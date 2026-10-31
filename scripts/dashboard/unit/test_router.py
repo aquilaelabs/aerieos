@@ -239,6 +239,18 @@ class Router(unittest.TestCase):
         self.assertIn("ollama/qwen2.5-coder:7b", [x["id"] for x in router.refresh_models("n1")["models"]])
         router.ollama_remove("n1", "qwen2.5-coder:7b")
         self.assertEqual(router.status("n1")["ollama"]["models"], [])
+        self.assertIn("a model is named", router.ollama_pull("n1", "--insecure")["error"], "a model name is never an option")
+        # A router that does not answer keeps the project allowed and says
+        # so: its key was handed to its sessions and still works there.
+        self.assertTrue(router.allow("n1", "app")["ok"])
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.assertIn("still allowed", router.disallow("n1", "app").get("error", ""))
+        self.assertIn("app", router.status("n1")["projects"])
+        self.srv = ThreadingHTTPServer(("127.0.0.1", self.port), FakeLiteLLM)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.addCleanup(self.srv.shutdown)
+        self.assertTrue(router.disallow("n1", "app")["ok"])
         # Not allowed any more; removed altogether.
         self.assertTrue(router.disallow("n1", "web")["ok"])
         self.assertEqual(router.for_project("web"), {})

@@ -11697,7 +11697,10 @@ class Handler(BaseHTTPRequestHandler):
                         if r.get("error"):
                             break
                     for p in sorted(have - want):
-                        router.disallow(nid, p)
+                        rr = router.disallow(nid, p)
+                        if rr.get("error"):
+                            r = rr
+                            break
                 if not r.get("error") and router.record(nid).get("deployed"):
                     r = router.apply(nid, containers, devactions, devapp, gpu) | {"saved": True}
             elif act == "install":

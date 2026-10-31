@@ -472,8 +472,15 @@ def disallow(nid, project):
     p = (rec.get("projects") or {}).get(str(project))
     if not p:
         return {"error": "not allowed there"}
-    with contextlib.suppress(Exception):
-        _api(nid, "/key/delete", {"keys": [_open(p.get("key"))]})
+    # The key was handed to the project's sessions, so the project is let go
+    # only once the router has deleted it: dropped from the record while the
+    # router was down, the key went on working with the page saying it was
+    # gone. A router no longer deployed holds no keys to delete.
+    if rec.get("deployed"):
+        try:
+            _api(nid, "/key/delete", {"keys": [_open(p.get("key"))]})
+        except Exception as e:                              # noqa: BLE001 (said to the person)
+            return {"error": f"{project} is still allowed: the router did not delete its key ({_why(e)}); try again once it answers"}
     with _lock:
         d = _load()
         (d.get(str(nid)) or {}).get("projects", {}).pop(str(project), None)
