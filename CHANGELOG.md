@@ -26,6 +26,7 @@
 - bb forge acts only on the repository a project was linked to: a session that points the project's origin at another repository is refused until it sets the remote back (353ec12)
 - Changing your password or removing a git token now shuts your key store at once, where the tokens it had opened went on working until its window ran out (4ffba79)
 - On the controller's own machine a job can no longer have the agent write over a system file through a link left in the VMs' folders (f0da796)
+- Changing the install key no longer loses the passwords of mounted shares, the keys of encrypted pools or the secret settings of tool packs, and the key before is kept until the next start has sealed everything again (67c73c3)
 
 ## 0.9.0: 2026-10-30
 
