@@ -429,13 +429,16 @@ jobs:
           # The notes are the tree's when it has them for this version
           # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
           # @TAG@, @VER@ and @REPO@ filled in, so the release is published with
-          # them rather than edited after.
+          # them rather than edited after. Otherwise they are the changelog's
+          # own section: Unreleased for a dev build, the version's for a release.
           ver="${TAG#v}"; base="${ver%%-dev.*}"
           notes="docs/release-notes/$base.md"; case "$TAG" in *-dev.*) notes="docs/release-notes/$base-dev.md";; esac
+          head="## $base:"; case "$TAG" in *-dev.*) head="## Unreleased";; esac
           if [ -f "$notes" ]; then
             sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" "$notes" > notes.md
           else
-            echo "BuilderBot $ver: see CHANGELOG.md." > notes.md
+            awk -v h="$head" 'index($0, h) == 1 {on = 1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
+            grep -q '[^[:space:]]' notes.md || echo "BuilderBot $ver: see CHANGELOG.md." > notes.md
           fi
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag "${pre[@]}" --title "$TAG" --notes-file notes.md
