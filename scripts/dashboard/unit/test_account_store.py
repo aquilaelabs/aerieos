@@ -101,7 +101,6 @@ class Store(unittest.TestCase):
     def test_the_key_before_stays_while_a_token_is_under_it_alone(self):
         # B548: a token the change could not seal again stayed under the key
         # before, which was dropped at once, and never opened again.
-        import base64
         old = accountkeys.key_of(UID)
         real = signing.seal
         def failing(data, key=None):
