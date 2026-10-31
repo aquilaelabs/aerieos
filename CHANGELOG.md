@@ -22,6 +22,7 @@
 - A project can no longer act on another project's VM whose machine name its own VM's name would share (foo's bar-web and foo-bar's web): the second name is refused on that node, and a node acts on a VM only for the project it was made for (a3b131a)
 - A VM's shared folder that is a link out of its project's folder is refused rather than shared, so a link to / no longer gives a VM the host's files (8d0a4f3)
 - Starting the controller with a mistyped install key no longer replaces every person's key store, which lost their git tokens for good once the right key was back (023d6be)
+- Setting or changing the install key no longer drops the people who gave a project their git token from it (9b48d7b)
 
 ## 0.9.0: 2026-10-30
 
