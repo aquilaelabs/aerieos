@@ -331,8 +331,12 @@ def seal_all(again=False):
         nonlocal n
         for k, v in list(m.items()):
             if isinstance(v, str) and v.startswith(SEALED):
-                m[k] = _keep(_open(v))
-                n += 1
+                # One that does not open stays sealed as it was, for the key
+                # it is under, never sealed again as nothing.
+                opened = _open(v)
+                if opened:
+                    m[k] = _keep(opened)
+                    n += 1
             elif isinstance(v, list):
                 for r in v:
                     if isinstance(r, dict):

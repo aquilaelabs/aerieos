@@ -661,21 +661,26 @@ def seal_all(again=False):
     n = 0
     with _lock:
         d = _load()
+        # A value that does not open (sealed under a key this controller does
+        # not hold) stays as it is for that key to open later, never sealed
+        # again as nothing: _open's "" for it erased every key.
+        def again_(m, k):
+            nonlocal n
+            v = _open(m.get(k))
+            if v:
+                m[k] = _keep(v)
+                n += 1
         for rec in d.values():
             for k in ("master", "dbpass"):
                 if rec.get(k):
-                    rec[k] = _keep(_open(rec[k]))
-                    n += 1
+                    again_(rec, k)
             for pid in list(rec.get("providers") or {}):
-                rec["providers"][pid] = _keep(_open(rec["providers"][pid]))
-                n += 1
+                again_(rec["providers"], pid)
             for c in rec.get("custom") or []:
                 if c.get("key"):
-                    c["key"] = _keep(_open(c["key"]))
-                    n += 1
+                    again_(c, "key")
             for p in (rec.get("projects") or {}).values():
-                p["key"] = _keep(_open(p.get("key")))
-                n += 1
+                again_(p, "key")
         if n:
             _save(d)
     return n

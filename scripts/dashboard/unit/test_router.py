@@ -185,6 +185,21 @@ class Router(unittest.TestCase):
         self.assertEqual([m["litellm_params"].get("api_base") for m in conf["model_list"] if m["model_name"] == "lab/*"],
                          ['https://lab.example/v1?a="b"'])
 
+    def test_a_key_sealed_under_another_install_key_is_kept_through_a_reseal(self):
+        # After the install key changed, a value the new key cannot open (no
+        # previous key at hand) stays sealed as it was; it was sealed again
+        # as nothing, erasing the key for good.
+        signing.MASTER = b"o" * 32
+        self.assertTrue(router.set_keys("n1", {"providers": {"anthropic": "sk-ant-old"}}).get("ok"))
+        was = json.load(open(os.path.join(self.tmp, "router.json")))["n1"]["providers"]["anthropic"]
+        signing.MASTER, signing.PREVIOUS = KEY, None
+        router.seal_all(again=True)
+        self.assertEqual(json.load(open(os.path.join(self.tmp, "router.json")))["n1"]["providers"]["anthropic"], was)
+        signing.MASTER, signing.PREVIOUS = KEY, b"o" * 32
+        self.assertGreaterEqual(router.seal_all(again=True), 1)
+        signing.PREVIOUS = None
+        self.assertIn("ANTHROPIC_API_KEY: \"sk-ant-old\"", router.compose_text("n1", router.record("n1")), "opened by the previous key, sealed again under today's")
+
     def test_deploy_allow_and_the_sessions_reach_it(self):
         self.assertIn("nothing behind it", router.deploy("n1", self.containers, self.devactions, self.devapp)["error"])
         router.set_keys("n1", {"providers": {"openai": "sk-x"}})
