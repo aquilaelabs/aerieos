@@ -225,6 +225,17 @@ def seal(pub, data, about=None):
     return _close(k, MAGIC1, head, data)
 
 
+def _exchange(me, pub):
+    """The shared secret, or Refused: cryptography raises ValueError for a
+    low-order point (an all-zero R a node could report), which no caller
+    catches, so one such seal stopped an account opening terminals on that
+    node (B551)."""
+    try:
+        return me.exchange(pub)
+    except ValueError as e:
+        raise Refused("a seal whose point gives no shared key") from e
+
+
 def key_for(a, R):
     """The key that opens a seal whose R is R, for the secret a: the
     controller's side, which alone can make it. A 32-byte secret and a
@@ -235,7 +246,7 @@ def key_for(a, R):
             raise Refused("a seal of the new kind, and the secret of the old")
         Rk = _pub2(R)
         me = X25519PrivateKey.from_private_bytes(a)
-        return _kdf(me.exchange(Rk), Rk.public_bytes_raw() + me.public_key().public_bytes_raw())
+        return _kdf(_exchange(me, Rk), Rk.public_bytes_raw() + me.public_key().public_bytes_raw())
     if isinstance(a, bytes):
         raise Refused("a seal of the old kind, and the secret of the new")
     Rn = element(R)
@@ -290,7 +301,7 @@ def unwrap(e, C, blob):
             raise Refused("a wrap of the new kind for a boot key of the old")
         Ck = _pub2(C)
         me = X25519PrivateKey.from_private_bytes(e)
-        w = _kdf(me.exchange(Ck), Ck.public_bytes_raw() + me.public_key().public_bytes_raw())
+        w = _kdf(_exchange(me, Ck), Ck.public_bytes_raw() + me.public_key().public_bytes_raw())
     else:
         if isinstance(e, bytes):
             raise Refused("a wrap of the old kind for a boot key of the new")

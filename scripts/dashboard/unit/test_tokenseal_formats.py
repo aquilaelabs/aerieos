@@ -35,6 +35,12 @@ class NodeSeals(unittest.TestCase):
         with self.assertRaises(ts.Refused):
             ts.open_with(ts.key_for(a, head["R"]), bytes(bad))
 
+    def test_a_point_that_gives_no_shared_key_is_refused(self):
+        # B551: an all-zero R raised ValueError, which no caller catches.
+        a = ts.secret(KEY, "n_1", "u_1")
+        with self.assertRaises(ts.Refused):
+            ts.key_for(a, "0" * 64)
+
     def test_the_old_seal_is_still_opened(self):
         a1 = ts.secret1(KEY, "n_1", "u_1")
         pub1 = ts.public(a1)
