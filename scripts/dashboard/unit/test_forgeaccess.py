@@ -238,3 +238,21 @@ class Dialects(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IssueList(Base):
+    def test_issues_behind_a_page_of_pull_requests_are_found(self):
+        # B562: GitHub lists pull requests among its issues; thirty asked for
+        # were thirty pull requests and no issue said.
+        prs = [{"number": n, "title": "pr", "state": "open", "pull_request": {"url": "x"}} for n in range(100)]
+        issues = [{"number": 200 + n, "title": "bug", "state": "open"} for n in range(5)]
+        pages = {1: prs, 2: issues}
+        asked = []
+        def call(t, method, path, data=None, raw=False):
+            asked.append(path)
+            page = int(path.rsplit("page=", 1)[1])
+            return 200, pages.get(page, []), {}
+        forgeaccess._call = call
+        got, code = forgeaccess.v_issue_list(self.t, {})
+        self.assertEqual((code, [i["number"] for i in got]), (200, [200, 201, 202, 203, 204]))
+        self.assertEqual(len(asked), 2)

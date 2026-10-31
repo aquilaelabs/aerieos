@@ -531,9 +531,21 @@ def v_issue_list(t, a):
     st = _text(a, "state") or "open"
     if st not in ("open", "closed", "all"):
         raise ValueError("--state: open, closed or all")
-    extra = "&type=issues&limit=30" if t["forge"]["kind"] == "gitea" else "&per_page=30"
-    c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}{extra}")
-    return _ok(c, b, lambda x: [_row_issue(i) for i in x if not i.get("pull_request")])
+    if t["forge"]["kind"] == "gitea":
+        c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}&type=issues&limit=30")
+        return _ok(c, b, lambda x: [_row_issue(i) for i in x])
+    # GitHub lists pull requests among its issues, so thirty asked for could
+    # be thirty pull requests and no issue said (B562): pages of a hundred,
+    # up to five, until thirty issues are in hand.
+    got = []
+    for page in range(1, 6):
+        c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}&per_page=100&page={page}")
+        if not 200 <= c < 300:
+            return _ok(c, b)
+        got += [_row_issue(i) for i in b or [] if not i.get("pull_request")]
+        if len(got) >= 30 or len(b or []) < 100:
+            break
+    return got[:30], 200
 
 
 def v_issue_view(t, a):
