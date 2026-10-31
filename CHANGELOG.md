@@ -25,6 +25,7 @@
 - Setting or changing the install key no longer drops the people who gave a project their git token from it (9b48d7b)
 - bb forge acts only on the repository a project was linked to: a session that points the project's origin at another repository is refused until it sets the remote back (353ec12)
 - Changing your password or removing a git token now shuts your key store at once, where the tokens it had opened went on working until its window ran out (4ffba79)
+- On the controller's own machine a job can no longer have the agent write over a system file through a link left in the VMs' folders (f0da796)
 
 ## 0.9.0: 2026-10-30
 
