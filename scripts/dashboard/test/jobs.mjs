@@ -229,12 +229,12 @@ await ready(page);
   await page.click('.jobstab [data-jbshow="failed"]');
   await page.waitForFunction(() => location.hash === '#/jobs/failed'
     && document.querySelector('.jobstab [data-jbshow="failed"].on'), null, { timeout: 10000 });
-  const states = await page.$$eval('.jobstab .jbrow', rs => [...new Set(rs.map(r => r.dataset.state))]);
+  const states = await page.$$eval('.jobstab .jbrow:not(.fghost)', rs => [...new Set(rs.map(r => r.dataset.state))]);
   ok(states.length === 1 && states[0] === 'failed',
      `the Failed chip lists the failed jobs alone, at #/jobs/failed (${states.join(', ')})`);
   await page.click('.jobstab [data-jbshow=""]');
   await page.waitForFunction(() => location.hash === '#/jobs'
-    && new Set([...document.querySelectorAll('.jobstab .jbrow')].map(r => r.dataset.state)).size > 1, null, { timeout: 10000 });
+    && new Set([...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => r.dataset.state)).size > 1, null, { timeout: 10000 });
   ok(true, '...and All puts every job back');
   // An address naming the chip opens the page on it: Home's "failed today".
   await page.evaluate(() => { location.hash = '#/jobs/failed'; });
@@ -250,7 +250,7 @@ await ready(page);
   });
   await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
   const today = await page.evaluate(() => ({
-    rows: [...document.querySelectorAll('.jobstab .jbrow')].map(r => [r.dataset.job, r.dataset.state]),
+    rows: [...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => [r.dataset.job, r.dataset.state]),
     chip: document.querySelector('.jobstab [data-jbshow="failed-today"] .pill')?.textContent,
     failed: document.querySelector('.jobstab [data-jbshow="failed"] .pill')?.textContent }));
   ok(today.rows.length && today.rows.every(([id, s]) => s === 'failed' && id !== 'j_yesterday')

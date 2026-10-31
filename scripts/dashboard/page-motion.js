@@ -371,7 +371,6 @@ function fadeThrough(pick, swap){
 // `items` the selector of what moves, each known by moveKey; `swap` is the
 // redraw. Only what is on screen on either side moves: a list of a hundred
 // rows animates the ones a person can see.
-const MOVE_EASE = "cubic-bezier(.2,.8,.2,1)";
 function moveKey(el){
   // A group's heading is its group's (the Library's kinds).
   const g = el.parentNode?.dataset?.libgroup;
@@ -384,6 +383,7 @@ function onScreen(r){
   return r.width && r.bottom > -40 && r.top < innerHeight + 40;
 }
 function chipMove(scope, items, swap){
+  const MOVE_EASE = "cubic-bezier(.2,.8,.2,1)";
   const list = () => [...(scope()?.querySelectorAll(items) || [])].filter(e => !e.classList.contains("fghost") && e.offsetParent);
   if (noMotion()) return swap();
   const before = new Map();
