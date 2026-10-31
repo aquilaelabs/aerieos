@@ -1097,6 +1097,15 @@ def _signed_out_everywhere(uid):
             logins.drop_all(uid)
     except ImportError:
         pass
+    # ...and the key store shut with them (B545): a window picked for eight
+    # hours went on handing out the person's tokens after a password change
+    # meant to stop exactly that.
+    try:
+        import unlocks                                      # noqa: PLC0415
+        if uid:
+            unlocks.lock(uid, why="signed out everywhere")
+    except ImportError:
+        pass
 
 
 def set_role(name, role):
