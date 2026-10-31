@@ -214,6 +214,10 @@ try:
     names = subprocess.run(["docker", "volume", "ls", "-q", "--filter", "label=com.docker.compose.project=" + old],
                            check=True, capture_output=True, text=True).stdout.split()
     have = set(subprocess.run(["docker", "volume", "ls", "-q"], check=True, capture_output=True, text=True).stdout.split())
+    # Every target checked, then every volume copied, and only then the old
+    # ones removed: one at a time, a failure on the second left the first
+    # copied and removed, the instance back on an empty one (B554).
+    plan = []
     for v in sorted(names):
         key = v[len(old) + 1:] if v.startswith(old + "_") else v
         target = f"{new}_{key}" if v.startswith(old + "_") else v
@@ -221,11 +225,22 @@ try:
             continue
         if target in have:
             raise SystemExit(f"a volume called {target} is already on this node: remove it first, or pick another name")
-        print(f"carrying the volume {v} to {target}", flush=True)
-        subprocess.run(["docker", "volume", "create", "--label", "com.docker.compose.project=" + new,
-                        "--label", "com.docker.compose.volume=" + key, target], check=True, capture_output=True)
-        subprocess.run(["docker", "run", "--rm", "-v", f"{v}:/v:ro", "-v", f"{target}:/w", helper,
-                        "sh", "-c", "cp -a /v/. /w/"], check=True)
+        plan.append((v, key, target))
+    made = []
+    try:
+        for v, key, target in plan:
+            print(f"carrying the volume {v} to {target}", flush=True)
+            subprocess.run(["docker", "volume", "create", "--label", "com.docker.compose.project=" + new,
+                            "--label", "com.docker.compose.volume=" + key, target], check=True, capture_output=True)
+            made.append(target)
+            subprocess.run(["docker", "run", "--rm", "-v", f"{v}:/v:ro", "-v", f"{target}:/w", helper,
+                            "sh", "-c", "cp -a /v/. /w/"], check=True)
+    except BaseException:
+        for target in made:
+            print(f"taking off the copy {target}", flush=True)
+            subprocess.run(["docker", "volume", "rm", target], check=False, capture_output=True)
+        raise
+    for v, _key, _target in plan:
         subprocess.run(["docker", "volume", "rm", v], check=True, capture_output=True)
 except BaseException:
     if moved:

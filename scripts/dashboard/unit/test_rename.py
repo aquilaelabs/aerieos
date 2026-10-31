@@ -140,7 +140,7 @@ fi
 if [ "$1 $2" = "volume create" ]; then exit 0; fi
 if [ "$1 $2" = "volume rm" ]; then exit 0; fi
 if [ "$1" = run ]; then
-  for a in "$@"; do case "$a" in *:/r) root="${a%:/r}" ;; *:/v:ro) [ -n "$FAILVOL" ] && exit 1 ;; esac; done
+  for a in "$@"; do case "$a" in *:/r) root="${a%:/r}" ;; *:/v:ro) [ -n "$FAILVOL" ] && exit 1; [ "$a" = "$FAILON:/v:ro" ] && exit 1 ;; esac; done
   [ -n "$root" ] || exit 0
   shift; while [ "$1" != sh ]; do shift; done; shift; shift
   cmd="$1"; shift
@@ -174,6 +174,17 @@ exit 0
         self.assertIn("putting the data directory back", r.stdout)
         self.assertTrue((self.root / "aquilaelabs" / "site.db").is_file(), "where it was")
         self.assertFalse((self.root / "aquilaelabs-dev").exists())
+
+    def test_a_failure_on_one_volume_removes_no_old_one(self):
+        # B554: one at a time, a failure on b left a copied and removed, the
+        # instance coming back on an empty a.
+        r = self.run_script(VOLS="aquilaelabs_a aquilaelabs_b", FAILON="aquilaelabs_b")
+        self.assertNotEqual(r.returncode, 0)
+        said = self.log.read_text()
+        self.assertNotIn("volume rm aquilaelabs_a", said)
+        self.assertNotIn("volume rm aquilaelabs_b", said)
+        self.assertIn("volume rm aquilaelabs-dev_a", said, "the copy made is taken back off")
+        self.assertTrue((self.root / "aquilaelabs" / "site.db").is_file())
 
     def test_a_target_with_files_is_refused_before_anything_moves(self):
         (self.root / "aquilaelabs-dev").mkdir()
