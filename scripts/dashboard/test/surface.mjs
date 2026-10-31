@@ -109,7 +109,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'sessionLabels', 'sessionOf', 'ask', 'askText', 'askYes', 'askQuestion', 'askYesWord', 'setArchived', 'setBadge', 'setLocked', 'setPinned',
   'setProjectPinned', 'shortUptime', 'shortUptime', 'shellCtx', 'show', 'showInStack', 'holdLeaving',
   'signIn', 'signOut', 'slideDetails',
-  'slideHidden', 'fadeIn', 'ghostOf', 'ghostOut', 'fadeThrough', 'slideMark', 'slidePanel', 'swapBox', 'startClaude', 'sendSure', 'launchClaude',   'openBrief', 'closeBrief', 'briefGo', 'pArchivePicked',
+  'slideHidden', 'fadeIn', 'ghostOf', 'ghostOut', 'fadeThrough', 'MOVE_EASE', 'moveKey', 'onScreen', 'chipMove', 'slideMark', 'slidePanel', 'swapBox', 'startClaude', 'sendSure', 'launchClaude',   'openBrief', 'closeBrief', 'briefGo', 'pArchivePicked',
   'tabLabel', 'tabLabels', 'tabTitle', 'untitle', 'untitleIn', 'untitleWatch', 'helpToggle', 'helpShow', 'helpHide', 'cLock', 'dmUnrouted', 'nodeDoorConfig', 'nginxUndeployed', 'resumePicker', 'toggleBell', 'toggleUiMenu', 'unveil', 'watchSignin', 'wireConsole', 'wireLogSection', 'wireJobsTab', 'wireNodeConf', 'wireNodesTab', 'wireMacros',
   'wireProjectRows'
 ];

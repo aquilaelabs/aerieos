@@ -587,7 +587,8 @@ function renderProjectsInto(i){
   const cb = el.querySelector("#pjChips");
   if (paint(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
-      fadeThrough(".pane .doc.on .projtab #pjGrid > *", () => { pjChip = c.dataset.pjchip; renderProjectsInto(i); }));
+      chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid > :not(.pgrid)",
+               () => { pjChip = c.dataset.pjchip; renderProjectsInto(i); }));
   const inChip = p => !pjChip || (pjChip === "none" ? !p.group : p.group === pjChip);
   const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;

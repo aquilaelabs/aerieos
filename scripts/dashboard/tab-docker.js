@@ -2880,7 +2880,8 @@ function renderDockerInto(i){
   // redraw from what is already here, nothing fetched and nothing saved.
   el.querySelectorAll("[data-dmchip]").forEach(c => c.onclick = () =>
     // ...the groups it leaves fading through, as a page does (fadeThrough).
-    fadeThrough(DM_PARTS, () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
+             () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
   dmViewWire(el, () => fadeThrough(DM_PARTS, () => { dockerRev++; drawPanes(); }));
   // The search redraws as it is typed, and keeps its focus and its caret
   // across the redraw, which replaces the box.

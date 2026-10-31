@@ -330,7 +330,8 @@ function nbRoadmapView({$, nb}){
                                {key: "shelved", label: "Shelved", count: parked}], nb.roadmapChip, "data-rmchip");
     if (paint($("roadmapChips"), chips, true))
       $("roadmapChips").querySelectorAll("[data-rmchip]").forEach(b => b.onclick = () => {
-        fadeThrough(() => [$("roadmapList")], () => { nb.roadmapChip = b.dataset.rmchip; redrawRoadmap(); }); });
+        chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp",
+                 () => { nb.roadmapChip = b.dataset.rmchip; redrawRoadmap(); }); });
     setHidden($("roadmapFind"), rows.length + finishedN < 2 && !nb.roadmapFind);
     // ...and by the release an item is meant for (the operator, 21 Oct): a
     // chip per target, oldest first, and No target; the Finished section
@@ -342,7 +343,7 @@ function nbRoadmapView({$, nb}){
     setHidden($("roadmapFilter"), !chips && !verChips);
     if (paint($("roadmapVers"), verChips, true))
       $("roadmapVers").querySelectorAll("[data-rmver]").forEach(b => b.onclick = () => {
-        fadeThrough(() => [$("roadmapList"), $("roadmapDoneList")], () => {
+        chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp, #roadmapDoneList > details.grp", () => {
           nb.roadmapVer = b.dataset.rmver; redrawRoadmap(); if (nb.roadmapDone) nb.drawFinished(); }); });
     const q = (nb.roadmapFind || "").trim().toLowerCase();
     const shown = r => (!nb.roadmapChip || (nb.roadmapChip === "shelved") === !!r.shelved) && rmVer(r, nb.roadmapVer) && rmMatch(r, q);

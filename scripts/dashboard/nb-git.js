@@ -431,7 +431,8 @@ function nbGitView({$, nb, project}){
     wireSections(body);
     wireMore(body);
     gitBranchShow(body);
-    body.querySelectorAll("[data-gbchip]").forEach(b => b.onclick = () => { gitBranchChip = b.dataset.gbchip; drawGit(); });
+    body.querySelectorAll("[data-gbchip]").forEach(b => b.onclick = () =>
+      chipMove(() => body, ".gbranch", () => { gitBranchChip = b.dataset.gbchip; drawGit(); }));
     const bf = $("gitBranchFind");
     if (bf) bf.oninput = () => { gitBranchFind = bf.value; gitBranchShow(body); };
     // A branch with work main lacks opens its comparison from its ⋯ or from

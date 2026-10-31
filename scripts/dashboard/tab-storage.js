@@ -844,9 +844,10 @@ function wireStorageTab(root){
   // Its sections fold as every page's do: one open at a time on a phone,
   // sliding, where they snapped and stood open together (B171).
   wireSections(root);
-  root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => {
+  root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => chipMove(
+    () => document.querySelector(".pane .doc.on .storagetab") || root, ".sect", () => {
     storageDisk = c.dataset.stdisk; storageRev++; drawPanes();
-  });
+  }));
   root.querySelectorAll("[data-stprune]").forEach(a => a.onclick = e => {
     e.preventDefault();
     sectOpen["docker:images"] = true;

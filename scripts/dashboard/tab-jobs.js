@@ -327,9 +327,9 @@ function renderJobsInto(i){
 }
 
 function wireJobsTab(root){
-  root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => {
-    jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync();
-  });
+  root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => chipMove(
+    () => document.querySelector(".pane .doc.on .jobstab") || root, ".jbrow",
+    () => { jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync(); }));
   // Every tail sits at its own bottom after a draw: the end is where the
   // reason is, the same rule the manager's compose log keeps.
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });

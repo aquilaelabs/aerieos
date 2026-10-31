@@ -143,7 +143,7 @@ function wireNotices(root){
     noticesAct({action: "clear", kind});
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>
-    fadeThrough(".pane .doc.on .ntlist", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () => noticesAct({action: "delete", id: b.dataset.ntdel}));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));

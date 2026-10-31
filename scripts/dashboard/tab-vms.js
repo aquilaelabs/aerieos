@@ -273,7 +273,8 @@ function wireVms(el){
   const s = el.querySelector("#vmSearch");
   if (s) s.oninput = () => { vmsSearch = s.value; const at = s.selectionStart; drawPanes();
     const n = document.querySelector("#vmSearch"); if (n){ n.focus(); n.setSelectionRange(at, at); } };
-  el.querySelectorAll("[data-vmchip]").forEach(c => c.onclick = () => { vmsChip = c.dataset.vmchip; drawPanes(); });
+  el.querySelectorAll("[data-vmchip]").forEach(c => c.onclick = () => chipMove(
+    () => el, ".row, .sect", () => { vmsChip = c.dataset.vmchip; drawPanes(); }));
   const np = el.querySelector("#vmPickNode");
   if (np) np.onchange = () => { vmsNode = np.value; drawPanes(); };
   el.querySelectorAll("[data-vmview]").forEach(b => b.onclick = () => {

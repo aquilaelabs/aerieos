@@ -362,6 +362,74 @@ function fadeThrough(pick, swap){
   fadeIn(now);
 }
 
+// A chip's press as a move (R192, the operator, 31 Oct): what the list holds
+// on both sides of the press slides from where it stood to where it stands
+// now, what the chip leaves out fades away where it was, and what it brings
+// in fades up in its place, so the eye follows the list rather than finding
+// it again. `scope` gives the box the list lives in (it outlives the redraw,
+// and a leaving copy is laid in it so the page's rules still dress it),
+// `items` the selector of what moves, each known by moveKey; `swap` is the
+// redraw. Only what is on screen on either side moves: a list of a hundred
+// rows animates the ones a person can see.
+const MOVE_EASE = "cubic-bezier(.2,.8,.2,1)";
+function moveKey(el){
+  // A group's heading is its group's (the Library's kinds).
+  const g = el.parentNode?.dataset?.libgroup;
+  if (g && el.matches(".libgname")) return `g:${g}`;
+  for (const a of el.attributes)
+    if (a.name.startsWith("data-") && a.value && !/^data-(state|kind|held|tail|skel|tiles)$/.test(a.name)) return `${a.name}=${a.value}`;
+  return (el.querySelector(".name, summary, code")?.textContent || el.textContent || "").trim().slice(0, 80);
+}
+function onScreen(r){
+  return r.width && r.bottom > -40 && r.top < innerHeight + 40;
+}
+function chipMove(scope, items, swap){
+  const list = () => [...(scope()?.querySelectorAll(items) || [])].filter(e => !e.classList.contains("fghost") && e.offsetParent);
+  if (noMotion()) return swap();
+  const before = new Map();
+  for (const el of list()){
+    const k = moveKey(el), r = el.getBoundingClientRect();
+    if (k && !before.has(k)) before.set(k, {el, r});
+  }
+  const out = swap();
+  const host = scope();
+  const kept = new Set();
+  let late = 0;
+  for (const el of list()){
+    const k = moveKey(el), was = before.get(k), r = el.getBoundingClientRect();
+    if (was && !kept.has(k)){
+      kept.add(k);
+      const dx = was.r.left - r.left, dy = was.r.top - r.top;
+      if ((dx || dy) && (onScreen(was.r) || onScreen(r)))
+        el.animate([{transform: `translate(${dx}px,${dy}px)`}, {transform: "none"}], {duration: 320, easing: MOVE_EASE});
+    } else if (onScreen(r)){
+      // Arriving one after another, a beat apart, as a store's shelf fills.
+      el.animate([{opacity: 0, transform: "scale(.96)"}, {opacity: 1, transform: "none"}],
+                 {duration: 240, delay: 110 + Math.min(late++, 8) * 18, fill: "backwards", easing: MOVE_EASE});
+    }
+  }
+  if (host) for (const [k, was] of before){
+    if (kept.has(k) || !onScreen(was.r)) continue;
+    const g = was.el.cloneNode(true);
+    g.classList.add("fghost");
+    g.removeAttribute("id");
+    g.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
+    g.inert = true;
+    g.setAttribute("aria-hidden", "true");
+    Object.assign(g.style, {position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
+                            width: `${was.r.width}px`, height: `${was.r.height}px`, pointerEvents: "none", zIndex: "1"});
+    host.appendChild(g);
+    const at = g.getBoundingClientRect();
+    g.style.left = `${(was.r.left - at.left).toFixed(1)}px`;
+    g.style.top = `${(was.r.top - at.top).toFixed(1)}px`;
+    const gone = () => g.remove();
+    g.animate([{opacity: 1, transform: "none"}, {opacity: 0, transform: "scale(.96)"}],
+              {duration: 180, easing: "ease-in", fill: "forwards"}).finished.then(gone, gone);
+    setTimeout(gone, 600);
+  }
+  return out;
+}
+
 // A change inside a project's card fades in what it brings to the face on
 // show (the operator, 26 Oct: a box opening on the card appeared with a cut):
 // the box opened, or the repositories coming back as it shuts. Only those,

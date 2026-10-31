@@ -248,7 +248,8 @@ function nbSigningView({$, nb, project}){
       + docSection("signing", "releases", "Releases", relStatus, relBody,
           {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""});
     wireSections($("sgBox"));
-    $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () => { keyPick = c.dataset.sgkey; drawSigning(); });
+    $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () =>
+      chipMove(() => $("sgBox"), ".sect", () => { keyPick = c.dataset.sgkey; drawSigning(); }));
     wire();
     nb.syncSave();
   }

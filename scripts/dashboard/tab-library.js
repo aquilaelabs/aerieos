@@ -456,8 +456,12 @@ function wireLibrary(root){
   if (q){
     q.oninput = () => { libQ = q.value; libRev++; drawPanes(); keepFocus(q); };
   }
-  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => { libKind = b.dataset.libkind; libRev++; drawPanes(); });
-  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => { libTier = b.dataset.libtier; libRev++; drawPanes(); });
+  // A chip rearranges the shelf (R192): the cards that stay slide to their
+  // places, the ones it leaves out fade away, the ones it brings fade up.
+  const shelf = () => document.querySelector(".pane .doc.on .librarytab");
+  const move = set => chipMove(shelf, ".lcard, .libgname", () => { set(); libRev++; drawPanes(); });
+  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => move(() => { libKind = b.dataset.libkind; }));
+  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => move(() => { libTier = b.dataset.libtier; }));
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
   const chk = root.querySelector("[data-libcheck]");
   if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking"); await tcAct("check"); await loadLibrary(); });
