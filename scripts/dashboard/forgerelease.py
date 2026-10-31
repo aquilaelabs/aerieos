@@ -194,7 +194,9 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
     req.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
         # The host is one of the two literals above, checked; the path is the repo's.
-        with urllib.request.urlopen(req, timeout=600) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        # Ten minutes for an upload, thirty seconds for anything else: a
+        # host that stopped answering held a page's lookup that long (B566).
+        with urllib.request.urlopen(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             raw = r.read(2_000_000)
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as e:
@@ -336,7 +338,7 @@ class _Forge:
         try:
             # The root is forges.api_base()'s, from a host its URL pattern
             # matched and a scheme of http or https, checked above.
-            with forges._OPENER.open(req, timeout=600) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            with forges._OPENER.open(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                 raw = r.read(2_000_000)
                 return json.loads(raw) if raw.strip() else {}
         except urllib.error.HTTPError as e:
