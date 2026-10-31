@@ -61,6 +61,22 @@ class AuthTest(unittest.TestCase):
         git("config", f"url.{self.bare}.insteadOf", URL, cwd=self.dest)
         projects.grant_push("app", "example.test", "owner/app", "token")
 
+    def test_bb_forge_asks_about_the_projects_own_repository_alone(self):
+        # B544: the tree's origin is a session's to rewrite; pointed at
+        # another repository on the host, bb forge took the project's token
+        # there. The repository on record is the one asked about, and an
+        # origin that disagrees with it is refused.
+        from unittest import mock
+        projects.grant_push("app", "github.com", "Owner/app", "token")
+        git("remote", "set-url", "origin", "https://github.com/Owner/app.git", cwd=self.dest)
+        with mock.patch.object(projects, "_stored_token", return_value="tok"):
+            t = projects.forge_target("app")
+            self.assertEqual((t.get("host"), t.get("repo")), ("github.com", "Owner/app"), t)
+            git("remote", "set-url", "origin", "https://github.com/Other/private.git", cwd=self.dest)
+            t = projects.forge_target("app")
+            self.assertIn("not its repository github.com/Owner/app", t.get("error", ""), t)
+            self.assertNotIn("token", t)
+
     def test_a_remote_it_can_read_and_push_says_so_and_pushes_nothing(self):
         j, code = projects.auth_test("app")
         self.assertEqual(code, 200)

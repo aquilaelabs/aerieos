@@ -2506,6 +2506,16 @@ def forge_target(name):
         return {"error": "this project has no access token: link one under its settings, Git"}
     if not repo:
         return {"error": "could not read the repository from this project's remote"}
+    # The repository the project was linked to, where it has one on record,
+    # is the one asked about: the tree's origin is a session's to rewrite,
+    # and pointed at another repository on the host it took the project's
+    # token there (B544). An origin that disagrees with it is refused.
+    rec = load_push().get(name) or {}
+    if rec.get("repo"):
+        if (str(rec.get("host") or host).lower(), str(rec["repo"]).lower()) != (str(host).lower(), str(repo).lower()):
+            return {"error": f"this project's origin names {host}/{repo}, not its repository {rec.get('host') or host}/{rec['repo']}: "
+                             "set the remote back (git remote set-url origin) before asking its git host"}
+        repo = rec["repo"]
     return {"forge": forge, "host": stored.get("host") or host, "repo": repo,
             "scheme": stored.get("scheme") or "https", "token": tok}
 
