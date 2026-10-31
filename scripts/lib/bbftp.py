@@ -83,7 +83,15 @@ class Asker:
                 self.out.flush()
                 line = self.inp.readline()
             except (OSError, ValueError):
-                return {}
+                line = ""
+            if not line:
+                # Its agent is gone (an exec keeps the pid, so the parent
+                # watch below never sees it): nobody can answer a login
+                # again, so the port goes back for the agent's next server
+                # rather than refusing everyone (B573).
+                sys.stderr.write("bb-ftpd: the agent's pipe closed; ending\n")
+                sys.stderr.flush()
+                os._exit(0)
         try:
             got = json.loads(line) if line else {}
         except ValueError:

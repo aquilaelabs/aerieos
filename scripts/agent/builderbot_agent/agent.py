@@ -922,6 +922,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # The sessions are tmux's and stay; the new agent opens terminals
         # from the bundle that is current, which is the point of updating.
         self.session_stop()
+        # The file-access servers are this process's, and an exec keeps its
+        # pid, so a bb-ftpd left running never sees its parent go: it held
+        # the port, refused every login with nobody left to ask, and the new
+        # agent's own could not bind it (B573).
+        self.ftp.stop_all()
         log("re-executing the new agent")
         if _COV_OUT:
             _cov_write()        # an exec runs no exit hook, and this process's counts are its own
