@@ -1041,7 +1041,7 @@ function pageHead({title = "", pills = "", facts = [], actions = "", cls = ""} =
   const grid = factGrid(facts, "pghfacts");
   if (!title && !pills && !grid && !actions) return "";
   return `<div class="field pghead${cls ? " " + esc(cls) : ""}">${
-    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? ` ${pills}` : ""}</div>` : ""}${grid}${
+    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${grid}${
     actions ? `<div class="actbar">${actions}</div>` : ""}</div>`;
 }
 
