@@ -736,34 +736,48 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 counts[top] = counts.get(top, 0) + 1
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir.parent / f"{state_dir.name}.moved-{stamp}"
-        # The state: what is here moved aside whole, the bundle's put in place.
-        if state_dir.exists():
-            os.rename(state_dir, aside)
-        shutil.move(str(work / "state"), str(state_dir))
-        # The stores, where the restored records name them (their paths may
-        # not exist on this machine: then under the state, and paths.py says
-        # so on the Storage page).
-        for kind_dir in (work / "stores").iterdir() if (work / "stores").is_dir() else []:
-            dest = (store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name)
-            dest = Path(dest)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.exists():
-                shutil.copytree(str(kind_dir), str(dest), symlinks=True, dirs_exist_ok=True)
-            else:
-                shutil.move(str(kind_dir), str(dest))
+        # The workspace and the secrets first, which do not need the state;
+        # the state swapped after, and anything failing from there on puts
+        # what was here back (B557): an error copying the workspace after
+        # the swap left the new state half restored, the old one aside and
+        # not said where.
         if (work / "workspace").is_dir():
             workspace_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
         if (work / "secrets").is_dir() and secrets_dir:
             secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
-        if (work / "install-key").is_file():
-            k = (work / "install-key").read_bytes()
-            keydir = state_dir / ".install-key"
-            keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            with open(keydir / "key", "wb") as f:
-                f.write(k)
-            os.chmod(keydir / "key", 0o600)
+        swapped = False
+        try:
+            # The state: what is here moved aside whole, the bundle's put in place.
+            if state_dir.exists():
+                os.rename(state_dir, aside)
+                swapped = True
+            shutil.move(str(work / "state"), str(state_dir))
+            # The stores, where the restored records name them (their paths may
+            # not exist on this machine: then under the state, and paths.py says
+            # so on the Storage page).
+            for kind_dir in (work / "stores").iterdir() if (work / "stores").is_dir() else []:
+                dest = (store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name)
+                dest = Path(dest)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if dest.exists():
+                    shutil.copytree(str(kind_dir), str(dest), symlinks=True, dirs_exist_ok=True)
+                else:
+                    shutil.move(str(kind_dir), str(dest))
+            if (work / "install-key").is_file():
+                k = (work / "install-key").read_bytes()
+                keydir = state_dir / ".install-key"
+                keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                with open(keydir / "key", "wb") as f:
+                    f.write(k)
+                os.chmod(keydir / "key", 0o600)
+        except (OSError, shutil.Error) as e:
+            if swapped:
+                shutil.rmtree(state_dir, ignore_errors=True)
+                os.rename(aside, state_dir)
+            return {"error": f"the restore stopped ({e}); "
+                             + ("the state that was here is back as it was" if swapped else "nothing of the state was changed")}
         # The move's own record, carried with the state: now the new home's,
         # which answers the nodes' knocks and knows where it came from.
         rec_path = state_dir / "move.json"

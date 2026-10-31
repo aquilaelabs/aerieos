@@ -131,6 +131,23 @@ class Move(unittest.TestCase):
         self.assertTrue(link.is_symlink() and os.readlink(link) == "README.md", "a link inside comes back a link")
         self.assertFalse(os.path.lexists(self.tmp / "new-ws" / "alpha" / "outside"), "one leading out is not restored")
 
+    def test_a_restore_that_fails_puts_the_state_back(self):
+        # B557: a failure after the swap left the new state half restored
+        # and the old one aside, unsaid.
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        (new_state / "fresh.json").write_text("{}")
+        self.configure(new_state, bare=True)
+        blocker = self.tmp / "a-file"
+        blocker.write_text("not a folder")
+        move.store_paths = lambda: {"gitrelay": str(blocker / "gitrelay")}
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertIn("back as it was", got.get("error", ""), got)
+        self.assertTrue((new_state / "fresh.json").is_file(), "the state that was here, in its place")
+        self.assertFalse((new_state / "users.json").exists())
+
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])
         r = move.prepare("user:ann", "")
