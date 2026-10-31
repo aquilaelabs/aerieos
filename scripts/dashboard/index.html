@@ -4014,6 +4014,14 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .pghead:has(> .actbar > :is(button, a.btn):only-child){display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--field-gap);align-items:start}
 .pghead:has(> .actbar > :is(button, a.btn):only-child) > *{grid-column:1}
 .pghead:has(> .actbar > :is(button, a.btn):only-child) > .actbar{grid-column:2;grid-row:1;margin:0;align-self:start}
+/* ...and at a desk a head whose actions are picks (the Audit page's Person
+   and Machine) keeps them beside its facts too, where they wrapped under
+   them onto a line of their own. */
+@media(min-width:901px){
+  .pghead:has(> .actbar > label.pick){display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--field-gap);align-items:start}
+  .pghead:has(> .actbar > label.pick) > *{grid-column:1}
+  .pghead:has(> .actbar > label.pick) > .actbar{grid-column:2;grid-row:1;margin:0;align-self:start}
+}
 .facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px var(--row-x);margin:4px 0 0}
 @media(max-width:900px){ .facts{grid-template-columns:minmax(0,1fr)} }
 .facts .fact{display:grid;grid-template-columns:minmax(5.5rem,auto) minmax(0,1fr);gap:0 8px;align-items:baseline;min-width:0}
@@ -6420,7 +6428,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <option value="9">9</option></select></label></div>
       <div class="hint">how many sessions of one agent a person may run here at once, each in a worktree of its own</div>
       <!-- Reference, not a setting: folded, opened by whoever wants it. -->
-      <details class="guards"><summary>How each agent is guarded</summary><div class="hint" id="rnAgentGuards"></div></details>
+      <details class="guards" data-sect="rn:guards"><summary>How each agent is guarded</summary><div class="hint" id="rnAgentGuards"></div></details>
     </div>
 </div></details>
     <details class="sect rngroup" data-sect="rn:yours"><summary><span class="t">Just for you</span></summary><div class="body">
