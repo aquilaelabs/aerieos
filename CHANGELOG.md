@@ -29,6 +29,7 @@
 - Changing the install key no longer loses the passwords of mounted shares, the keys of encrypted pools or the secret settings of tool packs, and the key before is kept until the next start has sealed everything again (67c73c3)
 - Moving or backing up the controller keeps the links in your repositories, which were dropped and then showed as deleted files (6ccf86c)
 - Replacing a file on a release keeps the old one until the new one is up, so a failed upload no longer leaves the release without it (5827373)
+- Renaming a container whose second volume fails to copy no longer leaves its first volume moved and the container on an empty one (0311d7e)
 
 ## 0.9.0: 2026-10-30
 
