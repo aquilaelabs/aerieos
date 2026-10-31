@@ -513,6 +513,12 @@ def edit_plan(project, tag, notes=None, attach=()):
             if t is None or t.returncode:
                 return {"error": f"{rel} is not committed: a release carries a build in dist/ or a file "
                                  "the project's history has, so what it shows can be found again"}
+            # ...as the history has it: a tracked file changed since was
+            # attached as it is now, which no commit holds (B564).
+            same = _tree_git(project, "diff", "--quiet", "HEAD", "--", rel)
+            if same is None or same.returncode:
+                return {"error": f"{rel} has changes not committed: commit them first, so what the release "
+                                 "carries is what the history has"}
         size = p.stat().st_size
         if size > ASSET_MAX:
             return {"error": f"{p.name} is {size // 1_000_000} MB, too big to attach"}

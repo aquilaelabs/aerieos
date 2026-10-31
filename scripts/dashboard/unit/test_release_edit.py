@@ -120,6 +120,12 @@ class Plan(Base):
                          [("app-0.5.4-dev.1-abc1234-release-signed.apk", True), ("shot.png", False)])
         self.assertEqual(p["files"][0]["size"], 1200)
 
+    def test_a_tracked_file_changed_since_its_commit_is_refused(self):
+        # B564: a committed screenshot changed since was attached as it is
+        # now, which no commit holds.
+        (self.app / "docs" / "shot.png").write_bytes(b"changed")
+        self.assertIn("not committed", fr.edit_plan("app", "v0.5.4", None, ["docs/shot.png"]).get("error", ""))
+
     def test_what_is_refused_before_anybody_is_asked(self):
         for attach, why in ((["loose.png"], "not committed"), (["../secret.txt"], "not a file in app"),
                             (["dist/app-0.5.4-dev.1-abc1234-dirty.apk"], "uncommitted changes"),
