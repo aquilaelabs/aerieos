@@ -20,6 +20,7 @@
 - A model router key containing a quote, a backslash or a dollar sign no longer breaks the router's compose file, and an endpoint address must be a single line (67651d4)
 - Taking a project off a node's model router while the router is down now says it could not, and keeps the project listed until the router has deleted its key, where it looked revoked while the key went on working (7397b39)
 - A project can no longer act on another project's VM whose machine name its own VM's name would share (foo's bar-web and foo-bar's web): the second name is refused on that node, and a node acts on a VM only for the project it was made for (a3b131a)
+- A VM's shared folder that is a link out of its project's folder is refused rather than shared, so a link to / no longer gives a VM the host's files (8d0a4f3)
 
 ## 0.9.0: 2026-10-30
 
