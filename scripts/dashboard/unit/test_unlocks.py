@@ -67,6 +67,20 @@ class Unlocks(unittest.TestCase):
         self.assertEqual(unlocks.status(UID)["open_tokens"], 0)
         self.assertEqual(unlocks.uses(UID)[0]["why"], "locked")
 
+    def test_signed_out_everywhere_or_a_token_removed_shuts_what_was_opened(self):
+        # B545: a password change (signed out everywhere) left the window
+        # open; B546: a token removed stayed opened until it ended.
+        import users
+        self.assertEqual(accountkeys.forge_line(UID, self.fid, why="push"), LINE)
+        self.assertEqual(unlocks.status(UID)["open_tokens"], 1)
+        users._signed_out_everywhere(UID)
+        self.assertEqual(unlocks.status(UID)["open_tokens"], 0)
+        self.assertEqual(unlocks.uses(UID)[0]["why"], "signed out everywhere")
+        self.assertEqual(accountkeys.forge_line(UID, self.fid, why="push"), LINE)
+        self.assertTrue(accountkeys.unlink_forge(UID, self.fid))
+        self.assertEqual(unlocks.status(UID)["open_tokens"], 0)
+        self.assertEqual(unlocks.uses(UID)[0]["why"], "a token removed")
+
     def test_a_key_of_the_persons_own(self):
         before = accountkeys.status(UID)["fingerprint"]
         secret = bytes(range(32))

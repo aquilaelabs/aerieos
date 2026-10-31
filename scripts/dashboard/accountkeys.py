@@ -418,6 +418,10 @@ def unlink_forge(uid, fid):
         if fs.pop(str(fid), None) is None:
             return False
         statefile.write_json(_secrets_file(), sd, mode=0o600)
+    # What was opened of it goes with it, its handouts shredded (B546): a
+    # leaked token removed on Profile stayed opened and handed out until
+    # the window ended.
+    unlocks.lock(uid, why="a token removed")
     return True
 
 
