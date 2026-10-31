@@ -546,7 +546,7 @@ function tcDriverLine(m){
     case "update": return `<span class="sub warn">${esc(m.installed)} is installed and takes over from ${esc(m.loaded)} when the machine restarts.${nodesBtn}</span>`;
     case "leaving": return `<span class="sub warn">removed; it keeps the card until the machine restarts, when nouveau takes it back.${nodesBtn}</span>`;
     case "nocard": return `<span class="sub warn">installed, but this machine has no NVIDIA card now: it tries for one at every boot and fills the console with "No NVIDIA GPU found". Remove it unless the card is coming back.</span>`;
-    default: return `<span class="sub where on">installed, and running the card</span>`;
+    default: return `<span class="sub where on">installed and in use</span>`;
   }
 }
 // One option's words: the version first, since that is what is being

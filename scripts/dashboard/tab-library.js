@@ -146,7 +146,7 @@ function libState(r){
     if (!m.managed) return w("installed by hand on this machine", "");
     // A newer version of what is here is the news, whatever runs the card now.
     if (m.here && m.newer && st !== "nocard" && st !== "leaving") return w("update available", "warn");
-    if (r.name === "nvidia-driver") return st === "absent" ? w("") : st === "loaded" ? w("running the card", "ok")
+    if (r.name === "nvidia-driver") return st === "absent" ? w("") : st === "loaded" ? w("installed and in use", "ok")
       : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
     return st === "absent" ? w("") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");

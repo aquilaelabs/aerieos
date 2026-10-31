@@ -82,7 +82,7 @@ source the machine has publishes one, since apt has no separate label for
 it. The pulldown is live only while no driver is installed: one branch at a
 time, so another version means removing this one first. The row reads where
 the driver stands from the census (not installed, installed and waiting for
-a restart, running the card, removed but still loaded). A guest machine's
+a restart, installed and in use, removed but still loaded). A guest machine's
 driver is its owner's, so there the row says so and offers nothing. Nothing
 else installs the driver: not enrolling a node, and not the emulator's GPU
 display, which needs the driver and says so until it is there. The install

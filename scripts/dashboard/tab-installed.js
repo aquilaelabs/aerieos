@@ -109,7 +109,7 @@ function instState(r){
   if (r.machine){
     const m = r.machine, st = m.state;
     if (!m.managed) return w("installed by hand on this machine");
-    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("running the card", "ok")
+    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("installed and in use", "ok")
       : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
     return st === "absent" ? w("not installed") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");

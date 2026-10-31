@@ -3462,15 +3462,15 @@ ok(page.errors.length === 0,
     await hello(shed, { sandbox: true, gpu_card: card, gpu_driver: { ...apt, installed: '595.91.07', loaded: '595.91.07', bound: 'nvidia',
       package: 'nvidia-driver-595', pkg_version: '595.91.07-0ubuntu1', candidate: '595.91.07-0ubuntu1' } });
     await page.evaluate(() => loadLibrary());
-    await page.waitForFunction(sel => /running the card/.test(document.querySelector(sel + ' .pcacts .state')?.textContent || ''), DRV, { timeout: 20000 });
+    await page.waitForFunction(sel => /installed and in use/.test(document.querySelector(sel + ' .pcacts .state')?.textContent || ''), DRV, { timeout: 20000 });
     const inst = await page.$eval(DRV, e => ({ dead: e.querySelector('#libDrvSel').disabled, why: saidOf(e.querySelector('#libDrvSel')),
       val: e.querySelector('#libDrvSel').value, install: !!e.querySelector('[data-libact="install"]') }));
     ok(inst.dead && /remove it first to install another version/.test(inst.why) && inst.val === 'nvidia-driver-595' && !inst.install,
        `installed, its version pick is ghosted on the installed branch and says to remove it first, with no Install (${inst.val}; ${inst.why})`);
     await page.evaluate(id => openThing(id, 'toolchain:nvidia-driver'), shed.id);
-    await page.waitForFunction(sel => /installed, and running the card/.test(document.querySelector(sel + ' .idetail')?.textContent || ''), IDRV, { timeout: 20000 });
-    ok(await page.$eval(IDRV, e => e.querySelector('.pghead .state')?.textContent.trim() === 'running the card' && !!e.querySelector('[data-instact="remove"]')),
-       '...and the Installed page\'s row says it is running the card, with Remove');
+    await page.waitForFunction(sel => /installed and in use/.test(document.querySelector(sel + ' .idetail')?.textContent || ''), IDRV, { timeout: 20000 });
+    ok(await page.$eval(IDRV, e => e.querySelector('.pghead .state')?.textContent.trim() === 'installed and in use' && !!e.querySelector('[data-instact="remove"]')),
+       '...and the Installed page\'s row says it is installed and in use, with Remove');
     const swap = await napi('/api/toolchains', { action: 'install', names: ['nvidia-driver'], driver: 'nvidia-driver-610', node: shed.id });
     ok(/nvidia-driver-595 is installed.*remove it first/.test(swap.error || ''), `...and the server holds the same rule (${swap.error})`);
     // A newer version of the installed branch: said on the card, which
