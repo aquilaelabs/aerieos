@@ -3,8 +3,10 @@ import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import threading
+import time
 from .base import hello_again, log
 from .toolchains import sdk_env
 
@@ -48,7 +50,7 @@ class FtpServers:
                      "port": p["port"], "addr": p.get("addr", "")} for n, p in self.procs.items()]
         self.agent.ctl.call("ftp", {"servers": rows}, timeout=15)
 
-    def _start(self, name, port, root):
+    def _start(self, name, port, root, again=True):
         rec = {"proc": None, "port": port, "root": root, "why": ""}
         env = dict(sdk_env(self.agent.state))
         try:
@@ -90,12 +92,63 @@ class FtpServers:
             rec["why"] = (tail[-1] if tail else "bb-ftpd ended at once")[:200]
             with contextlib.suppress(OSError):
                 proc.kill()
+            # The port held by a bb-ftpd an agent before this one started (an
+            # update execs in place, so it is still this process's child) and
+            # never stopped (B573): it refuses every login with nobody to
+            # ask. It is ended and the start tried once more.
+            if again and "in use" in rec["why"] and self._end_strays(port):
+                return self._start(name, port, root, again=False)
             return rec
         rec["proc"] = proc
         threading.Thread(target=self._relay, args=(name, proc), name=f"ftp-{name}", daemon=True).start()
         threading.Thread(target=self._drain, args=(name, proc), name=f"ftp-log-{name}", daemon=True).start()
         log(f"ftp: {name} on {bind}:{port}")
         return rec
+
+    def _end_strays(self, port):
+        """Ends this process's own bb-ftpd children on `port`, or on a port
+        whose data span meets it, that it does not know of: the ones an
+        earlier agent in this pid started. True when one was ended."""
+        me, known = os.getpid(), {p["proc"].pid for p in self.procs.values() if p.get("proc")}
+        ended = []
+        for d in os.listdir("/proc"):
+            if not d.isdigit() or int(d) in known:
+                continue
+            try:
+                with open(f"/proc/{d}/stat") as f:
+                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+                with open(f"/proc/{d}/cmdline", "rb") as f:
+                    argv = f.read().split(b"\0")
+            except (OSError, ValueError, IndexError):
+                continue
+            if ppid != me or not any(a.endswith(b"bb-ftpd") for a in argv[:2]):
+                continue
+            # Its port and the nine after it for data (bbftp.PASSIVE): one
+            # whose span meets this port's holds it too.
+            try:
+                theirs = int(argv[argv.index(b"--port") + 1])
+            except (ValueError, IndexError):
+                continue
+            if abs(theirs - port) >= 10:
+                continue
+            with contextlib.suppress(OSError):
+                os.kill(int(d), signal.SIGTERM)
+                ended.append(int(d))
+        for pid in ended:
+            for _ in range(30):
+                try:
+                    if os.waitpid(pid, os.WNOHANG)[0]:
+                        break
+                except ChildProcessError:
+                    break
+                time.sleep(0.1)
+            else:
+                with contextlib.suppress(OSError):
+                    os.kill(pid, signal.SIGKILL)
+                with contextlib.suppress(ChildProcessError):
+                    os.waitpid(pid, 0)
+            log(f"ftp: ended a bb-ftpd an earlier agent left on port {port} (pid {pid})")
+        return bool(ended)
 
     def _relay(self, name, proc):
         """Each login asked of the controller, its answer handed back."""

@@ -18,7 +18,7 @@
 
 ### Fixed
 
-- A project's FTP access keeps working after its node's agent updates itself, where the old server held the port and refused every login while the new one could not start (Address already in use). A node already in that state needs its agent updated to this version, or its old bb-ftpd ended by hand
+- A project's FTP access keeps working after its node's agent updates itself, where the old server held the port and refused every login while the new one could not start (Address already in use). A node already in that state mends itself once its agent is updated: the agent ends the old server it finds on the port and starts its own
 - The Windows companion's .exe starts again, where it stopped at once with No module named bbcompanion.__main__ because its build left the app's own package out
 - A node no longer goes quiet for good after its agent's token changes: two of its calls carrying a new token at the same moment left it with a token that expired three minutes on, and its agent was turned away until the node was enrolled again. A node shut out that way comes back by itself at its next call (6058f86)
 - A node whose agent is being turned away now says so on its row and on the bell, with the reason and that enrolling it again is the way back, where its row said only quiet
