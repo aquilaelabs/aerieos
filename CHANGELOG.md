@@ -17,6 +17,7 @@
 ### Fixed
 
 - A git token given for a host with a port (a self-hosted Gitea on :3000) matches its project's remote again: one kept with the port's colon written as %3a was never found by the remote's host, and read that way on the Keys page (2868b53)
+- A model router key containing a quote, a backslash or a dollar sign no longer breaks the router's compose file, and an endpoint address must be a single line (67651d4)
 
 ## 0.9.0: 2026-10-30
 
