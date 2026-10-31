@@ -587,6 +587,11 @@ def _said(rel, notes, urls, attached, replaced, skipped):
     return {"url": rel, "notes": notes is not None, "attached": attached, "replaced": replaced, "skipped": skipped}
 
 
+# The name a replacing file is uploaded under before the one it replaces is
+# taken off and it is named for it.
+_TMP = "replacing-"
+
+
 def _ctype(name):
     return mimetypes.guess_type(name)[0] or "application/octet-stream"
 
@@ -602,15 +607,20 @@ def _github_edit(project, repo, token, tag, notes, files):
     for x in files:
         p = WORKSPACE / project / x["path"]
         try:
-            if x["name"] in have:
-                _req("DELETE", f"{base}/assets/{int(have[x['name']]['id'])}", token)
-                replaced.append(x["name"])
+            # The new file first, under a name of its own, and only then the
+            # old one gone and the new one named for it (B560): deleted
+            # first, a failed upload left the release without the file.
+            old = have.get(x["name"])
             got = _req("POST", f"{UPLOADS}/repos/{repo}/releases/{int(rel['id'])}/assets"
-                               f"?name={urllib.parse.quote(x['name'])}", token,
+                               f"?name={urllib.parse.quote(_TMP + x['name'] if old else x['name'])}", token,
                        data=p.read_bytes(), ctype=_ctype(x["name"]))
+            if old:
+                _req("DELETE", f"{base}/assets/{int(old['id'])}", token)
+                got = _req("PATCH", f"{base}/assets/{int(got['id'])}", token, {"name": x["name"]})
+                replaced.append(x["name"])
             urls[x["name"]] = (got or {}).get("browser_download_url") or ""
             attached.append(x["name"])
-        except (Refused, OSError) as e:
+        except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
         _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls)})
@@ -628,15 +638,19 @@ def _gitea_edit(f, at, project, tag, notes, files):
     attached, replaced, skipped = [], [], []
     for x in files:
         try:
-            if x["name"] in have:
-                f.ask("DELETE", f"{base}/{int(rel['id'])}/assets/{int(have[x['name']]['id'])}")
-                replaced.append(x["name"])
-            data, ctype = _multipart("attachment", x["name"], (WORKSPACE / project / x["path"]).read_bytes())
-            got = f.ask("POST", f"{base}/{int(rel['id'])}/assets?name={urllib.parse.quote(x['name'])}",
+            # As on GitHub (B560): the new file in, then the old one out.
+            old = have.get(x["name"])
+            up = _TMP + x["name"] if old else x["name"]
+            data, ctype = _multipart("attachment", up, (WORKSPACE / project / x["path"]).read_bytes())
+            got = f.ask("POST", f"{base}/{int(rel['id'])}/assets?name={urllib.parse.quote(up)}",
                         data=data, ctype=ctype)
+            if old:
+                f.ask("DELETE", f"{base}/{int(rel['id'])}/assets/{int(old['id'])}")
+                got = f.ask("PATCH", f"{base}/{int(rel['id'])}/assets/{int(got['id'])}", {"name": x["name"]})
+                replaced.append(x["name"])
             urls[x["name"]] = (got or {}).get("browser_download_url") or ""
             attached.append(x["name"])
-        except (Refused, OSError) as e:
+        except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
         f.ask("PATCH", f"{base}/{int(rel['id'])}", {"body": _with_assets(notes, urls)})
@@ -657,13 +671,20 @@ def _gitlab_edit(f, at, project, tag, notes, files):
     for x in files:
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(x['name'])}"
         try:
-            if x["name"] in links:
-                f.ask("DELETE", f"/projects/{pid}/releases/{t}/assets/links/{int(links[x['name']]['id'])}")
-                replaced.append(x["name"])
+            # The package first (B560): a failed upload leaves the link and
+            # what it serves as they were. A link already at this address
+            # serves the new file now and stays.
             f.ask("PUT", path, data=(WORKSPACE / project / x["path"]).read_bytes(), ctype="application/octet-stream")
-            f.ask("POST", f"/projects/{pid}/releases/{t}/assets/links",
-                  {"name": x["name"], "url": f.base + path,
-                   "link_type": "image" if re.search(r"\.(png|jpe?g|gif|webp)$", x["name"], re.I) else "package"})
+            old = links.get(x["name"])
+            if old and old.get("url") == f.base + path:
+                replaced.append(x["name"])
+            else:
+                if old:
+                    f.ask("DELETE", f"/projects/{pid}/releases/{t}/assets/links/{int(old['id'])}")
+                    replaced.append(x["name"])
+                f.ask("POST", f"/projects/{pid}/releases/{t}/assets/links",
+                      {"name": x["name"], "url": f.base + path,
+                       "link_type": "image" if re.search(r"\.(png|jpe?g|gif|webp)$", x["name"], re.I) else "package"})
             urls[x["name"]] = f.base + path
             attached.append(x["name"])
         except (Refused, OSError) as e:
