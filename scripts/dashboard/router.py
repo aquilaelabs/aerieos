@@ -86,7 +86,7 @@ def pack():
                           "help": "on this node's card where it has one, else its CPU and memory; its models one more provider (ollama/NAME)"},
                          {"name": "projects", "label": "Projects that may use it", "kind": "projects",
                           "help": "each handed the address and its own key at a session's start; a session of any other project cannot reach it"}]}
-MODEL_RE = re.compile(r"^[A-Za-z0-9._:/-]{1,120}$")
+MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
 
 def configure(**deps):
