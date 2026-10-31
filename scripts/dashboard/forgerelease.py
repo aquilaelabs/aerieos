@@ -255,7 +255,7 @@ def _github(project, tag, version, sha, comp=""):
         return {"error": why, "forge": "GitHub"}
     base = f"{API}/repos/{repo}/releases"
     try:
-        have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag)}", token)
+        have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
         if have:
             _keep(project, tag, have.get("html_url") or "")
             return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": [],
@@ -363,7 +363,7 @@ def _gitea(f, at, project, tag, version, sha, title, body):
     not there, and each build attached to it as a multipart upload."""
     owner, _, repo = at["path"].partition("/")
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases"
-    have = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag)}")
+    have = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}")
     if have:
         return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": []}
     # Gitea takes a pushed tag into its database on a queue, a moment after
@@ -399,8 +399,8 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
     links rather than files: each build goes into the generic package
     registry under the version, and the release links to it there."""
     pid = urllib.parse.quote(at["path"], safe="")
-    web = f"{f.base.split('/api/')[0]}/{at['path']}/-/releases/{urllib.parse.quote(tag)}"
-    have = f.ask("GET", f"/projects/{pid}/releases/{urllib.parse.quote(tag)}")
+    web = f"{f.base.split('/api/')[0]}/{at['path']}/-/releases/{urllib.parse.quote(tag, safe="")}"
+    have = f.ask("GET", f"/projects/{pid}/releases/{urllib.parse.quote(tag, safe="")}")
     if have:
         return {"url": ((have.get("_links") or {}).get("self") or web), "made": False, "assets": [], "skipped": []}
     rel = f.ask("POST", f"/projects/{pid}/releases", {"tag_name": tag, "name": title, "description": body})
@@ -417,7 +417,7 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(p.name)}"
         try:
             f.ask("PUT", path, data=p.read_bytes(), ctype="application/octet-stream")
-            f.ask("POST", f"/projects/{pid}/releases/{urllib.parse.quote(tag)}/assets/links",
+            f.ask("POST", f"/projects/{pid}/releases/{urllib.parse.quote(tag, safe="")}/assets/links",
                   {"name": p.name, "url": f.base + path, "link_type": "package"})
             up.append(p.name)
         except Refused as e:
@@ -587,7 +587,7 @@ def _ctype(name):
 
 def _github_edit(project, repo, token, tag, notes, files):
     base = f"{API}/repos/{repo}/releases"
-    rel = _req("GET", f"{base}/tags/{urllib.parse.quote(tag)}", token)
+    rel = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
     if not rel:
         raise Refused(f"there is no release for {tag} on GitHub to edit: bb version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
@@ -614,7 +614,7 @@ def _github_edit(project, repo, token, tag, notes, files):
 def _gitea_edit(f, at, project, tag, notes, files):
     owner, _, repo = at["path"].partition("/")
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases"
-    rel = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag)}")
+    rel = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}")
     if not rel:
         raise Refused(f"there is no release for {tag} on {f.entry['name']} to edit: bb version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
@@ -639,7 +639,7 @@ def _gitea_edit(f, at, project, tag, notes, files):
 
 def _gitlab_edit(f, at, project, tag, notes, files):
     pid = urllib.parse.quote(at["path"], safe="")
-    t = urllib.parse.quote(tag)
+    t = urllib.parse.quote(tag, safe="")
     rel = f.ask("GET", f"/projects/{pid}/releases/{t}")
     if not rel:
         raise Refused(f"there is no release for {tag} on GitLab to edit: bb version release makes one")
@@ -707,7 +707,7 @@ def _handle(project):
 
 def _files_on(kind, name, ctx, tag):
     """(release url, {file name: (id, size)}) of the release for `tag`."""
-    t = urllib.parse.quote(tag)
+    t = urllib.parse.quote(tag, safe="")
     if kind == "github":
         repo, token = ctx
         rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{t}", token)
