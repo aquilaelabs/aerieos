@@ -30,6 +30,7 @@
 - Moving or backing up the controller keeps the links in your repositories, which were dropped and then showed as deleted files (6ccf86c)
 - Replacing a file on a release keeps the old one until the new one is up, so a failed upload no longer leaves the release without it (5827373)
 - Renaming a container whose second volume fails to copy no longer leaves its first volume moved and the container on an empty one (0311d7e)
+- A controller restore that fails partway puts the state that was there back and says so, where it left a half-restored controller (75a483a)
 
 ## 0.9.0: 2026-10-30
 
