@@ -366,6 +366,27 @@ class Relocate(unittest.TestCase):
         self.assertIn("no container", relocate.start("alpha", "nope", "move", "n3")["error"])
 
 
+
+class OneAtATime(unittest.TestCase):
+    def test_a_second_press_while_the_first_starts_is_refused(self):
+        # B555: the check and the mark were apart, so two presses both started.
+        import threading
+        from unittest import mock
+        go, inside = threading.Event(), threading.Event()
+        def slow(*a, **k):
+            inside.set()
+            go.wait(5)
+            return {"ok": True}
+        with mock.patch.object(relocate, "start_", side_effect=slow):
+            t = threading.Thread(target=relocate.start, args=("web", "main", "move", "n2"))
+            t.start()
+            inside.wait(5)
+            self.assertIn("already being copied or moved", relocate.start("web", "main", "move", "n3")["error"])
+            go.set()
+            t.join()
+            self.assertEqual(relocate.start("web", "main", "move", "n3"), {"ok": True})
+
+
 if __name__ == "__main__":
     unittest.main()
 

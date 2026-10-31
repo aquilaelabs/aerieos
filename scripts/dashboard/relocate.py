@@ -362,7 +362,27 @@ def builds_image(project, instance):
     return bool(re.search(r"^\s+build:", text, re.M))
 
 
+# The instances whose copy or move is being started now: the check that one
+# is relocating and the mark that it is were apart, with a question to the
+# old node between them, so two presses at once both started (B555).
+_starting, _starting_lock = set(), threading.Lock()
+
+
 def start(project, instance, mode, node, name="", env=None, data="unpack"):
+    """start_ (below), one at a time for an instance."""
+    key = (str(project), str(instance))
+    with _starting_lock:
+        if key in _starting:
+            return {"error": "it is already being copied or moved"}
+        _starting.add(key)
+    try:
+        return start_(project, instance, mode, node, name, env, data)
+    finally:
+        with _starting_lock:
+            _starting.discard(key)
+
+
+def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     """Copy (mode "copy", into a new instance called `name`) or move (mode
     "move", the same instance) an instance to `node`, its data with it, its
     env written from `env` when one is given; `data` says whether the data
