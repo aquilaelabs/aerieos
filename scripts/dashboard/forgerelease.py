@@ -803,7 +803,10 @@ def remove(project, plan):
             elif kind == "gitlab":
                 f, at = ctx
                 pid = urllib.parse.quote(at["path"], safe="")
-                f.ask("DELETE", f"/projects/{pid}/releases/{urllib.parse.quote(plan['tag'])}/assets/links/{got[0]}")
+                f.ask("DELETE", f"/projects/{pid}/releases/{urllib.parse.quote(plan['tag'], safe='')}/assets/links/{got[0]}")
+                # ...and the file the link served (B561): the link gone, the
+                # package registry still handed the build out.
+                _gl_pkg_drop(f, pid, project, plan["tag"], x["name"])
             else:
                 f, at = ctx
                 owner, _, repo = at["path"].partition("/")
@@ -820,6 +823,35 @@ def remove_said(r):
         return f"nothing removed: {r['error']}"
     return (f"removed from the release on {r.get('forge')}: {', '.join(r.get('removed') or []) or 'nothing'}"
             + (f"; not done: {'; '.join(r['skipped'])}" if r.get("skipped") else "") + f"; {r.get('url')}")
+
+
+def _gl_pkg(project, tag):
+    """The generic package a release's builds are kept in on GitLab: the
+    project's name and the tag's version, in GitLab's charset."""
+    pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"
+    ver = re.sub(r"[^A-Za-z0-9._+-]", "-", re.sub(r"^(?:.*-)?v(?=\d)", "", tag)) or "0"
+    return pkg, ver
+
+
+def _gl_pkg_drop(f, pid, project, tag, name=None):
+    """The release's package deleted, or its file called `name`; how many."""
+    pkg, ver = _gl_pkg(project, tag)
+    got = f.ask("GET", f"/projects/{pid}/packages?package_type=generic&package_name={urllib.parse.quote(pkg, safe='')}"
+                       f"&package_version={urllib.parse.quote(ver, safe='')}")
+    n = 0
+    for pk in got if isinstance(got, list) else []:
+        if pk.get("name") != pkg or pk.get("version") != ver:
+            continue
+        if name is None:
+            f.ask("DELETE", f"/projects/{pid}/packages/{int(pk['id'])}")
+            n += 1
+            continue
+        files = f.ask("GET", f"/projects/{pid}/packages/{int(pk['id'])}/package_files")
+        for pf in files if isinstance(files, list) else []:
+            if pf.get("file_name") == name:
+                f.ask("DELETE", f"/projects/{pid}/packages/{int(pk['id'])}/package_files/{int(pf['id'])}")
+                n += 1
+    return n
 
 
 # ---- withdrawing a release, its tag with it --------------------------------
@@ -887,6 +919,11 @@ def withdraw(project, tag):
         if rel:
             p["call"]("DELETE", p["by_id"] + str(int(rel["id"])) if p["by_id"] else p["rel"])
             out["release"] = True
+        if kind == "gitlab":
+            # GitLab keeps a release's builds in its package registry, which
+            # deleting the release leaves serving them (B561).
+            f, at = ctx
+            out["packages"] = _gl_pkg_drop(f, urllib.parse.quote(at["path"], safe=""), project, tag)
         if p["call"]("GET", p["ref"]):
             p["call"]("DELETE", p["unref"])
             out["tagged"] = True

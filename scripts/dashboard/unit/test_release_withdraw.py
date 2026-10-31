@@ -67,5 +67,29 @@ class Withdraw(unittest.TestCase):
         self.assertNotIn(("GET", f"{API}/git/refs/tags/v1.0.0-dev.5"), f.calls)
 
 
+
+class GitLabPackages(unittest.TestCase):
+    def test_a_withdrawn_release_takes_its_builds_from_the_package_registry(self):
+        # B561: the release and its tag went, and the package registry went
+        # on serving the build.
+        calls = []
+        class F:
+            def ask(self, method, path, body=None, data=None, ctype=None):
+                calls.append((method, path))
+                if method == "GET" and "/releases/" in path:
+                    return {"tag_name": "v1.2.0"}
+                if method == "GET" and "/repository/tags/" in path:
+                    return {"name": "v1.2.0"}
+                if method == "GET" and "/packages?" in path:
+                    return [{"id": 5, "name": "app", "version": "1.2.0"}, {"id": 6, "name": "app", "version": "1.1.0"}]
+                return {}
+        ctx = (F(), {"path": "grp/app"})
+        with mock.patch.object(forgerelease, "_handle", return_value=("gitlab", "GitLab", ctx)):
+            r = forgerelease.withdraw("app", "v1.2.0")
+        self.assertEqual(r.get("packages"), 1, r)
+        self.assertIn(("DELETE", "/projects/grp%2Fapp/packages/5"), calls)
+        self.assertNotIn(("DELETE", "/projects/grp%2Fapp/packages/6"), calls, "another version's stays")
+
+
 if __name__ == "__main__":
     unittest.main()
