@@ -576,6 +576,21 @@ class Agent(unittest.TestCase):
         self.assertEqual(fr.feed(frame[:5]), [])
         self.assertEqual(fr.feed(frame[5:]), [(2, payload)])
 
+    def test_a_shared_folder_is_where_it_really_is_and_the_projects_own(self):
+        # B541: virtiofsd serves a link's target as root, so a link to / in
+        # the project's tree gave its VM the host; the agent resolves the
+        # path, keeps it inside the project's folder, and writes the target.
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        links = {"/workspace/web/root": "/", "/workspace/web/other": "/workspace/api", "/workspace/web/data": "/workspace/web/store/data"}
+        real = lambda p: links.get(p, p)
+        with mock.patch.object(hw.os.path, "realpath", side_effect=real):
+            self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/root"}}, 2, 2048, project="web")[1])
+            self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/other"}}, 2, 2048, project="web")[1])
+            self.assertIn("project's own", hw.clean({"share": {"path": "/workspace/api/x"}}, 2, 2048, project="web")[1])
+            got, why = hw.clean({"share": {"path": "/workspace/web/data"}}, 2, 2048, project="web")
+            self.assertEqual((why, got["share"]["path"]), ("", "/workspace/web/store/data"))
+
     def test_a_vm_s_hardware_lands_in_its_domain_and_reads_back(self):
         # R100: what clean() lets through, apply() writes, and read() finds
         # again, so the row says what the VM has.

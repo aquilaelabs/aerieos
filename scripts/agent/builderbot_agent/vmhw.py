@@ -240,8 +240,9 @@ def usb_refresh(xml, kept, usb):
     return ET.tostring(root, encoding="unicode") if moved else None
 
 
-def clean(hw, vcpus, mem_mb):
-    """The record as it may be applied, or (None, why)."""
+def clean(hw, vcpus, mem_mb, project=""):
+    """The record as it may be applied, or (None, why). `project`, where the
+    job names it, is the one whose folder a shared folder must be in."""
     hw = hw if isinstance(hw, dict) else {}
     out = {}
     if hw.get("cpuset") is not None:
@@ -263,8 +264,17 @@ def clean(hw, vcpus, mem_mb):
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
         if sh:
             path = os.path.normpath(str(sh.get("path") or ""))
-            if not path.startswith("/workspace/") or ".." in path.split("/"):
+            parts = path.split("/")
+            if not path.startswith("/workspace/") or ".." in parts or len(parts) < 3 or (project and parts[2] != project):
                 return None, "a shared folder is one of the project's own, under /workspace"
+            # Where it really is: virtiofsd serves a link's target as root,
+            # so a link to / or to another project's folder in the project's
+            # tree gave the VM that (B541). Resolved, inside the project's own
+            # folder, and the resolved path is what the domain is given.
+            root, real = os.path.realpath("/workspace/" + parts[2]), os.path.realpath(path)
+            if real != root and not real.startswith(root + "/"):
+                return None, f"{path} leads out of the project's folder, to {real}"
+            path = real
             tag = str(sh.get("tag") or "project")
             if not TAG_RE.fullmatch(tag):
                 return None, "a shared folder's tag is a short lowercase name"

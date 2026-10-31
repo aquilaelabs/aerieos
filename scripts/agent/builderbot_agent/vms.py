@@ -752,7 +752,7 @@ class VmsMixin:
         text = domain_xml(name, project, vcpus, mem, disk, seed, str(spec.get("network") or ""), boot, fw,
                           nvram, lan, extra=extra, installer=bool(iso), mac=mac, vnc_pw=vnc_pw)
         # Its hardware beyond size (R100), where New VM gave any.
-        hw, why = vmhw.clean(spec.get("hw"), vcpus, mem)
+        hw, why = vmhw.clean(spec.get("hw"), vcpus, mem, project=str(spec.get("project") or ""))
         if hw is None or (hw and not self._vm_hw_ok(job, hw)):
             if why:
                 job.say(f"refused: {why}\n")
@@ -890,7 +890,7 @@ class VmsMixin:
         m_v = re.search(r"<vcpu[^>]*>(\d+)</vcpu>", xml)
         cur = re.search(r"<currentMemory unit='KiB'>(\d+)</currentMemory>", xml) or re.search(r"<memory unit='KiB'>(\d+)</memory>", xml)
         vcpus, mem = int(m_v.group(1)) if m_v else 1, int(cur.group(1)) // 1024 if cur else 1024
-        hw, why = vmhw.clean(spec.get("hw"), vcpus, mem)
+        hw, why = vmhw.clean(spec.get("hw"), vcpus, mem, project=str(spec.get("project") or ""))
         if hw is None:
             job.say(f"refused: {why}\n")
             return "failed", 64
