@@ -172,6 +172,19 @@ class Controller(unittest.TestCase):
         self.assertIn("share its machine name (bbvm-web-db-x) with web's db-x", r.get("error", ""), r)
         self.assertEqual(self.f.jobs[0][2]["project"], "web")
 
+    def test_remove_waits_for_a_create_still_going(self):
+        # B553: Remove while the create still ran dropped the record and the
+        # create then made a VM nobody had; a create that stalled may still
+        # be cleared.
+        self.assertTrue(self.new().get("ok"))
+        jid = vms._load()["vms"]["web/db"]["job"]
+        states = {jid: "running"}
+        vms.job_get = lambda j, with_log=True: {"id": j, "state": states[j]}
+        self.addCleanup(setattr, vms, "job_get", None)
+        self.assertIn("still being made", vms.act("user:test", "web", "db", "remove").get("error", ""))
+        states[jid] = "failed"
+        self.assertNotIn("still being made", vms.act("user:test", "web", "db", "remove").get("error", ""))
+
     def test_a_report_from_before_a_vm_was_made_is_an_earlier_vms(self):
         # Made again under a name an earlier VM had: the node's report, taken
         # before, describes that one (B319), and its address is nobody's now.

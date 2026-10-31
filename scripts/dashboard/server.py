@@ -4611,7 +4611,7 @@ vms.configure(state=STATE, write_json=write_json, node=nodes.node, node_list=nod
               job_add=nodes.job_add, audit=db.audit, prefs_get=prefs.get, nodes_rev=nodes.rev,
               enroll_script=nodes.enroll_script,
               node_retire=lambda by, nid: nodes.node_state(by, nid, "retired"),
-              node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail)
+              node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail, job_get=nodes.job)
 nodes.on_done("vm", vms.vm_done)
 # ...run as an administrator's, since the asks go to the administrators
 # alone and Allow is theirs (R116): a device passed through lands.

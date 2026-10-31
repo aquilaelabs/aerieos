@@ -67,11 +67,15 @@ _seen = {"nodes": None, "sig": 0}
 
 
 def configure(*, state, write_json, node, node_list, job_add, audit, prefs_get, nodes_rev=lambda: 0,
-              enroll_script=None, node_retire=None, node_mark=None, node_discard=None, job_tail=None):
+              enroll_script=None, node_retire=None, node_mark=None, node_discard=None, job_tail=None,
+              job_get=None):
     globals().update(STATE=Path(state), write_json=write_json, node=node, node_list=node_list,
                      job_add=job_add, audit=audit, prefs_get=prefs_get, nodes_rev=nodes_rev,
                      enroll_script=enroll_script, node_retire=node_retire, node_mark=node_mark,
-                     node_discard=node_discard, job_tail=job_tail)
+                     node_discard=node_discard, job_tail=job_tail, job_get=job_get)
+
+
+job_get = None
 
 
 def _why(job, fallback):
@@ -740,6 +744,13 @@ def act(principal, project, name, action, req=None):
             return {"error": f"{project} has no VM called {name}"}
         if rec.get("state") in ("making", "removing") and action != "remove":
             return {"error": f"{name} is {rec['state']}: wait for that to end"}
+        # Remove clears a create that stalled, but not one still going: the
+        # agent found nothing to remove, the record went, and the create
+        # then made a VM nobody had on record (B553).
+        if action == "remove" and rec.get("state") == "making" and job_get and rec.get("job"):
+            j = job_get(rec["job"], with_log=False) or {}
+            if j.get("state") in ("queued", "assigned", "running"):
+                return {"error": f"{name} is still being made (job {rec['job']}): wait for it to end, or cancel it on the Jobs page"}
         n = node(rec["node"]) or {}
         if not n.get("live"):
             return {"error": f"{n.get('name') or rec['node']}'s agent is not dialing in, so nothing from here reaches {name}"}
