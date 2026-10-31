@@ -412,9 +412,11 @@ function renderLibraryInto(i){
   if (LIB_STANDS[libKind] && !all.some(LIB_STANDS[libKind])) libKind = "";
   const inKind = r => !libKind || (LIB_STANDS[libKind] ? LIB_STANDS[libKind](r) : libGroup(r) === libKind);
   const tierRows = all.filter(inKind);
-  // A kind whose cards come from one source alone draws no source chips, so
-  // a source picked before is let go rather than narrowing out of sight.
-  if (libTier && LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2) libTier = "";
+  // A kind whose cards come from one source alone draws no source chips,
+  // and a source the kind has none from draws none: a source picked before
+  // is let go then rather than narrowing out of sight.
+  if (libTier && (LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2
+                  || !tierRows.some(r => r.tier === libTier))) libTier = "";
   const kindRows = all;
   const rows = all.filter(r => libMatch(r, libQ) && inKind(r) && (!libTier || r.tier === libTier));
   const inst = all.filter(r => r.installed).length, due = all.filter(r => r.update).length;
