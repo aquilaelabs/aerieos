@@ -197,7 +197,15 @@ def _tar_tree(tar, src, arc, leave=()):
         rel = p.relative_to(src)
         if rel.parts and rel.parts[0] in leave:
             continue
-        if p.is_symlink() or not (p.is_file() or p.is_dir()):
+        # A link goes as a link, never followed (a repository's committed
+        # links, node_modules/.bin): skipped, a moved repository showed them
+        # deleted and a commit -a deleted them for good (B556). The restore
+        # takes back only one that stays inside what it restores.
+        if p.is_symlink():
+            tar.add(str(p), arcname=f"{arc}/{rel.as_posix()}", recursive=False)
+            n += 1
+            continue
+        if not (p.is_file() or p.is_dir()):
             continue
         if p.is_file():
             tar.add(str(p), arcname=f"{arc}/{rel.as_posix()}", recursive=False)
@@ -712,10 +720,18 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     counts = {}
     try:
         with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
+            safe_links = hasattr(tarfile, "data_filter")
             for info in tar.getmembers():
-                if not info.isfile() or info.name.startswith("/") or ".." in Path(info.name).parts:
+                if info.name.startswith("/") or ".." in Path(info.name).parts:
                     continue
-                tar.extract(info, path=str(work), filter="data") if hasattr(tarfile, "data_filter") else tar.extract(info, path=str(work))
+                # A link only where the data filter can check it: it refuses
+                # one that is absolute or leads out of what is restored.
+                if not (info.isfile() or (info.issym() and safe_links)):
+                    continue
+                try:
+                    tar.extract(info, path=str(work), filter="data") if safe_links else tar.extract(info, path=str(work))
+                except tarfile.FilterError:
+                    continue
                 top = Path(info.name).parts[0]
                 counts[top] = counts.get(top, 0) + 1
         stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -732,15 +748,15 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             dest = Path(dest)
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.exists():
-                shutil.copytree(str(kind_dir), str(dest), dirs_exist_ok=True)
+                shutil.copytree(str(kind_dir), str(dest), symlinks=True, dirs_exist_ok=True)
             else:
                 shutil.move(str(kind_dir), str(dest))
         if (work / "workspace").is_dir():
             workspace_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(work / "workspace"), str(workspace_dir), dirs_exist_ok=True)
+            shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
         if (work / "secrets").is_dir() and secrets_dir:
             secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            shutil.copytree(str(work / "secrets"), str(secrets_dir), dirs_exist_ok=True)
+            shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
         if (work / "install-key").is_file():
             k = (work / "install-key").read_bytes()
             keydir = state_dir / ".install-key"

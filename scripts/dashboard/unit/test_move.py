@@ -113,6 +113,24 @@ class Move(unittest.TestCase):
         self.assertIn("moved already", move.prepare("user:ann", "https://x.example")["error"])
         self.assertIn("not withdrawn", move.forget("user:ann")["error"])
 
+    def test_a_repositorys_links_move_as_links_and_one_leading_out_stays_behind(self):
+        # B556: links were skipped, so a moved repository showed them deleted.
+        import os
+        (self.ws / "alpha" / "README.md").write_text("hi\n")
+        os.symlink("README.md", self.ws / "alpha" / "README")
+        os.symlink("/etc/passwd", self.ws / "alpha" / "outside")
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        self.assertTrue(r.get("ok"), r)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        self.configure(new_state, bare=True)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        link = self.tmp / "new-ws" / "alpha" / "README"
+        self.assertTrue(link.is_symlink() and os.readlink(link) == "README.md", "a link inside comes back a link")
+        self.assertFalse(os.path.lexists(self.tmp / "new-ws" / "alpha" / "outside"), "one leading out is not restored")
+
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])
         r = move.prepare("user:ann", "")
