@@ -112,7 +112,8 @@ try {
   ok(now !== FIRST && /^[0-9a-f]{64}$/.test(now), 'Change writes a new key to the key folder');
   // The one before is kept until the next start has sealed everything again
   // with both (B550); what the change sealed opens under the new key alone.
-  ok(!after.install.saved && after.install.previous, `...not saved yet, and the one before kept until the next start (${JSON.stringify(after.install)})`);
+  ok(!after.install.saved && after.install.previous && !(after.install.left || []).length,
+     `...not saved yet, every store sealed again, and the one before kept until the next start (${JSON.stringify(after.install)})`);
   const resealed = execFileSync('python3', ['-c', `
 import os, sys; sys.path.insert(0, ${JSON.stringify(DASH)})
 import gitcreds, signing

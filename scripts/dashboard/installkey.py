@@ -106,7 +106,7 @@ def status():
         # "yes" means INSTALL_KEY can be taken out and nothing changes.
         out["adopted"] = os.environ.get("BB_INSTALL_KEY_ADOPTED") or "no"
     out.update(fingerprint=fp, changeable=w != "env", made=a.get("made", 0), changed=a.get("changed", 0),
-               saved=a.get("saved") == fp, previous=signing.PREVIOUS is not None,
+               saved=a.get("saved") == fp, previous=signing.PREVIOUS is not None, left=list(a.get("left") or []),
                previous_on_nodes=int(on_nodes_previous() if on_nodes_previous and signing.PREVIOUS else 0))
     return out
 
@@ -159,16 +159,18 @@ def change(new=""):
         _write(d / "key-previous", signing.MASTER)
         _write(d / "key", key)
         signing.load_master()
-        moved, left = 0, 0
+        moved, failed = 0, []
         for p in reseal:
             # One that fails is run again at the next start (settle), the
-            # key before kept for it; the rest go on.
+            # key before kept for it; the rest go on, and the page says which.
             try:
                 moved += p(again=True) or 0
             except Exception:                               # noqa: BLE001 (said, and settled at the next start)
-                left += 1
+                failed.append(p)
+        left = len(failed)
         a = _about()
         a.pop("saved", None)
+        a["left"] = [getattr(p, "__module__", "") or getattr(p, "__name__", "") for p in failed]
         a["changed"] = int(time.time())
         a.setdefault("made", a["changed"])
         _save_about(a)
@@ -196,6 +198,9 @@ def settle():
                 clean = False
         if clean:
             _drop_previous()
+            a = _about()
+            if a.pop("left", None) is not None:
+                _save_about(a)
     return moved
 
 
