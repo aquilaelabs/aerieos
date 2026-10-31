@@ -923,6 +923,24 @@ def rotate_token(node_id):
     return bearer
 
 
+def _refused(node_id, why):
+    """A node's agent turned away, kept on its row so the page says why it
+    is quiet (B569): the agent asked every five minutes for two days with
+    its token expired while the Nodes page said only quiet. Written at most
+    once a minute; its next good hello takes it off."""
+    n = node(node_id) if node_id else None
+    if not n:
+        return
+    ag = dict(n.get("agent") or {})
+    was = ag.get("refused") if isinstance(ag.get("refused"), dict) else {}
+    now = int(time.time())
+    if was.get("why") == why and now - int(was.get("at") or 0) < 60:
+        return
+    ag["refused"] = {"at": now, "why": why, "since": int(was.get("since") or now) if was.get("why") == why else now}
+    _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), node_id))
+    _bump()
+
+
 def _token_reused(t):
     """A retired token presented after its grace: every token of the node
     revoked, and the bell told, with when and from where."""
@@ -976,9 +994,12 @@ def authenticate(bearer):
     elif kind == "node" and t["revoked"] == TOKEN_RETIRED:
         if not (t["expires"] and t["expires"] >= time.time()):
             _token_reused(t)
+            _refused(t["node_id"], "credential revoked")
             return {"error": "credential revoked"}
         t = dict(t, revoked=0, expires=None)
     if t["revoked"]:
+        if kind == "node":
+            _refused(t["node_id"], "credential revoked")
         return {"error": "credential revoked" if kind == "node"
                 else "enrollment token already used"}
     # A node's live token has no expiry (only an enroll token's TTL and a
@@ -4378,6 +4399,13 @@ def token_attention():
         ru = (n.get("agent") or {}).get("token_reuse")
         if isinstance(ru, dict) and ru.get("at"):
             out.append({"kind": "token-reuse", "node": n["name"], "id": n["id"], "at": int(ru["at"])})
+    # ...and one whose agent is being turned away (B569), not merely quiet:
+    # it says why, and that enrolling it again is the way back.
+    for n in node_list():
+        rf = (n.get("agent") or {}).get("refused")
+        if n.get("state") != "retired" and isinstance(rf, dict) and rf.get("at"):
+            out.append({"kind": "node-refused", "node": n["name"], "id": n["id"], "at": int(rf["at"]),
+                        "since": int(rf.get("since") or rf["at"]), "why": str(rf.get("why") or "")})
     return out
 
 
@@ -4412,6 +4440,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     ag.update({"version": str(version)[:40], "digest": str(digest)[:80],
                "addr": addr, "last_seen": int(time.time()),
                })
+    ag.pop("refused", None)
     # Why an idle session's token was not refreshed here, said by the agent
     # that tried (B419).
     kc = keep_clean(keep)

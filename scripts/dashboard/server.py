@@ -1687,6 +1687,8 @@ def _att_words(a):
         return ("A role of yours requires two-factor sign-in" if a.get("required") else "Turn on two-factor sign-in", "")
     if k == "token-read":
         return (f"A sign-in on {node} was read", f"{a.get('comm') or 'a process'} opened it")
+    if k == "node-refused":
+        return (f"{node}'s agent is turned away", f"{a.get('why') or 'its credential'}: enroll it again from the Nodes page")
     if k == "token-reuse":
         return (f"{node}'s credential was used from a copy", "every token of that node is revoked")
     if k == "acme":

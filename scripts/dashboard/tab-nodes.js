@@ -1885,7 +1885,8 @@ function ndRowHtml(n){
         </div>
         <div class="sub ndtest" hidden></div>` : "";
     const health = docSection("nodes", "health", ndTitle("health"),
-      n.kind === "agent" ? (n.live ? "live" : "quiet") : "", `
+      n.kind === "agent" ? (n.live ? "live" : n.agent?.refused?.at
+        ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "quiet") : "", `
         ${nodeMeters(n) || `<div class="empty">nothing measured yet</div>`}
         ${nodeCharts(n)}
         <div class="ndhmore">

@@ -17,6 +17,8 @@
 
 ### Fixed
 
+- A node no longer goes quiet for good after its agent's token changes: two of its calls carrying a new token at the same moment left it with a token that expired three minutes on, and its agent was turned away until the node was enrolled again. A node shut out that way comes back by itself at its next call (6058f86)
+- A node whose agent is being turned away now says so on its row and on the bell, with the reason and that enrolling it again is the way back, where its row said only quiet
 - A git token given for a host with a port (a self-hosted Gitea on :3000) matches its project's remote again: one kept with the port's colon written as %3a was never found by the remote's host, and read that way on the Keys page (2868b53)
 - A model router key containing a quote, a backslash or a dollar sign no longer breaks the router's compose file, and an endpoint address must be a single line (67651d4)
 - Taking a project off a node's model router while the router is down now says it could not, and keeps the project listed until the router has deleted its key, where it looked revoked while the key went on working (7397b39)

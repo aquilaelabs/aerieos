@@ -67,6 +67,15 @@ class Rotation(unittest.TestCase):
         rows = [r for r in nodes.token_attention() if r["kind"] == "token-reuse"]
         self.assertEqual([r["id"] for r in rows], [self.nid])
 
+    def test_a_node_turned_away_says_so_until_it_is_back(self):
+        # B569: the page said quiet for two days while the agent was refused.
+        nodes._exec("UPDATE tokens SET revoked = 1 WHERE node_id = ?", (self.nid,))
+        self.assertEqual(nodes.authenticate(self.first), {"error": "credential revoked"})
+        rows = [r for r in nodes.token_attention() if r["kind"] == "node-refused"]
+        self.assertEqual([(r["id"], r["why"]) for r in rows], [(self.nid, "credential revoked")])
+        self.hello(rotates=False)
+        self.assertFalse([r for r in nodes.token_attention() if r["kind"] == "node-refused"])
+
     def test_a_pending_one_never_used_is_dropped_at_the_next(self):
         a = self.hello()["token"]
         b = self.hello()["token"]

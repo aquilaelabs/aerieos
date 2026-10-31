@@ -331,6 +331,16 @@ function attRow(a){
   }
   // A node's retired token presented again after its grace (R135 step 4): a
   // copy of its credential is in use somewhere, and its tokens are revoked.
+  // A node whose agent is turned away (B569): it is running and asking, and
+  // the controller will not take its credential, so it is quiet for good.
+  if (a.kind === "node-refused"){
+    return `<div class="bnote att bad">
+      <div class="bt">${esc(a.node)}'s agent is turned away</div>
+      <div class="bsum">it is running and asking, and the controller refuses it (${esc(a.why || "its credential")}) since ${esc(ago(a.since))}: enroll it again from the Nodes page (Enroll script, run on that machine)</div>
+      <div class="bfoot"><span>${esc(ago(a.at))}</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
+  }
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
       <div class="bt">${esc(a.node)}'s credential was used from a copy</div>
