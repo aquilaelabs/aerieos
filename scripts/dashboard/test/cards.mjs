@@ -1786,9 +1786,9 @@ await page.click('#rnCancel');
   const where = await page.evaluate(v => ({ ship: [...document.querySelectorAll('.pane .nb .nbsub [data-in="ship"]')].map(b => b.dataset.v).join(),
     sect: !!document.querySelector('details.rngroup[data-sect="rn:signing"]'), hash: location.hash,
     head: (document.querySelector(`${v} #sgHint`)?.textContent || '').replace(/\s+/g, ' ').trim(),
-    empty: document.querySelector(`${v} .sghead`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
+    empty: document.querySelector(`${v} > .nbhead > .nbsaidslot`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
   ok(where.ship === 'artifacts,docker,vms,signing' && !where.sect && /\/projects\/alpha\/signing$/.test(where.hash)
-     && where.head === '' && /Keys\s*none yet/.test(where.empty),
+     && where.head === '' && /no key yet/.test(where.empty),
      `the keys are the notebook's Signing view, last in Ship, at its own address, no tiles over its head, and the settings have no signing section (${JSON.stringify(where)})`);
   const signRows = await page.$$eval(`${V} .rnsign[data-key]`, rs => rs.map(r => r.firstElementChild.textContent.trim()));
   // ...under the backup password's line, the project's owner's to set (the

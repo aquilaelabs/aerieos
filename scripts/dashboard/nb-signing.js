@@ -130,11 +130,11 @@ function nbSigningView({$, nb, project}){
     // ...and under them how the controller keeps them (R111 step 2).
     // With none held, the words that say so share the control row with its
     // buttons, as the other views' status lines do (a button never on a
-    // line of its own).
+    // line of its own), short enough to keep the row one control high.
     viewGlance($("sgHint"), !held ? [] : [
       {label: held === 1 ? "key" : "keys", value: held},
       {label: mappedN === 1 ? "app" : "apps", value: mappedN, omit: !mappedN}],
-      !held ? (why ? "" : "no key yet: bb sign signs this project's builds on its node with the keys kept here, and a session never sees one")
+      !held ? (why ? "" : "no key yet: bb sign uses the ones kept here")
         : AT_REST[atRest] || "", "", held ? {open: "warn", locked: "bad"}[atRest] || "" : "");
     // Import a backup and New key, the view's adds, the control row's
     // actions with New key the primary (a-notebook/views, R109), the form
