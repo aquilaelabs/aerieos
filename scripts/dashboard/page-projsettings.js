@@ -808,17 +808,6 @@ function rnFolds(){
 // Withdraw act on the press, as the actions they are.
 let rnPeople = null, rnPeopleDraft = {};
 
-// The Git view's session dials, read here with the rest of what a session
-// may do and set on the Git view (R255 step 7).
-function rnDrawGitPol(name){
-  // A project on the defaults carries no gitpol: read as the Git view does.
-  const pol = (state?.projects || []).find(p => p.name === name)?.prefs?.gitpol || {};
-  setHidden($("rnGitPolField"), rnMode === "git");
-  setText($("rnGitPol"), `its branches ${pol.push || "allow"} · to main ${pol.main || "deny"} · a sensitive push ${
-    (pol.scan || "hold") === "hold" ? "held for you" : "not held"}`);
-  $("rnGitPolGo").onclick = () => { closeRename(); openNotebook(name, "git"); };
-}
-
 // `keep`: read again in place, and drawn only when nothing there is being
 // changed, so a staged owner or Invite only is not put back under the hand.
 function rnLoadPeople(name, keep = false){
@@ -827,7 +816,6 @@ function rnLoadPeople(name, keep = false){
     $("rnPeopleField").hidden = true;
     setHidden($("rnPeopleField").closest("details"), true);
   }
-  rnDrawGitPol(name);
   if (rnMode === "git") return;
   postJSON("/api/members", {action: "view", project: name})
     .then(r => r.json())

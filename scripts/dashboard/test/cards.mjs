@@ -1760,11 +1760,12 @@ ok(await page.$eval('#rnPeopleField', f => f.closest('details')?.dataset.sect ==
    && await page.$eval('.rnbar[data-rnbar="project"] [data-rnsave]', b => b.disabled),
    '...in a People section of its own, whose Save it wakes and The project\'s not');
 await page.click('#rnInviteOnly');
-// ...and Agents may reads the Git view's session dials too, set there.
-const gp = await page.evaluate(() => ({ text: document.getElementById('rnGitPol')?.textContent, hidden: document.getElementById('rnGitPolField')?.hidden,
-  sect: document.getElementById('rnGitPolField')?.closest('details')?.dataset.sect, pol: (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.gitpol }));
-ok(/its branches allow · to main deny · a sensitive push held for you/.test(gp.text || '') && !gp.hidden && gp.sect === 'rn:claude',
-   `Agents may shows the Git view's push dials, with the way to where they are set (${JSON.stringify(gp)})`);
+// ...and Agents may says what each part is for, its guards folded, and no
+// push line of its own: Permissions' Pushing shows and sets that.
+const gp = await page.evaluate(() => ({ push: !!document.getElementById('rnGitPolField'),
+  guards: document.getElementById('rnAgentGuards')?.closest('details')?.open, label: document.getElementById('rnAgentsLabel')?.textContent }));
+ok(!gp.push && gp.guards === false && /Claude, which always may/.test(gp.label || ''),
+   `Agents may: no push line, the guards folded, and Claude's place said beside the list (${JSON.stringify(gp)})`);
 await page.click('#rnCancel');
 
 // Its Android signing keys (R106) are a view of the notebook's own, Signing,

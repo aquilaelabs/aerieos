@@ -3079,6 +3079,10 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* On the git host's Allow and Deny: wide enough for the word, which was
    cut to "allov" beside a long ability's two lines. */
 .permhost .row>.pick{flex:0 0 auto}
+/* Agents may's note on each agent's guards: reference, folded under a
+   line that says what it holds. */
+details.guards{margin-top:var(--label-gap)}
+details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width:max-content}
 .permhost .row>.pick>select{min-width:6.5em}
 /* An empty part of a head row (the Docker view's view switch while it has
    no containers) takes no gap: its status line sat 8px in from every other
@@ -6400,10 +6404,13 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     <!-- The coding agents beside Claude its sessions may run (R95): each
          installed and signed in on a node, ticked here to be offered. -->
     <div class="field" id="rnAgentsField">
-      <label id="rnAgentsLabel">Coding agents</label>
+      <!-- What each part is for, said where it is (the operator, 31 Oct:
+           "confused what any of this is for"). -->
+      <label id="rnAgentsLabel">Coding agents <span class="sub">besides Claude, which always may: one left unticked does not start here</span></label>
       <div class="lbox" id="rnAgents" role="group" aria-labelledby="rnAgentsLabel"></div>
       <div class="prefrow ctlrow"><label class="pick wide">Start opens <select id="rnAgentDefault"
         aria-label="the coding agent the project's Start opens"></select></label></div>
+      <div class="hint">the agent the project's Start agent button opens</div>
       <!-- How many sessions of one agent each person may run here at once
            (R143): each its own tree and branch. -->
       <div class="prefrow ctlrow"><label class="pick wide">Sessions of one agent, each person <select id="rnAgentSlots"
@@ -6411,16 +6418,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option>
         <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
         <option value="9">9</option></select></label></div>
-      <div class="hint">A session of an agent left unticked does not start on this project. Claude always may.</div>
-      <div class="hint" id="rnAgentGuards"></div>
-    </div>
-        <!-- The Git view's session dials, shown here with the rest of what its
-         sessions may do (R255 step 7) and set there, where the push they
-         govern is: one place to change each, two to read it. -->
-    <div class="field" id="rnGitPolField" hidden>
-      <label>Push</label>
-      <div class="setrow ctlrow"><span class="hint grow" id="rnGitPol"></span>
-        <button type="button" id="rnGitPolGo">Git view</button></div>
+      <div class="hint">how many sessions of one agent a person may run here at once, each in a worktree of its own</div>
+      <!-- Reference, not a setting: folded, opened by whoever wants it. -->
+      <details class="guards"><summary>How each agent is guarded</summary><div class="hint" id="rnAgentGuards"></div></details>
     </div>
 </div></details>
     <details class="sect rngroup" data-sect="rn:yours"><summary><span class="t">Just for you</span></summary><div class="body">
