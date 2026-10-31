@@ -157,6 +157,19 @@ def _url(nid, rec=None):
 
 # ---- the compose file -----------------------------------------------------------
 
+def _q(v):
+    """A string as YAML reads it back whole: a JSON string is a YAML
+    double-quoted scalar, so a quote, a backslash or a newline in a key or
+    an address is escaped rather than ending the value (B536)."""
+    return json.dumps(str(v))
+
+
+def _qc(v):
+    """...and for a value compose itself reads, a dollar doubled so it is
+    not taken as an interpolation."""
+    return _q(v).replace("$", "$$")
+
+
 def _indent(text, n):
     pad = " " * n
     return "\n".join(pad + ln if ln else ln for ln in text.splitlines())
@@ -171,11 +184,11 @@ def litellm_config(rec):
     out = ["model_list:"]
     for pid, p in PROVIDERS.items():
         if (rec.get("providers") or {}).get(pid):
-            out += [f"  - model_name: \"{p['route']}\"", "    litellm_params:", f"      model: \"{p['route']}\"",
+            out += [f"  - model_name: {_q(p['route'])}", "    litellm_params:", f"      model: {_q(p['route'])}",
                     f"      api_key: os.environ/{p['env']}"]
     for i, c in enumerate(rec.get("custom") or []):
-        out += [f"  - model_name: \"{c['name']}/*\"", "    litellm_params:", "      model: \"openai/*\"",
-                f"      api_base: \"{c['base']}\"", f"      api_key: os.environ/CUSTOM_{i}_KEY"]
+        out += [f"  - model_name: {_q(c['name'] + '/*')}", "    litellm_params:", "      model: \"openai/*\"",
+                f"      api_base: {_q(c['base'])}", f"      api_key: os.environ/CUSTOM_{i}_KEY"]
     if (rec.get("ollama") or {}).get("on"):
         out += ["  - model_name: \"ollama/*\"", "    litellm_params:", "      model: \"ollama_chat/*\"",
                 "      api_base: \"http://ollama:11434\""]
@@ -194,14 +207,14 @@ def compose_text(nid, rec, gpu=False):
     addr = node_addr(nid) if node_addr else ""
     name = container_name(nid)
     port = int(rec.get("port") or PORT)
-    env = [f"      LITELLM_MASTER_KEY: \"{_open(rec.get('master'))}\"",
-           f"      DATABASE_URL: \"postgresql://litellm:{_open(rec.get('dbpass'))}@db:5432/litellm\""]
+    env = [f"      LITELLM_MASTER_KEY: {_qc(_open(rec.get('master')))}",
+           f"      DATABASE_URL: {_qc('postgresql://litellm:' + _open(rec.get('dbpass')) + '@db:5432/litellm')}"]
     for pid, p in PROVIDERS.items():
         k = _open((rec.get("providers") or {}).get(pid))
         if k:
-            env.append(f"      {p['env']}: \"{k}\"")
+            env.append(f"      {p['env']}: {_qc(k)}")
     for i, c in enumerate(rec.get("custom") or []):
-        env.append(f"      CUSTOM_{i}_KEY: \"{_open(c.get('key')) or 'none'}\"")
+        env.append(f"      CUSTOM_{i}_KEY: {_qc(_open(c.get('key')) or 'none')}")
     out = ["# Written by BuilderBot from a node's Model router section (router.py); Save there rewrites it.",
            "services:",
            "  litellm:",
@@ -222,7 +235,7 @@ def compose_text(nid, rec, gpu=False):
            "    restart: unless-stopped",
            "    environment:",
            "      POSTGRES_USER: litellm",
-           f"      POSTGRES_PASSWORD: \"{_open(rec.get('dbpass'))}\"",
+           f"      POSTGRES_PASSWORD: {_qc(_open(rec.get('dbpass')))}",
            "      POSTGRES_DB: litellm",
            "    volumes:",
            "      - router_db:/var/lib/postgresql/data"]
@@ -256,6 +269,8 @@ def set_keys(nid, req):
         prov = rec.setdefault("providers", {})
         for pid in PROVIDERS:
             v = str((req.get("providers") or {}).get(pid) or "").strip() if isinstance(req.get("providers"), dict) else ""
+            if v and not v.isprintable():
+                return {"error": f"the {pid} key must be on one line"}
             if v == "clear":
                 prov.pop(pid, None)
             elif v:
@@ -269,9 +284,12 @@ def set_keys(nid, req):
                 name, base = str(c.get("name") or "").strip().lower(), str(c.get("base") or "").strip()
                 if not NAME_RE.match(name) or name in PROVIDERS or name == "ollama":
                     return {"error": f"a custom provider's name is letters, digits and dashes, and not one of {', '.join(PROVIDERS)}: {name or 'none'}"}
-                if not base.startswith(("http://", "https://")):
-                    return {"error": f"{name}'s address must start with http:// or https://"}
+                u = urllib.parse.urlsplit(base) if base.isprintable() and " " not in base else None
+                if not u or u.scheme not in ("http", "https") or not u.netloc:
+                    return {"error": f"{name}'s address must be an http:// or https:// address, on one line"}
                 key = str(c.get("key") or "").strip()
+                if not key.isprintable():
+                    return {"error": f"{name}'s key must be on one line"}
                 was = kept.get(name) or {}
                 out.append({"name": name, "base": base.rstrip("/"), "key": _keep(key) if key else was.get("key", "")})
             rec["custom"] = out

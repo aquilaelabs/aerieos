@@ -160,6 +160,31 @@ class Router(unittest.TestCase):
         self.assertFalse(router.status("n1")["providers"]["anthropic"])
         self.assertEqual(router.seal_all(again=True) >= 3, True)
 
+    def test_a_key_or_an_address_stays_inside_its_value(self):
+        # B536: written between bare quotes, a quote ended the value and a
+        # newline in an address ended the inline config, adding compose keys.
+        self.assertIn("one line", router.set_keys("n1", {"custom": [{"name": "lab", "base": "http://x\n  evil:\n    image: x"}]})["error"])
+        self.assertIn("one line", router.set_keys("n1", {"providers": {"anthropic": "sk\nevil: 1"}})["error"])
+        key = 'sk-"quoted"\\back$slash'
+        r = router.set_keys("n1", {"providers": {"anthropic": key},
+                                   "custom": [{"name": "lab", "base": 'https://lab.example/v1?a="b"', "key": key}]})
+        self.assertTrue(r.get("ok"), r)
+        rec = router.record("n1")
+        rec["port"] = self.port
+        text = router.compose_text("n1", rec)
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("no YAML reader here")
+        doc = yaml.safe_load(text)
+        self.assertEqual(sorted(doc["services"]), ["db", "litellm"], "no service but the router's own")
+        env = doc["services"]["litellm"]["environment"]
+        # compose reads $$ as one dollar: the value it hands the container is the key.
+        self.assertEqual(env["ANTHROPIC_API_KEY"].replace("$$", "$"), key)
+        conf = yaml.safe_load(doc["configs"]["litellm_conf"]["content"].replace("$$", "$"))
+        self.assertEqual([m["litellm_params"].get("api_base") for m in conf["model_list"] if m["model_name"] == "lab/*"],
+                         ['https://lab.example/v1?a="b"'])
+
     def test_deploy_allow_and_the_sessions_reach_it(self):
         self.assertIn("nothing behind it", router.deploy("n1", self.containers, self.devactions, self.devapp)["error"])
         router.set_keys("n1", {"providers": {"openai": "sk-x"}})
