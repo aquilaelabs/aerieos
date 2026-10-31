@@ -473,10 +473,13 @@ def seal_all(again=False):
             continue
         if text.startswith(LINKED):
             continue
+        # Through keep_as_own, which writes the line with the givers' lines
+        # after it: write_line kept the one line and every person who had
+        # given the project a token was gone from it (B543).
         if text and not text.startswith(SEALED):
-            write_line(f.name, text.splitlines()[0])
+            keep_as_own(f.name, text.splitlines()[0])
             n += 1
         elif again and text and (line := open_text(text)):
-            write_line(f.name, line)
+            keep_as_own(f.name, line)
             n += 1
     return n

@@ -58,6 +58,18 @@ class Sealed(unittest.TestCase):
         self.assertEqual(self.ask("gitea.lan:3000", "http"), "username=oauth2\npassword=tok\n")
         self.assertEqual(gitcreds.seal_all(), 0)
 
+    def test_a_reseal_keeps_the_people_who_gave_a_token(self):
+        # B543: a project's own line beside its givers' account: lines;
+        # sealed again (at start, or after the install key changed) it kept
+        # the one line and every giver was gone.
+        signing.load_master(str(self.tmp / "none"))
+        gitcreds.keep_as_own("web", "https://oauth2:tok@github.com")
+        gitcreds._write_givers("web", [("u_0000000a", "f1"), ("u_0000000b", "f2")])
+        self.keyed("k" * 32)
+        self.assertEqual(gitcreds.seal_all(), 1)
+        self.assertEqual(gitcreds.givers("web"), [("u_0000000a", "f1"), ("u_0000000b", "f2")])
+        self.assertEqual(gitcreds.read_line("web"), "https://oauth2:tok@github.com")
+
     def test_a_repo_still_naming_gits_store_counts_as_scoped(self):
         f = str(gitcreds.path("web"))
         self.assertTrue(gitcreds.names_helper(f"store --file={f}\n", "web"))
