@@ -153,6 +153,10 @@ jobs:
             # the trunk this workflow builds, and silently losing the :latest
             # tag breaks every consumer pulling it.
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # The dev channel's newest: every tag a release or a dev build is
+            # cut on, so a template or compose file following :dev takes each
+            # dev build and the release it was heading for.
+            type=raw,value=dev,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=short

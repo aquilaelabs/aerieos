@@ -209,6 +209,9 @@ back, see [Upgrading](#upgrading). Compose: `docker compose pull && docker compo
 releases. Each release publishes its own image, `ghcr.io/aquilaelabs/builderbot:0.6.0`,
 and `:0.6` for the newest release of that line; pin one of those in your
 compose file or template, and move it on when you choose to upgrade.
+`:dev` follows the dev channel instead: every dev build as it is cut and
+each release, so an install on it takes builds that may not come up
+([versions.md](versions.md#two-channels)).
 
 **What is supported:**
 
