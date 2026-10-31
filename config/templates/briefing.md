@@ -461,6 +461,8 @@ controller with the project's token, which never reaches you. What it may
 do is the token's and then the project's: your briefing says it in Your git
 host, `bb forge whoami` prints it whole, and a verb either refuses is
 refused with the permission to ask the person for. Merging starts off.
+The same list holds `bb git push`: a push that changes a file under
+`.github/workflows` is refused where Change CI workflow files is Deny.
 
 <!-- BUILDERBOT:IF android *.gradle *.gradle.kts android AndroidManifest.xml -->
 ## Android

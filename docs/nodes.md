@@ -413,13 +413,16 @@ piece at 100 nodes; the listener model is.
 token (`bbe_…`) is one use and one day; it exists to be pasted into a
 terminal, and one minted and forgotten is a standing way in, so it is
 revoked the moment enrollment succeeds. The **node** token (`bbn_…`) it
-trades for has no expiry at all: it is `0600` on the node and works until
-the operator revokes it or retires the node, so a node enrolled today is
-still working a year from now with nothing to renew. (The runner
-registration token is GitHub's and lives an hour; after registering, the
-runner holds credentials GitHub issued to it and refreshes them itself.)
-The row `expires` column and `revoke_tokens` are what a rotation policy
-would use if a deployment ever wants one: the shape is there, unbuilt.
+trades for has no expiry: it is `0600` on the node and works until the
+operator revokes it or retires the node, so a node enrolled today is still
+working a year from now with nothing to renew. An agent that rotates is
+handed a fresh one at each `hello`, held pending until its first use makes
+it the node's; the one before is still taken for three minutes, for calls
+already on their way, and presented after that means a copy of the
+credential is in use, so every token of the node is revoked and the bell
+says so. (The runner registration token is GitHub's and lives an hour;
+after registering, the runner holds credentials GitHub issued to it and
+refreshes them itself.)
 
    - **single-use** (homelab default): scoped to intended capabilities,
      short-lived; enrolling with it *is* the approval.
@@ -434,7 +437,10 @@ would use if a deployment ever wants one: the shape is there, unbuilt.
    TLS is not optional: the token is a bearer credential. On a LAN that can be
    a self-signed certificate pinned by the agent at enrollment.
 4. Rotation and revocation are rows: revoke a token and the node's next call
-   fails closed, showing offline with "credential revoked".
+   fails closed with "credential revoked". The node's row says it is turned
+   away and why, in place of quiet, and the bell carries a row for it until
+   the node's next good check-in, which after a revocation means enrolling
+   it again.
 
 **Enroll node is one script (R161, 9 Oct).** The dialog asks the name, the
 account jobs run as, which system the machine runs (R204: a pulldown of the

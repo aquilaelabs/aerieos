@@ -153,7 +153,7 @@ same agent run by hand is untouched. Codex's own hook trust is passed over
 for BuilderBot's where its version has the flag for it.
 
 Not every guard has a place on every agent, and the project's settings
-(Agents may, Coding agents) say which hold for which: Copilot has no hook
+(Agents may, under How each agent is guarded) say which hold for which: Copilot has no hook
 after a summary, so the house rules are not said again then, and Codex's and
 Copilot's searches are in the shell, out of the code map's hint's reach.
 Grok has no hook for its permission prompt alone, so its dot is never
