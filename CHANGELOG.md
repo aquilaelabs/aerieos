@@ -23,6 +23,7 @@
 - A VM's shared folder that is a link out of its project's folder is refused rather than shared, so a link to / no longer gives a VM the host's files (8d0a4f3)
 - Starting the controller with a mistyped install key no longer replaces every person's key store, which lost their git tokens for good once the right key was back (023d6be)
 - Setting or changing the install key no longer drops the people who gave a project their git token from it (9b48d7b)
+- bb forge acts only on the repository a project was linked to: a session that points the project's origin at another repository is refused until it sets the remote back (353ec12)
 
 ## 0.9.0: 2026-10-30
 
