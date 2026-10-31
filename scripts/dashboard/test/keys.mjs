@@ -110,12 +110,15 @@ try {
   const now = readFileSync(KEYF, 'utf8');
   const after = await keys({ action: 'status' });
   ok(now !== FIRST && /^[0-9a-f]{64}$/.test(now), 'Change writes a new key to the key folder');
-  ok(!after.install.saved && !after.install.previous, `...not saved yet, and with nothing on the nodes the one before is gone (${JSON.stringify(after.install)})`);
+  // The one before is kept until the next start has sealed everything again
+  // with both (B550); what the change sealed opens under the new key alone.
+  ok(!after.install.saved && after.install.previous, `...not saved yet, and the one before kept until the next start (${JSON.stringify(after.install)})`);
   const resealed = execFileSync('python3', ['-c', `
 import os, sys; sys.path.insert(0, ${JSON.stringify(DASH)})
 import gitcreds, signing
 from pathlib import Path
 signing.load_master()
+signing.PREVIOUS = None
 gitcreds.configure(state=Path(${JSON.stringify(`${w}/config`)}), seal_fn=signing.seal, unseal_fn=signing.unseal, sealing_fn=lambda: True)
 print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   ok(resealed === TOKEN, `...and the git token opens under the new key alone (${resealed === TOKEN ? 'it does' : resealed})`);
