@@ -30,6 +30,7 @@ import contextvars
 import os
 import re
 import shlex
+import threading
 import urllib.parse
 from pathlib import Path
 
@@ -176,10 +177,11 @@ def keep_as_own(project, line):
     d = STATE / "gitcreds"
     d.mkdir(parents=True, exist_ok=True)
     os.chmod(d, 0o700)
-    rows = givers(project)
-    fd = os.open(path(project), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        fh.write(_kept(line) + "\n" + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
+    with _glock:
+        rows = givers(project)
+        fd = os.open(path(project), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(_kept(line) + "\n" + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
     return True
 
 
@@ -242,20 +244,29 @@ def _write_givers(project, rows, keep_own=True):
         fh.write("".join(x + "\n" for x in own) + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
 
 
+# Each read of a project's givers and the write after it, as one: two
+# people giving a project a token at once each read the givers, and one
+# rewrite lost the other's line (B549). Re-entrant, so a writer may call
+# another.
+_glock = threading.RLock()
+
+
 def link_account(project, uid, fid):
     """The project given `uid`'s token: their line added, or theirs
     replaced when they had given one; the other givers stay."""
-    rows = [(u, f) for u, f in givers(project) if u != uid] + [(uid, fid)]
-    _write_givers(project, rows)
+    with _glock:
+        rows = [(u, f) for u, f in givers(project) if u != uid] + [(uid, fid)]
+        _write_givers(project, rows)
 
 
 def unlink_person(project, uid):
     """`uid`'s token no longer given to this project; the others stay."""
-    rows = [(u, f) for u, f in givers(project) if u != uid]
-    if len(rows) == len(givers(project)):
-        return False
-    _write_givers(project, rows)
-    return True
+    with _glock:
+        rows = [(u, f) for u, f in givers(project) if u != uid]
+        if len(rows) == len(givers(project)):
+            return False
+        _write_givers(project, rows)
+        return True
 
 
 def linked_projects(uid, fid=None):
@@ -287,10 +298,11 @@ def remap(uid, olds, new):
     olds = {str(o) for o in olds}
     d = STATE / "gitcreds"
     for f in sorted(d.iterdir()) if d.is_dir() else []:
-        rows = givers(f.name)
-        if any(u == uid and x in olds for u, x in rows):
-            moved = [(u, new if u == uid and x in olds else x) for u, x in rows]
-            _write_givers(f.name, list(dict.fromkeys(moved)))
+        with _glock:
+            rows = givers(f.name)
+            if any(u == uid and x in olds for u, x in rows):
+                moved = [(u, new if u == uid and x in olds else x) for u, x in rows]
+                _write_givers(f.name, list(dict.fromkeys(moved)))
 
 
 def adopt(owner_of):
