@@ -2957,7 +2957,12 @@ feature_vmhost() {
             fi
             # The cached cloud images and each VM's disk, the jobs account's;
             # 0755 so libvirt's own account reaches the disks it is handed.
-            install -d -m 0755 -o "$DOCKER_USER" /var/lib/builderbot/vms /var/lib/builderbot/vms/images /var/lib/builderbot/vms/disks
+            # On the controller's own machine the root agent writes them, so
+            # they are root's: the jobs account's, a link it left there had
+            # root write over the file it named (B552).
+            vmown="$DOCKER_USER"
+            { [ "$BESIDE_CONTROLLER" = 1 ] || [ -s /etc/bb-session.wall ]; } && vmown=root
+            install -d -m 0755 -o "$vmown" /var/lib/builderbot/vms /var/lib/builderbot/vms/images /var/lib/builderbot/vms/disks
             vmhost_virtiofsd
             # Run again on a machine that has it (a package the feature has
             # gained since, UEFI's firmware), what it added before is kept.

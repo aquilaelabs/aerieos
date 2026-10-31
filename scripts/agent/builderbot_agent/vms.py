@@ -523,6 +523,8 @@ class VmsMixin:
         # machine the agent itself, since that group is root there (R165
         # step 1) and the wall keeps the jobs account out of it.
         who = {} if own_here() else self.drop_privileges({})
+        if not who and os.geteuid() == 0:
+            self._vm_dirs_roots(job)
         # Two projects' names can make one libvirt name (bbvm-foo-bar-web is
         # foo's bar-web and foo-bar's web): an action on a domain another
         # project's marker names is refused, whatever the controller asked.
@@ -537,6 +539,29 @@ class VmsMixin:
         state, code = getattr(self, "_vm_" + action.replace("-", "_"))(job, spec, name, who)
         self.hello_again(f"the VM {name}: {action}")
         return state, code
+
+    def _vm_dirs_roots(self, job):
+        """Where the root agent writes VMs' files, root's alone, and no link
+        in them (B552): a machine provisioned before handed them to the jobs
+        account, and every write here follows a link, so one it left named
+        any file on the machine for root to write over."""
+        for d in [VM_DIR] + [os.path.join(VM_DIR, s) for s in ("images", "disks", "iso", vmhw.VBIOS_DIR)]:
+            try:
+                if os.path.islink(d):
+                    os.unlink(d)
+                    job.say(f"removed a link at {d}: this is the agent's own folder\n")
+                if not os.path.isdir(d):
+                    continue
+                for e in os.scandir(d):
+                    if e.is_symlink():
+                        os.unlink(e.path)
+                        job.say(f"removed a link at {e.path}: nothing the agent writes here may be one\n")
+                st = os.lstat(d)
+                if st.st_uid != 0 or st.st_mode & 0o022:
+                    os.lchown(d, 0, 0)
+                    os.chmod(d, 0o755)
+            except OSError as e:
+                job.say(f"could not keep {d} the agent's own: {e}\n")
 
     def _vm_owner(self, name, who):
         """The project the domain's BuilderBot marker names, "" for a domain

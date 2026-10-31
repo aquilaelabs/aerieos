@@ -447,6 +447,25 @@ class Agent(unittest.TestCase):
             self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web", "project": "foo"}), ("succeeded", 0))
             self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web"}), ("succeeded", 0))
 
+    def test_the_agents_own_vm_folders_hold_no_link(self):
+        # B552: on the controller's own machine a link the jobs account left
+        # where the root agent writes a disk named any file for root to write
+        # over; the agent removes every link there before a VM job.
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "disks"))
+            target = os.path.join(d, "passwd")
+            open(target, "w").write("root:x:0:0\n")
+            os.symlink(target, os.path.join(d, "disks", "bbvm-p-x.qcow2"))
+            os.symlink(target, os.path.join(d, "iso"))
+            a = self.agent.Agent.__new__(self.agent.Agent)
+            job = mock.Mock()
+            with mock.patch.object(self.av, "VM_DIR", d):
+                a._vm_dirs_roots(job)
+            self.assertFalse(os.path.lexists(os.path.join(d, "disks", "bbvm-p-x.qcow2")))
+            self.assertFalse(os.path.lexists(os.path.join(d, "iso")))
+            self.assertEqual(open(target).read(), "root:x:0:0\n", "the file it named untouched")
+
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
         # R165 step 1: the wall's file says the machine is the controller's
         # own, and there the job keeps root rather than dropping to the jobs
