@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -95,6 +96,25 @@ class Store(unittest.TestCase):
         before = (self.d / "account-secrets.json").read_text()
         self.assertEqual(accountkeys.change(UID)[1], 200)
         self.assertNotEqual((self.d / "account-secrets.json").read_text(), before)
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+
+    def test_the_key_before_stays_while_a_token_is_under_it_alone(self):
+        # B548: a token the change could not seal again stayed under the key
+        # before, which was dropped at once, and never opened again.
+        import base64
+        old = accountkeys.key_of(UID)
+        real = signing.seal
+        def failing(data, key=None):
+            if key is not None and key != old:
+                raise ValueError("busy")
+            return real(data, key) if key is not None else real(data)
+        with mock.patch.object(accountkeys.signing, "seal", side_effect=failing):
+            self.assertEqual(accountkeys.change(UID)[1], 200)
+        self.assertIsNotNone(accountkeys.previous_of(UID), "kept: a token is under it alone")
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+        # The next look (Profile's status) seals it again and lets the key go.
+        accountkeys.status(UID)
+        self.assertIsNone(accountkeys.previous_of(UID))
         self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
 
     def test_git_c_hands_any_command_the_credential(self):

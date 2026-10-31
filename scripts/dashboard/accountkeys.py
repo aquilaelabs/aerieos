@@ -160,10 +160,46 @@ def fingerprint(k):
     return f"{h[:4]} {h[4:]}"
 
 
+def _under_only(uid, prev):
+    """How many of the account's tokens open with `prev` and not with today's
+    key: what a change failed to seal again."""
+    k = _open(_entry(uid).get("key"))
+    n = 0
+    for f in _entries(uid).values():
+        raw = base64.b64decode(f.get("sealed") or "")
+        try:
+            signing.open_with(k, raw)
+            continue
+        except (signing.Locked, ValueError, TypeError):
+            pass
+        with contextlib.suppress(signing.Locked, ValueError, TypeError):
+            signing.open_with(prev, raw)
+            n += 1
+    return n
+
+
 def _drop_previous(uid):
     prev = previous_of(uid)
     if not prev or (on_nodes and on_nodes(uid, prev)):
         return False
+    # Nor while a token is still under it alone (B548): one the change could
+    # not seal again, or one given while it ran, was lost with it. Each such
+    # one is sealed again under today's key first, so a later try settles it.
+    if _under_only(uid, prev):
+        k = _open(_entry(uid).get("key"))
+        with _lock:
+            sd = _load_secrets()
+            for f in ((sd.get(uid) or {}).get("forges") or {}).values():
+                with contextlib.suppress(signing.Locked, ValueError, TypeError, KeyError):
+                    raw = base64.b64decode(f["sealed"])
+                    try:
+                        signing.open_with(k, raw)
+                    except signing.Locked:
+                        f["sealed"] = base64.b64encode(signing.seal(signing.open_with(prev, raw), k)).decode()
+            with contextlib.suppress(OSError):
+                statefile.write_json(_secrets_file(), sd, mode=0o600)
+        if _under_only(uid, prev):
+            return False
     with _lock:
         d = _load()
         if (d.get(uid) or {}).pop("prev", None) is not None:
@@ -386,11 +422,13 @@ def link_forge(uid, host, line, login):
     project linked to it uses the new one; any other entry for that account
     and host is dropped, its id in `replaced` for the caller to move the
     projects linked to it. ({ok, id, host, login, replaced}, status)."""
-    k = key_of(uid)
-    if not k:
-        return {"error": "this install has no key, so nothing can be kept in an account's key store"}, 409
     host = _bare(host)
+    # The key read under the lock a change takes (B548): read before it, a
+    # token given while the account's key changed was sealed under the old.
     with _lock:
+        k = key_of(uid)
+        if not k:
+            return {"error": "this install has no key, so nothing can be kept in an account's key store"}, 409
         sd = _load_secrets()
         fs = sd.setdefault(uid, {}).setdefault("forges", {})
         for fid, f in _entries(uid, sd).items():
@@ -439,7 +477,11 @@ def entry_for(uid, fid="", host=""):
 def open_entry_with(uid, fid, k):
     """One entry opened with the account key `k`: unlocks' way in."""
     f = _entries(uid).get(str(fid))
-    return _open_entry(k, f) if f and k else ""
+    if not (f and k):
+        return ""
+    # ...or with the key before, which is kept exactly while a token is
+    # still under it alone (B548).
+    return _open_entry(k, f) or ((prev := previous_of(uid)) and _open_entry(prev, f)) or ""
 
 
 def forge_line(uid, fid="", host="", why="", project="", by=""):
