@@ -320,19 +320,22 @@ function libRow(r, may){
 // The search on a line of its own with the page's buttons at its right
 // (the operator, 29 Oct: under the head, where the bar left a gap), then
 // the chips under it.
-function libFilterBand(rows, acts = ""){
-  const count = (key, f) => rows.filter(f).length;
+// Each row counts within the other's pick (the operator, 31 Oct: a kind
+// picked should say how many of it each source has): the kinds over the
+// source picked, the sources over the kind picked.
+function libFilterBand(kindRows, tierRows, acts = ""){
+  const count = (key, f) => kindRows.filter(f).length;
   // Installed, then Updates, first after All (the operator, 29 Oct): every
   // card installed, or with an update due, each in its own kind's section;
   // drawn only while one is.
   const kinds = [{key: "installed", label: "Installed", count: count("installed", LIB_STANDS.installed)},
                  {key: "update", label: "Updates", count: count("update", LIB_STANDS.update)},
                  ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: count(k, r => libGroup(r) === k)}))];
-  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: count(k, r => r.tier === k)}));
+  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: tierRows.filter(r => r.tier === k).length}));
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
       placeholder="search by name or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
-    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", rows.length)}</div>
+    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", kindRows.length)}</div>
     <div class="chips" data-chips="libtier">${chipButtons(tiers, libTier, "data-libtier", undefined, "Any source")}</div>
   </div>`;
 }
@@ -407,7 +410,13 @@ function renderLibraryInto(i){
   // The last update installed takes the Updates chip with it, the last
   // thing removed the Installed chip: back to All.
   if (LIB_STANDS[libKind] && !all.some(LIB_STANDS[libKind])) libKind = "";
-  const rows = all.filter(r => libMatch(r, libQ) && (!libKind || (LIB_STANDS[libKind] ? LIB_STANDS[libKind](r) : libGroup(r) === libKind)) && (!libTier || r.tier === libTier));
+  const inKind = r => !libKind || (LIB_STANDS[libKind] ? LIB_STANDS[libKind](r) : libGroup(r) === libKind);
+  const tierRows = all.filter(inKind);
+  // A kind whose cards come from one source alone draws no source chips, so
+  // a source picked before is let go rather than narrowing out of sight.
+  if (libTier && LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2) libTier = "";
+  const kindRows = all.filter(r => !libTier || r.tier === libTier);
+  const rows = all.filter(r => libMatch(r, libQ) && inKind(r) && (!libTier || r.tier === libTier));
   const inst = all.filter(r => r.installed).length, due = all.filter(r => r.update).length;
   const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
   const head = pageHead({facts: [
@@ -429,7 +438,7 @@ function renderLibraryInto(i){
         ? `<button type="button" data-libsysdeps${busy || stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : ""}`;
   libHold = busy ? "another toolchain job is running on this node" : stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
-  paint(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(all, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
+  paint(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);

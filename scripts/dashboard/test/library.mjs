@@ -76,6 +76,16 @@ if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   ok(await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .libgroup')].every(d => d.dataset.libgroup === 'toolchain')
      && document.querySelector('.doc .librarytab [data-libkind="toolchain"]').classList.contains('on')),
      'a kind chip shows that kind\'s group alone, the chip wearing .on');
+  // ...and the source chips count within it (the operator, 31 Oct).
+  const facet = await page.evaluate(() => {
+    const n = lib.rows.filter(r => !r.wrong_platform && libGroup(r) === 'toolchain');
+    const chips = Object.fromEntries([...document.querySelectorAll('.doc .librarytab [data-libtier]')]
+      .map(b => [b.dataset.libtier, +(b.querySelector('.pill')?.textContent || 0)]));
+    return { want: Object.fromEntries(LIB_TIERS.map(([k]) => [k, n.filter(r => r.tier === k).length]).filter(([, c]) => c)),
+             total: n.length, chips };
+  });
+  ok(!Object.keys(facet.chips).length || (facet.chips[''] === facet.total && Object.entries(facet.want).every(([k, c]) => facet.chips[k] === c)),
+     `...and the source chips count that kind's cards alone (${JSON.stringify(facet)})`);
   await page.click('.doc .librarytab [data-libkind=""]');
   await page.waitForFunction(() => libKind === '');
   ok(await page.$$eval('.doc .librarytab .libgroup', (ds, n) => ds.length === n, sects.length), '...and All puts every group back');
