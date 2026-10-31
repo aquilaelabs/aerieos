@@ -964,11 +964,15 @@ def authenticate(bearer):
     if kind == "node" and t["revoked"] == TOKEN_PENDING:
         # Its first use (R135 step 4): this token is the node's now, and
         # the one before retires with its grace.
+        # The one coming live is never among those retired, and comes live
+        # with no expiry (B570): two of the agent's calls carrying it at once
+        # each ran the retire, the second catching the first's live token,
+        # which then expired with the grace and left the node no credential.
         now = int(time.time())
-        _exec("UPDATE tokens SET revoked = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND revoked = 0",
-              (TOKEN_RETIRED, now + ROTATE_GRACE_S, t["node_id"]))
-        _exec("UPDATE tokens SET revoked = 0 WHERE id = ?", (t["id"],))
-        t = dict(t, revoked=0)
+        _exec("UPDATE tokens SET revoked = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND revoked = 0 AND id != ?",
+              (TOKEN_RETIRED, now + ROTATE_GRACE_S, t["node_id"], t["id"]))
+        _exec("UPDATE tokens SET revoked = 0, expires = NULL WHERE id = ?", (t["id"],))
+        t = dict(t, revoked=0, expires=None)
     elif kind == "node" and t["revoked"] == TOKEN_RETIRED:
         if not (t["expires"] and t["expires"] >= time.time()):
             _token_reused(t)
@@ -977,6 +981,13 @@ def authenticate(bearer):
     if t["revoked"]:
         return {"error": "credential revoked" if kind == "node"
                 else "enrollment token already used"}
+    # A node's live token has no expiry (only an enroll token's TTL and a
+    # retired one's grace do): one that carries one got it from the race
+    # above, and is given back its life rather than leaving the node shut
+    # out until it is enrolled again (B570).
+    if kind == "node" and t["expires"]:
+        _exec("UPDATE tokens SET expires = NULL WHERE id = ? AND revoked = 0", (t["id"],))
+        t = dict(t, expires=None)
     if t["expires"] and t["expires"] < time.time():
         return {"error": "token expired"}
     n = node(t["node_id"])

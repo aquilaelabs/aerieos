@@ -36,6 +36,28 @@ class Rotation(unittest.TestCase):
         self.assertNotEqual(nodes.screen_key(self.nid), key, "...and moves once the new one is used")
         self.assertIn("node", nodes.authenticate(self.first), "the old one within its grace")
 
+    def test_two_calls_with_a_new_token_at_once_leave_it_live(self):
+        # B570: the second of two calls that both read the new token as
+        # pending retired it (it was live by then) and gave it the grace's
+        # expiry; three minutes on the node had no credential left.
+        from unittest import mock
+        new = self.hello()["token"]
+        stale = nodes._rows("SELECT * FROM tokens WHERE revoked = ?", (nodes.TOKEN_PENDING,))
+        self.assertIn("node", nodes.authenticate(new))
+        real = nodes._rows
+        calls = iter([stale])
+        def once_stale(q, a=()):
+            return next(calls, None) or real(q, a) if "secret_hash" in q else real(q, a)
+        with mock.patch.object(nodes, "_rows", side_effect=once_stale):
+            self.assertIn("node", nodes.authenticate(new))
+        with mock.patch.object(nodes.time, "time", return_value=time.time() + 3600):
+            self.assertIn("node", nodes.authenticate(new), "still the node's an hour on")
+
+    def test_a_live_token_that_carries_an_expiry_is_given_its_life_back(self):
+        # B570: a node shut out by the race comes back at its next call.
+        nodes._exec("UPDATE tokens SET expires = ? WHERE kind = 'node' AND revoked = 0", (int(time.time()) - 60,))
+        self.assertIn("node", nodes.authenticate(self.first))
+
     def test_a_retired_token_after_its_grace_revokes_the_node(self):
         new = self.hello()["token"]
         nodes.authenticate(new)
