@@ -145,9 +145,16 @@ def _call(t, method, path, data=None, raw=False):
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with forges._OPENER.open(req, timeout=30) as r:
-            got = r.read(4_000_000 if raw else 2_000_000)
             if raw:
-                return r.status, got.decode("utf-8", "replace"), dict(r.headers)
+                # A log's end is where it says why: the last 4 MB of it kept,
+                # where the first 4 MB's end was taken for the tail (B563).
+                got, cut = b"", False
+                while (chunk := r.read(1_000_000)):
+                    got = (got + chunk)[-4_000_000:]
+                    cut = cut or len(got) == 4_000_000
+                text = got.decode("utf-8", "replace")
+                return r.status, ("[the log's start is left out: its last 4 MB follow]\n" + text if cut else text), dict(r.headers)
+            got = r.read(2_000_000)
             return r.status, (json.loads(got) if got.strip() else {}), dict(r.headers)
     except urllib.error.HTTPError as e:
         try:
@@ -617,10 +624,17 @@ def v_run_log(t, a):
     if (a.get("flags") or {}).get("job"):
         want = [n]
     else:
-        c, j, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/runs/{n}/jobs?per_page=50")
-        if not 200 <= c < 300:
-            return _ok(c, j)
-        jobs = (j or {}).get("jobs") or []
+        # Every page of a big matrix, so a failure past the first fifty jobs
+        # is found rather than the first jobs' passing logs shown (B563).
+        jobs = []
+        for page in range(1, 4):
+            c, j, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/runs/{n}/jobs?per_page=100&page={page}")
+            if not 200 <= c < 300:
+                return _ok(c, j)
+            got = (j or {}).get("jobs") or []
+            jobs += got
+            if len(got) < 100 or any(x.get("conclusion") == "failure" for x in got):
+                break
         want = [str(x["id"]) for x in jobs if x.get("conclusion") == "failure"] or [str(x["id"]) for x in jobs]
     out = []
     for jid in want[:6]:
@@ -839,10 +853,16 @@ def gl_run_log(t, a):
     if (a.get("flags") or {}).get("job"):
         want = [n]
     else:
-        c, j, _h = _call(t, "GET", f"{_gl(t)}/pipelines/{n}/jobs?per_page=50")
-        if not 200 <= c < 300:
-            return _ok(c, j)
-        jobs = j if isinstance(j, list) else []
+        # As on GitHub (B563): every page until a failure is found.
+        jobs = []
+        for page in range(1, 4):
+            c, j, _h = _call(t, "GET", f"{_gl(t)}/pipelines/{n}/jobs?per_page=100&page={page}")
+            if not 200 <= c < 300:
+                return _ok(c, j)
+            got = j if isinstance(j, list) else []
+            jobs += got
+            if len(got) < 100 or any(x.get("status") == "failed" for x in got):
+                break
         want = [str(x["id"]) for x in jobs if x.get("status") == "failed"] or [str(x["id"]) for x in jobs]
     out = []
     for jid in want[:6]:

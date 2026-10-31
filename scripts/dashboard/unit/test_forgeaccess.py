@@ -256,3 +256,19 @@ class IssueList(Base):
         got, code = forgeaccess.v_issue_list(self.t, {})
         self.assertEqual((code, [i["number"] for i in got]), (200, [200, 201, 202, 203, 204]))
         self.assertEqual(len(asked), 2)
+
+
+class RunLog(Base):
+    def test_a_failure_past_the_first_page_is_the_log_shown(self):
+        # B563: fifty jobs were asked for, and with no failure among them the
+        # first jobs' passing logs were shown as the answer.
+        ok = [{"id": n, "conclusion": "success"} for n in range(100)]
+        pages = {1: {"jobs": ok}, 2: {"jobs": [{"id": 163, "conclusion": "failure"}]}}
+        def call(t, method, path, data=None, raw=False):
+            if raw:
+                return 200, "line\n" * 5 + "the error", {}
+            return 200, pages[int(path.rsplit("page=", 1)[1])], {}
+        forgeaccess._call = call
+        got, code = forgeaccess.v_run_log(self.t, {"pos": ["7"]})
+        self.assertEqual((code, [x["job"] for x in got]), (200, ["163"]))
+        self.assertTrue(got[0]["log"].endswith("the error"))
