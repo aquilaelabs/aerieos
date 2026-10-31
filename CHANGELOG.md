@@ -11,6 +11,9 @@
 
 ### Changed
 
+- A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
+- On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
+- The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)
 - A project's Agents may says what each of its parts is for: Coding agents says Claude always may and an unticked agent does not start there, Start opens and Sessions each carry a line under them, and each agent's guards fold under How each agent is guarded (6ae825f)
 - A session's bb version release from a branch other than main makes a dev pre-release unless --stable is said, and its first line names the channel the release lands on (7a8e367)
 - bb sign release waits for its look and says what it found, run by run, or why it found nothing to sign (7a8e367)
