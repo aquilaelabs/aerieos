@@ -6,6 +6,7 @@ kept out of libvirt's group there, which is root), never by a
 session; the controller sends what to make, never a command line."""
 import contextlib
 import hashlib
+import html
 import ipaddress
 import json
 import os
@@ -522,10 +523,32 @@ class VmsMixin:
         # machine the agent itself, since that group is root there (R165
         # step 1) and the wall keeps the jobs account out of it.
         who = {} if own_here() else self.drop_privileges({})
+        # Two projects' names can make one libvirt name (bbvm-foo-bar-web is
+        # foo's bar-web and foo-bar's web): an action on a domain another
+        # project's marker names is refused, whatever the controller asked.
+        # A job that names no project (a controller from before) is let by.
+        want = str(spec.get("project") or "")
+        if want and action != "create" and not action.startswith("iso-") and action != "vbios":
+            owner = self._vm_owner(name, who)
+            if owner is not None and owner != want:
+                job.say(f"refused: {name} is {owner or 'another project'}'s VM, not {want}'s\n")
+                return "failed", 77
         job.say(f"vm {action} {name}{' as the root agent' if not who and os.geteuid() == 0 else ''}\n")
         state, code = getattr(self, "_vm_" + action.replace("-", "_"))(job, spec, name, who)
         self.hello_again(f"the VM {name}: {action}")
         return state, code
+
+    def _vm_owner(self, name, who):
+        """The project the domain's BuilderBot marker names, "" for a domain
+        without one, None for no such domain."""
+        p = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True, check=False, **who)
+        if p.returncode != 0:
+            return None
+        m = re.search(r"<(\w+):vm\b([^>]*)>", p.stdout)
+        if not m or f'xmlns:{m.group(1)}="{META_NS}"' not in m.group(2):
+            return ""
+        got = re.search(r'\bproject="([^"]*)"', m.group(2))
+        return html.unescape(got.group(1)) if got else ""
 
     def _vm_exists(self, name, who):
         return subprocess.run(VIRSH + ["dominfo", name], capture_output=True, check=False, **who).returncode == 0

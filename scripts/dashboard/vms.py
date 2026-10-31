@@ -709,6 +709,14 @@ def _refused(project, key, name, node_id, size, d=None):
     d = d if d is not None else _load()
     if key in d["vms"]:
         return f"{project} has a VM called {name} already"
+    # Two projects' names can make one libvirt name (foo's bar-web and
+    # foo-bar's web are both bbvm-foo-bar-web): on one node that would be
+    # one VM two projects act on, so the second name is refused there.
+    dom = domain(project, name)
+    for other in d["vms"].values():
+        if other.get("node") == node_id and other.get("domain") == dom:
+            return (f"{name} would share its machine name ({dom}) with {other.get('project')}'s {other.get('name')} "
+                    "on that node: pick another name or another node")
     why = check_caps(d, project, node_id, size)
     if why:
         return why
@@ -735,7 +743,7 @@ def act(principal, project, name, action, req=None):
         n = node(rec["node"]) or {}
         if not n.get("live"):
             return {"error": f"{n.get('name') or rec['node']}'s agent is not dialing in, so nothing from here reaches {name}"}
-        spec = {"action": action, "domain": rec["domain"], "timeout": 900}
+        spec = {"action": action, "domain": rec["domain"], "project": rec.get("project") or project, "timeout": 900}
         if action in ("snapshot", "revert", "snapshot-rm"):
             snap = str(req.get("snapshot") or "")
             if not SNAP_RE.fullmatch(snap):

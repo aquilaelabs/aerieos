@@ -164,6 +164,14 @@ class Controller(unittest.TestCase):
         self.assertEqual(vms.view()[0]["state"], "making")
         self.assertIn("already", self.new()["error"])
 
+    def test_two_projects_names_that_make_one_machine_name_are_refused_on_one_node(self):
+        # web's db-x and web-db's x are both bbvm-web-db-x: the second is
+        # refused on that node, and every action names its project.
+        self.assertTrue(vms.create("user:test", "web", {"name": "db-x", "os": "debian 13", "keys": [KEY]}, ["n1"]).get("ok"))
+        r = vms.create("user:test", "web-db", {"name": "x", "os": "debian 13", "keys": [KEY]}, ["n1"])
+        self.assertIn("share its machine name (bbvm-web-db-x) with web's db-x", r.get("error", ""), r)
+        self.assertEqual(self.f.jobs[0][2]["project"], "web")
+
     def test_a_report_from_before_a_vm_was_made_is_an_earlier_vms(self):
         # Made again under a name an earlier VM had: the node's report, taken
         # before, describes that one (B319), and its address is nobody's now.
@@ -417,6 +425,27 @@ class Agent(unittest.TestCase):
         with mock.patch.object(self.av, "_run", side_effect=virsh), mock.patch.object(self.av.shutil, "which", return_value="/usr/bin/virsh"):
             self.assertEqual(self.av.vms_other(), [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192},
                                                    {"name": "bbvm-fake", "state": "stopped", "vcpus": 1, "mem_mb": 1024}])
+
+    def test_an_action_on_another_projects_domain_is_refused(self):
+        # A domain's marker names its project: a job for another project's
+        # name that happens to make the same domain is refused before any
+        # command; one for its own goes on; one naming no project is let by.
+        from unittest import mock
+        xml = f'<domain><metadata><bb:vm xmlns:bb="{self.av.META_NS}" project="foo"/></metadata></domain>'
+        done = mock.Mock(returncode=0, stdout=xml, stderr="")
+        a = self.agent.Agent.__new__(self.agent.Agent)
+        a.drop_privileges = lambda kw: kw
+        a.hello_again = lambda why: None
+        a._vm_remove = mock.Mock(return_value=("succeeded", 0))
+        job = mock.Mock()
+        with mock.patch.object(self.av.subprocess, "run", return_value=done), \
+             mock.patch.object(self.av.shutil, "which", return_value="/usr/bin/virsh"), \
+             mock.patch.object(self.av.os.path, "isdir", return_value=True), \
+             mock.patch.object(self.av, "own_here", return_value=False):
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web", "project": "foo-bar"}), ("failed", 77))
+            a._vm_remove.assert_not_called()
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web", "project": "foo"}), ("succeeded", 0))
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web"}), ("succeeded", 0))
 
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
         # R165 step 1: the wall's file says the machine is the controller's
