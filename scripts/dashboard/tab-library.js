@@ -320,9 +320,9 @@ function libRow(r, may){
 // The search on a line of its own with the page's buttons at its right
 // (the operator, 29 Oct: under the head, where the bar left a gap), then
 // the chips under it.
-// Each row counts within the other's pick (the operator, 31 Oct: a kind
-// picked should say how many of it each source has): the kinds over the
-// source picked, the sources over the kind picked.
+// The sources count within the kind picked (the operator, 31 Oct: a kind
+// picked says how many of it each source has); the kinds, the first row,
+// count the whole library, so a source picked never empties that row.
 function libFilterBand(kindRows, tierRows, acts = ""){
   const count = (key, f) => kindRows.filter(f).length;
   // Installed, then Updates, first after All (the operator, 29 Oct): every
@@ -415,7 +415,7 @@ function renderLibraryInto(i){
   // A kind whose cards come from one source alone draws no source chips, so
   // a source picked before is let go rather than narrowing out of sight.
   if (libTier && LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2) libTier = "";
-  const kindRows = all.filter(r => !libTier || r.tier === libTier);
+  const kindRows = all;
   const rows = all.filter(r => libMatch(r, libQ) && inKind(r) && (!libTier || r.tier === libTier));
   const inst = all.filter(r => r.installed).length, due = all.filter(r => r.update).length;
   const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
