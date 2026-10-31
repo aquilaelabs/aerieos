@@ -79,6 +79,18 @@ class Store(unittest.TestCase):
         self.assertIn("192.168.1.16:3000", [f["host"] for f in accountkeys.forges_of(UID)])
         self.assertEqual(accountkeys.link_forge(UID, "192.168.1.16:3000", line, "octo")[0]["id"], got["id"])
 
+    def test_a_key_that_does_not_open_is_kept_not_made_anew(self):
+        # B542: started with another install key, the account's key does not
+        # open; it is kept as it was (and nothing is opened), and with the
+        # right install key back, the token sealed under it opens again.
+        was = (self.d / "account-keys.json").read_text()
+        right = signing.MASTER
+        signing.MASTER = b"w" * 32
+        self.assertIsNone(accountkeys.key_of(UID))
+        self.assertEqual((self.d / "account-keys.json").read_text(), was, "the record untouched")
+        signing.MASTER = right
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+
     def test_a_key_change_seals_the_store_again(self):
         before = (self.d / "account-secrets.json").read_text()
         self.assertEqual(accountkeys.change(UID)[1], 200)

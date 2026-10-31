@@ -129,17 +129,21 @@ def key_of(uid, make=True):
     if own_of(uid):
         return unlocks.opened_key(uid)
     k = _open(r.get("key"))
-    if k or not make:
+    # A key that is there and does not open (sealed under an install key
+    # this start was not given) is kept for that key, never made anew: a
+    # new one in its place lost every token sealed under the old for good,
+    # at every start with a mistyped INSTALL_KEY (B542).
+    if k or not make or r.get("key"):
         return k
     with _lock:
         d = _load()
         r = d.get(uid) or {}
         k = _open(r.get("key"))
-        if k:
+        if k or r.get("key"):
             return k
         k = secrets.token_bytes(32)
         now = int(time.time())
-        d[uid] = {"key": _keep(k), "made": now, "changed": now}
+        d[uid] = {**r, "key": _keep(k), "made": now, "changed": now}
         with contextlib.suppress(OSError):
             _save(d)
             return k
