@@ -4527,8 +4527,11 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
                  node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
                  project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
                  job_get=lambda jid: nodes.job(jid, with_log=True))
+# Every module that seals under the install key: one left out kept its
+# secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
-                             accountkeys.seal_all, reach.seal_all, router.seal_all),
+                             accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
+                             poolkeys.seal_all, packconfig.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
