@@ -272,3 +272,16 @@ class RunLog(Base):
         got, code = forgeaccess.v_run_log(self.t, {"pos": ["7"]})
         self.assertEqual((code, [x["job"] for x in got]), (200, ["163"]))
         self.assertTrue(got[0]["log"].endswith("the error"))
+
+
+class Governed(Base):
+    def test_an_ability_another_setting_governs_has_no_switch(self):
+        # B559: a deny on Push, Read the code or Publish and edit releases was
+        # told to sessions and enforced nowhere; it is fixed at allow, with
+        # where it is set, and Change CI workflow files keeps its switch.
+        self.pol = {"push": "deny", "releases_write": "deny", "code_read": "deny", "workflows": "deny"}
+        o = forgeaccess.override("app")
+        self.assertEqual((o["push"], o["releases_write"], o["code_read"], o["workflows"]), ("allow", "allow", "allow", "deny"))
+        rows = {r["id"]: r for r in forgeaccess.view("app")["rows"]}
+        self.assertEqual(rows["push"]["fixed"], "set under Pushing")
+        self.assertEqual(rows["workflows"]["fixed"], "")

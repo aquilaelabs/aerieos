@@ -42,3 +42,33 @@ class Wanted(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorkflowFiles(unittest.TestCase):
+    """B559: a push that changes a CI workflow file is the project's to
+    allow; the files are read in the relay's own repository."""
+
+    def test_the_workflow_files_a_push_would_change(self):
+        import subprocess
+        import tempfile
+        r = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, r, True)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x"}
+        g = lambda *a: subprocess.run(["git", "-C", r, *a], check=True, capture_output=True, text=True, env=env).stdout.strip()
+        g("init", "-q", "-b", "main")
+        open(os.path.join(r, "app.py"), "w").write("x\n")
+        g("add", "-A"); g("commit", "-qm", "one")
+        base = g("rev-parse", "HEAD")
+        open(os.path.join(r, "app.py"), "w").write("y\n")
+        g("commit", "-qam", "code")
+        code = g("rev-parse", "HEAD")
+        os.makedirs(os.path.join(r, ".github", "workflows"))
+        open(os.path.join(r, ".github", "workflows", "ci.yml"), "w").write("on: push\n")
+        g("add", "-A"); g("commit", "-qm", "ci")
+        ci = g("rev-parse", "HEAD")
+        d = os.path.join(r, ".git")
+        refs = {"refs/remotes/origin/feature": base}
+        self.assertEqual(gitrelay._workflow_files(d, "origin", ["origin"], "refs/heads/feature", "feature",
+                                                  {**refs, "refs/heads/feature": code}), [])
+        self.assertEqual(gitrelay._workflow_files(d, "origin", ["origin"], "refs/heads/feature", "feature",
+                                                  {**refs, "refs/heads/feature": ci}), [".github/workflows/ci.yml"])

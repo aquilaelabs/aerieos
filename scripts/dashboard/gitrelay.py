@@ -420,7 +420,7 @@ def _lfs(root):
 
 # ---- the verbs --------------------------------------------------------------
 
-def run(project, cwd, verb, args, scan=True, uid="", token_why=""):
+def run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=True):
     """{code, out, err, apply?} for one relayed verb, or {error} when it
     was refused before any git ran. A push is read for secrets first
     (pushscan, R219): `scan` True holds one with findings ({held: [...]},
@@ -428,9 +428,11 @@ def run(project, cwd, verb, args, scan=True, uid="", token_why=""):
     pushes what a person has read and approved. `uid`: whose work it is,
     whose own token is asked first (R154). `token_why`: what keeps the
     person's token from being used now (gitcreds.usable), refused after the
-    address's own refusals where the remote would need one (https)."""
+    address's own refusals where the remote would need one (https).
+    `workflows` False refuses a push that changes a CI workflow file (B559)."""
     try:
-        return _run(project, cwd, verb, [str(a) for a in args], scan=scan, uid=uid, token_why=token_why)
+        return _run(project, cwd, verb, [str(a) for a in args], scan=scan, uid=uid, token_why=token_why,
+                    workflows=workflows)
     except Refused as e:
         return {"error": str(e)}
 
@@ -523,27 +525,23 @@ def bad_args(args):
     return ""
 
 
-def _scan(d, project, name, pos, head_ref, branch, tree_refs):
-    """The findings a push would send that nobody has okayed (pushscan): the
-    added lines of each branch it writes, against the remote's copy of that
-    branch as this tree last saw it, else the remote's main, else nothing.
-    Read in the shadow repository, so nothing the tree's config names runs;
-    a diff git cannot make counts as nothing to flag, said in the log."""
+def _push_ranges(d, name, pos, head_ref, branch, tree_refs):
+    """(base, src) for each branch a push writes: what it sends, against the
+    remote's copy of that branch as this tree last saw it, else the remote's
+    main, else nothing (git's empty tree)."""
     specs = [a for a in pos[1:]]
     pairs = []
-    dashd = False
     for s in specs:
         s = s[1:] if s.startswith("+") else s
         src, sep, dst = s.partition(":")
-        if dashd or (sep and not src):
+        if sep and not src:
             continue
         src_ref = head_ref if src in ("", "HEAD") else (src if src.startswith("refs/") else f"refs/heads/{src}")
         dest = (dst if sep else src).removeprefix("refs/heads/")
         pairs.append((src_ref, head_ref.removeprefix("refs/heads/") if dest in ("", "HEAD") else dest))
     if not specs:
         pairs.append((head_ref, branch))
-    empty = ""
-    found = []
+    empty, out = "", []
     for src_ref, dest in pairs:
         src = tree_refs.get(src_ref) or (src_ref if OID.fullmatch(src_ref) else "")
         if not src:
@@ -555,8 +553,35 @@ def _scan(d, project, name, pos, head_ref, branch, tree_refs):
                 e = _git(d, "hash-object", "-t", "tree", "/dev/null", timeout=30)
                 empty = e["out"].strip() if e["code"] == 0 else ""
             base = empty
-        if not base or base == src:
-            continue
+        if base and base != src:
+            out.append((base, src))
+    return out
+
+
+# What a git host runs as CI: a push that changes one runs whatever it says
+# with the repository's secrets, so it is the project's to allow (B559).
+WORKFLOW_PATHS = (".github/workflows/", ".gitea/workflows/", ".forgejo/workflows/", ".gitlab-ci.yml")
+
+
+def _workflow_files(d, name, pos, head_ref, branch, tree_refs):
+    """The CI workflow files a push would change, read in the shadow
+    repository; a diff git cannot make counts as none."""
+    hit = []
+    for base, src in _push_ranges(d, name, pos, head_ref, branch, tree_refs):
+        r = _git(d, "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only", base, src, timeout=120)
+        if r["code"] == 0:
+            hit += [f for f in r["out"].splitlines() if f.startswith(WORKFLOW_PATHS[:3]) or f == WORKFLOW_PATHS[3]]
+    return sorted(set(hit))
+
+
+def _scan(d, project, name, pos, head_ref, branch, tree_refs):
+    """The findings a push would send that nobody has okayed (pushscan): the
+    added lines of each branch it writes, against the remote's copy of that
+    branch as this tree last saw it, else the remote's main, else nothing.
+    Read in the shadow repository, so nothing the tree's config names runs;
+    a diff git cannot make counts as nothing to flag, said in the log."""
+    found = []
+    for base, src in _push_ranges(d, name, pos, head_ref, branch, tree_refs):
         r = _git(d, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", "-U0",
                  "--diff-filter=AM", base, src, timeout=120)
         if r["code"] != 0:
@@ -570,7 +595,7 @@ def _scan(d, project, name, pos, head_ref, branch, tree_refs):
     return pushscan.fresh(project, uniq)
 
 
-def _run(project, cwd, verb, args, scan=True, uid="", token_why=""):
+def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=True):
     if verb not in VERBS:
         raise Refused(f"bb git takes {', '.join(VERBS)} or policy; plain git does everything else")
     why = bad_args(args)
@@ -625,6 +650,12 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why=""):
         net = [f for f in flags if f not in PULL_ONLY]
         if verb == "ls-remote":
             return _git(d, "ls-remote", *net, name, *pos[1:])
+        if verb == "push" and not workflows:
+            changed = _workflow_files(d, name, pos, head_ref, branch, tree_refs)
+            if changed:
+                raise Refused(f"this push changes CI workflow files ({', '.join(changed[:4])}), and this project "
+                              "does not let a session change them (Permissions, On the git host: Change CI "
+                              "workflow files); push without them, or ask its owner to turn it on")
         if verb == "push" and scan:
             # Read before it goes (R219): what nobody has okayed holds it.
             found = _scan(d, project, name, pos, head_ref, branch, tree_refs)

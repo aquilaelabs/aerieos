@@ -1186,9 +1186,13 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const hostSect = await page.$eval('.nb .nbview[data-view="permissions"] .permhost', el => ({
     n: el.querySelectorAll('[data-forgepol]').length, merge: el.querySelector('[data-forgepol="merge"]').value,
     pr: el.querySelector('[data-forgepol="pr_write"]').value, apply: el.querySelector('.permHostApply')?.disabled,
-    said: /not measured/.test(el.textContent), measure: !!el.querySelector('.permHostMeasure') }));
-  ok(hostSect.n === 12 && hostSect.merge === 'deny' && hostSect.pr === 'allow' && hostSect.apply === true && hostSect.said && hostSect.measure,
-     `Permissions lists every git host ability with an Allow or Deny, merging at Deny, and Measure (${JSON.stringify(hostSect)})`);
+    said: /not measured/.test(el.textContent), measure: !!el.querySelector('.permHostMeasure'),
+    elsewhere: /set under Pushing/.test(el.textContent) && /set under Agents may: Tag and publish a release/.test(el.textContent) }));
+  // Push, Read the code and Publish and edit releases have no switch here
+  // (B559): another setting governs each, and the row says which.
+  ok(hostSect.n === 9 && hostSect.merge === 'deny' && hostSect.pr === 'allow' && hostSect.apply === true && hostSect.said && hostSect.measure
+     && hostSect.elsewhere,
+     `Permissions lists each git host ability it governs with an Allow or Deny, merging at Deny, the rest where they are set, and Measure (${JSON.stringify(hostSect)})`);
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-forgepol="pr_write"]', 'deny');
   await page.click('.nb .nbview[data-view="permissions"] .permHostApply');
   const saved = await page.waitForFunction(async () => {

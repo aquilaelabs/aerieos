@@ -4942,7 +4942,7 @@ import pushscan                                                  # noqa: E402
 
 pushscan.configure(state=STATE, write_json=write_json)
 bbrelay.configure(users=users, projects=projects, prefs=prefs, gitrelay=gitrelay, registry=registry,
-                  WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan)
+                  WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan, forgeaccess=forgeaccess)
 
 
 def _push_approved(rec, by):
@@ -4951,8 +4951,11 @@ def _push_approved(rec, by):
     repository, as the session's bb would have run it."""
     pushscan.okay(rec.get("project") or "", rec.get("findings") or [], by)
     to = str(rec.get("to") or "")
-    return gitrelay.run(rec.get("project") or "", rec.get("cwd") or str(WORKSPACE / (rec.get("project") or "")),
-                        "push", rec.get("args") or [], scan=False, uid=to if to.startswith("u_") else "")
+    # Approved for its flagged lines, not for its workflow files (B559).
+    project = rec.get("project") or ""
+    return gitrelay.run(project, rec.get("cwd") or str(WORKSPACE / project),
+                        "push", rec.get("args") or [], scan=False, uid=to if to.startswith("u_") else "",
+                        workflows=forgeaccess.override(project).get("workflows") != "deny")
 
 
 phone.pusher = _push_approved

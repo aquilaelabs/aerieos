@@ -62,6 +62,7 @@ gitrelay = None
 registry = None
 phone = None          # the asks (R219): a held push waits on the bell there
 pushscan = None
+forgeaccess = None    # the project's On the git host settings (B559)
 WORKSPACE = None
 STATE = None
 
@@ -321,8 +322,11 @@ def run(me, req, project):
         # The project's git policy may turn the hold off (the Git view's
         # "Hold a push that looks sensitive"): the push then goes unread.
         hold = prefs.get(project)["gitpol"].get("scan") != "off"
+        # A session's push is held to the project's Change CI workflow files
+        # (B559): a workflow it wrote runs with the repository's secrets.
+        wf = not me.get("session") or not forgeaccess or forgeaccess.override(project).get("workflows") != "deny"
         r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=str(me.get("uid") or ""),
-                         token_why=u.get("why", ""))
+                         token_why=u.get("why", ""), workflows=wf)
         if "error" in r:
             return r, 400
         if r.get("held"):

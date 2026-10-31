@@ -57,11 +57,11 @@ ABILITIES = (
     {"id": "code_read", "label": "Read the code and its history",
      "gh": ("Contents", "read"), "classic": "repo, or public_repo for a public repository",
      "gitlab": "read_repository", "gitea": "read:repository", "how": "git fetch and pull (bb git)",
-     "verbs": (), "default": "allow"},
+     "verbs": (), "default": "allow", "fixed": "always: a session has the tree itself"},
     {"id": "push", "label": "Push branches",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "write_repository",
      "gitea": "write:repository", "how": "bb git push, under Permissions: Pushing",
-     "verbs": (), "default": "allow"},
+     "verbs": (), "default": "allow", "fixed": "set under Pushing"},
     {"id": "workflows", "label": "Change CI workflow files",
      "gh": ("Workflows", "write"), "classic": "workflow", "gitlab": "write_repository",
      "gitea": "write:repository", "how": "a push that touches .github/workflows",
@@ -92,7 +92,8 @@ ABILITIES = (
      "how": "", "verbs": ("release list", "release view"), "default": "allow"},
     {"id": "releases_write", "label": "Publish and edit releases",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "api", "gitea": "write:repository",
-     "how": "bb version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow"},
+     "how": "bb version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow",
+     "fixed": "set under Agents may: Tag and publish a release"},
 )
 BY_ID = {a["id"]: a for a in ABILITIES}
 
@@ -344,7 +345,10 @@ def override(project):
     """{ability: allow|deny}: what the project lets an agent do, over what
     the token allows."""
     pol = ((prefs_of(project) or {}).get("forgepol") if prefs_of else None) or {}
-    return {k: (pol.get(k) if pol.get(k) in ("allow", "deny") else v) for k, v in defaults().items()}
+    # An ability another setting governs has no switch here (B559): a deny
+    # kept from before it was taken away changed nothing, and said it did.
+    return {k: (pol.get(k) if pol.get(k) in ("allow", "deny") and not BY_ID[k].get("fixed") else v)
+            for k, v in defaults().items()}
 
 
 def may(project, ab, m=None):
@@ -372,7 +376,7 @@ def view(project, measure_now=False):
         got = (m.get("has") or {}).get(a["id"])
         rows.append({"id": a["id"], "label": a["label"], "token": got, "set": pol[a["id"]],
                      "default": a["default"], "needs": needs(a["id"], m.get("kind") or "github"),
-                     "verbs": list(a["verbs"]), "how": a["how"]})
+                     "verbs": list(a["verbs"]), "how": a["how"], "fixed": a.get("fixed", "")})
     return {"rows": rows, "measure": {k: m.get(k) for k in ("at", "host", "repo", "forge", "kind", "login",
                                                            "token", "expires", "notes", "error", "scopes")}
             if m else None}

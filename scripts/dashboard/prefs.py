@@ -66,6 +66,9 @@ FORGEPOL_DEFAULT = {"code_read": "allow", "push": "allow", "workflows": "allow",
                     "pr_write": "allow", "merge": "deny", "issues_read": "allow", "issues_write": "allow",
                     "actions_read": "allow", "actions_write": "allow", "releases_read": "allow",
                     "releases_write": "allow"}
+# The abilities another setting governs (B559), with where: no deny here.
+FORGEPOL_FIXED = {"code_read": "a session has the tree itself", "push": "it is set under Pushing",
+                  "releases_write": "it is set under Agents may: Tag and publish a release"}
 GATE_MODES = ("auto", "ask", "deny")
 # The modes a gate takes beyond those three, by kind: the wiki may also be
 # hidden, which keeps it from a session altogether, reading included
@@ -1002,6 +1005,8 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
                     return {"error": f"not an ability on the git host: {k}; one of {', '.join(FORGEPOL_DEFAULT)}"}
                 if v not in GITPOL_MODES:
                     return {"error": f"{k}: allow or deny, not {v}"}
+                if k in FORGEPOL_FIXED and v != "allow":
+                    return {"error": f"{k} has no switch here: {FORGEPOL_FIXED[k]}"}
                 cur["forgepol"][k] = v
         if gate is not None:
             if not isinstance(gate, dict):

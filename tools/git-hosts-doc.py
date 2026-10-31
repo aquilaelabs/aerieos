@@ -32,9 +32,14 @@ is decided twice:
    outright when it may not), keeps the answer, and measures again when the
    token changes, when Measure is pressed and once a day.
 2. **The project.** The project's Permissions view, On the git host, has
-   Allow or Deny for each ability below. Deny takes the ability away
-   whatever the token allows; Allow can never give more than the token has.
-   Merging starts at Deny.
+   Allow or Deny for each ability below that `bb forge` works, and for
+   changing CI workflow files, where Deny refuses a session's push that
+   changes one (a workflow runs with the repository's secrets). Deny takes
+   the ability away whatever the token allows; Allow can never give more
+   than the token has. Merging starts at Deny. Three have no switch there,
+   since another setting governs each: reading the code (a session has the
+   tree), pushing (Permissions, Pushing) and publishing releases (Agents
+   may: Tag and publish a release).
 
 Every session is told at its start what the token lets it do and what to
 ask for (`bb forge whoami` prints the same), and a verb the token cannot

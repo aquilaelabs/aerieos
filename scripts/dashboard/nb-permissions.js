@@ -113,13 +113,16 @@ function nbPermsView({$, nb, project, root}){
       const tok = r.token === true ? `<span class="ok">the token may</span>` : r.token === false
         ? `the token may not: it needs ${esc(r.needs)}` : "not measured";
       const how = r.verbs.length ? `bb forge ${r.verbs.join(", ")}` : r.how;
-      return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how ? ` · ${esc(how)}` : ""}</div></div>
-        <label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label></div>`;
+      // One another setting governs has no switch here, only where it is
+      // set (B559): its deny was told to sessions and enforced nowhere.
+      return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how && !r.fixed ? ` · ${esc(how)}` : ""}</div></div>
+        ${r.fixed ? `<span class="state">${esc(r.fixed)}</span>`
+          : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label>`}</div>`;
     }).join("");
     const foot = rows.length ? `<div class="row"><div class="grow"><span class="state">${locked ? "this project is locked: its owner changes these"
       : "a Deny here takes an ability away whatever the token allows; the token decides what is possible"}</span></div>
       <div class="actbar"><button type="button" class="permHostApply"${dirty && !locked ? "" : " disabled"}>Apply</button></div></div>` : "";
-    const on = rows.filter(r => r.token !== false && (hostDraft[r.id] || r.set) === "allow").length;
+    const on = rows.filter(r => r.token !== false && (r.fixed || (hostDraft[r.id] || r.set) === "allow")).length;
     const html = docSection("permissions", "githost", "On the git host",
       rows.length ? `${on} of ${rows.length} allowed` : "", facts + list + foot);
     if (el.dataset.drawn === html) return;
