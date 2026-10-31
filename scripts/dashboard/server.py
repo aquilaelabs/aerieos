@@ -4535,6 +4535,7 @@ installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
+installkey.settle()
 # Every account's own key made at the start that can seal it, a fresh
 # install's first and an upgraded one's first alike, rather than when it is
 # first needed (the operator, 27 Oct); one added later has its own made then.

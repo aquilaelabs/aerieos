@@ -99,8 +99,6 @@ def status():
     out: dict = {"where": w, "folder": str(_dir() or "") if w in ("secrets", "state") or (w == "env" and _dir()) else ""}
     if not w:
         return out
-    with _lock:
-        _drop_previous()
     a = _about()
     fp = fingerprint(signing.MASTER)
     if w == "env":
@@ -161,16 +159,44 @@ def change(new=""):
         _write(d / "key-previous", signing.MASTER)
         _write(d / "key", key)
         signing.load_master()
-        moved = 0
+        moved, left = 0, 0
         for p in reseal:
-            moved += p(again=True) or 0
+            # One that fails is run again at the next start (settle), the
+            # key before kept for it; the rest go on.
+            try:
+                moved += p(again=True) or 0
+            except Exception:                               # noqa: BLE001 (said, and settled at the next start)
+                left += 1
         a = _about()
         a.pop("saved", None)
         a["changed"] = int(time.time())
         a.setdefault("made", a["changed"])
         _save_about(a)
-        _drop_previous()
-    return {"ok": True, "fingerprint": fingerprint(key), "resealed": moved}, 200
+        # The key before is kept until the next start has run every pass
+        # again with both keys (settle): dropped here, anything a pass
+        # skipped (a keystore it could not write a moment ago) was left
+        # under a key that was gone for good (B550).
+    return {"ok": True, "fingerprint": fingerprint(key), "resealed": moved,
+            **({"note": f"{left} of the stores could not be sealed again now; the key before is kept, "
+                        "and they are sealed again at the next start"} if left else {})}, 200
+
+
+def settle():
+    """At start, while the key before today's is kept: every pass run again
+    under today's key, then the one before let go once nothing on the nodes
+    is sealed under it. Returns how many were sealed again."""
+    if signing.PREVIOUS is None:
+        return 0
+    moved, clean = 0, True
+    with _lock:
+        for p in reseal:
+            try:
+                moved += p(again=True) or 0
+            except Exception:                               # noqa: BLE001 (kept for the next start)
+                clean = False
+        if clean:
+            _drop_previous()
+    return moved
 
 
 def note_made():
