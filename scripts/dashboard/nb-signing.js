@@ -128,10 +128,14 @@ function nbSigningView({$, nb, project}){
     // while it holds no key, whose empty state is said where the keys are.
     const mappedN = Object.values({...map, ...mapDraft}).filter(k => k !== null).length;
     // ...and under them how the controller keeps them (R111 step 2).
+    // With none held, the words that say so share the control row with its
+    // buttons, as the other views' status lines do (a button never on a
+    // line of its own).
     viewGlance($("sgHint"), !held ? [] : [
       {label: held === 1 ? "key" : "keys", value: held},
       {label: mappedN === 1 ? "app" : "apps", value: mappedN, omit: !mappedN}],
-      !held ? "" : AT_REST[atRest] || "", "", {open: "warn", locked: "bad"}[atRest] || "");
+      !held ? (why ? "" : "no key yet: bb sign signs this project's builds on its node with the keys kept here, and a session never sees one")
+        : AT_REST[atRest] || "", "", held ? {open: "warn", locked: "bad"}[atRest] || "" : "");
     // Import a backup and New key, the view's adds, the control row's
     // actions with New key the primary (a-notebook/views, R109), the form
     // either opens unrolling under the row.
@@ -233,8 +237,7 @@ function nbSigningView({$, nb, project}){
       // node from it is said in its words (B232).
       + (why ? `<div class="field"><div class="notice warn">${esc(why)}</div></div>` : "")
       + (why ? "" : pageHead({cls: "sghead", facts: [
-          ["Node", tool ? "" : nodeWhy, {cls: "sgnode"}],
-          ["Keys", held ? "" : "none yet: bb sign signs this project's builds on its node with the keys kept here, and a session never sees one"]]}))
+          ["Node", tool ? "" : nodeWhy, {cls: "sgnode"}]]}))
       + docSection("signing", "lock", "Backup password", locked ? "set" : "none", lock, {cls: locked ? "" : "warn"})
       + names.filter(key => !keyPick || !names.includes(keyPick) || key === keyPick)
           .map(key => docSection("signing", `key:${key}`, key === "default" ? "Default key" : `Key: ${key}`,
