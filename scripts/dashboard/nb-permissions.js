@@ -30,6 +30,10 @@ function nbPermsView({$, nb, project, root}){
     sect.parentElement.insertBefore(document.createComment(RN_DIALS_MARK), sect);
     sect.open = true;
     host.appendChild(sect);
+    // Its edits and its Save heard here too, where they no longer bubble to
+    // the form's own box.
+    rnWireBox(host);
+    rnBars();
   }
 
   // What a session may do with the remote (roadmap R36), moved here from

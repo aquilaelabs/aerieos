@@ -7993,8 +7993,12 @@ $("rnName").oninput = rnShow;
 // Each section's Save, Save, keep it running, Save and end it and Revert,
 // and every change kept in step with its bar. On the form itself, which
 // moves between the dialog and a notebook's Settings view.
-{
-  const box = $("rnmodal").querySelector(":scope > .box");
+// Wired on whatever holds a part of it: the dialog's box, and the
+// Permissions view's, which Agents may is lent into (rnWireBox there): on
+// the dialog's box alone, a dial changed on Permissions never lit its Save.
+function rnWireBox(box){
+  if (!box || box.dataset.rnwired) return;
+  box.dataset.rnwired = "1";
   box.addEventListener("click", e => {
     const b = e.target.closest("[data-rnsave],[data-rnkeep],[data-rnend],[data-rnrevert]");
     if (b && !b.disabled){
@@ -8009,6 +8013,7 @@ $("rnName").oninput = rnShow;
   });
   for (const ev of ["input", "change"]) box.addEventListener(ev, () => setTimeout(rnBars, 0));
 }
+rnWireBox($("rnmodal").querySelector(":scope > .box"));
 $("rnTokenClear").onclick = () => {
   rnClearToken = !rnClearToken;
   if (rnClearToken) $("rnToken").value = "";   // whatever was typed was for the

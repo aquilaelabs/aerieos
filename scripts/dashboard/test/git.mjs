@@ -1175,6 +1175,19 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     apply: el.querySelector('.permGitApply')?.disabled }));
   ok(perm.dials && perm.pol === 3 && perm.apply === true,
      `Permissions holds Agents may and the push policy, its Apply asleep (${JSON.stringify(perm)})`);
+  // Agents may, lent here from the settings form: a dial changed lights its
+  // own Save, and put back puts it out (B568: neither reached the form's
+  // listeners, so Save stayed dead).
+  const DIAL = '.nb .nbview[data-view="permissions"] details[data-sect="rn:claude"] select';
+  await page.waitForSelector(DIAL, { state: 'visible', timeout: 10000 });
+  const dial = await page.$eval(DIAL, s => ({ was: s.value, other: [...s.options].map(o => o.value).find(v => v !== s.value) }));
+  const saveLit = () => page.$eval('.nb .nbview[data-view="permissions"] details[data-sect="rn:claude"] [data-rnsave]', b => !b.disabled);
+  await page.selectOption(DIAL, dial.other);
+  await page.waitForFunction(() => !document.querySelector('.nb .nbview[data-view="permissions"] details[data-sect="rn:claude"] [data-rnsave]')?.disabled, null, { timeout: 5000 }).catch(() => {});
+  const lit = await saveLit();
+  await page.selectOption(DIAL, dial.was);
+  await page.waitForFunction(() => document.querySelector('.nb .nbview[data-view="permissions"] details[data-sect="rn:claude"] [data-rnsave]')?.disabled, null, { timeout: 5000 }).catch(() => {});
+  ok(lit && !(await saveLit()), `Agents may on Permissions: a dial changed lights its Save, and put back puts it out (${JSON.stringify(dial)})`);
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-gitpol="push"]', 'deny');
   ok(await page.$eval('.nb .nbview[data-view="permissions"] .permGitApply', b => !b.disabled),
      '...picking a policy wakes Apply and saves nothing yet');
