@@ -74,7 +74,7 @@ def sums_verify(sums, sig, keys, run=subprocess.run):
 # Each piece of a slot, and where image/build.sh puts it on the ISO.
 PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
           "initrd": "live/initrd", "release": "live/release"}
-VER_RE = re.compile(r"v?(\d+\.\d+\.\d+)")
+VER_RE = re.compile(r"v?(\d+\.\d+\.\d+(?:-dev\.\d+)?)")  # a release, or a dev build (B589)
 
 
 def _env(name, default):
@@ -387,7 +387,7 @@ class OsImageMixin:
             say("refused: an update names a release (vX.Y.Z) or a folder with its files\n")
             return "failed", 64
         if tag and not VER_RE.fullmatch(tag):
-            say("refused: a release is named by its tag, vX.Y.Z\n")
+            say("refused: a release is named by its tag, vX.Y.Z or vX.Y.Z-dev.N\n")
             return "failed", 64
         if src and not (os.path.isabs(src) and os.path.isdir(src)):
             say(f"refused: {src or 'the folder'} is not a folder on this machine\n")

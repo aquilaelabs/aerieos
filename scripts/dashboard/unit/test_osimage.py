@@ -329,6 +329,14 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(state, "failed")
         self.assertIn("is not a folder", text)
 
+    def test_a_dev_build_is_taken_by_its_tag(self):
+        # B589: the dev channel's update names a dev build, v0.9.1-dev.12.
+        w = World(slot="a")
+        w.publish("0.9.1-dev.12")
+        state, code, text = self.run_update(w, {"release": "v0.9.1-dev.12"})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertIn("builderbot-os-0.9.1-dev.12", text)
+
     def test_what_is_refused(self):
         w = World()
         state, code, text = self.run_update(w, {"release": "latest"})
