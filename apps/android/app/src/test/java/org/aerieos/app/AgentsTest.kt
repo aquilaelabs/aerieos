@@ -9,9 +9,9 @@ import org.junit.Test
 
 class AgentsTest {
     @Test fun liveAgentsAreTheTablesClaudeFirst() {
-        assertEquals(listOf("claude", "codex", "copilot"), Agents.LIVE.map { it.id })
+        assertEquals(listOf("claude", "codex", "copilot", "grok", "open"), Agents.LIVE.map { it.id })
         assertEquals("ChatGPT", Agents.byId("codex")?.name)
-        assertNull(Agents.byId("open"))
+        assertNull(Agents.byId("nobody"))
     }
 
     @Test fun sessionNamesAreTmuxSpelled() {
