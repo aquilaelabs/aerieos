@@ -1412,8 +1412,12 @@ start() {
     # list above, token included) for the life of the server, where ps
     # shows it to every account on the machine. A server started bare has
     # nothing on its command line; the -e values still land in the
-    # session's environment, which is where they were wanted.
-    tmux start-server 2>/dev/null || true
+    # session's environment, which is where they were wanted. exit-empty off
+    # holds that bare server up until new-session below: a server with no
+    # session exits as soon as the command that started it is done, so every
+    # setting made here reached nothing on an account's first terminal, and
+    # with no default-shell a pane on nologin ended at once (B608).
+    tmux start-server \; set-option -g exit-empty off 2>/dev/null || true
     # Every pane's command runs through tmux's default shell, which is the
     # login shell where nothing set it, and an account's own user has
     # nologin for one (B277): bash, whoever this runs as.
@@ -1467,6 +1471,7 @@ start() {
     # attach-session, which attached this terminal right here, before the
     # settings below were made, and with -d threw every other client off it.
     tmux new-session -d -s "$s" -c "$dir" "${envs[@]}" "$@" 2>/dev/null || true
+    tmux set-option -g exit-empty on 2>/dev/null || true
 
     # Mouse mode decides who owns a drag. Off, the browser makes an ordinary
     # selection and the terminal copies it as the button comes up. On, tmux
