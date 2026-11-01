@@ -83,7 +83,7 @@
 </script>
 <!-- Inline so the browser never asks the server for /favicon.ico: the only
      404 this page would otherwise produce. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2310192b'/%3E%3Cpath d='M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z' fill='%2335b6ff'/%3E%3Cpath d='M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z' fill='%231c6fd1'/%3E%3Cpath d='M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z' fill='%239fdcff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1322'/%3E%3Cpath d='M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z' fill='%232fc6ff'/%3E%3Cpath d='M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z' fill='%230f7fd6'/%3E%3Cpath d='M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z' fill='%23ff8f4a'/%3E%3C/svg%3E">
 <style>
 /* hidden means hidden, whatever display a class gives the element. Without
    this, any rule that sets display (.uadd's flex, .modal label's block) beats
@@ -94,9 +94,9 @@
 /* The design language is docs/design-language.md, held by the house rule
    `design` and measured by test/uniform.mjs. */
 :root,.sw[data-theme="default"]{
-  --bg:#10192b; --panel:#172339; --line:#44597c; --ink:#e7eefa;
-  --dim:#a6b4cb; --accent:#35b6ff; --warn:#d29922; --bad:#f07178;
-  --note:#9aa5ff;
+  --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
+  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#d29922; --bad:#f07178;
+  --note:#ff8f4a;
   /* A check that passed is green in every scheme (the operator, 16 Oct: the
      doctor read teal on Abyss and orange on Ember, an accent that reads as
      a warning there), as warn and bad stay yellow and red. Not swapped by
@@ -384,7 +384,7 @@ html[data-mode="light"]{
 }
 html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
   --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
-  --dim:#566275; --accent:#0a6ab8; --warn:#996200; --bad:#c3131b; --note:#4d58d0}
+  --dim:#566275; --accent:#0059c7; --warn:#996200; --bad:#c3131b; --note:#b8470f}
 /* Nostromo's light half is the ship's white corridors: cool gray-white
    walls and panels and the hazard marking's red-orange for what is the one
    (the operator, 16 Oct); its graphics are with the dark half's, below. */
@@ -595,6 +595,9 @@ header>button{min-height:var(--tap);min-width:var(--tap)}
    the controller does not answer. */
 .logo{width:22px;height:22px;flex:0 0 auto;color:var(--note);display:block;
   transition:color .2s ease}
+/* The default scheme's mark is its own cerulean, never its copper. */
+html:not([data-theme]) .logo{color:var(--accent)}
+html:not([data-theme]) .logo.off{color:var(--bad)}
 .logo.off{color:var(--bad)}
 @media(prefers-reduced-motion:reduce){
   .logo{transition:none}

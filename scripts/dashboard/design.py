@@ -170,8 +170,8 @@ TOKEN_KEYS = [k for k, _, _ in TOKENS]
 # for. Default leads because it is what you get having made no choice; the
 # rest are alphabetical.
 SCHEMES = [
-    ("default", "Default", {"bg": "#10192b", "panel": "#172339", "line": "#44597c", "ink": "#e7eefa",
-                            "dim": "#a6b4cb", "accent": "#35b6ff", "warn": "#d29922", "bad": "#f8524a", "note": "#9aa5ff", "good": "#56d364"}),
+    ("default", "Default", {"bg": "#0b1322", "panel": "#121c30", "line": "#3e5378", "ink": "#eaf1fc",
+                            "dim": "#a9b7ce", "accent": "#2fc6ff", "warn": "#d29922", "bad": "#f8524a", "note": "#ff8f4a", "good": "#56d364"}),
     ("abyss", "Abyss", {"bg": "#111d20", "panel": "#18262a", "line": "#3e5e66", "ink": "#dcecee",
                         "dim": "#93a9ac", "accent": "#2fb8c6", "warn": "#d7ab4c", "bad": "#ef6a63", "note": "#6fb3e0", "good": "#4fd1a1"}),
     ("ash", "Ash", {"bg": "#1b1b1b", "panel": "#222322", "line": "#555955", "ink": "#e2e4e0",

@@ -12,15 +12,15 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#10192b` | the page |
-| `--panel` | `#172339` | a raised box: a card, a pane, a modal |
-| `--ink` | `#e7eefa` | the text, and text on a filled accent |
-| `--dim` | `#a6b4cb` | secondary text and field labels |
-| `--line` | `#44597c` | hairlines and borders, 1px |
-| `--accent` | `#35b6ff` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#0b1322` | the page |
+| `--panel` | `#121c30` | a raised box: a card, a pane, a modal |
+| `--ink` | `#eaf1fc` | the text, and text on a filled accent |
+| `--dim` | `#a9b7ce` | secondary text and field labels |
+| `--line` | `#3e5378` | hairlines and borders, 1px |
+| `--accent` | `#2fc6ff` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d29922` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#f07178` | an error, a destructive verb |
-| `--note` | `#9aa5ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#ff8f4a` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
@@ -31,10 +31,10 @@ Its light half, the same tokens under the mode switch:
 | `--ink` | `#1d2633` |
 | `--dim` | `#566275` |
 | `--line` | `#c4d2e6` |
-| `--accent` | `#0a6ab8` |
+| `--accent` | `#0059c7` |
 | `--warn` | `#996200` |
 | `--bad` | `#c3131b` |
-| `--note` | `#4d58d0` |
+| `--note` | `#b8470f` |
 
 ### Abyss (dark)
 

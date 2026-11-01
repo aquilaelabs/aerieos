@@ -22,7 +22,7 @@
 
 ### Changed
 
-- The default theme is blue: navy surfaces, a cerulean accent and periwinkle as the second color, and the mark with it; a check that passed stays green
+- The default theme is blue and copper: navy surfaces, a cerulean accent and warm copper on what is pressed and followed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
 - The command is aerie, in every shell and session
 - A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)

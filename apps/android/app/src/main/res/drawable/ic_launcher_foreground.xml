@@ -6,8 +6,8 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group android:scaleX="2.25" android:scaleY="2.25" android:translateX="18" android:translateY="18">
-        <path android:fillColor="#35B6FF" android:pathData="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z"/>
-        <path android:fillColor="#1C6FD1" android:pathData="M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z"/>
-        <path android:fillColor="#9FDCFF" android:pathData="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z"/>
+        <path android:fillColor="#2FC6FF" android:pathData="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z"/>
+        <path android:fillColor="#0F7FD6" android:pathData="M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z"/>
+        <path android:fillColor="#FF8F4A" android:pathData="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z"/>
     </group>
 </vector>
