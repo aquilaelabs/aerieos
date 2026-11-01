@@ -184,7 +184,7 @@ function libActs(r, may){
   // installing it again, which its line on the Installed page says.
   const again = r.machine?.state === "unconfigured";
   const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "", libHold)
-    : r.installed ? "" : a("install", "Install", r.kind === "agent" && r.agent === "claude" ? "primary" : "", libHold);
+    : r.installed ? "" : a("install", "Install", "", libHold);
   const edit = r.kind === "pack" && r.pack ? a("edit", "Edit") : "";
   // The catalog pins a newer commit of a pack kept from it (R169 step 4):
   // the dialog on that pin, its changes marked, before anything is kept.
