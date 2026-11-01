@@ -711,7 +711,7 @@ cmd_firstboot() {
 # printed. The newest release when no tag is named, read from the releases
 # page's redirect the way the Dockerfile reads its tools' (no API budget).
 # fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
-# release workflow publishes as builderbot-controller-X.Y.Z.tar.gz with its
+# release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
 # against the sha256, and against the attestation where gh is here to ask;
 # a release from before the bundle falls back to the tag's source archive,
@@ -725,7 +725,7 @@ fetch_tree() {
     fi
     d="$(mktemp -d /tmp/builderbot-release.XXXXXX)"
     ver="${tag#v}"
-    base="https://github.com/${REPO}/releases/download/${tag}/builderbot-controller-${ver}.tar.gz"
+    base="https://github.com/${REPO}/releases/download/${tag}/aerieos-controller-${ver}.tar.gz"
     local http
     http="$(curl -sSL -o "$d/release.tar.gz" -w '%{http_code}' "$base" 2>/dev/null || true)"
     if [ "$http" = 200 ]; then
@@ -769,7 +769,7 @@ fetch_tree() {
             fi
             ssh-keygen -Y verify -f "$signers" -I builderbot-release -n builderbot-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
                 || die "${tag}'s signature does not verify against this install's release key: not taken"
-            grep -q "^${sum}  \*\?builderbot-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
+            grep -q "^${sum}  \*\?aerieos-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
                 || die "the bundle is not the one ${tag} signed: not taken"
             printf '   signed by AerieOS'"'"'s release key\n' >&2
         else

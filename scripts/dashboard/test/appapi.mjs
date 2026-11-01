@@ -48,14 +48,14 @@ ok(typeof meta.body.built === 'string',
   writeFileSync(`${self}/.git/config`,
     '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/aquilaelabs/aerieos.git\n'
     + '\tfetch = +refs/heads/*:refs/remotes/origin/*\n');
-  const signed = 'builderbot-app-0.7.0-dev.2284-d51d651-signed.apk';
+  const signed = 'aerieos-app-0.7.0-dev.2284-d51d651-signed.apk';
   writeFileSync(`${d}/${signed}`, 'signed');
-  writeFileSync(`${d}/builderbot-app-0.7.0-dev.2290-abc1234-dirty.apk`, 'dirty');
-  writeFileSync(`${d}/builderbot-app-dev.apk`, 'a debug build');
+  writeFileSync(`${d}/aerieos-app-0.7.0-dev.2290-abc1234-dirty.apk`, 'dirty');
+  writeFileSync(`${d}/aerieos-app-dev.apk`, 'a debug build');
   const old = new Date(Date.now() - 3600_000);
   utimesSync(`${d}/${signed}`, old, old);
   mkdirSync(`${DIR}/ws/AerieOS/dist`, { recursive: true });
-  writeFileSync(`${DIR}/ws/AerieOS/dist/builderbot-app-0.7.0-dev.9999-fffffff-signed.apk`, 'not ours');
+  writeFileSync(`${DIR}/ws/AerieOS/dist/aerieos-app-0.7.0-dev.9999-fffffff-signed.apk`, 'not ours');
   const meta = (await get('/api/meta')).body;
   rmSync(self, { recursive: true, force: true });
   rmSync(`${DIR}/ws/AerieOS`, { recursive: true, force: true });

@@ -382,7 +382,7 @@ jobs:
             | sort -rn | tail -n +61 | cut -d' ' -f2- | xargs -r rm -f
 
   # The controller bundle a release publishes (R90 step 5): the tag's tree
-  # as builderbot-controller-X.Y.Z.tar.gz with its sha256 beside it and a
+  # as aerieos-controller-X.Y.Z.tar.gz with its sha256 beside it and a
   # build attestation, which install-controller.sh --update on a bare-metal
   # install fetches and verifies in place of the tag's source archive. On a
   # tag push alone; the release is made here when the tag has none yet.
@@ -405,7 +405,7 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           ver="${tag#v}"
-          name="builderbot-controller-${ver}.tar.gz"
+          name="aerieos-controller-${ver}.tar.gz"
           # The tree as the release carries it, with the commit's hash where
           # the installer reads it (tree_stamp's .release-rev).
           git archive --format=tar --prefix="builderbot-${ver}/" "$tag" > tree.tar
@@ -490,8 +490,8 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            out/builderbot-os-*.iso
-            out/builderbot-os-*.stick.raw.xz
+            out/aerieos-os-*.iso
+            out/aerieos-os-*.stick.raw.xz
       - name: Put it on the release
         shell: bash
         env:
@@ -505,8 +505,8 @@ jobs:
           # The attestation's bundle beside them, one line: an update from a
           # folder verifies the ISO with it and no network, against the
           # trusted root the image carries.
-          iso="$(find out -maxdepth 1 -name 'builderbot-os-*.iso' | head -1)"
+          iso="$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
           jq -c . "$BUNDLE" > "${iso%.iso}.attestation.jsonl"
-          gh release upload "$tag" out/builderbot-os-*.iso out/builderbot-os-*.iso.sha256 \
-            out/builderbot-os-*.stick.raw.xz out/builderbot-os-*.stick.raw.xz.sha256 \
+          gh release upload "$tag" out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
+            out/aerieos-os-*.stick.raw.xz out/aerieos-os-*.stick.raw.xz.sha256 \
             "${iso%.iso}.attestation.jsonl" --repo "$GITHUB_REPOSITORY" --clobber

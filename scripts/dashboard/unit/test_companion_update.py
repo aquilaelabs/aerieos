@@ -16,7 +16,7 @@ from bbcompanion import update  # noqa: E402
 class Ctl:
     """The door's connection: what it holds, and the file it serves."""
 
-    def __init__(self, version, body, sha=None, name="builderbot-companion-9.9.9.pyz"):
+    def __init__(self, version, body, sha=None, name="aerieos-companion-9.9.9.pyz"):
         self.version, self.body, self.name = version, body, name
         self.sha = sha or hashlib.sha256(body).hexdigest()
         self.fetched = []
@@ -35,7 +35,7 @@ class Ctl:
 class Update(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        self.me = os.path.join(self.dir, "builderbot-companion.pyz")
+        self.me = os.path.join(self.dir, "aerieos-companion.pyz")
         with open(self.me, "wb") as f:
             f.write(b"old")
         self.patches = [mock.patch.object(update, "running_as", lambda: ("pyz", self.me)),

@@ -8,7 +8,7 @@
 // and the phone is lent from. The watch and the live connection cover every
 // pairing, each with its own memory of what it has already said, so a note
 // from one is never mistaken for another's.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -28,11 +28,11 @@ class Store(context: Context) {
     private val secret: SharedPreferences = run {
         val key = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
         EncryptedSharedPreferences.create(
-            context, "builderbot-secret", key,
+            context, "aerieos-secret", key,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
     }
-    private val plain: SharedPreferences = context.getSharedPreferences("builderbot", Context.MODE_PRIVATE)
+    private val plain: SharedPreferences = context.getSharedPreferences("aerieos", Context.MODE_PRIVATE)
 
     init { migrate() }
 

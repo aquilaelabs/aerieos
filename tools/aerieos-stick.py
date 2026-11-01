@@ -3,12 +3,12 @@
 and Linux, nothing but Python's own library, that writes a release's stick
 image onto a USB stick and checks it.
 
-    builderbot-stick.py list                      the removable disks here
-    builderbot-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
-    builderbot-stick.py verify DISK --image FILE  the stick read back against the image
+    aerieos-stick.py list                      the removable disks here
+    aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
+    aerieos-stick.py verify DISK --image FILE  the stick read back against the image
 
 DISK is /dev/sdX on Linux, /dev/diskN on a Mac, \\\\.\\PhysicalDriveN or its
-number on Windows. The image is builderbot-os-VERSION.stick.raw.xz from a
+number on Windows. The image is aerieos-os-VERSION.stick.raw.xz from a
 release (its sha256 beside it is fetched and checked, and its build
 attestation where gh is on the machine), the newest one when nothing else
 is named, or a file you have (checked the same way, with its .sha256 where
@@ -180,7 +180,7 @@ def release_image(tag, channel="normal"):
         tag = withimg[0]["tag_name"]
     if not re.fullmatch(TAG, tag):
         die("a release is named by its tag, vX.Y.Z")
-    name = f"builderbot-os-{tag[1:]}.stick.raw.xz"
+    name = f"aerieos-os-{tag[1:]}.stick.raw.xz"
     base = f"{RELEASES}/download/{tag}/{name}"
     say(f"fetching {name} from the {tag} release")
     try:
@@ -263,8 +263,8 @@ def signers():
 
 
 def tag_of(path):
-    """The release an image file names (builderbot-os-0.9.0-dev.4724.stick.raw.xz), or ""."""
-    m = re.match(r"builderbot-os-(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.", os.path.basename(path))
+    """The release an image file names (aerieos-os-0.9.0-dev.4724.stick.raw.xz), or ""."""
+    m = re.match(r"aerieos-os-(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.", os.path.basename(path))
     return f"v{m.group(1)}" if m else ""
 
 
@@ -738,7 +738,7 @@ def cmd_write(a):
         attested(image)
         signed(tag_of(image), image)
     if not image.endswith(".xz"):
-        die("the image is the release's builderbot-os-VERSION.stick.raw.xz (or .raw.xz)")
+        die("the image is the release's aerieos-os-VERSION.stick.raw.xz (or .raw.xz)")
     # The disk asked about again after the download: one replugged meanwhile
     # may be another disk under the same name (B474).
     again = pick(a.disk)
@@ -770,7 +770,7 @@ def main(argv=None):
     sub.add_parser("list", help="the removable disks here").set_defaults(fn=cmd_list)
     w = sub.add_parser("write", help="write a stick image to a disk")
     w.add_argument("disk")
-    w.add_argument("--image", help="builderbot-os-VERSION.stick.raw.xz, a file you have")
+    w.add_argument("--image", help="aerieos-os-VERSION.stick.raw.xz, a file you have")
     w.add_argument("--release", help="the release's tag to fetch the image from (vX.Y.Z)")
     w.add_argument("--latest", action="store_true", help="fetch the newest release's image (what it does when nothing else is named)")
     w.add_argument("--set", action="append", metavar="KEY=VALUE", help="a line for the stick's builderbot.env: TZ=Region/City, BB_RELEASE_LINE=X.Y, BB_HOSTNAME=NAME, BB_NET_ADDRESS=A.B.C.D, BB_NET_MASK=24, BB_NET_GATEWAY=A.B.C.D, BB_NET_DNS=A.B.C.D,E.F.G.H, BB_DATA_MAX=64G")

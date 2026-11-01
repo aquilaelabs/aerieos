@@ -10,7 +10,7 @@ the plain JavaScript with no build step and no dependencies it is.
 
 The version is AerieOS's own (aerie version --semver), written into the
 package.json inside the archive, so an install says which AerieOS it came
-from; the Files API version it speaks is package.json's builderbotApi.
+from; the Files API version it speaks is package.json's aerieosApi.
 """
 import argparse
 import json

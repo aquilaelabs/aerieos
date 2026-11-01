@@ -4,7 +4,7 @@
 // lists, quotes, code and paragraphs), and the pages it links to with
 // [[Another page]] as chips under it. Reading only: pages are written on
 // the dashboard or by a session with aerie wiki.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -29,9 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.builderbot.app.Api
-import dev.builderbot.app.arr
-import dev.builderbot.app.str
+import org.aerieos.app.Api
+import org.aerieos.app.arr
+import org.aerieos.app.str
 
 private val LINK = Regex("""\[\[([^\]|]+)(?:\|([^\]]+))?\]\]""")
 

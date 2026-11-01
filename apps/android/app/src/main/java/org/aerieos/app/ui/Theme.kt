@@ -9,7 +9,7 @@
 // sunk ground is the panel darkened by 12%, and what a filled accent
 // surface is, is the accent darkened by 40% with its lightness capped, so
 // ink on it stays readable under the bright accents.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

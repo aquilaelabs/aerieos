@@ -17,7 +17,7 @@ import agentpkg  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 osimage = agentpkg.load("builderbot_agent_signing").module("osimage")
-spec = importlib.util.spec_from_file_location("bbstick_signing", os.path.join(ROOT, "tools", "builderbot-stick.py"))
+spec = importlib.util.spec_from_file_location("bbstick_signing", os.path.join(ROOT, "tools", "aerieos-stick.py"))
 stick = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stick)
 NS = "builderbot-release"
@@ -32,7 +32,7 @@ class Signing(unittest.TestCase):
         subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", NS, "-f", self.key], check=True, stdin=subprocess.DEVNULL, timeout=30)
         kt, kb = open(self.key + ".pub").read().split()[:2]
         self.line = f'{NS} namespaces="{NS}" {kt} {kb}'
-        self.image = os.path.join(self.d, "builderbot-os-0.9.0.stick.raw.xz")
+        self.image = os.path.join(self.d, "aerieos-os-0.9.0.stick.raw.xz")
         open(self.image, "wb").write(b"the image")
         import hashlib
         self.digest = hashlib.sha256(b"the image").hexdigest()
@@ -46,9 +46,9 @@ class Signing(unittest.TestCase):
         return sums, sums + ".sig"
 
     def test_a_signed_list_verifies_and_is_read(self):
-        sums, sig = self.sign([f"{self.digest}  builderbot-os-0.9.0.stick.raw.xz", "a" * 64 + "  other.iso"])
+        sums, sig = self.sign([f"{self.digest}  aerieos-os-0.9.0.stick.raw.xz", "a" * 64 + "  other.iso"])
         self.assertEqual(osimage.sums_verify(sums, sig, [self.line]),
-                         {"builderbot-os-0.9.0.stick.raw.xz": self.digest, "other.iso": "a" * 64})
+                         {"aerieos-os-0.9.0.stick.raw.xz": self.digest, "other.iso": "a" * 64})
 
     def test_a_changed_list_or_another_keys_signature_is_refused(self):
         sums, sig = self.sign([f"{self.digest}  x"])
@@ -61,7 +61,7 @@ class Signing(unittest.TestCase):
         self.assertIsNone(osimage.sums_verify(sums, sig, [self.line]))
 
     def test_the_stick_maker_holds_an_image_to_its_releases_signature(self):
-        sums, sig = self.sign([f"{self.digest}  builderbot-os-0.9.0.stick.raw.xz"])
+        sums, sig = self.sign([f"{self.digest}  aerieos-os-0.9.0.stick.raw.xz"])
 
         def fetch(url, dest, say_progress=True):
             shutil.copyfile(sig if url.endswith(".sig") else sums, dest)

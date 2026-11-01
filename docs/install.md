@@ -309,7 +309,7 @@ sudo bash /opt/builderbot/nodes/install-controller.sh --update --release v0.7.0
 ```
 
 An update fetches the release's controller bundle
-(`builderbot-controller-X.Y.Z.tar.gz`, published by the release workflow
+(`aerieos-controller-X.Y.Z.tar.gz`, published by the release workflow
 with its sha256 beside it and a build attestation), checks the archive
 against the sha256 and, where `gh` is installed, against the attestation
 (a release from before the bundle falls back to its source archive, said

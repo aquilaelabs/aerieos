@@ -18,7 +18,7 @@ archived one is listed last.
 
 ## Install
 
-Download `builderbot-vscode-VERSION.vsix` from the project's Artifacts tab,
+Download `aerieos-vscode-VERSION.vsix` from the project's Artifacts tab,
 or from `dist/` in the AerieOS repository. Then, in VS Code, open the
 Extensions view, open the **…** menu and choose **Install from VSIX…**.
 
@@ -29,7 +29,7 @@ Extensions view, open the **…** menu and choose **Install from VSIX…**.
   kept. The extension keeps the same signed cookie a browser gets, in VS
   Code's secret storage. Changing your password signs it out.
 - **AerieOS: Open Project**: pick a project. It opens as a folder named
-  `builderbot:/PROJECT`. A read-only project opens read-only.
+  `aerieos:/PROJECT`. A read-only project opens read-only.
 - **AerieOS: Open Agent Session**: pick a project, then Claude, ChatGPT
   or Copilot: your session of that agent on the project, in a terminal
   panel, started if it is not running. This is the same terminal the

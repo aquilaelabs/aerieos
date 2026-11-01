@@ -107,7 +107,7 @@ jobs:
           # BB_RELAYED, because this is a CI checkout under the runner's work
           # directory and not a project the controller knows: without it `bb
           # version` tries to relay, finds no session, and answers nothing.
-          # That is what shipped `builderbot-app-.apk`, an artifact named
+          # That is what shipped `aerieos-app-.apk`, an artifact named
           # after an empty string, from a build that reported success.
           # Every one falls back, so a version that cannot be read costs a
           # worse name and not a wrong one.
@@ -144,14 +144,14 @@ jobs:
         run: |
           exec > >(tee -a "$CI_LOG") 2>&1
           echo "== Name it by the repository's version"
-          echo "file=builderbot-app-${{ steps.v.outputs.file }}-unsigned.apk" >> "$GITHUB_OUTPUT"
+          echo "file=aerieos-app-${{ steps.v.outputs.file }}-unsigned.apk" >> "$GITHUB_OUTPUT"
           cp "apps/android/${{ steps.build.outputs.apk }}" \
-             "builderbot-app-${{ steps.v.outputs.file }}-unsigned.apk"
+             "aerieos-app-${{ steps.v.outputs.file }}-unsigned.apk"
           # A release's own name, which the controller keeps less -unsigned
-          # once it has signed it: builderbot-app-0.7.0.apk for v0.7.0.
+          # once it has signed it: aerieos-app-0.7.0.apk for v0.7.0.
           if [ -n "$TAG" ]; then
             mkdir -p release-apk
-            cp "apps/android/${{ steps.build.outputs.apk }}" "release-apk/builderbot-app-${TAG#v}-unsigned.apk"
+            cp "apps/android/${{ steps.build.outputs.apk }}" "release-apk/aerieos-app-${TAG#v}-unsigned.apk"
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 

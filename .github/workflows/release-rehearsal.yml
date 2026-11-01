@@ -39,7 +39,7 @@ jobs:
         run: |
           set -eo pipefail
           ver="$(BB_RELAYED=1 bash scripts/aerie version --file)"
-          name="builderbot-controller-${ver}.tar.gz"
+          name="aerieos-controller-${ver}.tar.gz"
           git archive --format=tar --prefix="builderbot-${ver}/" HEAD | gzip -n -9 > "$name"
           tar -tzf "$name" | grep -qx "builderbot-${ver}/scripts/dashboard/server.py" \
             || { echo "::error::the bundle has no scripts/dashboard/server.py"; exit 1; }

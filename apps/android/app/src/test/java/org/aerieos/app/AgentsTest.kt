@@ -1,7 +1,7 @@
 // How the app names and finds a coding agent's session (Agents.kt), held to
 // the dashboard's own rules: agents.session_name, names.running_session and
 // the page's launchClaude and launchAgent arguments.
-package dev.builderbot.app
+package org.aerieos.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

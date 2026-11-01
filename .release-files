@@ -3,20 +3,20 @@
 # controller checks each release against the list at its own tag once CI
 # has had three hours, and says on the bell what is missing and why
 # (releasefiles.py); the release rehearsal lists it (release-rehearsal.yml).
-builderbot-controller-@VER@.tar.gz
-builderbot-controller-@VER@.tar.gz.sha256
-builderbot-companion-@VER@.exe
-builderbot-companion-@VER@.exe.sha256
-builderbot-usb-maker-@VER@.exe
-builderbot-usb-maker-@VER@.exe.sha256
-builderbot-companion-@VER@.pyz
-builderbot-companion-@VER@.pyz.sha256
-builderbot-vscode-@VER@.vsix
-builderbot-vscode-@VER@.vsix.sha256
-builderbot-app-@VER@.apk
-builderbot-app-@VER@.apk.sha256
-builderbot-os-@VER@.iso
-builderbot-os-@VER@.iso.sha256
-builderbot-os-@VER@.attestation.jsonl
-builderbot-os-@VER@.stick.raw.xz
-builderbot-os-@VER@.stick.raw.xz.sha256
+aerieos-controller-@VER@.tar.gz
+aerieos-controller-@VER@.tar.gz.sha256
+aerieos-companion-@VER@.exe
+aerieos-companion-@VER@.exe.sha256
+aerieos-usb-maker-@VER@.exe
+aerieos-usb-maker-@VER@.exe.sha256
+aerieos-companion-@VER@.pyz
+aerieos-companion-@VER@.pyz.sha256
+aerieos-vscode-@VER@.vsix
+aerieos-vscode-@VER@.vsix.sha256
+aerieos-app-@VER@.apk
+aerieos-app-@VER@.apk.sha256
+aerieos-os-@VER@.iso
+aerieos-os-@VER@.iso.sha256
+aerieos-os-@VER@.attestation.jsonl
+aerieos-os-@VER@.stick.raw.xz
+aerieos-os-@VER@.stick.raw.xz.sha256

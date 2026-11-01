@@ -86,19 +86,19 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName' || true)"
-          now="$(find out -maxdepth 1 -name 'builderbot-os-*.packages' | head -1)"
-          if [ -z "$tag" ] || ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern 'builderbot-os-*.packages' --dir last 2>/dev/null; then
+          now="$(find out -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
+          if [ -z "$tag" ] || ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern 'aerieos-os-*.packages' --dir last 2>/dev/null; then
             echo "no release carries a package list yet: nothing to compare against" | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          last="$(find last -maxdepth 1 -name 'builderbot-os-*.packages' | head -1)"
+          last="$(find last -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
           { echo "## System packages moved since ${tag}"; echo; echo '```'; diff <(sort "$last") <(sort "$now") | grep '^[<>]' || echo "none"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
       - uses: actions/upload-artifact@v4
         with:
           name: builderbot-os
           path: |
-            out/builderbot-os-*
+            out/aerieos-os-*
             out/packages-moved.diff
           if-no-files-found: error
 
@@ -128,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          qcow="$(find out -maxdepth 1 -name 'builderbot-os-*.qcow2' | head -1)"
+          qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
           # A copy of the disk with the console on the serial line and the
           # initramfs tracing each step to it (bb_args
           # in the ESP's grubenv, which the menu adds to the kernel line), so
@@ -179,9 +179,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          qcow="$(find out -maxdepth 1 -name 'builderbot-os-*.qcow2' | head -1)"
+          qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
           name="$(basename "$qcow" .qcow2)"
-          ver="${name#builderbot-os-}"
+          ver="${name#aerieos-os-}"
           kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
           boot() {  # disk, log, the word its command line must carry
             # shellcheck disable=SC2086

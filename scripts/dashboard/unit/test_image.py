@@ -262,7 +262,7 @@ class Workflow(unittest.TestCase):
             self.assertIn(p, conf, p)
         wf = workflows()
         self.assertIn("xorriso mtools", wf)
-        self.assertIn("out/builderbot-os-*.iso", wf)
+        self.assertIn("out/aerieos-os-*.iso", wf)
 
     def test_the_first_boot_turns_on_the_features_the_installer_was_asked_for(self):
         inst = read(ROOT, "nodes", "install-controller.sh")
@@ -280,7 +280,7 @@ class Workflow(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/os-image.yml", wf)
         self.assertIn("hostfwd=tcp:127.0.0.1:7680-:7680", wf)
         self.assertIn("github.event_name == 'schedule'", wf)
-        self.assertIn("builderbot-os-*.packages", wf)
+        self.assertIn("aerieos-os-*.packages", wf)
         self.assertIn('"$OUT/$NAME.packages"', read(IMG, "build.sh"))
 
     def test_a_stick_loads_the_slot_into_memory_when_grub_says_so(self):
@@ -594,7 +594,7 @@ class Workflow(unittest.TestCase):
         self.assertIn('xz -q -T0 -6 "$RAW"', b)
         self.assertIn('grub-editenv "$MNT/grub/grubenv" set bb_toram=1', b)
         self.assertIn("stick.raw.xz", workflows())
-        self.assertTrue(os.access(os.path.join(ROOT, "tools", "builderbot-stick.py"), os.X_OK))
+        self.assertTrue(os.access(os.path.join(ROOT, "tools", "aerieos-stick.py"), os.X_OK))
 
     def test_build_sh_says_how_without_root(self):
         r = sh("bash image/build.sh --help")

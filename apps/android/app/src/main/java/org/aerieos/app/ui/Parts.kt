@@ -6,7 +6,7 @@
 // accent surface is the deep accent with ink on it, a hairline is the line
 // token, corners are 8dp for a surface and 6dp for a control, and severity
 // colors agree with the site: high red, medium amber, low blue.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background

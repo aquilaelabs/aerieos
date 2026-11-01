@@ -7,16 +7,16 @@
 #   sudo image/build.sh [--out DIR] [--tree-only] [--from-tree DIR]
 #
 # What comes out, under DIR (image/out by default), each with its .sha256:
-#   builderbot-os-VERSION.raw.xz         the whole disk, for an installed machine or a VM
-#   builderbot-os-VERSION.stick.raw.xz   the same disk with GRUB loading the slot into memory: the USB edition
-#   builderbot-os-VERSION.iso            the installer: boots the same root live, lays a disk out with lay-disk
-#   builderbot-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts
-#   builderbot-os-VERSION.ova            the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
-#   builderbot-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot (R160 step 4)
-#   builderbot-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
-#   builderbot-os-VERSION.initrd
-#   builderbot-os-VERSION.release        the stamp the image carries at /usr/lib/builderbot-os/release
-#   builderbot-os-VERSION.packages       every package in it with its version, for the weekly rebuild's diff
+#   aerieos-os-VERSION.raw.xz         the whole disk, for an installed machine or a VM
+#   aerieos-os-VERSION.stick.raw.xz   the same disk with GRUB loading the slot into memory: the USB edition
+#   aerieos-os-VERSION.iso            the installer: boots the same root live, lays a disk out with lay-disk
+#   aerieos-os-VERSION.qcow2          the same disk for Proxmox, libvirt and other QEMU hosts
+#   aerieos-os-VERSION.ova            the same disk for VMware and VirtualBox (a stream-optimized VMDK with its descriptor)
+#   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot (R160 step 4)
+#   aerieos-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
+#   aerieos-os-VERSION.initrd
+#   aerieos-os-VERSION.release        the stamp the image carries at /usr/lib/builderbot-os/release
+#   aerieos-os-VERSION.packages       every package in it with its version, for the weekly rebuild's diff
 # A release carries two of them, the ISO and the stick (build-image.yml's
 # appliance-publish); an update takes the slot out of the ISO.
 #
@@ -70,7 +70,7 @@ version() {
     printf '%s' "${target:-unstamped}"
 }
 VERSION="$(version)"
-NAME="builderbot-os-${VERSION}"
+NAME="aerieos-os-${VERSION}"
 # One day, not now: every file in the tree and the squashfs is stamped with
 # the snapshot's day, so the same inputs make the same image.
 SOURCE_DATE_EPOCH="$(date -u -d "${SNAPSHOT:0:8} ${SNAPSHOT:9:2}:${SNAPSHOT:11:2}:${SNAPSHOT:13:2}" +%s)"
@@ -225,7 +225,7 @@ sed -e "s|@NAME@|$NAME|g" -e "s|@VMDK@|$NAME-disk1.vmdk|g" \
 rm -rf "$OVA"
 # The USB edition (R161 steps 1 and 5): the same disk with bb_toram=1 in
 # GRUB's environment, so a stick written from it runs from memory; the
-# stick maker (tools/builderbot-stick.py) writes this one.
+# stick maker (tools/aerieos-stick.py) writes this one.
 say "the stick: ${NAME}.stick.raw"
 STICK="$OUT/$NAME.stick.raw"
 cp --reflink=auto --sparse=always "$RAW" "$STICK"

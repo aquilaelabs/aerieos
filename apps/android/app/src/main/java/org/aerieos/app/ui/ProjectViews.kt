@@ -4,7 +4,7 @@
 // on one, its tests as the last run left them, and a line said to the
 // account's own session, any agent's, which is the one thing a phone could not do
 // without a terminal.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,13 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.builderbot.app.Api
-import dev.builderbot.app.arr
-import dev.builderbot.app.bool
-import dev.builderbot.app.int
-import dev.builderbot.app.obj
-import dev.builderbot.app.str
-import dev.builderbot.app.strs
+import org.aerieos.app.Api
+import org.aerieos.app.arr
+import org.aerieos.app.bool
+import org.aerieos.app.int
+import org.aerieos.app.obj
+import org.aerieos.app.str
+import org.aerieos.app.strs
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -492,7 +492,7 @@ fun LogRow(api: Api, row: JSONObject, showProject: Boolean) {
         Text(row.str("first").ifBlank { "a conversation with no first line" }, color = Ink, maxLines = 2,
              overflow = TextOverflow.Ellipsis)
         // Which agent it was with (R95), named where it is not Claude.
-        val with = dev.builderbot.app.Agents.byId(row.str("agent"))
+        val with = org.aerieos.app.Agents.byId(row.str("agent"))
         Dim(listOf(if (showProject) project else "", if (with != null && with.id != "claude") with.name else "",
                    whenAt(row.optLong("at")), sized(row.optLong("bytes")) + " as written")
                 .filter { it.isNotBlank() }.joinToString(" · "))

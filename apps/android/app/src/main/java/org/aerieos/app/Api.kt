@@ -3,7 +3,7 @@
 // knows the server's address. Kept to the platform's own HTTP client and
 // org.json so the app carries no networking stack of its own. The surface
 // it calls is small, and android/api-surface.json names every path here.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers

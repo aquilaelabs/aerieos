@@ -2,7 +2,7 @@
 // bell's items above it, the approvals, the nodes, the accounts, the
 // profile, and More (about, the watch, and whether this app is behind the
 // dashboard it talks to).
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,18 +49,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import dev.builderbot.app.Api
-import dev.builderbot.app.BuildConfig
-import dev.builderbot.app.MainActivity
-import dev.builderbot.app.Store
-import dev.builderbot.app.Live
-import dev.builderbot.app.Watch
-import dev.builderbot.app.arr
-import dev.builderbot.app.bool
-import dev.builderbot.app.int
-import dev.builderbot.app.obj
-import dev.builderbot.app.str
-import dev.builderbot.app.strs
+import org.aerieos.app.Api
+import org.aerieos.app.BuildConfig
+import org.aerieos.app.MainActivity
+import org.aerieos.app.Store
+import org.aerieos.app.Live
+import org.aerieos.app.Watch
+import org.aerieos.app.arr
+import org.aerieos.app.bool
+import org.aerieos.app.int
+import org.aerieos.app.obj
+import org.aerieos.app.str
+import org.aerieos.app.strs
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 

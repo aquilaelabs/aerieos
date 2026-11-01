@@ -54,8 +54,8 @@ jobs:
         run: |
           set -eo pipefail
           v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
-          python3 tools/companion-build.py --version "$v" --out "dist/builderbot-companion-$v.pyz"
-          python3 tools/vscode-vsix.py --version "$v" --out "dist/builderbot-vscode-$v.vsix"
+          python3 tools/companion-build.py --version "$v" --out "dist/aerieos-companion-$v.pyz"
+          python3 tools/vscode-vsix.py --version "$v" --out "dist/aerieos-vscode-$v.vsix"
 
       - name: Attach them to the release with their sha256
         if: env.TAG != ''
@@ -64,7 +64,7 @@ jobs:
         run: |
           set -eo pipefail
           cd dist
-          for f in builderbot-companion-*.pyz builderbot-vscode-*.vsix; do
+          for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
             sha256sum "$f" > "$f.sha256"
             gh release upload "$TAG" "$f" "$f.sha256" --clobber --repo "$GITHUB_REPOSITORY"
           done
@@ -89,17 +89,17 @@ jobs:
           v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
-          python -m PyInstaller --noconfirm --onefile --windowed --name "builderbot-companion-$v" \
+          python -m PyInstaller --noconfirm --onefile --windowed --name "aerieos-companion-$v" \
             --paths apps/windows --paths scripts/agent \
             --hidden-import builderbot_agent.wssync --hidden-import builderbot_agent.controller \
             --add-data "apps/windows/bbcompanion/VERSION;bbcompanion" \
             --distpath dist "$RUNNER_TEMP/companion.py"
           # An entry point PyInstaller could not find still builds, into an
           # .exe that stops at start (B572): its warnings file says so.
-          if grep -E "missing module named '?(bbcompanion|builderbot_agent)" "build/builderbot-companion-$v/warn-builderbot-companion-$v.txt"; then
+          if grep -E "missing module named '?(bbcompanion|builderbot_agent)" "build/aerieos-companion-$v/warn-aerieos-companion-$v.txt"; then
             echo "the companion's own package was left out of the .exe"; exit 1
           fi
-          echo "EXE=dist/builderbot-companion-$v.exe" >> "$GITHUB_ENV"
+          echo "EXE=dist/aerieos-companion-$v.exe" >> "$GITHUB_ENV"
 
       # AerieOS USB Maker (R198): the stick maker in a window, one .exe
       # that asks for Administrator at start (writing a disk needs it), the
@@ -108,9 +108,9 @@ jobs:
         run: |
           set -eo pipefail
           v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
-          python -m PyInstaller --noconfirm --onefile --windowed --uac-admin --name "builderbot-usb-maker-$v" \
-            --add-data "tools/builderbot-stick.py;." --distpath dist tools/builderbot-usb-maker.py
-          echo "USBEXE=dist/builderbot-usb-maker-$v.exe" >> "$GITHUB_ENV"
+          python -m PyInstaller --noconfirm --onefile --windowed --uac-admin --name "aerieos-usb-maker-$v" \
+            --add-data "tools/aerieos-stick.py;." --distpath dist tools/aerieos-usb-maker.py
+          echo "USBEXE=dist/aerieos-usb-maker-$v.exe" >> "$GITHUB_ENV"
 
       - name: Sign it where the repository holds a certificate
         env:

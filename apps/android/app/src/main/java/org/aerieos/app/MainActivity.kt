@@ -3,7 +3,7 @@
 // shell are the browser's; everything else (projects, the notebook, the
 // approvals, the nodes, the accounts, your profile) is here, in the shape
 // an Android app takes rather than the tabs a browser page needs.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.Manifest
 import android.content.Intent
@@ -41,15 +41,15 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
-import dev.builderbot.app.ui.AccentDeep
-import dev.builderbot.app.ui.Bg
-import dev.builderbot.app.ui.Bad
-import dev.builderbot.app.ui.Dim
-import dev.builderbot.app.ui.Ink
-import dev.builderbot.app.ui.Line
-import dev.builderbot.app.ui.Note
-import dev.builderbot.app.ui.Panel
-import dev.builderbot.app.ui.Sunk
+import org.aerieos.app.ui.AccentDeep
+import org.aerieos.app.ui.Bg
+import org.aerieos.app.ui.Bad
+import org.aerieos.app.ui.Dim
+import org.aerieos.app.ui.Ink
+import org.aerieos.app.ui.Line
+import org.aerieos.app.ui.Note
+import org.aerieos.app.ui.Panel
+import org.aerieos.app.ui.Sunk
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -57,7 +57,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.repeatOnLifecycle
-import dev.builderbot.app.ui.Warn
+import org.aerieos.app.ui.Warn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,18 +73,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import dev.builderbot.app.ui.ApprovalsScreen
-import dev.builderbot.app.ui.HomeScreen
-import dev.builderbot.app.ui.JobsScreen
-import dev.builderbot.app.ui.WhatsNewScreen
-import dev.builderbot.app.ui.LoginScreen
-import dev.builderbot.app.ui.MoreScreen
-import dev.builderbot.app.ui.NodesScreen
-import dev.builderbot.app.ui.PhoneScreen
-import dev.builderbot.app.ui.ProfileScreen
-import dev.builderbot.app.ui.ProjectScreen
-import dev.builderbot.app.ui.ToolsScreen
-import dev.builderbot.app.ui.UsersScreen
+import org.aerieos.app.ui.ApprovalsScreen
+import org.aerieos.app.ui.HomeScreen
+import org.aerieos.app.ui.JobsScreen
+import org.aerieos.app.ui.WhatsNewScreen
+import org.aerieos.app.ui.LoginScreen
+import org.aerieos.app.ui.MoreScreen
+import org.aerieos.app.ui.NodesScreen
+import org.aerieos.app.ui.PhoneScreen
+import org.aerieos.app.ui.ProfileScreen
+import org.aerieos.app.ui.ProjectScreen
+import org.aerieos.app.ui.ToolsScreen
+import org.aerieos.app.ui.UsersScreen
 
 // A FragmentActivity rather than a ComponentActivity: BiometricPrompt (the
 // app's lock, R133) is a fragment of the activity it is shown over.
@@ -102,13 +102,13 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        setContent { BuilderBotApp(intent.getStringExtra("screen") ?: "", this) }
+        setContent { AerieApp(intent.getStringExtra("screen") ?: "", this) }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        setContent { BuilderBotApp(intent.getStringExtra("screen") ?: "", this) }
+        setContent { AerieApp(intent.getStringExtra("screen") ?: "", this) }
     }
 
     override fun onStart() {
@@ -160,15 +160,15 @@ class MainActivity : FragmentActivity() {
 // so is this; a light system setting still gets a readable page rather than
 // a second design.
 @Composable
-fun BuilderBotTheme(content: @Composable () -> Unit) {
+fun AerieTheme(content: @Composable () -> Unit) {
     // The dashboard's palette, the half the person chose: the screens paint
     // their panels and text from the tokens directly, and Material's scheme
     // underneath is the same half, so a light system setting never puts
     // black headings on a dark page or the other way round. System follows
     // the phone (R50 step 16).
     val sysDark = androidx.compose.foundation.isSystemInDarkTheme()
-    SideEffect { dev.builderbot.app.ui.Schemes.systemDark = sysDark }
-    val light = dev.builderbot.app.ui.Schemes.half.light
+    SideEffect { org.aerieos.app.ui.Schemes.systemDark = sysDark }
+    val light = org.aerieos.app.ui.Schemes.half.light
     // The status bar's ground is the page's, and its icons dark on a light one.
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) SideEffect {
@@ -205,17 +205,17 @@ fun BuilderBotTheme(content: @Composable () -> Unit) {
 data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 @Composable
-fun BuilderBotApp(openOn: String, activity: MainActivity) {
+fun AerieApp(openOn: String, activity: MainActivity) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val store = remember { Store(context).also { dev.builderbot.app.ui.Schemes.pick(it.scheme); it.scheme = dev.builderbot.app.ui.Schemes.current.name
-        dev.builderbot.app.ui.Schemes.pickMode(it.mode) } }
+    val store = remember { Store(context).also { org.aerieos.app.ui.Schemes.pick(it.scheme); it.scheme = org.aerieos.app.ui.Schemes.current.name
+        org.aerieos.app.ui.Schemes.pickMode(it.mode) } }
     var signedIn by remember { mutableStateOf(store.signedIn) }
     // Which pairing is in front (R132): the screens are keyed by it, so a
     // switch redraws every one of them from the other dashboard.
     var current by remember { mutableStateOf(store.pairing?.id ?: "") }
     val locked by activity.locked
     if (locked && store.lock) {
-        BuilderBotTheme {
+        AerieTheme {
             Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center,
                    horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("AerieOS", style = MaterialTheme.typography.headlineMedium, color = Ink)
@@ -233,11 +233,11 @@ fun BuilderBotApp(openOn: String, activity: MainActivity) {
     // can the page reads; an administrator until Home has said.
     var mayTools by rememberSaveable { mutableStateOf(false) }
     var waiting by rememberSaveable { mutableStateOf(0) }
-    BuilderBotTheme {
+    AerieTheme {
         if (!signedIn) {
             LoginScreen(store) { admin -> isAdmin = admin; mayTools = admin; signedIn = true; current = store.pairing?.id ?: ""
                                  Watch.startIfWanted(context); Live.startIfWanted(context) }
-            return@BuilderBotTheme
+            return@AerieTheme
         }
         key(current) {
         // The watch while the app is open: its own clock, on the interval

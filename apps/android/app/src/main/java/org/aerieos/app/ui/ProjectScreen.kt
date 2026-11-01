@@ -13,7 +13,7 @@
 //
 // A session's terminal opens over the project from its Agent view
 // (AgentView.kt): the dashboard's own page, in a WebView.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -53,13 +53,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.builderbot.app.Store
-import dev.builderbot.app.arr
-import dev.builderbot.app.bool
-import dev.builderbot.app.int
-import dev.builderbot.app.obj
-import dev.builderbot.app.str
-import dev.builderbot.app.strs
+import org.aerieos.app.Store
+import org.aerieos.app.arr
+import org.aerieos.app.bool
+import org.aerieos.app.int
+import org.aerieos.app.obj
+import org.aerieos.app.str
+import org.aerieos.app.strs
 import kotlinx.coroutines.launch
 
 private val VIEWS = listOf("Agent", "Roadmap", "Bugs", "Briefing", "Wiki", "Design", "Artifacts", "Docker", "Tests", "Git", "Settings")
@@ -210,7 +210,7 @@ private fun sent(r: Result<org.json.JSONObject>, to: String): String {
 }
 
 @Composable
-private fun Roadmap(api: dev.builderbot.app.Api, project: String) {
+private fun Roadmap(api: org.aerieos.app.Api, project: String) {
     val scope = rememberCoroutineScope()
     val (td, reload) = load("roadmap-$project") { api.roadmap(project) }
     var text by remember { mutableStateOf("") }
@@ -220,7 +220,7 @@ private fun Roadmap(api: dev.builderbot.app.Api, project: String) {
     // server's: no session, no send.
     val live = td.value?.str("session")?.isNotBlank() == true
     // ...and whose it is: any agent's session takes a step (R95).
-    val to = dev.builderbot.app.Agents.ofName(td.value?.str("session") ?: "")?.first?.name ?: "the session"
+    val to = org.aerieos.app.Agents.ofName(td.value?.str("session") ?: "")?.first?.name ?: "the session"
     Pull(td.value == null && td.error == null, reload) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
@@ -267,7 +267,7 @@ private fun Roadmap(api: dev.builderbot.app.Api, project: String) {
 }
 
 @Composable
-private fun Bugs(api: dev.builderbot.app.Api, project: String) {
+private fun Bugs(api: org.aerieos.app.Api, project: String) {
     val scope = rememberCoroutineScope()
     val (bg, reload) = load("bugs-$project") { api.bugs(project) }
     var title by remember { mutableStateOf("") }
@@ -325,7 +325,7 @@ private fun Bugs(api: dev.builderbot.app.Api, project: String) {
 }
 
 @Composable
-private fun Briefing(api: dev.builderbot.app.Api, project: String) {
+private fun Briefing(api: org.aerieos.app.Api, project: String) {
     val (rl, reloadRules) = load("rules-$project") { api.rules(project) }
     // The two halves of the dashboard's Briefing tab, in the same order: what
     // the operator holds a session to, then what a session noticed. Both are
@@ -393,7 +393,7 @@ private fun Briefing(api: dev.builderbot.app.Api, project: String) {
 }
 
 @Composable
-private fun Artifacts(api: dev.builderbot.app.Api, project: String) {
+private fun Artifacts(api: org.aerieos.app.Api, project: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val (ar, reload) = load("art-$project") { api.artifacts(project) }
@@ -482,13 +482,13 @@ private fun Artifacts(api: dev.builderbot.app.Api, project: String) {
 // the browser's. They are not decisions anybody makes from a phone. The
 // color is: it is how a project is found on this screen's own list.
 @Composable
-private fun Settings(api: dev.builderbot.app.Api, project: String, status: org.json.JSONObject?, reloadStatus: () -> Unit) {
+private fun Settings(api: org.aerieos.app.Api, project: String, status: org.json.JSONObject?, reloadStatus: () -> Unit) {
     val scope = rememberCoroutineScope()
     val me = status?.arr("projects")?.firstOrNull { it.str("name") == project }
     val prefs = me?.obj("prefs")
     val yours = me?.obj("yours")
     // The agents this project offers, Claude first: their own picks each.
-    val agents = dev.builderbot.app.Agents.LIVE.filter { it.id == "claude" || it.id !in (prefs?.strs("agents_off") ?: emptyList()) }
+    val agents = org.aerieos.app.Agents.LIVE.filter { it.id == "claude" || it.id !in (prefs?.strs("agents_off") ?: emptyList()) }
     val keys = agents.flatMap { listOf(it.modelKey, it.effortKey) }
     val picks = remember(yours?.toString()) { androidx.compose.runtime.mutableStateMapOf<String, String>().apply {
         for (k in keys) put(k, yours?.str(k) ?: "") } }
@@ -584,7 +584,7 @@ private fun Settings(api: dev.builderbot.app.Api, project: String, status: org.j
 // rest of the Git view (branches, commits, a diff) wants the room a
 // browser has.
 @Composable
-private fun Git(api: dev.builderbot.app.Api, project: String) {
+private fun Git(api: org.aerieos.app.Api, project: String) {
     val scope = rememberCoroutineScope()
     val (g, reload) = load("git-$project") { api.git(project) }
     // The answer carries the branch and the files at its top level. This

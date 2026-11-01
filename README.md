@@ -59,7 +59,7 @@ machine does.
 | **Aerie Workshop** | A container on any host with Docker: a NAS, a home server, a VPS | The AI workshop alone: the dashboard beside everything else the host runs, nodes elsewhere, and no storage of its own | `docker compose up` with the compose file below, or the app template on a NAS | Released |
 | **Bare-metal install** | A Linux machine of its own (every system a node runs on) | One box that is the controller and its own node: the dashboard, the builds, the sessions and the storage on one machine | `nodes/install-controller.sh --install` on the machine, updates from the page | Released |
 | **AerieOS** | A machine or a VM installed from the ISO | The bare-metal install as an appliance: a read-only root in two slots, an update that falls back by itself, the disks as pools, an array and shares | Boot the ISO and pick a disk | Experimental: it boots and updates in the lab and on one machine, and it is the edition most likely to break |
-| **USB edition** | A stick in any x86-64 machine | AerieOS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/builderbot-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
+| **USB edition** | A stick in any x86-64 machine | AerieOS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/aerieos-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
 
 Aerie Workshop and the bare-metal install are what AerieOS has shipped as
 since 0.6. The OS and USB editions are new in 0.9: try them on a machine or
@@ -249,13 +249,13 @@ makes the machine its own node; updates come from the page after that
 ### AerieOS and the USB edition (experimental)
 
 Each release carries the appliance image as two files:
-`builderbot-os-VERSION.iso` to install on a machine or a VM, and
-`builderbot-os-VERSION.stick.raw.xz` for a stick. Boot the ISO and pick a
+`aerieos-os-VERSION.iso` to install on a machine or a VM, and
+`aerieos-os-VERSION.stick.raw.xz` for a stick. Boot the ISO and pick a
 disk (a VM wants two processors and 4 GB), or write a stick:
 
 ```bash
-sudo python3 tools/builderbot-stick.py list
-sudo python3 tools/builderbot-stick.py write /dev/sdX      # the newest release
+sudo python3 tools/aerieos-stick.py list
+sudo python3 tools/aerieos-stick.py write /dev/sdX      # the newest release
 ```
 
 The machine comes up as its own controller and node at

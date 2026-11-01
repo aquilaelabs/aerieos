@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the companion app (R270) as one file that runs on any machine with
-Python 3.9 or newer: dist/builderbot-companion-VERSION.pyz, the app's package
+Python 3.9 or newer: dist/aerieos-companion-VERSION.pyz, the app's package
 and the four node-agent modules its sync is (the package's version, its base,
 the connection and the sync), nothing else of the agent's. The signed .exe
 for Windows is a CI job's (PyInstaller over the same entry point).
@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--version", required=True)
     ap.add_argument("--out", default="")
     a = ap.parse_args()
-    out = a.out or os.path.join(REPO, "dist", f"builderbot-companion-{a.version}.pyz")
+    out = a.out or os.path.join(REPO, "dist", f"aerieos-companion-{a.version}.pyz")
     print(build(a.version, out))
 
 

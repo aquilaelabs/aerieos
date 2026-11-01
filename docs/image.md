@@ -35,8 +35,8 @@ how it boots, and how it is built. The decisions behind it are in
 
 ## The disk
 
-`image/build.sh` lays the image into one GPT disk, `builderbot-os-VERSION.raw`
-(compressed with xz), and the same disk with the slot loaded into memory at boot as `builderbot-os-VERSION.stick.raw.xz`, the USB edition's. Every partition has a fixed UUID, the same on every
+`image/build.sh` lays the image into one GPT disk, `aerieos-os-VERSION.raw`
+(compressed with xz), and the same disk with the slot loaded into memory at boot as `aerieos-os-VERSION.stick.raw.xz`, the USB edition's. Every partition has a fixed UUID, the same on every
 disk AerieOS makes, held in `image/partitions.sh` and read by the build,
 the initramfs, `fstab` and GRUB alike:
 
@@ -135,7 +135,7 @@ here yet.
 
 ## The stick maker
 
-On Windows, **AerieOS USB Maker** (`builderbot-usb-maker-VERSION.exe`,
+On Windows, **AerieOS USB Maker** (`aerieos-usb-maker-VERSION.exe`,
 attached to every release) does it in a window: which release (the newest,
 the newest dev build, one by name, or an image file you have), which stick
 (the removable disks alone), a few settings for the first boot (the dev
@@ -144,10 +144,10 @@ stick by model and size, with a box to tick, before it is erased; then the
 progress and the read back. It asks for Administrator once at start, since
 writing a disk needs it, and every step in it is the stick maker's own.
 
-`tools/builderbot-stick.py` writes a release's stick image onto a USB
+`tools/aerieos-stick.py` writes a release's stick image onto a USB
 stick on Windows, a Mac or Linux with nothing but Python's own library: `list`
 names the removable disks here (the system disk marked, and never written),
-`write DISK` fetches the newest release's `builderbot-os-VERSION.stick.raw.xz`
+`write DISK` fetches the newest release's `aerieos-os-VERSION.stick.raw.xz`
 (or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256, checks
 it, says what is on the stick is lost, writes the disk whole and reads it
 back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
@@ -250,7 +250,7 @@ have, and it is never the default.
 
 ## Installing it on a machine
 
-`builderbot-os-VERSION.iso` boots the same root live (UEFI or BIOS) with
+`aerieos-os-VERSION.iso` boots the same root live (UEFI or BIOS) with
 the installer on the console: it lists the machine's disks (the medium it
 booted from left out), asks which one to lay out and says that everything
 on it is lost, asks which features to turn on at the first boot (VM host
@@ -269,7 +269,7 @@ A VM installs from the ISO as a machine does: give it a disk of 16 GB or
 more, boot the ISO and pick that disk. It boots into the bare-metal
 controller with the machine as its own node, as a stick or an installed
 disk does. The build also converts the raw disk, never laid out again, into
-`builderbot-os-VERSION.qcow2` and `builderbot-os-VERSION.ova` (a
+`aerieos-os-VERSION.qcow2` and `aerieos-os-VERSION.ova` (a
 stream-optimized VMDK with its OVF descriptor, `image/ovf.xml`, and a
 manifest), which the boot test runs and the CI run keeps as its artifact;
 a release does not carry them. Give the VM two processors and 4 GB at least, and

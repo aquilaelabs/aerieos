@@ -1,6 +1,6 @@
 'use strict';
 // AerieOS for VS Code (R159): a project's files opened as a folder of
-// their own, builderbot:/PROJECT/..., read and saved through the
+// their own, aerieos:/PROJECT/..., read and saved through the
 // controller's Files API, with no share mounted here; the changes a coding
 // agent's session makes appear in open editors as it saves them; and any
 // agent's session terminal in a VS Code panel. Signed in as the person: the server decides
@@ -11,18 +11,18 @@ const vscode = require('vscode');
 const { Client, Refused, signIn } = require('./lib/client');
 const { Term } = require('./lib/term');
 
-const SCHEME = 'builderbot';
-const SECRET = 'builderbot.cookie';
+const SCHEME = 'aerieos';
+const SECRET = 'aerieos.cookie';
 
 let client = null;
 let fsp = null;
 
 function base() {
-  return (vscode.workspace.getConfiguration('builderbot').get('url') || '').replace(/\/+$/, '');
+  return (vscode.workspace.getConfiguration('aerieos').get('url') || '').replace(/\/+$/, '');
 }
 
 function tls() {
-  return { rejectUnauthorized: !vscode.workspace.getConfiguration('builderbot').get('allowSelfSignedCertificate') };
+  return { rejectUnauthorized: !vscode.workspace.getConfiguration('aerieos').get('allowSelfSignedCertificate') };
 }
 
 async function connect(context) {
@@ -45,7 +45,7 @@ function asFsError(e, uri) {
 
 const TYPE = { file: vscode.FileType.File, dir: vscode.FileType.Directory };
 
-class BuilderBotFS {
+class AerieFS {
   constructor(context) {
     this.context = context;
     this.emitter = new vscode.EventEmitter();
@@ -54,7 +54,7 @@ class BuilderBotFS {
     this.watchers = new Map();       // project -> {count, stop}
   }
 
-  // builderbot:/PROJECT/PATH: the project is the path's first part, so VS
+  // aerieos:/PROJECT/PATH: the project is the path's first part, so VS
   // Code names the folder after it (in the host part it was named "/").
   where(uri) {
     const [project, ...rest] = uri.path.replace(/^\/+/, '').split('/');
@@ -235,7 +235,7 @@ async function pickAgent(project, running) {
 async function signInWith(context, url, name, password) {
   const clean = url.replace(/\/+$/, '');
   const cookie = await signIn(clean, name, password, tls());
-  await vscode.workspace.getConfiguration('builderbot').update('url', clean, vscode.ConfigurationTarget.Global);
+  await vscode.workspace.getConfiguration('aerieos').update('url', clean, vscode.ConfigurationTarget.Global);
   await context.secrets.store(`${SECRET}:${clean}`, cookie);
   client = null;
 }
@@ -276,7 +276,7 @@ async function cmdOpenProject(context) {
 }
 
 // Any coding agent's session on a project (R128): the project, then which
-// agent, unless the caller named them (`builderbot.openSession` with a
+// agent, unless the caller named them (`aerieos.openSession` with a
 // project, and an agent's id after it).
 async function cmdOpenSession(context, project, agent) {
   try {
@@ -341,15 +341,15 @@ async function cmdSearch(context) {
 }
 
 function activate(context) {
-  fsp = new BuilderBotFS(context);
+  fsp = new AerieFS(context);
   context.subscriptions.push(
     vscode.workspace.registerFileSystemProvider(SCHEME, fsp, { isCaseSensitive: true }),
-    vscode.commands.registerCommand('builderbot.signIn', () => cmdSignIn(context)),
-    vscode.commands.registerCommand('builderbot.signOut', () => cmdSignOut(context)),
-    vscode.commands.registerCommand('builderbot.openProject', () => cmdOpenProject(context)),
-    vscode.commands.registerCommand('builderbot.openSession', (p, a) => cmdOpenSession(context, p, a)),
-    vscode.commands.registerCommand('builderbot.search', () => cmdSearch(context)),
-    vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('builderbot')) client = null; }),
+    vscode.commands.registerCommand('aerieos.signIn', () => cmdSignIn(context)),
+    vscode.commands.registerCommand('aerieos.signOut', () => cmdSignOut(context)),
+    vscode.commands.registerCommand('aerieos.openProject', () => cmdOpenProject(context)),
+    vscode.commands.registerCommand('aerieos.openSession', (p, a) => cmdOpenSession(context, p, a)),
+    vscode.commands.registerCommand('aerieos.search', () => cmdSearch(context)),
+    vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('aerieos')) client = null; }),
   );
   return { signIn: (url, name, password) => signInWith(context, url, name, password) };
 }
@@ -358,4 +358,4 @@ function deactivate() {
   if (fsp) for (const w of fsp.watchers.values()) w.stopped = true;
 }
 
-module.exports = { activate, deactivate, BuilderBotFS, AGENTS, sessionArg, sessionFacts };
+module.exports = { activate, deactivate, AerieFS, AGENTS, sessionArg, sessionFacts };

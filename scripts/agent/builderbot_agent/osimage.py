@@ -587,15 +587,15 @@ class OsImageMixin:
         ver = VER_RE.fullmatch(tag).group(1) if tag else ""
         shutil.rmtree(work, ignore_errors=True)
         os.makedirs(work, mode=0o700)
-        name = f"builderbot-os-{ver}" if ver else ""
+        name = f"aerieos-os-{ver}" if ver else ""
         if src:
             # The folder's ISO names the version.
-            found = sorted(f for f in os.listdir(src) if f.startswith("builderbot-os-") and f.endswith(".iso"))
+            found = sorted(f for f in os.listdir(src) if f.startswith("aerieos-os-") and f.endswith(".iso"))
             if len(found) != 1:
-                say(f"refused: {src} holds {len(found)} images (builderbot-os-VERSION.iso); one, please\n")
+                say(f"refused: {src} holds {len(found)} images (aerieos-os-VERSION.iso); one, please\n")
                 return "failed", 65
             name = found[0][:-len(".iso")]
-            ver = name[len("builderbot-os-"):]
+            ver = name[len("aerieos-os-"):]
         say(f"os update: {name}, into slot {other} (slot {cur} runs now)\n")
         fn = f"{name}.iso"
         iso = os.path.join(work, fn)

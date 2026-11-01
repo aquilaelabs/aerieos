@@ -78,7 +78,7 @@ class TheCheck(unittest.TestCase):
         self.rows = [{"tag_name": "v1.0.0", "html_url": "u0"},
                      {"tag_name": "v1.0.1-dev.5", "prerelease": True, "html_url": "u5"},
                      {"tag_name": "v1.0.1-dev.9", "prerelease": True, "draft": True, "html_url": "u9",
-                      "assets": [{"name": "builderbot-os-1.0.1-dev.9.iso", "url": "https://api.github.com/repos/o/r/releases/assets/1"}]}]
+                      "assets": [{"name": "aerieos-os-1.0.1-dev.9.iso", "url": "https://api.github.com/repos/o/r/releases/assets/1"}]}]
         self.asked = []
 
         def urlopen(req, timeout=None):

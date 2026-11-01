@@ -12,7 +12,7 @@
 // WebView (TerminalPane): a session starts when its terminal is first
 // attached, and closing the pane leaves it running, as closing the browser
 // does. End is the one that stops it.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,14 +47,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import dev.builderbot.app.Agent
-import dev.builderbot.app.Agents
-import dev.builderbot.app.Api
-import dev.builderbot.app.arr
-import dev.builderbot.app.bool
-import dev.builderbot.app.obj
-import dev.builderbot.app.str
-import dev.builderbot.app.strs
+import org.aerieos.app.Agent
+import org.aerieos.app.Agents
+import org.aerieos.app.Api
+import org.aerieos.app.arr
+import org.aerieos.app.bool
+import org.aerieos.app.obj
+import org.aerieos.app.str
+import org.aerieos.app.strs
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 

@@ -1,32 +1,32 @@
 {
-  "name": "builderbot",
+  "name": "aerieos",
   "displayName": "AerieOS",
   "description": "Open an AerieOS project's files with no share mounted, see a coding agent session's changes as it saves them, and work in any agent's session terminal, as your own AerieOS account.",
   "version": "0.2.0",
-  "publisher": "builderbot",
+  "publisher": "aquilaelabs",
   "license": "Apache-2.0",
   "engines": { "vscode": "^1.84.0" },
   "categories": ["Other"],
   "main": "./extension.js",
-  "activationEvents": ["onFileSystem:builderbot"],
-  "builderbotApi": 1,
+  "activationEvents": ["onFileSystem:aerieos"],
+  "aerieosApi": 1,
   "contributes": {
     "commands": [
-      { "command": "builderbot.signIn", "title": "Sign In", "category": "AerieOS" },
-      { "command": "builderbot.signOut", "title": "Sign Out", "category": "AerieOS" },
-      { "command": "builderbot.openProject", "title": "Open Project", "category": "AerieOS" },
-      { "command": "builderbot.openSession", "title": "Open Agent Session", "category": "AerieOS" },
-      { "command": "builderbot.search", "title": "Search Project Files", "category": "AerieOS" }
+      { "command": "aerieos.signIn", "title": "Sign In", "category": "AerieOS" },
+      { "command": "aerieos.signOut", "title": "Sign Out", "category": "AerieOS" },
+      { "command": "aerieos.openProject", "title": "Open Project", "category": "AerieOS" },
+      { "command": "aerieos.openSession", "title": "Open Agent Session", "category": "AerieOS" },
+      { "command": "aerieos.search", "title": "Search Project Files", "category": "AerieOS" }
     ],
     "configuration": {
       "title": "AerieOS",
       "properties": {
-        "builderbot.url": {
+        "aerieos.url": {
           "type": "string",
           "default": "",
           "description": "AerieOS's address, as you open the dashboard. Sign In sets it."
         },
-        "builderbot.allowSelfSignedCertificate": {
+        "aerieos.allowSelfSignedCertificate": {
           "type": "boolean",
           "default": false,
           "description": "Accept a certificate no authority signed. Only for a controller you reach on your own network."

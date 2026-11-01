@@ -7,7 +7,7 @@
 // service: the phone reaches its AerieOS directly, as the watch does.
 // Android requires a note while it runs; it sits in its own channel at the
 // lowest importance, with no dot on the icon.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.app.Service
 import android.content.Context

@@ -212,7 +212,7 @@ def is_draft(tag):
 # What an AerieOS update takes from a release's folder (osimage).
 def _os_files(tag):
     ver = str(tag).lstrip("v")
-    return {f"builderbot-os-{ver}.iso", f"builderbot-os-{ver}.iso.sha256", f"builderbot-os-{ver}.attestation.jsonl",
+    return {f"aerieos-os-{ver}.iso", f"aerieos-os-{ver}.iso.sha256", f"aerieos-os-{ver}.attestation.jsonl",
             "SHA256SUMS", "SHA256SUMS.sig"}
 
 

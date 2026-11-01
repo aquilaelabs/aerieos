@@ -8,7 +8,7 @@
 // keeps: any live agent's, Claude's first.
 //
 // Plain Kotlin with no Android in it, so the unit tests read it as it is.
-package dev.builderbot.app
+package org.aerieos.app
 
 /** One coding agent: its table key, the name a person reads, the program,
  *  and the models and efforts Start's step offers for it. Claude's are the

@@ -104,19 +104,19 @@ class World:
             if piece != without:
                 with open(os.path.join(live, IN_ISO[piece]), "wb") as f:
                     f.write(data)
-        iso = os.path.join(d, f"builderbot-os-{version}.iso")
+        iso = os.path.join(d, f"aerieos-os-{version}.iso")
         with tarfile.open(iso, "w") as t:
             t.add(os.path.join(live, "live"), arcname="live")
         with open(iso, "rb") as f:
             want = sha(f.read())
         with open(iso + ".sha256", "w") as f:
-            f.write(f"{'0' * 64 if bad else want}  builderbot-os-{version}.iso\n")
+            f.write(f"{'0' * 64 if bad else want}  aerieos-os-{version}.iso\n")
         # Its build attestation: what GitHub's API answers for the ISO's
         # digest, and the bundle the release carries beside it.
         bundle = {"mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json", "subject": want}
         with open(os.path.join(self.d, "attestations.json"), "w") as f:
             json.dump({"attestations": [{"bundle": bundle}]}, f)
-        with open(os.path.join(d, f"builderbot-os-{version}.attestation.jsonl"), "w") as f:
+        with open(os.path.join(d, f"aerieos-os-{version}.attestation.jsonl"), "w") as f:
             f.write(json.dumps(bundle) + "\n")
         return d, files
 
@@ -254,7 +254,7 @@ class TheAgent(unittest.TestCase):
         # R191 step 1: a folder on a share is no proof of who built it.
         w = World(slot="a")
         d, _ = w.publish("0.9.2")
-        os.unlink(os.path.join(d, "builderbot-os-0.9.2.attestation.jsonl"))
+        os.unlink(os.path.join(d, "aerieos-os-0.9.2.attestation.jsonl"))
         state, code, text = self.run_update(w, {"from": d})
         self.assertEqual((state, code), ("failed", 68), text)
         self.assertIn("attestation.jsonl", text)
@@ -296,7 +296,7 @@ class TheAgent(unittest.TestCase):
         w.publish("0.9.1", bad=True)
         state, code, text = self.run_update(w, {"release": "v0.9.1"})
         self.assertEqual((state, code), ("failed", 67), text)
-        self.assertIn("builderbot-os-0.9.1.iso: its sha256 does not match", text)
+        self.assertIn("aerieos-os-0.9.1.iso: its sha256 does not match", text)
         with open(w.dev["b"], "rb") as f:
             self.assertEqual(f.read(), b"\0" * 4096)
         self.assertFalse(os.path.exists(w.nextf))
@@ -335,7 +335,7 @@ class TheAgent(unittest.TestCase):
         w.publish("0.9.1-dev.12")
         state, code, text = self.run_update(w, {"release": "v0.9.1-dev.12"})
         self.assertEqual((state, code), ("succeeded", 0), text)
-        self.assertIn("builderbot-os-0.9.1-dev.12", text)
+        self.assertIn("aerieos-os-0.9.1-dev.12", text)
 
     def test_what_is_refused(self):
         w = World()

@@ -66,6 +66,8 @@
 ### Upgrading
 
 - The command is now aerie, and bb is gone: change any script of your own that calls it
+- Every download is now named aerieos-*: an installed AerieOS, USB stick or bare-metal install from before this release cannot find it, so install this one by hand once with a new ISO, stick or install-controller.sh. Your configuration moves over as usual
+- The Android app is now org.aerieos.app: install the new APK, remove the old app and pair again. The VS Code extension is now aquilaelabs.aerieos: install the new VSIX, remove the old one and sign in again
 - The image is now ghcr.io/aquilaelabs/aerieos, and the old name gets no more builds: point your compose file, template or `docker pull` at the new one. The repositories moved to github.com/aquilaelabs/aerieos and aerieos-catalog, and old links still reach them. Folders, services and data keep their names, so nothing on an install moves
 - A container following :latest now moves only when a stable release is published; to follow every change on main as before, point it at :main (c4879b7)
 

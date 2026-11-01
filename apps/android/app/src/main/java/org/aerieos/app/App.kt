@@ -1,6 +1,6 @@
 // The application: the notification channels, made once, and the watch's
 // alarm set when the account is known.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.app.Application
 import android.app.NotificationChannel

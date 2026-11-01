@@ -2,7 +2,7 @@
 // from the phone, in place of typing its address, port and code into the
 // dashboard's Phone tab. PhonePair.kt does the finding and the pairing; this
 // is the screen that walks a person through it and shows where it stands.
-package dev.builderbot.app.ui
+package org.aerieos.app.ui
 
 import android.content.Intent
 import android.provider.Settings
@@ -31,14 +31,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.builderbot.app.PhonePair
-import dev.builderbot.app.Store
-import dev.builderbot.app.arr
-import dev.builderbot.app.bool
-import dev.builderbot.app.int
-import dev.builderbot.app.obj
-import dev.builderbot.app.str
-import dev.builderbot.app.strs
+import org.aerieos.app.PhonePair
+import org.aerieos.app.Store
+import org.aerieos.app.arr
+import org.aerieos.app.bool
+import org.aerieos.app.int
+import org.aerieos.app.obj
+import org.aerieos.app.str
+import org.aerieos.app.strs
 import kotlinx.coroutines.launch
 
 @Composable

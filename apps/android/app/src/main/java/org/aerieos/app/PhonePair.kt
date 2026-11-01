@@ -19,7 +19,7 @@
 // Nothing here touches another app or reads the screen; it is network
 // discovery on the phone's own network and calls to the person's own
 // AerieOS, so Play Protect has nothing new to look at.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.app.NotificationManager
 import android.app.PendingIntent

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""AerieOS USB Maker (R198): the stick maker (builderbot-stick.py) in a
+"""AerieOS USB Maker (R198): the stick maker (aerieos-stick.py) in a
 window, for Windows above all, where it is built into one .exe that asks for
 Administrator once at start. Nothing here writes a disk itself: every step
-is builderbot-stick.py's own (the disks it lists, the release it fetches and
+is aerieos-stick.py's own (the disks it lists, the release it fetches and
 checks, the write and the read back), so the window and the command line
 can never write a stick two ways.
 
-    python tools/builderbot-usb-maker.py      the window (Python's own tkinter)
+    python tools/aerieos-usb-maker.py      the window (Python's own tkinter)
 
 The steps, one page each: which AerieOS (the newest release, the newest
 dev build, a release by name, or an image file you have); which stick (the
@@ -38,13 +38,13 @@ def load(name, file):
     path = os.path.join(HERE, file)
     spec = importlib.util.spec_from_file_location(name, path)
     if not os.path.isfile(path) or spec is None or spec.loader is None:
-        raise SystemExit(f"{file} is not beside this tool in {HERE}: run it with builderbot-stick.py in the same folder")
+        raise SystemExit(f"{file} is not beside this tool in {HERE}: run it with aerieos-stick.py in the same folder")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-stick = load("builderbot_stick", "builderbot-stick.py")
+stick = load("builderbot_stick", "aerieos-stick.py")
 
 if sys.platform == "win32":
     # A windowed .exe has no console: every PowerShell the stick maker asks
@@ -65,7 +65,7 @@ def releases():
     """The published releases, newest first: [(tag, is a dev build)]."""
     import json
     import urllib.request
-    req = urllib.request.Request(stick.API, headers={"Accept": "application/json", "User-Agent": "builderbot-usb-maker"})
+    req = urllib.request.Request(stick.API, headers={"Accept": "application/json", "User-Agent": "aerieos-usb-maker"})
     with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310 (the releases' address)
         rows = json.loads(r.read())
     return [(str(x["tag_name"]), bool(x.get("prerelease"))) for x in rows
@@ -179,7 +179,7 @@ class Maker(tk.Tk):
             if s == "tag" and not re.fullmatch(stick.TAG, self.choice["tag"].get().strip()):
                 return "Name a release by its tag, as v0.9.0 or v0.9.0-dev.4724."
             if s == "file" and not os.path.isfile(self.choice["file"].get()):
-                return "Pick the image file: builderbot-os-VERSION.stick.raw.xz."
+                return "Pick the image file: aerieos-os-VERSION.stick.raw.xz."
             return None
         return check
 

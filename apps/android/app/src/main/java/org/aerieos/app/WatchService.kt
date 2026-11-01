@@ -17,7 +17,7 @@
 // nothing in the shade between questions. Doze can hold an alarm back for
 // some minutes on a phone left alone; a question that cannot wait is one
 // the dashboard's bell also carries.
-package dev.builderbot.app
+package org.aerieos.app
 
 import android.app.AlarmManager
 import android.app.Notification

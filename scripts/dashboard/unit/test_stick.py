@@ -1,4 +1,4 @@
-"""The USB stick maker (R161 step 5, tools/builderbot-stick.py): the disks
+"""The USB stick maker (R161 step 5, tools/aerieos-stick.py): the disks
 listed off the system's own tools, the system disk and a fixed disk never
 written, an image written whole from its xz and read back, a sha256 that
 does not match refused before anything is written."""
@@ -17,7 +17,7 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-TOOL = os.path.join(ROOT, "tools", "builderbot-stick.py")
+TOOL = os.path.join(ROOT, "tools", "aerieos-stick.py")
 
 
 def load():
@@ -143,7 +143,7 @@ class Stick(unittest.TestCase):
         self.assertEqual(self.m.named({"model": "", "size": 0}), "unnamed, 0.0 GB")
 
     def test_the_newest_release_is_the_newest_that_carries_a_stick_image(self):
-        img = [{"name": "builderbot-os-0.9.0-dev.4724.stick.raw.xz"}]
+        img = [{"name": "aerieos-os-0.9.0-dev.4724.stick.raw.xz"}]
         rows = [{"tag_name": "v0.9.0-dev.4724", "prerelease": True, "assets": img},
                 {"tag_name": "v0.9.0-dev.4706", "prerelease": True, "assets": []},
                 {"tag_name": "v0.8.2", "prerelease": False, "assets": []}]
@@ -163,7 +163,7 @@ class Stick(unittest.TestCase):
             rows.insert(0, {"tag_name": "v0.9.0-dev.4730", "prerelease": True, "assets": []})
             with self.assertRaises(SystemExit):
                 self.m.release_image("latest", "dev")
-        self.assertTrue(got[0].endswith("/v0.9.0-dev.4724/builderbot-os-0.9.0-dev.4724.stick.raw.xz"), got)
+        self.assertTrue(got[0].endswith("/v0.9.0-dev.4724/aerieos-os-0.9.0-dev.4724.stick.raw.xz"), got)
         self.assertIn("v0.9.0-dev.4730 carries no stick image", said[0])
 
     def test_a_named_release_without_a_stick_image_is_said_plainly(self):
@@ -181,7 +181,7 @@ class Stick(unittest.TestCase):
         # R191 step 2: the bundle from GitHub's public API, gh verify --bundle.
         import io
         import json
-        img = os.path.join(self.d, "builderbot-os-1.0.0.stick.raw.xz")
+        img = os.path.join(self.d, "aerieos-os-1.0.0.stick.raw.xz")
         with open(img, "wb") as f:
             f.write(b"image")
         gh = os.path.join(self.d, "gh")
@@ -202,7 +202,7 @@ class Stick(unittest.TestCase):
 
     def test_an_image_is_written_whole_from_its_xz_and_read_back(self):
         raw = os.urandom(3 << 20) + b"\0" * (1 << 20)
-        img = os.path.join(self.d, "builderbot-os-0.9.0.stick.raw.xz")
+        img = os.path.join(self.d, "aerieos-os-0.9.0.stick.raw.xz")
         with lzma.open(img, "wb") as f:
             f.write(raw)
         dev = os.path.join(self.d, "stick.img")
@@ -239,7 +239,7 @@ class Stick(unittest.TestCase):
         block = self.m.ENV_MARK + b": KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)\n"
         block += b" " * (self.m.ENV_SIZE - 1 - len(block)) + b"\n"
         raw = os.urandom(at) + block + os.urandom((3 << 20) - at)
-        img = os.path.join(self.d, "builderbot-os-0.9.0.stick.raw.xz")
+        img = os.path.join(self.d, "aerieos-os-0.9.0.stick.raw.xz")
         with lzma.open(img, "wb") as f:
             f.write(raw)
         dev = os.path.join(self.d, "stick.img")

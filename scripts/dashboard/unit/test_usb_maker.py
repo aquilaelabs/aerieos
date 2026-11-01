@@ -1,4 +1,4 @@
-"""AerieOS USB Maker (R198, tools/builderbot-usb-maker.py): the window is
+"""AerieOS USB Maker (R198, tools/aerieos-usb-maker.py): the window is
 tkinter's and not tested here, where there is none; what it decides without
 a screen is. The settings page's fields become the stick's builderbot.env
 lines or are refused with why, and the releases offered are the published
@@ -22,7 +22,7 @@ def load():
                       ("tkinter.messagebox", types.ModuleType("mb")), ("tkinter.ttk", types.ModuleType("ttk"))):
         sys.modules.setdefault(name, mod)
     vars(tk).update(filedialog=sys.modules["tkinter.filedialog"], messagebox=sys.modules["tkinter.messagebox"], ttk=sys.modules["tkinter.ttk"])
-    spec = importlib.util.spec_from_file_location("usb_maker", os.path.join(TOOLS, "builderbot-usb-maker.py"))
+    spec = importlib.util.spec_from_file_location("usb_maker", os.path.join(TOOLS, "aerieos-usb-maker.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m

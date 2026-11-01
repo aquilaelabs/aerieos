@@ -45,15 +45,15 @@ MAX_BYTES = 200 << 20
 APPS = {
     "android": {"title": "Android app", "setting": "apps_android",
                 "does": "The notebook, the bell and your sessions on a phone, and the phone lent to a project.",
-                "files": [("builderbot-app-", ".apk")]},
+                "files": [("aerieos-app-", ".apk")]},
     # dev: offered only with Offer dev features on, until walked on a real
     # Windows PC and a real VS Code (the operator, 20 Oct).
     "vscode": {"title": "VS Code extension", "setting": "apps_vscode", "dev": True,
                "does": "A project's files and its terminal in VS Code, opened from the controller.",
-               "files": [("builderbot-vscode-", ".vsix")]},
+               "files": [("aerieos-vscode-", ".vsix")]},
     "companion": {"title": "Windows companion", "setting": "apps_companion", "dev": True,
                   "does": "A folder on a Windows PC kept in step with a project both ways, for a tool that only runs there.",
-                  "files": [("builderbot-companion-", ".exe"), ("builderbot-companion-", ".pyz")]},
+                  "files": [("aerieos-companion-", ".exe"), ("aerieos-companion-", ".pyz")]},
 }
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,120}$")
 

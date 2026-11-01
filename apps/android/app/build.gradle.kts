@@ -56,11 +56,11 @@ tasks.register<Copy>("bbApk") {
 }
 
 android {
-    namespace = "dev.builderbot.app"
+    namespace = "org.aerieos.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.builderbot.app"
+        applicationId = "org.aerieos.app"
         minSdk = 26
         targetSdk = 36
         versionCode = bbCode
