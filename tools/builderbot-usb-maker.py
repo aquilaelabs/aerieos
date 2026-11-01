@@ -256,7 +256,9 @@ class Maker(tk.Tk):
 
     # ---- the work, on its own thread; the window hears it through the queue ----
     def work(self):
-        work_dir = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BuilderBot USB Maker")
+        # Downloads, not AppData: the Microsoft Store's Python keeps a private
+        # copy of AppData, so the image and the log were where nobody looks.
+        work_dir = os.path.join(os.path.expanduser("~"), "Downloads", "BuilderBot USB Maker")
         os.makedirs(work_dir, exist_ok=True)
         self.log_path = os.path.join(work_dir, "usb-maker.log")
         logf = open(self.log_path, "a", encoding="utf-8")
