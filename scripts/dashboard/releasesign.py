@@ -314,7 +314,9 @@ def _attach(project, repo, token, tag, files, lines):
     while kept and not kept[-1].strip():
         kept.pop()
     body = "\n".join([*kept, *([""] if kept else []), *lines])
-    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body})
+    # The release's draft said back with the notes: a draft whose notes were
+    # sent alone was published, unread, by the APK's attach (B590).
+    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body, "draft": rel.get("draft") is True})
     return rel.get("html_url") or ""
 
 

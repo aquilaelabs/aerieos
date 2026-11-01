@@ -643,7 +643,8 @@ def _github_edit(project, repo, token, tag, notes, files):
         except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
-        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls)})
+        # Its draft said back with the notes, or a draft is published (B590).
+        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls), "draft": rel.get("draft") is True})
     return _said(rel.get("html_url") or "", notes, urls, attached, replaced, skipped)
 
 
@@ -950,7 +951,7 @@ def draft_notes(project, tag, notes):
     published: {ok, tag} or {error}."""
     try:
         repo, token, rel = _draft(project, tag)
-        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, {"body": str(notes)[:120000]})
+        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, {"body": str(notes)[:120000], "draft": True})
     except Refused as e:
         return {"error": str(e)}
     return {"ok": True, "tag": tag}

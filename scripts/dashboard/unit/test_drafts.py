@@ -58,6 +58,21 @@ class Drafts(unittest.TestCase):
             self.assertIn("published already", forgerelease.publish_draft("p", "v1.0.0")["error"])
 
 
+class TheSigningAttach(unittest.TestCase):
+    def test_the_apks_attach_leaves_a_draft_a_draft(self):
+        # B590: its notes sent alone published v0.9.0-dev.4750 unread.
+        import releasesign
+        sent = []
+
+        def req(method, url, token, body=None, **kw):
+            sent.append((method, body))
+            return {"id": 7, "draft": True, "body": "notes", "assets": [], "html_url": "u"} if method == "GET" else {}
+        with mock.patch.object(forgerelease, "_req", req):
+            releasesign._attach("p", REPO, "tok", "v1.0.0-dev.3", [], ["signed with the project's key"])
+        self.assertEqual(sent[-1][0], "PATCH")
+        self.assertIs(sent[-1][1]["draft"], True)
+
+
 class TheCheck(unittest.TestCase):
     def setUp(self):
         self.rows = [{"tag_name": "v1.0.0", "html_url": "u0"},
