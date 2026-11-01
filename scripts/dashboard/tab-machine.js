@@ -68,6 +68,7 @@ function renderMachineInto(i){
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
     + stickSection(n)
     + firstbootSection()
+    + adoptSection(n)
     + ndRowHtml(n);
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
@@ -152,6 +153,67 @@ function firstbootSection(){
     `<div class="field">${factGrid(rows, "fbfacts")}<div class="hint">Taken off the stick at the first boot ${esc(ago(f.at))} and blanked there; what waits is applied once its disks are adopted.</div></div>`);
 }
 
+// The disks and pools the stick's plan names, adopted as they are (R163
+// steps 8 and 9): each found here by its serial or not, the parity disk
+// left alone, read only or writable said in what each costs, Check for the
+// dry run and Adopt; once adopted, what is mounted where and Release.
+let adoptWritable = false;
+function adoptFound(n, id){
+  const disks = n.reported?.disks || [];
+  return disks.find(d => { const link = String(d.by_id || "").split("/").pop();
+    return link === id || link.endsWith("-" + id) || link.endsWith("_" + id) || (d.serial && String(d.serial).length >= 4 && (id === d.serial || id.endsWith("_" + d.serial))); });
+}
+function adoptSection(n){
+  const had = n.reported?.adopted;
+  if (had && (had.mounts || []).length){
+    const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
+      ...Object.entries(had.merged || {}).map(([w, up]) => [w, up ? "merged" : "merged, not mounted yet", {cls: up ? "" : "warn"}]),
+      ...(had.parity || []).map(p => ["parity", `${p}, left alone`])];
+    return docSection("nodes", "adopted", "Adopted disks", had.writable ? "writable" : "read-only",
+      `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.writable
+        ? "Writable: going back to the old system takes a parity sync, which leaves its array unprotected until it ends."
+        : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
+        <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button></div></div>`);
+  }
+  const a = state?.firstboot?.adopt;
+  if (!a) return "";
+  const w = a.want || {};
+  const found = id => adoptFound(n, id);
+  const rows = [
+    ...(w.data || []).map(x => { const d = found(x.id);
+      return [x.slot, `${x.fs} · ${x.id}${d ? ` · here as ${d.name}` : " · not on this machine"}`, {cls: d ? "" : "warn"}]; }),
+    ...(w.parity || []).map(x => { const d = found(x.id);
+      return [x.slot, `${x.id}${d ? ` · here as ${d.name}, left alone` : " · not on this machine"}`]; }),
+    ...(w.pools || []).map(p => [p.name, `${p.fs} pool, writable`]),
+    ...(a.skipped || []).map(x => [x.slot || "disk", `${x.id} · ${x.why}`, {cls: "warn"}])];
+  const missing = (w.data || []).filter(x => !found(x.id)).length;
+  return docSection("nodes", "adopt", "Disks from the stick", missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
+    `<div class="field">${factGrid(rows, "adfacts")}
+      <div class="adpick">
+        <label class="ndcap"><input type="radio" name="adoptMode" value="ro"${adoptWritable ? "" : " checked"}> Read only: the old system's parity stays good, and new files land on a pool</label>
+        <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}> Writable: going back to the old system then takes a parity sync</label>
+      </div>
+      <div class="hint">Each disk is mounted as it is, never formatted or partitioned, at the path it had, and the merged folders are made again, so what pointed at them finds its files.</div>
+      <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, {open: true});
+}
+
+function wireAdopt(root){
+  root.querySelectorAll('input[name="adoptMode"]').forEach(r => r.onchange = () => { adoptWritable = r.value === "rw"; });
+  root.querySelectorAll("[data-adopt]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const act = b.dataset.adopt, n = ownMachine();
+    if (!n) return;
+    if (act === "release" && !await askYes("Unmount every adopted disk and pool and forget them?\n\nEach disk is left as it is. Containers and VMs using them stop finding their files.",
+        {title: "Release the disks?", verb: "Release", danger: true})) return;
+    if (act === "adopt" && adoptWritable && !await askYes("Adopt the data disks writable?\n\nA file written to one is a write the old system's parity did not see: going back to it then takes a parity sync, which leaves its array unprotected until it ends.",
+        {title: "Writable?", verb: "Adopt writable"})) return;
+    busy(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing");
+    const want = act === "release" ? undefined : {...(state?.firstboot?.adopt?.want || {}), writable: adoptWritable};
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: This machine shows each mount as it lands" : "releasing"), !!j.error);
+    await loadNodes();
+  }));
+}
+
 function wireHeld(root){
   root.querySelectorAll("[data-heldstart]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Starting");
@@ -161,4 +223,5 @@ function wireHeld(root){
   }));
   wireHoldNext(root);
   wireStick(root);
+  wireAdopt(root);
 }

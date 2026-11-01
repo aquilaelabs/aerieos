@@ -96,11 +96,37 @@ def apply(path=None):
     return report
 
 
+def adopt_want(cfg):
+    """What the stick's plan names to adopt (R163 step 9), as the
+    storage-adopt request takes it: the data disks by slot and serial with
+    their filesystem, the parity disks to leave alone, the pools by name and
+    UUID; an encrypted disk is listed apart with why, since its key is not
+    asked for yet. None when the plan names no disk or pool."""
+    ar = (cfg or {}).get("array") if isinstance((cfg or {}).get("array"), dict) else {}
+    data, skipped = [], []
+    for x in ar.get("disks") or []:
+        if not isinstance(x, dict) or not x.get("id"):
+            continue
+        fs = str(x.get("fs") or "").lower()
+        if fs.startswith("luks"):
+            skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": "encrypted: its key is not asked for yet"})
+        elif fs in ("xfs", "btrfs", "zfs"):
+            data.append({"slot": str(x.get("slot") or ""), "id": str(x["id"]), "fs": fs})
+        else:
+            skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": f"its filesystem is {fs or 'not said'}"})
+    parity = [{"slot": str(x.get("slot") or "parity"), "id": str(x["id"])} for x in ar.get("parity") or [] if isinstance(x, dict) and x.get("id")]
+    pools = [{"name": str(p.get("name") or ""), "fs": str(p.get("fs") or "").lower(), "uuid": str(p.get("uuid") or "")}
+             for p in (cfg or {}).get("pools") or [] if isinstance(p, dict) and p.get("name")]
+    if not data and not pools:
+        return None
+    return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
+
+
 def view():
     """This machine's section: what the stick's prepared configuration did,
-    or None when this install had none."""
+    and what its plan names to adopt; None when this install had none."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return {k: d.get(k) for k in ("at", "done", "waiting", "failed")}
+    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(d.get("config"))}

@@ -1552,6 +1552,19 @@ def _census(c):
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16)}
+    # ...and what it adopted of another NAS (R163 step 8): each mount, its
+    # filesystem, read-only or not and mounted now, the merged trees, and
+    # the parity disk left alone.
+    if isinstance(c.get("adopted"), dict) and c["adopted"]:
+        ad = c["adopted"]
+        aw = lambda v, n: re.sub(r"[^\w .,:;/()'@%+-]", "", str(v or ""))[:n]  # noqa: E731
+        out["adopted"] = {
+            "from": aw(ad.get("from"), 16), "writable": ad.get("writable") is True,
+            "at": ad["at"] if isinstance(ad.get("at"), int) and not isinstance(ad.get("at"), bool) else 0,
+            "mounts": [{"where": aw(m.get("where"), 120), "fs": aw(m.get("fs"), 8), "ro": m.get("ro") is True, "mounted": m.get("mounted") is True}
+                       for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
+            "merged": {aw(k, 120): v is True for k, v in list((ad.get("merged") or {}).items())[:4]} if isinstance(ad.get("merged"), dict) else {},
+            "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]]}
     # The machine's time zone (R161 step 3), a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]

@@ -154,3 +154,34 @@ class Request(unittest.TestCase):
             w, why = self.want({"want": bad})
             self.assertIsNone(w, bad)
             self.assertTrue(why)
+
+
+class FromTheStick(unittest.TestCase):
+    """What the stick's plan names to adopt (firstboot.adopt_want, R163
+    step 9): data disks by slot and serial, parity left alone, pools by
+    UUID, an encrypted disk set apart with why."""
+
+    def setUp(self):
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+        import firstboot
+        self.want = firstboot.adopt_want
+
+    def test_the_plan_becomes_the_request(self):
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}, {"slot": "disk2", "id": "WDC_B2", "fs": "luks:xfs"},
+                                   {"slot": "disk3", "id": "WDC_C3", "fs": "BTRFS"}],
+                         "parity": [{"slot": "parity", "id": "ST_P"}]},
+               "pools": [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}]}
+        got = self.want(cfg)
+        self.assertEqual(got["want"]["data"], [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}, {"slot": "disk3", "id": "WDC_C3", "fs": "btrfs"}])
+        self.assertEqual(got["want"]["parity"], [{"slot": "parity", "id": "ST_P"}])
+        self.assertEqual(got["want"]["pools"], [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}])
+        self.assertEqual([s["id"] for s in got["skipped"]], ["WDC_B2"])
+        # ...and the controller takes it whole.
+        import nodes
+        w, why = nodes._adopt_want({"want": got["want"]})
+        self.assertEqual(why, "")
+
+    def test_a_plan_with_no_disk_or_pool_offers_nothing(self):
+        self.assertIsNone(self.want({}))
+        self.assertIsNone(self.want({"array": {"disks": []}}))

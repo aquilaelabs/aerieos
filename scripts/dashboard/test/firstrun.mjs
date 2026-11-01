@@ -328,6 +328,48 @@ await firstRun(false);
        && st.pick.includes('/mnt/pools/fast'),
        `a stick boot's The stick says docker and the VMs wait for a system pool, what is still on the stick and what it has written, with the pools to pick (${st.text.slice(0, 160)})`);
   }
+  // The disks the stick's plan names (R163 step 9): each found here by its
+  // serial or not, the parity disk left alone, read only or writable, Check
+  // and Adopt; once adopted, what is mounted and Release.
+  {
+    const ad = await page.evaluate(() => {
+      const n = ownMachine();
+      n.reported = { ...n.reported, disks: [{ name: 'sdb', by_id: '/dev/disk/by-id/ata-WDC_X_SER111', serial: 'SER111' },
+                                            { name: 'sdc', by_id: '/dev/disk/by-id/ata-ST_P_SERPPP', serial: 'SERPPP' }] };
+      state.firstboot = { ...(state.firstboot || {}), at: Math.floor(Date.now() / 1000), done: [], waiting: [], failed: [],
+        adopt: { want: { data: [{ slot: 'disk1', id: 'WDC_X_SER111', fs: 'xfs' }, { slot: 'disk2', id: 'WDC_Y_GONE22', fs: 'btrfs' }],
+                         parity: [{ slot: 'parity', id: 'ST_P_SERPPP' }], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u-1' }] },
+                 skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
+      return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               radios: [...(sect?.querySelectorAll('input[name="adoptMode"]') || [])].map(r => r.value + (r.checked ? '*' : '')),
+               acts: [...(sect?.querySelectorAll('[data-adopt]') || [])].map(x => x.dataset.adopt) };
+    });
+    ok(ad.there && /here as sdb/.test(ad.text) && /WDC_Y_GONE22 · not on this machine/.test(ad.text) && /here as sdc, left alone/.test(ad.text)
+       && /cache/.test(ad.text) && /encrypted/.test(ad.text) && /1 not here/.test(ad.text)
+       && ad.radios.join() === 'ro*,rw' && ad.acts.join() === 'dry,adopt',
+       `Disks from the stick lists each disk found or not, parity left alone, read only picked, Check and Adopt (${JSON.stringify({ ...ad, text: ad.text.slice(0, 200) })})`);
+    const done = await page.evaluate(() => {
+      const n = ownMachine();
+      n.reported = { ...n.reported, adopted: { from: 'adopted', writable: false, at: 1, parity: ['sdc'],
+        mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: false }],
+        merged: { '/mnt/user': true } } };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               release: !!sect?.querySelector('[data-adopt="release"]') };
+    });
+    ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
+       `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
+    // The verb checks before any job: a filesystem it does not take, and a
+    // Release with nothing adopted, each refused with why and no job made.
+    const own = await page.evaluate(() => ownMachine()?.id);
+    const badFs = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'dry', want: { data: [{ slot: 'disk1', id: 'WDC_X_SER111', fs: 'ext4' }] } });
+    const noneHeld = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'release' });
+    ok(/xfs, btrfs or zfs/.test(badFs.error || '') && !badFs.job && /nothing is adopted/.test(noneHeld.error || '') && !noneHeld.job,
+       `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
+  }
   // Name and time (R161 step 3): the own machine's section, Apply asleep
   // until a field moves, and the press a system job on its node.
   const nt = await page.evaluate(() => {
