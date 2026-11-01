@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import move     # noqa: E402
@@ -82,7 +83,7 @@ class Move(unittest.TestCase):
             bad.write_bytes(head + b"".join(body))
             got = self._land(bad, r["token"])
             self.assertIn("error", got, why)
-            self.assertFalse((self.tmp / "new-config").exists(), f"{why}: nothing here changed")
+            self.assertFalse((self.tmp / "new-config" / "users.json").exists(), f"{why}: nothing here changed")
         self.assertIn("not this bundle's move token", self._land(path, "not-the-token").get("error", ""))
         got = self._land(path, r["token"])
         self.assertTrue(got.get("ok"), got)
@@ -222,14 +223,67 @@ class Move(unittest.TestCase):
         new_state.mkdir()
         (new_state / "fresh.json").write_text("{}")
         self.configure(new_state, bare=True)
-        blocker = self.tmp / "a-file"
-        blocker.write_text("not a folder")
-        move.store_paths = lambda: {"gitrelay": str(blocker / "gitrelay")}
-        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
-                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        def refused(key, state_dir):
+            raise OSError("no")
+        with mock.patch.object(move, "install_landed_key", refused):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
         self.assertIn("back as it was", got.get("error", ""), got)
         self.assertTrue((new_state / "fresh.json").is_file(), "the state that was here, in its place")
         self.assertFalse((new_state / "users.json").exists())
+        self.assertEqual([p.name for p in new_state.iterdir() if p.name.startswith(".move")], [], "nothing of the landing left")
+
+    def test_a_landing_swaps_inside_a_state_folder_it_cannot_rename(self):
+        # B594: the parent is root's on an installed machine, a mount point's
+        # in a container. Here the parent is read-only, as it is for the
+        # controller's account there.
+        r = move.prepare("user:ann", "https://new.example")
+        parent = self.tmp / "locked"
+        new_state = parent / "config"
+        new_state.mkdir(parents=True)
+        (new_state / "fresh.json").write_text("{}")
+        (new_state / "logs").mkdir()
+        (new_state / "logs" / "today").write_text("kept where it is")
+        path = str(self.tmp / "config" / "move" / r["bundle"])
+        os.chmod(parent, 0o555)
+        self.addCleanup(os.chmod, parent, 0o755)
+        got = move.restore(path, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets",
+                           build_state_version=16, here_bare_metal=False)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((new_state / "users.json").is_file())
+        self.assertTrue((Path(got["moved_aside"]) / "fresh.json").is_file(), "set aside, never deleted")
+        self.assertEqual(Path(got["moved_aside"]).parent, new_state)
+
+    def test_a_store_whose_path_cannot_be_made_lands_under_the_state(self):
+        # B598: and the record stops naming the path.
+        (self.state / "paths.json").write_text(json.dumps({"gitrelay": "/nowhere/gitrelay"}))
+        r = move.prepare("user:ann", "https://new.example")
+        new_state = self.tmp / "new-config"
+        blocker = self.tmp / "a-file"
+        blocker.write_text("not a folder")
+        with mock.patch.object(move, "store_paths", lambda: {"gitrelay": str(blocker / "gitrelay")}):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws",
+                               secrets_dir=self.tmp / "new-secrets", build_state_version=16, here_bare_metal=False)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((new_state / "gitrelay" / "alpha.git" / "HEAD").is_file())
+        self.assertNotIn("gitrelay", json.loads((new_state / "paths.json").read_text()))
+
+    def test_a_state_this_build_no_longer_upgrades_from_is_refused(self):
+        # B600: before it lands, not at the next start.
+        r = move.prepare("user:ann", "https://new.example")
+        with mock.patch.object(move.stateversion, "SUPPORTED_FROM", 99):
+            got = self._land(self.tmp / "config" / "move" / r["bundle"], r["token"])
+        self.assertIn("upgrades from 99 on", got.get("error", ""))
+
+    def test_what_a_landing_sets_aside_is_never_carried(self):
+        for name in (".moved-1", ".move-upload-2", ".reset-3"):
+            (self.state / name).mkdir()
+            (self.state / name / "big").write_text("x")
+        move.prepare("user:ann", "https://new.example")
+        import tarfile
+        raw, _ = move.pack()
+        with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
+            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n], [])
 
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])

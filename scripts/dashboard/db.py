@@ -148,6 +148,13 @@ def migrate():
                 raise
 
 
+def checkpoint():
+    """The write-ahead log folded into the database, so a copy of the file
+    alone is whole (a move's bundle, B601)."""
+    with _lock:
+        _db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
+
 def _statements(text):
     """Split a migration into statements on blank-line boundaries, comments
     stripped. That contract is declared in 0001's header, so a migration that

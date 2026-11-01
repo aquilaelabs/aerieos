@@ -5360,6 +5360,8 @@ import backup                                                    # noqa: E402
 # Moving this controller to another home (R90 step 12, move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
 import move                                                      # noqa: E402
+move.checkpoint = db.checkpoint
+move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
 move.configure(state=STATE, workspace=WORKSPACE, secrets_dir=os.environ.get("BB_SECRETS_DIR", ""), write_json_fn=write_json,
                seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=stateversion.current,
                build_version_fn=lambda: image_stamp().get("version") or "",
@@ -12905,7 +12907,7 @@ class Handler(BaseHTTPRequestHandler):
             n = -1
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
-        spool = Path(STATE).parent / f".restore-upload-{os.getpid()}"
+        spool = Path(STATE) / f".move-restore-upload-{os.getpid()}"
         file_part = spool.with_name(spool.name + ".file")
         try:
             with open(spool, "wb") as f:
@@ -12987,7 +12989,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page("This controller already has an account; a move lands only on a fresh install.")
         if nodes.on_stick():
             return self._move_page(STICK_MOVE_FIRST)
-        r, why = self._receive_move(Path(STATE).parent)
+        r, why = self._receive_move(Path(STATE))
         if why:
             return self._move_page(why)
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
@@ -13020,13 +13022,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
         if len(users.all_users()) > 1 or any(not nodes.own_machine(n) for n in nodes.node_list()):
             return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
-        where = Path(STATE).parent
+        where = Path(STATE)
         if nodes.on_stick():
             held = nodes.workspace_held()
             if held:
                 return self._json({"error": held}, 409)
             where = Path(WORKSPACE)
-        r, why = self._receive_move(where, work_root=where if where != Path(STATE).parent else None)
+        r, why = self._receive_move(where, work_root=where if where != Path(STATE) else None)
         if why:
             return self._json({"error": why}, 400)
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
@@ -13044,6 +13046,9 @@ class Handler(BaseHTTPRequestHandler):
             n = -1
         if not 0 < n <= 16 << 30:
             return None, "the upload is empty or past 16 GB"
+        # What a power loss left of a landing before this one (B601).
+        for old in Path(where).glob(".move-*"):
+            shutil.rmtree(old, ignore_errors=True) if old.is_dir() else old.unlink(missing_ok=True)
         spool = Path(where) / f".move-upload-{os.getpid()}"
         # Room for it and what it unpacks to, said before a byte is taken
         # (B588).

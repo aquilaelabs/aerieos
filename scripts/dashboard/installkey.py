@@ -183,6 +183,25 @@ def change(new=""):
                         "and they are sealed again at the next start"} if left else {})}, 200
 
 
+def landed(key, state_dir=None):
+    """The install key a move carried, in place of the one this install made
+    for itself (B599), with that one kept as the one before, and loaded now:
+    what the moved state sealed opens under it. A key set in the environment
+    is the environment's, and a move does not change it."""
+    key = bytes(key).strip()
+    if len(key) < 16 or not os.environ.get("BB_INSTALL_KEY_DIR"):
+        return
+    d = _dir()
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    was = (d / "key").read_bytes().strip() if (d / "key").is_file() else b""
+    if was and was != key:
+        _write(d / "key-previous", was)
+    _write(d / "key", key)
+    with contextlib.suppress(Exception):
+        signing.MASTER = key
+        signing.PREVIOUS = was if was and was != key else None
+
+
 def settle():
     """At start, while the key before today's is kept: every pass run again
     under today's key, then the one before let go once nothing on the nodes

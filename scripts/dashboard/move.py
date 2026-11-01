@@ -33,6 +33,7 @@ token, nothing secret), a newline, then the sealed tar.gz (ChaCha20-Poly1305
 under HKDF(token)).
 """
 import base64
+import contextlib
 import hashlib
 import hmac
 import io
@@ -49,6 +50,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+
+import stateversion
 from pathlib import Path
 
 STATE = Path("/config")
@@ -66,6 +69,20 @@ _lock = threading.Lock()
 write_json = None
 seal = None
 open_with = None
+checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
+
+
+def _key_beside_state(key, state_dir):
+    """A carried install key where an install with no secrets folder keeps
+    its own: the server hands this over to installkey.landed (B599)."""
+    keydir = Path(state_dir) / ".install-key"
+    keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(keydir / "key", "wb") as f:
+        f.write(key)
+    os.chmod(keydir / "key", 0o600)
+
+
+install_landed_key = _key_beside_state
 state_version = lambda: 0           # noqa: E731
 build_version = lambda: ""          # noqa: E731
 install_key = lambda: b""           # noqa: E731
@@ -189,6 +206,11 @@ def bundle_path():
     return p if d.get("bundle") and p.is_file() else None
 
 
+# Inside the state and never carried: what a landing or a reset set aside, and
+# a landing's own spool and working folder.
+NEVER_PACKED = (".moved-", ".move-", ".reset-")
+
+
 def _tar_tree(tar, src, arc, leave=()):
     src = Path(src)
     if not src.exists():
@@ -196,7 +218,7 @@ def _tar_tree(tar, src, arc, leave=()):
     n = 0
     for p in sorted(src.rglob("*")):
         rel = p.relative_to(src)
-        if rel.parts and rel.parts[0] in leave:
+        if rel.parts and (rel.parts[0] in leave or rel.parts[0].startswith(NEVER_PACKED)):
             continue
         # A link goes as a link, never followed (a repository's committed
         # links, node_modules/.bin): skipped, a moved repository showed them
@@ -433,6 +455,9 @@ def write_bundle(dest, header, manifest, key, **pack_kw):
     and is copied after it. Returns (manifest, counts)."""
     dest = Path(dest)
     body = dest.with_name(dest.name + ".body")
+    # The database's log folded into it first, so the copy is not torn (B601).
+    with contextlib.suppress(Exception):
+        checkpoint()
     try:
         with open(body, "wb") as f:
             sealer = _Sealer(f, key)
@@ -896,6 +921,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     never onto a build whose state version is older than the bundle's.
     Returns {ok, moved_aside, counts} or {error}."""
     state_dir = Path(state_dir or STATE)
+    state_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir = Path(workspace_dir or WORKSPACE)
     secrets_dir = Path(secrets_dir) if secrets_dir else (Path(SECRETS) if SECRETS else None)
     here_ver = int(build_state_version if build_state_version is not None else state_version() or 0)
@@ -905,6 +931,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     if int(m.get("state_version") or 0) > here_ver:
         return {"error": f"the bundle's state is at version {m.get('state_version')} and this build reads up to {here_ver}: "
                          "a move never lands on an older build; update this install first"}
+    # ...nor a state this build no longer upgrades from: it would land, and the
+    # next start refuse it (B600).
+    if m.get("state_version") and int(m["state_version"]) < stateversion.SUPPORTED_FROM:
+        return {"error": f"the bundle's state is at version {m['state_version']}, and this build upgrades from "
+                         f"{stateversion.SUPPORTED_FROM} on: move it through a release between them first"}
     # A backup opens under the key its password derives (backup.py); a
     # move under its token's.
     if key is None:
@@ -932,9 +963,9 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         except ValueError:
             fh.close()
             return {"error": wrong}
-    # Unpacked beside the state, or where the caller says (`work_root`: on a
+    # Unpacked inside the state, or where the caller says (`work_root`: on a
     # stick, the projects folder on the machine's disks, never the stick).
-    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir.parent)))
+    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir)))
     counts = {}
     try:
         try:
@@ -944,7 +975,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         if unpacked:
             return {"error": unpacked}
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        aside = state_dir.parent / f"{state_dir.name}.moved-{stamp}"
+        aside = state_dir / f".moved-{stamp}"
         # The workspace and the secrets first, which do not need the state;
         # the state swapped after, and anything failing from there on puts
         # what was here back (B557): an error copying the workspace after
@@ -958,33 +989,43 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
         swapped = False
         try:
-            # The state: what is here moved aside whole, the bundle's put in place.
-            if state_dir.exists():
-                os.rename(state_dir, aside)
-                swapped = True
-            shutil.move(str(work / "state"), str(state_dir))
-            # The stores, where the restored records name them (their paths may
-            # not exist on this machine: then under the state, and paths.py says
-            # so on the Storage page).
+            # The state swapped inside its folder, never by renaming the folder:
+            # its parent is root's on an installed machine and a container's
+            # /config is a mount point (B594). A mountpoint under it (a stick's
+            # logs on a RAM disk) stays where it is, the bundle's merged in.
+            aside.mkdir(mode=0o700)
+            swapped = True
+            for p in sorted(state_dir.iterdir()):
+                if p.name.startswith(NEVER_PACKED) or p == work:
+                    continue
+                with contextlib.suppress(OSError):
+                    os.rename(p, aside / p.name)
+            _into(work / "state", state_dir)
+            # The stores, where the restored records name them; one whose path
+            # cannot be made on this machine lands under the state, and the
+            # record says so for the Storage page (B598).
             for kind_dir in (work / "stores").iterdir() if (work / "stores").is_dir() else []:
-                dest = (store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name)
-                dest = Path(dest)
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                if dest.exists():
-                    shutil.copytree(str(kind_dir), str(dest), symlinks=True, dirs_exist_ok=True)
-                else:
-                    shutil.move(str(kind_dir), str(dest))
+                dest = Path((store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name))
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    _into(kind_dir, dest)
+                except OSError:
+                    _store_here(state_dir, kind_dir.name)
+                    _into(kind_dir, state_dir / kind_dir.name)
             if (work / "install-key").is_file():
-                k = (work / "install-key").read_bytes()
-                keydir = state_dir / ".install-key"
-                keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
-                with open(keydir / "key", "wb") as f:
-                    f.write(k)
-                os.chmod(keydir / "key", 0o600)
+                install_landed_key((work / "install-key").read_bytes(), state_dir)
         except (OSError, shutil.Error) as e:
             if swapped:
-                shutil.rmtree(state_dir, ignore_errors=True)
-                os.rename(aside, state_dir)
+                for p in list(state_dir.iterdir()):
+                    if p.name.startswith(NEVER_PACKED) or p == work:
+                        continue
+                    if p.is_dir() and not p.is_symlink():
+                        shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        with contextlib.suppress(OSError):
+                            p.unlink()
+                _into(aside, state_dir)
+                shutil.rmtree(aside, ignore_errors=True)
             return {"error": f"the restore stopped ({e}); "
                              + ("the state that was here is back as it was" if swapped else "nothing of the state was changed")}
         # The move's own record, carried with the state: now the new home's,
@@ -1008,11 +1049,33 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             json.dump(rec, f)
         # A bare-metal home keeps its own node and its stick's plan (above).
         here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
-        return {"ok": True, "moved_aside": str(aside) if state_dir != aside else "", "counts": counts, "from": m.get("from", ""),
+        return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),
                 "nodes": list(m.get("nodes") or []), "kept_here": here}
     finally:
         shutil.rmtree(work, ignore_errors=True)
         src.close()
+
+
+def _into(src, dest):
+    """What `src` holds moved into the folder `dest`, made if missing: a name
+    there already is merged (a mountpoint stays a mountpoint)."""
+    src, dest = Path(src), Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    for p in sorted(src.iterdir()):
+        to = dest / p.name
+        if to.is_dir() and not to.is_symlink() and p.is_dir() and not p.is_symlink():
+            _into(p, to)
+        else:
+            shutil.move(str(p), str(to))
+
+
+def _store_here(state_dir, kind):
+    """A store's record back to its default, under the state (paths.json)."""
+    f = Path(state_dir) / "paths.json"
+    with contextlib.suppress(OSError, ValueError):
+        d = json.loads(f.read_text())
+        if isinstance(d, dict) and d.pop(kind, None) is not None:
+            f.write_text(json.dumps(d))
 
 
 def _unpack(src, mode, work, counts):
