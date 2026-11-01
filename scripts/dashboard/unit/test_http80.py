@@ -60,7 +60,7 @@ class TheLoop(unittest.TestCase):
     def test_it_takes_the_port_and_lets_go_for_a_compose_job_and_for_nginx(self):
         port = self.free_port()
         nginx = [False]
-        with mock.patch.object(h, "nginx_exists", lambda: nginx[0]), mock.patch.object(h, "CHECK_S", 0.1), \
+        with mock.patch.object(h, "docker_look", lambda: (False, nginx[0])), mock.patch.object(h, "CHECK_S", 0.1), \
                 mock.patch.object(h, "scheme_of", lambda p: "http"):
             threading.Thread(target=h._loop, args=(port,), daemon=True).start()
             self.assertTrue(self.until(lambda: self.held(port), True), "it takes a free port")

@@ -24,6 +24,7 @@ MARK = "/etc/builderbot-controller/own-node"
 ENV = "/etc/builderbot-controller/controller.env"
 PORT = 80
 CHECK_S = 5.0
+HOLD_S = 120.0
 HOST = re.compile(r"[A-Za-z0-9.-]{1,253}|\[[0-9A-Fa-f:.]{2,64}\]")
 HOST_PORT = re.compile(r"(\[[^\]]*\]|[^:]*)(?::\d+)?")
 PATH = re.compile(r"/[A-Za-z0-9._~!$&'()*+,;=:@%/?#\[\]-]{0,2000}")
@@ -87,27 +88,33 @@ def answer(head, port, scheme="http", here="localhost"):
             "Cache-Control: no-store\r\n\r\n").encode("latin-1", "replace")
 
 
-def nginx_exists():
-    """Whether a container of BuilderBot's nginx is on this machine, up or
-    not: its restart policy then wants the port. No where docker is not
-    running (a stick before its pool), since no container can want it then;
-    yes where docker answers something else, since this is never worth being
-    in the way."""
+def docker_look():
+    """(whether docker runs, whether a container of BuilderBot's nginx is on
+    this machine, up or not: its restart policy then wants the port). A daemon
+    that is held (a stick before its pool) is not asked: docker's socket would
+    try to start it. Where docker answers oddly, nginx is taken to be there,
+    since this is never worth being in the way."""
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        r = subprocess.run(["systemctl", "is-active", "--quiet", "docker.service"], timeout=10, check=False)
+        if r.returncode != 0:
+            return False, False
     try:
         r = subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}}"], capture_output=True, text=True, timeout=10, check=False)
     except (OSError, subprocess.SubprocessError):
-        return False
+        return False, False
     if r.returncode != 0:
-        return "cannot connect" not in (r.stderr or "").lower()
-    return any(n.startswith("nginx-") for n in r.stdout.split())
+        return False, "cannot connect" not in (r.stderr or "").lower()
+    return True, any(n.startswith("nginx-") for n in r.stdout.split())
 
 
 def _serve_one(conn, port, scheme):
-    conn.settimeout(2)
+    """One request, under a deadline as a whole: a slow client holds nothing."""
+    conn.settimeout(1)
+    until = time.monotonic() + 3
     with conn:
         head = b""
         with contextlib.suppress(OSError):
-            while b"\r\n\r\n" not in head and len(head) < 8192:
+            while b"\r\n\r\n" not in head and len(head) < 8192 and time.monotonic() < until:
                 chunk = conn.recv(2048)
                 if not chunk:
                     break
@@ -117,43 +124,55 @@ def _serve_one(conn, port, scheme):
 
 
 def _loop(listen_port):
-    sock, checked, nginx, scheme, scheme_at = None, 0.0, False, "http", 0.0
+    state = {"sock": None, "checked": 0.0, "nginx": False, "up": False, "hold": 0.0, "scheme": "http", "scheme_at": 0.0}
     while True:
-        now = time.monotonic()
-        if now - checked >= CHECK_S:
-            checked = now
-            nginx = nginx_exists()
-        want = not nginx and not _paused
-        if not want and sock:
-            sock.close()
-            sock = None
-        if want and not sock:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind(("0.0.0.0", listen_port))                        # noqa: S104 (the LAN's way in is the point)
-                s.listen(16)
-                s.settimeout(1)
-                sock = s
-            except OSError:
-                with contextlib.suppress(NameError):
-                    s.close()
-                time.sleep(CHECK_S)
-                continue
-        if not sock:
-            time.sleep(1)
-            continue
         try:
-            conn, _ = sock.accept()
-        except TimeoutError:
-            continue
+            _turn(state, listen_port)
+        except Exception as e:                                  # noqa: BLE001 (a redirect's fault takes nothing with it)
+            print(f"http80: {type(e).__name__}: {e}", flush=True)
+            time.sleep(CHECK_S)
+
+
+def _turn(st, listen_port):
+    now = time.monotonic()
+    if now - st["checked"] >= CHECK_S:
+        st["checked"] = now
+        up, st["nginx"] = docker_look()
+        # Docker come up: its containers that start with it take their ports
+        # first, and it does not try one again that found its port taken.
+        if up and not st["up"]:
+            st["hold"] = now + HOLD_S
+        st["up"] = up
+    want = not st["nginx"] and not _paused and now >= st["hold"]
+    if not want and st["sock"]:
+        st["sock"].close()
+        st["sock"] = None
+    if want and not st["sock"]:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("0.0.0.0", listen_port))                        # noqa: S104 (the LAN's way in is the point)
+            s.listen(16)
+            s.settimeout(1)
+            st["sock"] = s
         except OSError:
-            sock = None
-            continue
-        port = dashboard_port()
-        if now - scheme_at > 60:
-            scheme, scheme_at = scheme_of(port), now
-        _serve_one(conn, port, scheme)
+            s.close()
+            time.sleep(CHECK_S)
+            return
+    if not st["sock"]:
+        time.sleep(1)
+        return
+    try:
+        conn, _ = st["sock"].accept()
+    except socket.timeout:                                      # TimeoutError from 3.10; the agent's python may be older
+        return
+    except OSError:
+        st["sock"] = None
+        return
+    port = dashboard_port()
+    if now - st["scheme_at"] > 60:
+        st["scheme"], st["scheme_at"] = scheme_of(port), now
+    _serve_one(conn, port, st["scheme"])
 
 
 def start():

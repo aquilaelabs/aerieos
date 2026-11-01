@@ -236,7 +236,12 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
 
 def publish(project, tag, version, sha, comp=""):
     """The forge's release for `tag`, made if it is not there:
-    {url, made, assets, skipped, forge} or {error, forge}."""
+    {url, made, assets, skipped, forge} or {error, forge}. A project whose CI
+    makes its releases says so with .release-files: its release is CI's draft,
+    which a person publishes, so nothing is published here ahead of it."""
+    if not comp and (WORKSPACE / project / ".release-files").is_file():
+        return {"url": "", "made": False, "assets": [], "skipped": [], "forge": "CI",
+                "note": "CI makes this release as a draft: read it and publish it from the Artifacts view's Drafts"}
     if cilogs.repo_of(project):
         return _github(project, tag, version, sha, comp)
     at = _remote(project)

@@ -137,7 +137,7 @@ def keep_state_before(say, running):
     keep = os.path.join(_env("BB_OS_WORK", "/var/lib/builderbot-os"), "before")
     os.makedirs(keep, mode=0o700, exist_ok=True)
     dest = os.path.join(keep, f"{running or 'unknown'}.tar.gz")
-    r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs",
+    r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs", "--exclude=os-draft", "--exclude=.moved-*", "--exclude=.move-*",
                         os.path.basename(src)], capture_output=True, text=True, check=False)
     if r.returncode != 0:
         say(f"the configuration's copy before the update did not take: {r.stderr.strip()[-300:]}\n")
@@ -185,7 +185,7 @@ def kept_list():
     for v in names:
         d = os.path.join(kept_dir(), v)
         root = os.path.join(d, "root.squashfs")
-        if KEPT_VER.fullmatch(v) and os.path.isfile(root):
+        if KEPT_VER.fullmatch(v) and not v.endswith(".new") and os.path.isfile(root):
             st = os.stat(root)
             size = sum(os.path.getsize(os.path.join(d, f)) for f in os.listdir(d))
             out.append({"version": v, "mb": size >> 20, "at": int(st.st_mtime), "state": os.path.isfile(os.path.join(d, "state.tar.gz"))})
@@ -236,7 +236,16 @@ def _prune_kept(keep, say, spare=""):
 def keep_slot(say, dev, where, keep=KEEP_DEFAULT):
     """The version in the slot about to be written kept, from its partition
     and its kernel on the ESP (`where`). Says why it was not; never raises:
-    an update does not stop for this."""
+    an update does not stop for this. The menu follows what is kept however
+    it ends."""
+    try:
+        _keep_slot(say, dev, where, keep)
+    finally:
+        with contextlib.suppress(OSError):
+            write_kept_menu()
+
+
+def _keep_slot(say, dev, where, keep):
     try:
         keep = int(keep)
     except (TypeError, ValueError):
@@ -251,7 +260,6 @@ def keep_slot(say, dev, where, keep=KEEP_DEFAULT):
         return
     if keep <= 0:
         _prune_kept(0, say)
-        write_kept_menu()
         return
     if rel.get("BUILDERBOT_OS_BOOTS_KEPT") != "1":
         say(f"{ver} is not kept as an older version: it was built before an older version could boot from its files\n")
@@ -288,7 +296,6 @@ def keep_slot(say, dev, where, keep=KEEP_DEFAULT):
             shutil.copyfile(state, os.path.join(new, "state.tar.gz"))
         shutil.rmtree(d, ignore_errors=True)
         os.replace(new, d)
-        write_kept_menu()
         say(f"{ver} is kept as an older version, on the boot menu\n")
     except OSError as e:
         shutil.rmtree(new, ignore_errors=True)
@@ -317,6 +324,12 @@ def _room(where, size):
     except OSError:
         return ""
     free, need = st.f_bavail * st.f_frsize, int(size * ROOM)
+    # Kept older versions give way, oldest first, before an update is refused.
+    while size and free < need and kept_list():
+        shutil.rmtree(os.path.join(kept_dir(), kept_list()[-1]["version"]), ignore_errors=True)
+        write_kept_menu()
+        st = os.statvfs(where)
+        free = st.f_bavail * st.f_frsize
     if size and free < need:
         return (f"the data partition has {free >> 20} MB free and the update needs about {need >> 20} MB "
                 f"for the image and what it takes out of it: free some, or grow the disk")
@@ -625,9 +638,9 @@ class OsImageMixin:
                     shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
                     shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
                 else:
-                    rel = f"{_env('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
-                    _fetch(f"{rel}/SHA256SUMS", sums, say)
-                    _fetch(f"{rel}/SHA256SUMS.sig", sig, say)
+                    at = f"{_env('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
+                    _fetch(f"{at}/SHA256SUMS", sums, say)
+                    _fetch(f"{at}/SHA256SUMS.sig", sig, say)
             except OSError as e:
                 say(f"the release carries no signature yet ({e}): it is taken once its key's holder has signed it; nothing written\n")
                 return "failed", 69

@@ -63,7 +63,7 @@ HEADER = b"BBMOVE1\n"
 BACKUP_HEADER = b"BBBACKUP1\n"
 # What the state carries that is nobody's to move: logs, CI logs, the job
 # trees, the apps fetched from the releases, this module's own output.
-LEAVE = {"logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next"}
+LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next"}
 
 _lock = threading.Lock()
 write_json = None

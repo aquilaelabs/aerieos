@@ -147,6 +147,9 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Never by itself: type=semver on a stable tag would add :latest at
+          # the tag's push, before anybody has read the release.
+          flavor: latest=false
           tags: |
             # What people follow (:latest, :dev, :X.Y) moves only when a
             # release is published (publish-release.yml), never here: a

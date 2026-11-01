@@ -64,12 +64,24 @@ fi
 name="$(basename "$STATE")"
 [ -d "$tmp/$name" ] || { rm -rf "${tmp:?}"; echo "restore-before: $copy holds no $name: nothing put back" >&2; exit 0; }
 # What the copy leaves out (the logs, the jobs) stays with the configuration.
+# A RAM disk there (a stick's logs) stays mounted where it is: it moves with the
+# folder below, and is put back under the new one after.
+moved=()
 for keep in logs jobs; do
-    [ -e "$STATE/$keep" ] && [ ! -e "$tmp/$name/$keep" ] && mv "$STATE/$keep" "$tmp/$name/$keep"
+    [ -e "$STATE/$keep" ] && [ ! -e "$tmp/$name/$keep" ] || continue
+    if mountpoint -q "$STATE/$keep"; then
+        moved+=("$keep")
+    else
+        mv "$STATE/$keep" "$tmp/$name/$keep"
+    fi
 done
 mv "$STATE" "$aside/$name"
 mv "$tmp/$name" "$STATE"
+for keep in "${moved[@]}"; do
+    mkdir -p "$STATE/$keep"
+    mount --move "$aside/$name/$keep" "$STATE/$keep" || echo "restore-before: $keep did not come across" >&2
+done
 rm -rf "${tmp:?}"
 # A visit's set-aside comes back when the visit ends (above).
-[ -z "$kept" ] || printf '%s\n' "$aside/$name" > "$MARK"
+[ -z "$kept" ] || [ -s "$MARK" ] || printf '%s\n' "$aside/$name" > "$MARK"
 echo "restore-before: the configuration is back to the copy from before the update ($copy); what it held is in $aside/$name"

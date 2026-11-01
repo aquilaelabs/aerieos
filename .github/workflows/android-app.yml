@@ -29,8 +29,6 @@ on:
   # ...and for each release, handed to the controller to sign and attach
   # under the release's version with its sha256, for every controller on
   # that version to fetch and offer (R272 step 2, apps.py).
-  release:
-    types: [published]
   # A release whose APK did not land (v0.5.0's, B117) is built again from
   # its tag and handed over by naming the tag here; left empty, a plain build.
   workflow_dispatch:

@@ -5316,6 +5316,8 @@ def _draft_update(principal, nid, tag, os_image):
 
 
 nodes.draft_update = _draft_update
+# What an earlier draft update fetched: the slot has taken it by now.
+shutil.rmtree(Path(STATE) / "os-draft", ignore_errors=True)
 nodes.keep_versions = lambda: int(settings.get("os_keep") or 0)
 
 

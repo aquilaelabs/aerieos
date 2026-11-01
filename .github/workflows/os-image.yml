@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 ovmf mtools grub-common jq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
           sudo chmod a+rw /dev/kvm 2>/dev/null || true
       - name: Boot the image and wait for the dashboard
         shell: bash
@@ -216,10 +216,17 @@ jobs:
           boot stick.raw serial-stick.log "bbtoram=1"
           rm -f stick.raw
           qemu-img convert -O raw "$qcow" kept.raw
+          # Room on the data partition for a root, as a stick's first boot
+          # grows it (p1 the BIOS partition, p2 the ESP, p5 the data).
+          truncate -s +8G kept.raw
+          sudo sfdisk --relocate gpt-bak-std kept.raw
+          echo ", +" | sudo sfdisk -N 5 --no-reread kept.raw
           loop="$(sudo losetup -Pf --show kept.raw)"
+          sudo e2fsck -fy "${loop}p5" || true
+          sudo resize2fs "${loop}p5"
           sudo mkdir -p /mnt/bbdata /mnt/bbesp
           sudo mount "${loop}p5" /mnt/bbdata
-          sudo mount "${loop}p1" /mnt/bbesp
+          sudo mount "${loop}p2" /mnt/bbesp
           k=/mnt/bbdata/lib/builderbot-os/kept/kept-test
           sudo mkdir -p "$k"
           sudo cp "out/$name.root.squashfs" "$k/root.squashfs"

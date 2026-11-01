@@ -9,9 +9,11 @@ The container edition has its own path (the image, pulled by the host), so
 nothing here is drawn for it: `attention` and `status` answer nothing when
 the install is not bare metal.
 """
+import contextlib
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import urllib.request
@@ -127,7 +129,9 @@ def check():
     version, tag, url, error = "", "", "", ""
     token = _token()
     try:
-        req = urllib.request.Request(RELEASES_URL, headers={"Accept": "application/json", "User-Agent": "builderbot-release"})
+        # A page long enough that dev builds never push the newest release off it.
+        url_ = RELEASES_URL + ("?per_page=100" if RELEASES_URL.startswith("https://") else "")
+        req = urllib.request.Request(url_, headers={"Accept": "application/json", "User-Agent": "builderbot-release"})
         if token:
             req.add_unredirected_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:   # noqa: S310 (our releases, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -216,11 +220,16 @@ def fetch_draft(tag, dest):
     """The draft's BuilderBot OS files fetched into `dest` with the token, as
     a folder update reads them: "" or why. Said on the Updates section as it
     goes (status's draft_fetch)."""
-    import shutil
     token = _token()
     assets = _drafts.get(str(tag)) or []
     want = _os_files(tag)
     got = [a for a in assets if a.get("name") in want and str(a.get("url") or "").startswith("https://api.github.com/")]
+    need = 2 * sum(int(a.get("size") or 0) for a in got)
+    with contextlib.suppress(OSError):
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        if shutil.disk_usage(os.path.dirname(dest)).free < need:
+            _fetch.update(tag=str(tag), at=int(time.time()), error=f"no room for the draft's {need >> 20} MB here", done=False)
+            return _fetch["error"]
     _fetch.update(tag=str(tag), at=int(time.time()), error="", done=False)
     if not token or not any(str(a.get("name")).endswith(".iso") for a in got):
         _fetch["error"] = f"{tag} is not a draft this controller can see, or it carries no BuilderBot OS image yet"

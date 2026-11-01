@@ -7,7 +7,7 @@
 # version, for every controller on that version to fetch, check and offer
 # on its card in the Library (apps.py).
 #
-# Only when a release is published, or by hand for a release that exists: a
+# Only when build-image.yml starts it for a tag's draft, or by hand for a release that exists: a
 # hosted Windows runner bills twice a Linux one's minutes, and a build on
 # every push kept as an artifact is what filled the account's Actions
 # storage once already (B669). Signed when the repository holds a
@@ -16,8 +16,6 @@
 name: companion app
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:

@@ -686,6 +686,12 @@ def v_release_view(t, a):
     if not REF.fullmatch(tag):
         raise ValueError("name the release by its tag")
     c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+    if c == 404:
+        # A draft is never found by its tag: looked for among the listed.
+        lc, lb, _h = _call(t, "GET", f"/repos/{t['repo']}/releases?per_page=50")
+        found = next((r for r in lb if isinstance(r, dict) and r.get("tag_name") == tag), None) if lc == 200 and isinstance(lb, list) else None
+        if found:
+            c, b = 200, found
     return _ok(c, b, lambda r: {"tag": r.get("tag_name"), "name": r.get("name"), "body": r.get("body"),
                                 "prerelease": r.get("prerelease"), "url": r.get("html_url"),
                                 "files": [{"name": f.get("name"), "size": f.get("size")} for f in r.get("assets") or []]})
