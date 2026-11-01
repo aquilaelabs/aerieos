@@ -723,13 +723,15 @@ session_dir() {
     [ "$slot" = 1 ] || branch="$branch-$slot"
     # An account that is its own user (R125) cannot make a folder beside the
     # tree or run git in it as the tree's owner: bb-session makes it, as that
-    # owner, at this place and on this branch (R125 step 7).
+    # owner, at this place and on this branch (R125 step 7). Where it does
+    # not (no helper here, as under the test harness, whose every account
+    # is the one user running it), the account makes it itself if it may,
+    # and the project directory is shared only when it may not (B430).
     case "$(id -un 2>/dev/null)" in
         bbu-*)
             local made
             made="$(sudo -n "${BB_SESSION_BIN:-/usr/local/sbin/bb-session}" worktree "$proj" "$agent" "$slot" "$branch" 2>/dev/null)" || made=""
-            if [ "$made" = "$wt" ] && [ -d "$wt" ]; then printf '%s' "$wt"; return 0; fi
-            printf '%s' "$src"; return 0 ;;
+            if [ "$made" = "$wt" ] && [ -d "$wt" ]; then printf '%s' "$wt"; return 0; fi ;;
     esac
     mkdir -p "$(dirname "$wt")" 2>/dev/null || { printf '%s' "$src"; return 0; }
     # An existing branch is checked out rather than recreated: this is somebody
