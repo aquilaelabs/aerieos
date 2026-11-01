@@ -948,6 +948,10 @@ function rnDrawFtp(){
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: BuilderBot for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the project gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
     ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
+    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpFor">Keep it on</label>
+      <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
+        ...(v.on && v.until ? [["", `until ${new Date(v.until * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
+        ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
     <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; projects on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
       <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
       <span class="dim">and the ${v.span - 1} after it</span></div>
@@ -959,6 +963,8 @@ function rnDrawFtp(){
     }).join("")}</div>`;
   $("rnFtpOn").onchange = e => { d.on = e.target.checked; rnDrawFtp(); };
   $("rnFtpEditor").onchange = e => { d.editor = e.target.checked; rnDrawFtp(); };
+  const fo = $("rnFtpFor");
+  if (fo) fo.onchange = () => { d.for = fo.value; rnDrawFtp(); };
   const pi = $("rnFtpPort");
   if (pi) pi.oninput = () => { d.port = pi.value.trim(); };
   box.querySelectorAll("[data-ftpuid]").forEach(sel => sel.onchange = () => {
@@ -973,6 +979,8 @@ function rnFtpChange(){
   if (d.on !== undefined && d.on !== v.on) out.on = d.on;
   if (d.editor !== undefined && d.editor !== v.editor) out.editor = d.editor;
   if (d.port !== undefined && String(d.port) !== String(v.port)) out.port = d.port;
+  // How long it stays on (R196): sent when picked, counted from the Save.
+  if (d.for !== undefined && d.for !== "" && (out.on ?? v.on)) out.for = Number(d.for);
   // A port shown for a project turned on now is its offer, and is sent.
   if (out.on && out.port === undefined) out.port = v.port;
   const acc = Object.fromEntries(Object.entries(d.access || {})

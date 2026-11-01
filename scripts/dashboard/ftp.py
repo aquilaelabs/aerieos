@@ -54,6 +54,11 @@ def configure(*, state, workspace, write_json, users, audit, project_node, ask_h
     globals().update(FILE=Path(state) / "ftp.json", WORKSPACE=Path(workspace), write_json=write_json,
                      users=users, audit=audit, project_node=project_node, ask_hello=ask_hello,
                      node_info=node_info)
+    # A timer set before a restart, armed again (R196).
+    for rec in _load().values():
+        r = _clean(rec)
+        if r["on"] and r["until"]:
+            _arm(r["until"])
 
 
 def _node(node):
@@ -119,8 +124,45 @@ def _clean(rec):
     acc = rec.get("access") if isinstance(rec.get("access"), dict) else {}
     # The editor's and the apps' door is open unless the project closed it
     # (R104): being on a project is what lets a person's own machine in.
+    until = rec.get("until") if isinstance(rec.get("until"), int) and not isinstance(rec.get("until"), bool) else 0
     return {"on": bool(rec.get("on")), "port": port, "editor": bool(rec.get("editor", True)),
-            "access": {str(k): v for k, v in acc.items() if v in ACCESS}}
+            "access": {str(k): v for k, v in acc.items() if v in ACCESS}, "until": until if rec.get("on") else 0}
+
+
+# How long FTP may be kept on (R196, the operator, 1 Nov): until turned off,
+# or for an hour, a day or a week, after which it turns itself off.
+FOR = (0, 3600, 86400, 7 * 86400)
+
+
+def expire(now=None):
+    """Each project whose time is up turned off, said in the audit and told
+    to its node at once. The projects turned off."""
+    now = now or int(time.time())
+    gone = []
+    with _lock:
+        d = _load()
+        for project, rec in list(d.items()):
+            r = _clean(rec)
+            if r["on"] and r["until"] and r["until"] <= now:
+                d[project] = {**r, "on": False, "until": 0}
+                gone.append(project)
+        if gone:
+            write_json(FILE, d, mode=0o600)
+    for project in gone:
+        audit("system:ftp-timer", "ftp", project, {"on": False, "why": "its time was up"})
+        node = project_node(project) or ""
+        if node and ask_hello:
+            ask_hello(node)
+    return gone
+
+
+def _arm(until):
+    """A timer that turns it off on the second, the hello at the check
+    being the way back after a restart."""
+    import threading as _t
+    t = _t.Timer(max(1, until - int(time.time())) + 1, expire)
+    t.daemon = True
+    t.start()
 
 
 def get(project):
@@ -164,6 +206,16 @@ def save(project, req, by):
         rec = _clean(d.get(project))
         if "on" in req:
             rec["on"] = bool(req.get("on"))
+        if "for" in req:
+            try:
+                f = int(req.get("for") or 0)
+            except (TypeError, ValueError):
+                f = -1
+            if f not in FOR:
+                return {"error": "FTP is kept on until turned off, or for an hour, a day or a week"}, 400
+            rec["until"] = int(time.time()) + f if f else 0
+        if not rec["on"]:
+            rec["until"] = 0
         # The editor's door (R159): the same people and access, through the
         # controller's Files API rather than an FTPS server on the node.
         if "editor" in req:
@@ -210,7 +262,9 @@ def save(project, req, by):
         d[project] = rec
         write_json(FILE, d, mode=0o600)
     audit(by, "ftp", project, {"on": rec["on"], "port": rec["port"], "editor": rec["editor"],
-                               "access": rec["access"]})
+                               "access": rec["access"], "until": rec["until"]})
+    if rec["on"] and rec["until"]:
+        _arm(rec["until"])
     if node and ask_hello:
         ask_hello(node)
     return view(project, True), 200
@@ -219,6 +273,7 @@ def save(project, req, by):
 def for_node(node):
     """What `node`'s agent runs: every project whose primary node it is,
     with file access on and a tree to serve. Rides hello."""
+    expire()
     out = []
     with _lock:
         d = _load()
@@ -248,6 +303,7 @@ def view(project, may_set):
     """What the settings' File access section draws: the record, every
     account that can see the project with its access, and what the node
     said about the server."""
+    expire()
     rec = get(project)
     node = project_node(project) or ""
     people = []
@@ -264,7 +320,7 @@ def view(project, may_set):
         why = missing_why(node)
         if why:
             st = {"up": False, "why": why}
-    return {"missing": missing_why(node), "on": rec["on"], "editor": rec["editor"],
+    return {"missing": missing_why(node), "on": rec["on"], "editor": rec["editor"], "until": rec["until"],
             "port": rec["port"] or free_port(project, node),
             "node": node, "people": people, "status": st, "may_set": bool(may_set), "span": SPAN}
 

@@ -64,6 +64,31 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.save("beta", {"on": True}, "boss")[0]["port"], 2131)
         self.assertEqual(ftp.save("gamma", {"on": True}, "boss")[0]["port"], 2121)
 
+    def test_kept_on_for_a_while_then_off_by_itself(self):
+        # R196 (the operator, 1 Nov): on for an hour, then off, said in the
+        # audit and told to the node so its server stops.
+        import time
+        v, code = ftp.save("alpha", {"on": True, "for": 3600}, "boss")
+        self.assertEqual(code, 200)
+        self.assertTrue(abs(v["until"] - (int(time.time()) + 3600)) <= 2)
+        self.assertEqual(ftp.expire(int(time.time()) + 60), [], "not before its time")
+        self.hellos.clear()
+        self.assertEqual(ftp.expire(v["until"] + 1), ["alpha"])
+        self.assertEqual(ftp.get("alpha")["on"], False)
+        self.assertEqual(ftp.get("alpha")["until"], 0)
+        self.assertEqual(self.hellos, ["n1"])
+        self.assertEqual(ftp.for_node("n1"), [])
+        self.assertTrue(any(a[0] == "system:ftp-timer" for a in self.audited))
+
+    def test_how_long_is_one_of_the_choices_and_off_clears_it(self):
+        self.assertEqual(ftp.save("alpha", {"on": True, "for": 5}, "boss")[1], 400)
+        ftp.save("alpha", {"on": True, "for": 86400}, "boss")
+        self.assertTrue(ftp.get("alpha")["until"])
+        ftp.save("alpha", {"on": False}, "boss")
+        self.assertEqual(ftp.get("alpha")["until"], 0)
+        ftp.save("alpha", {"on": True, "for": 0}, "boss")
+        self.assertEqual(ftp.get("alpha")["until"], 0, "until turned off")
+
     def test_ports_are_checked(self):
         ftp.save("alpha", {"on": True, "port": 3000}, "boss")
         for port, said in [(80, "a port from 1024"), (65530, "a port from 1024"),

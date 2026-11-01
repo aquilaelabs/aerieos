@@ -2098,6 +2098,10 @@ await page.click('#rnCancel');
   const draft = await page.evaluate(() => rnFtpChange());
   ok(draft?.on === true && draft.port === 2121 && draft.access?.[uid] === 'rw',
      `...and what Save sends is the switch, the port and the access picked (${JSON.stringify(draft)})`);
+  // ...and how long it stays on (R196): a day picked is sent as its seconds.
+  await page.selectOption('#rnFtpFor', '86400');
+  const timed = await page.evaluate(() => rnFtpChange());
+  ok(timed?.for === 86400 && timed.on === true, `...and Keep it on for a day sends how long (${JSON.stringify(timed)})`);
   // The editor's door (R159): its own switch over the same people, with no
   // port, and FTPS left off.
   await page.click('#rnFtpOn');
