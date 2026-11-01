@@ -298,7 +298,7 @@ const SCREEN_PORT = 17684 + Math.floor(Math.random() * 1000);
 // A terminal through the controller, as the page opens one (R133): its
 // screen, what is typed into it, and the reason it closes with.
 const { connect: wsConnect } = createRequire(import.meta.url)(`${REPO}/apps/vscode/lib/ws.js`);
-const termRun = async (arg, type, hdr) => {
+const termRun = async (arg, type, hdr, answer) => {
   const sock = await wsConnect(URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/termws?arg='
     + encodeURIComponent(arg) + '&cols=120&rows=30', { headers: hdr });
   let out = '', why = null;
@@ -308,6 +308,8 @@ const termRun = async (arg, type, hdr) => {
   if (type && why === null){
     sock.send(Buffer.concat([Buffer.from([0]), Buffer.from(type, 'utf8')]));
     await sleep(2500);
+    // A shell that is slow to start under a whole run's load answers late.
+    for (const t0 = Date.now(); answer && !answer.test(out) && why === null && Date.now() - t0 < 30000;) await sleep(200);
   }
   sock.close();
   return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b[()][0-9A-Za-z]/g, ''), why };
@@ -2112,7 +2114,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // and bb through .bb/current, so a shell open since before an update
       // still runs the bundle delivered last (bug #66).
       const sh = await termRun('shell:alpha',
-        'echo "W:$BB_ACCOUNT_UID:$BB_ACCOUNT_NAME:$BB_TREE_OWNER:${BB_TOKEN%%_*}:$BUILDERBOT_ROLE:$(command -v aerie | sed s,.*/.bb/,,)"\r', auth);
+        'echo "W:$BB_ACCOUNT_UID:$BB_ACCOUNT_NAME:$BB_TREE_OWNER:${BB_TOKEN%%_*}:$BUILDERBOT_ROLE:$(command -v aerie | sed s,.*/.bb/,,)"\r', auth, /W:u_[0-9a-f]+:[^\s]*\s/);
       const said = (sh.out.match(/W:u_[0-9a-f]+:[^\s]*/g) || []).pop() || '';
       ok(said === `W:${uid}:test:1:bbs:node:current/scripts/aerie`,
          `a project shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
