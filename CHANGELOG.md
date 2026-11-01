@@ -8,7 +8,7 @@
 - BuilderBot OS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
 - A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
 - An installed BuilderBot takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
-- The image is tagged :dev at every release and dev build, so an install can follow the dev channel by its compose file or template (1b8ce1d)
+- The image is tagged :dev when a release or dev build is published, so an install can follow the dev channel by its compose file or template (1b8ce1d)
 - bb version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
 - bb version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
 - A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
@@ -17,6 +17,7 @@
 - On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
 - A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
 - Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
+- BuilderBot OS keeps the versions an update replaces, the three newest by default: each is on the boot menu under Older versions and on This machine, a visit lasting one boot with the configuration as it was (300599f)
 
 ### Changed
 

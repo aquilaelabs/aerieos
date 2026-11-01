@@ -315,7 +315,7 @@ function moveSection(){
       : ar.from ? `; the old controller is told once it answers${ar.tell_error ? ` (last: ${esc(ar.tell_error)})` : ""}` : "; the old controller named no address, so it learns by asking here"}.${
       (m.not_here || []).length ? ` ${m.not_here.length} node${m.not_here.length === 1 ? " has" : "s have"} not checked in since: the Nodes page gives each its line.` : ""}</div>` : "";
   const sizeMb = m.size ? moveSize(m.size) : "";
-  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle.</div></div>` : "";
+  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle; a USB stick takes it under Controller settings, once its disks are set up.</div></div>` : "";
   const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
   // A move landed here instead (the operator, 1 Nov): on a fresh controller,
@@ -659,7 +659,9 @@ const SETTING_GROUPS = [
      options: [["", "never by itself: Update under Updates is the press"], ["daily", "daily, at the hour below"],
                ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]],
      hint: "In the window the newest release is applied the way Update does it: the image into the other slot on BuilderBot OS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
-    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"}]},
+    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"},
+    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number",
+     hint: "BuilderBot OS: each version an update replaces stays on the machine, about 2 GB each, bootable from the menu's Older versions. 0 keeps none."}]},
   {key: "maint", title: "Maintenance", can: "maintenance",
    heading: s => s?.settings?.maintenance_mode?.value ? "on" : "off",
    headingCls: s => s?.settings?.maintenance_mode?.value ? "warn" : "",

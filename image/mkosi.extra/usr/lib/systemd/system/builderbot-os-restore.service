@@ -9,6 +9,9 @@ Before=builderbot-controller.service builderbot-os-health.service
 
 [Service]
 Type=oneshot
+# The boot menu on the ESP follows the image running (R201): a stick written
+# before a change to it takes the change with its first update.
+ExecStartPre=-/usr/lib/builderbot-os/boot-menu
 ExecStart=/usr/lib/builderbot-os/restore-before
 StandardOutput=journal+console
 

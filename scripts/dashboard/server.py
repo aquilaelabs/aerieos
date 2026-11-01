@@ -5316,6 +5316,7 @@ def _draft_update(principal, nid, tag, os_image):
 
 
 nodes.draft_update = _draft_update
+nodes.keep_versions = lambda: int(settings.get("os_keep") or 0)
 
 
 def _update_in_window(version):

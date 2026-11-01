@@ -111,8 +111,9 @@ jobs:
   appliance-boot:
     needs: appliance
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: builderbot-os
@@ -169,9 +170,73 @@ jobs:
           [ -s first.log ] || head -n 400 plain.log > first.log
           tail -n 400 first.log
           exit 1
+      # What only a stick does (B592) and a kept older version (R201): the same
+      # disk booted with the slot in memory, the projects held; and booted once
+      # from a version laid on the data partition, as an update leaves one, its
+      # menu written by the agent's own code. Each must reach the dashboard and
+      # say on the kernel's command line that it is what it was asked to be.
+      - name: Boot it as a stick and from a kept version
+        shell: bash
+        run: |
+          set -euo pipefail
+          qcow="$(find out -maxdepth 1 -name 'builderbot-os-*.qcow2' | head -1)"
+          name="$(basename "$qcow" .qcow2)"
+          ver="${name#builderbot-os-}"
+          kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
+          boot() {  # disk, log, the word its command line must carry
+            # shellcheck disable=SC2086
+            qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+              -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+              -drive file="$1",format=raw,if=virtio \
+              -netdev user,id=n0,hostfwd=tcp:127.0.0.1:7680-:7680 -device virtio-net-pci,netdev=n0 \
+              -display none -serial file:"$2" -daemonize -pidfile qemu.pid
+            for i in $(seq 1 120); do
+              code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
+              case "$code" in
+                200|302|303)
+                  kill "$(cat qemu.pid)" || true; sleep 2
+                  grep -aq "Command line:.*$3" "$2" || { echo "the dashboard answered, but this boot was not $3"; exit 1; }
+                  echo "$3: the dashboard answered $code after $((i * 5)) s"; return 0 ;;
+              esac
+              if grep -aq "end Kernel panic" "$2" 2>/dev/null; then break; fi
+              sleep 5
+            done
+            kill "$(cat qemu.pid)" || true
+            tail -n 200 "$2"; echo "$3: no dashboard"; exit 1
+          }
+          env_set() {  # disk, settings for GRUB's environment
+            local disk="$1" at; shift
+            at="$disk@@$(( $(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
+            mcopy -n -i "$at" ::/grub/grubenv grubenv
+            grub-editenv grubenv set "$@" bb_args="console=ttyS0,115200 loglevel=6"
+            mcopy -o -i "$at" grubenv ::/grub/grubenv
+          }
+          qemu-img convert -O raw "$qcow" stick.raw
+          env_set stick.raw bb_toram=1
+          boot stick.raw serial-stick.log "bbtoram=1"
+          rm -f stick.raw
+          qemu-img convert -O raw "$qcow" kept.raw
+          loop="$(sudo losetup -Pf --show kept.raw)"
+          sudo mkdir -p /mnt/bbdata /mnt/bbesp
+          sudo mount "${loop}p5" /mnt/bbdata
+          sudo mount "${loop}p1" /mnt/bbesp
+          k=/mnt/bbdata/lib/builderbot-os/kept/kept-test
+          sudo mkdir -p "$k"
+          sudo cp "out/$name.root.squashfs" "$k/root.squashfs"
+          sudo cp "out/$name.vmlinuz" "$k/vmlinuz"
+          sudo cp "out/$name.initrd" "$k/initrd"
+          sudo cp "out/$name.release" "$k/release"
+          sudo env BB_OS_WORK=/mnt/bbdata/lib/builderbot-os BB_OS_ESP=/mnt/bbesp PYTHONPATH=scripts/agent \
+            python3 -c 'from builderbot_agent.osimage import write_kept_menu, kept_list; assert [r["version"] for r in kept_list()] == ["kept-test"]; write_kept_menu()'
+          sudo cat /mnt/bbesp/grub/kept.cfg
+          sudo umount /mnt/bbdata /mnt/bbesp
+          sudo losetup -d "$loop"
+          env_set kept.raw bb_kept_next=kept-test
+          boot kept.raw serial-kept.log "bbkept=kept-test"
+          echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: builderbot-os-boot
-          path: serial.log
+          path: serial*.log
           if-no-files-found: ignore

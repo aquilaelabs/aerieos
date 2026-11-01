@@ -538,7 +538,7 @@ below stopped receiving security patches in March 2026.
 **Where the space goes.** Nothing Android lives in the image at all: the SDK,
 the platforms, the build-tools, the emulator and the system images are
 installed into the node's [toolchain store](#the-toolchain-store-lives-outside-the-image), so
-each is downloaded **once** and a weekly `:latest` rebuild re-fetches none of
+each is downloaded **once** and a weekly `:main` rebuild re-fetches none of
 them. Budget roughly **2 GB per API level**. If that is tight, pick the plain
 **AOSP** flavor in the image picker instead of Google APIs: smaller, at the
 price of Play services.

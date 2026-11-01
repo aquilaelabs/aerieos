@@ -137,6 +137,9 @@ KEYS = {
     **{f"check_{k}": {"default": "weekly", "kind": "choice", "applied": "now", "choices": ["daily", "weekly", "monthly", "off"]}
        for k in ("release", "images", "nginx", "scanners", "catalog")},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
+    # How many versions an update pushes out of its slot stay on the boot
+    # menu (R201), 0 for none; BuilderBot OS alone.
+    "os_keep": {"default": 3, "kind": "number", "min": 0, "max": 10, "applied": "now"},
     # The room a node keeps for itself (R110): the disk left free under
     # which the bell warns and a build, a test or a container's rebuild is
     # refused (a tenth of a disk smaller than ten times this), the memory

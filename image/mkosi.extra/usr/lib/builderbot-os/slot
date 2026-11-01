@@ -12,6 +12,7 @@
 #   slot switch SLOT PREV VER   the next boot is a trial of SLOT holding VER, back to PREV: one write
 #   slot good            this boot's slot is healthy: the trial ends, and it stays
 #   slot fell-back [keep]   whether the last boot fell back to the slot before (and clears the mark, unless keep)
+#   slot kept-next [VER]    one boot of the kept older version VER next (R201), or none named: no such boot
 #
 # GRUB keeps the choice in its environment block on the ESP (bb_slot), the one
 # place this tool writes. Counting a new slot's tries and marking it good is
@@ -92,6 +93,8 @@ switch() {
 good() {
     needenv || return 1
     local cur nxt ver
+    # A kept older version is one boot's visit: the slots are as they were.
+    grep -q 'bbkept=' "$CMDLINE" 2>/dev/null && return 0
     cur="$(current 2>/dev/null || true)"
     [ -n "$cur" ] || return 0
     nxt="$(next)"
@@ -107,6 +110,15 @@ good() {
         grub-editenv "$ENVF" set "bb_ver_$cur=$ver"
     fi
     return 0
+}
+# One boot of a kept older version next, GRUB spending the word (R201).
+keptnext() {
+    needenv || return 1
+    case "${1:-}" in
+        '') grub-editenv "$ENVF" unset bb_kept_next ;;
+        *[!A-Za-z0-9.+-]*) echo "slot kept-next takes a version" >&2; return 2 ;;
+        *) grub-editenv "$ENVF" set "bb_kept_next=$1" ;;
+    esac
 }
 fellback() {
     if [ "$(envget bb_fell_back)" = 1 ]; then
@@ -138,6 +150,7 @@ case "${1:-}" in
     switch) switch "${2:-}" "${3:-}" "${4:-}" ;;
     good) good ;;
     fell-back) fellback "${2:-}" ;;
+    kept-next) keptnext "${2:-}" ;;
     status) status ;;
-    *) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -66,6 +66,7 @@ function renderMachineInto(i){
   const inflight = t => (n.jobs || []).some(j => j.type === t || j.apply === t);
   d.list.innerHTML = machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
+    + olderVersionsSection(n)
     + stickSection(n)
     + machineConsoleSection(n)
     + firstbootSection()
@@ -75,6 +76,7 @@ function renderMachineInto(i){
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);
+  wireOlderVersions(d.el);
   wireHeld(d.el);
   void inflight;
 }
@@ -97,6 +99,35 @@ function wireHoldNext(root){
   });
 }
 
+// Older versions (R201, the operator, 1 Nov): what updates pushed out of
+// their slots, each one on the boot menu. Boot this next is one visit: the
+// boot after is the version it came from again.
+function olderVersionsSection(n){
+  const k = n?.reported?.os_kept;
+  if (!k?.booted && !(k?.versions || []).length) return "";
+  const admin = !!state?.can?.admin, busy = (n.jobs || []).some(j => j.apply === "os-kept"), dead = busy || !n.live;
+  const rows = (k.versions || []).map(v => `<div class="row" data-oskept="${esc(v.version)}"><div class="grow"><span class="name">${esc(v.version)}</span>
+      <div class="sub dim">${v.mb >= 1024 ? `${(v.mb / 1024).toFixed(1)} GB` : `${v.mb} MB`}, kept ${esc(ago(v.at))}${v.state ? ", with its configuration" : ""}</div></div>
+      ${admin && k.booted !== v.version ? `<div class="acts"><button type="button" data-oskeptdo="next"${dead ? " disabled" : ""}>Boot this next</button><button type="button" class="danger" data-oskeptdo="remove"${dead ? " disabled" : ""}>Remove</button></div>` : ""}</div>`).join("");
+  return docSection("nodes", "older", "Older versions", k.booted ? `visiting ${k.booted}` : String(k.versions.length), `<div class="field">
+      ${k.booted ? `<div class="hint warn">This boot is a visit to ${esc(k.booted)}. Restart to go back to the version it came from; updates wait until then.</div>` : ""}
+      ${rows}${busy ? `<div class="sub dim">Working on it now.</div>` : !n.live ? `<div class="sub dim">Its agent is not dialing in.</div>` : ""}
+      <div class="hint">Each version an update replaced, also under Older versions on the boot menu. A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. Your projects, shares and VMs are not part of it. How many are kept is under Update window.</div></div>`);
+}
+function wireOlderVersions(root){
+  root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const verb = b.dataset.oskeptdo, version = b.closest("[data-oskept]")?.dataset.oskept || "";
+    if (!await askYes(verb === "next"
+        ? `Boot ${version} next?\n\nOnce, at the next restart; the boot after is this version again. Nothing restarts until you do.`
+        : `Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
+        {title: verb === "next" ? "Boot it next?" : "Remove it?", verb: verb === "next" ? "Boot it next" : "Remove", danger: verb !== "next"})) return;
+    busy(b, verb === "next" ? "Setting" : "Removing");
+    const j = await (await postJSON("/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || (verb === "next" ? `${version} boots next, once: restart from Advanced` : `removing ${version}`), !!j.error);
+    await loadNodes();
+  }));
+}
+
 // The stick (R161 step 10, the operator, 29 Oct: read once and written
 // rarely): the system runs from RAM, the stick keeps the configuration, and
 // what writes all day (docker, the VMs, the toolchains, the projects) is on
@@ -115,7 +146,7 @@ function stickSection(n){
     ["Runs from", "memory: the stick is read at boot"],
     ["On the stick", (s.on_stick || []).length ? `the configuration, and ${s.on_stick.map(k => STICK_WORDS[k] || k).join(", ")}` : "the configuration alone"],
     ["Docker and the VMs", s.ready ? `on ${s.pool}` : s.pool ? `waiting for ${s.pool} to mount` : "waiting for a system pool", {cls: s.ready ? "ok" : "warn"}],
-    ["The projects", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "on the stick",
+    ["The projects", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
   ];
@@ -126,7 +157,7 @@ function stickSection(n){
       <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
       ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
   return docSection("nodes", "stick", "The stick", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, and the logs and the journal are kept in memory.</div></div>${projectsFolderField(n, s, admin)}`,
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, no project can be made, and the logs and the journal are kept in memory.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 

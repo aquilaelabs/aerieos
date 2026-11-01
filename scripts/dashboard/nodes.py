@@ -1622,6 +1622,14 @@ def _census(c):
                      # On trial, and a fallback said (R161 step 2).
                      "trial": o.get("trial") is True,
                      "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200]}
+    # The older versions kept on its boot menu, and whether this boot is one (R201).
+    if isinstance(c.get("os_kept"), dict) and (c["os_kept"].get("versions") or c["os_kept"].get("booted")):
+        vs = c["os_kept"].get("versions")
+        num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0  # noqa: E731
+        out["os_kept"] = {"booted": re.sub(r"[^A-Za-z0-9.+-]", "", str(c["os_kept"].get("booted") or ""))[:60],
+                          "versions": [{"version": re.sub(r"[^A-Za-z0-9.+-]", "", str(x.get("version") or ""))[:60], "mb": num(x.get("mb")),
+                                        "at": num(x.get("at")), "state": x.get("state") is True}
+                                       for x in (vs if isinstance(vs, list) else [])[:16] if isinstance(x, dict) and x.get("version")]}
     # A stick boot (R161 step 10): its system pool, whether docker and the
     # VMs may run yet, what still lives on the stick, what it has written.
     if isinstance(c.get("os_stick"), dict) and c["os_stick"].get("stick") is True:
@@ -3961,6 +3969,36 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
 # None where the tag is no draft it can see. Configured by the server.
 draft_update = lambda principal, node_id, tag, os_image: None  # noqa: E731
 
+# How many pushed-out versions stay on the boot menu (R201): settings.os_keep.
+keep_versions = lambda: 3  # noqa: E731
+
+
+def node_os_kept(principal, node_id, verb, version):
+    """An older version on the boot menu (R201): `next` boots it once,
+    `remove` takes it away. A system job on the own machine's node."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    rep = n.get("reported") or {}
+    if not own_machine(n) or not (rep.get("os_image") or {}).get("version"):
+        return {"error": "older versions are BuilderBot OS's, on this machine"}
+    if verb not in ("next", "remove"):
+        return {"error": "next or remove"}
+    if version not in {x.get("version") for x in (rep.get("os_kept") or {}).get("versions") or []}:
+        return {"error": f"{version or 'that version'} is not kept on this machine"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "os-kept", "config": {"verb": verb, "version": version}, "timeout": 120})
+    if r.get("ok"):
+        audit(principal, "os-kept", node_id, {"job": r["job"], "verb": verb, "version": version})
+    return r
+
+
 def node_os_update(principal, node_id, release="", from_dir=""):
     """Update BuilderBot OS on the controller's own machine (R160 step 4): a
     system job on its node, whose root agent fetches the release's image
@@ -3997,7 +4035,7 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         if d is not None:
             return d
     r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "os-update", "config": ({"release": tag} if tag else {"from": src}), "timeout": 3600})
+                {"apply": "os-update", "config": {**({"release": tag} if tag else {"from": src}), "keep": keep_versions()}, "timeout": 3600})
     if r.get("ok"):
         audit(principal, "os-update", node_id, {"job": r["job"], "release": tag, "from": src})
     return r
@@ -7181,6 +7219,7 @@ def verb(principal, req):
              "controller-update": lambda: node_controller_update(principal, nid, field(req, "release")),
              "os-update": lambda: node_os_update(principal, nid, field(req, "release"), field(req, "from")),
              "system-pool": lambda: node_system_pool(principal, nid, field(req, "path")),
+             "os-kept": lambda: node_os_kept(principal, nid, field(req, "verb"), field(req, "version")),
              "projects-folder": lambda: node_projects_folder(principal, nid, field(req, "path"), req.get("release") is True),
              "machine": lambda: node_machine(principal, nid, field(req, "hostname"), field(req, "timezone"), req.get("spindown")),
              "storage-share": lambda: node_storage_share(principal, nid, req),

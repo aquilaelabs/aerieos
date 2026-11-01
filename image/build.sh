@@ -124,6 +124,7 @@ else
 fi
 cat > "$TREE/usr/lib/builderbot-os/release" <<REL
 BUILDERBOT_OS_VERSION=${VERSION}
+BUILDERBOT_OS_BOOTS_KEPT=1
 BUILDERBOT_VERSION=$(head -1 "$TREE_SRC/VERSION" | tr -d '[:space:]')
 DEBIAN_SNAPSHOT=${SNAPSHOT}
 BUILT=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)

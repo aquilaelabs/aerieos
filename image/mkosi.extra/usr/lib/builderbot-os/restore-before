@@ -13,8 +13,30 @@ STATE="${BB_OS_STATE:-/var/lib/builderbot-controller/config}"
 OPT="${BB_OS_OPT:-/opt/builderbot}"
 RELEASE="${BB_OS_RELEASE:-/usr/lib/builderbot-os/release}"
 
+CMDLINE="${BB_CMDLINE:-/proc/cmdline}"
+MARK="$WORK/kept-set-aside"
+
+# A visit to a kept older version (R201) ended: the configuration it set
+# aside comes back, and what the visit did to the one it ran on is set aside.
+kept=""
+line=""
+read -r line < "$CMDLINE" 2>/dev/null || true
+for w in $line; do case "$w" in bbkept=*) kept="${w#bbkept=}" ;; esac; done
+if [ -z "$kept" ] && [ -s "$MARK" ]; then
+    back="$(head -1 "$MARK")"
+    if [ -d "$back" ] && [ -d "$STATE" ]; then
+        aside="$WORK/rolled-back-$(date +%Y%m%d-%H%M%S)-visit"
+        mkdir -p "$aside"; chmod 0700 "$aside"
+        mv "$STATE" "$aside/$(basename "$STATE")"
+        mv "$back" "$STATE"
+        echo "restore-before: back from the kept version: the configuration is as you left it; what the visit changed is in $aside"
+    fi
+    rm -f "$MARK"
+fi
 # The mark is read and left for the health check, which says it.
-[ "$(bash "$SLOT" fell-back keep 2>/dev/null)" = yes ] || exit 0
+if [ -z "$kept" ]; then
+    [ "$(bash "$SLOT" fell-back keep 2>/dev/null)" = yes ] || exit 0
+fi
 [ -d "$STATE" ] || exit 0
 ver="$(sed -n "s/^BUILDERBOT_OS_VERSION=//p" "$RELEASE" 2>/dev/null | head -1 || true)"
 bbver="$(sed -n "s/^BB_VERSION=//p" "$OPT/build.env" 2>/dev/null | head -1 || true)"
@@ -23,6 +45,7 @@ if BB_VERSION="$bbver" python3 "$OPT/scripts/dashboard/stateversion.py" check "$
     exit 0
 fi
 copy="$WORK/before/${ver:-unknown}.tar.gz"
+[ -z "$kept" ] || copy="$WORK/kept/$kept/state.tar.gz"
 if [ ! -f "$copy" ]; then
     echo "restore-before: the configuration is newer than this slot reads, and there is no copy from before the update ($copy): the controller will say why it does not start" >&2
     exit 0
@@ -47,4 +70,6 @@ done
 mv "$STATE" "$aside/$name"
 mv "$tmp/$name" "$STATE"
 rm -rf "${tmp:?}"
+# A visit's set-aside comes back when the visit ends (above).
+[ -z "$kept" ] || printf '%s\n' "$aside/$name" > "$MARK"
 echo "restore-before: the configuration is back to the copy from before the update ($copy); what it held is in $aside/$name"

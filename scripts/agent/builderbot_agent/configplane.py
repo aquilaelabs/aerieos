@@ -128,6 +128,9 @@ class ConfigPlaneMixin:
         if what == "system-pool":
             # A stick's system pool (R161 step 10, osimage.py).
             return self._apply_system_pool(job, cfg)
+        if what == "os-kept":
+            # An older version kept: boot it once, or remove it (R201).
+            return self._apply_os_kept(job, cfg)
         if what == "projects-folder":
             # A folder on the machine's disks as the projects folder (R163).
             return self._apply_projects_folder(job, cfg)

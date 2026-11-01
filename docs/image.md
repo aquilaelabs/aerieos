@@ -412,6 +412,23 @@ is kept in `/var/lib/builderbot-os/rolled-back-TIME/`. A patch carries no
 configuration change, so falling back on one boots the same configuration
 as it is.
 
+**Older versions.** A slot holds a whole BuilderBot OS, its controller and
+agent with it. When an update is about to overwrite the slot not in use, the
+version in it is kept instead of lost, as files under
+`/var/lib/builderbot-os/kept/` with the configuration's copy from when it was
+left: about 2 GB each, the three newest by default (Update window's **Older
+versions kept on the boot menu**, 0 for none). Each is an entry under **Older
+versions** on the boot menu and a row on This machine, whose **Boot this next**
+visits it once. A visit loads its root into memory from the data partition, on
+a disk as on a stick. It lasts one boot: the next restart is the version it came
+from, and one that does not come up restarts into it by itself. If the
+configuration has moved on further than that version reads, its copy is used and
+yours is set aside, and comes back when the visit ends; what the visit changed
+is set aside in `/var/lib/builderbot-os/rolled-back-TIME-visit/`. Updates wait
+until a visit ends. An image built before this feature cannot boot from files,
+so it is said and not kept. The menu on the ESP follows the image running, so a
+disk laid by an older image takes the entry with its first update.
+
 **The boot menu.** Each slot is named with its version, the slot that
 boots is the default after four seconds, and **Safe mode** boots the slot
 that runs now with the start held: the dashboard and the shares come up

@@ -404,6 +404,9 @@ FILE] [--attach FILE]...` (the notes replaced whole, a build from dist/ or a
 committed file attached, `(asset:NAME)` in the notes naming an attached
 file: `![The keyboard](asset:shot.png)`), and a file comes off one only with
 `bb version release --remove NAME --why "..."`; each is its own ask.
+Where a project's CI makes its release a draft, the release stays unseen until
+a person publishes it from the Artifacts view's Drafts, its notes read first; a
+session does not publish it, and says the draft is waiting.
 From a branch other than main a release is a dev pre-release unless
 `--stable` is said, and its first line names the channel. `bb version
 rehearse` runs every build a tag would on the pushed branch and publishes

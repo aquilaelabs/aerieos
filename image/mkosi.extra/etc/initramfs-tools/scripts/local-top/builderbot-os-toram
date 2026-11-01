@@ -12,11 +12,32 @@ prereqs() { echo "$PREREQ"; }
 case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
 # shellcheck source=/dev/null  # the initramfs's own library
 . /scripts/functions
-toram=0; slotdev=""
+toram=0; slotdev=""; kept=""
 read -r cmdline < /proc/cmdline
 for w in $cmdline; do
-    case "$w" in bbtoram=1) toram=1 ;; bbslotdev=*) slotdev="${w#bbslotdev=}" ;; esac
+    case "$w" in bbtoram=1) toram=1 ;; bbslotdev=*) slotdev="${w#bbslotdev=}" ;; bbkept=*) kept="${w#bbkept=}" ;; esac
 done
+# A kept older version (R201): its root is a file on the data partition,
+# copied into memory the same way, on a disk as on a stick, so the partition
+# is free for init-bottom to mount read-write at /var as on any boot.
+if [ -n "$kept" ]; then
+    data=/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0d
+    i=0
+    while [ ! -b "$data" ] && [ "$i" -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
+    [ -b "$data" ] || panic "BuilderBot OS: the data partition holding version $kept is not here"
+    mkdir -p /run/bbdata /run/bbroot
+    mount -t ext4 -o ro "$data" /run/bbdata || panic "BuilderBot OS: the data partition did not mount to read version $kept"
+    file="/run/bbdata/lib/builderbot-os/kept/$kept/root.squashfs"
+    [ -f "$file" ] || panic "BuilderBot OS: version $kept is not kept here any more"
+    mb=$(( ($(wc -c < "$file") + 1048575) / 1048576 ))
+    mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "BuilderBot OS: no memory for version $kept ($mb MB)"
+    log_begin_msg "BuilderBot OS: loading version $kept ($mb MB) into memory"
+    cp "$file" /run/bbroot/root.squashfs || panic "BuilderBot OS: version $kept did not copy into memory"
+    log_end_msg
+    umount /run/bbdata
+    losetup /dev/loop0 /run/bbroot/root.squashfs || panic "BuilderBot OS: /dev/loop0 did not take version $kept"
+    exit 0
+fi
 [ "$toram" = 1 ] && [ -n "$slotdev" ] || exit 0
 case "$slotdev" in PARTUUID=*) dev="/dev/disk/by-partuuid/${slotdev#PARTUUID=}" ;; *) dev="$slotdev" ;; esac
 i=0

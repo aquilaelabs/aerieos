@@ -149,6 +149,152 @@ def keep_state_before(say, running):
         os.unlink(old)
 
 
+# ---- older versions kept (R201, the operator, 1 Nov) ---------------------------
+# A version an update pushes out of its slot is kept as files on the data
+# partition, its root, kernel, initrd and release, with the configuration's
+# copy from when it was left, and is a boot menu entry of its own. Only an
+# image that says it can boot that way (BUILDERBOT_OS_BOOTS_KEPT): an older
+# initramfs does not know bbkept=. Keeping never stops an update.
+KEPT_VER = re.compile(r"[0-9A-Za-z][0-9A-Za-z.+-]{0,59}")
+KEEP_DEFAULT = 3
+
+
+def kept_dir():
+    return os.path.join(_env("BB_OS_WORK", "/var/lib/builderbot-os"), "kept")
+
+
+def kept_boot():
+    """The kept version this boot came from, or ""."""
+    try:
+        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8", errors="replace") as f:
+            for w in f.read().split():
+                if w.startswith("bbkept="):
+                    return w[len("bbkept="):][:60]
+    except OSError:
+        pass
+    return ""
+
+
+def kept_list():
+    """The versions kept, newest first: [{version, mb, at, state}]."""
+    out = []
+    try:
+        names = os.listdir(kept_dir())
+    except OSError:
+        return out
+    for v in names:
+        d = os.path.join(kept_dir(), v)
+        root = os.path.join(d, "root.squashfs")
+        if KEPT_VER.fullmatch(v) and os.path.isfile(root):
+            st = os.stat(root)
+            size = sum(os.path.getsize(os.path.join(d, f)) for f in os.listdir(d))
+            out.append({"version": v, "mb": size >> 20, "at": int(st.st_mtime), "state": os.path.isfile(os.path.join(d, "state.tar.gz"))})
+    return sorted(out, key=lambda x: x["at"], reverse=True)
+
+
+def write_kept_menu(esp=None):
+    """GRUB's Older versions, from what is kept: grub.cfg sources this file
+    (nothing kept, an empty one). The root is on the same disk's data
+    partition, the fifth, never another BuilderBot disk's."""
+    grub = os.path.join(esp or _env("BB_OS_ESP", ESP), "grub")
+    if not os.path.isdir(grub):
+        return
+    rows = kept_list()
+    text = ""
+    if rows:
+        text = ("insmod regexp\ninsmod part_gpt\ninsmod ext2\n"
+                'regexp --set=1:bb_disk \'^([^,]+),\' "$root"\n'
+                'set bb_data="($bb_disk,gpt5)"\n'
+                'if [ "$bb_toram" = 1 ]; then set bb_keptram="bbtoram=1"; else set bb_keptram=""; fi\n'
+                "export bb_data\nexport bb_keptram\nexport bb_slot\nexport bb_args\n"
+                'submenu "Older versions" --id older {\n')
+        for r in rows:
+            v = r["version"]
+            at = f"$bb_data/lib/builderbot-os/kept/{v}"
+            text += (f'    menuentry "BuilderBot OS {v}" --id kept-{v} {{\n'
+                     f"        linux {at}/vmlinuz root=/dev/loop0 bbkept={v} $bb_keptram rootfstype=squashfs ro overlayroot=tmpfs "
+                     "bbslot=$bb_slot panic=15 console=ttyS0,115200 console=tty0 quiet systemd.show_status=auto $bb_args\n"
+                     f"        initrd {at}/initrd\n    }}\n")
+        text += "}\n"
+    with open(os.path.join(grub, "kept.cfg.new"), "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(os.path.join(grub, "kept.cfg.new"), os.path.join(grub, "kept.cfg"))
+
+
+def _prune_kept(keep, say, spare=""):
+    """Down to `keep` versions, oldest first, never `spare`."""
+    for r in reversed(kept_list()):
+        if len(kept_list()) <= keep:
+            break
+        if r["version"] != spare:
+            shutil.rmtree(os.path.join(kept_dir(), r["version"]), ignore_errors=True)
+            say(f"{r['version']} is no longer kept\n")
+
+
+def keep_slot(say, dev, where, keep=KEEP_DEFAULT):
+    """The version in the slot about to be written kept, from its partition
+    and its kernel on the ESP (`where`). Says why it was not; never raises:
+    an update does not stop for this."""
+    try:
+        keep = int(keep)
+    except (TypeError, ValueError):
+        keep = KEEP_DEFAULT
+    try:
+        with open(os.path.join(where, "release"), encoding="utf-8", errors="replace") as f:
+            rel = dict(ln.strip().partition("=")[::2] for ln in f if "=" in ln)
+    except OSError:
+        return                                          # an empty slot: nothing to keep
+    ver = rel.get("BUILDERBOT_OS_VERSION", "")
+    if not KEPT_VER.fullmatch(ver):
+        return
+    if keep <= 0:
+        _prune_kept(0, say)
+        write_kept_menu()
+        return
+    if rel.get("BUILDERBOT_OS_BOOTS_KEPT") != "1":
+        say(f"{ver} is not kept as an older version: it was built before an older version could boot from its files\n")
+        return
+    d = os.path.join(kept_dir(), ver)
+    new = d + ".new"
+    try:
+        with open(dev, "rb") as f:
+            head = f.read(48)
+            if head[:4] != b"hsqs":
+                say(f"{ver} is not kept: its slot does not hold a squashfs\n")
+                return
+            used = int.from_bytes(head[40:48], "little")
+            _prune_kept(keep - 1, say, spare=ver)
+            st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else _env("BB_OS_WORK", "/var/lib/builderbot-os"))
+            if st.f_bavail * st.f_frsize < used + (1 << 30):
+                say(f"{ver} is not kept: the data partition has too little room beside its {used >> 20} MB\n")
+                return
+            shutil.rmtree(new, ignore_errors=True)
+            os.makedirs(new, mode=0o700)
+            f.seek(0)
+            left = used
+            with open(os.path.join(new, "root.squashfs"), "wb") as out:
+                while left > 0:
+                    chunk = f.read(min(1 << 22, left))
+                    if not chunk:
+                        raise OSError("the slot ended early")
+                    out.write(chunk)
+                    left -= len(chunk)
+        for piece in ("vmlinuz", "initrd", "release"):
+            shutil.copyfile(os.path.join(where, piece), os.path.join(new, piece))
+        state = os.path.join(_env("BB_OS_WORK", "/var/lib/builderbot-os"), "before", f"{ver}.tar.gz")
+        if os.path.isfile(state):
+            shutil.copyfile(state, os.path.join(new, "state.tar.gz"))
+        shutil.rmtree(d, ignore_errors=True)
+        os.replace(new, d)
+        write_kept_menu()
+        say(f"{ver} is kept as an older version, on the boot menu\n")
+    except OSError as e:
+        shutil.rmtree(new, ignore_errors=True)
+        say(f"{ver} was not kept as an older version: {e}\n")
+
+
 def _sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -228,6 +374,36 @@ def stick_status():
 class OsImageMixin:
     """Agent's BuilderBot OS update: one of the parts class Agent (agent.py)
     is made of."""
+
+    def _apply_os_kept(self, job, cfg):
+        """An older version kept (R201): `next` boots it once, `remove` takes
+        it away; then a hello."""
+        tool = _env("BB_OS_SLOT", SLOT_TOOL)
+        verb, ver = str(cfg.get("verb") or ""), str(cfg.get("version") or "")
+        if not os.path.isfile(tool):
+            job.say("refused: this machine does not run BuilderBot OS\n")
+            return "failed", 77
+        if not KEPT_VER.fullmatch(ver) or not os.path.isdir(os.path.join(kept_dir(), ver)):
+            job.say(f"refused: {ver or 'that version'} is not kept here\n")
+            return "failed", 64
+        if verb == "next":
+            rc = self._sh(job, ["bash", tool, "kept-next", ver], timeout=30)
+            if rc == 0:
+                job.say(f"the next boot is {ver}, once: restart this machine to visit it, and the boot after is this version again\n")
+        elif verb == "remove":
+            if kept_boot() == ver:
+                job.say("refused: this boot is running from it\n")
+                return "failed", 65
+            self._sh(job, ["bash", tool, "kept-next"], timeout=30)
+            shutil.rmtree(os.path.join(kept_dir(), ver), ignore_errors=True)
+            write_kept_menu()
+            job.say(f"{ver} is no longer kept\n")
+            rc = 0
+        else:
+            job.say("refused: next or remove\n")
+            return "failed", 64
+        self.hello_again("the older versions changed")
+        return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _attested(self, job, iso, digest, name, src, work):
         """Whether the ISO verifies against its build attestation, said in
@@ -381,6 +557,9 @@ class OsImageMixin:
             say(f"refused: slot {cur} runs on trial and is not marked good yet, and slot {other} is the one to fall "
                 "back to: wait for the health check (a few minutes after the dashboard is up), then update\n")
             return "failed", 79
+        if kept_boot():
+            say(f"refused: this boot is a visit to the older version {kept_boot()}: restart into the version it came from, then update\n")
+            return "failed", 80
         tag = str(cfg.get("release") or "").strip()
         src = str(cfg.get("from") or "").strip()
         if not tag and not src:
@@ -491,6 +670,9 @@ class OsImageMixin:
         if self._sh(job, ["bash", tool, "hold"], timeout=30) != 0:
             say("GRUB's environment could not be set back to this slot: nothing written\n")
             return "failed", 73
+        # What the slot holds goes on the boot menu before it is overwritten.
+        job.step(f"keeping what slot {other} holds")
+        keep_slot(say, dev, os.path.join(_env("BB_OS_ESP", ESP), "builderbot", other), cfg.get("keep", KEEP_DEFAULT))
         job.step(f"writing slot {other}")
         try:
             with open(files["root.squashfs"], "rb") as f, open(dev, "r+b") as d:
