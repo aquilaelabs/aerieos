@@ -121,7 +121,9 @@ class FtpServers:
                     argv = f.read().split(b"\0")
             except (OSError, ValueError, IndexError):
                 continue
-            if ppid != me or not any(a.endswith(b"bb-ftpd") for a in argv[:2]):
+            # bb-ftpd itself, or an interpreter running it (/usr/bin/env
+            # python3 bb-ftpd, as a script with a shebang is started).
+            if ppid != me or not any(a.endswith(b"bb-ftpd") for a in argv[:3]):
                 continue
             # Its port and the nine after it for data (bbftp.PASSIVE): one
             # whose span meets this port's holds it too.
