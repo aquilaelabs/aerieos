@@ -4,6 +4,8 @@ written, an image written whole from its xz and read back, a sha256 that
 does not match refused before anything is written."""
 import hashlib
 import importlib.util
+import io
+import json
 import lzma
 import os
 import stat
@@ -58,6 +60,54 @@ class Stick(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.m.pick("/dev/sdz")
         self.assertEqual(self.m.pick("/dev/sdb")["model"], "Ultra Fit")
+
+    def test_a_disk_on_windows_is_named_with_its_drive_letters(self):
+        disks = '[{"Number":0,"Size":512110190592,"FriendlyName":"Samsung SSD","BusType":"NVMe","IsSystem":true,"IsBoot":true},' \
+                '{"Number":2,"Size":31457280000,"FriendlyName":"SanDisk Ultra","BusType":"USB","IsSystem":false,"IsBoot":false}]'
+        parts = '[{"DiskNumber":0,"DriveLetter":"C"},{"DiskNumber":2,"DriveLetter":"F"},{"DiskNumber":2,"DriveLetter":"E"}]'
+
+        def ps(cmd, **_kw):
+            return subprocess.CompletedProcess(cmd, 0, parts if "Get-Partition" in cmd[-1] else disks, "")
+        with mock.patch.object(self.m.platform, "system", return_value="Windows"), mock.patch.object(self.m.subprocess, "run", ps):
+            rows = self.m.disks()
+        self.assertEqual([r["letters"] for r in rows], [["C:"], ["E:", "F:"]])
+        self.assertEqual(self.m.named(rows[1]), "SanDisk Ultra, 31.5 GB, E: F:")
+        self.assertEqual(self.m.named({"model": "", "size": 0}), "unnamed, 0.0 GB")
+
+    def test_the_newest_release_is_the_newest_that_carries_a_stick_image(self):
+        img = [{"name": "builderbot-os-0.9.0-dev.4724.stick.raw.xz"}]
+        rows = [{"tag_name": "v0.9.0-dev.4724", "prerelease": True, "assets": img},
+                {"tag_name": "v0.9.0-dev.4706", "prerelease": True, "assets": []},
+                {"tag_name": "v0.8.2", "prerelease": False, "assets": []}]
+        said, got = [], []
+
+        def die(s):
+            raise SystemExit(s)
+
+        def fetch(url, dest, say_progress=True):
+            got.append(url)
+            raise SystemExit("fetched")
+        with mock.patch.object(self.m.urllib.request, "urlopen", side_effect=lambda *a, **k: io.BytesIO(json.dumps(rows).encode())), \
+                mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch):
+            with self.assertRaises(SystemExit) as e:
+                self.m.release_image("latest", "normal")
+            self.assertIn("pick the newest dev build", str(e.exception))
+            rows.insert(0, {"tag_name": "v0.9.0-dev.4730", "prerelease": True, "assets": []})
+            with self.assertRaises(SystemExit):
+                self.m.release_image("latest", "dev")
+        self.assertTrue(got[0].endswith("/v0.9.0-dev.4724/builderbot-os-0.9.0-dev.4724.stick.raw.xz"), got)
+        self.assertIn("v0.9.0-dev.4730 carries no stick image", said[0])
+
+    def test_a_named_release_without_a_stick_image_is_said_plainly(self):
+        def die(s):
+            raise SystemExit(s)
+
+        def fetch(url, dest, say_progress=True):
+            raise self.m.urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        with mock.patch.multiple(self.m, die=die, say=lambda s: None, fetch=fetch):
+            with self.assertRaises(SystemExit) as e:
+                self.m.release_image("v0.8.2")
+        self.assertIn("the v0.8.2 release carries no stick image", str(e.exception))
 
     def test_an_image_is_checked_against_its_build_attestation_where_gh_is(self):
         # R191 step 2: the bundle from GitHub's public API, gh verify --bundle.

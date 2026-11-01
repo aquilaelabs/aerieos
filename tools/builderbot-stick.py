@@ -40,6 +40,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 RELEASES = "https://github.com/aquilaelabs/builderbot/releases"
@@ -102,12 +103,29 @@ def disks():
         ps = ("Get-Disk | Select-Object Number,Size,FriendlyName,BusType,IsSystem,IsBoot | ConvertTo-Json -Compress")
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout
         data = json.loads(out or "[]")
+        # Each disk's drive letters, which is how Windows names a stick to
+        # its person (E:), where the tool writes the disk by its number.
+        ps = ("Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber,DriveLetter | ConvertTo-Json -Compress")
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout
+        parts = json.loads(out or "[]")
+        letters = {}
+        for p in (parts if isinstance(parts, list) else [parts]):
+            if str(p.get("DriveLetter") or "").strip().isalpha():
+                letters.setdefault(p.get("DiskNumber"), []).append(str(p["DriveLetter"]).strip() + ":")
         rows = []
         for d in (data if isinstance(data, list) else [data]):
             rows.append({"id": f"\\\\.\\PhysicalDrive{d.get('Number')}", "size": int(d.get("Size") or 0), "model": str(d.get("FriendlyName") or ""),
-                         "removable": str(d.get("BusType") or "") in ("USB", "SD", "MMC"), "system": bool(d.get("IsSystem") or d.get("IsBoot"))})
+                         "removable": str(d.get("BusType") or "") in ("USB", "SD", "MMC"), "system": bool(d.get("IsSystem") or d.get("IsBoot")),
+                         "letters": sorted(letters.get(d.get("Number"), []))})
         return rows
     die(f"{sysname} is not a system this tool knows (Windows, a Mac, Linux)")
+
+
+def named(d):
+    """A disk as its person knows it: its model, its size and, on Windows,
+    its drive letters."""
+    lt = " ".join(d.get("letters") or [])
+    return f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / GB:.1f} GB" + (f", {lt}" if lt else "")
 
 
 def cmd_list(_):
@@ -116,7 +134,7 @@ def cmd_list(_):
         say("no disk found")
         return
     for d in rows:
-        say(f"{d['id']:<24} {d['size'] / GB:7.1f} GB  {d['model'] or 'unnamed':<30} {'removable' if d['removable'] else 'fixed'}{'  (the system disk: never)' if d['system'] else ''}")
+        say(f"{d['id']:<24} {d['size'] / GB:7.1f} GB  {d['model'] or 'unnamed':<30} {'removable' if d['removable'] else 'fixed'}{'  ' + ' '.join(d['letters']) if d.get('letters') else ''}{'  (the system disk: never)' if d['system'] else ''}")
 
 
 # ---- the image ----------------------------------------------------------------
@@ -150,15 +168,26 @@ def release_image(tag, channel="normal"):
         dev = channel == "dev"
         live = [x for x in rows if not x.get("draft") and bool(x.get("prerelease")) == dev
                 and re.fullmatch(TAG if dev else r"v\d+\.\d+\.\d+", str(x.get("tag_name") or ""))]
-        if not live:
-            die("no published release" + (" on that channel" if dev else ""))
-        tag = live[0]["tag_name"]
+        # The newest that carries a stick image: a release from before
+        # BuilderBot OS, or one whose image build failed, has none.
+        withimg = [x for x in live if any(str(a.get("name", "")).endswith(".stick.raw.xz") for a in x.get("assets") or [])]
+        if not withimg:
+            die(("no dev build" if dev else "no release") + " carries a BuilderBot OS stick image yet"
+                + ("" if dev else ": the dev builds do, so pick the newest dev build"))
+        if live and withimg[0] is not live[0]:
+            say(f"{live[0]['tag_name']} carries no stick image, so {withimg[0]['tag_name']}'s is written")
+        tag = withimg[0]["tag_name"]
     if not re.fullmatch(TAG, tag):
         die("a release is named by its tag, vX.Y.Z")
     name = f"builderbot-os-{tag[1:]}.stick.raw.xz"
     base = f"{RELEASES}/download/{tag}/{name}"
     say(f"fetching {name} from the {tag} release")
-    fetch(base, name)
+    try:
+        fetch(base, name)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            die(f"the {tag} release carries no stick image ({name}): pick another release")
+        raise
     fetch(base + ".sha256", name + ".sha256", say_progress=False)
     check_sha(name, name + ".sha256")
     attested(name)
@@ -496,7 +525,7 @@ def cmd_write(a):
     again = pick(a.disk)
     if (again["size"], again["model"]) != (d["size"], d["model"]):
         die(f"{a.disk} is not the disk it was before the download ({again['model'] or 'unnamed'}, {again['size'] / GB:.1f} GB now): nothing written")
-    say(f"{d['id']}: {d['model'] or 'unnamed'}, {d['size'] / GB:.1f} GB. Everything on it is lost.")
+    say(f"{d['id']}: {named(d)}. Everything on it is lost.")
     if not a.yes:
         if input("Type yes to write it: ").strip().lower() != "yes":
             die("nothing written")

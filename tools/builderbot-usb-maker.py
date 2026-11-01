@@ -11,7 +11,7 @@ can never write a stick two ways.
 The steps, one page each: which BuilderBot (the newest release, the newest
 dev build, a release by name, or an image file you have); which stick (the
 removable disks alone, the system disk never listed); a few settings for
-the stick's first boot; the last page naming the stick by model and size,
+the stick's first boot; the last page naming the stick by model, size and drive letter,
 with a box to tick before Write; then the progress and the read back.
 
 Another tool can open the same window with pages of its own before these,
@@ -107,10 +107,9 @@ class Maker(tk.Tk):
         self.extra = extra or {}
         self.q = queue.Queue()
         self.busy = False
-        self.choice = {"source": tk.StringVar(value="latest"), "tag": tk.StringVar(), "file": tk.StringVar(),
+        self.choice = {"source": tk.StringVar(value=self.extra.get("source") or "latest"), "tag": tk.StringVar(), "file": tk.StringVar(),
                        "disk": None, "ack": tk.BooleanVar(value=False)}
         self.fields = {k: tk.StringVar() for k in ("hostname", "tz", "address", "mask", "gateway", "dns")}
-        self.dev = tk.BooleanVar(value=False)
         self.head = ttk.Label(self, font=("Segoe UI", 14, "bold"))
         self.head.pack(anchor="w", padx=16, pady=8)
         self.body = ttk.Frame(self)
@@ -152,7 +151,9 @@ class Maker(tk.Tk):
     # ---- the pages ----
     def page_release(self, f):
         v = self.choice["source"]
-        rows = [("latest", "The newest release (recommended)"), ("dev", "The newest dev build (unstable)"),
+        best = self.extra.get("source") or "latest"
+        rows = [("latest", "The newest release" + (" (recommended)" if best == "latest" else "")),
+                ("dev", "The newest dev build" + (" (recommended)" if best == "dev" else " (unstable)")),
                 ("tag", "A release by name:"), ("file", "An image file I have:")]
         for val, word in rows:
             ttk.Radiobutton(f, text=word, value=val, variable=v).pack(anchor="w", pady=2)
@@ -193,7 +194,7 @@ class Maker(tk.Tk):
                 for d in stick.disks():
                     if d.get("removable") and not d.get("system"):
                         rows.append(d)
-                        lb.insert("end", f"{d['model'] or 'unnamed'}   {d['size'] / stick.GB:.1f} GB   ({d['id']})")
+                        lb.insert("end", f"{stick.named(d)}   ({d['id']})")
             except Exception as e:      # noqa: BLE001 (said, not raised)
                 lb.insert("end", f"the disks could not be listed: {e}")
             if not rows:
@@ -210,7 +211,6 @@ class Maker(tk.Tk):
         return check
 
     def page_settings(self, f):
-        ttk.Checkbutton(f, text="Follow the dev builds after it starts (unstable)", variable=self.dev).pack(anchor="w", pady=(0, 8))
         grid = ttk.Frame(f)
         grid.pack(anchor="w")
         rows = [("hostname", "The machine's name"), ("tz", "Time zone (Region/City)"), ("address", "A fixed address (empty: from DHCP)"),
@@ -229,11 +229,11 @@ class Maker(tk.Tk):
         return check
 
     def settings(self):
-        return {**{k: v.get().strip() for k, v in self.fields.items()}, "dev": self.dev.get()}
+        return {k: v.get().strip() for k, v in self.fields.items()}
 
     def page_confirm(self, f):
         d = self.choice["disk"] or {}
-        ttk.Label(f, text=f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / stick.GB:.1f} GB", font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        ttk.Label(f, text=stick.named(d), font=("Segoe UI", 12, "bold")).pack(anchor="w")
         ttk.Label(f, text=f"({d.get('id', '')})", foreground="gray").pack(anchor="w")
         ttk.Label(f, text="Everything on this stick is erased and cannot be brought back. Check it is the stick you mean, "
                           "and that nothing on it is needed.", wraplength=560, foreground="#b42318").pack(anchor="w", pady=12)
