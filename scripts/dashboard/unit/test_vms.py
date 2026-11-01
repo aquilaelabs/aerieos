@@ -388,8 +388,8 @@ class Census(unittest.TestCase):
         got = nodes._census({"vms_other": [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "disk": "/x"},
                                            {"name": "bad name!", "state": "running"}, "junk",
                                            {"name": "old-box", "state": "shut <b>off</b>", "vcpus": "2"}]})
-        self.assertEqual(got["vms_other"], [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192},
-                                            {"name": "old-box", "state": "shut boffb", "vcpus": 0, "mem_mb": 0}])
+        self.assertEqual(got["vms_other"], [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "autostart": False},
+                                            {"name": "old-box", "state": "shut boffb", "vcpus": 0, "mem_mb": 0, "autostart": False}])
         self.assertEqual(vms.others.__doc__ is not None, True)
 
     def test_a_usb_device_s_name_and_use_reach_the_record(self):
@@ -436,8 +436,8 @@ class Agent(unittest.TestCase):
                         "bbvm-fake": "State:          shut off\nCPU(s):         1\nMax memory:     1048576 KiB\n"}.get(name, "")
             return ""
         with mock.patch.object(self.av, "_run", side_effect=virsh), mock.patch.object(self.av.shutil, "which", return_value="/usr/bin/virsh"):
-            self.assertEqual(self.av.vms_other(), [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192},
-                                                   {"name": "bbvm-fake", "state": "stopped", "vcpus": 1, "mem_mb": 1024}])
+            self.assertEqual(self.av.vms_other(), [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "autostart": False},
+                                                   {"name": "bbvm-fake", "state": "stopped", "vcpus": 1, "mem_mb": 1024, "autostart": False}])
 
     def test_an_action_on_another_projects_domain_is_refused(self):
         # A domain's marker names its project: a job for another project's

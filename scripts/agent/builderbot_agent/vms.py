@@ -131,8 +131,10 @@ def vms_other():
     if not shutil.which("virsh"):
         return []
     out = []
-    for name in _run(VIRSH + ["list", "--all", "--name"], timeout=15).split()[:128]:
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+    # One name a line: a name may have spaces in it (one made on another
+    # system, R163 step 11), which a split on whitespace cut in two.
+    for name in [n.strip() for n in _run(VIRSH + ["list", "--all", "--name"], timeout=15).splitlines() if n.strip()][:128]:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", name):
             continue
         if DOMAIN_RE.fullmatch(name) and META_NS in _run(VIRSH + ["dumpxml", name, "--inactive"], timeout=10):
             continue
@@ -143,7 +145,7 @@ def vms_other():
         mem = re.match(r"(\d+)", info.get("max memory", ""))
         out.append({"name": name, "state": _state_word(info.get("state", "")),
                     "vcpus": int(info["cpu(s)"]) if info.get("cpu(s)", "").isdigit() else 0,
-                    "mem_mb": int(mem.group(1)) // 1024 if mem else 0})
+                    "mem_mb": int(mem.group(1)) // 1024 if mem else 0, "autostart": info.get("autostart") == "enable"})
         if len(out) >= 64:
             break
     return out
