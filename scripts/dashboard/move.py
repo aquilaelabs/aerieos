@@ -797,10 +797,60 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             rec.pop(k, None)
         with open(rec_path, "w") as f:
             json.dump(rec, f)
+        # A bare-metal home keeps its own node and its stick's plan (above).
+        here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
         return {"ok": True, "moved_aside": str(aside) if state_dir != aside else "", "counts": counts, "from": m.get("from", ""),
-                "nodes": list(m.get("nodes") or [])}
+                "nodes": list(m.get("nodes") or []), "kept_here": here}
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def carry_here(aside, state_dir):
+    """What belongs to this machine rather than to the controller that moved
+    in, carried from the state set aside into the one put in place (the
+    operator, 1 Nov: a stick that came with a plan and a node of its own,
+    then a controller moved onto it): the machine's own node, enrolled at
+    its first boot, with its tokens, so its agent is known to the controller
+    that moved here; and the stick's prepared configuration (firstboot.json),
+    so what it names to adopt is still offered. Nothing the moved state has
+    of its own is replaced. The lines said."""
+    import sqlite3
+    said = []
+    old_db, new_db = Path(aside) / "builderbot.db", Path(state_dir) / "builderbot.db"
+    if old_db.is_file() and new_db.is_file():
+        try:
+            src, dst = sqlite3.connect(str(old_db)), sqlite3.connect(str(new_db))
+            try:
+                cols = lambda c, t: [r[1] for r in c.execute(f"PRAGMA table_info({t})")]  # noqa: E731
+                ncols = [x for x in cols(src, "nodes") if x in cols(dst, "nodes")]
+                tcols = [x for x in cols(src, "tokens") if x in cols(dst, "tokens")]
+                own = [r for r in src.execute(f"SELECT {', '.join(ncols)} FROM nodes WHERE state != 'retired'")
+                       if (json.loads(r[ncols.index("config")] or "{}") or {}).get("own")] if "config" in ncols else []
+                for r in own:
+                    nid = r[ncols.index("id")]
+                    if dst.execute("SELECT 1 FROM nodes WHERE id = ?", (nid,)).fetchone():
+                        continue
+                    # The old home's own machine, where it was bare metal, is
+                    # that machine's, not this one: retired here (step 5 of
+                    # Moving a controller in docs/install.md).
+                    for oid, ocfg in dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall():
+                        if (json.loads(ocfg or "{}") or {}).get("own"):
+                            dst.execute("UPDATE nodes SET state = 'retired' WHERE id = ?", (oid,))
+                    dst.execute(f"INSERT INTO nodes ({', '.join(ncols)}) VALUES ({', '.join('?' * len(ncols))})", r)
+                    for t in src.execute(f"SELECT {', '.join(tcols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
+                        dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(tcols)}) VALUES ({', '.join('?' * len(tcols))})", t)
+                    said.append(f"this machine's own node ({r[ncols.index('name')]}) is the moved controller's too")
+                dst.commit()
+            finally:
+                src.close()
+                dst.close()
+        except (sqlite3.Error, ValueError) as e:
+            said.append(f"this machine's own node was not carried over ({e}): enroll it again from the Nodes page")
+    fb_old, fb_new = Path(aside) / "firstboot.json", Path(state_dir) / "firstboot.json"
+    if fb_old.is_file() and not fb_new.exists():
+        shutil.copyfile(str(fb_old), str(fb_new))
+        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on This machine")
+    return said
 
 
 def restored():

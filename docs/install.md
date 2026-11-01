@@ -398,8 +398,12 @@ container to a machine of its own, and back.
    nothing is enrolled again (the node keeps its id, its token, its
    containers and its synced copies). The list empties as each says hello.
 5. A bare-metal source's own machine is not a node of the new home (its
-   row is retired there); a bare-metal destination enrolls its own machine
-   afresh with the installer. A same-address move (the new home takes over
+   row is retired there). A bare-metal destination keeps the node its own
+   machine already is: BuilderBot OS enrolls it at the first boot, and the
+   landing carries that node and its credential into the moved state, so
+   its agent goes on without enrolling again; a stick's prepared plan of
+   disks to adopt is kept the same way. A bare-metal install whose machine
+   is not a node yet enrolls it afresh with the installer. A same-address move (the new home takes over
    the old hostname) needs no knock: the certificate travels in the
    bundle's secrets, so the pin holds.
 
