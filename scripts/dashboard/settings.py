@@ -121,6 +121,10 @@ KEYS = {
     # machine's pools are sealed under a key it derives; eight characters
     # at least, sealed here like every secret.
     "backup_password": {"default": "", "kind": "secret", "applied": "now"},
+    # A GitHub token that may read BuilderBot's repository, with which a
+    # controller in debug mode sees and fetches unpublished (draft) builds
+    # (the operator, 1 Nov); debug mode's alone, cleared at a start without it.
+    "release_token": {"default": "", "kind": "secret", "applied": "now"},
     "update_window": {"default": "", "kind": "choice", "applied": "now",
                       "choices": ["", "daily", "mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
     # The release channel (R179): normal is the releases as published; dev
@@ -155,7 +159,7 @@ DEBUG_KEYS = ("debug_mode", "offer_unvetted")
 # ...and what only those allow, put back at a start without them: the dev
 # release channel (R193, the operator, 1 Nov: dev updates for a controller
 # in debug mode alone).
-DEBUG_ONLY = ("release_channel",)
+DEBUG_ONLY = ("release_channel", "release_token")
 
 
 def debug_available():
@@ -380,6 +384,8 @@ def set_many(changes):
             return {"error": "debug mode is on while the controller is started with DEBUG_MODE=1, and off otherwise"}
         if key == "release_channel" and _parse(key, raw) == "dev" and not dev_channel_ok():
             return {"error": "the dev channel is offered only on a controller in debug mode"}
+        if key == "release_token" and str(raw or "").strip() and not dev_channel_ok():
+            return {"error": "a token for unpublished builds is taken only on a controller in debug mode"}
         v = _parse(key, raw)
         if v is None:
             kind = KEYS[key]["kind"]

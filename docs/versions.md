@@ -51,6 +51,26 @@ which is what a session's release from a branch other than main is unless
 `--stable` says otherwise;
 the stick maker's `--latest` and `--release` take only the normal channel.
 
+## Drafts
+
+Every release starts as a draft, a dev build and a stable release alike:
+CI builds and attaches its files, but only the repository's own people see
+it until its owner publishes it from the Artifacts view's **Drafts**, where
+its notes are read and corrected first. Publishing is a person's press; a
+coding agent's session cannot do it, whatever the project's dials say, and
+it is refused while the release is short of a file `.release-files` names.
+The tag and the code are public once pushed; the release's files and the
+image tags people follow are not. A tag pushes the image under its exact
+version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
+and for a stable release `:latest` and `:0.9` too.
+
+A controller started for development, on the dev channel and holding a
+token for BuilderBot's repository, sees the drafts as well. Updating
+BuilderBot OS to one fetches the draft's files with that token and takes the
+update from them, checked as an update from a folder is. A controller
+installed on another system, and a container, take a draft only once it is
+published.
+
 ## What a release upgrades from
 
 Each release says how far back it reaches, in two numbers.

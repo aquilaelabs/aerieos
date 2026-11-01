@@ -140,7 +140,7 @@ jobs:
       - name: Derive cache ref
         id: cache
         run: |
-          echo "ref=$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]'):latest" >> "$GITHUB_OUTPUT"
+          echo "ref=$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]'):main" >> "$GITHUB_OUTPUT"
 
       - name: Derive tags
         id: meta
@@ -148,21 +148,16 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Explicitly keyed to main rather than {{is_default_branch}}: the
-            # repo's default branch is a settings value that can differ from
-            # the trunk this workflow builds, and silently losing the :latest
-            # tag breaks every consumer pulling it.
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            # The dev channel's newest: every tag a release or a dev build is
-            # cut on, so a template or compose file following :dev takes each
-            # dev build and the release it was heading for.
-            type=raw,value=dev,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # What people follow (:latest, :dev, :X.Y) moves only when a
+            # release is published (publish-release.yml), never here: a
+            # release is a draft until its owner has read it (the operator,
+            # 1 Nov). A tag pushes its exact version alone, and main its own
+            # :main, which the next build's cache seeds from.
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=short
             type=schedule,pattern={{date 'YYYYMMDD'}}
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
 
       # What the image will say it is when someone asks it from the inside.
       # The commit is the one being built; the time is this build's, not the
@@ -212,8 +207,9 @@ jobs:
           # a secret mount, in no layer of the image.
           secrets: |
             gh_token=${{ secrets.GITHUB_TOKEN }}
-          # Every trigger left publishes: a merge to main, the weekly refresh,
-          # and a dispatch. Nothing builds here without meaning to ship.
+          # Every trigger left pushes: a merge to main (:main), the weekly
+          # refresh, a dispatch and a tag (its version alone); what people
+          # follow moves only when a release is published.
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -247,7 +243,7 @@ jobs:
           # intermediate layers that never ship, does not exist here. Inline
           # embeds the cache metadata in the pushed image itself, with no
           # separate store and nothing to evict, and seeding from
-          # :latest lets an unchanged prefix of the Dockerfile reuse the
+          # :main lets an unchanged prefix of the Dockerfile reuse the
           # previous build's layers digest-for-digest. That reuse is also
           # what keeps the host's pull small: scripts/ and config/ are COPY'd
           # last, so a scripts-only change re-downloads megabytes of tail
@@ -428,8 +424,10 @@ jobs:
           NAME: ${{ steps.pack.outputs.name }}
         run: |
           # A dev build's tag (vX.Y.Z-dev.N, R179) is a pre-release and never
-          # the latest: the dev channel alone takes it.
-          pre=(); case "$TAG" in *-dev.*) pre=(--prerelease --latest=false);; esac
+          # the latest: the dev channel alone takes it. Every release starts
+          # a draft, seen by the repository's own people alone, until its
+          # owner has read its notes and publishes it (the operator, 1 Nov).
+          pre=(--draft); case "$TAG" in *-dev.*) pre+=(--prerelease --latest=false);; esac
           # The notes are the tree's when it has them for this version
           # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
           # @TAG@, @VER@ and @REPO@ filled in, so the release is published with
@@ -495,7 +493,7 @@ jobs:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
           tag="${GITHUB_REF_NAME}"
-          pre=(); case "$tag" in *-dev.*) pre=(--prerelease --latest=false);; esac
+          pre=(--draft); case "$tag" in *-dev.*) pre+=(--prerelease --latest=false);; esac
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag "${pre[@]}" --title "$tag" --notes "BuilderBot ${tag#v}: see CHANGELOG.md."
           # The attestation's bundle beside them, one line: an update from a

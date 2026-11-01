@@ -2158,6 +2158,8 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
    the other like every field (the operator, 11 Oct: the two sat beside the
    picker on desktop). */
 .nginxtab textarea{min-height:96px;resize:vertical;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+/* A draft release's notes, read and corrected before it is published. */
+.verdraft textarea{width:100%;box-sizing:border-box;min-height:180px;resize:vertical}
 .nginxtab .field>.ndcap{margin-top:var(--label-gap)}
 .rnreach{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .modal .rnreach input[data-reach]{flex:1 1 12em;width:auto;min-width:0}
@@ -6013,6 +6015,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            already runs past a phone at five labels, and a version and the
            artifacts it stamps are one subject; those filenames carry it. -->
       <div id="verBox" data-skel="version"></div>
+      <div id="verDrafts"></div>
       <div id="artList" data-skel="artifacts"></div>
       <!-- What a session looked with (R96): reels and emulator shots, in one
            fold apart from what ships, each saying whose it is, and swept

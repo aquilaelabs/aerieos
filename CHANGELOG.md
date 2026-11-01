@@ -16,6 +16,7 @@
 - On a USB stick, This machine can name a folder already on the machine's disks as the projects folder, so a controller moved there works on its projects where they are, with nothing copied (7c24926)
 - On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
 - A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
+- Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
 
 ### Changed
 
@@ -27,6 +28,7 @@
 - bb sign release waits for its look and says what it found, run by run, or why it found nothing to sign (7a8e367)
 - Pages read alike: sizes say their unit after a space and in TB past a terabyte, a list narrowed two ways shows one All with the second row starting at Any source or Any version, a view's status line is a note unless it says what stops a press, the Wiki view's controls are one row, Commit all and the Design view's new page sit on one line, and where any coding agent is meant the page says agent (56bc704)
 - A project's Permissions, On the git host: Change CI workflow files set to Deny now refuses a session's push that changes a workflow file (a workflow runs with the repository's secrets); Push branches, Read the code and Publish and edit releases have no switch there any more, each showing the setting that governs it (Pushing, or Agents may: Tag and publish a release), since a Deny on them was told to sessions but never enforced (30cba84)
+- The :latest image is now the newest published release, moved when one is published, where it followed every push to main; :main follows main, and :dev and :X.Y move when a release is published (c4879b7)
 
 ### Fixed
 
@@ -53,6 +55,10 @@
 - On a node, the project owner's shells and coding agent sessions are known as the owner's again, so bb treats the owner's own tree as theirs there (0369c15)
 - Moving a controller or restoring a backup no longer holds the whole bundle in memory, so a large workspace can move without the controller being stopped partway; a bundle made by an earlier version still lands (0369c15)
 - A container that cannot start because its port is taken says which port, where the reason was cut off (2e1d46b)
+
+### Upgrading
+
+- A container following :latest now moves only when a stable release is published; to follow every change on main as before, point it at :main (c4879b7)
 
 ## 0.9.0: 2026-10-30
 

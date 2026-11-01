@@ -159,13 +159,15 @@ container.
 
 ### Updating: the whole point
 
-CI publishes a fresh `:latest` for any push to `main` that changes what the
-image is built from, and on a weekly schedule. On the **Docker** tab, Unraid's
+`:latest` moves to each stable release when it is published; `:main` follows
+each push to `main` that changes what the image is built from, and a weekly
+rebuild. On the **Docker** tab, Unraid's
 *Check for Updates* compares your running image's digest against GHCR and flips
 the container to **update ready**: click it and you're on the new build.
 That's the entire update procedure. Ansible not required. Most updates pull
-only the layers that changed; the Monday build is rebuilt from scratch on
-purpose (that is the one that refreshes packages) and pulls everything.
+only the layers that changed. The Monday rebuild of `:main` is from scratch on
+purpose (it is the one that refreshes packages); `:latest` takes them with the
+next release.
 
 Template edits (new paths, changed variables) are done from the container's
 own settings page (click the icon → *Edit*), and survive image updates.

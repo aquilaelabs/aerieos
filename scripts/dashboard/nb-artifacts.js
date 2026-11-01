@@ -482,6 +482,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       verSection(v) + nb.sectBar(`artifacts:version${v.component ? ":" + v.component : ""}`),
       {cls: v.target ? "" : "warn"})).join("");
     wireSections(box);
+    loadDrafts();
     // A role without Releases and versions Write on the project (B101):
     // every button that moves or releases the version left out, and the
     // fields that say it read-only; without Projects Write, Send to Claude
@@ -1044,6 +1045,49 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
       </select>${verPolicyPending != null
         ? `<span class="vermark">staged: on Save</span>` : ""}
     </label>`;
+  }
+
+  // Drafts (the operator, 1 Nov): every release CI makes waits as a draft,
+  // seen by the repository's own people alone, its notes read and corrected
+  // here, then published. A role that may not release reads them.
+  async function loadDrafts(force){
+    const box = $("verDrafts");
+    if (!box) return;
+    // Notes being corrected are never redrawn under the person typing them.
+    if (!force && box.querySelector("textarea[data-dirty]")) return;
+    const j = await (await postJSON("/api/version", {project, action: "release-drafts"})).json().catch(() => ({drafts: []}));
+    const ds = j.drafts || [];
+    if (!ds.length){ box.innerHTML = ""; return; }
+    const may = !projReleaseWhy(project);
+    box.innerHTML = docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
+      const miss = d.missing || [];
+      return `<div class="field verdraft" data-draft="${esc(d.tag)}">
+        <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
+        ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
+        <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
+        ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${miss.length ? " disabled" : ""}>Publish</button></div>` : ""}
+      </div>`;
+    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest.</div>`, {cls: "warn"});
+    wireSections(box);
+    box.querySelectorAll("[data-draft]").forEach(row => {
+      const tag = row.dataset.draft, ta = row.querySelector("textarea");
+      const save = row.querySelector("[data-draftsave]"), pub = row.querySelector("[data-draftpub]");
+      ta.oninput = () => { ta.dataset.dirty = "1"; };
+      if (save) save.onclick = () => pressing(save, async () => {
+        const r = await (await postJSON("/api/version", {project, action: "release-draft-notes", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
+        notify(r.error || `${tag}'s notes saved; it is still a draft`, !!r.error);
+        if (!r.error) delete ta.dataset.dirty;
+      });
+      if (pub) pub.onclick = () => pressing(pub, async () => {
+        if (!await askYes(`Publish ${tag}?\n\nIts notes as they stand in the box go out with it, and everybody can see and take it from then on: ${
+            tag.includes("-dev.") ? "the dev channel and the containers following :dev" : "every install following releases, and :latest"}. A published release is taken back with Withdraw.`,
+            {title: "Publish it?", verb: "Publish"})) return;
+        busy(pub, "Publishing");
+        const r = await (await postJSON("/api/version", {project, action: "release-publish", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
+        notify(r.error || `${tag} is published`, !!r.error);
+        if (!r.error) await loadDrafts(true);
+      });
+    });
   }
 
   async function postVersion(body, quiet){

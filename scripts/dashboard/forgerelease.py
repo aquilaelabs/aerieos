@@ -184,6 +184,22 @@ def _same_tree(project, sha, others):
 
 # ---- asking GitHub ------------------------------------------------------------
 
+# A release asked for by its tag, for _req's draft fallback.
+_BY_TAG = re.compile(re.escape(API) + r"/repos/([^/?#]+/[^/?#]+)/releases/tags/([^/?#]+)")
+
+def _draft_by_tag(repo, tag, token, pages=3):
+    """The release (a draft among them) whose tag is `tag`, from the listed
+    releases, newest first, or None."""
+    for page in range(1, pages + 1):
+        rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=50&page={page}", token) or []
+        for r in rows if isinstance(rows, list) else []:
+            if isinstance(r, dict) and r.get("tag_name") == tag:
+                return r
+        if not isinstance(rows, list) or len(rows) < 50:
+            return None
+    return None
+
+
 def _req(method, url, token, body=None, data=None, ctype="application/json"):
     if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/")):
         raise Refused("not an address this asks GitHub at")
@@ -201,7 +217,11 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as e:
         if e.code == 404 and method == "GET":
-            return None
+            # A draft release is never found by its tag (GitHub's rule), and
+            # every release starts a draft (the operator, 1 Nov): looked for
+            # among the listed ones, which a token that may see drafts lists.
+            m = _BY_TAG.fullmatch(url)
+            return _draft_by_tag(m.group(1), urllib.parse.unquote(m.group(2)), token) if m else None
         try:
             why = (json.loads(e.read(20000)) or {}).get("message") or ""
         except (ValueError, OSError):
@@ -882,6 +902,73 @@ def _paths(kind, ctx, tag):
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}"
     return {"rel": f"{base}/releases/tags/{t}", "ref": f"{base}/tags/{t}", "unref": f"{base}/tags/{t}",
             "by_id": f"{base}/releases/", "call": f.ask}
+
+
+
+# ---- drafts (the operator, 1 Nov) --------------------------------------------
+# Every release CI makes starts a draft, seen by the repository's own people
+# alone, so its notes are read before anybody else sees it. GitHub's alone:
+# Gitea and GitLab releases made here are published as they are made.
+
+def drafts(project):
+    """The project's draft releases on GitHub, newest first: {drafts:
+    [{tag, prerelease, notes, url}], forge} or {error}. [] on another forge."""
+    try:
+        kind, name, ctx = _handle(project)
+    except Refused as e:
+        return {"error": str(e)}
+    if kind != "github":
+        return {"drafts": [], "forge": name}
+    repo, token = ctx
+    try:
+        rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=30", token) or []
+    except Refused as e:
+        return {"error": str(e)}
+    return {"forge": name, "drafts": [{"tag": str(r.get("tag_name") or ""), "prerelease": r.get("prerelease") is True,
+                                       "notes": str(r.get("body") or ""), "url": str(r.get("html_url") or "")}
+                                      for r in rows if isinstance(r, dict) and r.get("draft") and TAG.fullmatch(str(r.get("tag_name") or ""))]}
+
+
+def _draft(project, tag):
+    """(repo, token, release) of the draft for `tag`, or raises Refused."""
+    if not tag or not TAG.fullmatch(tag) or ".." in tag:
+        raise Refused(f"not a tag: {tag or '(none)'}")
+    kind, name, ctx = _handle(project)
+    if kind != "github":
+        raise Refused(f"{name} releases are published as they are made: there is no draft to publish")
+    repo, token = ctx
+    rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}", token)
+    if not rel:
+        raise Refused(f"there is no release for {tag} on GitHub")
+    if not rel.get("draft"):
+        raise Refused(f"{tag} is published already")
+    return repo, token, rel
+
+
+def draft_notes(project, tag, notes):
+    """A draft's notes replaced, as read and corrected before it is
+    published: {ok, tag} or {error}."""
+    try:
+        repo, token, rel = _draft(project, tag)
+        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, {"body": str(notes)[:120000]})
+    except Refused as e:
+        return {"error": str(e)}
+    return {"ok": True, "tag": tag}
+
+
+def publish_draft(project, tag, notes=None, missing=()):
+    """A draft published, its notes first replaced when given: {ok, tag,
+    url} or {error}. Refused while `missing` names a file the release must
+    carry (releasefiles), so nothing goes out half built."""
+    if missing:
+        return {"error": f"{tag} is not whole yet: {', '.join(missing)} still missing. CI may still be building it"}
+    try:
+        repo, token, rel = _draft(project, tag)
+        body = {"draft": False, **({"body": str(notes)[:120000]} if notes is not None else {})}
+        out = _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, body) or {}
+    except Refused as e:
+        return {"error": str(e)}
+    return {"ok": True, "tag": tag, "url": str(out.get("html_url") or rel.get("html_url") or "")}
 
 
 def withdraw_plan(project, tag):

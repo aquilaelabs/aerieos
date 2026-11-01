@@ -236,7 +236,8 @@ function updatesSection(){
   // normal channel and sees no pulldown.
   const channel = r.dev_ok ? `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}` : ""}. A dev build is not a release: it may not come up, and on BuilderBot OS the other slot's fallback is what brings the machine back.` : "Releases alone. The dev channel is here because this controller runs in debug mode."}</div></div>` : "";
+      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? ", a draft not published yet, seen here with this controller's token for BuilderBot's repository" : ""}` : ""}.${
+        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on BuilderBot OS the other slot's fallback is what brings the machine back.` : "Releases alone. The dev channel is here because this controller runs in debug mode."}</div></div>` : "";
   return `<div class="row stack2" data-group="Updates"><div class="grow">
       <div class="sub">This install runs ${runs}; the newest ${r.channel === "dev" ? "on the dev channel" : "release"} is ${(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) ? esc(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) : "not known yet"} (${when}${r.error ? `; ${esc(r.error)}` : ""}).</div>
       <div class="sub dim">${how}</div>
@@ -467,7 +468,7 @@ function wireUpdates(root){
       if (!await askYes(`Update this machine to BuilderBot OS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
       busy(b, "Updating");
       const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+      notify(j.error || j.said || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
@@ -640,6 +641,14 @@ const SETTING_GROUPS = [
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
      hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, projects, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
+  // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
+  // token that may read BuilderBot's repository, with which the dev channel
+  // also sees the drafts not published yet, and an update fetches one.
+  {key: "drafts", title: "Unpublished builds", debug: true,
+   heading: s => s?.settings?.release_token?.set ? "token set" : "no token",
+   fields: [
+    {key: "release_token", label: "GitHub token", type: "secret",
+     hint: "A personal access token that may read BuilderBot's repository (contents, read). With it, and the dev channel picked under Updates, this controller also sees the builds not published yet, and Update on BuilderBot OS fetches one's files with it and takes the update from them, checked as a folder's are. Kept sealed here, never shown again, and cleared at any start out of debug mode."}]},
   // The update window (R160 step 4): a newer release applied by itself at
   // the hour named, daily or one weekday; off by default, so nothing moves
   // the install without a press or this choice.
@@ -927,7 +936,7 @@ function settingsSections(){
   const offSect = offs.length ? [{key: "off", title: "Switched off", status: String(offs.length), cls: "",
     html: `<div class="row stack2"><div class="grow"><div class="sub">Set where this container starts (FEATURES_OFF), so nothing here turns them back on.</div>${
       offs.map(w => `<div class="setrow">${esc(w)}</div>`).join("")}</div></div>`}] : [];
-  return offSect.concat(SETTING_GROUPS.filter(g => !g.can || state?.can?.[g.can]).map(g => {
+  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)).map(g => {
     const field = f => {
             const v = s.settings[f.key]?.value;
             const id = "set_" + f.key;

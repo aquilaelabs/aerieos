@@ -193,24 +193,25 @@ section of your **Profile**, under Settings, each with Disconnect. Which are off
 the Controller settings page, or `/config/seed.json` before the first start
 ([reference.md](reference.md#the-seed-file)).
 
-**Updating**: CI publishes `:latest` for any push to `main` that touches the
-image's inputs (Dockerfile, `scripts/`, `config/`) + a weekly freshness
-rebuild. The host's app page's *Check for Updates* flips the container to **update ready**,
-so click it. Builds seed their layer cache from the previous `:latest`, so a
-scripts-only change is a small pull; the Monday rebuild is uncached on purpose
-and is always the big one. *Run workflow* takes a **Rebuild every layer** box
+**Updating**: `:latest` is the newest stable release, moved when its owner
+publishes it ([versions.md](versions.md#drafts)); `:main` follows each push to
+`main` that touches the image's inputs (Dockerfile, `scripts/`, `config/`) and
+a weekly freshness rebuild. The host's app page's *Check for Updates* flips the
+container to **update ready**, so click it. Builds seed their layer cache from
+`:main`, so a scripts-only change is a small pull; the Monday rebuild is
+uncached on purpose and is always the big one. *Run workflow* takes a **Rebuild every layer** box
 for the same effect on demand: leave it off and a manual run is a cheap retry,
 tick it to force a fresh pull of everything. To upgrade between releases, and roll
 back, see [Upgrading](#upgrading). Compose: `docker compose pull && docker compose up -d`.
 
 ## Upgrading
 
-**Pin a release, not `:latest`.** `:latest` follows the main branch between
-releases. Each release publishes its own image, `ghcr.io/aquilaelabs/builderbot:0.6.0`,
+**Pin a release, not `:latest`.** `:latest` moves to each stable release as it
+is published. Each release publishes its own image, `ghcr.io/aquilaelabs/builderbot:0.6.0`,
 and `:0.6` for the newest release of that line; pin one of those in your
 compose file or template, and move it on when you choose to upgrade.
-`:dev` follows the dev channel instead: every dev build as it is cut and
-each release, so an install on it takes builds that may not come up
+`:dev` follows the dev channel instead: every dev build and release as it is
+published, so an install on it takes builds that may not come up
 ([versions.md](versions.md#two-channels)).
 
 **What is supported:**

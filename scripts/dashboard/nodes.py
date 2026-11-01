@@ -3956,6 +3956,11 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     return r
 
 
+# A draft release (the operator, 1 Nov): the controller fetches its files
+# itself and the update is taken from that folder (server._draft_update);
+# None where the tag is no draft it can see. Configured by the server.
+draft_update = lambda principal, node_id, tag, os_image: None  # noqa: E731
+
 def node_os_update(principal, node_id, release="", from_dir=""):
     """Update BuilderBot OS on the controller's own machine (R160 step 4): a
     system job on its node, whose root agent fetches the release's image
@@ -3987,6 +3992,10 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": "the folder is a path on the machine, from /"}
     if not tag and not src:
         return {"error": "name the release (vX.Y.Z), or a folder on the machine holding its files"}
+    if tag:
+        d = draft_update(principal, node_id, tag, True)
+        if d is not None:
+            return d
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "os-update", "config": ({"release": tag} if tag else {"from": src}), "timeout": 3600})
     if r.get("ok"):
@@ -4141,6 +4150,10 @@ def node_controller_update(principal, node_id, release=""):
     tag = str(release or "").strip()
     if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-dev\.\d+)?", tag):
         return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
+    if tag:
+        d = draft_update(principal, node_id, tag, False)
+        if d is not None:
+            return d
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "controller-update", "config": ({"release": tag} if tag else {}), "timeout": 3600})
     if r.get("ok"):

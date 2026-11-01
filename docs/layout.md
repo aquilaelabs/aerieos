@@ -458,7 +458,8 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
-  build-image.yml                GHCR publish: hosted, cached from :latest, on a push to main that touches the image's inputs
+  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs; a tag's build and its release, made a draft
+  publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   BuilderBot OS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       the linters, on a pull request, on this runner
   dashboard.yml                  the dashboard's browser suite, on a pull request that changes it, on this runner

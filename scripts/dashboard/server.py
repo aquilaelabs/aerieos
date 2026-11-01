@@ -5251,8 +5251,10 @@ import releasecheck                                              # noqa: E402
 releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
                        window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
                        apply=lambda v: _update_in_window(v),
-                       # The release channel (R179): dev only in debug mode with the dev switch on.
-                       channel=lambda: str(settings.get("release_channel") or "normal"), dev_ok=settings.dev_channel_ok)
+                       # The release channel (R179): dev only in debug mode (R193), and
+                       # its drafts seen with BuilderBot's own repository's token.
+                       channel=lambda: str(settings.get("release_channel") or "normal"), dev_ok=settings.dev_channel_ok,
+                       draft_token=lambda: _builderbot_repo_token())
 
 
 # Update checks on one clock (R176, checks.py): each check's cadence a
@@ -5282,6 +5284,38 @@ def _own_host():
     nid = _own_node_id()
     n = nodes.node(nid) if nid else None
     return dict(((n or {}).get("reported") or {}).get("host_updates") or {})
+
+
+def _builderbot_repo_token():
+    """In debug mode, the GitHub token Controller settings' Unpublished
+    builds holds, with which the update check sees BuilderBot's draft
+    releases (the operator, 1 Nov); "" otherwise."""
+    return settings.secret("release_token") if settings.debug_available() else ""
+
+
+def _draft_update(principal, nid, tag, os_image):
+    """An update to a draft (nodes.draft_update): its BuilderBot OS files
+    fetched here with the token, then the update taken from that folder,
+    checked as any folder's is; None when `tag` is no draft seen here."""
+    if not releasecheck.is_draft(tag):
+        return None
+    if not os_image:
+        return {"error": f"{tag} is a draft: a draft reaches BuilderBot OS alone, from its files; publish it for this install to take it"}
+    dest = Path(STATE) / "os-draft"
+    shutil.rmtree(dest, ignore_errors=True)
+
+    def go():
+        why = releasecheck.fetch_draft(tag, str(dest / tag))
+        if why:
+            print(f"[dashboard] the draft {tag}: {why}", flush=True)
+            return
+        r = nodes.node_os_update(principal, nid, "", str(dest / tag))
+        print(f"[dashboard] the draft {tag}: {r.get('job') or r.get('error')}", flush=True)
+    threading.Thread(target=go, name="draft-update", daemon=True).start()
+    return {"ok": True, "fetching": True, "said": f"{tag} is a draft: its files are fetched here first, then the update runs from them"}
+
+
+nodes.draft_update = _draft_update
 
 
 def _update_in_window(version):
@@ -10122,6 +10156,42 @@ class Handler(BaseHTTPRequestHandler):
             r = phone.ask_release_edit(field(req, "why"), name, plan, membership.owner_of(name),
                                        membership.owner_name(name) or "the project's owner",
                                        asker_name=str(acct.get("name") or ""), principal=self._principal())
+            return self._json(r, 400 if r.get("error") else 200)
+        if act == "release-drafts":
+            # The drafts waiting to be read and published (the operator,
+            # 1 Nov), each with the files it still lacks.
+            if who.get("session") and name != who["session"]:
+                return self._json({"error": "a session reads its own project's drafts and no other"}, 403)
+            d = forgerelease.drafts(name)
+            if d.get("error"):
+                # No release page to read (no forge, no token): no drafts,
+                # which is no error to the page that asks.
+                return self._json({"drafts": [], "why": d["error"]})
+            for x in d["drafts"]:
+                try:
+                    x["missing"] = releasefiles.missing(name, x["tag"])[0]
+                except forgerelease.Refused as e:
+                    x["missing"], x["missing_error"] = [], str(e)
+            return self._json(d)
+        if act in ("release-draft-notes", "release-publish"):
+            # Reading a draft and publishing it is a person's, whatever the
+            # dial: it is the read before anybody else sees the release.
+            if who.get("session"):
+                return self._json({"error": "a release is published by a person, once its notes are read: the Artifacts view's Drafts"}, 403)
+            if self._refused("version", name):
+                return None
+            tag = field(req, "tag")
+            notes = req.get("notes") if isinstance(req.get("notes"), str) else None
+            if act == "release-draft-notes":
+                r = forgerelease.draft_notes(name, tag, notes or "")
+            else:
+                try:
+                    miss = releasefiles.missing(name, tag)[0]
+                except forgerelease.Refused as e:
+                    return self._json({"error": str(e)}, 400)
+                r = forgerelease.publish_draft(name, tag, notes, miss)
+                if r.get("ok"):
+                    db.audit(self._principal(), "release-publish", name, {"tag": tag})
             return self._json(r, 400 if r.get("error") else 200)
         if who.get("session"):
             return self._json({"error": "a session moves its version with bb version bump, "
