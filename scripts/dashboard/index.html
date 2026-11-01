@@ -96,7 +96,7 @@
 :root,.sw[data-theme="default"]{
   --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
   --dim:#a9b7ce; --accent:#2fc6ff; --warn:#d29922; --bad:#f07178;
-  --note:#ff8f4a;
+  --note:#8cc8ff;
   /* A check that passed is green in every scheme (the operator, 16 Oct: the
      doctor read teal on Abyss and orange on Ember, an accent that reads as
      a warning there), as warn and bad stay yellow and red. Not swapped by
@@ -384,7 +384,11 @@ html[data-mode="light"]{
 }
 html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
   --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
-  --dim:#566275; --accent:#0059c7; --warn:#996200; --bad:#c3131b; --note:#b8470f}
+  --dim:#566275; --accent:#0059c7; --warn:#996200; --bad:#c3131b; --note:#0a5fb0}
+/* The default scheme alone fills what is pressed in its third hue, copper, so
+   words and links stay blue and information never reads as a warning. */
+html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
+html[data-mode="light"]:not([data-theme]),html[data-mode="light"] .sw[data-theme="default"]{--lit:#b8470f}
 /* Nostromo's light half is the ship's white corridors: cool gray-white
    walls and panels and the hazard marking's red-orange for what is the one
    (the operator, 16 Oct); its graphics are with the dark half's, below. */

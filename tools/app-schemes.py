@@ -20,6 +20,9 @@ THEME_KT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "apps"
 
 def half(cols, name, which):
     got = {c["name"]: c["hex"] for c in cols or []}
+    # The app has one second color, for both; the default scheme's filled one reads there.
+    if name == "Default":
+        got["note"] = {"dark": "#ff8f4a", "light": "#b8470f"}[which]
     missing = [k for k in KEYS if k not in got]
     if missing:
         sys.exit(f"app-schemes: {name}'s {which} half has no {', '.join(missing)}")
