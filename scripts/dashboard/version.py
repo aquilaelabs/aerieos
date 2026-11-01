@@ -287,15 +287,25 @@ def _git(project, *args, timeout=10, env=None):
     # would otherwise take can make a session's git in the same tree fail
     # with index.lock: File exists (B155). A commit still takes the locks it
     # needs; only the optional one is skipped.
-    try:
-        r = subprocess.run(["git", "-C", tree, *args],
-                           capture_output=True, text=True,
-                           timeout=timeout, check=False,
-                           env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(env or {})})
-    except (OSError, subprocess.SubprocessError):
-        return None
-    out = r.stdout.strip() if r.returncode == 0 else None
-    if stamp is not None:
+    out = None
+    # A read about history that fails is tried once more: a push landing in
+    # the tree that moment fails it, and once was said as no history at all
+    # (B586).
+    for attempt in range(2 if keep else 1):
+        try:
+            r = subprocess.run(["git", "-C", tree, *args],
+                               capture_output=True, text=True,
+                               timeout=timeout, check=False,
+                               env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(env or {})})
+        except (OSError, subprocess.SubprocessError):
+            r = None
+        if r is not None and r.returncode == 0:
+            out = r.stdout.strip()
+            break
+        if attempt == 0 and keep:
+            time.sleep(0.5)
+    # ...and a failure is never kept as the answer, so the next ask asks again.
+    if stamp is not None and out is not None:
         kept = _git_kept.get(tree)
         if not kept or kept[0] != stamp or time.time() - kept[1] >= GIT_KEPT_S:
             kept = _git_kept[tree] = (stamp, time.time(), {})

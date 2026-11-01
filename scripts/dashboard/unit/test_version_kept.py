@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -44,6 +45,25 @@ class Kept(unittest.TestCase):
 
     def count(self):
         return version._git("app", "rev-list", "--count", "HEAD")
+
+    def test_a_history_read_that_fails_is_tried_again_and_never_kept(self):
+        # B586: a push landing that moment failed one read, which was said
+        # as no history and kept as the answer.
+        fails = [2]
+        real = version.subprocess.run
+
+        def flaky(*a, **k):
+            if a and a[0][:1] == ["git"] and fails[0]:
+                fails[0] -= 1
+                return subprocess.CompletedProcess(a[0], 128, "", "fatal: bad object")
+            return real(*a, **k)
+        version.subprocess.run = flaky
+        with unittest.mock.patch.object(version.time, "sleep"):
+            self.assertIsNone(self.count(), "two failures in a row: cannot tell")
+            self.assertEqual(self.count(), "1", "the failure was not kept: the next ask asks again")
+            fails[0] = 1
+            version._git_kept.clear()
+            self.assertEqual(self.count(), "1", "one failure: the second try answers")
 
     def test_a_history_read_is_asked_once_while_nothing_moves(self):
         self.assertEqual(self.count(), "1")
