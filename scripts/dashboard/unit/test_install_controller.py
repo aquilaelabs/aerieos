@@ -95,7 +95,7 @@ class LaidOutAsTheImage(unittest.TestCase):
             else:
                 self.assertTrue(os.path.isfile(where), (src, dest))
         self.assertTrue(os.access(os.path.join(rel, "scripts", "host-boot.sh"), os.X_OK))
-        self.assertTrue(os.access(os.path.join(rel, "scripts", "bb"), os.X_OK))
+        self.assertTrue(os.access(os.path.join(rel, "scripts", "aerie"), os.X_OK))
         for f in ("nodes/install-controller.sh", "config/controller.env", "Dockerfile"):
             self.assertTrue(os.path.isfile(os.path.join(rel, f)), f)
         env = open(os.path.join(rel, "build.env"), encoding="utf-8").read()

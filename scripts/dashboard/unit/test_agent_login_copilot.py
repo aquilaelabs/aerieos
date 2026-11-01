@@ -45,7 +45,7 @@ class CopilotLogin(unittest.TestCase):
         answer = os.path.join(into, "answer")
         # The flow runs with the agent's own environment, so the stand-in is
         # told where to write in its text.
-        with open(os.path.join(into, "scripts", "bb"), "w") as f:
+        with open(os.path.join(into, "scripts", "aerie"), "w") as f:
             f.write(FAKE.replace("ANSWER_TO", answer))
         job = agent.Job(FakeAgent(into), {"id": "j_1", "type": "copilot-login", "spec": {}})
         job.flush = lambda keepalive=False: True

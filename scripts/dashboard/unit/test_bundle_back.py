@@ -32,9 +32,9 @@ class BundleBack(unittest.TestCase):
                 test.fetched.append(who)
                 d = os.path.join(test.store, ".bb", "current", "scripts")
                 os.makedirs(d, exist_ok=True)
-                with open(os.path.join(d, "bb"), "w") as f:
+                with open(os.path.join(d, "aerie"), "w") as f:
                     f.write("#!/bin/sh\n")
-                os.chmod(os.path.join(d, "bb"), 0o755)
+                os.chmod(os.path.join(d, "aerie"), 0o755)
                 return d
 
             def session_start(self, into):
