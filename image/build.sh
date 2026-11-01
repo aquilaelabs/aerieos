@@ -15,7 +15,7 @@
 #   aerieos-os-VERSION.root.squashfs  one root slot, what an update writes into the other slot (R160 step 4)
 #   aerieos-os-VERSION.vmlinuz        the slot's kernel and initrd, kept on the ESP beside it
 #   aerieos-os-VERSION.initrd
-#   aerieos-os-VERSION.release        the stamp the image carries at /usr/lib/builderbot-os/release
+#   aerieos-os-VERSION.release        the stamp the image carries at /usr/lib/aerieos-os/release
 #   aerieos-os-VERSION.packages       every package in it with its version, for the weekly rebuild's diff
 # A release carries two of them, the ISO and the stick (build-image.yml's
 # appliance-publish); an update takes the slot out of the ISO.
@@ -100,12 +100,12 @@ if [ -z "$TREE" ]; then
           --force build
     TREE="$OUT/mkosi/tree"
 fi
-[ -d "$TREE/usr/lib/builderbot-os" ] || die "no AerieOS tree at $TREE"
+[ -d "$TREE/usr/lib/aerieos-os" ] || die "no AerieOS tree at $TREE"
 # What the installer on the ISO lays a disk out with (R160 step 2): the
 # same layout script, numbers and menu this build uses, in the image.
-install -m 0755 "$HERE/lay-disk" "$TREE/usr/lib/builderbot-os/lay-disk"
-install -m 0644 "$HERE/partitions.sh" "$TREE/usr/lib/builderbot-os/partitions.sh"
-install -m 0644 "$HERE/grub.cfg" "$TREE/usr/lib/builderbot-os/grub.cfg"
+install -m 0755 "$HERE/lay-disk" "$TREE/usr/lib/aerieos-os/lay-disk"
+install -m 0644 "$HERE/partitions.sh" "$TREE/usr/lib/aerieos-os/partitions.sh"
+install -m 0644 "$HERE/grub.cfg" "$TREE/usr/lib/aerieos-os/grub.cfg"
 # gh, pinned (above), and the Sigstore trusted root of the day it was built,
 # which an update from a folder verifies its bundle against with no network.
 say "gh ${GH_PIN}"
@@ -115,21 +115,21 @@ echo "${GH_SHA256}  $OUT/gh.tar.gz" | sha256sum -c - >/dev/null || die "gh ${GH_
 tar -xzf "$OUT/gh.tar.gz" -C "$OUT" "gh_${GH_PIN}_linux_amd64/bin/gh"
 install -m 0755 "$OUT/gh_${GH_PIN}_linux_amd64/bin/gh" "$TREE/usr/bin/gh"
 rm -rf "${OUT:?}/gh.tar.gz" "${OUT:?}/gh_${GH_PIN}_linux_amd64"
-if "$TREE/usr/bin/gh" attestation trusted-root > "$TREE/usr/lib/builderbot-os/trusted-root.jsonl.new" \
-        && [ -s "$TREE/usr/lib/builderbot-os/trusted-root.jsonl.new" ]; then
-    mv "$TREE/usr/lib/builderbot-os/trusted-root.jsonl.new" "$TREE/usr/lib/builderbot-os/trusted-root.jsonl"
+if "$TREE/usr/bin/gh" attestation trusted-root > "$TREE/usr/lib/aerieos-os/trusted-root.jsonl.new" \
+        && [ -s "$TREE/usr/lib/aerieos-os/trusted-root.jsonl.new" ]; then
+    mv "$TREE/usr/lib/aerieos-os/trusted-root.jsonl.new" "$TREE/usr/lib/aerieos-os/trusted-root.jsonl"
 else
-    rm -f "$TREE/usr/lib/builderbot-os/trusted-root.jsonl.new"
+    rm -f "$TREE/usr/lib/aerieos-os/trusted-root.jsonl.new"
     die "gh attestation trusted-root gave nothing: an update from a folder would have nothing to verify against"
 fi
-cat > "$TREE/usr/lib/builderbot-os/release" <<REL
+cat > "$TREE/usr/lib/aerieos-os/release" <<REL
 BUILDERBOT_OS_VERSION=${VERSION}
 BUILDERBOT_OS_BOOTS_KEPT=1
 BUILDERBOT_VERSION=$(head -1 "$TREE_SRC/VERSION" | tr -d '[:space:]')
 DEBIAN_SNAPSHOT=${SNAPSHOT}
 BUILT=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 REL
-cp "$TREE/usr/lib/builderbot-os/release" "$OUT/$NAME.release"
+cp "$TREE/usr/lib/aerieos-os/release" "$OUT/$NAME.release"
 # Every package in the image with its version (R160 step 6): what the weekly
 # rebuild compares against the last release's to say what moved.
 # From mkosi's manifest, recorded before CleanPackageMetadata removes the
@@ -223,7 +223,7 @@ sed -e "s|@NAME@|$NAME|g" -e "s|@VMDK@|$NAME-disk1.vmdk|g" \
                  printf 'SHA256(%s)= %s\n' "$NAME-disk1.vmdk" "$(sha256sum "$NAME-disk1.vmdk" | cut -d' ' -f1)"; } > "$NAME.mf" \
   && tar -cf "$OUT/$NAME.ova" --owner=0 --group=0 --mtime="@$SOURCE_DATE_EPOCH" "$NAME.ovf" "$NAME.mf" "$NAME-disk1.vmdk" )
 rm -rf "$OVA"
-# The USB edition (R161 steps 1 and 5): the same disk with bb_toram=1 in
+# The USB edition (R161 steps 1 and 5): the same disk with aerie_toram=1 in
 # GRUB's environment, so a stick written from it runs from memory; the
 # stick maker (tools/aerieos-stick.py) writes this one.
 say "the stick: ${NAME}.stick.raw"
@@ -233,7 +233,7 @@ LOOP="$(losetup --find --show --partscan "$STICK")"
 trap 'losetup -d "$LOOP" 2>/dev/null || true' EXIT
 MNT="$(mktemp -d)"
 mount "${LOOP}p2" "$MNT"
-grub-editenv "$MNT/grub/grubenv" set bb_toram=1
+grub-editenv "$MNT/grub/grubenv" set aerie_toram=1
 umount "$MNT"; rmdir "$MNT"
 losetup -d "$LOOP"; trap - EXIT
 say "compressing"

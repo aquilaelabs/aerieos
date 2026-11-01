@@ -274,7 +274,7 @@ bb_image_log() {
 # environment worth trusting, so a bare-metal install's is read from its env
 # file, and only when that file is root's and nobody else may write it (R90);
 # anywhere else it is the container's /config.
-BB_CONTROLLER_ENV="${BB_CONTROLLER_ENV:-/etc/builderbot-controller/controller.env}"
+BB_CONTROLLER_ENV="${BB_CONTROLLER_ENV:-/etc/aerieos-controller/controller.env}"
 bb_root_state() {
     local f="$BB_CONTROLLER_ENV" v="" mode
     if [ -f "$f" ] && [ "$(stat -c %u "$f" 2>/dev/null)" = 0 ]; then
@@ -515,7 +515,7 @@ user_home() {
         # credential should not be world-readable inside the container even to
         # something that could take it a harder way.
         chmod 700 "$home" 2>/dev/null || true
-        for d in /opt/builderbot/skel/. "$BUILDER_HOME/.bashrc" "$BUILDER_HOME/.profile"; do
+        for d in /opt/aerieos/skel/. "$BUILDER_HOME/.bashrc" "$BUILDER_HOME/.profile"; do
             if [ -e "${d%/.}" ]; then
                 cp -rn "$d" "$home/" 2>/dev/null || true
             fi

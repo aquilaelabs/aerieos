@@ -79,14 +79,14 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
 
     def test_every_copy_line_lands_where_the_image_puts_it(self):
-        rel = os.path.join(self.root, "opt", "builderbot-releases", "1.2.3")
+        rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
         os.makedirs(os.path.dirname(rel))
         r = sh(f'lay_out "{ROOT}" "{rel}" 1.2.3 abc123', root=self.root)
         self.assertEqual(r.returncode, 0, r.stderr)
-        copies = re.findall(r"^COPY (\S+) (/opt/builderbot\S*)$", dockerfile(), re.M)
+        copies = re.findall(r"^COPY (\S+) (/opt/aerieos\S*)$", dockerfile(), re.M)
         self.assertGreater(len(copies), 10)
         for src, dest in copies:
-            where = rel + dest[len("/opt/builderbot"):]
+            where = rel + dest[len("/opt/aerieos"):]
             if src.endswith("/"):
                 for name in os.listdir(os.path.join(ROOT, src)):
                     self.assertTrue(os.path.lexists(os.path.join(where, name)), (src, name))
@@ -104,7 +104,7 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.assertFalse(os.path.exists(rel + ".partial"))
 
     def test_flip_keeps_the_one_before(self):
-        rels = os.path.join(self.root, "opt", "builderbot-releases")
+        rels = os.path.join(self.root, "opt", "aerieos-releases")
         for v in ("1.0", "1.1", "1.2", "1.3", "1.4"):
             os.makedirs(os.path.join(rels, v))
         r = sh(f'for v in 1.0 1.1 1.2 1.3 1.4; do flip "{rels}/$v"; touch -d "@$((1700000000 + ${{v#1.}}))" "{rels}/$v"; done; '
@@ -168,12 +168,12 @@ class TheEnvironment(unittest.TestCase):
                                env={"BB_CONTROLLER_ENV": p, "PATH": "/usr/bin:/bin"})
             state, port, banner, kind, ws, path = r.stdout.strip().split("|")
             self.assertEqual((state, port, banner, kind, ws),
-                             ("/x/config", "7700", "Back at six", "bare-metal", "/srv/builderbot/projects"))
-            self.assertTrue(path.startswith("/usr/local/lib/builderbot-controller/bin:"))
+                             ("/x/config", "7700", "Back at six", "bare-metal", "/srv/aerieos/projects"))
+            self.assertTrue(path.startswith("/usr/local/lib/aerieos-controller/bin:"))
 
     def test_the_template_carries_every_setting_compose_passes(self):
         compose = open(os.path.join(ROOT, "docker-compose.yml"), encoding="utf-8").read()
-        svc = compose.split("\n  builderbot:", 1)[1]
+        svc = compose.split("\n  aerie-workshop:", 1)[1]
         passed = {a for a, b in re.findall(r"^\s+([A-Z][A-Z0-9_]+):\s*\$\{([A-Z][A-Z0-9_]+)", svc, re.M) if a == b}
         tmpl = open(os.path.join(ROOT, "config", "controller.env"), encoding="utf-8").read()
         have = set(re.findall(r"^([A-Z][A-Z0-9_]+)=", tmpl, re.M))
@@ -194,8 +194,8 @@ class TheEnvironment(unittest.TestCase):
 
     def test_an_update_adds_what_a_newer_template_has(self):
         with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "etc", "builderbot-controller"))
-            with open(os.path.join(d, "etc", "builderbot-controller", "controller.env"), "w") as f:
+            os.makedirs(os.path.join(d, "etc", "aerieos-controller"))
+            with open(os.path.join(d, "etc", "aerieos-controller", "controller.env"), "w") as f:
                 f.write("TZ=Europe/Paris\n")
             r = sh('chown() { :; }; id() { echo root; }; env_file; cat "$ENV_FILE"', root=d)
             self.assertIn("TZ=Europe/Paris\n", r.stdout)
@@ -210,22 +210,22 @@ class TheWall(unittest.TestCase):
 
     def test_written_from_the_env_file(self):
         with tempfile.TemporaryDirectory() as d:
-            etc = os.path.join(d, "etc", "builderbot-controller")
+            etc = os.path.join(d, "etc", "aerieos-controller")
             os.makedirs(etc)
             with open(os.path.join(etc, "controller.env"), "w") as f:
-                f.write(f"DASHBOARD_STATE={d}/var/lib/builderbot-controller/config\n"
-                        f"BUILDER_HOME={d}/var/lib/builderbot-controller/home\n"
-                        "SDK_ROOT=/mnt/sdk/\nWORKSPACE=/srv/builderbot/projects\n"
-                        f"BB_SECRETS_DIR={d}/etc/builderbot-controller/secrets\n"
-                        "SSH_AUTH_SOCK=/run/builderbot-controller/ssh-agent.sock\n")
+                f.write(f"DASHBOARD_STATE={d}/var/lib/aerieos-controller/config\n"
+                        f"BUILDER_HOME={d}/var/lib/aerieos-controller/home\n"
+                        "SDK_ROOT=/mnt/sdk/\nWORKSPACE=/srv/aerieos/projects\n"
+                        f"BB_SECRETS_DIR={d}/etc/aerieos-controller/secrets\n"
+                        "SSH_AUTH_SOCK=/run/aerieos-controller/ssh-agent.sock\n")
             r = sh('JOBS_USER=bb; echo old > "$WALL_NFT"; wall_write; cat "$WALL_FILE"; [ -e "$WALL_NFT" ] || echo "no nft"', root=d)
             self.assertEqual(r.returncode, 0, r.stderr)
             cover = re.search(r"^COVER=(.*)$", r.stdout, re.M).group(1).split(":")
             self.assertEqual(sorted(cover), sorted([
-                f"{d}/var/lib/builderbot-controller", f"{d}/etc/builderbot-controller", "/run/builderbot",
+                f"{d}/var/lib/aerieos-controller", f"{d}/etc/aerieos-controller", "/run/builderbot",
                 "/run/builderbot-key",
-                "/run/builderbot-controller", "/mnt/sdk", "/srv/builderbot/projects"]))
-            self.assertIn("ACCOUNT=builderbot\nJOBS_USER=bb\n", r.stdout)
+                "/run/aerieos-controller", "/mnt/sdk", "/srv/aerieos/projects"]))
+            self.assertIn("ACCOUNT=aerieos\nJOBS_USER=bb\n", r.stdout)
             self.assertIn("PORTS=\n", r.stdout)
             self.assertIn("no nft", r.stdout)
 
@@ -276,7 +276,7 @@ class Updates(unittest.TestCase):
             envf = os.path.join(d, "controller.env")
             open(envf, "w").write("PORT=7680\n")
             r = sh(f'ENV_FILE="{envf}"; state_dir', root=d)
-            self.assertEqual(r.stdout, os.path.join(d, "var/lib/builderbot-controller/config"), r.stderr)
+            self.assertEqual(r.stdout, os.path.join(d, "var/lib/aerieos-controller/config"), r.stderr)
             open(envf, "w").write("DASHBOARD_STATE=relative/x\n")
             r = sh(f'ENV_FILE="{envf}"; state_dir', root=d)
             self.assertNotEqual(r.returncode, 0)

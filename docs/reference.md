@@ -36,7 +36,7 @@ shielded credentials), `/reports` (ro, a scanner's output) and `/logs`
 ### A controller installed bare metal: its env file
 
 A controller installed with `nodes/install-controller.sh` ([install.md](install.md#bare-metal))
-reads `/etc/builderbot-controller/controller.env` at every start, in place of
+reads `/etc/aerieos-controller/controller.env` at every start, in place of
 compose's `.env`. It carries the same settings as the table above, under the
 same names and with the same defaults (`TZ`, `DASHBOARD_PORT`,
 `FEATURES_OFF`, `FEATURES_OFF_WHY`, `BANNER_TEXT`, `BANNER_LINK`,
@@ -46,17 +46,17 @@ mounts it names the folders:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DASHBOARD_STATE` | `/var/lib/builderbot-controller/config` | The state, compose's `/config`: accounts, settings, notebooks, logs |
-| `BUILDER_HOME` | `/var/lib/builderbot-controller/home` | The controller's own home, compose's `/home/builder` |
-| `WORKSPACE` | `/srv/builderbot/projects` | The projects, compose's `/workspace` (the installer's `--workspace`); never `/workspace`, which is the machine's own node's synced copy |
-| `SDK_ROOT` | `/var/lib/builderbot-controller/sdk` | The toolchain store, compose's `/sdk` |
-| `BB_SECRETS_DIR` | `/etc/builderbot-controller/secrets` | The root-only secrets folder, compose's `/secrets`: `*.env` files and `ssh/` |
-| `SSH_AUTH_SOCK` | `/run/builderbot-controller/ssh-agent.sock` | The deploy-key agent's socket, in a folder only the controller's account enters |
+| `DASHBOARD_STATE` | `/var/lib/aerieos-controller/config` | The state, compose's `/config`: accounts, settings, notebooks, logs |
+| `BUILDER_HOME` | `/var/lib/aerieos-controller/home` | The controller's own home, compose's `/home/builder` |
+| `WORKSPACE` | `/srv/aerieos/projects` | The projects, compose's `/workspace` (the installer's `--workspace`); never `/workspace`, which is the machine's own node's synced copy |
+| `SDK_ROOT` | `/var/lib/aerieos-controller/sdk` | The toolchain store, compose's `/sdk` |
+| `BB_SECRETS_DIR` | `/etc/aerieos-controller/secrets` | The root-only secrets folder, compose's `/secrets`: `*.env` files and `ssh/` |
+| `SSH_AUTH_SOCK` | `/run/aerieos-controller/ssh-agent.sock` | The deploy-key agent's socket, in a folder only the controller's account enters |
 | `BB_ACCOUNT` | `builderbot` | The account the controller runs as, written by the installer (`--account`); change it by running the installer again |
 | `BB_INSTALL` | `bare-metal` | What the install is, written by the installer and read by the controller, never guessed: on a bare-metal install the first run's node is the machine's own, set up by the installer, and Finish waits for it |
 
 A value with spaces in it goes in double quotes. After an edit, `sudo
-systemctl restart builderbot-controller`. The file is root's and readable by
+systemctl restart aerieos-controller`. The file is root's and readable by
 the controller's account alone; a session on the machine's own node is kept
 out of it, with the rest of the controller (the wall,
 [decisions.md](decisions.md#a-controller-installed-bare-metal-and-its-own-node)).

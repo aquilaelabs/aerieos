@@ -1,6 +1,6 @@
 """The VM manager (R91): a project's VMs on the nodes whose VM host feature is
 installed, made, started, stopped, snapshotted and removed as `vm` jobs the
-agent runs from its own fixed table (scripts/agent/builderbot_agent/vms.py).
+agent runs from its own fixed table (scripts/agent/aerieos_agent/vms.py).
 
 A VM's record lives here, in /config/vms.json, keyed by "PROJECT/NAME": which
 node, which OS, its size, who made it and what its last job did. What it is

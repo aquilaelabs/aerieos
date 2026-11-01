@@ -77,7 +77,7 @@ Full discussion: [unraid.md](unraid.md#notes-and-gotchas); the threat model, who
 
 The controller can also be installed on a machine of its own, bare metal
 (`nodes/install-controller.sh`, [install.md](install.md#bare-metal)): the
-same files under `/opt/builderbot`, laid out from the Dockerfile's own
+same files under `/opt/aerieos`, laid out from the Dockerfile's own
 `COPY` lines; the same packages, read from one list
 (`config/controller-packages.tsv`) by both; the same boot, whose steps are
 `scripts/lib/boot.sh` for the container's entrypoint and for

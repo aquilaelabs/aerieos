@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 import busy  # noqa: E402
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_busy")
+agent = agentpkg.load("aerieos_agent_busy")
 
 
 def sample(**k):

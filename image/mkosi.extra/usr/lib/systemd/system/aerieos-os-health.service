@@ -1,0 +1,15 @@
+[Unit]
+Description=AerieOS: the slot marked good once the dashboard and the agent are up
+# Only on an AerieOS boot (aerieslot= on the kernel's command line); the
+# controller's own first boot runs first where there is one.
+ConditionKernelCommandLine=aerieslot
+After=network-online.target aerieos-controller.service aerieos-os-firstboot.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/aerieos-os/health
+TimeoutStartSec=12min
+
+[Install]
+WantedBy=multi-user.target

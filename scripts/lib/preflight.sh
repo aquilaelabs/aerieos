@@ -198,7 +198,7 @@ cmd_tests_preflight() {
             printf '  FAIL  unit\n'; rc=1
         fi
     fi
-    [ -x "$here" ] || here=/opt/builderbot/scripts/dashboard/test/run.sh
+    [ -x "$here" ] || here=/opt/aerieos/scripts/dashboard/test/run.sh
     # A gate's verdict is on the change, never on a kept world: its server
     # is the keep's own copy and holds what probes left in it.
     export BB_TEST_FRESH=1

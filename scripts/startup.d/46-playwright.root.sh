@@ -20,7 +20,7 @@
 # as builder, so nothing lands owned by root.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 command -v playwright >/dev/null 2>&1 || exit 0
 BROWSERS="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"

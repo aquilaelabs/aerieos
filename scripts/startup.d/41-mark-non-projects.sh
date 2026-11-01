@@ -20,7 +20,7 @@
 # the UI honors is a suggestion. This is housekeeping, not a boundary.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 MARKER=".bbignore"
 

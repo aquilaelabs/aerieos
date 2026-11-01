@@ -9,7 +9,7 @@ import types
 import unittest
 
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_cache_age")
+agent = agentpkg.load("aerieos_agent_cache_age")
 agent.log = lambda *a, **k: None
 
 

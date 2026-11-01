@@ -1,9 +1,0 @@
-#!/bin/sh
-# What the initramfs carries for AerieOS: losetup, for the slot loaded
-# into RAM (scripts/local-top/builderbot-os-toram), and od to read its size.
-PREREQ=""
-prereqs() { echo "$PREREQ"; }
-case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
-. /usr/share/initramfs-tools/hook-functions
-copy_exec /sbin/losetup /sbin
-copy_exec /usr/bin/od /bin

@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_ctr_stats")
+agent = agentpkg.load("aerieos_agent_ctr_stats")
 
 
 class CtrStats(unittest.TestCase):

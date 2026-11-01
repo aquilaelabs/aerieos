@@ -8,7 +8,7 @@ import unittest
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent_routes")
+agent = agentpkg.load("aerieos_agent_routes")
 agent.log = lambda *a, **k: None
 
 R = [{"to": "10.20.0.0/24", "via": "192.168.1.1"}, {"to": "172.16.5.0/24", "via": "192.168.1.2"}]

@@ -21,7 +21,7 @@ TOOL = os.path.join(ROOT, "tools", "aerieos-stick.py")
 
 
 def load():
-    spec = importlib.util.spec_from_file_location("builderbot_stick", TOOL)
+    spec = importlib.util.spec_from_file_location("aerieos_stick", TOOL)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -235,7 +235,7 @@ class Stick(unittest.TestCase):
         self.assertNotIn("--channel", w, "the channel is not the help's to name")
 
     def stick_with_env(self, at):
-        """An image whose builderbot.env starts `at` bytes in, as lay-disk lays it."""
+        """An image whose aerieos.env starts `at` bytes in, as lay-disk lays it."""
         block = self.m.ENV_MARK + b": KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)\n"
         block += b" " * (self.m.ENV_SIZE - 1 - len(block)) + b"\n"
         raw = os.urandom(at) + block + os.urandom((3 << 20) - at)
@@ -260,7 +260,7 @@ class Stick(unittest.TestCase):
             self.assertEqual(got[:at], raw[:at])
             self.assertEqual(got[at + self.m.ENV_SIZE:], raw[at + self.m.ENV_SIZE:])
             env = got[at:at + self.m.ENV_SIZE].decode()
-            self.assertTrue(env.startswith("# builderbot.env BB-STICK-ENV-1"))
+            self.assertTrue(env.startswith("# aerieos.env AERIE-STICK-ENV-1"))
             self.assertEqual([x for x in env.splitlines() if "=" in x and not x.startswith("#")], ["TZ=Europe/Berlin", "BB_RELEASE_LINE=0.9", "BB_NET_DNS=1.1.1.1,9.9.9.9"])
 
     def test_config_writes_the_prepared_configuration_beside_the_env_file(self):
@@ -288,7 +288,7 @@ class Stick(unittest.TestCase):
         self.assertEqual(got[len(raw):], bytes(whole - len(raw)))
         self.assertIn(b"\nTZ=UTC\n", got[a:a + self.m.ENV_SIZE])
         lines = got[b:b + self.m.BOOT_SIZE].decode().split("\n", 1)
-        self.assertEqual(lines[0], "BB-FIRSTBOOT-1")
+        self.assertEqual(lines[0], "AERIE-FIRSTBOOT-1")
         self.assertEqual(json.loads(lines[1])["machine"]["hostname"], "tower")
         self.assertEqual(got[b + self.m.BOOT_SIZE:len(raw)], raw[b + self.m.BOOT_SIZE:])
         json.dump({"machine": {}}, open(cfg, "w"))

@@ -330,12 +330,12 @@ def _extra_stamp():
 
 
 def _keyops():
-    """The real agent's key work (scripts/agent/builderbot_agent/keyops.py),
+    """The real agent's key work (scripts/agent/aerieos_agent/keyops.py),
     read by path: standard library only, so it runs here as on a node."""
     import importlib.util
     here = os.path.dirname(os.path.abspath(__file__))
     spec = importlib.util.spec_from_file_location(
-        "stub_keyops", os.path.join(here, "..", "..", "agent", "builderbot_agent", "keyops.py"))
+        "stub_keyops", os.path.join(here, "..", "..", "agent", "aerieos_agent", "keyops.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

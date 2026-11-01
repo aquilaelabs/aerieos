@@ -11,7 +11,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_gpu_cache")
+agent = agentpkg.load("aerieos_agent_gpu_cache")
 gpu = agent.module("gpu")
 
 TABLE = """|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |

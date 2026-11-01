@@ -186,8 +186,8 @@ Make the folders it keeps its state in, owned by the user the container
 should run as (`id -u` and `id -g` give yours):
 
 ```bash
-mkdir -p /srv/projects /srv/builderbot/{home,config,sdk}
-chown -R 1000:1000 /srv/projects /srv/builderbot
+mkdir -p /srv/projects /srv/aerieos/{home,config,sdk}
+chown -R 1000:1000 /srv/projects /srv/aerieos
 ```
 
 Then save this as `docker-compose.yml`, changing the paths and the IDs to
@@ -209,9 +209,9 @@ services:
       DASHBOARD_PORT: 7680
     volumes:
       - /srv/projects:/workspace           # your projects: one folder each
-      - /srv/builderbot/sdk:/sdk           # the controller's own toolchains
-      - /srv/builderbot/home:/home/builder # each account's home
-      - /srv/builderbot/config:/config     # accounts, settings, notebooks, logs
+      - /srv/aerieos/sdk:/sdk           # the controller's own toolchains
+      - /srv/aerieos/home:/home/builder # each account's home
+      - /srv/aerieos/config:/config     # accounts, settings, notebooks, logs
       - runner-tokens:/config/runner-tokens
     ports:
       - "7680:7680"
@@ -242,7 +242,7 @@ sudo bash nodes/install-controller.sh --check        # changes nothing
 sudo bash nodes/install-controller.sh --install
 ```
 
-It lays the controller out under `/opt/builderbot`, starts its service and
+It lays the controller out under `/opt/aerieos`, starts its service and
 makes the machine its own node; updates come from the page after that
 ([docs/install.md, Bare metal](docs/install.md#bare-metal)).
 

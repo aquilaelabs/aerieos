@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_tell")
+agent = agentpkg.load("aerieos_agent_tell")
 LINE = ("AerieOS is back after an update. Pick up where you stopped: read the note you "
         "left on where you were and what was next, and carry on.")
 

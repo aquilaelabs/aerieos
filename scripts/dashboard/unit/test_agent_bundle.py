@@ -13,7 +13,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AGENT = os.path.join(HERE, "..", "..", "agent")
-spec = importlib.util.spec_from_file_location("bb_bundle", os.path.join(AGENT, "builderbot_agent", "bundle.py"))
+spec = importlib.util.spec_from_file_location("bb_bundle", os.path.join(AGENT, "aerieos_agent", "bundle.py"))
 bundle = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bundle)
 

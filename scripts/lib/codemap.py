@@ -2563,7 +2563,7 @@ def suites_for(idx, paths):
         elif d["kind"] == "file" and "/" in d["what"].strip("/") \
                 and any(f.startswith(d["what"].strip("/") + "/") for f in files):
             # a directory named whole reaches what is in it: agent.mjs names
-            # scripts/agent/builderbot_agent, the package it loads and runs,
+            # scripts/agent/aerieos_agent, the package it loads and runs,
             # and its modules each read as reached by no suite (9 Oct)
             hits.setdefault(d["file"], set()).add(d["what"] + "/")
     for c in idx["calls"]:

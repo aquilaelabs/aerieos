@@ -5,7 +5,7 @@ import http.client
 import unittest
 
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_ca")
+agent = agentpkg.load("aerieos_agent_ca")
 agent.log = lambda *a, **k: None
 
 

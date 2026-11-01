@@ -13,7 +13,7 @@
 # which reads bashrc and never touches profile.d.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # The store's one standing rule, kept at boot: the android system images
 # shared across platforms (roadmap R19).
@@ -29,7 +29,7 @@ mkdir -p "$ROOT" 2>/dev/null || true
 # it lives in sdk.sh, which common.sh does not pull in, so both are sourced
 # (B82: the hook exited 127 on 'command not found' and the file was never
 # written).
-ENV_FILE="$(run_as_builder bash -c '. /opt/builderbot/scripts/lib/common.sh; . /opt/builderbot/scripts/lib/sdk.sh; sdk_env_file')"
+ENV_FILE="$(run_as_builder bash -c '. /opt/aerieos/scripts/lib/common.sh; . /opt/aerieos/scripts/lib/sdk.sh; sdk_env_file')"
 mkdir -p "$(dirname "$ENV_FILE")" 2>/dev/null || true
 # Written by bb so the file and `aerie toolchains env` can never disagree: one
 # generator, two ways of asking for it.

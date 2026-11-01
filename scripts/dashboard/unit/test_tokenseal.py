@@ -9,7 +9,7 @@ import os
 import unittest
 
 _spec = importlib.util.spec_from_file_location(
-    "tokenseal", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "builderbot_agent", "tokenseal.py"))
+    "tokenseal", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "aerieos_agent", "tokenseal.py"))
 ts = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ts)
 

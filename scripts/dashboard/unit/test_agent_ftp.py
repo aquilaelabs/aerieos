@@ -13,7 +13,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_ftp")
+agent = agentpkg.load("aerieos_agent_ftp")
 agent.log = lambda *a, **k: None
 
 STAND_IN = """#!/usr/bin/env python3

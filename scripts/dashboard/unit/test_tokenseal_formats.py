@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import signing  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
-    "bb_tokenseal_formats", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "builderbot_agent", "tokenseal.py"))
+    "bb_tokenseal_formats", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "aerieos_agent", "tokenseal.py"))
 ts = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ts)
 KEY = bytes(range(32))

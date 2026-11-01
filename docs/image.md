@@ -18,7 +18,7 @@ how it boots, and how it is built. The decisions behind it are in
   (`zfs-dkms` at build time), so the two never part.
 - **The controller staged in**, exactly as a bare-metal install lays it out
   (`nodes/install-controller.sh --stage`, run inside the tree by
-  `image/mkosi.postinst`): the account, `/opt/builderbot`, the env file,
+  `image/mkosi.postinst`): the account, `/opt/aerieos`, the env file,
   `aerie`, the sudo rule and the service, enabled for the first boot. Its
   packages come from the one list the container image and a bare-metal
   install read, `config/controller-packages.tsv`.
@@ -43,7 +43,7 @@ the initramfs, `fstab` and GRUB alike:
 | Partition | Size | What |
 |---|---|---|
 | `bios` | 1 MiB | GRUB's core for a BIOS boot |
-| `esp` | 512 MiB | the ESP: GRUB for UEFI and BIOS, one menu, its environment, each slot's kernel and initrd under `/builderbot/a` and `/builderbot/b` |
+| `esp` | 512 MiB | the ESP: GRUB for UEFI and BIOS, one menu, its environment, each slot's kernel and initrd under `/aerieos/a` and `/aerieos/b` |
 | `bbroot-a` | 4 GiB | root slot A: a squashfs, read-only |
 | `bbroot-b` | 4 GiB | root slot B: empty until an update writes it |
 | `bbdata` | 2 GiB in the image, the rest of the disk when installed | `/var`, and under it the changes to `/etc` |
@@ -56,7 +56,7 @@ from.
 ## On a stick, run from memory
 
 The same disk written to a USB stick is the USB edition's base (R161): with
-`bb_toram=1` in GRUB's environment (`slot ram on`; the stick maker sets
+`aerie_toram=1` in GRUB's environment (`slot ram on`; the stick maker sets
 it) the initramfs copies the slot's squashfs into memory, exactly its
 bytes, and the root is that copy, so the stick is read once at boot and the
 system runs from memory; `/var` and `/etc`'s changes stay
@@ -109,7 +109,7 @@ in its bundle: name their folder first, and they are found where they are.
 
 **The data partition takes the stick's room.** The image's data partition
 is 2 GB; at each boot it is grown to the end of the stick (the filesystem
-with it, while mounted) and never shrunk. `BB_DATA_MAX` in `builderbot.env`
+with it, while mounted) and never shrunk. `BB_DATA_MAX` in `aerieos.env`
 caps it (`64G`, `512M`, `2T`; a bare number is GiB), to leave the rest of a
 big stick unused.
 
@@ -151,7 +151,7 @@ names the removable disks here (the system disk marked, and never written),
 (or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256, checks
 it, says what is on the stick is lost, writes the disk whole and reads it
 back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
-often as needed, writes a line into the stick's `builderbot.env`, the file on
+often as needed, writes a line into the stick's `aerieos.env`, the file on
 the ESP each boot reads: `TZ` (`Europe/Berlin`) and `BB_RELEASE_LINE` (the
 release line updates follow, `0.9`) for the controller, and the stick's
 network settings. `BB_HOSTNAME` names the machine; `BB_NET_ADDRESS`
@@ -168,14 +168,14 @@ another machine it is a plain file to edit, and `verify` takes the same
 
 `--mirror FILE` writes a mirror of the vetted catalog (the archive
 `tools/catalog-mirror.py` makes, up to 64 MiB) into the stick's
-`builderbot/catalog-mirror.bin`, laid and filled the same way. Each boot
+`aerieos/catalog-mirror.bin`, laid and filled the same way. Each boot
 hands it to the controller, which imports it as it starts, once per mirror,
 so a machine with no network installs tool packs from the Library (Tool
 packs' Without the network says how the mirror is used). The stick keeps
 it; it holds nothing secret.
 
 `--config FILE` writes a prepared configuration into the stick's
-`builderbot/firstboot.json` (64 KiB, laid and filled the same way), which the
+`aerieos/firstboot.json` (64 KiB, laid and filled the same way), which the
 first boot applies before anyone signs in. It is a JSON object:
 
 ```json
@@ -190,7 +190,7 @@ first boot applies before anyone signs in. It is a JSON object:
 
 Before the controller starts, the boot sets the hostname and the time zone,
 writes a static address (`"network": "dhcp"` or leaving it out keeps DHCP)
-into the stick's `builderbot.env` as the `BB_NET_` lines above, unless the
+into the stick's `aerieos.env` as the `BB_NET_` lines above, unless the
 stick already names one, hands the rest to the controller and blanks the file on the stick, so the
 password hash is never left there. The controller makes the owner from the
 hash (the dashboard's own scheme, so a tool that writes the file hashes what
@@ -207,7 +207,7 @@ themselves. It runs as root (sudo) on Linux and a
 Mac and as an administrator on Windows, where it locks and dismounts the
 stick's volumes first. A stick made this way boots the appliance with the
 slot loaded into memory and keeps its configuration on the stick's data
-partition. Its network settings are the `BB_NET_` lines in `builderbot.env`;
+partition. Its network settings are the `BB_NET_` lines in `aerieos.env`;
 without them the stick takes DHCP.
 
 ## Its disks at the first run
@@ -256,7 +256,7 @@ booted from left out), asks which one to lay out and says that everything
 on it is lost, asks which features to turn on at the first boot (VM host
 and the hosting firewall on, the IOMMU off), then lays the disk out with
 the very script that made the image (`image/lay-disk`, carried in the
-image at `/usr/lib/builderbot-os/lay-disk`), the data partition grown to
+image at `/usr/lib/aerieos-os/lay-disk`), the data partition grown to
 the disk, and asks for a restart. Nothing else is asked: the first boot
 makes the machine its own node with those features, and the dashboard's
 first page, at `http://ITS-ADDRESS:7680` on the LAN, makes the owner and
@@ -283,12 +283,12 @@ taken up at the next one.
 The root is read-only, with a tmpfs over it (`overlayroot`): anything
 written anywhere in it lives until the next boot. Two places are made to
 last, both on the data partition and both mounted by the initramfs
-(`image/mkosi.extra/etc/initramfs-tools/scripts/init-bottom/builderbot-os`)
+(`image/mkosi.extra/etc/initramfs-tools/scripts/init-bottom/aerieos-os`)
 before the system starts, so PID 1 sees them from its first read:
 
 - **`/var`**, the data partition itself: the controller's state and
   secrets' home, the projects, docker, libvirt, the logs.
-- **`/etc`**, as an overlay whose upper half is `/var/lib/builderbot-os/etc`:
+- **`/etc`**, as an overlay whose upper half is `/var/lib/aerieos-os/etc`:
   an account made, a hostname set, a unit enabled or a share written is kept
   across boots, and every file the next image brings still shows through
   unless a changed copy sits over it.
@@ -297,21 +297,21 @@ Nothing else persists, which is what makes an update a whole image.
 
 ## How it boots
 
-GRUB on the ESP reads its environment (`grubenv`) for `bb_slot`, the slot to
+GRUB on the ESP reads its environment (`grubenv`) for `aerie_slot`, the slot to
 boot, and shows both slots in its menu for three seconds. The slot's kernel
 and initrd are on the ESP; the kernel's command line names the slot's root
-partition by its UUID and the slot by name (`bbslot=a`). The initramfs mounts
+partition by its UUID and the slot by name (`aerieslot=a`). The initramfs mounts
 the squashfs, puts the tmpfs over it, mounts `/var` and `/etc`'s overlay,
 and the system starts.
 
-The first boot of a disk runs `builderbot-os-firstboot.service` once: it
+The first boot of a disk runs `aerieos-os-firstboot.service` once: it
 waits for the controller, which the image's own service started, puts up
 the wall between the controller and the sessions, and enrolls the machine as
 its controller's own node, as a bare-metal install's last step does. From
 there the machine is what [install.md](install.md)'s bare-metal section
 describes, and its page is This machine.
 
-`/usr/lib/builderbot-os/slot` is the slot tool: `current` (the slot this
+`/usr/lib/aerieos-os/slot` is the slot tool: `current` (the slot this
 boot came from), `other`, `next [a|b]` (the one GRUB boots next time, which
 is what an update sets once it has written the other slot) and `status`.
 An updated slot's trial and Safe mode are under [Updating](#updating).
@@ -398,7 +398,7 @@ fingerprint is published on aerieos.org to check the file against.
 
 **On trial.** The slot an update wrote boots on trial: GRUB counts each
 boot of it in its environment, and the health check
-(`builderbot-os-health.service`) marks it good once the controller's health
+(`aerieos-os-health.service`) marks it good once the controller's health
 answer (`/api/v1/healthz`) says it is up, three times running, and the
 node's agent runs. A trial boot that is not healthy
 within ten minutes restarts, a kernel or initramfs that panics restarts
@@ -407,17 +407,17 @@ before at once; a second boot without the health check's word goes back to
 the slot before by itself, and This machine says so until the next update.
 Picking the slot before from the menu during a trial ends the trial there.
 Before an update the controller's configuration is copied to
-`/var/lib/builderbot-os/before/` (the two newest kept). A boot that fell
+`/var/lib/aerieos-os/before/` (the two newest kept). A boot that fell
 back puts that copy back before the controller starts, when the newer slot
 moved the configuration on further than the slot before reads; what it held
-is kept in `/var/lib/builderbot-os/rolled-back-TIME/`. A patch carries no
+is kept in `/var/lib/aerieos-os/rolled-back-TIME/`. A patch carries no
 configuration change, so falling back on one boots the same configuration
 as it is.
 
 **Older versions.** A slot holds a whole AerieOS, its controller and
 agent with it. When an update is about to overwrite the slot not in use, the
 version in it is kept instead of lost, as files under
-`/var/lib/builderbot-os/kept/` with the configuration's copy from when it was
+`/var/lib/aerieos-os/kept/` with the configuration's copy from when it was
 left: about 2 GB each, the three newest by default (Update window's **Older
 versions kept on the boot menu**, 0 for none). Each is an entry under **Older
 versions** on the boot menu and a row on This machine, whose **Boot this next**
@@ -426,7 +426,7 @@ a disk as on a stick. It lasts one boot: the next restart is the version it came
 from, and one that does not come up restarts into it by itself. If the
 configuration has moved on further than that version reads, its copy is used and
 yours is set aside, and comes back when the visit ends; what the visit changed
-is set aside in `/var/lib/builderbot-os/rolled-back-TIME-visit/`. Updates wait
+is set aside in `/var/lib/aerieos-os/rolled-back-TIME-visit/`. Updates wait
 until a visit ends. An image built before this feature cannot boot from files,
 so it is said and not kept. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.

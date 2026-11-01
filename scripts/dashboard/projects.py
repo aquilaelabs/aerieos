@@ -618,7 +618,7 @@ def auth_options(project, dest):
 # root-only helper on stdin and is never seen here again: the helper keeps it
 # under /config/deploy-keys and loads it into the shielded agent, so a
 # session can push with it and never read it, as with the hand-placed keys.
-KEY_HELPER = "/opt/builderbot/scripts/deploy-key"
+KEY_HELPER = "/opt/aerieos/scripts/deploy-key"
 # Where each host takes a deploy key, after https://HOST/OWNER/REPO.
 _KEY_PAGES = {"github": "/settings/keys", "gitea": "/settings/keys", "forgejo": "/settings/keys",
               "codeberg": "/settings/keys", "gitlab": "/-/settings/repository",

@@ -634,7 +634,7 @@ function storageBackups(n){
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : []),
                   ...(n.extmounts || []).filter(m => (n.ext_mounts || []).find(x => x.id === m.id)?.mounted).map(m => [`/mnt/other/${m.name}`, `${m.name} (/mnt/other/${m.name})`]),
-                  ["/var/lib/builderbot-controller", "the controller's state"]];
+                  ["/var/lib/aerieos-controller", "the controller's state"]];
   const rows = recs.map(r => {
     const st = live.find(x => x.id === r.id || x.name === r.name) || {};
     const sch = scheds.find(x => x.backup === r.name);

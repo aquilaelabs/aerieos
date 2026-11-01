@@ -81,7 +81,7 @@ class World:
             with open(self.dev[s], "wb") as f:
                 f.write(b"\0" * 4096)
         self.esp = os.path.join(self.d, "esp")
-        os.makedirs(os.path.join(self.esp, "builderbot", "a"))
+        os.makedirs(os.path.join(self.esp, "aerieos", "a"))
         self.work = os.path.join(self.d, "work")
         self.env = {"BB_OS_RELEASE": self.release, "BB_OS_SLOT": self.tool, "BB_OS_DEV_A": self.dev["a"], "BB_OS_DEV_B": self.dev["b"],
                     "BB_OS_ESP": self.esp, "BB_OS_WORK": self.work, "BB_OS_RELEASE_URL": "file://" + os.path.join(self.d, "rel"),
@@ -123,7 +123,7 @@ class World:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_os")
+        self.agent = agentpkg.load("aerieos_agent_os")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
         av = self.av
 
@@ -193,7 +193,7 @@ class TheAgent(unittest.TestCase):
         with open(w.dev["a"], "rb") as f:
             self.assertEqual(f.read(), b"\0" * 4096, "the running slot is untouched")
         for piece in ("vmlinuz", "initrd", "release"):
-            with open(os.path.join(w.esp, "builderbot", "b", piece), "rb") as f:
+            with open(os.path.join(w.esp, "aerieos", "b", piece), "rb") as f:
                 self.assertEqual(f.read(), files[piece])
         self.assertEqual(open(w.nextf).read().strip(), "b")
         self.assertIn("slot b holds AerieOS 0.9.1", text)

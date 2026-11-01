@@ -16,7 +16,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
-from builderbot_agent import screen, term  # noqa: E402
+from aerieos_agent import screen, term  # noqa: E402
 
 KEY = screen.screen_key("bbn_secret")
 

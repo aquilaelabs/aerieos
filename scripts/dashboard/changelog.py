@@ -876,7 +876,7 @@ def reading(name, component=""):
 def welcome(seen):
     """AerieOS's own changelog, for the welcome panel: the file beside
     this checkout (CHANGELOG.md two levels up, which is
-    /opt/builderbot/CHANGELOG.md in the image and the repository's under aerie
+    /opt/aerieos/CHANGELOG.md in the image and the repository's under aerie
     dashboard dev), and where this account last looked (`seen`, the image
     commit it acknowledged), so the panel can draw a line under what is new
     since."""

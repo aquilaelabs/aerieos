@@ -150,7 +150,7 @@ them under their key and accept that this work waits for their unlock.
 ## Memory and process
 
 The dashboard and the node agent each do three things about the keys they
-hold (R158 step 6, `hardening.py` and `builderbot_agent.base.harden`): no
+hold (R158 step 6, `hardening.py` and `aerieos_agent.base.harden`): no
 core dump (the core limit is zero and the process is not dumpable, which
 also keeps another process of the same user from reading its memory
 through ptrace or `/proc/PID/mem`), no swap (the process locks its pages

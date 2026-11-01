@@ -17,7 +17,7 @@
 #
 set -euo pipefail
 # Beside this script rather than by absolute path. In the image the two are the
-# same file (this lives at /opt/builderbot/scripts/dashboard/bb-tty), and out
+# same file (this lives at /opt/aerieos/scripts/dashboard/bb-tty), and out
 # of it, the checkout's copy runs from the checkout, which is what lets the
 # dashboard suite drive this script at all.
 . "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
@@ -446,7 +446,7 @@ SESSION_BIN="${BB_SESSION_BIN:-/usr/local/sbin/bb-session}"
 # What only a controller installed bare metal leaves on a machine (R90, the
 # same as bb-session's CONTROLLER_MARKS): where one is, a session runs in
 # its view or not at all.
-CONTROLLER_MARKS=(/etc/bb-session.wall /etc/builderbot-controller /var/lib/builderbot-controller)
+CONTROLLER_MARKS=(/etc/bb-session.wall /etc/aerieos-controller /var/lib/aerieos-controller)
 
 # isolating - whether this node builds a session's view. Asked of the helper
 # through sudo, so it answers from what root set up and from nothing a
@@ -697,7 +697,7 @@ session_token() {
     # the safe direction: bb then says it has no credential rather than
     # reaching for anybody else's.
     if on_node; then printf '%s' "${BB_TOKEN:-}"; return 0; fi
-    local py="/opt/builderbot/scripts/dashboard/users.py"
+    local py="/opt/aerieos/scripts/dashboard/users.py"
     [ -f "$py" ] || py="$(dirname "$(readlink -f "$0")")/users.py"
     [ -f "$py" ] || return 0
     # Minted for the ACCOUNT as well as the project, the shape the controller

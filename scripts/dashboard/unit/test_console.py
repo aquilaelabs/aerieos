@@ -10,7 +10,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-console = agentpkg.load("builderbot_agent_console").module("console")
+console = agentpkg.load("aerieos_agent_console").module("console")
 H = "$6$abcdefgh$" + "A" * 86
 
 

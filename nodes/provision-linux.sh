@@ -535,7 +535,7 @@ in_container() {
 }
 if [ "${BB_PROVISION_LIB:-0}" != 1 ] && in_container; then
     warn "this is a container, and this script provisions a VM."
-    if [ -d /opt/builderbot ]; then
+    if [ -d /opt/aerieos ]; then
         printf '   You are inside AerieOS. It is the thing that TALKS to the\n'
         printf '   sandbox; the sandbox is the separate machine AerieOS lists as a node.\n'
         printf '   Run this in a console on that VM, not in here.\n\n'

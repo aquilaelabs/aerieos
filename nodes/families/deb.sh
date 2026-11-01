@@ -36,7 +36,7 @@ apt_waiting() {
 # pinned when it was built, and its root forgets at the next boot: nothing is
 # fetched, and a package the provisioner needs that the image lacks is a
 # build of the image to fix, said here by name.
-on_os_image() { [ -r "${BB_OS_RELEASE:-/usr/lib/builderbot-os/release}" ]; }
+on_os_image() { [ -r "${BB_OS_RELEASE:-/usr/lib/aerieos-os/release}" ]; }
 pkg_refresh() {
     on_os_image && return 0
     export DEBIAN_FRONTEND=noninteractive; apt_waiting apt-get update -qq

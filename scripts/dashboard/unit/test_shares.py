@@ -49,7 +49,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_shares")
+        self.agent = agentpkg.load("aerieos_agent_shares")
         self.sm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".shares"]
         self.d = tempfile.mkdtemp()
         self.smb = os.path.join(self.d, "samba", "builderbot.conf")

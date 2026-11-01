@@ -9,7 +9,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_packconfig")
+agent = agentpkg.load("aerieos_agent_packconfig")
 agent.log = lambda *a, **k: None
 
 

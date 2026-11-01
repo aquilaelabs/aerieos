@@ -12,7 +12,7 @@ import agentpkg  # noqa: E402
 
 class Knock(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_move")
+        self.agent = agentpkg.load("aerieos_agent_move")
         self.mod = sys.modules[self.agent.Agent.__module__]
         self.saved = []
         self.mod.save_state = lambda st: self.saved.append(dict(st))

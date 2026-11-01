@@ -36,7 +36,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_array")
+        self.agent = agentpkg.load("aerieos_agent_array")
         self.am = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".array"]
         self.d = tempfile.mkdtemp()
         self.env = {"BB_ARRAY_RECORD": os.path.join(self.d, "array.json"), "BB_ARRAY_STATE": os.path.join(self.d, "state.json"),

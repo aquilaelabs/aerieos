@@ -32,7 +32,7 @@ class TheRecord(unittest.TestCase):
         self.assertEqual((r["source"], r["dest"], r["keep"], r["on"]), ("/mnt/tank/media", "/mnt/other/usb", 5, True))
         self.assertEqual(storebackups.wanted(), [{"id": r["id"], "name": "media", "source": "/mnt/tank/media", "dest": "/mnt/other/usb", "keep": 5}])
         self.assertIn("taken", storebackups.set_backup({"name": "media", "source": "/mnt/a", "dest": "/mnt/b"})["error"])
-        storebackups.set_backup({"name": "state", "source": "/var/lib/builderbot-controller", "dest": "/mnt/array/backups"})
+        storebackups.set_backup({"name": "state", "source": "/var/lib/aerieos-controller", "dest": "/mnt/array/backups"})
         now = 1_700_000_000
         sm = storebackups.summary([{"name": "media", "ok": True, "last_at": now - 3600}, {"name": "state", "ok": False, "last_at": now - 100, "error": "rsync exit 23"}],
                                   scheduled_names={"media", "state"}, now=now)
@@ -45,7 +45,7 @@ class TheRecord(unittest.TestCase):
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_backups")
+        self.agent = agentpkg.load("aerieos_agent_backups")
         self.bm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".backups"]
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)

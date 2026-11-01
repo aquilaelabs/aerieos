@@ -58,7 +58,7 @@ def configure(*, run, write_json, state, project_nodes=None, workspace=None):
 
 
 # The catalog lives beside the code rather than in it: config/toolchains.json,
-# which ships to /opt/builderbot/config/ and so sits at the same place relative
+# which ships to /opt/aerieos/config/ and so sits at the same place relative
 # to this file in the image and in a checkout.
 #
 # Adding a toolchain is an entry there and nothing else, as long as it fits one
@@ -282,7 +282,7 @@ _tc_job = {"running": False, "queue": [], "current": "", "action": "",
 _sdk_root_cache = []
 
 
-# The bb that ships with this server.py: /opt/builderbot/scripts/aerie in the
+# The bb that ships with this server.py: /opt/aerieos/scripts/aerie in the
 # image, the checkout's copy under `aerie dashboard dev`. Same relative position
 # either way, and it keeps the pair in step: a page offering a subcommand
 # the bb beside it does not have would be a button that cannot work.

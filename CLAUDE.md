@@ -8,7 +8,7 @@ CONTRIBUTING.md and docs/decisions.md.
 ## About this project
 
 This repository **is** AerieOS: the source of the container the
-controller runs in. `scripts/` becomes `/opt/builderbot/scripts`,
+controller runs in. `scripts/` becomes `/opt/aerieos/scripts`,
 `config/templates/briefing.md` is the briefing every session on every
 project is handed, and the Dockerfile is the whole product. There is no
 application here; the deliverable is the environment.
@@ -105,7 +105,7 @@ ref and nowhere else; `aerie ci-log` reads a run's output.
 ## Layout and conventions
 
 - **The agent's compatibility window.** `AGENT_VERSION` in
-  `scripts/agent/builderbot_agent/__init__.py` is `WINDOW.BUILD`: inside a
+  `scripts/agent/aerieos_agent/__init__.py` is `WINDOW.BUILD`: inside a
   window nothing is held; across one the controller ends the sessions on a
   project whose node's agent is from the old window until it is updated
   (`server.compat_holds`). BUILD never resets; the minor moves only for a
@@ -143,7 +143,7 @@ ref and nowhere else; `aerie ci-log` reads a run's output.
   `bb-tty` validates its one URL argument against directories that exist.
   The terminal, at `/termws`, is there for anything else.
 - **A setting that has to be in the environment lands in five places:**
-  `.env.example`, `docker-compose.yml`, `platforms/unraid/builderbot.xml`,
+  `.env.example`, `docker-compose.yml`, `platforms/unraid/aerie-workshop.xml`,
   `docs/reference.md`, and `docs/unraid.md` when it needs host-side setup.
 - **The briefing** is `config/templates/briefing.md`, assembled per session
   by `preamble.py` with the project's rules, roadmap and bugs: the core

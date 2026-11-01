@@ -16,10 +16,10 @@
 # and everything else in here works without it.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
-PROBE=/opt/builderbot/scripts/lib/docker-probe.py
-DEVAPP=/opt/builderbot/scripts/dashboard/devapp.py
+PROBE=/opt/aerieos/scripts/lib/docker-probe.py
+DEVAPP=/opt/aerieos/scripts/dashboard/devapp.py
 [ -f "$PROBE" ] && [ -f "$DEVAPP" ] || exit 0
 
 # Bounded: available() gives its `docker version` ten seconds, and reaching the

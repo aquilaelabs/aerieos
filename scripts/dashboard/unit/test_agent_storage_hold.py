@@ -11,7 +11,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_storage_hold")
+agent = agentpkg.load("aerieos_agent_storage_hold")
 agent.log = lambda *a, **k: None
 agent.mounts_now = lambda: []
 

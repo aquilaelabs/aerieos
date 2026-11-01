@@ -39,7 +39,7 @@ def ts():
     """tokenseal.py, the agent's own, loaded by path once."""
     if "mod" not in _ts:
         spec = importlib.util.spec_from_file_location(
-            "bb_tokenseal", os.path.join(str(AGENT_DIR), "builderbot_agent", "tokenseal.py"))
+            "bb_tokenseal", os.path.join(str(AGENT_DIR), "aerieos_agent", "tokenseal.py"))
         if spec is None or spec.loader is None:
             raise ImportError("no tokenseal.py beside the agent")
         mod = importlib.util.module_from_spec(spec)

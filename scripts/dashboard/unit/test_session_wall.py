@@ -55,13 +55,13 @@ class TheFile(unittest.TestCase):
     def test_read_as_written(self):
         with tempfile.TemporaryDirectory() as d:
             p = wall_file(d, "# a comment\nACCOUNT=builderbot\nJOBS_USER=bb\n"
-                             "COVER=/var/lib/builderbot-controller:/etc/builderbot-controller/:/x/../y:rel\n"
+                             "COVER=/var/lib/aerieos-controller:/etc/aerieos-controller/:/x/../y:rel\n"
                              "PORTS=7681,7682\n")
             with mock.patch.dict(os.environ, {"BB_SESSION_WALL": p}):
                 w = session.wall_conf()
         self.assertEqual(w["ACCOUNT"], "builderbot")
         self.assertEqual(w["JOBS_USER"], "bb")
-        self.assertEqual(w["COVER"], ["/var/lib/builderbot-controller", "/etc/builderbot-controller"])
+        self.assertEqual(w["COVER"], ["/var/lib/aerieos-controller", "/etc/aerieos-controller"])
         self.assertEqual(w["PORTS"], [7681, 7682])
 
     def test_one_naming_nothing_is_refused(self):

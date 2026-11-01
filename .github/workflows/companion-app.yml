@@ -91,12 +91,12 @@ jobs:
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
           python -m PyInstaller --noconfirm --onefile --windowed --name "aerieos-companion-$v" \
             --paths apps/windows --paths scripts/agent \
-            --hidden-import builderbot_agent.wssync --hidden-import builderbot_agent.controller \
+            --hidden-import aerieos_agent.wssync --hidden-import aerieos_agent.controller \
             --add-data "apps/windows/bbcompanion/VERSION;bbcompanion" \
             --distpath dist "$RUNNER_TEMP/companion.py"
           # An entry point PyInstaller could not find still builds, into an
           # .exe that stops at start (B572): its warnings file says so.
-          if grep -E "missing module named '?(bbcompanion|builderbot_agent)" "build/aerieos-companion-$v/warn-aerieos-companion-$v.txt"; then
+          if grep -E "missing module named '?(bbcompanion|aerieos_agent)" "build/aerieos-companion-$v/warn-aerieos-companion-$v.txt"; then
             echo "the companion's own package was left out of the .exe"; exit 1
           fi
           echo "EXE=dist/aerieos-companion-$v.exe" >> "$GITHUB_ENV"

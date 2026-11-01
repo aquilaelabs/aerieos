@@ -243,7 +243,7 @@ function updatesSection(){
       <div class="sub dim">${how}</div>
       ${channel}
       ${host}
-      ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/builderbot-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
+      ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/aerieos-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
       <div class="actbar"><span class="sp"></span>
         <button type="button" data-relcheck>Check for updates</button>
         ${os ? `<button type="button" data-osfrom="${esc(r.node || "")}"${r.node ? "" : " disabled"}>Update from the folder</button>` : ""}

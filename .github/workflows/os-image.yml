@@ -96,7 +96,7 @@ jobs:
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
       - uses: actions/upload-artifact@v4
         with:
-          name: builderbot-os
+          name: aerieos-os
           path: |
             out/aerieos-os-*
             out/packages-moved.diff
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
-          name: builderbot-os
+          name: aerieos-os
           path: out
       - name: QEMU
         shell: bash
@@ -130,7 +130,7 @@ jobs:
           set -euo pipefail
           qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
           # A copy of the disk with the console on the serial line and the
-          # initramfs tracing each step to it (bb_args
+          # initramfs tracing each step to it (aerie_args
           # in the ESP's grubenv, which the menu adds to the kernel line), so
           # what the initramfs and systemd say reaches serial.log; the disk
           # as shipped writes them to the screen.
@@ -139,7 +139,7 @@ jobs:
           esp="$(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start')"
           at="$disk@@$((esp * 512))"
           mcopy -n -i "$at" ::/grub/grubenv grubenv
-          grub-editenv grubenv set bb_args="console=ttyS0,115200 debug=vc loglevel=7"
+          grub-editenv grubenv set aerie_args="console=ttyS0,115200 debug=vc loglevel=7"
           mcopy -o -i "$at" grubenv ::/grub/grubenv
           grub-editenv grubenv list
           kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
@@ -208,12 +208,12 @@ jobs:
             local disk="$1" at; shift
             at="$disk@@$(( $(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
             mcopy -n -i "$at" ::/grub/grubenv grubenv
-            grub-editenv grubenv set "$@" bb_args="console=ttyS0,115200 loglevel=6"
+            grub-editenv grubenv set "$@" aerie_args="console=ttyS0,115200 loglevel=6"
             mcopy -o -i "$at" grubenv ::/grub/grubenv
           }
           qemu-img convert -O raw "$qcow" stick.raw
-          env_set stick.raw bb_toram=1
-          boot stick.raw serial-stick.log "bbtoram=1"
+          env_set stick.raw aerie_toram=1
+          boot stick.raw serial-stick.log "aerietoram=1"
           rm -f stick.raw
           qemu-img convert -O raw "$qcow" kept.raw
           # Room on the data partition for a root, as a stick's first boot
@@ -227,23 +227,23 @@ jobs:
           sudo mkdir -p /mnt/bbdata /mnt/bbesp
           sudo mount "${loop}p5" /mnt/bbdata
           sudo mount "${loop}p2" /mnt/bbesp
-          k=/mnt/bbdata/lib/builderbot-os/kept/kept-test
+          k=/mnt/bbdata/lib/aerieos-os/kept/kept-test
           sudo mkdir -p "$k"
           sudo cp "out/$name.root.squashfs" "$k/root.squashfs"
           sudo cp "out/$name.vmlinuz" "$k/vmlinuz"
           sudo cp "out/$name.initrd" "$k/initrd"
           sudo cp "out/$name.release" "$k/release"
-          sudo env BB_OS_WORK=/mnt/bbdata/lib/builderbot-os BB_OS_ESP=/mnt/bbesp PYTHONPATH=scripts/agent \
-            python3 -c 'from builderbot_agent.osimage import write_kept_menu, kept_list; assert [r["version"] for r in kept_list()] == ["kept-test"]; write_kept_menu()'
+          sudo env BB_OS_WORK=/mnt/bbdata/lib/aerieos-os BB_OS_ESP=/mnt/bbesp PYTHONPATH=scripts/agent \
+            python3 -c 'from aerieos_agent.osimage import write_kept_menu, kept_list; assert [r["version"] for r in kept_list()] == ["kept-test"]; write_kept_menu()'
           sudo cat /mnt/bbesp/grub/kept.cfg
           sudo umount /mnt/bbdata /mnt/bbesp
           sudo losetup -d "$loop"
-          env_set kept.raw bb_kept_next=kept-test
-          boot kept.raw serial-kept.log "bbkept=kept-test"
+          env_set kept.raw aerie_kept_next=kept-test
+          boot kept.raw serial-kept.log "aeriekept=kept-test"
           echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: builderbot-os-boot
+          name: aerieos-os-boot
           path: serial*.log
           if-no-files-found: ignore

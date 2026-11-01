@@ -1,7 +1,7 @@
 # Contributing
 
 AerieOS is the source of the container it runs in: `scripts/` becomes
-`/opt/builderbot/scripts`, `config/templates/` ships the briefing every
+`/opt/aerieos/scripts`, `config/templates/` ships the briefing every
 session is handed, and the Dockerfile is the whole product. That decides
 the shape of a change: nothing you edit here is live until CI builds a new
 image and the box updates to it, so the loop is edit, prove on the checkout,
@@ -22,7 +22,7 @@ notebook verbs do not, since they relay to a controller.
   it back), so a dashboard change is looked at in a browser without an
   image build.
 - `bash scripts/aerie <verb>` runs the checkout's `aerie` rather than the image's;
-  the installed one on your PATH is `/opt/builderbot/scripts/aerie`.
+  the installed one on your PATH is `/opt/aerieos/scripts/aerie`.
 - `aerie capture shot URL FILE` pictures a page at rest; `aerie capture reel`
   shows what changed over time. Both are how a change is shown to somebody
   who was not watching.

@@ -67,4 +67,4 @@ The `.exe`, the `.pyz` and the VS Code extension's `.vsix` are built by the
 `companion app` workflow on a published release (or by hand for one), and
 attached to the release with their sha256, for each controller on that
 version to fetch and offer. It uses the node agent's
-own sync (`scripts/agent/builderbot_agent/wssync.py`), not a copy of it.
+own sync (`scripts/agent/aerieos_agent/wssync.py`), not a copy of it.

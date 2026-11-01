@@ -55,7 +55,7 @@ decisions.md under *The notebook*.
 
 A node is a machine enrolled to run work: builds, tests, the emulator, a
 project's containers, and the agents' sessions themselves. It runs the
-agent, `scripts/agent/` (the `builderbot_agent` package and its entry,
+agent, `scripts/agent/` (the `aerieos_agent` package and its entry,
 shipped as one zip that python runs as it would a script), which dials into the controller
 (`channel.py` on that side: enroll, hello, work, result) and needs no port
 of its own; the controller keeps the registry and the job queue in

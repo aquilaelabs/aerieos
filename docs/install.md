@@ -78,7 +78,7 @@ just see them.
 ### 3. Install the container
 
 **Docker template (recommended)**: get
-[`platforms/unraid/builderbot.xml`](../platforms/unraid/builderbot.xml) into
+[`platforms/unraid/aerie-workshop.xml`](../platforms/unraid/aerie-workshop.xml) into
 `/boot/config/plugins/dockerMan/templates-user/`, then **Docker → Add
 Container →** pick *builderbot*. From the host's terminal that is one
 `curl` of the raw file, in [docs/unraid.md](unraid.md#install).
@@ -249,7 +249,7 @@ it.
 
 The same controller can be installed on a Linux machine of its own, without
 the container: the same dashboard, state, `aerie` and updates, laid out under
-`/opt/builderbot` the way the image lays it out, run by the machine's own
+`/opt/aerieos` the way the image lays it out, run by the machine's own
 service manager (systemd, OpenRC or runit) with an env file in place of
 compose's. It is for a machine that is only AerieOS, a small server or
 a NAS, and it can use that machine as one of its own nodes, so one box runs
@@ -272,9 +272,9 @@ sudo bash nodes/install-controller.sh --install
 It installs the packages the image carries (`config/controller-packages.tsv`,
 one list for both), makes an account for the controller (`builderbot`, no
 password, no sudo but the image's two root helpers), lays the release out,
-writes `/etc/builderbot-controller/controller.env` (yours to edit; every
+writes `/etc/aerieos-controller/controller.env` (yours to edit; every
 setting is in [reference.md](reference.md#a-controller-installed-bare-metal-its-env-file)),
-starts `builderbot-controller`, and then makes this machine a node of
+starts `aerieos-controller`, and then makes this machine a node of
 itself. Open `http://ADDRESS:7680` and make the owner account, as on a
 container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
@@ -283,7 +283,7 @@ there for more, and none is needed. `sudo bb ...` is the container's `docker exe
 AerieOS bb ...`.
 
 Options worth knowing: `--workspace PATH` (the projects folder, by default
-`/srv/builderbot/projects`), `--port N`, `--no-node` (the controller alone),
+`/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),
 `--docker` (the controller's account in the docker group, the bare-metal
 form of mounting the docker socket into the container: containers can then
 run on this machine's daemon from the controller; docker is root here).
@@ -304,8 +304,8 @@ controller). The reasons and the threat model are in
 **Updating** is the image pull's equivalent:
 
 ```bash
-sudo bash /opt/builderbot/nodes/install-controller.sh --update                 # the newest release
-sudo bash /opt/builderbot/nodes/install-controller.sh --update --release v0.7.0
+sudo bash /opt/aerieos/nodes/install-controller.sh --update                 # the newest release
+sudo bash /opt/aerieos/nodes/install-controller.sh --update --release v0.7.0
 ```
 
 An update fetches the release's controller bundle

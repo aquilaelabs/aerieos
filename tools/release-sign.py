@@ -28,8 +28,8 @@ from typing import NoReturn
 
 REPO = "aquilaelabs/aerieos"
 API = f"https://api.github.com/repos/{REPO}"
-NS = "builderbot-release"
-DEFAULT_KEY = os.path.join(os.path.expanduser("~"), ".builderbot-release", "key")
+NS = "aerieos-release"
+DEFAULT_KEY = os.path.join(os.path.expanduser("~"), ".aerieos-release", "key")
 
 
 def die(s) -> NoReturn:
@@ -50,7 +50,7 @@ def token():
 
 
 def get(url, raw=False):
-    req = urllib.request.Request(url, headers={"User-Agent": "builderbot-release-sign",
+    req = urllib.request.Request(url, headers={"User-Agent": "aerieos-release-sign",
                                                "Accept": "application/octet-stream" if raw else "application/vnd.github+json"})
     t = token()
     if t:

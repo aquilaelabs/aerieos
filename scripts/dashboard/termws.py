@@ -43,7 +43,7 @@ def term():
     """The node agent's term.py, loaded once by path: stdlib alone."""
     if "mod" not in _term:
         spec = importlib.util.spec_from_file_location(
-            "bb_agent_term", os.path.join(str(AGENT_DIR), "builderbot_agent", "term.py"))
+            "bb_agent_term", os.path.join(str(AGENT_DIR), "aerieos_agent", "term.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         _term["mod"] = mod

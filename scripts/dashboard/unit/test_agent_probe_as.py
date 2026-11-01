@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "agent"))
-from builderbot_agent import base  # noqa: E402
+from aerieos_agent import base  # noqa: E402
 
 
 def st(uid, mode):

@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DASH = os.path.join(HERE, "..")
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 EXTRA = os.path.join(ROOT, "image", "mkosi.extra")
-TOOL = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "system-pool")
+TOOL = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "system-pool")
 sys.path.insert(0, DASH)
 import agentpkg  # noqa: E402
 
@@ -36,24 +36,24 @@ class Job:
 
 class TheImage(unittest.TestCase):
     def test_a_stick_boot_alone_keeps_the_logs_in_memory_and_holds_docker(self):
-        s = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "builderbot-os")
+        s = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
         block = s[s.index('if [ "$stick" = 1 ]; then'):]
-        self.assertIn("bbtoram=1) stick=1", s)
+        self.assertIn("aerietoram=1) stick=1", s)
         self.assertIn("commit=60", block)
         self.assertIn('tmpfs "${rootmnt}/var/log"', block)
         self.assertIn("Storage=volatile", block)
-        self.assertIn("ConditionPathExists=/run/builderbot-os/system-pool-ready", block)
+        self.assertIn("ConditionPathExists=/run/aerieos-os/system-pool-ready", block)
         self.assertIn('"${rootmnt}/usr/lib/systemd', block, "written into the root's tmpfs: this boot alone")
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-system-pool.service")
-        self.assertIn("ConditionKernelCommandLine=bbtoram=1", unit)
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-system-pool.service")
+        self.assertIn("ConditionKernelCommandLine=aerietoram=1", unit)
         self.assertIn("Before=containerd.service docker.service libvirtd.service", unit)
         self.assertIn("Restart=on-failure", unit)
-        self.assertIn("builderbot-os-system-pool.service", read(ROOT, "image", "mkosi.postinst"))
+        self.assertIn("aerieos-os-system-pool.service", read(ROOT, "image", "mkosi.postinst"))
         self.assertTrue(os.access(TOOL, os.X_OK))
 
     def tool(self, d, *argv, stick=True):
         with open(os.path.join(d, "cmd"), "w") as f:
-            f.write("bbslot=a bbtoram=1\n" if stick else "bbslot=a\n")
+            f.write("aerieslot=a aerietoram=1\n" if stick else "aerieslot=a\n")
         with open(os.path.join(d, "env"), "w") as f:
             f.write(f"SDK_ROOT={d}/sdk\nWORKSPACE={d}/ws\n")
         env = dict(os.environ, BB_OS_WORK=f"{d}/work", BB_OS_RUN=f"{d}/run", BB_CMDLINE=f"{d}/cmd", BB_CONTROLLER_ENV=f"{d}/env",
@@ -122,7 +122,7 @@ class TheImage(unittest.TestCase):
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_stick")
+        self.agent = agentpkg.load("aerieos_agent_stick")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
 
     def test_the_census_reads_the_tool(self):
@@ -161,7 +161,7 @@ class TheAgent(unittest.TestCase):
 
 class TheAgentsProjectsFolder(unittest.TestCase):
     def test_the_job_names_the_folder_and_the_projects_or_lets_it_go(self):
-        av = sys.modules[agentpkg.load("builderbot_agent_stick2").Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
+        av = sys.modules[agentpkg.load("aerieos_agent_stick2").Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
 
         class A(av.OsImageMixin):
             def _sh(self, job, argv, **kw):

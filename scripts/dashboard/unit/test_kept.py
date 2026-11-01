@@ -17,8 +17,8 @@ import agentpkg  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 EXTRA = os.path.join(ROOT, "image", "mkosi.extra")
-OS = os.path.join(EXTRA, "usr", "lib", "builderbot-os")
-agent = agentpkg.load("builderbot_agent_kept")
+OS = os.path.join(EXTRA, "usr", "lib", "aerieos-os")
+agent = agentpkg.load("aerieos_agent_kept")
 av = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
 
 
@@ -41,7 +41,7 @@ class World:
         self.env = {"BB_OS_WORK": os.path.join(d, "work"), "BB_OS_ESP": os.path.join(d, "esp"), "BB_CMDLINE": os.path.join(d, "cmdline")}
         os.makedirs(os.path.join(d, "esp", "grub"))
         os.makedirs(os.path.join(d, "work"))
-        open(self.env["BB_CMDLINE"], "w").write("bbslot=a\n")
+        open(self.env["BB_CMDLINE"], "w").write("aerieslot=a\n")
 
     def slot(self, ver, boots=True, state=False):
         """A slot holding `ver`: the partition's file and its kernel's folder."""
@@ -80,8 +80,8 @@ class Keeping(unittest.TestCase):
         d = os.path.join(av.kept_dir(), "0.9.1")
         self.assertEqual(os.path.getsize(os.path.join(d, "root.squashfs")), 4096, "the squashfs's own bytes, not the partition's")
         menu = read(self.w.env["BB_OS_ESP"], "grub", "kept.cfg")
-        for word in ('submenu "Older versions" --id older', "--id kept-0.9.1", "bbkept=0.9.1", ",gpt5)", "/lib/builderbot-os/kept/0.9.1/vmlinuz",
-                     "root=/dev/loop0", "panic=15", "export bb_data"):
+        for word in ('submenu "Older versions" --id older', "--id kept-0.9.1", "aeriekept=0.9.1", ",gpt5)", "/lib/aerieos-os/kept/0.9.1/vmlinuz",
+                     "root=/dev/loop0", "panic=15", "export aerie_data"):
             self.assertIn(word, menu)
 
     def test_the_oldest_goes_first_and_none_is_none(self):
@@ -131,10 +131,10 @@ class Keeping(unittest.TestCase):
             self.assertEqual(A.ran[-1][-2:], ["kept-next", "0.9.1"])
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "next", "version": "../../etc"}), ("failed", 64))
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "other", "version": "0.9.1"}), ("failed", 64))
-            open(self.w.env["BB_CMDLINE"], "w").write("bbslot=a bbkept=0.9.1\n")
+            open(self.w.env["BB_CMDLINE"], "w").write("aerieslot=a aeriekept=0.9.1\n")
             self.assertEqual(av.kept_boot(), "0.9.1")
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "remove", "version": "0.9.1"}), ("failed", 65), "not the one running")
-            open(self.w.env["BB_CMDLINE"], "w").write("bbslot=a\n")
+            open(self.w.env["BB_CMDLINE"], "w").write("aerieslot=a\n")
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "remove", "version": "0.9.1"}), ("succeeded", 0))
             self.assertEqual(A.ran[-1][-1], "kept-next", "and no boot of it stays named")
         self.assertEqual(av.kept_list(), [])
@@ -143,27 +143,27 @@ class Keeping(unittest.TestCase):
 class TheBoot(unittest.TestCase):
     def test_the_menu_and_the_initramfs_know_a_kept_version(self):
         g = read(ROOT, "image", "grub.cfg")
-        self.assertIn('set default="older>kept-${bb_kept_next}"', g)
-        self.assertIn("save_env bb_kept_next", g, "the word is spent, so it is one boot")
+        self.assertIn('set default="older>kept-${aerie_kept_next}"', g)
+        self.assertIn("save_env aerie_kept_next", g, "the word is spent, so it is one boot")
         self.assertIn("source $prefix/kept.cfg", g)
-        init = read(EXTRA, "etc", "initramfs-tools", "scripts", "local-top", "builderbot-os-toram")
-        self.assertIn("bbkept=*", init)
-        self.assertIn("/run/bbdata/lib/builderbot-os/kept/$kept/root.squashfs", init)
+        init = read(EXTRA, "etc", "initramfs-tools", "scripts", "local-top", "aerieos-os-toram")
+        self.assertIn("aeriekept=*", init)
+        self.assertIn("/run/bbdata/lib/aerieos-os/kept/$kept/root.squashfs", init)
         self.assertIn("umount /run/bbdata", init, "free for init-bottom to mount read-write")
         self.assertIn("BUILDERBOT_OS_BOOTS_KEPT=1", read(ROOT, "image", "build.sh"))
-        self.assertIn("boot-menu", read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-restore.service"))
+        self.assertIn("boot-menu", read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-restore.service"))
 
     def test_the_boot_menu_follows_the_image_but_not_on_a_visit(self):
         with tempfile.TemporaryDirectory() as d:
             os.makedirs(os.path.join(d, "grub"))
             open(os.path.join(d, "grub", "grub.cfg"), "w").write("old")
             open(os.path.join(d, "new"), "w").write("new")
-            open(os.path.join(d, "cmd"), "w").write("bbslot=a bbkept=0.9.1\n")
+            open(os.path.join(d, "cmd"), "w").write("aerieslot=a aeriekept=0.9.1\n")
             env = dict(os.environ, BB_ESP=d, BB_OS_GRUBCFG=os.path.join(d, "new"), BB_CMDLINE=os.path.join(d, "cmd"))
             tool = os.path.join(OS, "boot-menu")
             subprocess.run(["bash", tool], env=env, check=True)
             self.assertEqual(read(d, "grub", "grub.cfg"), "old")
-            open(os.path.join(d, "cmd"), "w").write("bbslot=a\n")
+            open(os.path.join(d, "cmd"), "w").write("aerieslot=a\n")
             subprocess.run(["bash", tool], env=env, check=True)
             self.assertEqual(read(d, "grub", "grub.cfg"), "new")
 
@@ -188,12 +188,12 @@ class TheBoot(unittest.TestCase):
             cmd = os.path.join(d, "cmd")
             env = dict(os.environ, BB_OS_SLOT=slot, BB_OS_WORK=os.path.join(d, "work"), BB_OS_STATE=state, BB_OS_OPT=opt, BB_OS_RELEASE=rel, BB_CMDLINE=cmd)
             tool = os.path.join(OS, "restore-before")
-            open(cmd, "w").write("bbslot=a bbkept=0.9.1\n")
+            open(cmd, "w").write("aerieslot=a aeriekept=0.9.1\n")
             r = subprocess.run(["bash", tool], env=env, capture_output=True, text=True, check=False)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(read(state, "state.json"), "its", r.stdout)
             open(os.path.join(state, "state.json"), "w").write("its, changed on the visit")
-            open(cmd, "w").write("bbslot=a\n")
+            open(cmd, "w").write("aerieslot=a\n")
             r = subprocess.run(["bash", tool], env=env, capture_output=True, text=True, check=False)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(read(state, "state.json"), "yours", r.stdout)

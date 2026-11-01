@@ -479,7 +479,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: builderbot-os
+          name: aerieos-os
           path: out
       # Two files go on the release, the ISO and the USB stick's image, each
       # with its sha256 (the operator, 30 Oct): an update takes the slot, its

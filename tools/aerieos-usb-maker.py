@@ -44,7 +44,7 @@ def load(name, file):
     return mod
 
 
-stick = load("builderbot_stick", "aerieos-stick.py")
+stick = load("aerieos_stick", "aerieos-stick.py")
 
 if sys.platform == "win32":
     # A windowed .exe has no console: every PowerShell the stick maker asks
@@ -73,7 +73,7 @@ def releases():
 
 
 def settings_lines(s):
-    """The stick's builderbot.env lines from the settings page's fields: the
+    """The stick's aerieos.env lines from the settings page's fields: the
     dev channel, a name, a time zone and a fixed address; refused with why."""
     out = []
     if s.get("dev"):

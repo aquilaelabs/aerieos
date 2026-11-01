@@ -11,7 +11,7 @@ import agentpkg  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import toolchains  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_batch")
+agent = agentpkg.load("aerieos_agent_batch")
 agent.log = lambda *a, **k: None
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 
@@ -63,7 +63,7 @@ class Progress(unittest.TestCase):
 class NoCut(unittest.TestCase):
     def test_the_cap_is_a_refusal_and_well_above_the_catalog(self):
         self.assertGreater(agent.TC_NAMES_MAX, len(toolchains.TOOLCHAINS or range(40)))
-        src = open(os.path.join(REPO, "scripts", "agent", "builderbot_agent", "work.py")).read()
+        src = open(os.path.join(REPO, "scripts", "agent", "aerieos_agent", "work.py")).read()
         self.assertNotIn('(spec.get("names") or [])][:', src, "no batch is cut short without a word")
         ctl = open(os.path.join(REPO, "scripts", "dashboard", "toolchains.py")).read()
         self.assertNotIn('if n in known][:', ctl, "...on the controller either (B681)")

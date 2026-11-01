@@ -9,7 +9,7 @@ from pathlib import Path
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent_gpu")
+agent = agentpkg.load("aerieos_agent_gpu")
 
 SMI = """
 | Processes:                                                                              |

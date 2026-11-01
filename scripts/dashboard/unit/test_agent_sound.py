@@ -7,7 +7,7 @@ import unittest
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent")
+agent = agentpkg.load("aerieos_agent")
 
 CARDS = """ 0 [PCH            ]: HDA-Intel - HDA Intel PCH
                       HDA Intel PCH at 0xf7f10000 irq 32

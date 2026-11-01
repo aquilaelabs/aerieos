@@ -7,7 +7,7 @@
 # Settings live in .env next to this file (copy .env.example).
 
 services:
-  builderbot:
+  aerie-workshop:
     image: ghcr.io/aquilaelabs/aerieos:${BUILDERBOT_TAG:-latest}
     # An install pulls the image; AerieOS's own dev instance on a node
     # builds this checkout instead, the way any project's dev instance is
@@ -90,9 +90,9 @@ services:
       # that carries the project, and this is it once /workspace is a share
       # that does not hold this checkout (a dev instance on its own share,
       # 15 Sep). Outside /workspace on purpose, so it is not a project of
-      # this instance's; the image's own copy at /opt/builderbot is laid out
+      # this instance's; the image's own copy at /opt/aerieos is laid out
       # for running, not for the suite.
-      - .:/opt/builderbot/src
+      - .:/opt/aerieos/src
 
       # --- the toolchain store --------------------------------------------
       # This controller's own toolchains (the browsers `aerie capture shot`
@@ -162,7 +162,7 @@ services:
       net.unraid.docker.managed: composeman
 
     healthcheck:
-      test: ["CMD", "/opt/builderbot/scripts/healthcheck.sh"]
+      test: ["CMD", "/opt/aerieos/scripts/healthcheck.sh"]
       interval: 60s
       timeout: 10s
       start_period: 120s

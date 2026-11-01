@@ -15,7 +15,7 @@ import devapp  # noqa: E402
 import toolchains  # noqa: E402
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent")
+agent = agentpkg.load("aerieos_agent")
 
 CARD = "NVIDIA Corporation GA104 [GeForce RTX 3070 Ti] [10de:2482] (rev a1)"
 LOADED = {"installed": "610.57.04", "loaded": "610.57.04", "bound": "nvidia"}

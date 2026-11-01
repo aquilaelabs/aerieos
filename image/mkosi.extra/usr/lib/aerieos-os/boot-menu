@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# GRUB's menu on the ESP put in step with the image running (R201): an update
+# writes a slot and its kernel, never the menu, so a disk laid by an older
+# image kept its menu for good. Never on a visit to a kept older version, whose
+# older menu would take Older versions away. Written whole, then moved over.
+set -euo pipefail
+ESP="${BB_ESP:-/boot/efi}"
+NEW="${BB_OS_GRUBCFG:-/usr/lib/aerieos-os/grub.cfg}"
+CMDLINE="${BB_CMDLINE:-/proc/cmdline}"
+grep -q 'aeriekept=' "$CMDLINE" 2>/dev/null && exit 0
+[ -s "$NEW" ] && [ -d "$ESP/grub" ] || exit 0
+cmp -s "$NEW" "$ESP/grub/grub.cfg" && exit 0
+cp "$NEW" "$ESP/grub/grub.cfg.new"
+sync
+mv -f "$ESP/grub/grub.cfg.new" "$ESP/grub/grub.cfg"
+echo "boot-menu: the boot menu follows this image"

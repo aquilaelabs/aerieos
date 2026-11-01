@@ -1,6 +1,6 @@
 """The node agent for a test, as one object, the way the single file was.
 
-The agent is the builderbot_agent package now (scripts/agent). load() reads
+The agent is the aerieos_agent package now (scripts/agent). load() reads
 a fresh copy of it under a name of its own, so one test file's patches never
 reach another's, as when each loaded the file by path. Reading agent.NAME
 finds the name wherever the package defines it; agent.NAME = value sets it
@@ -13,7 +13,7 @@ import itertools
 import os
 import sys
 
-PKG = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agent", "builderbot_agent"))
+PKG = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agent", "aerieos_agent"))
 _seq = itertools.count()
 
 

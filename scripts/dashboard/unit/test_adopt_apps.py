@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import adoptapps  # noqa: E402
 import agentpkg  # noqa: E402
 
-adopt = agentpkg.load("builderbot_agent_adopt_apps").module("adopt")
+adopt = agentpkg.load("aerieos_agent_adopt_apps").module("adopt")
 
 APP = {"name": "Plex-Media-Server", "compose": {"services": {"plex-media-server": {
     "image": "plexinc/pms-docker:latest", "restart": "unless-stopped", "ports": ["32400:32400/tcp"],

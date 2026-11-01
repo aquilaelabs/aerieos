@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import agentpkg  # noqa: E402
 import nginxproxy as npx  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_http80")
+agent = agentpkg.load("aerieos_agent_http80")
 h = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".http80"]
 
 

@@ -1,6 +1,6 @@
 """The companion app's sync (R270 step 3): a folder on this machine kept in
 step with an AerieOS project, both ways, by the node agent's own sync
-(builderbot_agent.wssync), shared rather than copied, spoken through the
+(aerieos_agent.wssync), shared rather than copied, spoken through the
 device door (/api/v1/device/) with the person's device token.
 
 What the agent's sync expects of a node, this answers for a person:
@@ -17,12 +17,12 @@ import tarfile
 import threading
 
 try:
-    from builderbot_agent import controller as _controller, wssync as _wssync
+    from aerieos_agent import controller as _controller, wssync as _wssync
 except ImportError:                                   # a checkout: the agent beside this tree
     # From the checkout (apps/windows/bbcompanion): the agent's package three
     # levels up, under scripts/agent.
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts", "agent"))
-    from builderbot_agent import controller as _controller, wssync as _wssync
+    from aerieos_agent import controller as _controller, wssync as _wssync
 
 from . import names, pc, update
 

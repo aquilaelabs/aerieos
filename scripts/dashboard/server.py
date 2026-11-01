@@ -5345,7 +5345,7 @@ if BARE_METAL:
         print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
     # The catalog's mirror the stick carries (R169 step 6), handed over by
     # the boot: imported once per mirror, as Import under Controller settings.
-    _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/builderbot-os"), "firstboot", "catalog-mirror.tar.gz")
+    _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot", "catalog-mirror.tar.gz")
     if os.path.isfile(_cm):
         try:
             _r = catalogmirror.take_file(_cm, time.time())
@@ -6962,7 +6962,7 @@ class Handler(BaseHTTPRequestHandler):
     def _novnc(self, rest):
         """noVNC's files (the page and the RFB client it imports), as the
         image fetched them; nothing outside its directory."""
-        root = Path(os.environ.get("BB_NOVNC_DIR", "/opt/builderbot/novnc")).resolve()
+        root = Path(os.environ.get("BB_NOVNC_DIR", "/opt/aerieos/novnc")).resolve()
         target = (root / urllib.parse.unquote(rest)).resolve()
         if root not in target.parents or not target.is_file():
             return self._json({"error": "not part of noVNC" if root.is_dir() else

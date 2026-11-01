@@ -1,5 +1,5 @@
 # The root is a squashfs with a tmpfs overlay (overlayroot), and /etc an
-# overlay of its own on the data partition (scripts/init-bottom/builderbot-os).
+# overlay of its own on the data partition (scripts/init-bottom/aerieos-os).
 squashfs
 overlay
 ext4

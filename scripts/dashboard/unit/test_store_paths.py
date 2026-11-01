@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 import nodes  # noqa: E402
 
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
-from builderbot_agent import base, stores  # noqa: E402
+from aerieos_agent import base, stores  # noqa: E402
 
 
 class StorePaths(unittest.TestCase):

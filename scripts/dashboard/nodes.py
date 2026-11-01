@@ -6852,15 +6852,15 @@ def job_counts():
 # ship a newer agent changes only its own world's, not the copy every worker
 # of a whole run serves from (B718, B751, B510).
 AGENT_DIR = Path(os.environ.get("BB_AGENT_DIR") or HERE.parent / "agent")
-AGENT_VERSION_PY = AGENT_DIR / "builderbot_agent" / "__init__.py"
+AGENT_VERSION_PY = AGENT_DIR / "aerieos_agent" / "__init__.py"
 _agent_cache = {}
 
 
 def _agent_bundle():
-    """builderbot_agent/bundle.py, loaded by path: it makes the zip a node
+    """aerieos_agent/bundle.py, loaded by path: it makes the zip a node
     runs, and the agent itself makes the same one to know its own digest."""
     if "bundle" not in _agent_cache:
-        spec = importlib.util.spec_from_file_location("bb_agent_bundle", AGENT_DIR / "builderbot_agent" / "bundle.py")
+        spec = importlib.util.spec_from_file_location("bb_agent_bundle", AGENT_DIR / "aerieos_agent" / "bundle.py")
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         _agent_cache["bundle"] = mod

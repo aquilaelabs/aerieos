@@ -365,13 +365,13 @@ def test_change_line(project):
 
 
 # Where the environment briefing is written. The image puts config/templates/
-# at /opt/builderbot/templates/ (see the Dockerfile), which is NOT where it
+# at /opt/aerieos/templates/ (see the Dockerfile), which is NOT where it
 # sits in a checkout, and the first version of this looked only at the checkout
 # layout: every session on a real controller got no briefing at all and nothing
 # said so. So: the override first, then the installed path, then the checkout
 # beside this module, and a miss is said out loud rather than swallowed.
 BRIEFING_PATHS = [Path(os.environ["BRIEFING_MD"])] if os.environ.get("BRIEFING_MD") else [
-    Path("/opt/builderbot/templates/briefing.md"),
+    Path("/opt/aerieos/templates/briefing.md"),
     Path(__file__).resolve().parents[2] / "config" / "templates" / "briefing.md",
 ]
 _IF = re.compile(r"<!-- BUILDERBOT:IF ([^>]*?) *-->")

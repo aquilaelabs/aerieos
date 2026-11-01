@@ -1,8 +1,8 @@
 """A prepared configuration's first boot on the controller (R161 step 8).
 
-The stick's root step (image/mkosi.extra/usr/lib/builderbot-os/firstboot-take)
+The stick's root step (image/mkosi.extra/usr/lib/aerieos-os/firstboot-take)
 takes builderbot/firstboot.json off the ESP before the controller starts and
-hands it over at /run/builderbot-os/firstboot/firstboot.json with what it did
+hands it over at /run/aerieos-os/firstboot/firstboot.json with what it did
 to the machine itself (the hostname, the time zone). At start this applies
 the rest it can: the owner (a name and a password hash; none leaves the
 first-run page to ask), the people (by name and role, their SMB password's
@@ -25,7 +25,7 @@ import os
 import time
 from pathlib import Path
 
-RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/builderbot-os/firstboot/firstboot.json"))
+RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/aerieos-os/firstboot/firstboot.json"))
 STATE = None
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)

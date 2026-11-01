@@ -33,7 +33,7 @@
 # by nothing here any more; bb still honors one passed for a single command.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # No switch. This IS the controller: nodes dial into its API, so without it
 # there are no nodes, and compiling, testing, CI and emulation all run on one.
@@ -43,7 +43,7 @@ set -euo pipefail
 # no scope and no context.
 
 PORT="${DASHBOARD_PORT:-7680}"
-DASH=/opt/builderbot/scripts/dashboard
+DASH=/opt/aerieos/scripts/dashboard
 
 if [ ! -s "${DASHBOARD_STATE:-/config}/users.json" ]; then
     log "dashboard: no accounts yet; the first page it serves asks you to make the owner. Do it now."
@@ -59,7 +59,7 @@ command -v tmux >/dev/null 2>&1 \
 # merely sources it, and is created only if absent. The home directory is a
 # persistent volume, so writing ~/.tmux.conf directly meant reverting the
 # user's own tmux config on every container start.
-cp -f /opt/builderbot/scripts/lib/tmux.conf "$HOME/.tmux.builderbot.conf"
+cp -f /opt/aerieos/scripts/lib/tmux.conf "$HOME/.tmux.builderbot.conf"
 
 if [ ! -e "$HOME/.tmux.conf" ]; then
     printf 'source-file ~/.tmux.builderbot.conf\n' > "$HOME/.tmux.conf"
@@ -90,7 +90,7 @@ for v in ${BB_SHIELDED:-}; do unset_args+=(-u "$v"); done
 listening "$PORT" || \
 nohup env "${unset_args[@]}" DASHBOARD_PORT="$PORT" \
         python3 -u "$DASH/server.py" 2>&1 \
-    | /opt/builderbot/scripts/lib/log-split.sh "$(bb_log_dir)/dashboard.log" dashboard &
+    | /opt/aerieos/scripts/lib/log-split.sh "$(bb_log_dir)/dashboard.log" dashboard &
 
 # It is not supervised: a dashboard that dies should not take the workstation
 # with it, and the container is useful without it. `aerie logs` names the files.

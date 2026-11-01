@@ -135,7 +135,7 @@ def layout():
 def settings():
     compose = open("docker-compose.yml").read()
     # The builderbot service only: the lab's services carry their own.
-    svc = compose.split("\n  builderbot:", 1)[1]
+    svc = compose.split("\n  aerie-workshop:", 1)[1]
     svc = re.split(r"\n  [a-z][a-z0-9_-]*:\s*\n", svc, maxsplit=1)[0]
     env = {}
     for m in re.finditer(r"^\s+([A-Z][A-Z0-9_]+):\s*\$\{([A-Z][A-Z0-9_]+)(?::?-([^}]*))?\}", svc, re.M):
@@ -146,7 +146,7 @@ def settings():
         m = re.match(r"^#?\s*([A-Z][A-Z0-9_]+)=(.*)$", ln.rstrip("\n"))
         if m:
             example[m.group(1)] = m.group(2).strip()
-    root = ET.parse("platforms/unraid/builderbot.xml").getroot()
+    root = ET.parse("platforms/unraid/aerie-workshop.xml").getroot()
     tmpl = {c.get("Target"): c.get("Default") or "" for c in root.iter("Config") if c.get("Type") == "Variable"}
     paths = {c.get("Target"): c.get("Default") or "" for c in root.iter("Config") if c.get("Type") == "Path"}
     # A row may name two at once, `PUID` / `PGID` | `99` / `100`, paired in order.
@@ -333,7 +333,7 @@ def unraid():
     allowed = ("platforms/unraid/", "docs/unraid.md", "nodes/unraid-vm.xml", "scripts/dashboard/vmtemplate.py",
                "scripts/startup.d/05-unraid-icon.root.sh", "scripts/lib/lint-checks.py", "docs/design-language.md",
                "docs/sandbox-vm.md")      # the VM XML's walkthrough, host settings and all
-    names = ("template", "unraid-vm.xml", "unraid.md", "builderbot.xml", "unraid_", "unraid-", "\"unraid\"", "'unraid'", "net.unraid.", "walkthrough")
+    names = ("template", "unraid-vm.xml", "unraid.md", "aerie-workshop.xml", "unraid_", "unraid-", "\"unraid\"", "'unraid'", "net.unraid.", "walkthrough")
     import subprocess
     files = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=False).stdout.split("\n")
     bad = []

@@ -5,7 +5,7 @@
 #
 # The container install is the image: compose or the Unraid template, tini
 # and the entrypoint. This is the same controller laid out the way the image
-# lays it out (/opt/builderbot, from the Dockerfile's own COPY lines), with
+# lays it out (/opt/aerieos, from the Dockerfile's own COPY lines), with
 # systemd (or OpenRC, or runit) in place of tini and an env file in place of
 # compose's; the dashboard, the state, the verbs and the updates are the
 # same. It is built on the node provisioner, not beside it: it sources
@@ -18,19 +18,19 @@
 #
 #   sudo bash nodes/install-controller.sh --check      can this machine take one
 #   sudo bash nodes/install-controller.sh --install    the controller, and its own node
-#   sudo bash /opt/builderbot/nodes/install-controller.sh --update     the newest release
-#   sudo bash /opt/builderbot/nodes/install-controller.sh --remove     take it away
+#   sudo bash /opt/aerieos/nodes/install-controller.sh --update     the newest release
+#   sudo bash /opt/aerieos/nodes/install-controller.sh --remove     take it away
 #
 # What it lays down, and who owns it:
 #
-#   /opt/builderbot                  -> /opt/builderbot-releases/VERSION, root's
-#   /etc/builderbot-controller/      root:builderbot 0750
+#   /opt/aerieos                  -> /opt/aerieos-releases/VERSION, root's
+#   /etc/aerieos-controller/      root:builderbot 0750
 #     controller.env                 the settings, root:builderbot 0640
 #     secrets/                       *.env and ssh/, root's alone (0700)
-#   /var/lib/builderbot-controller/  root:builderbot 0750
+#   /var/lib/aerieos-controller/  root:builderbot 0750
 #     config/ home/ sdk/             the state, the home, the toolchain store: the account's, 0700
-#   /srv/builderbot/projects         the projects (--workspace), the account's
-#   builderbot-controller            the service: scripts/host-boot.sh, as root, which
+#   /srv/aerieos/projects         the projects (--workspace), the account's
+#   aerieos-controller            the service: scripts/host-boot.sh, as root, which
 #                                    drops to the account for good
 #   /usr/local/bin/aerie                bb as the account, for anybody who may sudo
 #   /etc/bb-session.wall             what a session on this machine's node never sees
@@ -48,23 +48,23 @@ TREE="$(cd "$HERE/.." && pwd)"
 # Where everything goes. One prefix, empty on a real install, so the unit
 # tests lay a release out under a scratch folder and read what landed.
 P="${BB_INSTALL_ROOT:-}"
-OPT="$P/opt/builderbot"
-RELEASES="$P/opt/builderbot-releases"
-ETC="$P/etc/builderbot-controller"
+OPT="$P/opt/aerieos"
+RELEASES="$P/opt/aerieos-releases"
+ETC="$P/etc/aerieos-controller"
 ENV_FILE="$ETC/controller.env"
-VAR="$P/var/lib/builderbot-controller"
-SHIM="$P/usr/local/lib/builderbot-controller/bin"
+VAR="$P/var/lib/aerieos-controller"
+SHIM="$P/usr/local/lib/aerieos-controller/bin"
 WALL_FILE="$P/etc/bb-session.wall"
-SUDOERS="$P/etc/sudoers.d/builderbot-controller"
+SUDOERS="$P/etc/sudoers.d/aerieos-controller"
 BB_BIN="$P/usr/local/bin/aerie"
-SERVICE=builderbot-controller
+SERVICE=aerieos-controller
 REPO=aquilaelabs/aerieos
 # How many releases are kept beside the one in use: the one before is what
 # an update that does not come up goes back to by itself.
 KEEP_RELEASES=3
 
-ACCOUNT=builderbot
-WORKSPACE_DIR=/srv/builderbot/projects
+ACCOUNT=aerieos
+WORKSPACE_DIR=/srv/aerieos/projects
 PORT=7680
 JOBS_USER=bb
 SESSION_USER=builder
@@ -95,7 +95,7 @@ Actions:
                  it can take a controller, 1 when not.
   --install      the controller, from the tree this script is in: the
                  packages (config/controller-packages.tsv), the account, the
-                 release under /opt/builderbot, the env file, the service,
+                 release under /opt/aerieos, the env file, the service,
                  and then this machine as a node of itself. Safe to run
                  again: what is there is kept, an env file you edited above all.
   --update       the newest release (or --release TAG, or --from DIR, a
@@ -120,7 +120,7 @@ Actions:
                  this machine enrolls as its node, once.
 
 Options:
-  --workspace PATH   the projects folder (default /srv/builderbot/projects);
+  --workspace PATH   the projects folder (default /srv/aerieos/projects);
                      never /workspace, which is this machine's node's synced copy
   --port N           the dashboard's port (default 7680)
   --account NAME     the account the controller runs as (default builderbot);
@@ -205,7 +205,7 @@ copy_as_copy() {
 }
 
 # lay_out TREE DIR VERSION REV: the release in DIR, from TREE, by the
-# Dockerfile's COPY lines (every one that lands under /opt/builderbot), so
+# Dockerfile's COPY lines (every one that lands under /opt/aerieos), so
 # what the image carries and what is laid out here cannot drift; then what
 # the image's RUN lines add there (noVNC, the scripts made executable) and
 # the stamp the image carries in its ENV (build.env).
@@ -214,8 +214,8 @@ lay_out() {
     rm -rf "$dir.partial"
     install -d -m 0755 "$dir.partial"
     while read -r src dest; do
-        case "$dest" in /opt/builderbot/*|/opt/builderbot) ;; *) continue ;; esac
-        copy_as_copy "$t" "$src" "$dir.partial${dest#/opt/builderbot}"
+        case "$dest" in /opt/aerieos/*|/opt/aerieos) ;; *) continue ;; esac
+        copy_as_copy "$t" "$src" "$dir.partial${dest#/opt/aerieos}"
         n=$((n + 1))
     done < <(sed -n 's/^COPY \([^ ]*\) \([^ ]*\)$/\1 \2/p' "$t/Dockerfile")
     [ "$n" -gt 5 ] || die "the Dockerfile in $t names nothing to lay out ($n COPY lines)"
@@ -255,7 +255,7 @@ lay_out() {
 # release_name VERSION: the folder a release is laid out in.
 release_name() { printf '%s' "$1" | tr -c 'A-Za-z0-9._+-' '_'; }
 
-# flip DIR: /opt/builderbot is DIR from now, in one rename; the release it
+# flip DIR: /opt/aerieos is DIR from now, in one rename; the release it
 # was is remembered as the one before.
 flip() {
     local dir="$1" was=""
@@ -518,9 +518,9 @@ set -euo pipefail
 if [ "\$(id -un)" != "${ACCOUNT}" ]; then
     exec sudo -u "${ACCOUNT}" -- "\$0" "\$@"
 fi
-. /opt/builderbot/scripts/lib/host-env.sh
+. /opt/aerieos/scripts/lib/host-env.sh
 export HOME="\$BUILDER_HOME" USER="${ACCOUNT}"
-exec /opt/builderbot/scripts/aerie "\$@"
+exec /opt/aerieos/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
     # The old name, while anything still calls it.
@@ -531,8 +531,8 @@ EOF
 sudoers() {
     install -d -m 0750 "$(dirname "$SUDOERS")"
     printf '%s\n' "# Written by AerieOS's install-controller.sh: the two root helpers, as in the image." \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/mint-runner-token" \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/deploy-key" > "$SUDOERS.new"
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token" \
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" > "$SUDOERS.new"
     chmod 0440 "$SUDOERS.new"
     if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$SUDOERS.new" >/dev/null 2>&1; then
         rm -f "$SUDOERS.new"; die "the sudo rule did not check out (visudo -c), so it was not put in place"
@@ -545,12 +545,12 @@ sudoers() {
 # rest after it is done (KillMode=mixed), which is the order `docker stop`
 # gives the container: the terminals are saved before tmux goes.
 service() {
-    # On AerieOS the boot's own settings (builderbot-os-env.service)
+    # On AerieOS the boot's own settings (aerieos-os-env.service)
     # are read beside the env file; elsewhere the file is simply not there.
-    svc_install "$SERVICE" "AerieOS controller" "/opt/builderbot/scripts/host-boot.sh supervise" \
+    svc_install "$SERVICE" "AerieOS controller" "/opt/aerieos/scripts/host-boot.sh supervise" \
         "KillMode=mixed
 TimeoutStopSec=30
-EnvironmentFile=-/run/builderbot-os/env"
+EnvironmentFile=-/run/aerieos-os/env"
 }
 
 # wait_up: the dashboard answering on its port, or why not.
@@ -661,7 +661,7 @@ cmd_stage() {
     local ver rev dir py
     load_core
     [ "$(id -u)" -eq 0 ] || die "--stage runs as root inside the image's root"
-    [ -d /usr/lib/builderbot-os ] || die "--stage is for the appliance image's tree (image/), which carries /usr/lib/builderbot-os"
+    [ -d /usr/lib/aerieos-os ] || die "--stage is for the appliance image's tree (image/), which carries /usr/lib/aerieos-os"
     INIT=systemd
     py="$(pick_python)" || die "the image has no python 3.${PY_MIN} or newer: image/mkosi.conf"
     printf '   python: %s\n' "$py"
@@ -683,7 +683,7 @@ cmd_stage() {
 }
 
 # cmd_firstboot: the first boot of an appliance disk
-# (builderbot-os-firstboot.service): the controller is up by its own
+# (aerieos-os-firstboot.service): the controller is up by its own
 # service, so this is --install's last step, the wall and this machine as
 # the controller's node. own_node writes the marker the unit's condition
 # reads, so it runs once; a boot that fails it (no network yet) runs it
@@ -723,7 +723,7 @@ fetch_tree() {
         tag="${tag##*/}"
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi
-    d="$(mktemp -d /tmp/builderbot-release.XXXXXX)"
+    d="$(mktemp -d /tmp/aerieos-release.XXXXXX)"
     ver="${tag#v}"
     base="https://github.com/${REPO}/releases/download/${tag}/aerieos-controller-${ver}.tar.gz"
     local http
@@ -767,7 +767,7 @@ fetch_tree() {
             if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig"; then
                 die "${tag} carries no signature yet: it is taken once its key's holder has signed it"
             fi
-            ssh-keygen -Y verify -f "$signers" -I builderbot-release -n builderbot-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
+            ssh-keygen -Y verify -f "$signers" -I aerieos-release -n aerieos-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
                 || die "${tag}'s signature does not verify against this install's release key: not taken"
             grep -q "^${sum}  \*\?aerieos-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
                 || die "the bundle is not the one ${tag} signed: not taken"
@@ -973,7 +973,7 @@ cmd_remove() {
 OWN_MARK="$ETC/own-node"
 # The features the installer on the ISO was asked for (R160 step 2), turned
 # on with the node at the first boot: one id per line, on the data partition.
-OS_FEATURES_FILE="$P/var/lib/builderbot-os/features"
+OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"
 declare -a OS_FEATURES=()
 own_node() {
     local ip name tok ctl prov="$OPT/nodes/provision-linux.sh"
@@ -1012,7 +1012,7 @@ own_node() {
 # the port table an earlier install wrote is taken away.
 # The name of that table (bb-session's WALL_TABLE).
 WALL_TABLE=builderbot_wall
-WALL_NFT="$P/etc/builderbot-controller/wall.nft"
+WALL_NFT="$P/etc/aerieos-controller/wall.nft"
 
 # wall_cover: the folders, from the env file as the controller reads it,
 # each once and none inside another.
@@ -1132,7 +1132,7 @@ main() {
     case "$ACCOUNT" in [a-z_][a-z0-9_-]*) ;; *) die "--account takes an account name" ;; esac
     # An install that is here already keeps its own answers.
     if [ -f "$ENV_FILE" ]; then
-        ACCOUNT="$(env_get BB_ACCOUNT)"; ACCOUNT="${ACCOUNT:-builderbot}"
+        ACCOUNT="$(env_get BB_ACCOUNT)"; ACCOUNT="${ACCOUNT:-aerieos}"
         PORT="$(env_get DASHBOARD_PORT)"; PORT="${PORT:-7680}"
     fi
     case "$ACTION" in

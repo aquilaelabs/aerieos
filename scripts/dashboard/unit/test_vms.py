@@ -416,7 +416,7 @@ class Census(unittest.TestCase):
 class Agent(unittest.TestCase):
     def setUp(self):
         import agentpkg
-        self.agent = agentpkg.load("builderbot_agent_vms")
+        self.agent = agentpkg.load("aerieos_agent_vms")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".vms"]
 
     def test_the_domains_it_did_not_make_are_listed_and_never_ours(self):

@@ -156,7 +156,7 @@ for (const os of SYSTEMS){
     }, 10 * 60000, 30000);
     ok(check, `[${os}] bb-session check passes there: the wall holds (${oneLine(check || await inVm(ip, '/usr/local/sbin/bb-session check 2>&1')).slice(0, 300)})`);
     const walls = await inVm(ip, 'cat /etc/bb-session.wall; nft list table inet builderbot_wall >/dev/null && echo guard-up');
-    ok(/^COVER=.*\/var\/lib\/builderbot-controller/m.test(walls) && /guard-up/.test(walls),
+    ok(/^COVER=.*\/var\/lib\/aerieos-controller/m.test(walls) && /guard-up/.test(walls),
        `[${os}] the wall names the controller's folders and its ports' table is up`);
 
     // Outside a view: the session account and the job account, each refused

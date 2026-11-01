@@ -18,7 +18,7 @@ import projsessions  # noqa: E402
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 
-node = agentpkg.load("builderbot_agent")
+node = agentpkg.load("aerieos_agent")
 
 
 class Table(unittest.TestCase):
@@ -383,7 +383,7 @@ class Copies(unittest.TestCase):
         # its table (apps/android/.../Agents.kt) is the live rows, Claude first,
         # with each other agent's own models.
         path = os.path.join(HERE, "..", "..", "..", "apps", "android", "app", "src", "main", "java",
-                            "dev", "builderbot", "app", "Agents.kt")
+                            "org", "aerieos", "app", "Agents.kt")
         with open(path) as f:
             kt = f.read()
         body = kt[kt.index("val LIVE = listOf("):kt.index("\n    )\n", kt.index("val LIVE = listOf("))]

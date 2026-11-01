@@ -40,7 +40,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_power")
+        self.agent = agentpkg.load("aerieos_agent_power")
         self.pw = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".power"]
         pw = self.pw
         ran = self.ran = []

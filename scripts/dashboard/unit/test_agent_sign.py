@@ -14,7 +14,7 @@ import zipfile
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent_sign")
+agent = agentpkg.load("aerieos_agent_sign")
 agent.log = lambda *a, **k: None
 
 STORE = next((d for d in glob.glob("/mnt/SDK/*") + glob.glob("/sdk/*")

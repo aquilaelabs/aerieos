@@ -62,7 +62,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NODE_PATH=/usr/lib/node_modules \
     BUILDER_HOME=/home/builder \
     WORKSPACE=/workspace \
-    PATH=/opt/builderbot/bin:/home/builder/.npm-global/bin:/home/builder/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    PATH=/opt/aerieos/bin:/home/builder/.npm-global/bin:/home/builder/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 # ---------------------------------------------------------------------------
 # Base system + build toolchain
@@ -74,11 +74,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # count is checked: a reader that printed nothing would otherwise install
 # nothing and pass.
 # ---------------------------------------------------------------------------
-COPY config/controller-packages.tsv /opt/builderbot/config/controller-packages.tsv
-COPY scripts/lib/controller-packages.sh /opt/builderbot/scripts/lib/controller-packages.sh
+COPY config/controller-packages.tsv /opt/aerieos/config/controller-packages.tsv
+COPY scripts/lib/controller-packages.sh /opt/aerieos/scripts/lib/controller-packages.sh
 # hadolint ignore=SC2046
 RUN set -eux; \
-    pkgs="$(bash /opt/builderbot/scripts/lib/controller-packages.sh deb core tools image)"; \
+    pkgs="$(bash /opt/aerieos/scripts/lib/controller-packages.sh deb core tools image)"; \
     [ "$(printf '%s\n' "$pkgs" | wc -l)" -ge 50 ]; \
     apt-get update; \
     apt-get install -y --no-install-recommends $(printf '%s\n' "$pkgs"); \
@@ -94,7 +94,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # hadolint ignore=SC2046
 RUN set -eux; \
-    pkgs="$(bash /opt/builderbot/scripts/lib/controller-packages.sh deb vendor docker)"; \
+    pkgs="$(bash /opt/aerieos/scripts/lib/controller-packages.sh deb vendor docker)"; \
     [ "$(printf '%s\n' "$pkgs" | wc -l)" -ge 5 ]; \
     install -m 0755 -d /etc/apt/keyrings; \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
@@ -215,8 +215,8 @@ RUN set -eux; \
     # which runs as root during startup.
     # ...and keeping the deploy keys made or pasted in a project's settings,
     # whose private halves the builder user never reads (deploy-key).
-    printf '%s\n' 'builder ALL=(root) NOPASSWD: /opt/builderbot/scripts/mint-runner-token' \
-        'builder ALL=(root) NOPASSWD: /opt/builderbot/scripts/deploy-key' > /etc/sudoers.d/builder; \
+    printf '%s\n' 'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token' \
+        'builder ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key' > /etc/sudoers.d/builder; \
     chmod 0440 /etc/sudoers.d/builder; \
     # Explicitly lock both accounts' passwords: password auth must never be a
     # path to privilege in this container, and there is nothing to brute-force,
@@ -224,7 +224,7 @@ RUN set -eux; \
     # this pins the guarantee against future drift.)
     passwd -l root; \
     passwd -l builder; \
-    mkdir -p "${WORKSPACE}" /opt/builderbot; \
+    mkdir -p "${WORKSPACE}" /opt/aerieos; \
     chown -R builder:builder "${WORKSPACE}"
 
 # ---------------------------------------------------------------------------
@@ -255,12 +255,12 @@ RUN set -eux; \
     curl -fsSL -o /tmp/novnc.tar.gz \
         "https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz"; \
     echo "${NOVNC_SHA256}  /tmp/novnc.tar.gz" | sha256sum -c -; \
-    mkdir -p /opt/builderbot/novnc; \
-    tar xzf /tmp/novnc.tar.gz -C /opt/builderbot/novnc --strip-components=1 \
+    mkdir -p /opt/aerieos/novnc; \
+    tar xzf /tmp/novnc.tar.gz -C /opt/aerieos/novnc --strip-components=1 \
         "noVNC-${NOVNC_VERSION}/core" "noVNC-${NOVNC_VERSION}/vendor" \
         "noVNC-${NOVNC_VERSION}/vnc_lite.html" "noVNC-${NOVNC_VERSION}/LICENSE.txt"; \
     rm -f /tmp/novnc.tar.gz; \
-    test -f /opt/builderbot/novnc/core/rfb.js
+    test -f /opt/aerieos/novnc/core/rfb.js
 
 # cloudflared: the home tunnel the controller can run itself (R176), from
 # Cloudflare's release for this architecture. Latest rather than pinned,
@@ -279,58 +279,60 @@ RUN --mount=type=secret,id=gh_token,required=false \
     chmod +x /usr/local/bin/cloudflared; \
     cloudflared --version
 
-COPY scripts/ /opt/builderbot/scripts/
-COPY config/skel/ /opt/builderbot/skel/
-COPY config/templates/ /opt/builderbot/templates/
+COPY scripts/ /opt/aerieos/scripts/
+COPY config/skel/ /opt/aerieos/skel/
+COPY config/templates/ /opt/aerieos/templates/
 # The toolchain catalog the Toolchains tab renders and `aerie toolchains` walks.
 # Under config/ so that the path relative to both bb and server.py is the same
 # here as it is in a checkout, which is what lets `aerie dashboard dev` and the
 # tests read it.
-COPY config/toolchains.json /opt/builderbot/config/toolchains.json
+COPY config/toolchains.json /opt/aerieos/config/toolchains.json
 # ...and the publishers' release keys a download is checked against (R137).
-COPY config/release-keys/ /opt/builderbot/config/release-keys/
+COPY config/release-keys/ /opt/aerieos/config/release-keys/
 # ...and the vetted catalog maintainers' key its signed index is checked against (R169).
-COPY config/catalog.pub /opt/builderbot/config/catalog.pub
+COPY config/catalog.pub /opt/aerieos/config/catalog.pub
 # The operating systems a VM is made from (R91), read by vms.py the same way.
-COPY config/vm-images.json /opt/builderbot/config/vm-images.json
+COPY config/vm-images.json /opt/aerieos/config/vm-images.json
 # What a sandbox VM is made from, one per hypervisor, which the Nodes tab
 # renders with an identity per VM (vmtemplate.py). Two levels above
 # server.py, where a checkout keeps them too.
-COPY nodes/unraid-vm.xml /opt/builderbot/nodes/unraid-vm.xml
+COPY nodes/unraid-vm.xml /opt/aerieos/nodes/unraid-vm.xml
 # In the bundle a node fetches, so the agent can refresh the machine's
 # bb-sandbox (embedded in it) when a system job needs a newer verb.
-COPY nodes/provision-linux.sh /opt/builderbot/nodes/provision-linux.sh
-COPY nodes/families/ /opt/builderbot/nodes/families/
+COPY nodes/provision-linux.sh /opt/aerieos/nodes/provision-linux.sh
+COPY nodes/families/ /opt/aerieos/nodes/families/
 # ...and the Mac's, which the Enroll dialog fetches from here the same way.
-COPY nodes/provision-macos.sh /opt/builderbot/nodes/provision-macos.sh
+COPY nodes/provision-macos.sh /opt/aerieos/nodes/provision-macos.sh
 # The root helper that builds a session's view, in the bundle a node fetches;
 # its agent installs it (R35).
-COPY nodes/bb-session /opt/builderbot/nodes/bb-session
-COPY nodes/vm/ /opt/builderbot/nodes/vm/
+COPY nodes/bb-session /opt/aerieos/nodes/bb-session
+COPY nodes/vm/ /opt/aerieos/nodes/vm/
 # AerieOS's own docs, for the Help page (helpdocs.py, R258): the Markdown
 # alone, two levels above server.py as in a checkout; the screenshots stay
 # out of the image.
-COPY docs/*.md /opt/builderbot/docs/
+COPY docs/*.md /opt/aerieos/docs/
 # The changelog, for the welcome panel: shown once per image update, so it
 # has to travel with the image it describes. Two levels above server.py,
 # where a checkout keeps it too.
-COPY CHANGELOG.md /opt/builderbot/CHANGELOG.md
+COPY CHANGELOG.md /opt/aerieos/CHANGELOG.md
 # The static analysis scan, which the Schedules page runs on a node as its
 # built-in schedule (R117): two levels above server.py, as in a checkout.
 # Carried in the image so the container can seed Unraid's icon cache itself
 # rather than depending on a URL Unraid can reach. See
 # scripts/startup.d/05-unraid-icon.root.sh.
-COPY config/icon.png /opt/builderbot/icon.png
+COPY config/icon.png /opt/aerieos/icon.png
 
 RUN set -eux; \
-    chmod -R +x /opt/builderbot/scripts; \
-    ln -sf /opt/builderbot/scripts/aerie /usr/local/bin/aerie; \
-    # /opt/builderbot/bin sits first on PATH and holds privilege-dropping
-    # wrappers, so `docker exec -it builderbot bb` runs as `builder`
+    chmod -R +x /opt/aerieos/scripts; \
+    ln -sf /opt/aerieos/scripts/aerie /usr/local/bin/aerie; \
+    # /opt/aerieos/bin sits first on PATH and holds privilege-dropping
+    # wrappers, so `docker exec -it Aerie-Workshop aerie` runs as `builder`
     # (correct HOME, correct file ownership) instead of as root.
-    mkdir -p /opt/builderbot/bin; \
-    ln -sf /opt/builderbot/scripts/as-builder /opt/builderbot/bin/aerie; \
-    chown -R builder:builder /opt/builderbot/skel
+    mkdir -p /opt/aerieos/bin; \
+    # An existing checkout's .git/config names its credential helper by this path.
+    ln -s /opt/aerieos /opt/builderbot; \
+    ln -sf /opt/aerieos/scripts/as-builder /opt/aerieos/bin/aerie; \
+    chown -R builder:builder /opt/aerieos/skel
 
 # Baked in so `docker exec` sessions also see it: when the entrypoint has
 # loaded shielded keys from /secrets/ssh into the root-owned agent, every
@@ -380,7 +382,7 @@ ENV BB_IMAGE_REV=${IMAGE_REV} \
 WORKDIR /workspace
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
-    CMD ["/opt/builderbot/scripts/healthcheck.sh"]
+    CMD ["/opt/aerieos/scripts/healthcheck.sh"]
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/opt/builderbot/scripts/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/aerieos/scripts/entrypoint.sh"]
 CMD ["supervise"]

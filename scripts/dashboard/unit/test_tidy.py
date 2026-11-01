@@ -71,7 +71,7 @@ class Tidy(unittest.TestCase):
         # A background tool call's own server, still running (B840): the call's
         # shell, aerie run's, then the server, under Claude Code.
         proc(r, 70, "bash", "bash -c aerie run -- python3 server.py", ppid=9)
-        proc(r, 71, "bash", "bash /opt/builderbot/scripts/aerie run -- python3 server.py", ppid=70)
+        proc(r, 71, "bash", "bash /opt/aerieos/scripts/aerie run -- python3 server.py", ppid=70)
         proc(r, 72, "python3", "python3 scripts/dashboard/server.py", ppid=71, fds=["socket:[5003]"])
         got = sorted(tidy.processes(root=r, uid=UID, spare=set()))
         self.assertEqual(got, [(10, "node", "server"), (11, "python3", "server"), (60, "node", "server"),

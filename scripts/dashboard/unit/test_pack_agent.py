@@ -215,7 +215,7 @@ class OnTheNode(unittest.TestCase):
     def test_the_node_agent_respawns_its_launcher_and_reads_its_sessions(self):
         sys.path.insert(0, os.path.dirname(__file__))
         import agentpkg  # noqa: PLC0415
-        node = agentpkg.load("builderbot_agent")
+        node = agentpkg.load("aerieos_agent")
         cur = os.path.join(self.d, "bundle", "current", "config")
         os.makedirs(cur)
         Path(cur, "toolpacks.json").write_text(Path(self.packs).read_text())

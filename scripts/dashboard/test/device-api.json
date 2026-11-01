@@ -20,7 +20,7 @@
       "handshake": "GET /api/meta answers api (server.py APP_API); the app says plainly when that is older or newer than its TARGET_API"
     },
     "companion": {
-      "source": "apps/windows/bbcompanion, with the agent's sync (scripts/agent/builderbot_agent/wssync.py) on the device door",
+      "source": "apps/windows/bbcompanion, with the agent's sync (scripts/agent/aerieos_agent/wssync.py) on the device door",
       "says": {"Authorization": "Bearer bbd_...", "X-BB-Door": "the door it speaks (devices.DOOR)",
                "X-BB-App": "companion/VERSION"},
       "handshake": "the controller refuses a door older than devices.DOOR_MIN with 426 and the way to update; its projects and apps answers say door and door_min, and the app says plainly when the controller's door is older than its NEEDS_DOOR",

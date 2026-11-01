@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # shellcheck source=lib/common.sh
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # ---------------------------------------------------------------------------
 # Graceful shutdown
@@ -147,7 +147,7 @@ while :; do
         if [ "$restarts" -lt 5 ]; then
             restarts=$((restarts + 1))
             warn "the dashboard is not running; starting it again (${restarts}/5 this hour)"
-            bash /opt/builderbot/scripts/startup.d/15-dashboard.sh 2>&1 | sed 's/^/[dashboard] /' || true
+            bash /opt/aerieos/scripts/startup.d/15-dashboard.sh 2>&1 | sed 's/^/[dashboard] /' || true
         elif [ "$restarts" -eq 5 ]; then
             restarts=6
             warn "the dashboard died five times in an hour and is left down: read $(bb_log_dir)/dashboard.log"

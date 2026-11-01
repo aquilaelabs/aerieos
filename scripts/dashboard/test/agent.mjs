@@ -20,9 +20,9 @@ const SHIPPED = `${DIR}/agentsrc`;
 // The agent's own modules, in-process: a fresh copy of the package as one
 // object (unit/agentpkg.py), the way the single file was loaded by path.
 const LOAD_AGENT = `import sys; sys.path.insert(0, ${JSON.stringify(`${REPO}/scripts/dashboard/unit`)}); import agentpkg`;
-// What a node runs: the zip the controller ships (builderbot_agent/bundle.py).
+// What a node runs: the zip the controller ships (aerieos_agent/bundle.py).
 const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); '
-  + 'from builderbot_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED]);
+  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED]);
 // Under aerie tests coverage (R76) every python this file starts, the agent it
 // runs and the module it drives in-process alike, counts the agent's
 // functions into its own file: PID is each process's own, so a self-update's
@@ -30,7 +30,7 @@ const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.inse
 if (process.env.BB_COVERAGE_DIR){
   process.env.BB_COVERAGE_OUT = `${process.env.BB_COVERAGE_DIR}/agent-PID.json`;
   process.env.BB_COVERAGE_SUITE = 'agent';
-  process.env.BB_COVERAGE_AS = 'scripts/agent/builderbot_agent';   // the copy's modules count as the tree's
+  process.env.BB_COVERAGE_AS = 'scripts/agent/aerieos_agent';   // the copy's modules count as the tree's
 }
 // A node's toolchains live under <store>/<node id> (R196), so every fixture
 // written INTO a store goes there, while the store's own path (the setting)
@@ -3913,7 +3913,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 // check is here rather than in anybody's memory.
 {
   // the package's sources, the number in its __init__
-  const PKG = `${REPO}/scripts/agent/builderbot_agent`;
+  const PKG = `${REPO}/scripts/agent/aerieos_agent`;
   const src = readdirSync(PKG).filter(f => f.endsWith('.py')).sort()
     .map(f => readFileSync(`${PKG}/${f}`, 'utf8')).join('\n');
   const av = /^AGENT_VERSION\s*=\s*"([^"]+)"/m.exec(src)?.[1] || '';

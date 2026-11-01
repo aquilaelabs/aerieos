@@ -17,7 +17,7 @@ import time
 STATE = None
 write_json = None
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
-ROOTS = ("/mnt/", "/srv/", "/var/lib/builderbot-controller")
+ROOTS = ("/mnt/", "/srv/", "/var/lib/aerieos-controller")
 MAX = 32
 STALE_S = 2 * 86400
 _lock = threading.RLock()

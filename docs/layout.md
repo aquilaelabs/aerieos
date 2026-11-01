@@ -18,7 +18,7 @@ lab/compose.yml                  the lab's Gitea and Forgejo for aerie tests lab
 lab/.env.example                 the lab's one setting: the address other machines reach it at
 platforms/                       each place the container edition installs (R98 step 1), its template and generated files; the installed
                                  edition's own parts (host/, modules/, installer/, image/) land beside it as they are built (R56)
-  unraid/builderbot.xml          Unraid Docker template (one-click updates)
+  unraid/aerie-workshop.xml          Unraid Docker template (one-click updates)
 image/                           AerieOS, the appliance image the installed editions are made from (R160 step 1): Debian stable by mkosi, pinned to the snapshot in SNAPSHOT, the controller staged in, sealed as a squashfs and laid into a disk with two root slots by build.sh; docs/image.md says what persists and how it boots
   SNAPSHOT                       the snapshot.debian.org timestamp every package is pinned to
   mkosi.conf                     the tree: Debian trixie, its packages (the controller's own come from config/controller-packages.tsv)
@@ -298,7 +298,7 @@ scripts/
     test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
     unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
-  agent/builderbot_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
+  agent/aerieos_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
     __init__.py                  what the agent is and how it runs, and AGENT_VERSION
     base.py                      the constants naming the node's paths and tools, the log, own_path and own_digest
     bundle.py                    the zip a node runs, built the same on the controller and the node, so the digests agree

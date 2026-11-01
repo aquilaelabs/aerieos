@@ -207,7 +207,7 @@ if [ -n "${BB_COVERAGE:-}" ] && [ -z "${BB_TEST_WORKER:-}" ]; then
     python3 "$DASH/../lib/codemap.py" instrument "$DASH" >&2 || exit 1
 fi
 # shellcheck source=/dev/null
-. /opt/builderbot/scripts/lib/common.sh 2>/dev/null || {
+. /opt/aerieos/scripts/lib/common.sh 2>/dev/null || {
     log()  { printf '[dashboard-test] %s\n' "$*"; }
     warn() { printf '[dashboard-test] WARN: %s\n' "$*" >&2; }
     die()  { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }

@@ -13,7 +13,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_adopt")
+agent = agentpkg.load("aerieos_agent_adopt")
 adopt = agent.module("adopt")
 
 DISKS = [

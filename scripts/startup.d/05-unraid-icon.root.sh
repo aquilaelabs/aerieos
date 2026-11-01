@@ -31,10 +31,10 @@
 # Entirely optional: without the mount this exits quietly.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 CACHE="${UNRAID_ICON_DIR:-/unraid-icons}"
-SRC="${UNRAID_ICON_SRC:-/opt/builderbot/icon.png}"
+SRC="${UNRAID_ICON_SRC:-/opt/aerieos/icon.png}"
 
 [ -d "$CACHE" ] || exit 0
 [ -f "$SRC" ]   || { warn "icon source $SRC is missing"; exit 0; }

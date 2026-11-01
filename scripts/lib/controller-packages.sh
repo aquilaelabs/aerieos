@@ -22,7 +22,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 list="${LIST:-}"
 if [ -z "$list" ]; then
-    # Beside the scripts in a checkout and in the image's /opt/builderbot alike.
+    # Beside the scripts in a checkout and in the image's /opt/aerieos alike.
     list="$here/../../config/controller-packages.tsv"
 fi
 [ -r "$list" ] || { echo "controller-packages.sh: no package list at $list" >&2; exit 1; }

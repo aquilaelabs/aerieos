@@ -11,7 +11,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_logs")
+agent = agentpkg.load("aerieos_agent_logs")
 said = []
 agent.log = lambda m: said.append(m)
 

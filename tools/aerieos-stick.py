@@ -13,7 +13,7 @@ release (its sha256 beside it is fetched and checked, and its build
 attestation where gh is on the machine), the newest one when nothing else
 is named, or a file you have (checked the same way, with its .sha256 where
 it sits beside it). --set KEY=VALUE, as often as
-needed, writes a line into the stick's builderbot.env, which each boot reads:
+needed, writes a line into the stick's aerieos.env, which each boot reads:
 TZ (the machine's time zone, Europe/Berlin), BB_RELEASE_LINE (the release
 line updates follow, 0.9), BB_HOSTNAME, and a static address for the wired
 network: BB_NET_ADDRESS, BB_NET_MASK (24 or 255.255.255.0), BB_NET_GATEWAY
@@ -48,13 +48,13 @@ RELEASES = "https://github.com/aquilaelabs/aerieos/releases"
 API = "https://api.github.com/repos/aquilaelabs/aerieos/releases"
 CHUNK = 4 << 20
 GB = 1e9
-# The stick's builderbot.env (image/lay-disk): 4 KiB behind this line.
-ENV_MARK = b"# builderbot.env BB-STICK-ENV-1"
+# The stick's aerieos.env (image/lay-disk): 4 KiB behind this line.
+ENV_MARK = b"# aerieos.env AERIE-STICK-ENV-1"
 ENV_SIZE = 4096
-# ...and its builderbot/firstboot.json, a prepared configuration: 64 KiB.
-BOOT_MARK = b"BB-FIRSTBOOT-1\n"
+# ...and its aerieos/firstboot.json, a prepared configuration: 64 KiB.
+BOOT_MARK = b"AERIE-FIRSTBOOT-1\n"
 BOOT_SIZE = 65536
-# ...and its builderbot/catalog-mirror.bin, a mirror of the vetted catalog
+# ...and its aerieos/catalog-mirror.bin, a mirror of the vetted catalog
 # (R169 step 6): 64 MiB, the archive's length on the line after the marker.
 MIRROR_MARK = b"BB-MIRROR-1\n"
 MIRROR_SIZE = 64 << 20
@@ -65,7 +65,7 @@ def say(s):
 
 
 def die(s):
-    print(f"builderbot-stick: {s}", file=sys.stderr, flush=True)
+    print(f"aerieos-stick: {s}", file=sys.stderr, flush=True)
     sys.exit(1)
 
 
@@ -140,7 +140,7 @@ def cmd_list(_):
 
 # ---- the image ----------------------------------------------------------------
 def fetch(url, dest, say_progress=True):
-    req = urllib.request.Request(url, headers={"User-Agent": "builderbot-stick"})
+    req = urllib.request.Request(url, headers={"User-Agent": "aerieos-stick"})
     with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:  # noqa: S310 (the release's address)
         total = int(r.headers.get("Content-Length") or 0)
         got, said = 0, -1
@@ -163,7 +163,7 @@ def release_image(tag, channel="normal"):
     checked; the newest release when tag is 'latest', or on the dev channel
     the newest pre-release a dev build's tag made (R179)."""
     if tag == "latest":
-        req = urllib.request.Request(API, headers={"Accept": "application/json", "User-Agent": "builderbot-stick"})
+        req = urllib.request.Request(API, headers={"Accept": "application/json", "User-Agent": "aerieos-stick"})
         with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
             rows = json.loads(r.read())
         dev = channel == "dev"
@@ -215,7 +215,7 @@ def attested(path):
         for chunk in iter(lambda: f.read(CHUNK), b""):
             h.update(chunk)
     req = urllib.request.Request(ATTEST.format(digest=h.hexdigest()), headers={"Accept": "application/vnd.github+json",
-                                                                              "User-Agent": "builderbot-stick"})
+                                                                              "User-Agent": "aerieos-stick"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 (GitHub's API)
             got = json.loads(r.read(4 << 20) or b"{}")
@@ -255,7 +255,7 @@ def check_sha(path, sha_file):
 # built it, which whoever changes the repository could run.
 RELEASE_SIGNERS = """
 """
-SIG_NS = "builderbot-release"
+SIG_NS = "aerieos-release"
 
 
 def signers():
@@ -311,13 +311,13 @@ def signed(tag, path):
     say(f"{os.path.basename(path)}: signed by AerieOS's release key")
 
 
-# ---- the stick's builderbot.env --------------------------------------------------
+# ---- the stick's aerieos.env --------------------------------------------------
 KEY = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
 VALUE = re.compile(r"[A-Za-z0-9_./:+,-]{0,200}")
 
 
 def env_block(sets):
-    """The 4 KiB the stick's builderbot.env is, with these KEY=VALUE lines:
+    """The 4 KiB the stick's aerieos.env is, with these KEY=VALUE lines:
     the marker line first, so another write finds it again, and blank
     padding, which the boot's reader passes over."""
     lines = []
@@ -328,7 +328,7 @@ def env_block(sets):
         lines.append(f"{k}={v}")
     body = ENV_MARK + b": KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)\n" + "".join(x + "\n" for x in lines).encode()
     if len(body) > ENV_SIZE - 1:
-        die(f"--set: {len(body)} bytes of lines, and builderbot.env holds {ENV_SIZE}")
+        die(f"--set: {len(body)} bytes of lines, and aerieos.env holds {ENV_SIZE}")
     return body + b" " * (ENV_SIZE - 1 - len(body)) + b"\n"
 
 
@@ -369,7 +369,7 @@ def mirror_block(path):
 
 
 def patched(src, block, boot=None, mirror=None):
-    """The image's bytes in CHUNKs, builderbot.env's 4 KiB and firstboot.json's
+    """The image's bytes in CHUNKs, aerieos.env's 4 KiB and firstboot.json's
     64 KiB put in place where their markers are. A chunk is held until the
     next is read, so a file across the line between two is found and written
     whole. A block of None passes its file as it is; a block with no marker
@@ -391,7 +391,7 @@ def patched(src, block, boot=None, mirror=None):
         if out:
             yield out
     if want:
-        what = " and ".join({ENV_MARK: "builderbot.env to write --set into", BOOT_MARK: "firstboot.json to write --config into",
+        what = " and ".join({ENV_MARK: "aerieos.env to write --set into", BOOT_MARK: "firstboot.json to write --config into",
                              MIRROR_MARK: "catalog-mirror.bin to write --mirror into"}[m] for m, _, _ in want)
         die(f"this image has no {what} (made before 0.9.0): nothing past the start of the stick is right, so write it again without them or with a newer image")
     if held:
@@ -765,7 +765,7 @@ def cmd_verify(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="builderbot-stick", description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
+    ap = argparse.ArgumentParser(prog="aerieos-stick", description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list", help="the removable disks here").set_defaults(fn=cmd_list)
     w = sub.add_parser("write", help="write a stick image to a disk")
@@ -773,7 +773,7 @@ def main(argv=None):
     w.add_argument("--image", help="aerieos-os-VERSION.stick.raw.xz, a file you have")
     w.add_argument("--release", help="the release's tag to fetch the image from (vX.Y.Z)")
     w.add_argument("--latest", action="store_true", help="fetch the newest release's image (what it does when nothing else is named)")
-    w.add_argument("--set", action="append", metavar="KEY=VALUE", help="a line for the stick's builderbot.env: TZ=Region/City, BB_RELEASE_LINE=X.Y, BB_HOSTNAME=NAME, BB_NET_ADDRESS=A.B.C.D, BB_NET_MASK=24, BB_NET_GATEWAY=A.B.C.D, BB_NET_DNS=A.B.C.D,E.F.G.H, BB_DATA_MAX=64G")
+    w.add_argument("--set", action="append", metavar="KEY=VALUE", help="a line for the stick's aerieos.env: TZ=Region/City, BB_RELEASE_LINE=X.Y, BB_HOSTNAME=NAME, BB_NET_ADDRESS=A.B.C.D, BB_NET_MASK=24, BB_NET_GATEWAY=A.B.C.D, BB_NET_DNS=A.B.C.D,E.F.G.H, BB_DATA_MAX=64G")
     w.add_argument("--config", metavar="FILE", help="a prepared configuration (JSON, docs/image.md) the stick's first boot applies, skipping the first-run page where it says so")
     w.add_argument("--mirror", metavar="FILE", help="a mirror of the vetted catalog (tools/catalog-mirror.py) for a machine with no network, imported as the controller starts")
     w.add_argument("--channel", choices=["normal", "dev"], default="normal", help=argparse.SUPPRESS)

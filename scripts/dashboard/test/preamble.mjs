@@ -193,8 +193,8 @@ ok(page.errors.length === 0,
 // The suite runs server.py from the checkout, so a path that is only right in a
 // checkout passes every test here and still ships a controller whose sessions
 // get no briefing at all. That is exactly what happened: the Dockerfile copies
-// config/templates/ to /opt/builderbot/templates/ and the first version of
-// preamble.py looked in /opt/builderbot/config/templates/. This asserts the two
+// config/templates/ to /opt/aerieos/templates/ and the first version of
+// preamble.py looked in /opt/aerieos/config/templates/. This asserts the two
 // agree by reading the Dockerfile, rather than trusting either.
 {
   const root = join(import.meta.dirname, '..', '..', '..');

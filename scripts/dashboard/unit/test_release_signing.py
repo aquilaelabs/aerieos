@@ -16,11 +16,11 @@ import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
-osimage = agentpkg.load("builderbot_agent_signing").module("osimage")
+osimage = agentpkg.load("aerieos_agent_signing").module("osimage")
 spec = importlib.util.spec_from_file_location("bbstick_signing", os.path.join(ROOT, "tools", "aerieos-stick.py"))
 stick = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stick)
-NS = "builderbot-release"
+NS = "aerieos-release"
 
 
 @unittest.skipUnless(shutil.which("ssh-keygen"), "no ssh-keygen here")

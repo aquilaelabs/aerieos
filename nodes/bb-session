@@ -278,9 +278,9 @@ WALL = "/etc/bb-session.wall"
 # What only a controller installed bare metal leaves on a machine: where
 # one of them is, a wall has to be too, so a missing file is never taken
 # for "no controller here".
-CONTROLLER_MARKS = ("/etc/builderbot-controller", "/var/lib/builderbot-controller",
-                    "/etc/systemd/system/builderbot-controller.service", "/etc/init.d/builderbot-controller",
-                    "/etc/sv/builderbot-controller")
+CONTROLLER_MARKS = ("/etc/aerieos-controller", "/var/lib/aerieos-controller",
+                    "/etc/systemd/system/aerieos-controller.service", "/etc/init.d/aerieos-controller",
+                    "/etc/sv/aerieos-controller")
 NFT_BINS = ("/usr/sbin/nft", "/sbin/nft", "/usr/bin/nft")
 WALL_TABLE = "builderbot_wall"
 

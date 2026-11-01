@@ -104,11 +104,11 @@ Get the template onto the flash drive, from the Unraid terminal:
 
 ```bash
 curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-builderbot.xml \
-  https://raw.githubusercontent.com/aquilaelabs/aerieos/main/platforms/unraid/builderbot.xml
+  https://raw.githubusercontent.com/aquilaelabs/aerieos/main/platforms/unraid/aerie-workshop.xml
 ```
 
 **Or copy it over.** The flash drive is an SMB share: open
-`platforms/unraid/builderbot.xml` on GitHub → **Raw** → save, then drop it into
+`platforms/unraid/aerie-workshop.xml` on GitHub → **Raw** → save, then drop it into
 `\\<TOWER>\flash\config\plugins\dockerMan\templates-user\` as
 `my-builderbot.xml`.
 
@@ -206,7 +206,7 @@ The one-time equivalent, if you would rather not add a mapping: just redo it
 if you ever recreate `docker.img`:
 
 ```bash
-docker cp Aerie-Workshop:/opt/builderbot/icon.png \
+docker cp Aerie-Workshop:/opt/aerieos/icon.png \
   /var/lib/docker/unraid/images/Aerie-Workshop-icon.png
 ```
 

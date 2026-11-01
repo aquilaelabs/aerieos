@@ -19,7 +19,7 @@ the agents a later step wires without anything behaving differently now.
 No imports from the rest of the dashboard, like names.py, so bb-tty, the
 node's bundle and the doctor can read it standalone. The page's copy is
 page-agents.js, held to this one by unit/test_agents.py; the node agent's
-prefixes (builderbot_agent/sessions.py AGENT_PREFIXES) by the same test.
+prefixes (aerieos_agent/sessions.py AGENT_PREFIXES) by the same test.
 """
 import re
 from dataclasses import dataclass, field

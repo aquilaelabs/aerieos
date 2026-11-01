@@ -131,7 +131,7 @@ def check():
     try:
         # A page long enough that dev builds never push the newest release off it.
         url_ = RELEASES_URL + ("?per_page=100" if RELEASES_URL.startswith("https://") else "")
-        req = urllib.request.Request(url_, headers={"Accept": "application/json", "User-Agent": "builderbot-release"})
+        req = urllib.request.Request(url_, headers={"Accept": "application/json", "User-Agent": "aerieos-release"})
         if token:
             req.add_unredirected_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:   # noqa: S310 (our releases, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -237,7 +237,7 @@ def fetch_draft(tag, dest):
     try:
         os.makedirs(dest, exist_ok=True)
         for a in got:
-            req = urllib.request.Request(str(a["url"]), headers={"Accept": "application/octet-stream", "User-Agent": "builderbot-release"})
+            req = urllib.request.Request(str(a["url"]), headers={"Accept": "application/octet-stream", "User-Agent": "aerieos-release"})
             req.add_unredirected_header("Authorization", f"Bearer {token}")
             with urllib.request.urlopen(req, timeout=600) as r, open(os.path.join(dest, str(a["name"])), "wb") as f:  # noqa: S310 (GitHub's API, checked above)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                 shutil.copyfileobj(r, f, 1 << 20)

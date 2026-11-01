@@ -59,7 +59,7 @@ class TheRecord(unittest.TestCase):
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_extmounts")
+        self.agent = agentpkg.load("aerieos_agent_extmounts")
         self.em = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".extmounts"]
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
