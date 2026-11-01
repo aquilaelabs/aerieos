@@ -581,7 +581,13 @@ def last_line(text):
     lines = [ln.strip() for ln in str(text or "").splitlines()]
     said = [ln for ln in lines if ln and not ln.startswith(skip)
             and not re.search(r"\b(Creating|Created|Starting|Started|Stopping|Stopped|Removing|Removed|Building|Built|Pulling|Pulled)\s*$", ln)]
-    return (said or [ln for ln in lines if ln] or [""])[-1][:200]
+    line = (said or [ln for ln in lines if ln] or [""])[-1]
+    # Docker's port refusal ends with what matters (B424): said whole.
+    m = re.search(r"(?:Bind for |listen tcp4? )?([0-9.:\[\]a-f]*?:)?(\d+)(?: failed)?: (?:port is already allocated|bind: address already in use)", line)
+    if m:
+        return f"port {m.group(2)} is already taken on the node (another container or program holds it): pick another port"
+    # A long line keeps its end, where the reason is, not its start.
+    return line if len(line) <= 200 else "…" + line[-199:]
 
 
 def compose_done(job, state):

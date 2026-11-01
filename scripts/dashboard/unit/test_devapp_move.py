@@ -46,6 +46,13 @@ class Scripts(unittest.TestCase):
         self.assertEqual(devactions.last_line("$ docker compose up\n Container x Creating \n"), "Container x Creating",
                          "with nothing telling, the last line there is")
         self.assertEqual(devactions.last_line(""), "")
+        # B424: Docker's port refusal said whole, and a long line its end.
+        self.assertEqual(devactions.last_line(
+            "Error response from daemon: driver failed programming external connectivity on endpoint site-web-1 "
+            "(3f1c2a9b8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b): Bind for 0.0.0.0:8381 failed: port is already allocated"),
+            "port 8381 is already taken on the node (another container or program holds it): pick another port")
+        long = "a" * 250 + " the reason"
+        self.assertTrue(devactions.last_line(long).endswith("the reason") and len(devactions.last_line(long)) == 200)
 
     def test_a_failed_stage_carries_the_last_line_written(self):
         class Q:
