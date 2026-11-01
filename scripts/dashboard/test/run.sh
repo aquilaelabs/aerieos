@@ -3,7 +3,7 @@
 #
 # Nothing here touches the live dashboard: the server under test binds a spare
 # port with its own scratch state directory, a fake workspace of four projects
-# (one broken, one locked), a crafted SARIF report, a stub `bb` whose doctor
+# (one broken, one locked), a crafted SARIF report, a stub `aerie` whose doctor
 # output the tests can flip, and throwaway tmux sessions on a PRIVATE tmux
 # server (TMUX_TMPDIR under the scratch dir): the live dashboard lists every
 # session on the shared server, and a test session showing up there as a
@@ -11,8 +11,8 @@
 # PID and by name, never by pattern, which is how a previous session managed
 # to kill the real dashboard while trying to stop a test one.
 #
-#   bb dashboard test            # every *.mjs in this directory
-#   bb dashboard test cards      # just cards.mjs
+#   aerie dashboard test            # every *.mjs in this directory
+#   aerie dashboard test cards      # just cards.mjs
 #   BB_TEST_TIMING=1 ...         # seconds between results, to find the slow part
 #   BB_TEST_WORKERS=3 ...        # three suites at once, each in a world of its own
 #
@@ -35,8 +35,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
 # Never as root. The suite's premise is an unprivileged runner: the agent it
 # starts drops to the account sessions run as, which as root means an
-# account the machine may not have (inside BuilderBot's own dev container,
-# where tests run as root through compose exec, that was `bb`, and the
+# account the machine may not have (inside AerieOS's own dev container,
+# where tests run as root through compose exec, that was `aerie`, and the
 # session half never came up). The image's account is builder; the suite
 # re-runs itself as that account when it starts as root and builder exists.
 if [ "$(id -u)" = 0 ] && id builder >/dev/null 2>&1 && command -v runuser >/dev/null; then
@@ -46,14 +46,14 @@ if [ "$(id -u)" = 0 ] && id builder >/dev/null 2>&1 && command -v runuser >/dev/
 fi
 
 # ---- a kept fixture (roadmap R75 step 2) ------------------------------------
-# `bb tests keep` runs this script with BB_TEST_HOLD=1: the whole set-up, then
+# `aerie tests keep` runs this script with BB_TEST_HOLD=1: the whole set-up, then
 # instead of suites it writes its address to $KEEPF and waits to be stopped.
 # Any run after that ATTACHES: no copy, no fixtures, no server, just the
 # named suite or probe against the fixture that is up: half the time of a
 # fresh run, and the world a suite just left still there for a probe to
 # look at, which is what iterating on one failure needs. The trade: the
 # world is not put back between runs
-# (`bb tests keep` again for a clean one), and the server is the kept copy's,
+# (`aerie tests keep` again for a clean one), and the server is the kept copy's,
 # so a change to the dashboard's python needs a fresh keep; its .js and
 # .html are copied over before every attached run, since the server reads
 # those per request. The whole suite is refused here: it wants a clean
@@ -74,7 +74,7 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
     if kill -0 "${KEEP_PID:-0}" 2>/dev/null && [ -n "${KEEP_ORIGIN:-}" ] && [ "$KEEP_ORIGIN" != "$_here_root" ]; then
         printf '[dashboard-test] a fixture is kept from %s, not this tree (%s): not attaching to it\n' "$KEEP_ORIGIN" "$_here_root" >&2
     elif kill -0 "${KEEP_PID:-0}" 2>/dev/null; then
-        [ $# -gt 0 ] || { printf '[dashboard-test] ERROR: a fixture is kept (%s): name a suite or a probe to run against it, or bb tests keep stop\n' "$KEEP_URL" >&2; exit 1; }
+        [ $# -gt 0 ] || { printf '[dashboard-test] ERROR: a fixture is kept (%s): name a suite or a probe to run against it, or aerie tests keep stop\n' "$KEEP_URL" >&2; exit 1; }
         # One attached run at a time, as a fresh run is (B240). The keeper
         # holds the harness's lock, so an attached run keeps its own beside
         # it: two pages on the test account in one kept world fight over its
@@ -194,7 +194,7 @@ if [ -z "${BB_TEST_COPY:-}" ] && [ -z "${BB_TEST_INPLACE:-}" ]; then
     BB_TEST_COPY="$_dst" BB_TEST_ORIGIN="$_src" exec bash "$_dst/scripts/dashboard/test/run.sh" "$@"
 fi
 DASH="$(dirname "$HERE")"
-# Function coverage (roadmap R76), under `bb tests coverage`: the page files
+# Function coverage (roadmap R76), under `aerie tests coverage`: the page files
 # of THIS copy are rewritten to count every function body they enter (never
 # the tree: with no copy, BB_TEST_INPLACE, it is refused), the server
 # records the functions it enters, and the counts are merged into the
@@ -228,7 +228,7 @@ export NODE_PATH
 node -e "require.resolve('playwright')" 2>/dev/null \
     || die "node and playwright are not on PATH here (NODE_PATH=$NODE_PATH); on a node they are the playwright recipe in the toolchain store, installed from the Library"
 CHROME="$(bash "$DASH/../bb" capture shot --print-chromium 2>/dev/null || true)"
-[ -x "${CHROME:-}" ] || die "no Playwright chromium: install it with: bb toolchains install playwright"
+[ -x "${CHROME:-}" ] || die "no Playwright chromium: install it with: aerie toolchains install playwright"
 command -v tmux >/dev/null || die "tmux is not installed"
 
 # The port is picked, not fixed. It was 8093 for everybody, which meant a run
@@ -287,7 +287,7 @@ fi
 # In a directory of its own, NOT a file straight under /tmp. /tmp is sticky,
 # and with fs.protected_regular (on by default since Ubuntu 20.04) a file
 # there that another account owns cannot be opened for writing whatever its
-# mode, so a lock a canceled CI job left as `bb` could never be taken over
+# mode, so a lock a canceled CI job left as `aerie` could never be taken over
 # by a session, or the reverse, and every run died on "cannot take" until
 # somebody with that account removed it (measured on bb-sandbox, 9 Sep). A
 # world-writable directory that is not sticky has no such rule: anyone can
@@ -317,7 +317,7 @@ for l in "$LOCK" "${TMPDIR:-/tmp}/dashboard-test.lock"; do
             # A kept fixture holds it until it is stopped, which no wait ends
             # (B343): said, with how.
             if [ -f "$KEEPF" ] && [ "$(sed -n 's/^KEEP_PID=//p' "$KEEPF" 2>/dev/null)" = "$other" ]; then
-                echo "[dashboard-test] waiting for the lock, which the fixture bb tests keep holds (pid $other): bb tests keep stop releases it" >&2
+                echo "[dashboard-test] waiting for the lock, which the fixture aerie tests keep holds (pid $other): aerie tests keep stop releases it" >&2
             else
                 echo "[dashboard-test] waiting for the run that holds the lock (pid $other) to end" >&2
             fi
@@ -365,10 +365,10 @@ coverage_merge() {
     [ "$n" -gt 0 ] || { warn "coverage: no counts were written"; return; }
     python3 "$DASH/../lib/codemap.py" --root "$origin" coverage-ingest \
         --strip "${BB_TEST_COPY:-$origin}/" "$BB_COVERAGE_DIR"/*.json >&2 || warn "coverage: the merge failed"
-    log "coverage from $n file(s) merged into $origin/.bb-map/coverage.json; bb map coverage reads it"
+    log "coverage from $n file(s) merged into $origin/.bb-map/coverage.json; aerie map coverage reads it"
 }
 # Every suite but the library and the lab's: a lab-*.mjs runs against a
-# real service (roadmap R54) and is asked for by name, `bb tests lab`.
+# real service (roadmap R54) and is asked for by name, `aerie tests lab`.
 default_suites() {
     local t
     for t in "$HERE"/*.mjs; do
@@ -434,7 +434,7 @@ workers_cleanup() {
 }
 # The machine's load as a run ends (R108), the one-minute and five-minute
 # averages and its cores: what a timing in this log was taken under, which
-# bb tests ingest keeps with the run so the Tests tab can tell a quiet run's
+# aerie tests ingest keeps with the run so the Tests tab can tell a quiet run's
 # seconds from a busy one's.
 load_line() {
     printf '[dashboard-test] load: %s on %s cores\n' "$(cut -d' ' -f1,2 /proc/loadavg 2>/dev/null)" \
@@ -621,8 +621,8 @@ renice -n 19 -p $$ >/dev/null 2>&1 || true
 command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || true
 # Same reasoning, for the credential. This script is usually run FROM a Claude
 # session, which is given BB_TOKEN, a token scoped to ONE project with `user`
-# rights and a twelve-hour life. `bb` prefers it over DASHBOARD_AUTH, so every
-# test that shells out to `bb` was quietly using the outer session's
+# rights and a twelve-hour life. `aerie` prefers it over DASHBOARD_AUTH, so every
+# test that shells out to `aerie` was quietly using the outer session's
 # credential instead of the harness's: it worked while that token was fresh
 # and the project happened to match, and stopped the moment it expired. What
 # that looked like was agent.mjs dying on "no node called agentbox" (a 401
@@ -630,10 +630,10 @@ command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || t
 # in the diff to explain it.
 # ---- the container is the boundary, where the project says so (R65) --------
 #
-# `bb test` routes a project's tests into its dev instance and refuses when the
+# `aerie test` routes a project's tests into its dev instance and refuses when the
 # instance is down and the Docker row says the container is the only place they
 # run. Calling this script directly skipped bb entirely, which is the door
-# BuilderBot's own suite went through for a day while its dev instance sat
+# AerieOS's own suite went through for a day while its dev instance sat
 # untouched: the machinery was built and simply not taken.
 #
 # NOT CI's. The setting is about a SESSION's tests (prefs.devtest), and a
@@ -648,12 +648,12 @@ command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || t
 # one relay per worker for an answer that cannot have changed.
 if [ -z "${BB_IN_INSTANCE:-}" ] && [ -z "${CI:-}" ] && [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${BB_TEST_WORKER:-}" ]; then
     _proj="${BB_PROJECT:-$(basename "$(cd "$HERE/../../.." && pwd)")}"
-    _only="$(BB_PROJECT="$_proj" BB_SETTINGS_JSON=1 bb settings --json 2>/dev/null         | python3 -c 'import json,sys
+    _only="$(BB_PROJECT="$_proj" BB_SETTINGS_JSON=1 aerie settings --json 2>/dev/null         | python3 -c 'import json,sys
 try: print("only" if json.load(sys.stdin).get("devtest") else "")
 except Exception: print("")' 2>/dev/null || true)"
     if [ "$_only" = only ]; then
         echo "[dashboard-test] ERROR: $_proj's tests run only inside its dev instance, and this is not it." >&2
-        echo "[dashboard-test] Run 'bb test' (or 'bb devapp test FILE'), which puts them there and says so if the instance is down." >&2
+        echo "[dashboard-test] Run 'aerie test' (or 'aerie devapp test FILE'), which puts them there and says so if the instance is down." >&2
         exit 1
     fi
 fi
@@ -661,19 +661,19 @@ fi
 unset BB_TOKEN
 # And the role. Run from a session ON A NODE, this script inherits
 # BUILDERBOT_ROLE=node, the real controller's address and pin, and the
-# account the session runs as, and every `bash scripts/bb` a test makes
+# account the session runs as, and every `bash scripts/aerie` a test makes
 # then relays to the real controller with no token, or reads a node's
 # home. The suite drives the checkout's bb as the CONTROLLER's, against its
 # own server; the tests that mean a node say so in their own env.
 unset BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE \
       BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR \
-      BB_NODE_TOOLCHAINS BB_EMU_LOCAL   # "already on the node's store": bb emu would run here
+      BB_NODE_TOOLCHAINS BB_EMU_LOCAL   # "already on the node's store": aerie emu would run here
 export TMUX_TMPDIR="$S/tmux"
 mkdir -p "$TMUX_TMPDIR"
 # git's global and system config are the suite's own, not the machine's. The
 # fixtures are `git init` with no branch named, so the branch they start on
 # is whatever init.defaultBranch says: nothing on a node, so master; `main`
-# in BuilderBot's own image, whose ~/.gitconfig sets it. The relayed-push
+# in AerieOS's own image, whose ~/.gitconfig sets it. The relayed-push
 # refusals in agent.mjs read the policy on that branch, and went green on the
 # node and red inside builderbot-dev with nothing in the diff to explain it
 # (15 Sep). Pinned here, so a run says the same thing on every machine.
@@ -872,10 +872,10 @@ for r in c if isinstance(c, list) else c.get("toolchains", []):
     if need:
         print(f"{r['name']}\t{need}")
 PY
-cat > "$S/bin/bb" <<'EOF'
+cat > "$S/bin/aerie" <<'EOF'
 #!/usr/bin/env bash
-# Stub: deterministic `bb doctor`, the emulator's image listings, and a
-# `bb toolchains` that makes and removes directories instead of downloading
+# Stub: deterministic `aerie doctor`, the emulator's image listings, and a
+# `aerie toolchains` that makes and removes directories instead of downloading
 # gigabytes, which is enough for the Library to watch a toolchain
 # appear and disappear.
 if [ "${1:-}" = doctor ]; then cat "${BB_DOCTOR_FIXTURE:?}"; fi
@@ -972,7 +972,7 @@ if [ "${1:-}" = toolchains ]; then
 fi
 exit 0
 EOF
-chmod +x "$S/bin/bb"
+chmod +x "$S/bin/aerie"
 # Stub claude: `auth status` answers from a fixture the tests flip, and
 # `auth logout` rewrites that fixture rather than going anywhere near the
 # operator's real credentials, which is the entire reason this stub exists,
@@ -1117,7 +1117,7 @@ case "$1" in
       exit 1; }
     echo "99.stub"; exit 0 ;;
   # What the daemon says it is. The provisioner's label lives here, and this is
-  # how BuilderBot tells the sandbox from any other machine that answers
+  # how AerieOS tells the sandbox from any other machine that answers
   # Docker, so the suite can take the stamp away (unlabeled.fail) and can
   # make it a DIFFERENT sandbox (uid file), which is the other question:
   # whether records from the last one are cleared when a new one is plugged in.
@@ -1335,7 +1335,7 @@ chmod +x "$S/bin/web-ext"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$S/bin/gh"
 chmod +x "$S/bin/gh"
 printf '  [ok]   claude on PATH\n  [ok]   github reachable\n  [ok]   disk space\n  [skip] gpu (no device)\n' > "$S/doctor-ok.txt"
-{ cat "$S/doctor-ok.txt"; echo '  [warn] clock skew 3s'; echo '  [FAIL] runner offline'; echo '         diagnose with: bb logs --runner'; } > "$S/doctor-fail.txt"
+{ cat "$S/doctor-ok.txt"; echo '  [warn] clock skew 3s'; echo '  [FAIL] runner offline'; echo '         diagnose with: aerie logs --runner'; } > "$S/doctor-fail.txt"
 cp "$S/doctor-ok.txt" "$S/doctor.txt"
 python3 - "$S/reports/test.sarif" <<'EOF'
 import json, sys
@@ -1478,7 +1478,7 @@ start_server() {
 rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
 ( env WORKSPACE="$S/ws" DASHBOARD_PORT="$PORT" BUILDER_HOME="$S/home" \
     BB_AGENT_DIR="$S/agentsrc" \
-    BB_BIN="$S/bin/bb" SDK_TEST_ROOT="$S/sdk" ANDROID_HOME="$S/androidsdk" \
+    BB_BIN="$S/bin/aerie" SDK_TEST_ROOT="$S/sdk" ANDROID_HOME="$S/androidsdk" \
     TC_AUTOCHECK=0 BB_NODE_POLL=3 \
     SSH_AUTH_SOCK="$S/ssh-agent.sock" \
     FINDINGS_DIR="$S/reports" DASHBOARD_STATE="$S/state" \
@@ -1684,14 +1684,14 @@ fresh_world() {
 stop_world
 snapshot_world
 
-# ---- kept: the world is up; wait for bb tests keep stop --------------------
+# ---- kept: the world is up; wait for aerie tests keep stop --------------------
 if [ -n "${BB_TEST_HOLD:-}" ]; then
     fresh_world
     fresh
     KEEP_MINE=1
     printf 'KEEP_PID=%s\nKEEP_URL=%s\nKEEP_S=%s\nKEEP_HERE=%s\nKEEP_CHROME=%s\nKEEP_SINCE=%s\nKEEP_ORIGIN=%s\n' \
         "$$" "http://127.0.0.1:$PORT/" "$S" "$HERE" "$CHROME" "$(date +%s)" "${BB_TEST_ORIGIN:-$(cd "$HERE/../../.." && pwd)}" > "$KEEPF"
-    log "fixture kept at http://127.0.0.1:$PORT/ (test:test); bb dashboard test SUITE and bb tests probe FILE attach to it; bb tests keep stop ends it"
+    log "fixture kept at http://127.0.0.1:$PORT/ (test:test); aerie dashboard test SUITE and aerie tests probe FILE attach to it; aerie tests keep stop ends it"
     while :; do sleep 3600 & wait $! || true; done
 fi
 
@@ -1704,7 +1704,7 @@ names=()
 if [ $# -gt 0 ]; then
     for t in "$@"; do
         case "$t" in
-            # A probe (`bb tests probe FILE`): a script from anywhere, copied
+            # A probe (`aerie tests probe FILE`): a script from anywhere, copied
             # beside lib.mjs so its `./lib.mjs` resolves, and removed after.
             /*) f="$HERE/_probe-$(basename "${t%.mjs}").mjs"; cp "$t" "$f"; probes+=("$f"); tests+=("$f") ;;
             *)  # A name that is no suite is said so before anything runs,

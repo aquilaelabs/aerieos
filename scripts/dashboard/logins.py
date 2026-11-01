@@ -4,7 +4,7 @@ when its browser signs out or it runs out; a device signed in as the
 account (devices.py) counts the same way. The question it answers is
 `live(uid)`: whether this person holds a live sign-in anywhere, which is
 what their git tokens are usable while (gitcreds.helpers) and what the
-Git view and bb git say when they are not.
+Git view and aerie git say when they are not.
 
 Kept in /config/logins.json, 0600, nothing secret in it: the cookie itself
 is stateless (server.make_token) and this only knows which of them were

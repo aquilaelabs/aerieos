@@ -1,4 +1,4 @@
-// bb capture (R95). reel: the frames of a recording that changed, stamped and tiled,
+// aerie capture (R95). reel: the frames of a recording that changed, stamped and tiled,
 // with a JSON of when. Driven on a synthetic video ffmpeg draws with two
 // hard changes, so the answer is known: three frames, at 0, 2.0 and 3.5s.
 // ffmpeg is a toolchain recipe rather than a given, so a node without it
@@ -19,7 +19,7 @@ const cap = (...a) => spawnSync('python3', [`${REPO}/scripts/lib/capture.py`, ..
 
 const ff = spawnSync('ffmpeg', ['-version'], { encoding: 'utf8' });
 if (ff.status !== 0){
-  ok(true, 'skipped: no ffmpeg on this node, which bb capture reel says in its own words');
+  ok(true, 'skipped: no ffmpeg on this node, which aerie capture reel says in its own words');
 } else {
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi',
     '-i', 'color=c=navy:size=640x400:rate=10:duration=5',
@@ -120,7 +120,7 @@ if (ff.status !== 0){
   mkdirSync(`${S}/dist/emu`, { recursive: true });
   writeFileSync(`${S}/dist/emu/shot-old.png`, Buffer.from([1, 2, 3]));
   writeFileSync(`${S}/dist/emu/.shot-old.png.json`, JSON.stringify({ by: 'claude', at: Math.floor(Date.now() / 1000) - 10 * 86400 }));
-  // A page's shot is a capture too (B6): bb capture shot URL with no file
+  // A page's shot is a capture too (B6): aerie capture shot URL with no file
   // writes it under dist/shot and marks it with the URL it was taken from.
   mkdirSync(`${S}/dist/shot`, { recursive: true });
   writeFileSync(`${S}/dist/shot/shot-page.png`, Buffer.from([1, 2, 3]));
@@ -140,7 +140,7 @@ if (ff.status !== 0){
   const none = cap('prune', `${S}/dist`);
   ok(none.status !== 0 && /prune NAME\.\.\. removes those; --days N/.test(none.stderr), 'prune with nothing to go by says what it takes');
   const missing = cap('prune', `${S}/dist`, 'nope');
-  ok(missing.status !== 0 && /no such capture: nope; bb capture ls names them/.test(missing.stderr), 'a name that is not there is refused, naming ls');
+  ok(missing.status !== 0 && /no such capture: nope; aerie capture ls names them/.test(missing.stderr), 'a name that is not there is refused, naming ls');
   const work = JSON.parse(readFileSync(`${S}/dist/reel/cut/frames.json`, 'utf8')).work;
   const byName = cap('prune', `${S}/dist`, 'cut');
   ok(work && !existsSync(work), `pruning a reel takes its working files on this machine with it (report 42: ${work})`);
@@ -273,7 +273,7 @@ exit 0
   mkdirSync(bin, { recursive: true });
   writeFileSync(`${bin}/adb`, '#!/bin/sh\n[ "$1" = devices ] && echo "List of devices attached"; exit 0\n', { mode: 0o755 });
   writeFileSync(`${bin}/emulator`, '#!/bin/sh\necho "emulator ran" >&2; exit 1\n', { mode: 0o755 });
-  const emu = (...a) => spawnSync('bash', [`${REPO}/scripts/bb`, 'emu', ...a], { encoding: 'utf8',
+  const emu = (...a) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'emu', ...a], { encoding: 'utf8',
     env: { ...process.env, ANDROID_AVD_HOME: home, ANDROID_AVD_NAME: 'builderbot-36', PATH: `${bin}:${process.env.PATH}`,
            BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
   const holder = spawn('flock', [`${home}/builderbot-36.avd/multiinstance.lock`, 'sleep', '600'], { detached: true, stdio: 'ignore' });
@@ -284,10 +284,10 @@ exit 0
   try { process.kill(-holder.pid, 'SIGTERM'); } catch {}
   console.log(`[emu held] three calls took ${Date.now() - t0} ms`);
   ok(/builderbot-36 is running in another of your sessions on this node/.test(st.stdout) && !/no emulator is running/.test(st.stdout),
-     `bb emu status names an emulator another session holds (${st.stdout.trim().split('\n').pop().slice(0, 80)})`);
+     `aerie emu status names an emulator another session holds (${st.stdout.trim().split('\n').pop().slice(0, 80)})`);
   ok(start.status !== 0 && /running in another of your sessions/.test(start.stderr) && !/emulator ran/.test(start.stderr),
      `...bb emu start refuses at once, starting nothing (${start.stderr.trim().split('\n').pop().slice(0, 80)})`);
-  ok(/running in another of your sessions/.test(stop.stderr), '...and bb emu stop says whose it is to stop');
+  ok(/running in another of your sessions/.test(stop.stderr), '...and aerie emu stop says whose it is to stop');
   await new Promise(r => setTimeout(r, 200));
   ok(/no emulator is running/.test(emu('status').stdout), '...and with the lock let go, none is running');
 }
@@ -299,12 +299,12 @@ ok(noDisp.status !== 0 && /no X display :77 on this node.*provisioner adds Xvfb 
    `a display the node does not have is refused, naming what the provisioner adds (${(noDisp.stderr || '').trim().slice(0, 80)})`);
 const noVid = reel('--video', `${S}/none.mp4`);
 ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that is not there is refused');
-// bb capture shot at rest: shots a quarter second apart until two match, so a page
+// aerie capture shot at rest: shots a quarter second apart until two match, so a page
 // whose element lands late is pictured after it does. A page of this
 // suite's own, served here, draws its heading at 700 ms: two settled shots
 // of it carry the heading and are the same bytes, since nothing moves after
 // that, and an immediate shot of a page whose heading comes much later
-// carries none. The heading lands inside the second bb capture shot waits
+// carries none. The heading lands inside the second aerie capture shot waits
 // for; a page that changes later than that is one it cannot know about,
 // and --wait is for it.
 {
@@ -325,14 +325,14 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
     try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch {}
     await new Promise(r => setTimeout(r, 100));
   }
-  const shot = (page, file, ...flags) => spawnSync('bash', [`${REPO}/scripts/bb`, 'capture', 'shot', `http://127.0.0.1:${port}/${page}`, file, ...flags],
+  const shot = (page, file, ...flags) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'shot', `http://127.0.0.1:${port}/${page}`, file, ...flags],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_PORT: '1' } });
   const now = shot('slow.html', `${S}/now.png`, '--now'), one = shot('', `${S}/one.png`, '--settle'), two = shot('', `${S}/two.png`, '--settle');
   srv.kill();
   const bytes = f => existsSync(f) ? readFileSync(f) : Buffer.alloc(0);
   ok(now.status === 0 && one.status === 0 && two.status === 0 && bytes(`${S}/one.png`).length > 0
      && !bytes(`${S}/now.png`).equals(bytes(`${S}/one.png`)) && bytes(`${S}/one.png`).equals(bytes(`${S}/two.png`)),
-     `bb capture shot --settle pictures a page after its late element lands, and --now pictures it before (${
+     `aerie capture shot --settle pictures a page after its late element lands, and --now pictures it before (${
         [now, one, two].map(r => r.status).join('/')}; ${(one.stderr || '').trim().slice(0, 60)})`);
   // B535: the server is gone now. A page that does not answer is no
   // picture and a failure, where it was Chromium's error page and exit 0.
@@ -367,15 +367,15 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
   heard();
   const as = controller => ({ ...process.env, BB_TOKEN: 'bbs_dGVzdA', BB_CONTROLLER: controller, DASHBOARD_PORT: String(port) });
   const url = `http://127.0.0.1:${port}/`;
-  const away = spawnSync('bash', [`${REPO}/scripts/bb`, 'capture', 'shot', url, `${S}/heard-away.png`, '--now'],
+  const away = spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'shot', url, `${S}/heard-away.png`, '--now'],
     { encoding: 'utf8', env: as('http://127.0.0.2:7680') });
   const awayHeard = heard();
-  const home = spawnSync('bash', [`${REPO}/scripts/bb`, 'capture', 'shot', url, `${S}/heard-home.png`, '--now'],
+  const home = spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'shot', url, `${S}/heard-home.png`, '--now'],
     { encoding: 'utf8', env: as(`http://127.0.0.1:${port}`) });
   const homeHeard = heard();
   let reelHeard = 'skipped';
   if (spawnSync('ffmpeg', ['-version']).status === 0) {
-    spawnSync('bash', [`${REPO}/scripts/bb`, 'capture', 'reel', '--url', url, '--seconds', '1'],
+    spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'reel', '--url', url, '--seconds', '1'],
       { encoding: 'utf8', env: as('http://127.0.0.2:7680'), cwd: S });
     reelHeard = heard();
   }

@@ -9,7 +9,7 @@ actually needs to act on it: where it is, how to reproduce it, and the gap
 between what should happen and what does.
 
 So bugs get their own file and their own shape. Either side writes them: the
-operator reports one from the notebook's Bugs tab, a session through `bb bug`
+operator reports one from the notebook's Bugs tab, a session through `aerie bug`
 when it trips over something out of scope for what it is on. That is the same
 reason the roadmap exists, applied to defects.
 
@@ -37,7 +37,7 @@ import json
 import os
 import sys
 
-# `bb` execs this module by path (spec_from_file_location), so its directory
+# `aerie` execs this module by path (spec_from_file_location), so its directory
 # is not on sys.path the way it is when the dashboard imports it normally, and
 # a plain `import statefile` would work in one caller and not the other. Doing
 # it through sys.path rather than a second by-path load keeps it ONE module
@@ -108,7 +108,7 @@ def replay(project, verb, args):
 
 # Every read-modify-write below is already wrapped in `with _lock:`. What it
 # was NOT is a lock: a threading.Lock guards the threads of one process, and
-# the tracker has two writers: the dashboard, and a `bb` invocation, which is a
+# the tracker has two writers: the dashboard, and a `aerie` invocation, which is a
 # separate process. Both loaded, both mutated their own copy, both wrote, and
 # the second landed on top of the first. Measured, four processes making forty
 # changes each: 40 of 160 survived.
@@ -521,7 +521,7 @@ def _stamp(project):
     """The project's version right now (roadmap #6): what a report was first
     seen in, and what it was closed in.
 
-    The same identity `bb version` prints (VERSION file plus commit count
+    The same identity `aerie version` prints (VERSION file plus commit count
     plus sha, or git describe where there is no file), so two reports say
     "before" and "after" in an order that sorts. None rather than a guess
     when there is nothing honest to say: a tree with no commits yet, a
@@ -662,7 +662,7 @@ def send(project, bug_id, sessions=(), note="", prefix="", want=""):
     """Point a running session at one bug, by number rather than by contents.
 
     The message deliberately does NOT carry the report. It says which bug and
-    tells the session to run `bb bug show N`, because the tracker is the copy
+    tells the session to run `aerie bug show N`, because the tracker is the copy
     that stays current: a report pasted into a conversation is a snapshot that
     starts going stale the moment somebody adds a note to it, and the session
     would then be working from the paste rather than from the file everything
@@ -695,9 +695,9 @@ def send(project, bug_id, sessions=(), note="", prefix="", want=""):
     session = running_session(prefix, project, set(sessions), want)
     tag = ids.label("bugs", bug_id)
     line = (f"Please look at bug {tag} in this project's tracker. "
-            f"Run `bb bug show {tag}` for the report: the area, how to "
+            f"Run `aerie bug show {tag}` for the report: the area, how to "
             f"reproduce it, expected against actual, and the notes so far. "
-            f"When you have dealt with it, close it with `bb bug fix "
+            f"When you have dealt with it, close it with `aerie bug fix "
             f"{tag} \"what fixed it\"`, or one of the other closes if it "
             f"turns out not to be a fix.")
     note = " ".join(_clean(note or "", 500).split())
@@ -796,7 +796,7 @@ def open_bugs(project):
 def brief(project):
     """The tracker's lines in a session's block (R202): how many are open by
     severity and the verbs, in place of the list; the bugs a prompt names
-    arrive on that prompt (preamble.mentioned) and `bb bug show` prints one
+    arrive on that prompt (preamble.mentioned) and `aerie bug show` prints one
     in full. Empty when nothing is open."""
     rows = open_bugs(project)
     if not rows:
@@ -805,17 +805,17 @@ def brief(project):
     for b in rows:
         by[b.get("severity", "medium")] = by.get(b.get("severity", "medium"), 0) + 1
     sev = ", ".join(f"{by[s]} {s}" for s in reversed(SEVERITIES) if by.get(s))
-    return (f"The project has a bug tracker with {len(rows)} open ({sev}). `bb bug` lists them, "
-            "`bb bug show B7` prints one in full: where it lives, how to reproduce it, what is known "
-            "about why. The bugs a prompt names arrive with it. `bb bug add \"...\" --sev medium "
+    return (f"The project has a bug tracker with {len(rows)} open ({sev}). `aerie bug` lists them, "
+            "`aerie bug show B7` prints one in full: where it lives, how to reproduce it, what is known "
+            "about why. The bugs a prompt names arrive with it. `aerie bug add \"...\" --sev medium "
             "--area \"...\" --repro \"...\" --reproduces always|sometimes|once|untried` files one you find "
-            "that is out of scope (how often those steps showed it, said with them), `bb bug note B7 "
-            "\"...\"` adds what you learn about an open one, and `bb bug fix B7 \"what fixed it\"` "
+            "that is out of scope (how often those steps showed it, said with them), `aerie bug note B7 "
+            "\"...\"` adds what you learn about an open one, and `aerie bug fix B7 \"what fixed it\"` "
             "closes one you fixed. The tracker is where the next session looks first.")
 
 
 def prompt(project):
-    """The tracker's lines in a session's block: `bb bug --prompt`."""
+    """The tracker's lines in a session's block: `aerie bug --prompt`."""
     return brief(project)
 
 

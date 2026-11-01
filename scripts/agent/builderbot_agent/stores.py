@@ -241,7 +241,7 @@ def _stores(stores, used=False):
 
 
 # Where a toolchain installed into the toolchain store keeps its command,
-# relative to the store (bb toolchains's layout), for the census to find without
+# relative to the store (aerie toolchains's layout), for the census to find without
 # PATH knowing about it. `android` is a directory, not a command.
 def _lay_path(store, entry, rel):
     """A layout path against the store. `root:` means the store itself;
@@ -326,7 +326,7 @@ def store_dirs(state):
     The census's `toolchains` above is a placement summary (six names, so a
     job can select on them), and it was being read as an inventory of the
     whole catalog, which called four installed toolchains missing on a store
-    the controller could see for itself. `bb toolchains` puts each toolchain in
+    the controller could see for itself. `aerie toolchains` puts each toolchain in
     <root>/<name>, and android's parts under <root>/android/, so the names
     ARE the inventory and this is one listdir.
     """

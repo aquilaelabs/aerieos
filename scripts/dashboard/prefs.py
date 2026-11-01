@@ -100,7 +100,7 @@ def _vm_caps(v):
 # Agents may: Sign a build (R106). Ask by default: a signed build is
 # something that leaves, and a person reads which build and which key.
 SIGN_MODES = ("deny", "ask", "auto")
-# Where `bb test` runs a project's tests (roadmap R48, B241): on the node and
+# Where `aerie test` runs a project's tests (roadmap R48, B241): on the node and
 # never in its dev instance, which is the default; inside the instance when
 # it is up and on the node otherwise; or inside it and nowhere else.
 TESTS_IN = ("node", "up", "only")
@@ -112,9 +112,9 @@ TEST_CHANGE = ("wait", "restart")
 # node's NVIDIA card (R102): on unless somebody said otherwise, since an
 # unused card costs nothing; off runs them as if the machine had none.
 GPU = ("on", "off")
-# Whether this project's sessions report BuilderBot's own problems with
-# `bb report` (reports.py): on everywhere by default, and off where the
-# project IS BuilderBot, whose sessions file those in its own tracker (the
+# Whether this project's sessions report AerieOS's own problems with
+# `aerie report` (reports.py): on everywhere by default, and off where the
+# project IS AerieOS, whose sessions file those in its own tracker (the
 # operator, 24 Sep). Two of the gates' words, since there is nothing to ask.
 REPORT_MODES = ("auto", "deny")
 # A color for the project, worn by its notebook tab and its row so that
@@ -423,7 +423,7 @@ def _clean(rec):
             # reading `node`; containers may live on any of these.
             "nodes": _nodes_of(rec),
             # The node its test suites run on (R151): one of its nodes, or
-            # "" for the session's own node, which is what bb tests run and
+            # "" for the session's own node, which is what aerie tests run and
             # the gate used before there was a choice.
             "test_node": str(rec.get("test_node") or "")[:40],
             # The nodes outside that set its containers may also run on: a
@@ -467,7 +467,7 @@ def _clean(rec):
             # on the project's nodes it names, every one when it names none
             # (the operator, 7 Oct). devapp.session_net_own hands them on.
             "reaches": _reaches_of(rec),
-            # What `bb build` / `bb test` run there, and the globs whose
+            # What `aerie build` / `aerie test` run there, and the globs whose
             # matches come back into dist/.
             "build": str(rec.get("build") or "")[:500],
             "test": str(rec.get("test") or "")[:500],
@@ -479,7 +479,7 @@ def _clean(rec):
             # What a session may do with git's network half (roadmap R36):
             # push its own branch, and push to main. Enforced where the
             # controller runs git (the relay) and read by a session with
-            # bb git policy; a local commit or merge cannot be forbidden.
+            # aerie git policy; a local commit or merge cannot be forbidden.
             "gitpol": {k: ((rec.get("gitpol") or {}).get(k)
                            if isinstance(rec.get("gitpol"), dict)
                            and (rec.get("gitpol") or {}).get(k) in GITPOL_KEY_MODES[k] else GITPOL_DEFAULT[k])
@@ -512,7 +512,7 @@ def _clean(rec):
             # curate, `auto` adds it at the index's pin, `deny` refuses.
             "installpacks": rec.get("installpacks") if rec.get("installpacks") in DEVBUILD_MODES else "ask",
             "vm_caps": _vm_caps(rec.get("vm_caps")),
-            # Where `bb test` runs the tests, one of TESTS_IN. On the node
+            # Where `aerie test` runs the tests, one of TESTS_IN. On the node
             # unless the project says otherwise: an image built to ship
             # carries no tests, and a run inside one found none and reported
             # success (B241). "only" makes a down instance a refusal that
@@ -523,10 +523,10 @@ def _clean(rec):
             "test_change": rec.get("test_change") if rec.get("test_change") in TEST_CHANGE else "wait",
             # May compute on the node's NVIDIA card: one of GPU.
             "gpu": rec.get("gpu") if rec.get("gpu") in GPU else "on",
-            # Agents may: Report BuilderBot bugs. Off takes `bb report` and
+            # Agents may: Report AerieOS bugs. Off takes `aerie report` and
             # the rule that points at it away from this project's sessions.
             "report": "deny" if rec.get("report") == "deny" else "auto",
-            # Agents may: Sign a build, one of SIGN_MODES (bb sign, R106).
+            # Agents may: Sign a build, one of SIGN_MODES (aerie sign, R106).
             "sign": rec.get("sign") if rec.get("sign") in SIGN_MODES else "ask",
             # Agents may: Manage signing keys, one of SIGN_MODES: a new
             # generated key or a package mapped to a key (R106 step 6).
@@ -536,7 +536,7 @@ def _clean(rec):
             # controller with the project's own credentials, which no session
             # holds. Ask by default: the operator, 5 Oct.
             "release": rec.get("release") if rec.get("release") in SIGN_MODES else "ask",
-            # Agents may: Use a lent PC, one of SIGN_MODES (bb pc, R270
+            # Agents may: Use a lent PC, one of SIGN_MODES (aerie pc, R270
             # step 6): the verbs a person's Windows companion lends this
             # project. Deny by default: it is somebody's own machine.
             "pc": rec.get("pc") if rec.get("pc") in SIGN_MODES else "deny",
@@ -636,13 +636,13 @@ def get(project):
 
 # How a project of each shape runs its tests, in the order a tree is asked.
 # The command is never WRITTEN anywhere: the record stays exactly what the
-# operator typed, and this answers when that is empty, so `bb test` on a
+# operator typed, and this answers when that is empty, so `aerie test` on a
 # project nobody has configured runs the thing that project obviously runs,
 # and the settings field shows it as the placeholder it would use.
 #
 # Tests only. "Run the tests" has one conventional answer per ecosystem;
 # "build" does not (which target, which flavor, which of an Android
-# project's four), so `bb build` still refuses and says so rather than
+# project's four), so `aerie build` still refuses and says so rather than
 # guessing at somebody's release variant.
 def all_projects(workspace=None):
     """Every project's pair, for the status payload. Cheap (one small file,
@@ -796,7 +796,7 @@ def sees_problem(path):
         return (f"{path} is not a place on a node: a path from the top, in letters, "
                 f"digits, dots, dashes and underscores")
     if path.split("/")[1] in SEES_NEVER:
-        return (f"{path} is the machine's own or BuilderBot's: a project is shown a share "
+        return (f"{path} is the machine's own or AerieOS's: a project is shown a share "
                 f"or a disk mounted on its node, like /mnt/media")
     return ""
 

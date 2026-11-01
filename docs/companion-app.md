@@ -1,6 +1,6 @@
 # The companion app
 
-The companion app is BuilderBot on an Android phone: the projects and their
+The companion app is AerieOS on an Android phone: the projects and their
 notebooks, the approvals and the notifications, without the terminals.
 Download it from its card on the **Library**, under Build on the rail, in the For you section. This doc covers what it
 does, pairing it with several BuilderBots, its lock, Claude from the phone,
@@ -13,7 +13,7 @@ the approvals, the nodes, the jobs, the accounts and your profile, in the
 shape an Android app takes, screens and a bottom bar. Sign in with the dashboard's address and your account;
 the credential is kept in the device's encrypted preferences.
 
-**More than one BuilderBot.** The app pairs with as many dashboards as
+**More than one AerieOS.** The app pairs with as many dashboards as
 you have (R132): **Add another** under More signs in to the next, with a
 name for it (home, work), and the one in front is picked from Home's title
 or the list under More. Every pairing is watched, and each note names the
@@ -79,12 +79,12 @@ that open the right screen. The note that a session is waiting on you
 names the project and the agent first and follows the project's *During a test run*
 setting: where a new ask interrupts a run, it comes as soon as the session
 is waiting, tests running or not, and says so; where a new ask waits for
-the run, the note waits too, and comes when the tests finish. `bb test`
+the run, the note waits too, and comes when the tests finish. `aerie test`
 tells the dashboard when a run starts and ends, which is how it knows;
 a run that never reports its end is forgotten after four hours. A
 phone left alone can hold the alarm back for some minutes, which is why the
 dashboard's bell carries the same questions. There is no push service: the phone reaches
-your BuilderBot directly, on your network or over your tailnet, so nothing
+your AerieOS directly, on your network or over your tailnet, so nothing
 needs an account with anybody, and nothing is kept in the repository.
 
 **Keeping it in step with the dashboard.** `apps/android/api-surface.json` names
@@ -94,17 +94,17 @@ suite's `appapi.mjs` holds the running server to that file, each field's
 type pinned too, so a change that removes, renames or retypes a field or a
 path the app reads fails the suite; and the app compares the dashboard's
 number to its own on the More screen and says when either is behind, naming
-the newer APK in BuilderBot's own Artifacts view. A field may be added at any
+the newer APK in AerieOS's own Artifacts view. A field may be added at any
 time; one is removed only in the release after the app stopped reading it,
 with the file, the constant and a changelog line moved in that change.
 
 **Building it.** `.github/workflows/android-app.yml` builds the unsigned
 release APK on a node's runner: the JDK and the Android SDK come from the
-node's toolchain store, the same environment every `bb` job gets, on a push
-to `main` that touches `apps/android/`, names it by `bb version --file`, drops it
-into BuilderBot's `dist/` where the runner's machine mounts the projects
+node's toolchain store, the same environment every `aerie` job gets, on a push
+to `main` that touches `apps/android/`, names it by `aerie version --file`, drops it
+into AerieOS's `dist/` where the runner's machine mounts the projects
 share. For a release it is handed to the controller as the artifact
-`bb-release-apk-TAG`, which the controller has signed on BuilderBot's node
+`bb-release-apk-TAG`, which the controller has signed on AerieOS's node
 with its own sideload key and attaches to the release (docs/building.md, "A
 release's APK is signed on the project's node"); no key or password is a
 GitHub secret.
@@ -115,4 +115,4 @@ On a node the build writes under the node's own disk rather than the
 projects share (a job's cache folder, or the account's `~/.cache/builderbot/gradle`),
 because a directory emptied and removed in one build on NFS can fail to go
 (B351); `./gradlew bbApk -PbbOut=NAME.apk` puts the debug APK into `dist/`
-from wherever it was built, and that is what `bb build` runs.
+from wherever it was built, and that is what `aerie build` runs.

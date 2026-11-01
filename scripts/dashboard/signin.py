@@ -174,7 +174,7 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
         old.cancel()
     # The token is what lets the flow REPORT what it signed in as: minted
     # for the account and scoped to this node, it is the credential
-    # bb login --flow speaks to the controller with. Without one the flow
+    # aerie login --flow speaks to the controller with. Without one the flow
     # ended and nobody was told, and the next check signed the node out
     # again as stale (16 Sep).
     a = agents.get(agent) or agents.get("claude")

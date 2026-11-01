@@ -1,4 +1,4 @@
-"""bb map unused over python too (11 Oct): it measured the page's functions
+"""aerie map unused over python too (11 Oct): it measured the page's functions
 alone and answered "nothing on the page is unused" for a python file, which
 hid two dead functions. A python function counts as unused only when its
 name appears nowhere in the tree but its definition, and never when a
@@ -45,7 +45,7 @@ class Unused(unittest.TestCase):
 
 
 class UnusedClasses(unittest.TestCase):
-    """bb map unused over a page's stylesheet (B79): R60 swept the classes
+    """aerie map unused over a page's stylesheet (B79): R60 swept the classes
     nothing names and took .gl0 to .gl4, which nb-git.js builds as
     gl${lane % 5}, for dead. A template's head or tail names a family."""
 

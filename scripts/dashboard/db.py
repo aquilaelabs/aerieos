@@ -55,7 +55,7 @@ def configure(*, state):
 def open_readonly(state):
     """Open the store to read it: no migration and no writes.
 
-    For `bb nodes` and anything else that looks without being the boot: a
+    For `aerie nodes` and anything else that looks without being the boot: a
     read-only caller mutating the store on its way in would make "look at
     the list" a write, and two processes racing the boot's.
     """

@@ -1,4 +1,4 @@
-"""R77: a tool pack's manifest, checked and cut to what BuilderBot reads,
+"""R77: a tool pack's manifest, checked and cut to what AerieOS reads,
 fetched from a repository at a commit, kept pinned to it, and turned into
 one catalog row of the recipe machinery's own shape."""
 import json
@@ -70,7 +70,7 @@ class Manifest(unittest.TestCase):
 
     def test_a_shipped_name_is_refused(self):
         _, errors = toolpacks.validate(GOOD, shipped=("hexkit",))
-        self.assertTrue(any("BuilderBot ships" in e for e in errors), errors)
+        self.assertTrue(any("AerieOS ships" in e for e in errors), errors)
 
 
 class Repository(unittest.TestCase):

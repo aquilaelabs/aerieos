@@ -1,4 +1,4 @@
-"""A release's Android APK signed by BuilderBot with the project's own
+"""A release's Android APK signed by AerieOS with the project's own
 sideload key, not in CI (R106, the operator 22 Oct: four keystore secrets
 set by hand on GitHub failed three ways, and one put a password in a public
 log).
@@ -7,7 +7,7 @@ The project's workflow builds an UNSIGNED release APK and hands it over as a
 workflow artifact named `bb-release-apk-TAG` (kept a few days, never on the
 release). The controller, which made the release, watches for that artifact:
 it fetches it with the project's GitHub token, hands each APK in it to a
-sign-key job on the project's node, which signs it as `bb sign` does
+sign-key job on the project's node, which signs it as `aerie sign` does
 (signing.sign_release: zipalign, apksigner with the proof of a rotation,
 verify, the certificate checked against the kept key) with the node's own
 tools, and attaches what comes back to the release under its name less
@@ -70,7 +70,7 @@ SCAN_S = 3600
 TICK_S = int(os.environ.get("BB_RELEASESIGN_TICK", "120"))
 RUN_AGE_S = 3 * 86400
 MAX_ZIP = 400 << 20
-NOTE = "Signed by BuilderBot:"
+NOTE = "Signed by AerieOS:"
 _lock = threading.Lock()
 _busy = set()
 _cache = {}
@@ -225,7 +225,7 @@ def _download(repo, aid, token, into):
     path = f"/repos/{repo}/actions/artifacts/{int(aid)}/zip"
     if not re.fullmatch(r"/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/artifacts/\d+/zip", path):
         raise cilogs.Refused("not a path this asks GitHub for")
-    req = urllib.request.Request(cilogs.API + path, headers={"User-Agent": "BuilderBot",
+    req = urllib.request.Request(cilogs.API + path, headers={"User-Agent": "AerieOS",
                                                              "Accept": "application/vnd.github+json"})
     req.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
@@ -393,7 +393,7 @@ def check(project, force=False):
     d = _load()
     rec = _mine(d, project)
     rec["scanned"] = now
-    # What this look found, run by run, for bb sign release to say (R190
+    # What this look found, run by run, for aerie sign release to say (R190
     # step 5): "looking" alone left a missing APK unexplained.
     last = {"at": now, "error": done["error"], "asked": seen.get("asked", 0),
             "known_bare": seen.get("known_bare", 0), "runs": []}

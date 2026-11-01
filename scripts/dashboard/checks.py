@@ -1,7 +1,7 @@
 """Update checks on one clock, adjustable (R176, the operator, 28 Oct).
 
-Each check BuilderBot makes by itself has a cadence under Controller
-settings, Update checks: the release (a newer BuilderBot), the container
+Each check AerieOS makes by itself has a cadence under Controller
+settings, Update checks: the release (a newer AerieOS), the container
 images, nginx, the scanners, and the catalog (the toolchains, the coding
 agents and the vetted index this controller offers), each daily, weekly
 (the default), monthly or off, with Check now beside it. A node's own

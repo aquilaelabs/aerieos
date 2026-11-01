@@ -1,4 +1,4 @@
-"""sound.py, behind bb tool sound (R107): a preset and a seed make the same
+"""sound.py, behind aerie tool sound (R107): a preset and a seed make the same
 sound every time, each preset makes something of its own length and shape,
 a tone sweeps where it is told, and a WAV is written without ffmpeg. The
 OGG and the pictures are ffmpeg's, walked by hand against the store's

@@ -1,4 +1,4 @@
-"""Behind `bb tool search` and `bb tool install` (cmd_tool in bb, R169 step
+"""Behind `aerie tool search` and `aerie tool install` (cmd_tool in bb, R169 step
 5): the vetted catalog's tool packs looked through, and one asked for by
 name, as the project's Install a tool pack dial says (deny refuses, ask
 waits for a person on the bell, auto adds it now at the commit the signed
@@ -13,8 +13,8 @@ import sys
 import bbapi
 
 AUTH = os.environ.get("BB_PACK_AUTH", "")
-USAGE = """usage: bb tool search [WORDS...]
-       bb tool install NAME --why "what it is for\""""
+USAGE = """usage: aerie tool search [WORDS...]
+       aerie tool install NAME --why "what it is for\""""
 
 
 def main(argv):
@@ -48,7 +48,7 @@ def main(argv):
     if d.get("error"):
         sys.exit(f"[builderbot] ERROR: {d['error']}")
     if d.get("request") or d.get("asked") or d.get("id"):
-        print(f"asked: {rest[0]} waits for a person on the bell; bb tool search shows it as added once they allow it")
+        print(f"asked: {rest[0]} waits for a person on the bell; aerie tool search shows it as added once they allow it")
     elif d.get("note"):
         print(d["note"])
     else:

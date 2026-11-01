@@ -1,6 +1,6 @@
 """The bundle comes back by itself when it is gone from the toolchain store
 while sessions run (the operator, 12 Oct: the store emptied by hand, and
-"no bundle bb at .../.bb/current/scripts/bb, so no idle session's token is
+"no bundle bb at .../.bb/current/scripts/aerie, so no idle session's token is
 refreshed" until the next job or session start fetched it)."""
 import os
 import shutil

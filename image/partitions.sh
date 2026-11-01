@@ -4,7 +4,7 @@
 # one, and test_image.py holds the three copies to this file. A partition's
 # UUID is fixed, the same on every stick and every installed disk, so a slot
 # is found by what it is rather than by where a firmware put it; two
-# BuilderBot disks in one machine are not a case the appliance serves.
+# AerieOS disks in one machine are not a case the appliance serves.
 #
 # shellcheck disable=SC2034  # read by the scripts that source it
 BB_PART_BIOS=6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e00   # GRUB's BIOS core, 1 MiB

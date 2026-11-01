@@ -104,7 +104,7 @@ after being asked, and merging into main stays everybody's (git.py
 `not_yours`, projsessions.py; the operator, 24 Sep).
 
 Which other projects a project's sessions may read (its settings' Reads) is
-BuilderBot's owner's alone: it hands one project's sessions another's code
+AerieOS's owner's alone: it hands one project's sessions another's code
 and notebook, so no administrator or user grants it on their own say,
 whatever their roles. They see the list and save the rest of the dialog;
 a change to it is refused, and the row says why (the operator, 6 Oct).
@@ -127,20 +127,20 @@ nothing else is reachable, and after it the store is the truth. (The setup
 page follows it: the controller's basics, then a first node that runs
 sessions, before the rest of the dashboard opens.) Nothing at
 boot reads a credential from the environment: one there stays readable
-forever. The one place `DASHBOARD_AUTH=name:password` is honored is `bb`,
+forever. The one place `DASHBOARD_AUTH=name:password` is honored is `aerie`,
 for a single command from a plain `docker exec` shell that has no session
 token.
 
 Which leaves the obvious question: what happens when the owner forgets the
 password. The answer is the one every system gives; you need the machine.
-`bb users passwd <name>`, in the container, resets it. Whoever can `docker
+`aerie users passwd <name>`, in the container, resets it. Whoever can `docker
 exec` into this container can already read everything in it.
 
 ## Sessions
 
 The `bb_session` cookie already exists; it grows a user id, and tokens are kept
 server-side with an expiry. Basic auth stays exactly as it is, checked against
-the user store instead of one string, because `bb` and the test suite use it
+the user store instead of one string, because `aerie` and the test suite use it
 and should keep working unchanged.
 
 ## What a Claude session gets, and bug #16

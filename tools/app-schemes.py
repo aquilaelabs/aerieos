@@ -3,7 +3,7 @@
 halves, so the app's twelve are the dashboard's by construction rather than
 a copy kept by hand (R50 step 16).
 
-    bb design json | python3 tools/app-schemes.py
+    aerie design json | python3 tools/app-schemes.py
 
 rewrites Schemes.all in apps/android/.../ui/Theme.kt in place and says how many
 it wrote. A theme without a light half is refused: the app offers Light for

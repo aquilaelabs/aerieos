@@ -313,7 +313,7 @@ def _insert_node(rec):
 
 STORE_ID_FILE = ".bb-store-id"
 
-# Where this container keeps its toolchains. `bb toolchains root` is the authority
+# Where this container keeps its toolchains. `aerie toolchains root` is the authority
 # and toolchains.py asks it, but nodes.py is imported at boot before any of
 # that and must not shell out on the seed path, so the same two answers bb
 # itself resolves between, in the same order.
@@ -721,7 +721,7 @@ def node_avd_remove(principal, node_id, project, uid, name):
     if not ph:
         return {"error": f"{name} is not one of {project}'s phones on {n['name']} as last measured"}
     if ph.get("running"):
-        return {"error": f"{name} is running on {n['name']}: stop it first (bb emu stop in a {project} session)"}
+        return {"error": f"{name} is running on {n['name']}: stop it first (aerie emu stop in a {project} session)"}
     r = job_add(principal, {"node": node_id}, "avd-remove",
                 {"timeout": 900, "project": project, "uid": uid, "name": name})
     if r.get("ok"):
@@ -785,7 +785,7 @@ def node_lock(principal, node_id, lock):
     OS level only. For a node somebody manages by hand, or one whose fstab
     and netplan are not the dashboard's to rewrite. The desired config is
     kept and still shown beside what the node reports; only applying it
-    stops. The runner and a funnel are BuilderBot's own footprint and are
+    stops. The runner and a funnel are AerieOS's own footprint and are
     not covered."""
     n = node(node_id)
     if not n:
@@ -972,7 +972,7 @@ def authenticate(bearer):
     kind = next((k for k, p in TOKEN_PREFIX.items() if bearer.startswith(p)),
                 None)
     if not kind:
-        return {"error": "not a BuilderBot token"}
+        return {"error": "not a AerieOS token"}
     secret = bearer[len(TOKEN_PREFIX[kind]):]
     rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = ?",
                  (_hash(secret), kind))
@@ -1369,7 +1369,7 @@ def _census(c):
                 # The node's own directory in the store: linux-x86_64,
                 # darwin-arm64 (roadmap R19).
                 "scope": re.sub(r"[^A-Za-z0-9_-]", "", str(s.get("scope") or ""))[:40]}
-    # {name: version} from `bb toolchains versions` on the node: the controller's
+    # {name: version} from `aerie toolchains versions` on the node: the controller's
     # own generator, run there. Whitelisted like store_dirs, and for the same
     # reason: a value the agent reports and this drops is a value that does
     # not exist.
@@ -1466,7 +1466,7 @@ def _census(c):
                                   **({"virtiofs": vm["virtiofs"] is True} if "virtiofs" in vm else {})},
                        "firewall": {"installed": fw.get("installed") is True},
                        # The IOMMU on the kernel's command line (R116 step 4):
-                       # put there by BuilderBot, and on now, which a restart
+                       # put there by AerieOS, and on now, which a restart
                        # and the firmware decide.
                        "iommu": {"installed": io.get("installed") is True, "on": io.get("on") is True},
                        "storage": {k: sto.get(k) is True for k in ("installed", "zfs", "mergerfs", "snapraid", "smart")},
@@ -1552,7 +1552,7 @@ def _census(c):
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16)}
-    # ...and whether its console takes a password (R194, BuilderBot OS).
+    # ...and whether its console takes a password (R194, AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
         out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
     # ...and what it adopted of another NAS (R163 step 8): each mount, its
@@ -1610,7 +1610,7 @@ def _census(c):
     # ...and its disks' spin-down in minutes (R164 step 3), 0 for never.
     if isinstance(c.get("spindown"), int) and not isinstance(c.get("spindown"), bool) and c["spindown"] in SPINDOWN_MINUTES:
         out["spindown"] = c["spindown"]
-    # BuilderBot OS on the machine (R160 step 4): the image's version and
+    # AerieOS on the machine (R160 step 4): the image's version and
     # snapshot, the slot this boot came from and the one GRUB boots next.
     if isinstance(c.get("os_image"), dict) and c["os_image"].get("version"):
         o = c["os_image"]
@@ -1643,7 +1643,7 @@ def _census(c):
                            "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
                            "projects_bound": s.get("projects_bound") is True,
                            "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else ""}
-    # The domains its libvirt has that BuilderBot did not make (R165 step 1):
+    # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
         out["vms_other"] = [{"name": str(v["name"]), "state": re.sub(r"[^a-z ]", "", str(v.get("state") or ""))[:20],
@@ -1895,7 +1895,7 @@ def _census(c):
             # false from a node that could not set it up, with why.
             "ctr": bool(se.get("ctr")),
             "ctr_why": str(se.get("ctr_why") or "")[:120],
-            # Whether its agent serves BuilderBot's own terminal (R133): one
+            # Whether its agent serves AerieOS's own terminal (R133): one
             # that does not (an agent before 0.8) opens no terminal until
             # it is updated.
             "term": bool(se.get("term")),
@@ -1903,7 +1903,7 @@ def _census(c):
             "workspace": bool(se.get("workspace")),
             # None is "not probed", read as unknown rather than read-only:
             # a /workspace the agent could not test is not one it found
-            # closed. Said in bb diag; no gate reads it since the synced
+            # closed. Said in aerie diag; no gate reads it since the synced
             # copy is the node's own directory (R163).
             "writable": None if "writable" not in se else bool(se.get("writable")),
             "claude": str(se.get("claude") or "")[:40],
@@ -2215,7 +2215,7 @@ def node_session_net(principal, node_id, on):
 
 
 def node_vm_of(node_id, host_id):
-    """A node that is a VM BuilderBot made on another node (R91 step 14),
+    """A node that is a VM AerieOS made on another node (R91 step 14),
     said on its row; retired with the VM."""
     n = node(node_id)
     if not n:
@@ -2241,7 +2241,7 @@ def node_vm_lan(principal, node_id, on):
 
 
 def node_root_asks(principal, node_id, on):
-    """Whether a session on this node may ask for a root command (bb root
+    """Whether a session on this node may ask for a root command (aerie root
     run): on, the ask goes to a person as ever; off, it is refused with the
     sentence root_refused says. An administrator's, like the rest of the
     config plane."""
@@ -2399,7 +2399,7 @@ def session_net_nudge():
 def node_test_workers(principal, node_id, n):
     """How many workers a test run on this node may use (R81): 0 means the
     node's own core count. Handed to every test job there as
-    BB_TEST_WORKERS, for the project's test command and BuilderBot's own
+    BB_TEST_WORKERS, for the project's test command and AerieOS's own
     harness to read. An administrator's, like the rest of the config plane;
     the node hears it by a fresh hello."""
     node_ = node(node_id)
@@ -2454,7 +2454,7 @@ def node_log_read(principal, asking_id, target_id, stream="agent", lines=200,
     if not asking_id:
         return {"error": "this session is not on a node, and the grant is a "
                          "node's; a controller session reads its own log with "
-                         "`bb logs`"}
+                         "`aerie logs`"}
     tgt = node(target_id)
     if not tgt:
         return {"error": "no such node"}
@@ -3123,7 +3123,7 @@ def node_in_use(n):
     rep = n.get("reported") or {}
     # The sessions the card lists: an account's (u_<uid>~name), the way
     # server._SESS_OWNER reads them. The node's tmux may hold others (the
-    # harness's own, somebody's shell), which are not BuilderBot's to end.
+    # harness's own, somebody's shell), which are not AerieOS's to end.
     sessions = [s for s in (rep.get("sessions") or []) if isinstance(s, dict)
                 and re.match(r"^u_[0-9a-f]{8}~", str(s.get("name") or ""))]
     containers = list((rep.get("published") or {}).keys())
@@ -3137,9 +3137,9 @@ def node_in_use(n):
 
 
 def node_uninstall(principal, node_id, rings=None):
-    """Take BuilderBot off a node from its row: a system job the agent
+    """Take AerieOS off a node from its row: a system job the agent
     answers by deregistering its runners and starting bb-sandbox uninstall
-    detached, after which nothing of BuilderBot's is left on the machine
+    detached, after which nothing of AerieOS's is left on the machine
     but docker, the packages and the shares' contents. The node is retired
     when the job succeeds (job_result), so the row leaves every list the
     way Remove's does."""
@@ -3149,7 +3149,7 @@ def node_uninstall(principal, node_id, rings=None):
     if n.get("kind") != "agent":
         return {"error": "only an agent node can be uninstalled from here"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox can be uninstalled "
+        return {"error": "only a node provisioned as a AerieOS sandbox can be uninstalled "
                          "from here: on the machine, sudo bb-sandbox uninstall"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
@@ -3399,7 +3399,7 @@ def node_storage_array(principal, node_id, req):
 
 
 def node_console(principal, node_id, password, clear=False):
-    """A console password for BuilderBot OS's screen (R194): hashed here
+    """A console password for AerieOS's screen (R194): hashed here
     (SHA-512 crypt, by openssl, so neither the job nor its record holds the
     password itself), sent to the machine's agent, which makes the admin
     account from it at every boot. clear takes it away."""
@@ -3409,7 +3409,7 @@ def node_console(principal, node_id, password, clear=False):
         return {"error": "a console password is the controller's own machine's"}
     rep = n.get("reported") or {}
     if not (rep.get("console") or {}).get("os"):
-        return {"error": "a console password is BuilderBot OS's; on a Linux of your own, log in with its own accounts"}
+        return {"error": "a console password is AerieOS's; on a Linux of your own, log in with its own accounts"}
     cfg = {"clear": True} if clear else {}
     if not clear:
         pw = str(password or "")
@@ -3566,7 +3566,7 @@ def node_storage_key(principal, node_id, req):
 def node_storage_share(principal, node_id, req):
     """A share on the controller's own machine (R162 step 1): set (SMB,
     NFS or both, on a folder under a pool's mount) or removed, a system job
-    on its node whose root agent writes BuilderBot's own two files whole and
+    on its node whose root agent writes AerieOS's own two files whole and
     tells Samba and NFS to read again. Refused anywhere else, and without
     the shares feature's daemons."""
     n = node(node_id)
@@ -3891,7 +3891,7 @@ def node_storage_backup(principal, node_id, name):
 def node_host_update(principal, node_id, reboot=False):
     """The controller's own machine's own packages updated (R164 step 3):
     apt on its node by the root agent, a restart after when asked for;
-    refused anywhere else, on BuilderBot OS (whole images), and while a
+    refused anywhere else, on AerieOS (whole images), and while a
     system job is in flight."""
     n = node(node_id)
     if not n:
@@ -3902,7 +3902,7 @@ def node_host_update(principal, node_id, reboot=False):
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot update its packages"}
     if rep.get("os_image"):
-        return {"error": "BuilderBot OS updates as a whole image under Controller settings, never package by package"}
+        return {"error": "AerieOS updates as a whole image under Controller settings, never package by package"}
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -3981,7 +3981,7 @@ def node_os_kept(principal, node_id, verb, version):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_image") or {}).get("version"):
-        return {"error": "older versions are BuilderBot OS's, on this machine"}
+        return {"error": "older versions are AerieOS's, on this machine"}
     if verb not in ("next", "remove"):
         return {"error": "next or remove"}
     if version not in {x.get("version") for x in (rep.get("os_kept") or {}).get("versions") or []}:
@@ -4000,7 +4000,7 @@ def node_os_kept(principal, node_id, verb, version):
 
 
 def node_os_update(principal, node_id, release="", from_dir=""):
-    """Update BuilderBot OS on the controller's own machine (R160 step 4): a
+    """Update AerieOS on the controller's own machine (R160 step 4): a
     system job on its node, whose root agent fetches the release's image
     files (or takes them from a folder on the machine), checks each against
     its sha256 and the slot against its build attestation, writes the slot
@@ -4011,7 +4011,7 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_image") or {}).get("version"):
-        return {"error": "updating the image is for a machine that runs BuilderBot OS, on its own node; "
+        return {"error": "updating the image is for a machine that runs AerieOS, on its own node; "
                          "a bare-metal install on another system updates its controller, a container install pulls its image"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot write a slot"}
@@ -4042,7 +4042,7 @@ def node_os_update(principal, node_id, release="", from_dir=""):
 
 
 def on_stick():
-    """Whether this controller's own machine runs BuilderBot OS from a stick."""
+    """Whether this controller's own machine runs AerieOS from a stick."""
     return any(own_machine(n) and ((n.get("reported") or {}).get("os_stick") or {}).get("stick") for n in node_list())
 
 
@@ -4100,7 +4100,7 @@ def node_projects_folder(principal, node_id, path="", release=False):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
-        return {"error": "a projects folder of the machine's own is a stick's: this machine does not run BuilderBot OS from a stick"}
+        return {"error": "a projects folder of the machine's own is a stick's: this machine does not run AerieOS from a stick"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot name a folder"}
     cfg = {"release": True}
@@ -4141,7 +4141,7 @@ def node_system_pool(principal, node_id, path=""):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
-        return {"error": "a system pool is a stick's: this machine does not run BuilderBot OS from a stick"}
+        return {"error": "a system pool is a stick's: this machine does not run AerieOS from a stick"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot move a pool"}
     path = str(path or "").strip()
@@ -4239,7 +4239,7 @@ def node_lockdown(principal, node_id):
 
 def reset_unenroll(principal, ids, stores=False):
     """Un-enroll these nodes ahead of a Reset (the operator, 12 Oct), so
-    each machine is clean to enroll again afterwards: a node BuilderBot
+    each machine is clean to enroll again afterwards: a node AerieOS
     provisioned and can reach is uninstalled, its job retiring it when the
     machine reports done; any other is retired here, its tokens revoked.
     [{id, name, how, error}], how being "uninstall" or "retired"."""
@@ -4295,7 +4295,7 @@ def node_gpu_display(principal, node_id):
     if n.get("kind") != "agent":
         return {"error": "only an agent node has a GPU display to set up"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox is set up from here: "
+        return {"error": "only a node provisioned as a AerieOS sandbox is set up from here: "
                          "on the machine, sudo bb-sandbox gpu"}
     # The display runs on the driver and does not install it (R102): the
     # driver's card in the Library is the one place it is installed.
@@ -4326,7 +4326,7 @@ def node_gpu_display_off(principal, node_id):
     if not n:
         return {"error": "no such node"}
     if n.get("kind") != "agent" or not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox is changed from here: "
+        return {"error": "only a node provisioned as a AerieOS sandbox is changed from here: "
                          "on the machine, sudo bb-sandbox gpu-off"}
     why = node_locked(n)
     if why:
@@ -4443,7 +4443,7 @@ def node_apply(principal, node_id, what):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a BuilderBot sandbox "
+        return {"error": "this node was not provisioned as a AerieOS sandbox "
                          "(no bb-sandbox on it), so system jobs are not offered to it"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; system jobs go to an online node"}
@@ -5010,7 +5010,7 @@ def heartbeat(nid, sample, addr, running=0):
     clean["disks"] = {r: [_mb((disks.get(r) or {}).get("free_mb")), _mb((disks.get(r) or {}).get("total_mb"))]
                       for r in ("root", "docker") if isinstance(disks.get(r), dict)}
     clean["store_totals"] = totals
-    # BuilderBot's memory fence (R110 step 4), [max MB, used MB], or None
+    # AerieOS's memory fence (R110 step 4), [max MB, used MB], or None
     # from an agent that looked and found none; absent from an older one.
     if "fence" in s:
         f = s.get("fence")
@@ -5668,7 +5668,7 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a BuilderBot sandbox, so root "
+        return {"error": "this node was not provisioned as a AerieOS sandbox, so root "
                          "there is its owner's"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; a root command goes to an online node"}
@@ -6823,7 +6823,7 @@ def jobs_restart_sweep():
         if runner_of(j["type"], j["kind"] or "local") != "controller":
             continue
         _exec("UPDATE jobs SET state = 'failed', ended = ?, step = '', error "
-              "= 'lost: BuilderBot restarted while it was running' WHERE "
+              "= 'lost: AerieOS restarted while it was running' WHERE "
               "id = ?", (now, j["id"]))
         audit("system", "job-lost", j["id"], {"why": "controller restart"})
         n += 1
@@ -6890,7 +6890,7 @@ def agent_file():
         was = _agent_cache.get("digest")
         if was and was != digest:
             # The sources moved under a running controller (a tree edited
-            # under bb dashboard dev, a harness copy written mid-run, B718):
+            # under aerie dashboard dev, a harness copy written mid-run, B718):
             # every node enrolled on the old digest is held from here on, so
             # the file that moved is named, once, where the log is read.
             newest = max(b.sources(str(AGENT_DIR)), key=lambda t: os.stat(t[1]).st_mtime)[1]
@@ -7246,7 +7246,7 @@ def verb(principal, req):
     return r if isinstance(r, tuple) else (r, 400 if r.get("error") else 200)
 
 def run_job(name, req, principal):
-    """`bb run`, `bb build` and `bb test` from the controller (docs/nodes.md
+    """`aerie run`, `aerie build` and `aerie test` from the controller (docs/nodes.md
     §6), once server.py has let an administrator queue one for this
     project: snapshot the project's working tree, dirty edits included, and
     queue an exec on the project's node, or on the node named; `emu` runs a
@@ -7323,7 +7323,7 @@ def run_job(name, req, principal):
         return r | {"node": nid}, 200
     # A build or a test held to the node's room (R110 step 7): it writes its
     # outputs and caches to the data store, and one started under the floor
-    # fills the disk partway. bb run is left alone: it is how room is made.
+    # fills the disk partway. aerie run is left alone: it is how room is made.
     if room_floor_gb() and field(req, "role") in ("build", "test"):
         took = last_took(name).get("workspace") or 0
         why = room_short(nid, room_floor_gb(), roles=("data", "cache", "root"), need_mb=took >> 20)
@@ -7349,7 +7349,7 @@ def run_job(name, req, principal):
 
 
 # The project a job belongs to when it is not the one it names: a container
-# written for a project (bb container new --for) carries the container's own
+# written for a project (aerie container new --for) carries the container's own
 # name as its project, and its owner is the record's. Set by server.py to
 # devapp.owner_of; None reads every job as its own project's.
 job_owner = None
@@ -7384,7 +7384,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         return mine is None or _job_mine(j, mine) or (system is not None and not j.get("project"))
 
     def scrub(v):
-        # Every string inside, the shape kept: bb jobs and the Jobs tab read
+        # Every string inside, the shape kept: aerie jobs and the Jobs tab read
         # a spec's fields by name.
         if isinstance(v, str):
             return system(v)
@@ -7407,7 +7407,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         n = min(500, max(1, int(q.get("n", ["100"])[0])))
     except ValueError:
         n = 100
-    # A node by its id or its name: `bb jobs --node bb-sandbox` is how a
+    # A node by its id or its name: `aerie jobs --node bb-sandbox` is how a
     # person or a session says it.
     nd = q.get("node", [""])[0] or None
     if nd and not nd.startswith("n_"):

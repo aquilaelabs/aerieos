@@ -239,7 +239,7 @@ class Migrate(unittest.TestCase):
             self.assertIn("disk full", sv.HELD)
             self.assertEqual(sv.migrate(self.state, {"ran": []}), [])
         self.assertEqual(sv.read(self.state), (None, ""))
-        # B109: said where bb doctor reads it, and cleared once nothing is held.
+        # B109: said where aerie doctor reads it, and cleared once nothing is held.
         self.assertIn("disk full", (self.state / sv.HELD_FILE).read_text())
         with mock.patch.object(sv, "HELD", ""), redirect_stdout(io.StringIO()):
             sv.gate(self.state, "0.6.0")
@@ -268,7 +268,7 @@ class Migrate(unittest.TestCase):
 
 
 class Release(unittest.TestCase):
-    """bb version release, and the Artifacts view's Release, refuse a
+    """aerie version release, and the Artifacts view's Release, refuse a
     version with no snapshot where the tree keeps them."""
     def test_a_tree_that_keeps_snapshots_needs_this_ones(self):
         import version

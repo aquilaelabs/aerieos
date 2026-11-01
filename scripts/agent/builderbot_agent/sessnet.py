@@ -39,7 +39,7 @@ def session_sudoers(user, accounts=False):
     own terminal rather than a pty sudo would relay. Where accounts are their
     own users (R125), each of them may start its own session the same way
     (bb-session holds it to its own account), and nothing more."""
-    return (f"# Written by the BuilderBot agent (R35): the one command {user} may run as root,\n"
+    return (f"# Written by the AerieOS agent (R35): the one command {user} may run as root,\n"
             f"# which starts a session inside a view of this node that holds only its project.\n"
             f"Defaults!{SESSION_BIN} !use_pty, !lecture\n"
             f"{user} ALL=(root) NOPASSWD: {SESSION_BIN}\n"
@@ -55,7 +55,7 @@ def session_conf(state, user, net=False, accounts=None):
     once the table is in place, that each session gets a network of its own
     (R79). Off, the lines are not written at all."""
     stores = state.get("stores") or {}
-    return (f"# Written by the BuilderBot agent (R35) for bb-session.\n"
+    return (f"# Written by the AerieOS agent (R35) for bb-session.\n"
             f"SESSION_USER={user}\n"
             f"WORKSPACE=/workspace\n"
             f"DATA_STORE={stores.get('data') or ''}\n"
@@ -133,7 +133,7 @@ def sessnet_resolvers(paths=RESOLV_UPSTREAM):
 
 
 def sessnet_resolv_text(ns, search):
-    return ("# Written by the BuilderBot agent (R79): the resolvers a session's own network reaches.\n"
+    return ("# Written by the AerieOS agent (R79): the resolvers a session's own network reaches.\n"
             + "".join(f"nameserver {n}\n" for n in ns)
             + (f"search {search}\n" if search and search != "." else ""))
 
@@ -380,7 +380,7 @@ def sessnet_containers():
 def sessnet_pairs(sessions, own, containers):
     """(session address, container address) for every session and every
     container its project owns here: by compose project for an instance
-    BuilderBot runs, by name for one the operator gave the project."""
+    AerieOS runs, by name for one the operator gave the project."""
     addrs = {}
     for project, o in (own or {}).items():
         if not isinstance(o, dict):
@@ -533,7 +533,7 @@ def ctrnet_reach(containers, ctr):
     pairs, ports, lan = set(), set(), set()
     for comp, e in by.items():
         to = {comp} | {str(x) for x in ((ctr or {}).get(comp) or {}).get("to") or []}
-        # BuilderBot's own (R180, the controller's `all`): every compose
+        # AerieOS's own (R180, the controller's `all`): every compose
         # project here, the ones the controller never heard of included.
         if ((ctr or {}).get(comp) or {}).get("all"):
             to |= set(by)

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>BuilderBot</Name>
+  <Name>AerieOS</Name>
   <Repository>ghcr.io/aquilaelabs/builderbot:latest</Repository>
   <Registry>https://ghcr.io</Registry>
   <Network>bridge</Network>
@@ -12,7 +12,7 @@
 A workshop for coding agents (Claude Code, ChatGPT's Codex CLI and GitHub's Copilot CLI) and the controller for your build nodes: the machines where builds, tests, CI and the Android emulator run.
 
 Open the dashboard on its port; an agent's session runs on a node from there.
-Helper CLI inside:       docker exec -it BuilderBot bb status
+Helper CLI inside:       docker exec -it AerieOS aerie status
 
 NOTES
 - This container is the controller and nothing else: it compiles nothing, renders nothing and claims no GPU. Builds, tests, CI and the Android emulator run on a NODE - a machine you enroll from the dashboard's Nodes tab, which holds its own toolchains, its own card and its own /dev/kvm. So there is no runtime, no device and no Android setting to get right here.
@@ -45,12 +45,12 @@ NOTES
   <Config Name="Projects folder" Target="/workspace" Default="/mnt/user/projects" Mode="rw" Description="The folder your projects live in. Every subfolder becomes a project at /workspace/&lt;name&gt; - add one by creating a folder, no container edit needed. Anything wrong with one is reported on the dashboard." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/projects</Config>
 
   <!-- ===================== persistent state ===================== -->
-  <Config Name="Home (accounts, shell history)" Target="/home/builder" Default="/mnt/user/appdata/BuilderBot/home" Mode="rw" Description="Each account's home on the controller: shell history, npm globals and which Claude login it is bound to (the login itself, and the emulator, live on the nodes). Survives image updates" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/BuilderBot/home</Config>
-  <Config Name="Config (custom startup hooks)" Target="/config" Default="/mnt/user/appdata/BuilderBot/config" Mode="rw" Description="Drop your own *.sh files into startup.d/ here to run them at container start" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/BuilderBot/config</Config>
+  <Config Name="Home (accounts, shell history)" Target="/home/builder" Default="/mnt/user/appdata/AerieOS/home" Mode="rw" Description="Each account's home on the controller: shell history, npm globals and which Claude login it is bound to (the login itself, and the emulator, live on the nodes). Survives image updates" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/AerieOS/home</Config>
+  <Config Name="Config (custom startup hooks)" Target="/config" Default="/mnt/user/appdata/AerieOS/config" Mode="rw" Description="Drop your own *.sh files into startup.d/ here to run them at container start" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/AerieOS/config</Config>
   <Config Name="Logs directory (optional override)" Target="/logs" Default="" Mode="rw" Description="Leave empty to keep logs under the Config path in logs/. Set a host path (e.g. an array share like /mnt/user/logs/builderbot) to send the persistent log there instead - the container auto-detects this mount." Type="Path" Display="advanced" Required="false" Mask="false"/>
-  <Config Name="Secrets directory (shielded tokens)" Target="/secrets" Default="/mnt/user/appdata/BuilderBot/secrets" Mode="rw" Description="RECOMMENDED: a root-owned folder (chmod 700) holding an ssh/ subfolder of private git keys, and any *.env file of publishing tokens. The first start makes the install key here (Controller, Keys shows it to save). Shielded means a session can USE them and cannot read them. A runner's token is typed on the Nodes tab instead. See docs/unraid.md." Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/BuilderBot/secrets</Config>
-  <Config Name="toolchain store" Target="/sdk" Default="/mnt/user/sdk" Mode="rw" Description="This controller's own toolchains (the browsers bb capture shot uses), kept outside the image so an update never downloads them again. A node keeps its own. Empty falls back to the home volume." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/sdk</Config>
-  <Config Name="Scanner reports (read-only)" Target="/reports" Default="/mnt/user/appdata/scanners/reports" Mode="ro" Description="Deprecated in 0.9.0, removed in the release after: a host scanner's output directory, mounted READ-ONLY and still read beside what the Scanners page's own scanners send up from each node. Read them with: bb findings" Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/scanners/reports</Config>
+  <Config Name="Secrets directory (shielded tokens)" Target="/secrets" Default="/mnt/user/appdata/AerieOS/secrets" Mode="rw" Description="RECOMMENDED: a root-owned folder (chmod 700) holding an ssh/ subfolder of private git keys, and any *.env file of publishing tokens. The first start makes the install key here (Controller, Keys shows it to save). Shielded means a session can USE them and cannot read them. A runner's token is typed on the Nodes tab instead. See docs/unraid.md." Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/AerieOS/secrets</Config>
+  <Config Name="toolchain store" Target="/sdk" Default="/mnt/user/sdk" Mode="rw" Description="This controller's own toolchains (the browsers aerie capture shot uses), kept outside the image so an update never downloads them again. A node keeps its own. Empty falls back to the home volume." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/sdk</Config>
+  <Config Name="Scanner reports (read-only)" Target="/reports" Default="/mnt/user/appdata/scanners/reports" Mode="ro" Description="Deprecated in 0.9.0, removed in the release after: a host scanner's output directory, mounted READ-ONLY and still read beside what the Scanners page's own scanners send up from each node. Read them with: aerie findings" Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/scanners/reports</Config>
   <Config Name="Unraid icon cache" Target="/unraid-icons" Default="/var/lib/docker/unraid/images" Mode="rw" Description="Optional, cosmetic: mounted here, the container writes its icon in on every start so the Docker page shows one without downloading it." Type="Path" Display="advanced" Required="false" Mask="false">/var/lib/docker/unraid/images</Config>
 
   <!-- ===================== core settings ===================== -->

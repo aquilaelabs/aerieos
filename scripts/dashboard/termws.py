@@ -1,4 +1,4 @@
-"""BuilderBot's own terminal, the controller's half (R133): the page's
+"""AerieOS's own terminal, the controller's half (R133): the page's
 websocket at /termws, answered here.
 
 server.py decides everything first: whose terminal it is, whether this

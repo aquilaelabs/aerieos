@@ -9,7 +9,7 @@
 # The base is origin/main's merge point when there is one (a checkout with
 # history), origin/main itself on a shallow checkout that fetched it (CI),
 # the previous commit otherwise; a tree with no base to compare is said, not
-# passed. Run by `bb lint` and by the lint workflow, so the two agree.
+# passed. Run by `aerie lint` and by the lint workflow, so the two agree.
 # Exit 0 clean, 1 on a finding, 0 with [skip] when it cannot compare.
 set -eu
 f=scripts/agent

@@ -42,7 +42,7 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
              ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 # ...and what is out by where it is: Claude Code's worktrees for its own
 # agents, each a checkout whose .git file the controller refuses, so syncing
-# them held the project behind and bb git push with it (B68).
+# them held the project behind and aerie git push with it (B68).
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024

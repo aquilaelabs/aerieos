@@ -33,7 +33,7 @@ mark() {
     case "$dir" in "$WORKSPACE"/*) ;; *) return 0 ;; esac
     [ -e "$dir/$MARKER" ] && return 0
     if cat > "$dir/$MARKER" <<EOF 2>/dev/null
-# BuilderBot: this directory is ${why}, not a project.
+# AerieOS: this directory is ${why}, not a project.
 #
 # The file's existence is the whole signal: the dashboard skips any
 # directory under the projects share that holds one. Delete it to have this

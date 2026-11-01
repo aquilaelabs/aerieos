@@ -11,13 +11,13 @@ of every verb.
 
 WHAT THE TOKEN DECIDES. A session token stands for one project with user
 rights; the relay refuses a request naming another, and every verb runs
-with that project pinned into the environment, so `bb roadmap` cannot be
+with that project pinned into the environment, so `aerie roadmap` cannot be
 pointed elsewhere by a working directory. A person's credential (an
 operator at a node's console) is held to the same rule the page holds them
 to: a project on their list.
 
 WHAT IT RUNS. Only the verbs bb itself relays (BB_RELAY_VERBS in
-scripts/bb, read from the same file as VERBS below): the notebook, the
+scripts/aerie, read from the same file as VERBS below): the notebook, the
 settings, the registry, the version and changelog, the findings. Not `sdk`,
 `emu`, `run`, `build`: those answer for the machine the session is on, and
 relaying them would make a node's session act on this container, which is
@@ -26,7 +26,7 @@ nothing that administers this box. The audit row at the top of POST
 records the argv with the principal, like every other mutation.
 
 The server holds the door: a signed-in caller before admit(), and the
-account's `bb` right on the project between admit() and run(). Which words
+account's `aerie` right on the project between admit() and run(). Which words
 travel, whose project a token names and what a session may push are this
 module's; both answer (payload, status).
 """
@@ -131,7 +131,7 @@ def admit(me, req):
     # check, so it runs on the machine the session is on and never here
     # (B152). A node's bb keeps it local; this refuses one sent anyway.
     if argv[:2] == ["rules", "check"]:
-        return None, ({"error": "bb rules check runs on the machine the session is on, "
+        return None, ({"error": "aerie rules check runs on the machine the session is on, "
                                 "not on the controller: run it there"}, 400)
     # A new install's setup from a shell (R84): an administrator's, at the
     # controller. Each verb refuses a session itself; this refuses it here as
@@ -140,7 +140,7 @@ def admit(me, req):
     if me.get("session") and (argv[:2] in (["nodes", "enroll-token"], ["settings", "node"])):
         return None, ({"error": f"bb {' '.join(argv[:2])} is an administrator's, from a shell on the "
                                 "controller, never a session's"}, 403)
-    # `bb findings --all` means every project in the scanner's report, and
+    # `aerie findings --all` means every project in the scanner's report, and
     # the report covers the whole share. The rest of this door keeps a
     # session inside its own project; this flag walks straight out of it,
     # and the reports live on the CONTROLLER, so a node's session cannot
@@ -150,7 +150,7 @@ def admit(me, req):
     # answers for its own project, which is what a session wants anyway.
     if me.get("session") and argv[:1] == ["findings"] \
             and any(a in ("-a", "--all") for a in argv[1:]):
-        return None, ({"error": "bb findings --all reads every project in the report, "
+        return None, ({"error": "aerie findings --all reads every project in the report, "
                                 "and a session reads its own: run it without --all"}, 403)
     project = field(req, "project") or me.get("session") or ""
     # A shown name (R154) is taken for its directory (B1): the person names
@@ -199,7 +199,7 @@ def admit(me, req):
 
 def run(me, req, project):
     """Run the words for the project admit() named, once the server has
-    asked the account's `bb` right on it: a git verb's own refusals first
+    asked the account's `aerie` right on it: a git verb's own refusals first
     (no push rights, a session's push against the project's git policy),
     then git's network half through gitrelay or the verb through bb."""
     argv = _argv(req)
@@ -212,7 +212,7 @@ def run(me, req, project):
     if argv[:2] == ["git", "push"] and not projects.may_push(project):
         return {"error": "this project has no push rights: the operator grants them "
                          "in the clone dialog or with Link to a git host on its Projects page; "
-                         "bb git policy says so first"}, 403
+                         "aerie git policy says so first"}, 403
     # The tree the session is in: the project directory, or one of its
     # worktrees. Anything else (a path outside the share, a sibling
     # project) runs in the project directory instead of being trusted.
@@ -276,7 +276,7 @@ def run(me, req, project):
             elif dest not in local and (dest.startswith("refs/tags/")
                                         or dest in gitrelay.tree_tags(project, cwd)):
                 return {"error": f"{dest.removeprefix('refs/tags/')} is a tag, and a tag is a "
-                                 "release's name here: bb version release pushes it, and "
+                                 "release's name here: aerie version release pushes it, and "
                                  "releasing again finishes one whose push failed"}, 403
             elif dest not in local:
                 return {"error": f"this project's git policy lets a session push its own "
@@ -316,7 +316,7 @@ def run(me, req, project):
     # hands the tree's half back to the node's bb as `apply`.
     if argv[0] == "git" and argv[1:2] and argv[1] in gitrelay.VERBS:
         # A session's git is its person's, with their own token, while they
-        # are signed in (R159): signed out everywhere, bb git waits for them,
+        # are signed in (R159): signed out everywhere, aerie git waits for them,
         # and a project nobody signed in gave a token says so.
         u = gitcreds.usable(project, str(me.get("uid") or ""))
         # The project's git policy may turn the hold off (the Git view's
@@ -332,7 +332,7 @@ def run(me, req, project):
         if r.get("held"):
             # Lines that look like a secret or something private (R219):
             # the push waits on a person, who reads them on the bell. The
-            # node's bb waits on the ask the way bb root run does, and the
+            # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
             a = phone.ask_push(project, str(cwd), argv[2:], r["held"],
                                asker_uid=me.get("uid") or "", asker_name=me.get("name") or "",

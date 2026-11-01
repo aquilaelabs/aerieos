@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The BuilderBot USB stick maker (R161 step 5): one tool for Windows, a Mac
+"""The AerieOS USB stick maker (R161 step 5): one tool for Windows, a Mac
 and Linux, nothing but Python's own library, that writes a release's stick
 image onto a USB stick and checks it.
 
@@ -170,10 +170,10 @@ def release_image(tag, channel="normal"):
         live = [x for x in rows if not x.get("draft") and bool(x.get("prerelease")) == dev
                 and re.fullmatch(TAG if dev else r"v\d+\.\d+\.\d+", str(x.get("tag_name") or ""))]
         # The newest that carries a stick image: a release from before
-        # BuilderBot OS, or one whose image build failed, has none.
+        # AerieOS, or one whose image build failed, has none.
         withimg = [x for x in live if any(str(a.get("name", "")).endswith(".stick.raw.xz") for a in x.get("assets") or [])]
         if not withimg:
-            die(("no dev build" if dev else "no release") + " carries a BuilderBot OS stick image yet"
+            die(("no dev build" if dev else "no release") + " carries a AerieOS stick image yet"
                 + ("" if dev else ": the dev builds do, so pick the newest dev build"))
         if live and withimg[0] is not live[0]:
             say(f"{live[0]['tag_name']} carries no stick image, so {withimg[0]['tag_name']}'s is written")
@@ -223,7 +223,7 @@ def attested(path):
         die(f"the image's build attestation could not be read from GitHub ({e}): not written")
     lines = [json.dumps(a["bundle"]) for a in got.get("attestations") or [] if isinstance(a, dict) and isinstance(a.get("bundle"), dict)]
     if not lines:
-        die(f"GitHub has no build attestation for {os.path.basename(path)}: it is not an image BuilderBot's release built, so not written")
+        die(f"GitHub has no build attestation for {os.path.basename(path)}: it is not an image AerieOS's release built, so not written")
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
         f.write("\n".join(lines) + "\n")
     try:
@@ -233,7 +233,7 @@ def attested(path):
         os.unlink(f.name)
     if r.returncode != 0:
         die(f"{os.path.basename(path)} does not verify against its build attestation: not written\n{(r.stderr or r.stdout).strip()[-600:]}")
-    say(f"{os.path.basename(path)}: built by BuilderBot's release workflow (its attestation verifies)")
+    say(f"{os.path.basename(path)}: built by AerieOS's release workflow (its attestation verifies)")
 
 
 def check_sha(path, sha_file):
@@ -250,7 +250,7 @@ def check_sha(path, sha_file):
 # ---- the release's signature (R199) ------------------------------------------------
 # The keys that may sign a release, as config/release-signers holds them (a
 # lint keeps the two the same). A release's SHA256SUMS signed by one of them
-# is what says the image is BuilderBot's own: the sha256 beside it is the
+# is what says the image is AerieOS's own: the sha256 beside it is the
 # release's word for itself, and the attestation proves only which workflow
 # built it, which whoever changes the repository could run.
 RELEASE_SIGNERS = """
@@ -295,7 +295,7 @@ def signed(tag, path):
             r = subprocess.run([tool, "-Y", "verify", "-f", os.path.join(d, "signers"), "-I", SIG_NS, "-n", SIG_NS,
                                 "-s", os.path.join(d, "SHA256SUMS.sig")], stdin=sums, capture_output=True, text=True, check=False)
         if r.returncode != 0:
-            die(f"the {tag} release's signature does not verify against BuilderBot's release key: not written")
+            die(f"the {tag} release's signature does not verify against AerieOS's release key: not written")
         h = hashlib.sha256()
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(CHUNK), b""):
@@ -308,7 +308,7 @@ def signed(tag, path):
                     listed[parts[1].lstrip("*")] = parts[0].lower()
         if listed.get(os.path.basename(path)) != h.hexdigest():
             die(f"{os.path.basename(path)} is not the file the {tag} release signed: not written")
-    say(f"{os.path.basename(path)}: signed by BuilderBot's release key")
+    say(f"{os.path.basename(path)}: signed by AerieOS's release key")
 
 
 # ---- the stick's builderbot.env --------------------------------------------------

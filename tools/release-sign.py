@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign a BuilderBot release (R199), on the release key holder's own machine:
+"""Sign a AerieOS release (R199), on the release key holder's own machine:
 never in the repository, CI or a controller, so whoever changes those can
 build and attest a release but not sign one, and every install refuses an
 update its release key did not sign.
@@ -95,7 +95,7 @@ def cmd_key(a):
     fp = subprocess.run([tool, "-l", "-f", path + ".pub"], capture_output=True, text=True, check=False).stdout.strip()
     print("\nThe line for config/release-signers (commit it; it is public):")
     print(f'{NS} namespaces="{NS}" {kt} {kb} {NS}')
-    print(f"\nIts fingerprint, to publish where people can check it (builderbot.dev): {fp}")
+    print(f"\nIts fingerprint, to publish where people can check it (aerieos.org): {fp}")
     print("Keep the private key and its passphrase off the repository, CI and every controller, and back it up offline.")
 
 

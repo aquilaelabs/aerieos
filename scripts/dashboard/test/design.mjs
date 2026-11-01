@@ -1,7 +1,7 @@
 // The notebook's Design view (design.py, nb-design.js): a project's design
 // language and its pages, laid out as labeled blocks on a frame and named
 // for what they are for. Staged behind the notebook's Save; the prompts and
-// docs/design-language.md are the server's words, which is what bb design
+// docs/design-language.md are the server's words, which is what aerie design
 // prints. The view is passive: nothing on it reaches into a session.
 import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR } from './lib.mjs';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -62,7 +62,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
         d.presets.schemes.length} schemes, ${d.presets.templates.length} templates)`);
   // Nothing designed beforehand: the briefing says so, and what to do after.
   const pre0 = await api(`/api/preamble?project=${P}`);
-  ok(/The notebook's Design view is empty: no theme, no page, no design rule\. Build as you would and choose the look yourself; then put what you arrived at into the design with `bb design save`/.test(pre0.text)
+  ok(/The notebook's Design view is empty: no theme, no page, no design rule\. Build as you would and choose the look yourself; then put what you arrived at into the design with `aerie design save`/.test(pre0.text)
      && /the type, corners, space and motion you settled on/.test(pre0.text)
      && /Under the project's dial Agents may: Add to the design, a save of yours lands\./.test(pre0.text),
      'the briefing of an undesigned project says to build as usual and put the look into the design afterwards, and what the dial does with that');
@@ -185,7 +185,7 @@ await page.keyboard.press('Shift+ArrowLeft');
 ok(await page.$eval(`${NB} [data-dspage] .dsblock.on`, e => e.style.gridColumn) === '2 / span 7',
    '...and narrowed by a column it sits beside the list again');
 // Nothing on the view reaches into a session, and nothing on it is a
-// prompt: a session reads the design piece by piece with bb design show
+// prompt: a session reads the design piece by piece with aerie design show
 // (the operator, 28 and 29 Sep).
 ok(!(await page.$(`${NB} [data-dssend]`)) && !(await page.$(`${NB} button:has-text("Send to Claude")`))
    && !(await page.$(`${NB} #dsBody textarea[readonly]`)) && !(await page.$(`${NB} #dsBody button:has-text("Copy")`)),
@@ -196,16 +196,16 @@ const pg = rec.pages[0];
 ok(rec.pages.length === 1 && pg.id === 1 && pg.name === 'the home dashboard' && pg.platform === 'web'
    && pg.blocks[4].x === 1 && pg.blocks[4].y === 3 && pg.blocks[4].h === 5 && pg.blocks[4].label === 'orders per day',
    `Save writes the page with its id, its name, its platform and the blocks as arranged (${JSON.stringify(pg.blocks[4])})`);
-// ---- the page's prose, the server's words, read with bb design show --------------------
+// ---- the page's prose, the server's words, read with aerie design show --------------------
 const promptText = (await api(`/api/design?project=${P}&show=1`)).text || '';
 ok(/^Build or restyle the home dashboard to this layout/.test(promptText) && /numbered in drawing order/.test(promptText)
-   && /docs\/design-language\.md is yours to write and commit with the work, from what is saved here: `bb design file > docs\/design-language\.md`; the notebook never writes it into the tree by itself/.test(promptText)
+   && /docs\/design-language\.md is yours to write and commit with the work, from what is saved here: `aerie design file > docs\/design-language\.md`; the notebook never writes it into the tree by itself/.test(promptText)
    && /Platform: a responsive web app/.test(promptText)
    && /5\. Chart \(a chart or a meter\): orders per day, in the middle, columns 2 to 8 of 12, rows 4 to 8 of 8/.test(promptText)
    && /Colors: none chosen yet\. Choose them as tokens/.test(promptText)
    && /Not chosen yet: type, corners, space, motion\. Choose each from what you build/.test(promptText)
    && !/prefers-reduced-motion|Type:|Shape:|Space:|Motion:|AA contrast/.test(promptText),
-   `bb design show PAGE names the page, its platform, each block with what it is for and where, whose the file is, and the language, colors still to choose (${promptText.split('\n')[3]})`);
+   `aerie design show PAGE names the page, its platform, each block with what it is for and where, whose the file is, and the language, colors still to choose (${promptText.split('\n')[3]})`);
 // ---- the language: themes, each a named set of colors ------------------------------
 // A theme is a name, dark or light, and colors that are added, changed
 // and taken away one by one; a preset fills one with the ten roles.
@@ -370,11 +370,11 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
   // The briefing a session is started with is the verb's, run as a process
   // of its own: it read no design store and said "empty" of every designed
   // project, while the Briefing tab, asking the server, said otherwise (B355).
-  const told = execFileSync('bash', [`${REPO}/scripts/bb`, 'preamble'], { encoding: 'utf8',
+  const told = execFileSync('bash', [`${REPO}/scripts/aerie`, 'preamble'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } });
   ok(/This project's notebook holds a design already:/.test(told) && !/Design view is empty/.test(told),
-     'bb preamble, which is what a session is started with, says the same of a designed project');
+     'aerie preamble, which is what a session is started with, says the same of a designed project');
   await page.selectOption(`${NB} #dst-0-font`, 'system');
   await page.selectOption(`${NB} #dst-0-corners`, 'soft');
   await page.selectOption(`${NB} #dst-0-density`, 'comfortable');
@@ -399,7 +399,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
   await page.waitForSelector(`${NB} [data-dstheme="0"]`, { timeout: 5000 });
 }
 
-// ---- the file, and bb design -----------------------------------------------------------
+// ---- the file, and aerie design -----------------------------------------------------------
 await page.click(`${NB} #dsWrite`);
 await page.waitForFunction(() => /is written and current/.test([...document.querySelectorAll('.nb .nbview[data-view="design"] :is(#dsHint, .nbsaidslot)')].map(e => e.textContent).join(' ')), null, { timeout: 10000 });
 const file = `${DIR}/ws/${P}/docs/design-language.md`;
@@ -407,19 +407,19 @@ const written = existsSync(file) ? readFileSync(file, 'utf8') : '';
 ok(/^# The design language/.test(written) && /\| `--accent` \| `#ff8800` \|/.test(written)
    && /### the home dashboard \(Android app\)/.test(written) && /Chart \(a chart or a meter\): orders per day/.test(written),
    'Write the file puts docs/design-language.md in the tree: the tokens as a table, and each page under Pages');
-const token = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', P, 'test'],
+const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', P, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/bb`, 'design', ...a], { encoding: 'utf8',
+const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'design', ...a], { encoding: 'utf8',
   env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
          XDG_CACHE_HOME: `${DIR}/cache-design` } });
 ok(/Default \(dark\), Paper \(light and dark\); system sans/.test(bb()) && /1  the home dashboard  \(android app, phone, 6 blocks\)/.test(bb()),
-   `bb design lists the language and the pages, a theme with another half said so (${bb().split('\n')[0].trim()})`);
+   `aerie design lists the language and the pages, a theme with another half said so (${bb().split('\n')[0].trim()})`);
 const shown = bb('show', '1');
 ok(bb('show', 'the home dashboard') === shown && /^Build or restyle the home dashboard to this layout/.test(shown)
    && /Platform: an Android app/.test(shown),
-   'bb design show prints a page by id or by name, the same words');
-ok(bb('file') === written, 'bb design file prints the file as the notebook wrote it');
-// A branch's own record, not the saved one (B227): bb design json, edited,
+   'aerie design show prints a page by id or by name, the same words');
+ok(bb('file') === written, 'aerie design file prints the file as the notebook wrote it');
+// A branch's own record, not the saved one (B227): aerie design json, edited,
 // renders through --from, and the notebook's design is left as it was.
 {
   const mine = `${DIR}/design-mine.json`;
@@ -427,7 +427,7 @@ ok(bb('file') === written, 'bb design file prints the file as the notebook wrote
   const fromMine = bb('file', '--from', mine);
   ok(/\| `--accent` \| `#00aa55` \|/.test(fromMine) && !/#ff8800/.test(fromMine)
      && /### the home dashboard \(Android app\)/.test(fromMine),
-     'bb design file --from FILE renders the file from the record given, its pages included');
+     'aerie design file --from FILE renders the file from the record given, its pages included');
   ok(bb('file') === written, '...and the saved design is not touched by it');
   let bad = '';
   writeFileSync(mine, JSON.stringify({ language: { themes: [{ name: 'x', mode: 'sideways' }] }, pages: [] }));
@@ -501,14 +501,14 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(await page.$eval(`${NB} [data-dstheme="0"] [data-dstrm]`, b => !b.disabled), '...and the last theme can go too: no theme is a state a design may be in');
 }
 
-// ---- a session writes one: bb design json, edited, and bb design save --------------------
+// ---- a session writes one: aerie design json, edited, and aerie design save --------------------
 // Asked to put a design language into the notebook, a session reads the
 // record with json, changes it, and saves it back whole: a page without
 // an id is new, one with its id replaces that page.
 {
   const rec = JSON.parse(bb('json'));
   ok(rec.language.themes[0].name === 'Paper' && rec.pages.length === 1 && rec.presets.kinds.length > 10,
-     'bb design json prints the record with the presets it is drawn from');
+     'aerie design json prints the record with the presets it is drawn from');
   // The choices are each theme's: Night, the new default, is given the
   // ones the old default had, or the design would lose them with it.
   rec.language.themes = [{ name: 'Night', mode: 'dark', font: 'system', corners: 'soft', density: 'comfortable', motion: 'quiet',
@@ -525,7 +525,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(/saved alpha's design: 2 pages/.test(said) && after.language.themes.map(t => t.name).join() === 'Night,Day' && after.language.themes[0].rules.map(r => r.name).join() === 'lists,voice'
      && after.pages[0].id === 1 && after.pages[0].notes === 'The chart is the first thing read.'
      && after.pages[1].id === 2 && after.pages[1].name === 'the login screen' && after.pages[1].frame === 'phone' && after.by === 'session:alpha',
-     `a session's bb design save writes the record back: the language, the page by its id, a new page with the next (${said.trim()})`);
+     `a session's aerie design save writes the record back: the language, the page by its id, a new page with the next (${said.trim()})`);
   await page.evaluate(n => getNotebook(n).view('design'), P);
   await page.waitForFunction(() => document.querySelector('.nb #dsPagePick')?.options.length === 2, null, { timeout: 15000 });
   ok(/^2 themes/.test(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.textContent))
@@ -547,19 +547,19 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
 // ---- the design's rules reach a session the way house rules do ---------------------------
 // A rule with a trigger is named in the briefing and arrives on its turn
 // (rules.matching, through the hooks); one without stands in every
-// briefing whole. bb rules show reads it like any rule; bb design show too.
+// briefing whole. aerie rules show reads it like any rule; aerie design show too.
 {
-  const rulesOut = execFileSync('bash', [`${REPO}/scripts/bb`, 'rules', '--json'], { encoding: 'utf8',
+  const rulesOut = execFileSync('bash', [`${REPO}/scripts/aerie`, 'rules', '--json'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } });
   const eff = JSON.parse(rulesOut);
   ok(eff.some(r => r.name === 'lists' && r.design && r.words.join() === 'list,paging'),
      'a design rule is among the rules a session works under, marked as the design\'s, with its triggers');
   const pre = await api(`/api/preamble?project=${P}`);
-  ok(/  lists: list, paging \(the design's\)/.test(pre.text) && /One marked the design's is the notebook's Design view's, and `bb design show <name>` reads it too/.test(pre.text) && /One sentence that tells the person what to do\. \(the design's/.test(pre.text)
+  ok(/  lists: list, paging \(the design's\)/.test(pre.text) && /One marked the design's is the notebook's Design view's, and `aerie design show <name>` reads it too/.test(pre.text) && /One sentence that tells the person what to do\. \(the design's/.test(pre.text)
      && !/Every list pages at fifty/.test(pre.text),
      'the briefing names the triggered rule and how to read it, carries the standing one whole, and never the triggered one\'s text');
   ok(/^lists \(applies to: list, paging\)\n\nEvery list pages at fifty\./.test(bb('show', 'lists')),
-     `bb design show NAME prints one rule with what fires it (${bb('show', 'lists').split('\n')[0]})`);
+     `aerie design show NAME prints one rule with what fires it (${bb('show', 'lists').split('\n')[0]})`);
   // In the view: the Rules fold is the Briefing's list, a row a rule, folded,
   // Add a rule first, and a new row is its form until it has words.
   await page.evaluate(n => getNotebook(n).view('design'), P);
@@ -616,18 +616,18 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   const alpha = await api('/api/design', { project: P, action: 'save', language: { ...cur,
       themes: [{ ...cur.themes[0], colors: [...cur.themes[0].colors, { name: 'glass', hex: '#1e232be0', means: 'a pane' }] }, ...cur.themes.slice(1)] }, pages: (await api(`/api/design?project=${P}`)).pages });
   ok(alpha.status === 200 && alpha.language.themes[0].colors.some(c => c.hex === '#1e232be0'), 'a color with alpha saves as written');
-  ok(/^The record bb design save takes/.test(bb('schema')) && /at most 100; the first is the default, whose choices and rules are the design's/.test(bb('schema'))
+  ok(/^The record aerie design save takes/.test(bb('schema')) && /at most 100; the first is the default, whose choices and rules are the design's/.test(bb('schema'))
      && /at most 100, a color name once per theme/.test(bb('schema')) && /RULE is \{ "name"/.test(bb('schema')),
-     'bb design schema prints the shape with its limits');
-  const help = execFileSync('bash', [`${REPO}/scripts/bb`, 'design', 'save', '-h'], { encoding: 'utf8',
+     'aerie design schema prints the shape with its limits');
+  const help = execFileSync('bash', [`${REPO}/scripts/aerie`, 'design', 'save', '-h'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P, XDG_CACHE_HOME: `${DIR}/cache-design` } });
-  ok(/^bb design save FILE/.test(help) && /The record bb design save takes/.test(help), 'bb design save -h is help, not a file called -h');
+  ok(/^aerie design save FILE/.test(help) && /The record aerie design save takes/.test(help), 'aerie design save -h is help, not a file called -h');
 
   // ---- what sessions on other projects met, 29 Sep ------------------------------------------
   // Six reports and a save of this project's own. A save changed what it
   // was sent and said only that it had saved; a refusal left problems
   // out; a phone layout was kept and never said; the words carried
-  // sentences no record could turn off; bb settings showed two dials of
+  // sentences no record could turn off; aerie settings showed two dials of
   // seven; and a design inside every limit was too large to send.
   const post = async body => { const r = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
     headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
@@ -715,7 +715,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
      'a custom choice that names its rule is said by that rule, in the prompt and in the file, and one that names none says so');
   ok(/now\/live/.test(bb()) && /^now\/live/m.test(bb('show', 'now/live')) && /It polls every ten seconds/.test(bb('show', 'now/live'))
      && /#### Rules of Now: who is listening[^\n]*\n\n##### now\/live/.test(bb('file')) && /Layout of Now: who is listening/.test(nowPage),
-     'a page with a key of its own has its rules addressed under it, and bb design show KEY prints the page');
+     'a page with a key of its own has its rules addressed under it, and aerie design show KEY prints the page');
   const noRule = await post({ language: onLead(named.language, () => ({ custom: { corners: 'nowhere', motion: 'gaps' } })), pages: named.pages });
   ok(noRule.status === 400 && /custom names the rule nowhere for corners, and \w+ has no rule called that/.test(noRule.error)
      && /custom names a rule for motion, which is quiet and not custom/.test(noRule.error),
@@ -725,7 +725,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
      && /The same blocks on a phone frame \(6 columns by 24 rows: the frame shows 12 of them, and the page scrolls\):/.test(shown2)
      && /Card \(a box holding one thing\): part 12, across the bottom, rows 23 to 24 of 24/.test(shown2)
      && /The same blocks on a phone frame/.test(bb('file')),
-     'bb design show and the file say where the same blocks sit on every other frame the page has a layout for');
+     'aerie design show and the file say where the same blocks sit on every other frame the page has a layout for');
   ok(/Header \(the band at the top\): part 1/.test(shown2) && /Shape: as the design's own rules say\./.test(shown2)
      && !/monospace for data|hairlines 1px|AA contrast|one Save or Submit|each opening to detail|the top bar with/.test(shown2 + bb('file')),
      `the words say what the record says: a kind is what it is, custom hands a choice to the rules, and nothing is added that no record could turn off (${
@@ -770,17 +770,17 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
     && document.querySelector('.nb #dsPagePick')?.options.length > 0, null, { timeout: 10000 });
   await page.selectOption(`${NB} #dsPagePick`, 'p1');
   await page.waitForSelector(`${NB} [data-dspage="p1"]`, { timeout: 5000 });
-  const dials = execFileSync('bash', [`${REPO}/scripts/bb`, 'settings'], { encoding: 'utf8',
+  const dials = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: P }, cwd: `${DIR}/ws/${P}` });
-  ok(['Add to roadmap', 'File bugs', 'Add rules', 'Fill in build and test', 'Add to the design', 'Run its container', 'Report BuilderBot bugs']
+  ok(['Add to roadmap', 'File bugs', 'Add rules', 'Fill in build and test', 'Add to the design', 'Run its container', 'Report AerieOS bugs']
        .every(d => new RegExp(`Agents may: ${d}\\s+(auto|ask|deny)`).test(dials)),
-     `bb settings lists every dial as it stands, Add to the design among them (${(dials.match(/Agents may: [^\n]+/g) || []).length} of 7)`);
+     `aerie settings lists every dial as it stands, Add to the design among them (${(dials.match(/Agents may: [^\n]+/g) || []).length} of 7)`);
 
   // ---- a theme's own rules and a page's own: a Rules section inside each ------------------
   // The Nostromo scheme has needs no other theme shares (the operator, 28
   // Sep): a rules section inside the theme and inside the page, the
   // Briefing's list again, following the pulldown; a rule there reaches a
-  // session as HOLDER/RULE, and bb design show reads it so.
+  // session as HOLDER/RULE, and aerie design show reads it so.
   // Day's own rules (Night's are the design's now, being the default's).
   await openSect('themes');   // one section open at a time (the operator, 5 Oct)
   await page.selectOption(`${NB} #dsThemePick`, '1');
@@ -815,30 +815,30 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(own.language.themes[1].rules?.some(r => r.name === 'hull' && r.words.join() === 'texture,hull')
      && own.pages[0].rules?.[0]?.name === 'first-read' && own.pages[0].rules[0].paths.length === 0,
      `a rule typed under a theme saves with the theme, and one under a page with the page (${JSON.stringify(own.language.themes[1].rules)})`);
-  const eff2 = JSON.parse(execFileSync('bash', [`${REPO}/scripts/bb`, 'rules', '--json'], { encoding: 'utf8',
+  const eff2 = JSON.parse(execFileSync('bash', [`${REPO}/scripts/aerie`, 'rules', '--json'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } }));
   ok(eff2.some(r => r.name === 'day/hull' && r.design && /^For the Day theme\. Day alone/.test(r.text))
      && eff2.some(r => r.name === 'the-home-dashboard/first-read' && /^For the home dashboard\. The chart/.test(r.text)),
      'both reach a session as rules named under their holder, the text saying whose they are');
   ok(/^day\/hull \(for the Day theme\) \(applies to: texture, hull\)\n\nDay alone carries/.test(bb('show', 'day/hull')),
-     `bb design show THEME/RULE prints the theme's rule (${bb('show', 'day/hull').split('\n')[0]})`);
+     `aerie design show THEME/RULE prints the theme's rule (${bb('show', 'day/hull').split('\n')[0]})`);
   const themeOut = bb('show', 'Day');
   ok(/^Day \(light\), one theme of 2:\n  bg #/.test(themeOut) && /day\/hull \(applies to: texture, hull\)\nDay alone carries/.test(themeOut),
-     'bb design show THEME prints the theme: its colors and its own rules');
+     'aerie design show THEME prints the theme: its colors and its own rules');
   ok(/^Night \(dark\), the default of 2:\n  bg #/.test(bb('show', 'Night')) && /\n  Type: /.test(bb('show', 'Night')),
      "...and the default theme is said as such, with its choices");
   const pre2 = await api(`/api/preamble?project=${P}`);
   ok(/  day\/hull: texture, hull \(the design's\)/.test(pre2.text)
      && /This project's notebook holds a design already: 2 themes \(Night, Day\); 1 page: the home dashboard; \d+ design rules and 2 of a theme's or a page's own\./.test(pre2.text)
-     && /Read `bb design show` before laying out or styling anything/.test(pre2.text),
+     && /Read `aerie design show` before laying out or styling anything/.test(pre2.text),
      "the briefing names the theme's rule under it, and says the notebook holds a design, what is in it, and to read it before building");
   const file2 = bb('file');
   ok(/#### Rules of Day's own\n\n##### day\/hull\n\nApplies to: texture, hull\n\nDay alone carries/.test(file2)
      && /##### the-home-dashboard\/first-read\n\nThe chart is read/.test(file2),
      "the file carries a theme's rules under the theme and a page's under the page");
   const pagePrompt = bb('show', '1');
-  ok(/This page's own rules:\n  the-home-dashboard\/first-read: The chart is read before/.test(pagePrompt) && /    Day's own rules:\n      day\/hull: texture, hull \(`bb design show day\/hull` reads it\)/.test(pagePrompt),
-     "bb design show PAGE carries the page's own rules whole and names the theme's under the theme");
+  ok(/This page's own rules:\n  the-home-dashboard\/first-read: The chart is read before/.test(pagePrompt) && /    Day's own rules:\n      day\/hull: texture, hull \(`aerie design show day\/hull` reads it\)/.test(pagePrompt),
+     "aerie design show PAGE carries the page's own rules whole and names the theme's under the theme");
   await openSect('themes');   // one section open at a time (the operator, 5 Oct)
   await page.selectOption(`${NB} #dsThemePick`, '1');
   await page.waitForSelector(`${NB} [data-dsrules="t1"] .rulerow[data-i="0"]`, { timeout: 5000 });
@@ -899,7 +899,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
    'Remove page and Save take the page out, and the language goes back to one theme filled from Default');
 // A record saved under the build before the choices were each theme's,
 // with a custom map naming the language's rules and a second theme with
-// no rules: read strictly it took every bb design verb down (B386, two
+// no rules: read strictly it took every aerie design verb down (B386, two
 // reports). It reads, the map lands on the first theme with the rules,
 // the second theme keeps its choice with no rule named, and the schema
 // prints whatever the store holds.
@@ -915,9 +915,9 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
   ok(old.status === 200 && dark?.custom?.corners === 'shape' && dark.rules.map(r => r.name).join() === 'shape,motion,differences'
      && light?.corners === 'custom' && JSON.stringify(light.custom) === '{}' && light.rules.length === 0,
      `a record from before the choices were each theme's reads: the custom map and the rules go to the first theme, the second keeps its choice with no rule named (${old.status} ${(old.error || '').slice(0, 80)})`);
-  ok(/^The record bb design save takes/.test((await api('/api/design?project=beta&show=schema')).text || '')
+  ok(/^The record aerie design save takes/.test((await api('/api/design?project=beta&show=schema')).text || '')
      && /Dark \(dark\)/.test((await api('/api/design?project=beta&show=list')).text || ''),
-     'bb design schema and list answer over it');
+     'aerie design schema and list answer over it');
   delete all.beta;
   writeFileSync(store, JSON.stringify(all));
 }

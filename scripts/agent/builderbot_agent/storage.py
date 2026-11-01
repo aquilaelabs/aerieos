@@ -191,7 +191,7 @@ def _account_builds(home):
 
 
 # A project's virtual phones (R123): each account's AVDs for it, in the
-# folder bb emu keeps them in (~/.android/avd-projects/PROJECT, B511), which
+# folder aerie emu keeps them in (~/.android/avd-projects/PROJECT, B511), which
 # no store holds, so the emulator column read the data store's emu/ and
 # missed every one of them (bb-sandbox, 23 Oct: 20 GB of phones, none shown).
 AVD_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
@@ -212,7 +212,7 @@ def avd_homes(home):
 
 def avd_running(avd_dir):
     """Whether the emulator holds this AVD: its multiinstance.lock flocked,
-    the test bb emu's emu_held makes."""
+    the test aerie emu's emu_held makes."""
     import fcntl
     lock = os.path.join(avd_dir, "multiinstance.lock")
     if not os.path.exists(lock):
@@ -244,7 +244,7 @@ def _phones(home):
                     mb = (sizes or {}).get(name + ".avd") if sizes is not None else None
                     avd = os.path.join(d, proj, name + ".avd")
                     # When it last started and what its quick-boot snapshot
-                    # holds (R129): what the room keeper and bb tidy go by.
+                    # holds (R129): what the room keeper and aerie tidy go by.
                     ran = next((int(os.path.getmtime(os.path.join(avd, f))) for f in ("hardware-qemu.ini", "emulator-user.ini")
                                 if os.path.exists(os.path.join(avd, f))), 0)
                     snap = (_du_children(os.path.join(avd, "snapshots")) or {}).get("", 0)

@@ -11,7 +11,7 @@ quotes is an argument, so `grep "apt install" notes.md` runs grep and is
 let through, while `sudo apt install jq` runs apt and is not. Each simple
 command is cut at `;`, `&&`, `||`, `|`, `&`, a newline and the brackets of
 `$(...)` and a subshell; the wrappers that run another command in front of
-it (sudo, env, timeout, nohup, `bb run --` and the like) and leading
+it (sudo, env, timeout, nohup, `aerie run --` and the like) and leading
 VAR=value assignments are stepped over; `bash -c '...'` is read again
 inside; a heredoc's body is data and is not read at all.
 
@@ -89,15 +89,15 @@ def _unwrap(words):
         if _ASSIGN.match(w) or w in KEYWORDS:
             i += 1
             continue
-        if w == "bb" and words[i + 1:i + 2] == ["run"]:
-            # `bb run [--node N] -- CMD`: the command is after the `--`.
+        if w in ("aerie", "bb") and words[i + 1:i + 2] == ["run"]:
+            # `aerie run [--node N] -- CMD`: the command is after the `--`.
             try:
                 i = words.index("--", i) + 1
             except ValueError:
                 return words[i:]
             continue
         base = os.path.basename(w)
-        # `bash scripts/bb tests run` runs the script: read it as the
+        # `bash scripts/aerie tests run` runs the script: read it as the
         # command, the way `bash -c '...'` is read again below.
         if base in ("bash", "sh", "dash", "zsh") and i + 1 < len(words) and not words[i + 1].startswith("-"):
             i += 1

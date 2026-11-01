@@ -35,9 +35,9 @@ function machineHead(n){
     ["System", [r.os, r.hostname && r.hostname !== n.name ? r.hostname : ""].filter(Boolean).join(" · ")],
     ["Cores and memory", [r.cpu ? `${r.cpu} cpu` : "", mem].filter(Boolean).join(" · ")],
     ["Release", `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`],
-    // BuilderBot OS (R160 step 4): the image, the slot this boot came from
+    // AerieOS (R160 step 4): the image, the slot this boot came from
     // and the one that boots next when an update has been written.
-    ...(r.os_image?.version ? [["Image", `BuilderBot OS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
+    ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
     ...(r.timezone ? [["Time zone", r.timezone]] : []),
     ["Agent", n.agent?.version || ""],
@@ -49,7 +49,7 @@ function renderMachineInto(i){
   if (!d) return;
   d.setBar("");
   if (!state?.bare_metal){
-    d.list.innerHTML = `<div class="empty">This machine is a bare-metal install's page: the machine the controller runs on, its system, its updates and what it runs as a node. This BuilderBot runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
+    d.list.innerHTML = `<div class="empty">This machine is a bare-metal install's page: the machine the controller runs on, its system, its updates and what it runs as a node. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
     return;
   }
   if (nodesList === null){
@@ -181,7 +181,7 @@ function projectsFolderField(n, s, admin){
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
       <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="hint">Where the projects already are on these disks, as another system kept them (its share for the projects): the controller works in that folder in place, nothing copied, so a move here can leave its repositories out. Its files become BuilderBot's own; nothing in them changes.</div></div>`;
+    <div class="hint">Where the projects already are on these disks, as another system kept them (its share for the projects): the controller works in that folder in place, nothing copied, so a move here can leave its repositories out. Its files become AerieOS's own; nothing in them changes.</div></div>`;
 }
 function wireStick(root){
   root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {
@@ -189,7 +189,7 @@ function wireStick(root){
     if (!release && !path) return notify("name the folder the projects are in first", true);
     if (!await askYes(release
         ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are."
-        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to BuilderBot's own account, so git and the controller can write them, and the folder is closed to other accounts: their owner changes, nothing in them does, and a share of this folder stops serving other people. What the projects folder held before stays underneath, unseen.`,
+        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: their owner changes, nothing in them does, and a share of this folder stops serving other people. What the projects folder held before stays underneath, unseen.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
     busy(pb, release ? "Letting go" : "Taking it");
     const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));
@@ -210,9 +210,9 @@ function wireStick(root){
   });
 }
 
-// A way in at the screen (R194): BuilderBot OS's console takes a password
+// A way in at the screen (R194): AerieOS's console takes a password
 // set here, logging in as admin with sudo for root; the boot menu's Rescue
-// entry is the way in when nothing else answers. Only on BuilderBot OS.
+// entry is the way in when nothing else answers. Only on AerieOS.
 function machineConsoleSection(n){
   const c = n.reported?.console;
   if (!c?.os) return "";
@@ -340,7 +340,7 @@ function adoptAppsSection(n){
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
       ${adoptPlan === null ? skRows(2) : `<div class="adpick">${rows}</div>`}
-      <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where BuilderBot keeps its own.</div>
+      <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where AerieOS keeps its own.</div>
       <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway)}"`, `Make the ${esc(k)} network`)).join("")}
         ${btn(`data-adoptapp="make"${nC ? "" : " disabled"}`, `Make and start ${nC === (adoptPlan || []).filter(a => a.ok).length ? "the containers" : nC ? `the ${nC} ticked` : "the ticked"}`, "primary")}</div>
       ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}

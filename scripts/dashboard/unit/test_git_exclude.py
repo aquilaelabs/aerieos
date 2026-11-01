@@ -1,5 +1,5 @@
 """The Git view reads a tree through the controller's own git dir, and the
-tree's .git/info/exclude goes with it (B45): BuilderBot keeps its code map's
+tree's .git/info/exclude goes with it (B45): AerieOS keeps its code map's
 .bb-map/ out of a project's git there, and a status that read another git
 dir's exclude listed it as an uncommitted change."""
 import os

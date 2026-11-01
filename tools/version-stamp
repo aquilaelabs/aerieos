@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# BuilderBot's own version stamps, moved with the number.
+# AerieOS's own version stamps, moved with the number.
 #
-# `bb version bump` runs this from the repository root with the new version
+# `aerie version bump` runs this from the repository root with the new version
 # and the part that moved, and commits whatever it changes alongside VERSION.
 # It exists because this project's minor is not only a number: it is the
 # COMPATIBILITY WINDOW, and the window is written down in one more place:

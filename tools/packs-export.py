@@ -5,7 +5,7 @@ as a pack in bbtool.json's format under packs/, tagged official and
 bundled with the release for an install with no network. One manifest
 for everything: the installer and the agents' adapters still read their
 own tables; the packs are those tables in the one format, and this
-script's --check holds the two to each other in bb lint.
+script's --check holds the two to each other in aerie lint.
 
     tools/packs-export.py --write     write packs/official/*/bbtool.json and packs/agents/*/bbtool.json
     tools/packs-export.py --check     fail when what is written is not what the tables say
@@ -62,7 +62,7 @@ def agent_packs():
 
 
 def service_packs():
-    """[(path, manifest)] for every deployed thing of BuilderBot's that is a pack (R172)."""
+    """[(path, manifest)] for every deployed thing of AerieOS's that is a pack (R172)."""
     import router
     return [(os.path.join(PACKS, "services", "model-router", "bbtool.json"), router.pack())]
 

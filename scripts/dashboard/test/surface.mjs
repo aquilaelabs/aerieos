@@ -3,7 +3,7 @@
 // deliberate line in a diff rather than something that happens.
 //
 // index.html is one file of vanilla JS with no build step and no module
-// boundary: the stated design, and the reason `bb dashboard test` can drive
+// boundary: the stated design, and the reason `aerie dashboard test` can drive
 // its internals directly. What it lacks is any way to notice code landing in
 // the WRONG scope. That is not hypothetical: a feature written this week was
 // declared three braces deep inside makeNotebook, a per-notebook factory, so
@@ -129,7 +129,7 @@ const live = await page.evaluate(() => {
   const base = new Set(Object.getOwnPropertyNames(f.contentWindow));
   f.remove();
   return Object.getOwnPropertyNames(window)
-    .filter(k => !base.has(k) && !/^\d+$/.test(k) && !k.startsWith('__bbcov')).sort();  // the coverage counters, under bb tests coverage
+    .filter(k => !base.has(k) && !/^\d+$/.test(k) && !k.startsWith('__bbcov')).sort();  // the coverage counters, under aerie tests coverage
 });
 
 const declared = new Set(SURFACE);

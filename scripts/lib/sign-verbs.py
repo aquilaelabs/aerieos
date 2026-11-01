@@ -1,4 +1,4 @@
-"""Behind `bb sign` (cmd_sign in bb, R106): ask the controller to sign a
+"""Behind `aerie sign` (cmd_sign in bb, R106): ask the controller to sign a
 build in the project's dist/ with one of its keys, wait for the project's
 owner when its dial is `ask`, then follow the sign job to its verdict. The
 session sends a file name and a route and gets a file back in dist/; the
@@ -16,7 +16,7 @@ import waits
 auth = os.environ["BB_SIGN_AUTH"]
 project = os.environ.get("BB_SIGN_PROJECT", "")
 if not project:
-    sys.exit("[builderbot] ERROR: run bb sign inside a project's tree")
+    sys.exit("[builderbot] ERROR: run aerie sign inside a project's tree")
 
 
 def ago(at):
@@ -26,7 +26,7 @@ def ago(at):
 
 
 def status_verb(rest):
-    """bb sign status [TAG] (R134): whether the project's release APKs can be
+    """aerie sign status [TAG] (R134): whether the project's release APKs can be
     signed, and how the newest went, in the Signing view's and the bell's
     words."""
     tag = rest[0] if rest else ""
@@ -36,7 +36,7 @@ def status_verb(rest):
     r = d.get("release") or {}
     if not r.get("wanted"):
         print(f"  {project}'s workflows hand over no unsigned APK (an artifact named bb-release-apk-TAG), "
-              "so BuilderBot signs none of its releases")
+              "so AerieOS signs none of its releases")
         return
     for k in r.get("keys") or []:
         print(f"  {k.get('package') or 'the app'}: releases sign with {k.get('key')}  {k.get('sha256') or ''}")
@@ -56,11 +56,11 @@ def status_verb(rest):
     if tag and not rows:
         print(f"  nothing yet for {tag}: its APK is looked for once the release is made, and hourly")
     if any(w == "failed" for w, _ in rows):
-        print("  bb sign release --why \"...\" asks for the look again once what stopped it is fixed")
+        print("  aerie sign release --why \"...\" asks for the look again once what stopped it is fixed")
 
 
 def release_verb(why):
-    """bb sign release --why (R134 step 5): the Signing view's Look for
+    """aerie sign release --why (R134 step 5): the Signing view's Look for
     unsigned APKs now, under the Sign a build dial."""
     # The look before this one, so its end is told by the controller's own
     # clock, never this machine's.
@@ -88,7 +88,7 @@ def release_verb(why):
         if not rel.get("looking") and int(last.get("at") or 0) > before:
             break
     else:
-        sys.exit("[builderbot] ERROR: the look is still going after fifteen minutes: bb sign status says how it went")
+        sys.exit("[builderbot] ERROR: the look is still going after fifteen minutes: aerie sign status says how it went")
     said_look(last, rel.get("expect") or [])
 
 
@@ -103,13 +103,13 @@ def said_look(last, expect):
         print(f"  no unsigned APK waiting: {last.get('asked', 0)} recent run(s) that passed were asked and "
               f"none handed one over, {last.get('known_bare', 0)} more are known to hand over none")
         print("  the Android workflow's run for the release may still be going, or it failed: "
-              "bb forge run list says which")
+              "aerie forge run list says which")
     if expect:
         print(f"  still expected: {', '.join(expect)}, looked for every few minutes for twelve hours")
 
 
 def keys_verb(sub, route, why, rest):
-    """bb sign keys | key new NAME | map PACKAGE KEY (R106 step 6)."""
+    """aerie sign keys | key new NAME | map PACKAGE KEY (R106 step 6)."""
     if sub == "--keys":
         d = bbapi.call("/api/signing", {"action": "keys", "project": project}, auth=auth)
         if d.get("error"):
@@ -124,15 +124,15 @@ def keys_verb(sub, route, why, rest):
         return
     if sub == "--rotate":
         if len(rest) != 2:
-            sys.exit("[builderbot] ERROR: bb sign rotate OLD NEW --why \"...\" (two keys, each with a sideload key)")
+            sys.exit("[builderbot] ERROR: aerie sign rotate OLD NEW --why \"...\" (two keys, each with a sideload key)")
         body = {"action": "rotate", "from": rest[0], "to": rest[1]}
     elif sub == "--key":
         if len(rest) != 2 or rest[0] != "new" or route not in ("play", "sideload"):
-            sys.exit("[builderbot] ERROR: bb sign key new NAME --for play|sideload --why \"...\"")
+            sys.exit("[builderbot] ERROR: aerie sign key new NAME --for play|sideload --why \"...\"")
         body = {"action": "generate", "key": rest[1], "route": route}
     else:
         if len(rest) != 2:
-            sys.exit("[builderbot] ERROR: bb sign map PACKAGE KEY --why \"...\" (KEY \"\" unmaps it)")
+            sys.exit("[builderbot] ERROR: aerie sign map PACKAGE KEY --why \"...\" (KEY \"\" unmaps it)")
         body = {"action": "map", "package": rest[0], "key": rest[1]}
     r = bbapi.call("/api/signing", body | {"project": project, "why": why}, auth=auth, timeout=180)
     if r.get("error"):
@@ -143,7 +143,7 @@ def keys_verb(sub, route, why, rest):
         o = waits.outcome(auth, r["id"], "the change was not allowed")
         if o.get("code"):
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it was not made'}")
-    print("[builderbot] done: bb sign keys says what the project has now", file=sys.stderr)
+    print("[builderbot] done: aerie sign keys says what the project has now", file=sys.stderr)
 
 
 if sys.argv[1] == "--status":
@@ -190,4 +190,4 @@ for _ in range(600):
         sys.exit(f"[builderbot] ERROR: the signing {j['state']}: {str(j.get('error') or '')[:200]}")
     print(next((ln for ln in reversed(said) if ln.startswith("signed ")), "signed"))
     sys.exit(0)
-sys.exit(f"[builderbot] ERROR: the signing ({job}) had not finished in twenty minutes; bb jobs {job} says where it is")
+sys.exit(f"[builderbot] ERROR: the signing ({job}) had not finished in twenty minutes; aerie jobs {job} says where it is")

@@ -1,10 +1,10 @@
 """What a bb verb waits on, written once: a person's Allow, or a job's end.
 
-Six verbs put a request in front of a person and wait for the answer (bb
-phone run, bb root run, bb container new, bb devapp rebuild, new, env set,
+Six verbs put a request in front of a person and wait for the answer (aerie
+phone run, aerie root run, aerie container new, aerie devapp rebuild, new, env set,
 remove, start, stop, restart), and each carried the same fifteen-minute poll
-of /api/phone with its own copy of the three ways it ends. Two more (bb run,
-bb emu on a node) queue a job and stream its log until it stops, with the same
+of /api/phone with its own copy of the three ways it ends. Two more (aerie run,
+aerie emu on a node) queue a job and stream its log until it stops, with the same
 loop twice. This is those loops, each kept once; the sentence a refusal is
 said with stays with the verb, because "the operator said no" and "the
 rebuild was not allowed" are different verbs' words.

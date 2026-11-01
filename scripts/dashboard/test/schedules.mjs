@@ -48,7 +48,7 @@ ok(dlg.dialog && dlg.title === 'New schedule' && !dlg.inPage && dlg.foot === 'Ca
    `New schedule opens a dialog, its foot Cancel and Add (${JSON.stringify(dlg)})`);
 // As few fields as User Scripts (the operator, 26 Oct): a name, When as a
 // pick, where it runs (the controller first, and picked), and the script;
-// no timeout, and Runs as only for a sandbox node, where root is BuilderBot's.
+// no timeout, and Runs as only for a sandbox node, where root is AerieOS's.
 const form = await page.evaluate(() => {
   const ids = [...$('schedmodal').querySelectorAll('input, select, textarea')].filter(e => e.offsetParent).map(e => e.id);
   const node = $('schNode');
@@ -121,7 +121,7 @@ ok(!!gone && (await api('/api/schedules', { action: 'remove', id: 'scan' })).sta
 // A session's token is refused, reading or writing; so is an account
 // without the Schedules area.
 {
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const SH = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
   const read = await api('/api/schedules', undefined, SH);

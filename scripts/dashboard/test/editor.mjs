@@ -5,7 +5,7 @@
 // project, a role that caps it at read, the editor's switch off, a session's
 // token, taken off the project or signed out partway. Then the extension's
 // own code, driven under a stand-in for VS Code's API against this server,
-// and its terminal, BuilderBot's own on /termws.
+// and its terminal, AerieOS's own on /termws.
 // No browser.
 import { ok, done, DIR, URL } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
@@ -24,7 +24,7 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', name, '--role', 'user'],
+const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
   { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
@@ -132,7 +132,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   ok(up.status === 400 && git.status === 403 && link.status === 403 && !listed.entries.some(([n]) => n === '.git'),
      `a path out of the project, through .git or through a symlink leading out is refused, and .git is never listed (${
        up.status} ${git.status} ${link.status})`);
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
   const r = await fetch(base + '/api/v1/files', { method: 'POST', body: JSON.stringify({ action: 'list', project: 'alpha', path: '' }),
     headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' } });
   ok(r.status === 403, `a session's token is refused: a session has the tree, and is never a person (${r.status})`);
@@ -175,7 +175,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: true });
   ok(gone.status === 403 && off.status === 400 && shut.status === 403 && /off in its settings/.test(shut.error),
      `access taken away holds on the next request with the same sign-in: the role's File access, the project, the editor's switch (${gone.status} ${off.status} ${shut.status})`);
-  execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'passwd', 'ed.rw'], { input: 'edrwpass2\nedrwpass2\n', encoding: 'utf8', env });
+  execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'passwd', 'ed.rw'], { input: 'edrwpass2\nedrwpass2\n', encoding: 'utf8', env });
   const out = await as(c['ed.rw'], 'alpha', 'list', { path: '' });
   ok(out.status === 401 && /Sign In/.test(out.error), `...and a password change signs the extension out (${out.status}: ${out.error})`);
   cookie['ed.rw'] = await signIn(base, 'ed.rw', 'edrwpass2');
@@ -261,7 +261,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
      `...and a file a session writes is told to VS Code as created, for open editors to follow (${Date.now() - t0} ms)`);
 }
 
-// ---- the session's terminal, BuilderBot's own (R133) ---------------------------------
+// ---- the session's terminal, AerieOS's own (R133) ---------------------------------
 {
   // Opened, written to and ended through the extension's own client; the
   // reason a terminal ends with, a refusal among them, is what it closes on.

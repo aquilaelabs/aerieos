@@ -60,17 +60,17 @@ accept nothing new: what makes a node safe to reboot), **Clear cache**,
 **Revoke**, **Disable** (the operator, 11 Oct: kept and configured, its agent
 dialing in, but off every picker, refused to a project's set and handed no
 work or session until **Enable**), and **Un-enroll**, which on a node
-provisioned as a sandbox that is dialing in uninstalls BuilderBot from the
+provisioned as a sandbox that is dialing in uninstalls AerieOS from the
 machine and then removes the node here (retire: off every list, its record kept as
 history, and an id is never reused), and on any other removes the node here
-only, saying BuilderBot's pieces stay on the machine. Neither Disable nor
+only, saying AerieOS's pieces stay on the machine. Neither Disable nor
 Un-enroll goes through while a session or a container is running on
 the node: the refusal counts them and says where to end them (the Sessions
 page, Down on the Containers page). Un-enroll opens a dialog, since what goes is
 in rings (the operator, 11 Oct), with a box saying what un-enrolling takes
-off a machine and what it leaves, the same one Reset BuilderBot shows. Always: the runners deregistered on their
+off a machine and what it leaves, the same one Reset AerieOS shows. Always: the runners deregistered on their
 forges, then the agent and its unit, the sessions' firewall rules and their
-own networks (nothing of the isolation outlives the agent), the `bb` and
+own networks (nothing of the isolation outlives the agent), the `aerie` and
 `builder` accounts with their homes, `/etc/builderbot` with the tunnel to
 the controller, and bb-sandbox itself. Three boxes to tick: the stores on
 the machine's own disk (toolchains, caches, artifacts, dev instance data, the
@@ -110,7 +110,7 @@ toolchains, in the copy of the project its agent keeps at `/workspace` in
 step with this container's (a synced copy, the one way a node holds its
 projects: nothing mounts the projects share on a node). The node's census
 says whether that half is up (`session`: the screen relay's port, account,
-which agents the account has) and how far each copy is; `bb roadmap`, `bb bug`, `bb version` and the other verbs
+which agents the account has) and how far each copy is; `aerie roadmap`, `aerie bug`, `aerie version` and the other verbs
 whose state is this container's are relayed back here over the API with the
 session's own token. The controller carries a bound project's session to
 that node's screen relay when its census says the half is up and the project's copy is there, and
@@ -220,9 +220,9 @@ set to `dhcp` keeps Apply network live and says so.
 An agent node is *live* when a poll has arrived within the last 75
 seconds, and the poll carries the numbers: CPU, memory, jobs running and
 free space per store (`data`, `toolchains`, `cache`), so its page shows them
-and `bb nodes` marks liveness (`●` live, `○` quiet). Test runs
+and `aerie nodes` marks liveness (`●` live, `○` quiet). Test runs
 `uname` there through the channel and shows the answer. Jobs run as the
-account the node enrolled (`bb`, the docker account), never as root, and a
+account the node enrolled (`aerie`, the docker account), never as root, and a
 job needing a capability the node was not enrolled with is refused **on the
 node** (exit 77), whatever the page says. Over plain http the node token
 travels in the clear, as the dashboard's own credential does; enrollment says
@@ -277,7 +277,7 @@ under the node's Advanced section, keeps all of that at the machine's own
 console: while it is on, Apply storage, Apply network and a root command
 are refused here with the reason, the desired configuration stays on the
 record beside what the node reports, and the runner and a funnel, which
-are BuilderBot's own footprint: are unaffected. For a node whose fstab and
+are AerieOS's own footprint: are unaffected. For a node whose fstab and
 address are managed by hand, or by something else. Nothing here is
 offered to a node that did not enroll as a sandbox.
 
@@ -297,10 +297,10 @@ Features section offers two more: *Storage* (ZFS, mergerfs, SnapRAID and
 SMART, for the pools, the array and the disks' health) and *Shares*
 (Samba and NFS, serving what the Storage page makes), each installed with
 exactly its packages and removed with them, refused while a pool or a
-share still stands; on BuilderBot OS the packages are the image's. The
+share still stands; on AerieOS the packages are the image's. The
 row says which of each one's tools answer.
 
-**Shares** (R162): the own machine's SMB and NFS shares as BuilderBot's own
+**Shares** (R162): the own machine's SMB and NFS shares as AerieOS's own
 two files say them (an include of `smb.conf`, and `exports.d`): each a
 folder on a pool, served over SMB to named users of the machine or to
 everybody as a guest, over NFS to named clients (an address, a network, a
@@ -344,7 +344,7 @@ which both the page and the agent hold to. Add a disk formats it and
 takes the next slot; Replace on a slot formats the new disk and rebuilds
 that slot from parity (a data disk) or the parity on it (a parity disk),
 hours during which the array is readable, or unprotected, as the job says.
-The record is BuilderBot's own (`/etc/builderbot/array.json`), from which
+The record is AerieOS's own (`/etc/builderbot/array.json`), from which
 `snapraid.conf` and the array's fstab lines (by filesystem UUID, `nofail`)
 are written whole. Destroying the array unmounts it and forgets it: every
 data disk keeps its files, readable on any Linux. There is no cache tier and no mover (see Pools by purpose below).
@@ -389,7 +389,7 @@ that backs it up to the array nightly (seven runs kept), and a dead disk is
 restored from last night's run. A special vdev or a SLOG on a single disk
 is never offered: losing one loses the pool.
 
-**People on shares** (R164): an SMB share's users are BuilderBot's own
+**People on shares** (R164): an SMB share's users are AerieOS's own
 accounts, named on the share by account name (each becomes its own Unix
 user on the machine, `bbu-` and the account's id, made when first named)
 or by role (`role:NAME` on the API; the form offers each role, and it
@@ -531,14 +531,14 @@ feature's own configuration (`/etc/nut`, written once and left alone where
 a person changed it).
 
 **The system's own updates** (R164): on a bare-metal install that is not
-BuilderBot OS, Updates under Controller settings also counts the system's
+AerieOS, Updates under Controller settings also counts the system's
 own package updates (apt, once an hour as root), says how many are
 security ones and whether the last update asked for a restart, and Apply
 updates runs apt on the machine by its root agent with the configuration
 files kept as they are, restarting after when the box was ticked and the
 update asked for it; Restart now is there when one is needed. Security
 updates waiting and a restart needed are rows on the bell (kind host).
-BuilderBot OS has none of this: its updates are whole images.
+AerieOS has none of this: its updates are whole images.
 
 ## Network
 
@@ -562,14 +562,14 @@ drawn only for an account that may read the controller, is what the
 and the build it is serving. Its sections, each with its own Apply and Revert:
 
 - **Logs**: how long logs are kept, and the downloads (see [Logs](#logs)).
-- **BuilderBot bug reports**: what sessions and people reported about
-  BuilderBot itself, each with its delete, **Download diagnostics** and
+- **AerieOS bug reports**: what sessions and people reported about
+  AerieOS itself, each with its delete, **Download diagnostics** and
   **Clear reports**.
 - **Updates** (a controller installed bare metal, R90): the release this
   install runs and the newest published, checked on its cadence under
   Update checks (weekly unless set) and on **Check for updates**; **Update** runs the installer's update through this machine's
   own node, the bundle verified and the state copied aside, and the install
-  comes back by itself if the new release does not answer. On BuilderBot OS
+  comes back by itself if the new release does not answer. On AerieOS
   the same press writes the release's image into the slot not in use and
   names it for the next boot, the restart yours ([image.md](image.md)), and
   **Update from the folder** takes the files from a folder on the machine.
@@ -591,9 +591,9 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   install's first page restores one ([image.md](image.md)).
 - **Update window**: a newer release applied by itself at an hour, daily or
   one weekday, the way Update does it; off by default.
-- **Update checks** (R176): how often BuilderBot asks by itself for what is
+- **Update checks** (R176): how often AerieOS asks by itself for what is
   newer, each check daily, weekly (the default), monthly or off, with when it
-  last ran and **Check for updates** beside it: a newer BuilderBot (a bare-metal
+  last ran and **Check for updates** beside it: a newer AerieOS (a bare-metal
   install's), the container images, nginx, the scanners and the Library (the
   toolchains' and coding agents' newest versions and the vetted catalog's
   index). Off leaves only Check for updates. A node's own check of what it holds is
@@ -617,13 +617,13 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   ([tool-packs.md](tool-packs.md)).
 - **Apps**: which of the apps a person installs this controller offers as
   Library cards ([reference.md](reference.md#the-apps-a-person-installs)).
-- **Mail**: the SMTP server BuilderBot sends through (its port, security,
+- **Mail**: the SMTP server AerieOS sends through (its port, security,
   sign-in and the From address, the password sealed under the install key),
   for a person who asked on their Profile for the bell by email (R149,
   `reach.py`); nothing is sent until a server is set.
 - **Maintenance**: the owner's alone. While *Maintenance mode* is on, only
   the owner signs in and is answered, from the page, the phone app or a
-  session of theirs. Everybody else is told BuilderBot is down for
+  session of theirs. Everybody else is told AerieOS is down for
   maintenance, by the sign-in page, the API (503) and the app, and stays
   signed in for when it ends. Turning it on ends everybody else's coding
   agent sessions and terminals, here and on the nodes; it asks first, listing
@@ -636,13 +636,13 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   bundle packed fresh each press, Ask the new home, Forget it, Mark as
   moved; and, on a controller a move landed on, where it came from and
   whether the old one has been told ([install.md](install.md#moving-a-controller)).
-- **Reset BuilderBot**, last.
+- **Reset AerieOS**, last.
 
 The page says plainly what still comes from the environment and why (the
 placement rule and the unhardwiring are docs/nodes.md §13 and §11).
 
 
-**Reset BuilderBot** starts the controller over at the setup page: accounts,
+**Reset AerieOS** starts the controller over at the setup page: accounts,
 node enrollments, project settings, git tokens, the notebook, memories and
 logs are moved into a dated `.reset-…` directory under `/config`, never
 deleted, and project files are not touched. Its dialog first offers to
@@ -720,10 +720,10 @@ pruned at `3` in passing. Pressing it without changing anything is a
 crop-now, which is the other thing you sometimes want. The same section
 downloads this session's logs as one file, or everything kept as a `.tar.gz`,
 and **Clear** deletes the kept generations, the archived CI runs and every
-finished job's log without touching the ones being written. The BuilderBot bug
-reports section lists every report made about BuilderBot, each with its own
+finished job's log without touching the ones being written. The AerieOS bug
+reports section lists every report made about AerieOS, each with its own
 delete, and under them **Download diagnostics**, the controller's
-diagnostics as one file (what `bb diag` prints, with the reports left in the
+diagnostics as one file (what `aerie diag` prints, with the reports left in the
 list, redacted and on the audit trail), so a report can be taken out before
 the diagnostics go to somebody. **Clear reports** deletes every one after a
 confirmation that says how many; the numbers carry on, so a bug that names
@@ -734,7 +734,7 @@ the diagnostics, and never deletes one.
 One deliberate omission from *this session*: the **CI logs stay where they are**, under `config/ci-logs/<repo>/`, one
 file per run: a CI run is not a container session, it belongs to a workflow
 run and spans whatever session was up. They are already grouped the way you
-would want and `bb ci-log` reads them by run id; they are in the archive and
+would want and `aerie ci-log` reads them by run id; they are in the archive and
 under the same retention.
 
 ## Jobs
@@ -750,13 +750,13 @@ once as its row allows; the rest wait in order. **Cancel** on a row stops one
 where it is: a queued job never starts, a running one is killed and the row
 moves when the runner reports that it did, and nothing edits a job after the
 fact. The checkbox in the bar narrows the list to what is running or waiting.
-`bb jobs [--node NAME] [--type T]` prints the same list read-only, so a
-session can see what became of the work it asked for, and `bb jobs ID
+`aerie jobs [--node NAME] [--type T]` prints the same list read-only, so a
+session can see what became of the work it asked for, and `aerie jobs ID
 [--all]` prints one job's log. Both ask the controller as the caller, so
 they are narrowed the way the page is: a session sees its own project's jobs
 and its reads', and the nodes' own jobs (a toolchain install, a system
 change) only where the project's settings grant it the diagnostics, which is
-also what `bb diag` needs; a node's machine logs (`bb logs --node NAME`) are
+also what `aerie diag` needs; a node's machine logs (`aerie logs --node NAME`) are
 a grant of their own. The log is the only copy:
 a node buffers it and posts it here, and keeps nothing. `/api/v1/healthz` answers without a credential with
 the queue's counts, and `/metrics` answers with one in Prometheus text.
@@ -769,7 +769,7 @@ weekly, monthly, or cron's five fields under Custom, said in words: `0 4 * * 0`
 is Sundays at 4:00), where it runs, and a script. It runs on the controller,
 as the controller's account with everything that account can read, or on a
 node as the node's jobs account; on a node provisioned as a sandbox it may
-run as root instead, as `bb root run` does. A run is stopped after a day.
+run as root instead, as `aerie root run` does. A run is stopped after a day.
 New schedule and a row's Edit open the same dialog. Every run is a job, its
 log on the Jobs page and linked from the schedule's row with how it ended;
 **Run now** runs one once, whatever its timetable says. One run of a schedule
@@ -785,6 +785,6 @@ a session's token is refused at it whatever it asks; bb has no verb for
 schedules, and a schedule's runs are not among the jobs a session reads.
 
 The static analysis scan is not a schedule here since 0.9.0: it is the
-Scanners page's own ([scanners.md](scanners.md)), which deploys BuilderBot's
+Scanners page's own ([scanners.md](scanners.md)), which deploys AerieOS's
 scanners to each node and runs them on one timetable.
 

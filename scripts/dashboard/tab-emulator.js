@@ -149,7 +149,7 @@ function emuSections(images, count, add){
 // Each project's phones on the node (R123, the operator 23 Oct: removed on
 // the page that manages them, not on Storage), largest first: when each last
 // started, its quick-boot snapshot, and a Remove that is refused while it
-// runs. Its next bb emu start makes it again, empty.
+// runs. Its next aerie emu start makes it again, empty.
 function emuPhonesSaid(phones){
   const mb = phones.reduce((a, p) => a + (p.mb || 0), 0);
   return `${phones.length}, ${mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB"}`;
@@ -160,7 +160,7 @@ function emuPhones(d){
   const cols = [{label: "Phone"}, {label: "Project"}, {label: "last started"}, {label: "snapshot", num: true},
                 {label: "size", num: true}, ...(may ? [{act: true, w: "6.5rem"}] : [])];
   const rows = [...d.phones].sort((a, b) => (b.mb || 0) - (a.mb || 0));
-  return `<div class="field"><div class="hint">A phone removed is made again by its project's next <code>bb emu start</code>, empty: what was installed and signed in on it goes.</div></div>`
+  return `<div class="field"><div class="hint">A phone removed is made again by its project's next <code>aerie emu start</code>, empty: what was installed and signed in on it goes.</div></div>`
     + tblWrap(cols, rows.map(p => `<div class="row stack2 emphone">${tblLine(cols, [
       `<span class="name">${esc(p.name)}</span>${p.running ? ` <span class="pill ok">running</span>` : ""}`,
       esc(projLabel(p.project)), p.running ? "now" : p.ran ? esc(ago(p.ran)) : `<span class="dim">never</span>`,
@@ -285,7 +285,7 @@ function renderEmulatorInto(i){
   };
   el.querySelectorAll("[data-emuphone]").forEach(b => b.onclick = async () => {
     const {emuphone: project, uid, avd} = b.dataset;
-    if (!await askYes(`Remove ${avd}, ${projLabel(project)}'s phone on ${emu?.name || "this node"}?\n\nIts next bb emu start makes it again, empty: what was installed and signed in on it goes.`,
+    if (!await askYes(`Remove ${avd}, ${projLabel(project)}'s phone on ${emu?.name || "this node"}?\n\nIts next aerie emu start makes it again, empty: what was installed and signed in on it goes.`,
                       {verb: "Remove"})) return;
     busy(b, "Removing");
     const j = await (await postJSON("/api/emulator", {action: "phone-remove", node: emuNode, project, uid, name: avd})).json().catch(() => ({error: "no answer"}));

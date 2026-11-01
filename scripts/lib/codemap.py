@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bb map: a code map a session asks instead of grepping (roadmap R75).
+"""aerie map: a code map a session asks instead of grepping (roadmap R75).
 
 One index over a project tree: every function a file defines, every call
 by name with the function it was made from, every element id and class a
@@ -7,34 +7,34 @@ function's markup draws, and which test suite names each of those. Built
 from the files themselves with nothing installed: python's own parser for
 the .py files, a scanner for C and C++, a brace scanner for the other
 C-shaped languages (JavaScript, Kotlin, Java, Go, Rust, PHP and the rest)
-and a line pass for shell. `bb map languages` says which files are read.
+and a line pass for shell. `aerie map languages` says which files are read.
 
-    bb map                       what is indexed, and the verbs
-    bb map find NAME             where NAME is defined
-    bb map who-calls NAME        every call of NAME, with the caller, and every place NAME is
+    aerie map                       what is indexed, and the verbs
+    aerie map find NAME             where NAME is defined
+    aerie map who-calls NAME        every call of NAME, with the caller, and every place NAME is
                                  passed by name without a call (handed to a draw, assigned, listed)
-    bb map calls NAME            what NAME calls
-    bb map defs FILE             the definitions in one file, nested shown
-    bb map draws ID|.class       which functions draw it, which suites name it
-    bb map suites FILE...        the suites that reach what these files define, draw or name
+    aerie map calls NAME            what NAME calls
+    aerie map defs FILE             the definitions in one file, nested shown
+    aerie map draws ID|.class       which functions draw it, which suites name it
+    aerie map suites FILE...        the suites that reach what these files define, draw or name
                                  (--names: one suite name per line, for a script)
-    bb map unused [FILE]         page functions nothing calls and nothing passes by name, and a page's CSS classes nothing names whole or by a template: dead by measurement
-    bb map state [FILE]          the page-level `let`s of a page script (all of them with no FILE), each
+    aerie map unused [FILE]         page functions nothing calls and nothing passes by name, and a page's CSS classes nothing names whole or by a template: dead by measurement
+    aerie map state [FILE]          the page-level `let`s of a page script (all of them with no FILE), each
                                  with where it is assigned and from what: one assigned from `state`
                                  mirrors the poll and drifts from it, which is what to read instead
-    bb map addresses [FILE...]   the `file ~line` addresses in these texts (the roadmap on stdin with
+    aerie map addresses [FILE...]   the `file ~line` addresses in these texts (the roadmap on stdin with
                                  no FILE), each checked against where the name beside it is now:
                                  a plan keeps its words and its addresses move under it
-    bb map sections FILE         the file by its `// ---- name ----` sections: functions, who reaches in
+    aerie map sections FILE         the file by its `// ---- name ----` sections: functions, who reaches in
                                  from outside, what runs at load, what the suite covers. The unit a
                                  cleanup moves.
-    bb map coverage              what the last covered run reached, per file (bb tests coverage runs one)
-    bb map affected --base REF FILES...   the suites a change touches, by the functions its lines fall in and the covered run (--names for a script)
-    bb map covered NAME          which suites ran NAME, and how often: the regression net for touching it
-    bb map uncovered [FILE]      the functions no suite reached
-    bb map languages             which files are indexed, by extension, and that everything else is not
-    bb map build                 rescan everything now (a changed file is rescanned by itself on any question)
-    bb map exclude               keep .bb-map/ out of git in this tree's repository; every build does it too
+    aerie map coverage              what the last covered run reached, per file (aerie tests coverage runs one)
+    aerie map affected --base REF FILES...   the suites a change touches, by the functions its lines fall in and the covered run (--names for a script)
+    aerie map covered NAME          which suites ran NAME, and how often: the regression net for touching it
+    aerie map uncovered [FILE]      the functions no suite reached
+    aerie map languages             which files are indexed, by extension, and that everything else is not
+    aerie map build                 rescan everything now (a changed file is rescanned by itself on any question)
+    aerie map exclude               keep .bb-map/ out of git in this tree's repository; every build does it too
 
 The scanner is deliberately rough: it knows nothing of scope beyond braces
 and nothing of types. It answers "where would I look" in one call, which
@@ -319,7 +319,7 @@ def handler_calls(text):
     return [c.group(1) for m in HANDLER_ATTR.finditer(text) for c in HANDLER_CALL.finditer(m.group(2))
             if c.group(1) not in JS_OWN_KEYWORDS]
 # What a suite and a server share besides names: an API path, and a file
-# of the tree named outright (a suite that runs scripts/bb). Both are how
+# of the tree named outright (a suite that runs scripts/aerie). Both are how
 # `suites FILE` reaches a python change, which no suite calls by name.
 API_PATH = re.compile(r"(/api/[\w/.-]+)")
 TREE_FILE = re.compile(r"(?<![\w/])((?:scripts|config|tools|docs)/[\w./-]+)")
@@ -1953,7 +1953,7 @@ def build(root, prior=None):
     # function: every other identifier is a local, and locating those would
     # be most of the tree again. Filtered against every definition the index
     # holds at this build, so a function added later is seen passed in a
-    # file only once that file is rescanned; `bb map build` rescans them all.
+    # file only once that file is rescanned; `aerie map build` rescans them all.
     names = {d["name"] for e in files.values() for d in e.get("defs", [])
              if d["kind"] in PASSABLE}
     for rel, sink in fresh.items():
@@ -1988,7 +1988,7 @@ def scan_data(text, sink, suffix):
     """A data file's keys as definitions (R167): a compose service's
     environment keys, .env.example's settings, the Unraid template's
     Config targets, a JSON or TOML file's keys and a Markdown file's
-    headings, each at its line, so `bb map find DASHBOARD_PORT` answers
+    headings, each at its line, so `aerie map find DASHBOARD_PORT` answers
     across the five places a setting lands. A key under a path keeps the
     path as its parent (services/controller/environment); a setting (an
     env key, a compose environment key, a Config target) is kind `setting`
@@ -2018,7 +2018,7 @@ _ENV_READ = re.compile(r"""(?:environ(?:\.get)?\s*[\[(]\s*["']|getenv\s*\(\s*["'
 def env_reads(root, files, fresh):
     """Where the code reads a setting (R167): every `os.environ.get("X")`,
     `getenv("X")`, `$X` and `process.env.X` whose X some data file defines
-    as a setting, recorded as a call of X from `env`, so `bb map who-calls
+    as a setting, recorded as a call of X from `env`, so `aerie map who-calls
     DASHBOARD_PORT` answers. Only the files scanned this build are read
     again; the rest keep the calls they were given."""
     names = {d["name"] for e in files.values() for d in e.get("defs", []) if d.get("kind") == "setting"}
@@ -2373,7 +2373,7 @@ def q_find(idx, name, root=None):
         out = []
         for f, ln, kind in found:
             out.append(f"{f}:{ln}  page-level {kind}"
-                       + ("" if kind == "const" else f"; bb map state {Path(f).name} says where it is assigned"))
+                       + ("" if kind == "const" else f"; aerie map state {Path(f).name} says where it is assigned"))
         return out
     out = []
     for d in rows:
@@ -2458,7 +2458,7 @@ def q_calls(idx, name):
 def q_defs(idx, path):
     rows = [d for d in idx["defs"] if d["file"] == path or d["file"].endswith("/" + path)]
     if not rows:
-        return [f"no definitions in {path} (is it indexed? bb map languages says which files are)"]
+        return [f"no definitions in {path} (is it indexed? aerie map languages says which files are)"]
     out = []
     named = [d for d in rows if d["name"] != "(anonymous)"]
     anon = [d for d in rows if d["name"] == "(anonymous)"]
@@ -2504,7 +2504,7 @@ def suites_for(idx, paths):
     """{suite file: set of reasons} for the suites that reach these files:
     a suite that calls a function they define, names an id or class they
     draw, asks an API path they name, or names one of them outright (a
-    suite that runs scripts/bb). A changed suite reaches itself. The
+    suite that runs scripts/aerie). A changed suite reaches itself. The
     map's half of a preflight (R75 step 3)."""
     files = set()
     for p in paths:
@@ -2589,7 +2589,7 @@ def q_suites(idx, paths, names_only=False):
     for f, why in sorted(hits.items(), key=lambda kv: (-len(kv[1]), kv[0])):
         if names_only:
             # For a script that will run them: a lab suite needs a real
-            # service and is asked for by name (bb tests lab), never picked.
+            # service and is asked for by name (aerie tests lab), never picked.
             if not Path(f).name.startswith("lab-"):
                 out.append(Path(f).stem)
             continue
@@ -3001,7 +3001,7 @@ def affected(idx, cov, ranges, root=None):
                 suites.setdefault(s_, set()).add(f"{Path(f).name} (file)")
             why = "lines outside any function" if loose and not any(u.startswith(f + ":") for u in unknown) else "a function no covered run has seen"
             notes.append(f"{f}: {why}, so the file's {len(names)} suite{'' if len(names) == 1 else 's'}")
-    # A lab suite needs a real service and is run by name (bb tests lab),
+    # A lab suite needs a real service and is run by name (aerie tests lab),
     # never picked, whichever road reached it: the file's own answer already
     # left them out, and a drawn name did not, so a change posting to a path
     # a lab suite also asks planned that lab suite (B395).
@@ -3031,7 +3031,7 @@ def account_line(a, every=False):
     line = "suites: " + ", ".join(parts)
     if a.get("by_name"):
         line += (f"; {', '.join(a['by_name'][:3])}{' and more' if len(a['by_name']) > 3 else ''} no covered "
-                 "run has seen, so planned by the map's reading alone (a whole gate or bb tests coverage measures it)")
+                 "run has seen, so planned by the map's reading alone (a whole gate or aerie tests coverage measures it)")
     return line
 
 
@@ -3051,13 +3051,13 @@ def q_affected(idx, cov, root, base, files, names_only=False, ranges=None):
     out += [f"  {n}" for n in notes]
     if unknown:
         out.append(f"  unknown to coverage: {', '.join(unknown[:8])}{', ...' if len(unknown) > 8 else ''}"
-                   " (bb tests coverage, or a whole gate, refreshes it)")
+                   " (aerie tests coverage, or a whole gate, refreshes it)")
     return out
 
 
 def q_coverage(idx, cov):
     if not cov:
-        return ["no covered run yet: bb tests coverage runs the suite with the counters in"]
+        return ["no covered run yet: aerie tests coverage runs the suite with the counters in"]
     hit = covered_ids(cov)
     per = {}
     for d in targets(idx):
@@ -3072,13 +3072,13 @@ def q_coverage(idx, cov):
     for f, (c, n) in sorted(per.items(), key=lambda kv: (kv[1][1] - kv[1][0]) * -1)[:25]:
         if n - c:
             out.append(f"  {n - c:4d} unreached of {n:4d}  {f}")
-    out.append("bb map uncovered FILE lists them; bb map covered NAME says which suites ran one")
+    out.append("aerie map uncovered FILE lists them; aerie map covered NAME says which suites ran one")
     return out
 
 
 def q_covered(idx, cov, name):
     if not cov:
-        return ["no covered run yet: bb tests coverage runs the suite with the counters in"]
+        return ["no covered run yet: aerie tests coverage runs the suite with the counters in"]
     hit = covered_ids(cov)
     rows = [d for d in targets(idx) if d["name"] == name]
     if not rows:
@@ -3099,7 +3099,7 @@ def q_covered(idx, cov, name):
 
 def q_uncovered(idx, cov, path=None):
     if not cov:
-        return ["no covered run yet: bb tests coverage runs the suite with the counters in"]
+        return ["no covered run yet: aerie tests coverage runs the suite with the counters in"]
     hit = covered_ids(cov)
     rows = [d for d in targets(idx) if fid(d) not in hit
             and (not path or d["file"] == path or d["file"].endswith("/" + path))]
@@ -3488,15 +3488,15 @@ def q_sections(idx, path, cov=None):
                    + (f", {len(at_load)} at load" if at_load else "")
                    + (f", runs {len(own_load)} call{'s' if len(own_load) != 1 else ''} at load itself" if own_load else "")
                    + cov_s)
-    out.append("bb map defs FILE lists the functions; who-calls NAME each one's callers; a section with few callers from outside that runs nothing at load itself moves whole, and one that does leaves that wiring behind")
+    out.append("aerie map defs FILE lists the functions; who-calls NAME each one's callers; a section with few callers from outside that runs nothing at load itself moves whole, and one that does leaves that wiring behind")
     return out
 
 
-# Every verb a person asks, in one line: what bare `bb map` ends with, and
+# Every verb a person asks, in one line: what bare `aerie map` ends with, and
 # what bb's own usage names (B546: the two had drifted apart).
-VERBS = ("bb map find NAME | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
+VERBS = ("aerie map find NAME | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
          "state [FILE] | sections FILE | unused [FILE] | addresses [FILE...] | coverage | covered NAME | "
-         "uncovered [FILE] | affected --base REF FILES... | languages | build; bb map help says what each does")
+         "uncovered [FILE] | affected --base REF FILES... | languages | build; aerie map help says what each does")
 LANG_WORDS = {"py": "python", "c": "C and C++", "js": "brace scanner (C-shaped languages)",
               "html": "HTML, Astro, Vue and Svelte (markup and scripts)", "sh": "shell",
               "data": "data and prose (keys, settings, headings)"}
@@ -3571,7 +3571,7 @@ def main(argv):
         return 0
     if verb == "instrument":
         if not rest:
-            print("bb map instrument DIR: the dashboard directory of a run's copy", file=sys.stderr)
+            print("aerie map instrument DIR: the dashboard directory of a run's copy", file=sys.stderr)
             return 2
         nf, nn = instrument(rest[0])
         print(f"instrumented {nn} functions in {nf} files under {rest[0]}")
@@ -3595,12 +3595,12 @@ def main(argv):
         return 0
     if verb == "covered":
         if not rest:
-            print("bb map covered NAME", file=sys.stderr)
+            print("aerie map covered NAME", file=sys.stderr)
             return 2
         print("\n".join(q_covered(idx, coverage_load(root), rest[0])))
         return 0
     if verb == "affected":
-        # bb map affected --base REF [--names] [--ranges FILE:A-B ...] FILES...
+        # aerie map affected --base REF [--names] [--ranges FILE:A-B ...] FILES...
         base, names_only, ranges, files = "HEAD", False, None, []
         i = 0
         while i < len(rest):
@@ -3631,7 +3631,7 @@ def main(argv):
         return 0
     if verb == "sections":
         if not rest:
-            print("bb map sections FILE", file=sys.stderr)
+            print("aerie map sections FILE", file=sys.stderr)
             return 2
         print("\n".join(q_sections(idx, rest[0], coverage_load(root))))
         return 0
@@ -3640,10 +3640,10 @@ def main(argv):
         return 0
     need = {"find": 1, "who-calls": 1, "calls": 1, "defs": 1, "draws": 1, "suites": 1}
     if verb not in need:
-        print(f"bb map: no verb called {verb}; bb map -h lists them", file=sys.stderr)
+        print(f"aerie map: no verb called {verb}; aerie map -h lists them", file=sys.stderr)
         return 2
     if len(rest) < need[verb]:
-        print(f"bb map {verb} needs an argument; bb map -h", file=sys.stderr)
+        print(f"aerie map {verb} needs an argument; aerie map -h", file=sys.stderr)
         return 2
     if fmt != "text" and verb in ("find", "who-calls", "defs"):
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard"))

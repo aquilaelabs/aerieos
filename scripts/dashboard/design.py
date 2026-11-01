@@ -10,14 +10,14 @@ blocks arranged on a phone or desktop frame and named for what it is for
 means applying it there.
 
 Two things come out of it, both generated here and nowhere else, so the
-tab, `bb design` and the file cannot drift:
+tab, `aerie design` and the file cannot drift:
 
-  * the prose a session reads piece by piece with `bb design show`: the
+  * the prose a session reads piece by piece with `aerie design show`: the
     language, one page, one theme or one rule. The tab shows none of it
     (the operator, 29 Sep: a whole dump is not how a session should read
     a design), and nothing on the view reaches into a session;
   * docs/design-language.md in the project's tree, the same shape as
-    BuilderBot's own, written on request from the saved state. A session
+    AerieOS's own, written on request from the saved state. A session
     reads it as the standing description of the look, which is what the
     brief could never be: a file that says what the product looks like now.
 
@@ -46,7 +46,7 @@ NOTES_MAX = 20000
 # The design's rules: the prose, cut into named pieces with triggers, the
 # shape the house rules have. A session gets one on the turn it edits a
 # file or is asked about a word the rule names (rules.matching, through the
-# hooks), never the whole text at once: BuilderBot's own design language is
+# hooks), never the whole text at once: AerieOS's own design language is
 # thirty thousand characters, and a dump of it on every design question is
 # what nobody reads (the operator, 28 Sep). One without triggers stands in
 # every briefing, as a house rule does.
@@ -331,8 +331,8 @@ def _open_line(lang):
     if not left:
         return ""
     return ("Not chosen yet: " + ", ".join(left) + ". Choose " + ("it" if len(left) == 1 else "each")
-            + " from what you build, and put it into the design with `bb design save` "
-              "(`bb design schema` names the choices; custom is the one for a design whose "
+            + " from what you build, and put it into the design with `aerie design save` "
+              "(`aerie design schema` names the choices; custom is the one for a design whose "
               "rules say it better than a choice can).")
 
 # Six hex digits, or eight when a color carries its alpha: a glass theme's
@@ -369,7 +369,7 @@ def _load():
 def _record(d, project):
     """The stored record, read the forgiving way a save is checked: a
     problem in it is noted and a stand-in used, never raised. Read strictly,
-    a record saved under the build before, valid then, took every bb design
+    a record saved under the build before, valid then, took every aerie design
     verb down with it once the shape moved (B386), and nothing from a
     session could get past it: schema could not even say the new shape."""
     rec = d.get(project)
@@ -633,7 +633,7 @@ def _clean_rules(raw, whose):
 def scoped_rules(rec):
     """Every rule the design carries, with the theme's or the page's rules
     named under it: `nostromo/hull` is the Nostromo theme's rule hull, and
-    `bb design show nostromo/hull` reads it. [(name, rule, holder)]."""
+    `aerie design show nostromo/hull` reads it. [(name, rule, holder)]."""
     lang = rec["language"]
     themes = lang["themes"]
     # The default theme's rules are the design's, bare; the others' under
@@ -984,7 +984,7 @@ def language_text(lang, platform=""):
     lines = []
     if not themes:
         lines.append("Colors: none chosen yet. Choose them as tokens a stylesheet names once and every "
-                     "surface reads, and put them into the design (bb design save) as a theme, named, dark or light.")
+                     "surface reads, and put them into the design (aerie design save) as a theme, named, dark or light.")
     elif len(themes) == 1:
         t = themes[0]
         lines.append(f"Colors ({t['name']}, {t['mode']}), as tokens a stylesheet names once and every "
@@ -1006,7 +1006,7 @@ def language_text(lang, platform=""):
                 lines.extend(_rule_lines(t.get("rules") or [], f"{t['name']}'s own rules", _slug(t["name"]), "    "))
     # Each choice says what it means once somebody has made it, and only
     # that: the sentences this used to add by itself (monospace for data,
-    # hairlines of 1px, AA contrast on a filled accent) were BuilderBot's
+    # hairlines of 1px, AA contrast on a filled accent) were AerieOS's
     # own design said of every project's, and one of them contradicted a
     # project's rules (a report from another project, 29 Sep). What a
     # design holds to beyond its choices is in its rules. The default
@@ -1020,7 +1020,7 @@ def language_text(lang, platform=""):
     for r in standing:
         lines.append(f"{r['name']}: {r['text']}")
     if named:
-        lines.append("Design rules, named, not quoted: `bb design show NAME` reads one, and its text "
+        lines.append("Design rules, named, not quoted: `aerie design show NAME` reads one, and its text "
                      "arrives on the turn you edit a file or are asked about a word it names.")
         lines.extend(f"  {r['name']}: " + "; ".join(x for x in [", ".join(r["paths"]), ", ".join(r["words"])] if x)
                      for r in named)
@@ -1058,7 +1058,7 @@ def _rule_lines(rules, head, scope, indent):
     out = [f"{indent}{head}:"]
     for r in rules:
         on = "; ".join(x for x in [", ".join(r["paths"]), ", ".join(r["words"])] if x)
-        out.append(f"{indent}  {scope}/{r['name']}: " + (f"{on} (`bb design show {scope}/{r['name']}` reads it)" if on else r["text"]))
+        out.append(f"{indent}  {scope}/{r['name']}: " + (f"{on} (`aerie design show {scope}/{r['name']}` reads it)" if on else r["text"]))
     return out
 
 
@@ -1133,12 +1133,12 @@ def page_text(page):
 
 def prompt(lang, page=None):
     """What a session is asked to do, in full: the text the tab shows under
-    a page and `bb design show` prints. The language alone when no page."""
+    a page and `aerie design show` prints. The language alone when no page."""
     scope = lang.get("scope") or "the project's user interface"
     # Whose the file is, said outright: a session read "keep it in step",
     # found no file in the tree, and had to guess whether to make one (B344).
     keep = (f"{FILE_PATH} is yours to write and commit with the work, from what is saved here: "
-            f"`bb design file > {FILE_PATH}`; the notebook never writes it into the tree by itself.")
+            f"`aerie design file > {FILE_PATH}`; the notebook never writes it into the tree by itself.")
     if page is None:
         head = (f"Apply this design language to {scope}. Put the tokens in one place the whole "
                 f"stylesheet reads. {keep}")
@@ -1151,11 +1151,11 @@ def prompt(lang, page=None):
 
 def file_text(rec):
     """docs/design-language.md for a project: its language and its pages,
-    the shape BuilderBot's own file has, generated from the saved state so
+    the shape AerieOS's own file has, generated from the saved state so
     it cannot say what the notebook no longer does."""
     lang, pages = rec["language"], rec["pages"]
     out = ["# The design language", "",
-           "What this project looks like, in one place. Written by BuilderBot's Design view "
+           "What this project looks like, in one place. Written by AerieOS's Design view "
            "from the notebook, so edit it there, or edit here and say so in the notebook. "
            "Every surface follows it; a change to the look is a change to this file first.", ""]
     if lang.get("scope"):
@@ -1200,7 +1200,7 @@ def file_text(rec):
     if first["rules"]:
         out += ["", "## Rules", "",
                 "Each is one rule of the design, by name; a session is handed one on the turn it edits a "
-                "file or is asked about a word the rule names, and `bb design show NAME` reads one."]
+                "file or is asked about a word the rule names, and `aerie design show NAME` reads one."]
         for r in first["rules"]:
             on = "; ".join(x for x in [", ".join(r["paths"]), ", ".join(r["words"])] if x)
             out += ["", f"### {r['name']}", ""] + ([f"Applies to: {on}", ""] if on else []) + [r["text"]]
@@ -1251,11 +1251,11 @@ def problems(lang, pages):
 
 
 def schema_text():
-    """bb design schema: the record's shape and every limit, so a session
+    """aerie design schema: the record's shape and every limit, so a session
     writes a record that saves the first time (B342)."""
     kinds = ", ".join(k for k, _, _ in KINDS)
     return "\n".join([
-        "The record bb design save takes (and bb design json prints), as JSON:",
+        "The record aerie design save takes (and aerie design json prints), as JSON:",
         "",
         "{",
         '  "language": {',
@@ -1275,14 +1275,14 @@ def schema_text():
         '  "pages": [ {',
         '    "id": 3,   a saved page keeps its id; leave it out for a new page; a saved page left out is removed',
         f'    "name": "the settings page",   what it is for, at most {NAME_MAX} characters',
-        '    "key": "settings",   optional: a short name of its own, up to 24 lowercase letters, digits and dashes, once per design; its rules are addressed KEY/RULE and bb design show KEY prints it. Without one they are addressed by the whole name as a slug',
+        '    "key": "settings",   optional: a short name of its own, up to 24 lowercase letters, digits and dashes, once per design; its rules are addressed KEY/RULE and aerie design show KEY prints it. Without one they are addressed by the whole name as a slug',
         f'    "platform": {" | ".join(PLATFORM_KEYS)},',
         f'    "frame": {" | ".join(FRAMES)},   one the platform allows: phone and landscape for a phone app. '
         + ", ".join(f"{k} is {v['cols']} columns by {v['rows']} rows" for k, v in FRAMES.items()),
         f'    "rows": 14,   optional: how long the page is where it is longer than one screen, the frame\'s rows to {ROWS_MAX}',
         f'    "template": {" | ".join(TEMPLATE_KEYS)},',
         f'    "blocks": [ {{ "kind": one of {kinds}, "label": "one line, at most {NAME_MAX} characters", "x": 0, "y": 0, "w": 4, "h": 2, "in": 1 }} ],   at most {MAX_BLOCKS}, each inside the frame\'s columns and the page\'s rows, in drawing order (a later block draws over an earlier one where they overlap); "in" is optional: the number of the block this one lies within and is drawn over, any block that is part of another (a card in a list, a cover in a card, a pill in a bar), which it then stays inside, and which comes before it in the list; a child can hold children of its own',
-        f'    "layouts": {{ "phone": [ {{ "x": 0, "y": 0, "w": 6, "h": 2 }} ] }},   optional: where the same blocks sit on another frame, one place per block in the blocks\' order, a block inside another still within it; a layout is as long as its places reach, up to {ROWS_MAX} rows, and rows above is the length on the page\'s own frame; bb design show and the file say each',
+        f'    "layouts": {{ "phone": [ {{ "x": 0, "y": 0, "w": 6, "h": 2 }} ] }},   optional: where the same blocks sit on another frame, one place per block in the blocks\' order, a block inside another still within it; a layout is as long as its places reach, up to {ROWS_MAX} rows, and rows above is the length on the page\'s own frame; aerie design show and the file say each',
         f'    "notes": "...",   at most {NOTES_MAX} characters',
         '    "rules": [RULE]',
         f'  }} ],   at most {MAX_PAGES} pages',
@@ -1298,7 +1298,7 @@ def schema_text():
 
 
 def save(project, req, who=""):
-    """The notebook's Save, and a session's bb design save: the whole record
+    """The notebook's Save, and a session's aerie design save: the whole record
     replaced by what was staged, each page keeping its id (a new one gets
     the next), with who saved it and when. (payload, status)."""
     raw = req.get("pages") if isinstance(req.get("pages"), list) else []
@@ -1345,7 +1345,7 @@ def write_file(project, who=""):
 
 
 def render(req):
-    """bb design file --from FILE: docs/design-language.md from a record
+    """aerie design file --from FILE: docs/design-language.md from a record
     given rather than the saved one, so a branch writes the file from its own
     design without taking in what other branches saved to the notebook
     (B227). Checked as a save is, and nothing is stored. (payload, status)."""
@@ -1366,14 +1366,14 @@ def render(req):
 
 def verb(project, req, who, session):
     """POST /api/design. A person saves from the tab; a session saves the
-    same record through `bb design save`, asked to put a design language
+    same record through `aerie design save`, asked to put a design language
     it was given, or found in the tree, into the notebook. The file is a
-    person's: a session writes it itself with bb design file.
+    person's: a session writes it itself with aerie design file.
     (payload, status)."""
     act = str(req.get("action") or "")
     if session and act == "write":
-        return {"error": "a session reads the design with bb design and writes the file with "
-                         "bb design file; Write the file is the tab's"}, 403
+        return {"error": "a session reads the design with aerie design and writes the file with "
+                         "aerie design file; Write the file is the tab's"}, 403
     if act == "save":
         # A session's save is the project's dial, Agents may: Add to the
         # design (auto lands it, ask holds it for the operator, deny refuses
@@ -1406,7 +1406,7 @@ def verb(project, req, who, session):
 
 
 def text_for(project, which=""):
-    """bb design: the list (`list`), the prompt for the language
+    """aerie design: the list (`list`), the prompt for the language
     (`language`) or for one page by id or name, or the file's text
     (`file`). (text, error)."""
     rec = _record(_load(), project)
@@ -1444,12 +1444,12 @@ def text_for(project, which=""):
     page = next((p for p in rec["pages"] if str(p["id"]) == which or p["name"].lower() == which.lower()
                  or (p.get("key") and p["key"] == which.lower())), None)
     if page is None:
-        return "", f"no page, theme or rule here called {which!r}: bb design lists them"
+        return "", f"no page, theme or rule here called {which!r}: aerie design lists them"
     return prompt(rec["language"], page), ""
 
 
 def listing(project):
-    """bb design with no words: the language in one line and the pages."""
+    """aerie design with no words: the language in one line and the pages."""
     rec = _record(_load(), project)
     lang = rec["language"]
     themes = ", ".join(f"{t['name']} ({t['mode']}{' and ' + _other(t['mode']) if t.get('light') else ''})"
@@ -1482,9 +1482,9 @@ def listing(project):
     if rec["by"]:
         lines.append(f"  last saved by {rec['by']} {time.strftime('%d %b %H:%M', time.localtime(rec['at']))}")
     if not rec["at"]:
-        lines.insert(1, "  nothing saved here yet: build as you would, and put what you arrive at into it with bb design save")
-    lines.append(f"bb design show [ID|NAME] prints one in full; bb design file prints {FILE_PATH}; "
-                 "bb design json prints the record, bb design save FILE writes one back, and bb design schema says its shape")
+        lines.insert(1, "  nothing saved here yet: build as you would, and put what you arrive at into it with aerie design save")
+    lines.append(f"aerie design show [ID|NAME] prints one in full; aerie design file prints {FILE_PATH}; "
+                 "aerie design json prints the record, aerie design save FILE writes one back, and aerie design schema says its shape")
     return "\n".join(lines)
 
 

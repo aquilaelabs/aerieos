@@ -20,7 +20,7 @@ writeFileSync(`${DIR}/ws/ep.silon/.env.example`, '');
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 
 // The store the harness server booted with, read through the module itself,
-// the way bb nodes reads it, so the test exercises the same path.
+// the way aerie nodes reads it, so the test exercises the same path.
 const readStore = (py) => JSON.parse(execFileSync('python3', ['-c', `
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location('nodes',
@@ -246,13 +246,13 @@ print(json.dumps(out))
      'the seed itself is on the record, once, as system');
 }
 
-// ---- bb nodes --------------------------------------------------------------
+// ---- aerie nodes --------------------------------------------------------------
 {
-  const out = execFileSync('bash', ['scripts/bb', 'nodes'],
+  const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO,
       env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(!/\blocal\b/.test(out) && /sandbox · stub/.test(out),
-     'bb nodes prints the enrolled machines, read-only. Never the controller, which is registry plumbing');
+     'aerie nodes prints the enrolled machines, read-only. Never the controller, which is registry plumbing');
 }
 
 // ---- phase 2: the Nodes tab ------------------------------------------------
@@ -376,7 +376,7 @@ m = importlib.util.module_from_spec(spec); sys.modules["nodes"] = m; spec.loader
 m.configure(state="${DIR}/state")
 ag = m.node("${added.id}")["agent"]
 ag["keep"] = m.keep_clean({"said": [{"at": int(time.time()) - 120, "key": "u_1/alpha",
-                                     "msg": "bb token keep failed (exit 1): the session token was not kept"}],
+                                     "msg": "aerie token keep failed (exit 1): the session token was not kept"}],
                            "ok": int(time.time()) - 7200})
 m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}"))`],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
@@ -384,7 +384,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
     await pickNode(page, added.id);
     const keepRow = await page.waitForFunction(id => document.querySelector(`.nodestab .ndrow[data-node="${id}"] .ndkeep`)?.textContent || '',
       added.id, { timeout: 15000 }).then(h => h.jsonValue()).catch(() => '');
-    ok(/session tokens: bb token keep failed \(exit 1\): the session token was not kept, .*ago; one was last kept .*ago/.test(keepRow),
+    ok(/session tokens: aerie token keep failed \(exit 1\): the session token was not kept, .*ago; one was last kept .*ago/.test(keepRow),
        `why a session's token was not kept is on the node's row, with when one last was (${keepRow})`);
   }
   ok(['docker-host', 'package-build', 'deploy-target'].every(c => added.capabilities.includes(c)),
@@ -494,7 +494,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
   // Both are the thing under test (a reason on screen instead of a spinner),
   // and listing only three made the fourth read as a failure in a full run
   // while the file passed alone.
-  ok(/not a BuilderBot sandbox|does not answer|will not say what it is/.test(emptyWhy),
+  ok(/not a AerieOS sandbox|does not answer|will not say what it is/.test(emptyWhy),
      `an unreachable node shows its reason, not a spinner (${emptyWhy.slice(0, 50)})`);
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   ok(await page.$eval('.pane .bar #ndPick', s => !s.disabled),
@@ -610,7 +610,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
                                        toolchains: { path: '/var/lib/builderbot/toolchains', free_mb: 40000, total_mb: 90000 },
                                        artifacts: { path: '/var/lib/builderbot/artifacts', free_mb: 30000, total_mb: 90000 } },
               toolchains: { flutter: '3.24.0', node: 'v22.1.0' },
-              // What `bb toolchains versions` says on the node: the controller's
+              // What `aerie toolchains versions` says on the node: the controller's
               // own generator, run there. The toolchains dict above is a
               // placement summary and describes the same store differently,
               // which is the disparity this replaces.
@@ -1427,7 +1427,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const asked = await rootAsk();
     if (asked.id) await napi('/api/phone', { action: 'deny', id: asked.id });
     ok(/shed is not gamma's/.test(notMine.error || '') && asked.ok && asked.node === 'shed',
-       `bb root run --node shed is refused until gamma hosts containers there, then asked for shed (${notMine.error} / ${JSON.stringify(asked)})`);
+       `aerie root run --node shed is refused until gamma hosts containers there, then asked for shed (${notMine.error} / ${JSON.stringify(asked)})`);
     ok(await page.$eval(`${ROW} [data-k="rootasks"]`, c => c.checked && /bb root run --node shed/.test(c.closest('label').textContent)),
        'the hosting-only row carries the root-asks switch, on, naming the verb');
     await page.click(`${ROW} [data-k="rootasks"]`);
@@ -1508,7 +1508,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // What it does is said on its row (the operator, 18 Oct: Advanced's
     // actions a row each, the words beside the button, not in a tooltip).
     const unro = await page.$eval(`${ROW} [data-nd="unenroll"]`, b => ({ text: b.textContent, title: b.closest('.ndact')?.querySelector('.sub')?.textContent || '' }));
-    ok(/Un-enroll/.test(unro.text) && /Takes BuilderBot off the machine/.test(unro.title) && !(await page.$(`${ROW} [data-nd="retire"]`)),
+    ok(/Un-enroll/.test(unro.text) && /Takes AerieOS off the machine/.test(unro.title) && !(await page.$(`${ROW} [data-nd="retire"]`)),
        'Un-enroll is the one way off, cleaning the machine where it can; Remove and Uninstall are gone');
     // Its dialog: what always goes, and the three rings to tick (the stores,
     // what the dashboard configured, a host's doors), none ticked for a node
@@ -1807,7 +1807,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   const tools = await page.$$eval('.doc .librarytab .lcard[data-lrow^="toolchain:"]', rs => rs.map(r => r.textContent.replace(/\s+/g, ' ')));
   ok(tools.some(t => /6655482e/.test(t)) && tools.some(t => /29\.0\.14206865/.test(t))
      && !tools.some(t => /3\.24\.0/.test(t)),
-     'a node\'s versions come from its own bb toolchains versions, not the census summary');
+     'a node\'s versions come from its own aerie toolchains versions, not the census summary');
   // Its headroom is the head's Store fact to say, once (R218 step 24).
   const room = await page.$eval('.doc .librarytab .pghead', e => e.textContent.replace(/\s+/g, ' '));
   ok(tools.some(t => /6655482e/.test(t)) && /(40|39)(\.\d)? ?GB free/.test(room)
@@ -1851,7 +1851,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       return r ? { ...(r.system || {}), installed: !!r.installed } : null; });
     ok(dotnetSys?.manager === 'dnf' && (dotnetSys.names || []).includes('libicu') && !dotnetSys.installed,
        `a toolchain's record names the system packages its tool installs on this node (${JSON.stringify(dotnetSys)})`);
-    // Nobody has to press it on a node BuilderBot manages: the census that
+    // Nobody has to press it on a node AerieOS manages: the census that
     // named them queued the job itself, for exactly those recipes.
     const tcJobs = async () => ((await pj(`/api/v1/jobs?node=${minted.id}&type=toolchain&n=20`)).jobs || []);
     const auto = (await tcJobs()).filter(j => j.spec?.action === 'sysdeps');
@@ -2166,12 +2166,12 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       image: 'system-images;android-30;google_apis;x86_64' });
     ok(rm.job, 'one it did report can be');
     if (rm.job) await napi('/api/v1/jobs', { action: 'cancel', id: rm.job });
-    // The same in a terminal: bb toolchains says where images went.
+    // The same in a terminal: aerie toolchains says where images went.
     let said = '';
-    try { execFileSync('bash', [`${REPO}/scripts/bb`, 'toolchains', 'images'], { stdio: 'pipe' }); }
+    try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'toolchains', 'images'], { stdio: 'pipe' }); }
     catch (e) { said = String(e.stderr); }
-    ok(/system images are the emulator's, not a toolchain: bb emu images/.test(said),
-       `bb toolchains images points at bb emu images (${said.trim()})`);
+    ok(/system images are the emulator's, not a toolchain: aerie emu images/.test(said),
+       `aerie toolchains images points at aerie emu images (${said.trim()})`);
 
     // A node whose platform the Android recipes are not packaged for can
     // never hold an image, which is a different thing from not having the
@@ -3389,7 +3389,7 @@ ok(page.errors.length === 0,
     const cancel = async r => { if (r?.job) await napi('/api/v1/jobs', { action: 'cancel', id: r.job }); };
     await hello(shed, { sandbox: true, gpu_card: card, gpu_driver: { ...apt, installed: '', loaded: '', bound: 'nouveau' } });
     const r = await rowOf(shed.id);
-    ok(r?.managed === true, `a sandbox's driver row is BuilderBot's to install (${r?.managed})`);
+    ok(r?.managed === true, `a sandbox's driver row is AerieOS's to install (${r?.managed})`);
     const seen = [];
     for (const [gd, want] of [
       [{ installed: '', loaded: '', bound: 'nouveau' }, 'absent'],
@@ -3579,7 +3579,7 @@ ok(page.errors.length === 0,
     await hello(shed, { sandbox: true, gpu_card: card });
   }
   const no = await napi('/api/v1/nodes', { action: 'uninstall', id: plain.id });
-  ok(/only a node provisioned as a BuilderBot sandbox/.test(no.error || '') && /sudo bb-sandbox uninstall/.test(no.error || ''),
+  ok(/only a node provisioned as a AerieOS sandbox/.test(no.error || '') && /sudo bb-sandbox uninstall/.test(no.error || ''),
      `a node that is not a sandbox is refused, and told the command to run on the machine (${no.error})`);
   const r = await napi('/api/v1/nodes', { action: 'uninstall', id: shed.id, stores: true, doors: true, configured: 'yes' });
   ok(r.ok && /^j_/.test(r.job || ''), `a sandbox node queues the uninstall as a system job (${r.error || r.job})`);
@@ -3641,7 +3641,7 @@ ok(page.errors.length === 0,
   const chk = await napi('/api/toolchains', { action: 'check', node: en.id });
   ok(!('claude' in chk), `...and the toolchain check, the Library's Check for updates, asks nothing of a coding agent (${Object.keys(chk).join(', ')})`);
   // The node's own toolchain check it queued: the fake agent takes it and
-  // answers the way bb toolchains versions does, Go behind, so the tab is
+  // answers the way aerie toolchains versions does, Go behind, so the tab is
   // not busy with it and the agent is handed the update next.
   const tcRowOf = st => (st.attention || []).find(a => a.kind === 'toolchain' && a.id === en.id);
   const agRowOf = st => (st.attention || []).find(a => a.kind === 'agents' && a.id === en.id);

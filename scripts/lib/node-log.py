@@ -1,4 +1,4 @@
-"""Behind `bb logs --node NAME [--agent|--runner|--terminal]` (cmd_logs in bb): a
+"""Behind `aerie logs --node NAME [--agent|--runner|--terminal]` (cmd_logs in bb): a
 MACHINE's own log, read through the controller, which decides whether the
 asking session may see it.
 

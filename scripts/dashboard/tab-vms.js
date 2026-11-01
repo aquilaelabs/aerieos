@@ -77,7 +77,7 @@ function vmRow(v){
     disks.length > 1 ? `disks of ${disks.join(", ")} GB` : `${v.disk_gb} GB disk`}`;
   const origin = [esc(v.os_name || v.os || ""), esc(v.node_name || ""), esc(size)].filter(Boolean).join(`<span class="sep"></span>`);
   // From an installer (R99): its ISO in the drive until ejected, and no
-  // account of BuilderBot's to ssh in as.
+  // account of AerieOS's to ssh in as.
   const reach = up && v.iso ? `installing from ${esc(v.iso)}: its Screen shows the installer`
     : up && v.ip && v.os !== "installer" ? `ssh ${esc(v.user || "builder")}@${esc(v.ip)}`
     : up && v.ip ? `at ${esc(v.ip)}`
@@ -152,12 +152,12 @@ function vmRow(v){
     <div class="dmbody">${inner}</div></details>`;
 }
 
-// Domains on a node's libvirt that BuilderBot did not make (R165 step 1):
+// Domains on a node's libvirt that AerieOS did not make (R165 step 1):
 // an administrator reads them by name, state and size, and nothing on the
 // page acts on one; libvirt's own tools do, on the machine.
 function vmOthersHtml(rows){
   const size = v => [v.vcpus ? `${v.vcpus} vCPU` : "", v.mem_mb ? (v.mem_mb >= 1024 ? `${+(v.mem_mb / 1024).toFixed(1)} GB` : `${v.mem_mb} MB`) : ""].filter(Boolean).join(" · ");
-  return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not BuilderBot's</b><span class="sub"> · on a node's libvirt, made outside BuilderBot: read here, never changed from here</span></div>
+  return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not AerieOS's</b><span class="sub"> · on a node's libvirt, made outside AerieOS: read here, never changed from here</span></div>
     <div class="rows">${rows.map(v => `<div class="row stack2 vmother" data-vmother="${esc(v.node)}/${esc(v.name)}"><div class="grow"><div class="dmhead"><div class="dmid">
       <div class="name">${esc(v.name)}<span class="pill${v.state === "running" ? " ok" : ""}">${esc(v.state || "unknown")}</span></div>
       <div class="sub dmorigin">${[esc(v.node_name || ""), esc(size(v))].filter(Boolean).join(`<span class="sep"></span>`)}</div>
@@ -244,8 +244,8 @@ function renderVmsInto(i){
     : vmsErr ? `<div class="hint bad">${esc(vmsErr)}</div>`
     : !hosts.length ? `<div class="empty vmnone">No node has VM host yet: its Features section on the ${pageLink("nodes", "Nodes page")} installs it, where the machine has /dev/kvm.</div>`
     : !(vmsData.vms || []).length ? `<div class="empty vmnone">No VM yet. ${Object.values(vmsData.can || {}).includes("write")
-        ? "Press <b>New VM</b>, or ask the agent in a session for one: <code>bb vm new NAME --os debian</code>."
-        : "A project's sessions make them with <code>bb vm new</code> where its settings allow it."}</div>`
+        ? "Press <b>New VM</b>, or ask the agent in a session for one: <code>aerie vm new NAME --os debian</code>."
+        : "A project's sessions make them with <code>aerie vm new</code> where its settings allow it."}</div>`
     : !rows.length ? `<div class="empty">No VM matches “${esc(vmsSearch)}”.</div>` : "";
   const head = off || vmsErr || !onNode.length ? "" : vmTiles(onNode, chips.length) + chipBar(chips, vmsChip, "data-vmchip");
   // A reload that lands while the search is being typed in keeps the box's
@@ -253,10 +253,10 @@ function renderVmsInto(i){
   // Written only when it says something new, as the Containers page is
   // (the operator, 26 Oct): a read bringing the same VMs leaves the page,
   // its menus and its focus alone.
-  // The domains a node's libvirt has that BuilderBot did not make (R165
+  // The domains a node's libvirt has that AerieOS did not make (R165
   // step 1): read here by an administrator, under the node picked, with no
   // button on them; not counted in the tiles or the chips, which are
-  // BuilderBot's own VMs.
+  // AerieOS's own VMs.
   const others = off ? [] : (vmsData.others || []).filter(v => !vmsNode || v.node === vmsNode)
     .filter(v => !q || [v.name, v.node_name].some(x => String(x || "").toLowerCase().includes(q)));
   const html = `<div class="doctab vmtab">${vmBar(false)}${head}${empty || vmGroupsHtml(rows)}${others.length ? vmOthersHtml(others) : ""}</div>`;

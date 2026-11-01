@@ -1,4 +1,4 @@
-# BuilderBot OS: the root is the slot GRUB booted (a squashfs, read-only,
+# AerieOS: the root is the slot GRUB booted (a squashfs, read-only,
 # under overlayroot's tmpfs) and /var and /etc's changes are mounted by the
 # initramfs (scripts/init-bottom/builderbot-os); only the ESP is here, for
 # the slot tool and an update to reach GRUB's environment.

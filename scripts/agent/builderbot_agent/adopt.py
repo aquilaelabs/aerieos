@@ -40,7 +40,7 @@ VM_OPS = {"start": ["start"], "shutdown": ["shutdown"], "off": ["destroy"],
           "autostart-on": ["autostart"], "autostart-off": ["autostart", "--disable"]}
 DATA_RE = re.compile(r"disk([1-9][0-9]?)")
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
-# Names a pool may not take: the merged trees under /mnt, and BuilderBot's.
+# Names a pool may not take: the merged trees under /mnt, and AerieOS's.
 NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "other", "cache-mover"}
 # What a read-only mount adds so the filesystem writes nothing at all.
 NO_REPLAY = {"xfs": "norecovery", "btrfs": "rescue=nologreplay"}

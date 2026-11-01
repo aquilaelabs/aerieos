@@ -56,7 +56,7 @@ status() {
     systemctl is-active builderbot-controller
     readlink /opt/builderbot
     id builderbot
-    bb nodes 2>&1 | tail -3
+    aerie nodes 2>&1 | tail -3
 }
 
 # inside: the tries and the covers inside a session's view, built by

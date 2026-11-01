@@ -217,14 +217,14 @@ class Controller(unittest.TestCase):
 
     def test_made_a_node_it_carries_enroll_node_s_script_and_goes_with_it(self):
         made, retired, marked = [], [], []
-        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# BuilderBot: enroll x"}
+        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# AerieOS: enroll x"}
         vms.node_retire = lambda by, nid: retired.append(nid)
         vms.node_mark = lambda nid, host: marked.append((nid, host))
         try:
             r = self.new(node_agent=True, ctl="http://192.168.1.16:7680")
             self.assertTrue(r.get("ok"), r)
             self.assertEqual((made[0]["system"], made[0]["controller"], made[0]["sessions"]), ("debian", "http://192.168.1.16:7680", True))
-            self.assertTrue(self.f.jobs[-1][2]["enroll"].startswith("#!/usr/bin/env bash\n# BuilderBot: enroll"))
+            self.assertTrue(self.f.jobs[-1][2]["enroll"].startswith("#!/usr/bin/env bash\n# AerieOS: enroll"))
             self.assertEqual(marked, [("n_vm", "n1")])
             # Its own account is not the sessions', which cloud-init would give sudo.
             self.assertEqual(self.f.jobs[-1][2]["user"], "admin")
@@ -238,7 +238,7 @@ class Controller(unittest.TestCase):
         # A create past the cap minted the node's enroll row first, and the
         # next try was refused by that row's name (R97's walk, 21 Oct).
         made, dropped = [], []
-        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# BuilderBot: enroll x"}
+        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# AerieOS: enroll x"}
         vms.node_discard = lambda by, nid: dropped.append(nid)
         try:
             self.f.caps = dict(self.f.caps, count=1)
@@ -421,7 +421,7 @@ class Agent(unittest.TestCase):
 
     def test_the_domains_it_did_not_make_are_listed_and_never_ours(self):
         # R165 step 1: a name without the prefix, or with it and without the
-        # agent's marker, is somebody else's; one with both is BuilderBot's
+        # agent's marker, is somebody else's; one with both is AerieOS's
         # and stays out of this list.
         from unittest import mock
         def virsh(argv, timeout=0, **kw):
@@ -833,7 +833,7 @@ if __name__ == "__main__":
 
 
 class Verbs(unittest.TestCase):
-    """bb vm's hardware words (R100): what is named is sent, none takes it
+    """aerie vm's hardware words (R100): what is named is sent, none takes it
     off, and what is not a hardware word is left for the verb."""
 
     def setUp(self):
@@ -857,7 +857,7 @@ class Verbs(unittest.TestCase):
 
 class Ask(unittest.TestCase):
     """A session's VM change asked of the administrators shows them the
-    hardware in bb vm's own words, and keeps what the Allow will need."""
+    hardware in aerie vm's own words, and keeps what the Allow will need."""
 
     def test_the_bell_says_what_is_asked(self):
         import phone
@@ -869,7 +869,7 @@ class Ask(unittest.TestCase):
         self.assertEqual(seen["shown"][-7:], ["--pin", "2,3", "--mem-max", "none", "--share", "data", "--ro"])
         phone.ask_vm("bigger", "web", {"action": "disk-grow", "name": "db", "disk": "vdb", "gb": 60}, "s")
         self.assertEqual((seen["shown"][-2:], seen["extra"]["vm"]["gb"], seen["extra"]["vm"]["disk"]), (["vdb", "60G"], 60, "vdb"))
-        # A USB device to a VM (R116), as bb vm usb names it.
+        # A USB device to a VM (R116), as aerie vm usb names it.
         phone.ask_vm("the stick", "web", {"action": "usb-give", "name": "db", "usb": {"vendor": "0x0781", "product": "0x5583", "serial": "4C53"}}, "s")
         self.assertEqual(seen["shown"], ["vm", "usb", "db", "give", "0781:5583:4C53"])
         self.assertEqual(seen["extra"]["vm"]["usb"]["serial"], "4C53")

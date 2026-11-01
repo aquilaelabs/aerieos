@@ -135,7 +135,7 @@ fun Pull(loading: Boolean, reload: () -> Unit, content: @Composable () -> Unit) 
 
 @Composable
 fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) -> Unit) {
-    // Adding another BuilderBot (R132) starts blank; the first sign-in
+    // Adding another AerieOS (R132) starts blank; the first sign-in
     // offers what was there before.
     var server by remember { mutableStateOf(if (adding) "https://" else store.server.ifBlank { "https://" }) }
     var user by remember { mutableStateOf(if (adding) "" else store.user) }
@@ -145,7 +145,7 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text(if (adding) "Another BuilderBot" else "BuilderBot", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Ink)
+        Text(if (adding) "Another AerieOS" else "AerieOS", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Ink)
         Dim(if (adding) "Sign in to a second dashboard. The app watches every one it is paired with, and shows one at a time."
             else "Sign in with your dashboard account. The address is the one you open in a browser: on your network, or over your tailnet.")
         Spacer(Modifier.height(16.dp))
@@ -165,7 +165,7 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
                 try {
                     val api = Api(server, user, password)
                     val st = api.status()
-                    if (st.str("me").isBlank()) throw Exception("that address answers, but not as a BuilderBot")
+                    if (st.str("me").isBlank()) throw Exception("that address answers, but not as a AerieOS")
                     store.add(name, server, user, password)
                     onDone(st.obj("can").optBoolean("admin", false))
                 } catch (e: Exception) {
@@ -277,7 +277,7 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
                                 text = { Text(if (p.id == here.id) "\u2713 ${p.label}" else p.label) },
                                 onClick = { pick = false; if (p.id != here.id) onSwitch(p.id) })
                         }
-                    } else Text("BuilderBot", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Ink)
+                    } else Text("AerieOS", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Ink)
                     if (s != null) Text("${s.str("me")} · ${s.obj("image").str("version").ifBlank { "unstamped" }} on ${s.str("host")}",
                         color = Dim, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                 }
@@ -660,7 +660,7 @@ private fun EditAccount(api: Api, u: JSONObject, roles: List<String>, everyProje
 }
 
 // ---- installing the newer build of this app ------------------------------------
-// The card that says the app is behind used to end with "in BuilderBot's
+// The card that says the app is behind used to end with "in AerieOS's
 // Artifacts tab", which means: go to a desktop, download a file, move it to
 // the phone. The APK is an artifact the dashboard already serves and the
 // phone is already authenticated to it, so the whole errand is a download
@@ -688,7 +688,7 @@ private fun InstallNewer(api: Api, apk: String, sha: String = "", url: String = 
                     dir.mkdirs()
                     dir.listFiles()?.forEach { it.delete() }
                     // The controller's own copy from its release when it holds
-                    // one (R272), else the one in BuilderBot's dist/.
+                    // one (R272), else the one in AerieOS's dist/.
                     val file = api.download(url.ifBlank { api.apkPath(apk) }, java.io.File(dir, apk))
                     // What arrived is what the dashboard named, or it is not
                     // installed (B273): the download crosses the same network
@@ -825,7 +825,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
                     // was offered to the phone running dev.2414, and Install it
                     // reinstalled it); then a newer one has to be built and signed.
                     val same = m.str("apk").isNotBlank() && m.str("apk").contains("-" + BuildConfig.VERSION_NAME.replace('+', '-') + "-")
-                    if (same) Text("That is the build this phone already runs: a newer one has to be built and signed on BuilderBot's Artifacts tab first.", color = Bad)
+                    if (same) Text("That is the build this phone already runs: a newer one has to be built and signed on AerieOS's Artifacts tab first.", color = Bad)
                     else if (m.str("apk").isNotBlank()) InstallNewer(api, m.str("apk"), m.str("apk_sha256"), m.str("apk_url"))
                 }
             } else if (serverApi < BuildConfig.TARGET_API) Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -853,7 +853,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
             }
         }
         SectionHead("The watch", inset = false)
-        Dim("The app asks the dashboard what the bell would show and posts it, with Approve and Deny on the notification: on the interval below while the app is open, and about once a minute in the background. Nothing stays in the shade between questions. No push service: the phone reaches your BuilderBot directly.")
+        Dim("The app asks the dashboard what the bell would show and posts it, with Approve and Deny on the notification: on the interval below while the app is open, and about once a minute in the background. Nothing stays in the shade between questions. No push service: the phone reaches your AerieOS directly.")
         // A draft until Save, as every group of settings is: a switch that
         // stopped the watch on a mis-tap had nothing to look at first.
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -874,7 +874,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Hear asks at once")
-                Dim("keeps a connection open to your BuilderBot so a question reaches you in seconds, " +
+                Dim("keeps a connection open to your AerieOS so a question reaches you in seconds, " +
                     "with a quiet note in the shade while it runs; uses a little more battery")
             }
             Switch(checked = live, enabled = watch, onCheckedChange = { live = it; watchSaid = "" })
@@ -883,7 +883,7 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
             val pm = context.getSystemService(android.os.PowerManager::class.java)
             if (!pm.isIgnoringBatteryOptimizations(context.packageName)) Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Dim("Android cuts the connection while the phone sleeps unless BuilderBot may run unrestricted")
+                    Dim("Android cuts the connection while the phone sleeps unless AerieOS may run unrestricted")
                 }
                 TextButton(onClick = {
                     context.startActivity(android.content.Intent(
@@ -1159,7 +1159,7 @@ fun ToolsScreen(store: Store, mayTools: Boolean) {
     }
 }
 
-// ---- what's new: BuilderBot's own changelog -----------------------------------
+// ---- what's new: AerieOS's own changelog -----------------------------------
 // What the dashboard's welcome panel shows after an update, to read on the
 // way to the desk: each release with what it added, changed and fixed.
 

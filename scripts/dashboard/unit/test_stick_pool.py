@@ -230,9 +230,9 @@ class TheController(unittest.TestCase):
                              env=dict(os.environ, DASHBOARD_STATE=state), capture_output=True, text=True, check=False)
         self.assertEqual(tok.returncode, 0, tok.stderr)
         n = next(x for x in nodes.node_list() if x["name"] == "nas")
-        self.assertIn("does not run BuilderBot OS from a stick", nodes.node_system_pool("user:t", n["id"], "/mnt/fast").get("error", ""))
+        self.assertIn("does not run AerieOS from a stick", nodes.node_system_pool("user:t", n["id"], "/mnt/fast").get("error", ""))
         self.assertEqual(nodes.node_system_pool("user:t", "n_nothere", "/mnt/fast").get("error"), "no such node")
-        self.assertIn("does not run BuilderBot OS from a stick", nodes.node_projects_folder("user:t", n["id"], "/mnt/user/projects").get("error", ""))
+        self.assertIn("does not run AerieOS from a stick", nodes.node_projects_folder("user:t", n["id"], "/mnt/user/projects").get("error", ""))
         self.assertEqual(nodes.node_projects_folder("user:t", "n_nothere", "/mnt/user/projects").get("error"), "no such node")
 
 

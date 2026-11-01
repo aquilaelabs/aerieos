@@ -205,7 +205,7 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
         raise Refused("not an address this asks GitHub at")
     payload = data if data is not None else (json.dumps(body).encode() if body is not None else None)
     req = urllib.request.Request(url, data=payload, method=method,
-                                 headers={"User-Agent": "BuilderBot", "Accept": "application/vnd.github+json",
+                                 headers={"User-Agent": "AerieOS", "Accept": "application/vnd.github+json",
                                           **({"Content-Type": ctype} if payload is not None else {})})
     req.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
@@ -357,7 +357,7 @@ class _Forge:
         auth = ({"PRIVATE-TOKEN": self.token} if self.entry["kind"] == "gitlab"
                 else {"Authorization": f"token {self.token}"})
         req = urllib.request.Request(url, data=payload, method=method,
-                                     headers={"User-Agent": "BuilderBot", "Accept": "application/json", **auth,
+                                     headers={"User-Agent": "AerieOS", "Accept": "application/json", **auth,
                                               **({"Content-Type": ctype} if payload is not None else {})})
         name = self.entry["name"]
         try:
@@ -452,7 +452,7 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
 
 def _multipart(field, name, data):
     """One file as multipart/form-data, which is how Gitea takes an asset."""
-    boundary = "bb" + os.urandom(12).hex()
+    boundary = "aerie" + os.urandom(12).hex()
     safe = name.replace('"', "_").replace("\r", "_").replace("\n", "_")
     head = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; filename=\"{safe}\"\r\n"
             f"Content-Type: application/octet-stream\r\n\r\n").encode()
@@ -625,7 +625,7 @@ def _github_edit(project, repo, token, tag, notes, files):
     base = f"{API}/repos/{repo}/releases"
     rel = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
     if not rel:
-        raise Refused(f"there is no release for {tag} on GitHub to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on GitHub to edit: aerie version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
     urls = {n: a.get("browser_download_url") or "" for n, a in have.items()}
     attached, replaced, skipped = [], [], []
@@ -658,7 +658,7 @@ def _gitea_edit(f, at, project, tag, notes, files):
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases"
     rel = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}")
     if not rel:
-        raise Refused(f"there is no release for {tag} on {f.entry['name']} to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on {f.entry['name']} to edit: aerie version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
     urls = {n: a.get("browser_download_url") or "" for n, a in have.items()}
     attached, replaced, skipped = [], [], []
@@ -688,7 +688,7 @@ def _gitlab_edit(f, at, project, tag, notes, files):
     t = urllib.parse.quote(tag, safe="")
     rel = f.ask("GET", f"/projects/{pid}/releases/{t}")
     if not rel:
-        raise Refused(f"there is no release for {tag} on GitLab to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on GitLab to edit: aerie version release makes one")
     links = {x.get("name"): x for x in ((rel.get("assets") or {}).get("links") or [])}
     urls = {n: x.get("url") or "" for n, x in links.items()}
     pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"

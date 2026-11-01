@@ -1,5 +1,5 @@
 {
- "about": "What bb lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, bb lint on a node skips its checks.",
+ "about": "What aerie lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, aerie lint on a node skips its checks.",
  "label": "Lint tools (shellcheck, hadolint, actionlint, ruff, yq, fd)",
  "layout": {
   "bin": [

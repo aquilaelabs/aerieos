@@ -1,7 +1,7 @@
-"""A session sees a release's signing and asks for it again (R134): bb sign
+"""A session sees a release's signing and asks for it again (R134): aerie sign
 status prints whether the release APK can be signed and how the newest went,
-in the Signing view's words; bb sign release asks the project's owner, under
-Sign a build, and Allow starts the look the Signing view's press starts; bb
+in the Signing view's words; aerie sign release asks the project's owner, under
+Sign a build, and Allow starts the look the Signing view's press starts; aerie
 version release is refused before the tag when the APK could not be signed,
 unless told --without-apk. The clients against a stand-in controller on a
 local port; the ask against phone.py itself."""
@@ -81,7 +81,7 @@ class Clients(unittest.TestCase):
         self.assertIn("ready: a release's APK can be signed", r.stdout)
         self.assertIn("v0.7.0: signed 2 min ago, app-0.7.0.apk with release (DE:66:E7)", r.stdout)
         self.assertIn("v0.6.9: FAILED 2 h ago: no sideload key", r.stdout)
-        self.assertIn("bb sign release", r.stdout, "a failure says how to ask again")
+        self.assertIn("aerie sign release", r.stdout, "a failure says how to ask again")
         self.assertLess(r.stdout.index("v0.7.0"), r.stdout.index("v0.6.9"), "newest first")
 
     def test_status_of_one_tag_and_what_would_stop_one(self):

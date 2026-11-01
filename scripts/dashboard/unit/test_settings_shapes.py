@@ -19,7 +19,7 @@ class Shapes(unittest.TestCase):
 
     def test_each_text_keeps_its_own_shape(self):
         good = {"tls_mode": "self", "tls_host": "bb.example.com", "tls_email": "me@example.com", "smtp_host": "smtp.example.com",
-                "smtp_port": "587", "smtp_security": "ssl", "smtp_user": "Me@Example.com", "smtp_from": "BuilderBot <bb@example.com>",
+                "smtp_port": "587", "smtp_security": "ssl", "smtp_user": "Me@Example.com", "smtp_from": "AerieOS <bb@example.com>",
                 "catalog_url": "https://example.com/catalog/", "tunnel_host": "bb.example.com"}
         for k, v in good.items():
             self.assertNotIn("error", settings.set_many({k: v}), k)

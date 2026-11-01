@@ -1,5 +1,5 @@
 #!/bin/sh
-# BuilderBot OS (R160 step 1): what persists on an immutable root, mounted
+# AerieOS (R160 step 1): what persists on an immutable root, mounted
 # before the system starts so PID 1 sees it from its first read.
 #
 # overlayroot has just put a tmpfs over the read-only root, so anything
@@ -21,16 +21,16 @@ DATA=/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0d
 i=0
 while [ ! -b "$DATA" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
 if [ ! -b "$DATA" ]; then
-    panic "BuilderBot OS: the data partition (PARTUUID ...0e0d) is not here: the disk this slot booted from has lost it, or another disk was put in its place"
+    panic "AerieOS: the data partition (PARTUUID ...0e0d) is not here: the disk this slot booted from has lost it, or another disk was put in its place"
 fi
 mkdir -p "${rootmnt}/var"
 mount -t ext4 -o defaults,noatime "$DATA" "${rootmnt}/var" \
-    || panic "BuilderBot OS: the data partition did not mount (fsck it from a rescue system, or Safe mode once R161 step 2 lands)"
+    || panic "AerieOS: the data partition did not mount (fsck it from a rescue system, or Safe mode once R161 step 2 lands)"
 mkdir -p "${rootmnt}/var/lib/builderbot-os/etc/upper" "${rootmnt}/var/lib/builderbot-os/etc/work"
 mount -t overlay overlay \
     -o "lowerdir=${rootmnt}/etc,upperdir=${rootmnt}/var/lib/builderbot-os/etc/upper,workdir=${rootmnt}/var/lib/builderbot-os/etc/work" \
     "${rootmnt}/etc" \
-    || panic "BuilderBot OS: /etc's overlay did not mount"
+    || panic "AerieOS: /etc's overlay did not mount"
 # /srv on the data partition too: the projects live under it
 # (/srv/builderbot/projects, the controller's WORKSPACE), and on the root's
 # tmpfs they were gone at every boot (B437).
@@ -38,7 +38,7 @@ mkdir -p "${rootmnt}/var/lib/builderbot-os/srv" "${rootmnt}/srv"
 [ -z "$(ls -A "${rootmnt}/var/lib/builderbot-os/srv")" ] && [ -n "$(ls -A "${rootmnt}/srv" 2>/dev/null)" ] \
     && cp -a "${rootmnt}/srv/." "${rootmnt}/var/lib/builderbot-os/srv/"
 mount --bind "${rootmnt}/var/lib/builderbot-os/srv" "${rootmnt}/srv" \
-    || panic "BuilderBot OS: /srv did not mount from the data partition"
+    || panic "AerieOS: /srv did not mount from the data partition"
 
 # The USB edition (R161 step 10, the operator, 29 Oct: the stick read once
 # and written rarely, as Unraid's is). On a stick boot (bbtoram=1: the slot

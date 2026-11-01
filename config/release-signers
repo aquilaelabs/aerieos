@@ -1,7 +1,7 @@
-# Who may sign a BuilderBot release (R199): ssh-keygen's allowed signers
+# Who may sign a AerieOS release (R199): ssh-keygen's allowed signers
 # format, one line a key:
 #   builderbot-release namespaces="builderbot-release" ssh-ed25519 AAAA... COMMENT
-# Every update an install takes (the controller's bundle, BuilderBot OS's
+# Every update an install takes (the controller's bundle, AerieOS's
 # image, a stick's image) must carry a SHA256SUMS signed by a key here, as
 # the install holds this file, so someone who changes the repository or a
 # release cannot hand installs a build: they can build and attest one, not

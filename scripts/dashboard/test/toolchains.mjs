@@ -72,7 +72,7 @@ ok(tc.items.every(i => !i.installed && !i.size && !i.version),
 ok(String(tc.root || '').includes(`${DIR}/sdk`), `the store says which root things are installed into (${tc.root})`);
 // What a session on a node needs from the store rather than from the image
 // (roadmap #24, step 4): the playwright module beside its browsers, with
-// NODE_PATH pointing at it, and the tools bb lint runs.
+// NODE_PATH pointing at it, and the tools aerie lint runs.
 const pw = catalog.toolchains.find(p => p.name === 'playwright');
 const lt = catalog.toolchains.find(p => p.name === 'lint-tools');
 ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.source?.run?.join(' '))
@@ -81,10 +81,10 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
    && pw?.layout?.bin?.includes('node_modules/.bin')
    && lt?.layout?.bin?.includes('bin')
    && ['shellcheck', 'hadolint', 'actionlint', 'ruff', 'yq', 'fd'].every(t => (lt?.source?.run?.join(' ') || '').includes(t)),
-   'the playwright recipe puts the module in the store with NODE_PATH on it and its command on PATH, and lint-tools carries what bb lint runs');
+   'the playwright recipe puts the module in the store with NODE_PATH on it and its command on PATH, and lint-tools carries what aerie lint runs');
 
 // A recipe that gives a session commands says under which name (`tool`):
-// they live under `bb tool NAME`, one name per recipe, so two toolchains may
+// they live under `aerie tool NAME`, one name per recipe, so two toolchains may
 // both have a `render` and neither can shadow a verb of bb's own. Held to
 // the script itself: every declared tool is a label in bb's `tool` case, no
 // two recipes claim one, and neither that case nor the dispatch carries a
@@ -99,11 +99,11 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
   const toolCase = bb.slice(bb.indexOf('\ncmd_tool() {'), bb.indexOf('\n}\n', bb.indexOf('\ncmd_tool() {')));
   const tools = [...toolCase.matchAll(/^        ([a-z][a-z0-9-]*)\)\s+tool_/gm)].map(m => m[1]);
   const tdup = tools.filter((l, i) => tools.indexOf(l) !== i);
-  ok(tools.length >= 2 && tdup.length === 0, `bb tool names each tool once (${tools.join(', ')})`);
+  ok(tools.length >= 2 && tdup.length === 0, `aerie tool names each tool once (${tools.join(', ')})`);
   const claimed = new Map();
   const missing = [];
   for (const t of catalog.toolchains) if (t.tool) {
-    if (!tools.includes(t.tool)) missing.push(`${t.name}: bb tool ${t.tool}`);
+    if (!tools.includes(t.tool)) missing.push(`${t.name}: aerie tool ${t.tool}`);
     if (claimed.has(t.tool)) missing.push(`${t.tool} is claimed by ${claimed.get(t.tool)} and ${t.name}`);
     if (labels.includes(t.tool)) missing.push(`${t.tool} is also a verb of bb's own`);
     claimed.set(t.tool, t.name);
@@ -131,7 +131,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
     return out;
   });
   const withTool = said.find(s => s.name === 'graphics' && s.tool) || said.find(s => s.tool);
-  ok(!!withTool && withTool.detail.includes(`Adds bb tool ${withTool.tool} to a session`),
+  ok(!!withTool && withTool.detail.includes(`Adds aerie tool ${withTool.tool} to a session`),
      `a card's Details says which tool installing it adds (${withTool?.name}: ${withTool?.tool})`);
   const android = said.filter(s => /^android/.test(s.name));
   ok(android.length && android.every(s => s.google && /Installing it asks you to accept Google's Android SDK terms/.test(s.terms)),
@@ -323,7 +323,7 @@ ok(item(tc, 'swift').state !== 'update', '...and says it plainly: only an actual
 const stored = JSON.parse(readFileSync(`${DIR}/state/toolchain-versions.json`, 'utf8'));
 ok(stored.at > 0 && stored.items.flutter.status === 'update',
    '...and they are on disk, to outlive the process that asked');
-// So is the local version read: `bb toolchains versions` is a couple of
+// So is the local version read: `aerie toolchains versions` is a couple of
 // seconds across every toolchain, and the answer has not changed. Keyed by
 // what it is an answer about (the set of installed paths, and the catalog's
 // own digest), so installing something, or editing a recipe, is not answered
@@ -534,7 +534,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(/== builds with ==/.test(builds) && /platforms\s+35 36\n/.test(builds)
      && /compileSdk\s+up to 36: a library that wants a newer platform fails checkDebugAarMetadata; the operator adds one from the Library/.test(builds)
      && /build-tools\s+36\.0\.0/.test(builds),
-     `bb toolchains says the platforms, the compileSdk ceiling and the build-tools as a build reads them (${builds.split('\n')[2]?.trim()})`);
+     `aerie toolchains says the platforms, the compileSdk ceiling and the build-tools as a build reads them (${builds.split('\n')[2]?.trim()})`);
   ok(/gradle\s+9\.7\.1 \(wrapper distributions, no download\)/.test(builds) && /AGP\s+9\.4\.1\n/.test(builds)
      && /kotlin\s+2\.4\.20\n/.test(builds) && !/compose BOM/.test(builds),
      '...and what the Gradle cache holds, naming only what is there');
@@ -564,7 +564,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(/^not installed: nouveau has the card/.test(lines[0]) && /^580\.95\.05 installed; it takes the card when the machine restarts$/.test(lines[1])
      && /^580\.95\.05, running the card/.test(lines[2]) && /^575\.64 running the card; 580\.95\.05 takes over/.test(lines[3])
      && /^removed; it keeps the card until the machine restarts$/.test(lines[4]),
-     `bb toolchains says where the NVIDIA driver stands, read from the machine (${lines.map(x => x.slice(0, 24)).join(' | ')})`);
+     `aerie toolchains says where the NVIDIA driver stands, read from the machine (${lines.map(x => x.slice(0, 24)).join(' | ')})`);
   // ...and the container toolkit's line beside it, by its own tool. On a
   // PATH of this check's own, so a machine that really has the toolkit
   // reads the same as one that does not.
@@ -693,7 +693,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     return { pills: [...c.querySelectorAll('.lcmeta .pill')].map(p => p.textContent.trim()),
              detail: d.textContent.replace(/\s+/g, ' ') || '' };
   });
-  ok(hcard.pills.includes('sideloaded') && /From .*packrepo at [0-9a-f]{12}, added by .*A session has bb tool hexkit/.test(hcard.detail),
+  ok(hcard.pills.includes('sideloaded') && /From .*packrepo at [0-9a-f]{12}, added by .*A session has aerie tool hexkit/.test(hcard.detail),
      `its card wears sideloaded with Edit, its Details saying where it came from and what a session gets (${hcard.detail.slice(0, 120)})`);
   // A project's Toolchains group (R77 step 5): the pack is offered switched
   // off, since adding a pack hands it to no project, and switched on and

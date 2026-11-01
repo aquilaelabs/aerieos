@@ -1,4 +1,4 @@
-"""Behind `bb node busy` and `bb node wait-quiet` (cmd_node in bb, R108):
+"""Behind `aerie node busy` and `aerie node wait-quiet` (cmd_node in bb, R108):
 whether the node this session is on is quiet enough to time anything on.
 
 The controller's answer (busy.report) is the node's last heartbeat joined
@@ -74,7 +74,7 @@ def show(d):
     print(f"  claude   {d.get('sessions_working', 0)} session(s) working, this one included")
     if d["verdict"] != "quiet":
         print("  a timing taken now is the machine's as much as the code's: say the load with it, "
-              "or bb node wait-quiet first")
+              "or aerie node wait-quiet first")
 
 
 def main(argv):
@@ -95,7 +95,7 @@ def main(argv):
             elif a == "--timeout":
                 timeout = int(next(it, "600"))
             else:
-                sys.exit("[builderbot] ERROR: bb node wait-quiet [--level quiet|busy] [--timeout SECONDS]")
+                sys.exit("[builderbot] ERROR: aerie node wait-quiet [--level quiet|busy] [--timeout SECONDS]")
         if level not in ("quiet", "busy"):
             sys.exit("[builderbot] ERROR: --level is quiet or busy")
         start, calm = time.time(), 0
@@ -112,7 +112,7 @@ def main(argv):
                       f"({'; '.join(d['why'])}); a timing taken now says so with it", file=sys.stderr)
                 return 1
             time.sleep(10)
-    sys.exit("[builderbot] ERROR: bb node busy [--json] | wait-quiet [--level quiet|busy] [--timeout SECONDS]")
+    sys.exit("[builderbot] ERROR: aerie node busy [--json] | wait-quiet [--level quiet|busy] [--timeout SECONDS]")
 
 
 if __name__ == "__main__":

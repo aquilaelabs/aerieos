@@ -1,7 +1,7 @@
 # Building, testing and releasing
 
 A project builds, tests and runs its CI on its node, never on the controller.
-This doc covers `bb build`, `bb test` and `bb run`, the test registry, CI
+This doc covers `aerie build`, `aerie test` and `aerie run`, the test registry, CI
 runners and reading CI's logs, the scanner's findings, what lands in
 `dist/`, and signing and publishing a release. The toolchains a build needs
 are in [toolchains.md](toolchains.md).
@@ -15,15 +15,15 @@ can add other nodes it also works on (R82): its containers may live on any
 of those and nowhere else, and a session start asks which node when there
 is more than one. A project with no node has no default to fall to and is
 told to set one.
-**Nothing runs that nobody wrote down**: with a field empty, `bb build` and
-`bb test` refuse and say how to fill it. The person who knows how a tree
+**Nothing runs that nobody wrote down**: with a field empty, `aerie build` and
+`aerie test` refuse and say how to fill it. The person who knows how a tree
 builds is often the session that has just read it, so a session can:
-`bb settings set test "./gradlew test"` (or `build`, or `outputs`), and
+`aerie settings set test "./gradlew test"` (or `build`, or `outputs`), and
 what happens then is the project's fourth gate, beside the three for the
 notebook: auto lands it, ask holds it on the notebook for approval with the
 command in full, deny refuses it with a sentence the session quotes. Only
 those three fields have a verb; the node, the git policy and the gates
-themselves stay the settings'. `bb build`, `bb test` and `bb run -- CMD` snapshot the working
+themselves stay the settings'. `aerie build`, `aerie test` and `aerie run -- CMD` snapshot the working
 tree here, dirty edits included, run on that node in a workspace of the job's
 own, and stream the log back; what the outputs match comes back into `dist/`
 by name with a provenance record beside it, which the Artifacts view shows on
@@ -33,24 +33,24 @@ git tracks and would track, under one directory named for the project, never
 `.git`, `dist/` or what `.gitignore` hides. A failed build keeps its
 workspace on the node for a look, and says where. The census reports each
 node's cache size beside **Clear cache**, and the Library takes a node in the
-Build group's header: installing a toolchain there is a job that carries `bb` and the
+Build group's header: installing a toolchain there is a job that carries `aerie` and the
 catalog to the node's own toolchain store.
 
 ## The test registry
 
-**The test registry** is a project page's Tests view, under Code, and `bb tests` in a
+**The test registry** is a project page's Tests view, under Code, and `aerie tests` in a
 terminal. It answers two questions that are only worth keeping together: what
 each test protects, and what the suite actually spends its time on.
 
 The first half is written by hand, in the same change as the test: what
 breaks if it goes red, and what it really exercises (which fixtures, which
 stubs, what is real and what is faked). The second half is not written by hand
-at all: `bb tests ingest` parses a run's own output, because a self-reported
+at all: `aerie tests ingest` parses a run's own output, because a self-reported
 estimate is a guess that ages and reads exactly like a measurement.
 
 ```bash
-BB_TEST_TIMING=1 bb dashboard test 2>&1 | tee /tmp/run.log
-bb tests ingest /tmp/run.log
+BB_TEST_TIMING=1 aerie dashboard test 2>&1 | tee /tmp/run.log
+aerie tests ingest /tmp/run.log
 ```
 
 How many workers a test run may use on a node is the node's to say: **Test
@@ -120,14 +120,14 @@ the controller): GitHub's runner and Gitea's `act_runner` (published as gitea-ru
 each registered with labels `builderbot, self-hosted, linux, <arch>, <node
 name>` plus any extra, so a workflow's `runs-on` names the node it should
 land on whichever host its repository is on. Each row says whether its
-runner is listening or busy; Remove deregisters it first. `bb ci-labels` lists every label the registry knows
+runner is listening or busy; Remove deregisters it first. `aerie ci-labels` lists every label the registry knows
 and `--write` regenerates `.github/actionlint.yaml` from them, so the lint
 checks `runs-on` against runners that exist. This container runs no runner
 of its own.
 
 **A project's node does not decide where its CI runs, and nothing can make
-it.** That setting governs BuilderBot's own queue: `bb build`, `bb test`,
-`bb run`, `bb emu`, compose. Actions dispatch belongs to GitHub, which reads
+it.** That setting governs AerieOS's own queue: `aerie build`, `aerie test`,
+`aerie run`, `aerie emu`, compose. Actions dispatch belongs to GitHub, which reads
 `runs-on` and nothing else, so with runners on two nodes a label both carry
 sends the job to whichever is idle: possibly the machine without the
 toolchain, silently. The node's own name is already a label on its runner, so
@@ -137,7 +137,7 @@ pinning is one word:
 runs-on: [self-hosted, alpha-vm]
 ```
 
-The CI runner page prints that line for each node, and `bb lint` says when
+The CI runner page prints that line for each node, and `aerie lint` says when
 a project has a node and its workflows do not carry it: a note, not a
 failure, because the workflow file is the repo's and this is advice. A
 `runs-on` built from an expression is left alone: choosing the runner at
@@ -152,11 +152,11 @@ tests` workflow beside it, which carries the browser suite: each check is
 teed into
 `ci-logs/<repo>/<run-id>-<attempt>.log` under the runner's node's data store
 (the agent writes that path into the runner's `.env`, beside the node's
-toolchain environment: the same one every `bb` job there gets, so CI sees
+toolchain environment: the same one every `aerie` job there gets, so CI sees
 the store's node, Playwright and JDK, and a session on the node can read
 what its runner archived), with a header
 naming the commit, ref and event, and a `result:` line written by an
-`if: always()` step so a job that died still says so. `bb ci-log` fetches the
+`if: always()` step so a job that died still says so. `aerie ci-log` fetches the
 newest from the project's node, `--list` shows the twenty kept with their
 results, and a run id picks one.
 
@@ -170,9 +170,9 @@ answer "did that build land, and why did the host re-pull a gigabyte?".
 ## CI on GitHub's runners, and CI watched
 
 **CI on GitHub's own runners.** A job on a hosted runner keeps no log
-anywhere BuilderBot reaches, and GitHub hands a run's log only to a token,
+anywhere AerieOS reaches, and GitHub hands a run's log only to a token,
 even on a public repository. So when every workflow of a project names a
-hosted label rather than `self-hosted`, `bb ci-log` asks the controller
+hosted label rather than `self-hosted`, `aerie ci-log` asks the controller
 (`/api/ci-runs`, `cilogs.py`), which asks GitHub with the project's own
 token or the shared PAT: `--list` is the newest runs, and a run (the newest
 finished one when none is named) is its jobs, the step that failed, and the
@@ -186,17 +186,17 @@ workflows once a day, and at once when one is linked (`ciwatch.py`): the
 tree's workflows (`.github/workflows`, and `.gitea/workflows` and
 `.forgejo/workflows` for a repository on those hosts) for a GitHub-hosted
 job on a moving `-latest` label and for each action against its newest
-release, and on GitHub, with the token `bb ci-log`
+release, and on GitHub, with the token `aerie ci-log`
 uses, whether the newest run on the main branch passed and what GitHub wrote
 on it (its warnings about a retired Node or a label about to move). What it
 finds is kept under `ciwatch/` in the state, shown as the Git view's CI
-section (with Check now), printed by `bb catchup`, and, while main is red,
+section (with Check now), printed by `aerie catchup`, and, while main is red,
 a bell row. It reads and never changes anything; nothing in a repository
-needs setting up, so every BuilderBot and every project gets it. R117.
+needs setting up, so every AerieOS and every project gets it. R117.
 
 ## Static analysis reports
 
-The scanners that write these reports are BuilderBot's own, deployed to
+The scanners that write these reports are AerieOS's own, deployed to
 each node and run on a schedule from the Scanners page
 ([scanners.md](scanners.md)); each node sends its SARIF up to the
 controller over the agent's own API, so nothing is mounted for it.
@@ -215,17 +215,17 @@ reads findings; it does not produce them. If a report looks stale, re-run the
 scanner on the host; there is deliberately no way to do it from in here.
 
 ```bash
-bb findings              # this project's findings
-bb findings --all        # every project the report covers
-bb findings x.sarif      # one file rather than all of /reports
-bb findings --level error --rule DL3008 --find "quote"   # narrow it
-bb findings sample       # a fake report, for a box with no scanner
-bb findings sample --remove
+aerie findings              # this project's findings
+aerie findings --all        # every project the report covers
+aerie findings x.sarif      # one file rather than all of /reports
+aerie findings --level error --rule DL3008 --find "quote"   # narrow it
+aerie findings sample       # a fake report, for a box with no scanner
+aerie findings sample --remove
 ```
 
 The scanner is the host's and a development stack has none, so the Analysis
 page, the notebook's Analysis view and the findings log have nothing to show
-in a dev instance. `bb findings sample` writes one obviously-fake report,
+in a dev instance. `aerie findings sample` writes one obviously-fake report,
 tool `builderbot-sample`, with a finding in each of the first few projects on
 the share and one on a path that places nowhere, so every shape those surfaces
 draw has something to draw. It refuses to sit beside a real report, and it
@@ -235,12 +235,12 @@ controller, because planting findings in somebody else's report directory is
 not a thing a session should do.
 
 A session reads its own project's findings and no others: not through the
-Analysis page, not in the poll's counts, and `bb findings --all` is refused for
+Analysis page, not in the poll's counts, and `aerie findings --all` is refused for
 one, since the report covers the whole share and the flag means every project
 in it.
 
 A scanner pointed at a directory of repos writes one report covering all of
-them, so `bb findings` filters to the project you run it from and says how many
+them, so `aerie findings` filters to the project you run it from and says how many
 it held back. Reports must be **SARIF**: several scanners default to their own
 JSON and need asking (`--format sarif` for Trivy, `--sarif` for Semgrep);
 anything that is not SARIF is skipped silently, which looks identical to a
@@ -252,7 +252,7 @@ actually walked, keep the scanner's own stdout: `semgrep` and `trivy` both
 print file counts that the report itself does not preserve.
 
 Raw SARIF is mostly metadata: a few hundred KB of it fills a session's context
-before it reaches the code the findings are about. `bb findings` groups by
+before it reaches the code the findings are about. `aerie findings` groups by
 severity and rule, prints each message once with the locations under it, and
 rewrites the scanner's paths to be repo-relative so they can be opened
 directly. Run it from the project directory; the current directory name is what
@@ -284,7 +284,7 @@ reasons it is (no mount, nothing in it, or nothing in it that parses).
 
 ## What lands in dist/
 
-**Dev builds do not pile up.** A build named with `bb version --file` carries
+**Dev builds do not pile up.** A build named with `aerie version --file` carries
 its dev version (`0.1.0-dev.17-9e09ad3`). Of each product (the name before
 the version: `Shebang-DevBoard-`, `Shebang-Voice-`) `dist/` keeps every file
 of its newest few builds, whatever follows the version (the project's
@@ -315,7 +315,7 @@ A project keeps up to two keys per named key, set by an administrator in the
   The project's owner puts a **backup password** on its keys before the
   first one: until there is one, no key is uploaded, generated or proposed,
   and a key from before the rule goes on signing. Every download then asks
-  for it, BuilderBot's owner's included. Handing the project to another
+  for it, AerieOS's owner's included. Handing the project to another
   owner leaves it as it is, and the new owner changes it only with it; one
   nobody passed on leaves the keys' backups out of the dashboard's reach,
   which for a sideload key means a new key and a new app. It is kept as a hash,
@@ -346,7 +346,7 @@ toolchain is missing, the Signing view and the answer say which node and
 what, for instance "alpha's node bb-sandbox has no jdk: install it from its
 Library". A session never
 receives the key or a password, and is refused even the list of which keys
-exist: it signs with `bb sign`, which runs on the project's node as a job the
+exist: it signs with `aerie sign`, which runs on the project's node as a job the
 session cannot look inside. Renaming the project leaves its keys where they are, with it.
 
 **Import a backup** brings a key back from what Download backup gave, into
@@ -392,9 +392,9 @@ signs a failed one again. What would stop a release's signing (no sideload
 key, an app mapped to none of several, the project's node offline, behind, or
 without the jdk or the build-tools, a project not on GitHub) is a bell row before the release, and a signing that
 failed after one is a red bell row until it is signed or put away. Release's
-confirm says it too, and a session's `bb version release` is refused before
+confirm says it too, and a session's `aerie version release` is refused before
 the tag with the reason unless it adds `--without-apk`. A session reads the
-same with `bb sign status [TAG]` and asks for the look again with `bb sign
+same with `aerie sign status [TAG]` and asks for the look again with `aerie sign
 release --why "..."`, under **Agents may: Sign a build**. GitHub only: a Gitea
 or GitLab workflow's artifacts are not fetched.
 
@@ -407,15 +407,15 @@ keystore and that password. Under **Apps** an app's package is mapped to a
 key; a sign job reads the package from the build (`aapt2` for an `.apk`, the
 bundle's manifest for an `.aab`) and the controller hands it the mapped key, or
 the default for a package with no line, unless the signing named one
-(`bb sign FILE --key NAME`). Sharing one key between apps is allowed, and
+(`aerie sign FILE --key NAME`). Sharing one key between apps is allowed, and
 sensible for apps meant to trust each other; a key of their own keeps one
 app's lost key from being every app's. A session reads which keys exist and
-proposes a new one or a mapping (`bb sign keys`, `bb sign key new NAME --for
-sideload`, `bb sign map PACKAGE KEY`) under **Agents may: Manage signing
+proposes a new one or a mapping (`aerie sign keys`, `aerie sign key new NAME --for
+sideload`, `aerie sign map PACKAGE KEY`) under **Agents may: Manage signing
 keys**, ask by default, which puts it in front of the project's owner.
 
 **Moving an app to another sideload key.** **Rotate to it** on a key's
-sideload row (or `bb sign rotate OLD NEW`, under the same dial) makes a proof
+sideload row (or `aerie sign rotate OLD NEW`, under the same dial) makes a proof
 of rotation on the project's node with its `apksigner`, signed by both
 keys, and keeps it with the new one. From then on every build that would have
 used the old key is signed with both and the proof, with the new key from
@@ -432,7 +432,7 @@ that carries a rotation says so, and which key older devices still see.
 
 **Signing a build.** A person signs from the **Artifacts** view: an `.apk` or
 `.aab` row offers **Sign** for each key the project has. A session runs
-`bb sign FILE [--for play|sideload] [--why "..."]` (Play for an `.aab` and
+`aerie sign FILE [--for play|sideload] [--why "..."]` (Play for an `.aab` and
 sideload for an `.apk` unless it says), under the project's dial **Agents
 may: Sign a build**: auto signs, **ask** (the default) puts the build, the
 key and the reason in front of the project's owner in their bell, and deny
@@ -440,7 +440,7 @@ refuses naming the setting. Either way it is the same job, and the session
 follows it to the signed file's name. A signing that could not happen (no
 such key, no such build, no node) is refused before anybody is asked.
 
-**A release from a session.** `bb version release --why "..."` tags the
+**A release from a session.** `aerie version release --why "..."` tags the
 commit and publishes the release the way **Release** on the Artifacts view
 does, on the controller and with the project's own credentials, which the
 session never holds (R138). It is its own dial, **Agents may: Tag and
@@ -454,7 +454,7 @@ from, a session's release is the dev build's (`--dev`, a pre-release on
 the dev channel) unless `--stable` says otherwise, and its first line
 names the channel it lands on (R190).
 
-**Rehearsing one.** `bb version rehearse` runs every build a release's tag
+**Rehearsing one.** `aerie version rehearse` runs every build a release's tag
 runs (the controller bundle packed, the OS image built and booted, the
 Android app, the companion and the VS Code extension built) on the pushed
 branch, publishing nothing, its summary listing the files the release would
@@ -479,7 +479,7 @@ since a GitLab release holds links rather than files (R124). A forge that
 says no leaves the tag as the release and the Artifacts row says why, and a
 host with no release API (Bitbucket, plain git) says that instead.
 
-**Editing a published release.** `bb version release --edit --why "..."`
+**Editing a published release.** `aerie version release --edit --why "..."`
 changes the release of the version this tree is on (or `--tag TAG`): the
 notes replaced whole with `--notes FILE`, and files attached with
 `--attach FILE`, each a build in dist/ or a file the project's history
@@ -491,7 +491,7 @@ own dial, and on ask every edit is its own ask: the project's owner reads
 the notes whole and each file by its name and size before Allow. Nothing
 here moves a tag (R139).
 
-A file comes off a release with `bb version release --remove NAME --why
+A file comes off a release with `aerie version release --remove NAME --why
 "..."` (once for each name), and only that way: its own ask under the same
 dial, never part of an edit, since it is the one change that takes
 something away from the people downloading. The names are checked against
@@ -500,7 +500,7 @@ the ask names files that are there, with their sizes, and the bell shows it
 in the destructive color. On GitLab the release's link to the file goes;
 the file itself stays in the package registry.
 
-A release made by mistake is taken back with `bb version release --withdraw
+A release made by mistake is taken back with `aerie version release --withdraw
 TAG --why "..."`: the forge's release and its tag deleted together, and the
 tag taken out of the controller's copy, so the number can be cut again from
 a fixed commit (R190). It is always the project owner's answer on the bell,

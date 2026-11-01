@@ -48,12 +48,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
-          fetch-depth: 0   # a rehearsal's name is bb version's, which counts commits
+          fetch-depth: 0   # a rehearsal's name is aerie version's, which counts commits
 
       - name: Build the .pyz and the .vsix
         run: |
           set -eo pipefail
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/bb version --file)"
+          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           python3 tools/companion-build.py --version "$v" --out "dist/builderbot-companion-$v.pyz"
           python3 tools/vscode-vsix.py --version "$v" --out "dist/builderbot-vscode-$v.vsix"
 
@@ -80,13 +80,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
-          fetch-depth: 0   # bb version counts commits
+          fetch-depth: 0   # aerie version counts commits
 
       - name: Build the .exe
         run: |
           set -eo pipefail
           python -m pip install --disable-pip-version-check --quiet pyinstaller
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/bb version --file)"
+          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
           python -m PyInstaller --noconfirm --onefile --windowed --name "builderbot-companion-$v" \
@@ -101,13 +101,13 @@ jobs:
           fi
           echo "EXE=dist/builderbot-companion-$v.exe" >> "$GITHUB_ENV"
 
-      # BuilderBot USB Maker (R198): the stick maker in a window, one .exe
+      # AerieOS USB Maker (R198): the stick maker in a window, one .exe
       # that asks for Administrator at start (writing a disk needs it), the
       # stick maker carried inside it beside the window's script.
       - name: Build the USB Maker
         run: |
           set -eo pipefail
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/bb version --file)"
+          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           python -m PyInstaller --noconfirm --onefile --windowed --uac-admin --name "builderbot-usb-maker-$v" \
             --add-data "tools/builderbot-stick.py;." --distpath dist tools/builderbot-usb-maker.py
           echo "USBEXE=dist/builderbot-usb-maker-$v.exe" >> "$GITHUB_ENV"

@@ -65,7 +65,7 @@ const plainEnd = await call('/api/project-sessions', { project: 'alpha', action:
 ok(plainList.status === 403 && plainEnd.status === 403,
    `a plain account can neither list them nor end one (${plainList.status}, ${plainEnd.status})`);
 // A session's token is never an administrator's, whoever it was minted for.
-const stok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const asSession = await call('/api/project-sessions', { project: 'alpha', action: 'end', session: here[0] },
   { 'Content-Type': 'application/json', Authorization: 'Bearer ' + stok });

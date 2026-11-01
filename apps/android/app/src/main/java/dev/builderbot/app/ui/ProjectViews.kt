@@ -360,7 +360,7 @@ fun TestsView(api: Api, project: String) {
             Column(Modifier.padding(16.dp, 8.dp)) {
                 if (ts.error != null) Problem(ts.error)
                 if (t != null && t.int("n") == 0)
-                    Dim("no tests on record: a run on the project's node, read in with bb tests ingest, lists them here")
+                    Dim("no tests on record: a run on the project's node, read in with aerie tests ingest, lists them here")
                 if (t != null && t.int("n") > 0) {
                     Text("${t.int("n")} tests", color = Ink, fontWeight = FontWeight.SemiBold)
                     Dim(listOf("${secs(t.int("total_ms"))} measured",

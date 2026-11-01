@@ -271,7 +271,7 @@ class WorkspaceMixin:
                         os.chown(x, 0, 0)
                         st = os.stat(x)
                         os.chmod(x, (st.st_mode & 0o755) | (0o755 if os.path.isdir(x) else 0o644))
-                for x in ("scripts/bb", "scripts/dashboard/bb-tty", "scripts/dashboard/bb-work-note",
+                for x in ("scripts/aerie", "scripts/dashboard/bb-tty", "scripts/dashboard/bb-work-note",
                           "scripts/dashboard/bb-prompt-relay"):
                     with contextlib.suppress(OSError):
                         os.chmod(os.path.join(tmp, x), 0o755)

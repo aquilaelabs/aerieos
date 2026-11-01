@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install BuilderBot's controller on a machine of its own, without the
+# Install AerieOS's controller on a machine of its own, without the
 # container (R90), and make that machine a node of itself.
 #
 # The container install is the image: compose or the Unraid template, tini
@@ -32,7 +32,7 @@
 #   /srv/builderbot/projects         the projects (--workspace), the account's
 #   builderbot-controller            the service: scripts/host-boot.sh, as root, which
 #                                    drops to the account for good
-#   /usr/local/bin/bb                bb as the account, for anybody who may sudo
+#   /usr/local/bin/aerie                bb as the account, for anybody who may sudo
 #   /etc/bb-session.wall             what a session on this machine's node never sees
 #
 # The controller's own node (--no-node leaves it out) is provision-linux.sh
@@ -56,7 +56,7 @@ VAR="$P/var/lib/builderbot-controller"
 SHIM="$P/usr/local/lib/builderbot-controller/bin"
 WALL_FILE="$P/etc/bb-session.wall"
 SUDOERS="$P/etc/sudoers.d/builderbot-controller"
-BB_BIN="$P/usr/local/bin/bb"
+BB_BIN="$P/usr/local/bin/aerie"
 SERVICE=builderbot-controller
 REPO=aquilaelabs/builderbot
 # How many releases are kept beside the one in use: the one before is what
@@ -85,7 +85,7 @@ usage() {
     cat <<'EOF'
 usage: sudo bash install-controller.sh ACTION [options]
 
-Install BuilderBot's controller on this machine, without the container, and
+Install AerieOS's controller on this machine, without the container, and
 make the machine a node of itself. With no arguments this prints the help and
 changes nothing.
 
@@ -346,7 +346,7 @@ pick_python() {
 }
 
 # extras: what the image fetches from each vendor beside the packages, the
-# same way and as best it can: the linters `bb lint` runs, uv and mise,
+# same way and as best it can: the linters `aerie lint` runs, uv and mise,
 # Playwright and web-ext through npm, the home tunnel's cloudflared. Each
 # one that does not land is said, and nothing waits on it. The terminals
 # need none of them: each is a pty of the dashboard's own.
@@ -404,7 +404,7 @@ extras() {
         *) miss+=(cloudflared) ;;
     esac
     rm -rf "$t"
-    [ "${#miss[@]}" -eq 0 ] || warn "not here, which the image carries: ${miss[*]} (the dashboard runs without them; bb lint says [skip] for a missing linter)"
+    [ "${#miss[@]}" -eq 0 ] || warn "not here, which the image carries: ${miss[*]} (the dashboard runs without them; aerie lint says [skip] for a missing linter)"
 }
 
 # ---- the account and its folders ---------------------------------------------
@@ -506,12 +506,12 @@ state_dir() {
 
 # bb_wrapper: bb on the machine's PATH, as the controller's account, with
 # the environment the service has (scripts/lib/host-env.sh). What `docker
-# exec -it BuilderBot bb` is on a container install.
+# exec -it AerieOS bb` is on a container install.
 bb_wrapper() {
     install -d -m 0755 "$(dirname "$BB_BIN")"
     cat > "$BB_BIN" <<EOF
 #!/usr/bin/env bash
-# Written by BuilderBot's install-controller.sh: bb as the controller's
+# Written by AerieOS's install-controller.sh: bb as the controller's
 # account (${ACCOUNT}), with the controller's environment. Anybody who may
 # sudo may run it; root runs it as the account.
 set -euo pipefail
@@ -520,15 +520,17 @@ if [ "\$(id -un)" != "${ACCOUNT}" ]; then
 fi
 . /opt/builderbot/scripts/lib/host-env.sh
 export HOME="\$BUILDER_HOME" USER="${ACCOUNT}"
-exec /opt/builderbot/scripts/bb "\$@"
+exec /opt/builderbot/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
+    # The old name, while anything still calls it.
+    ln -sf "$(basename "$BB_BIN")" "$(dirname "$BB_BIN")/bb"
 }
 
 # sudoers: the two root helpers the account may run, the image's rule.
 sudoers() {
     install -d -m 0750 "$(dirname "$SUDOERS")"
-    printf '%s\n' "# Written by BuilderBot's install-controller.sh: the two root helpers, as in the image." \
+    printf '%s\n' "# Written by AerieOS's install-controller.sh: the two root helpers, as in the image." \
         "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/mint-runner-token" \
         "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/deploy-key" > "$SUDOERS.new"
     chmod 0440 "$SUDOERS.new"
@@ -543,9 +545,9 @@ sudoers() {
 # rest after it is done (KillMode=mixed), which is the order `docker stop`
 # gives the container: the terminals are saved before tmux goes.
 service() {
-    # On BuilderBot OS the boot's own settings (builderbot-os-env.service)
+    # On AerieOS the boot's own settings (builderbot-os-env.service)
     # are read beside the env file; elsewhere the file is simply not there.
-    svc_install "$SERVICE" "BuilderBot controller" "/opt/builderbot/scripts/host-boot.sh supervise" \
+    svc_install "$SERVICE" "AerieOS controller" "/opt/builderbot/scripts/host-boot.sh supervise" \
         "KillMode=mixed
 TimeoutStopSec=30
 EnvironmentFile=-/run/builderbot-os/env"
@@ -601,7 +603,7 @@ checks() {
 
 cmd_check() {
     checks
-    printf '\n   %s can take a BuilderBot controller.\n' "${PRETTY_NAME:-$ID}"
+    printf '\n   %s can take a AerieOS controller.\n' "${PRETTY_NAME:-$ID}"
 }
 
 cmd_install() {
@@ -641,7 +643,7 @@ cmd_install() {
 The controller is at http://${stamp}:${PORT}. Open it and make the owner
 account: until somebody does, it serves that page and nothing else.
 
-  sudo bb status                  what it is running, as the container's bb says it
+  sudo aerie status                  what it is running, as the container's bb says it
   sudo systemctl status ${SERVICE}
   ${ENV_FILE}   its settings
 
@@ -769,7 +771,7 @@ fetch_tree() {
                 || die "${tag}'s signature does not verify against this install's release key: not taken"
             grep -q "^${sum}  \*\?builderbot-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
                 || die "the bundle is not the one ${tag} signed: not taken"
-            printf '   signed by BuilderBot'"'"'s release key\n' >&2
+            printf '   signed by AerieOS'"'"'s release key\n' >&2
         else
             printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
         fi
@@ -787,7 +789,7 @@ fetch_tree() {
     tar -xzf "$d/release.tar.gz" -C "$d"
     local top
     top="$(find "$d" -mindepth 1 -maxdepth 1 -type d | head -1)"
-    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not a BuilderBot tree that installs bare metal"
+    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not a AerieOS tree that installs bare metal"
     # The commit, from the header git writes on every archive.
     python3 -c 'import sys, tarfile; print(tarfile.open(sys.argv[1]).pax_headers.get("comment", ""))' \
         "$d/release.tar.gz" > "$top/.release-rev" 2>/dev/null || true
@@ -817,7 +819,7 @@ cmd_update() {
     # The new release's own installer lays the new release out, the way the
     # new image's own entrypoint is what starts it.
     if [ "${BB_UPDATE_HANDOFF:-}" != 1 ] && [ "$(cd "$t/nodes" && pwd)" != "$HERE" ]; then
-        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not a BuilderBot tree that installs bare metal"
+        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not a AerieOS tree that installs bare metal"
         if [ "$DEV" = 1 ]; then
             BB_UPDATE_HANDOFF=1 exec bash "$t/nodes/install-controller.sh" --update --from "$t" --dev
         fi
@@ -936,7 +938,7 @@ cmd_remove() {
         runit)   rm -f "/var/service/${SERVICE}"; rm -rf "/etc/sv/${SERVICE}" ;;
     esac
     wall_remove
-    rm -f "$BB_BIN" "$SUDOERS"
+    rm -f "$BB_BIN" "$(dirname "$BB_BIN")/bb" "$SUDOERS"
     rm -rf "$RELEASES" "$SHIM"
     rm -f "$OPT"
     if [ "$PURGE" = 1 ]; then
@@ -962,7 +964,7 @@ cmd_remove() {
 # ---- the controller's own node --------------------------------------------------
 # own_node: this machine as an ordinary agent node of its own controller,
 # made the way any node is: a token minted from a shell on the controller
-# (bb nodes enroll-token --own), then provision-linux.sh run as it is, from
+# (aerie nodes enroll-token --own), then provision-linux.sh run as it is, from
 # the release, with --beside-controller. It dials the controller at the
 # address a remote node would (this machine's own on its network), so a
 # session there reaches it by that address and port and by nothing else.
@@ -1034,7 +1036,7 @@ wall_cover() {
 wall_write() {
     say "the wall: what a session on this machine never reaches"
     {
-        printf '# Written by BuilderBot'"'"'s install-controller.sh (R90): this machine is a BuilderBot\n'
+        printf '# Written by AerieOS'"'"'s install-controller.sh (R90): this machine is a AerieOS\n'
         printf '# controller, and a session on its node is kept out of what follows. bb-session\n'
         printf '# covers every folder in COVER in a session'"'"'s view and starts none unless the\n'
         printf '# session and job accounts reach none of it.\n'

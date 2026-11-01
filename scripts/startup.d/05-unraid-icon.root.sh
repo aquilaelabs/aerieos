@@ -35,7 +35,7 @@ set -euo pipefail
 
 CACHE="${UNRAID_ICON_DIR:-/unraid-icons}"
 SRC="${UNRAID_ICON_SRC:-/opt/builderbot/icon.png}"
-NAME="BuilderBot"          # the container's name on Unraid, which the icon cache is keyed by
+NAME="AerieOS"          # the container's name on Unraid, which the icon cache is keyed by
 
 [ -d "$CACHE" ] || exit 0
 [ -f "$SRC" ]   || { warn "icon source $SRC is missing"; exit 0; }

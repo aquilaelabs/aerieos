@@ -1,4 +1,4 @@
-"""bb devapp remove (B755, report #111): the controller answers a remove by
+"""aerie devapp remove (B755, report #111): the controller answers a remove by
 queueing the down as a job, and the verb follows that job to its end. A
 down that failed (the compose file gone from the tree: "empty compose
 file") left the container running while the verb printed "removed"."""

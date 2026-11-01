@@ -287,12 +287,12 @@ def move_to_own(uid, secret, how, passkey=""):
 
 
 def move_back(uid):
-    """The store given back to this BuilderBot's install key, while it is
+    """The store given back to this AerieOS's install key, while it is
     unlocked: its key sealed under the install key again, the own record
     gone."""
     own = own_of(uid)
     if not own:
-        return {"error": "your store is under this BuilderBot's key already"}, 400
+        return {"error": "your store is under this AerieOS's key already"}, 400
     k = unlocks.opened_key(uid)
     if k is None:
         return {"error": "your store is locked: unlock it, then give the key back"}, 409
@@ -303,7 +303,7 @@ def move_back(uid):
         r.pop("own", None)
         d[uid] = r
         _save(d)
-    unlocks.lock(uid, why="given back to this BuilderBot")
+    unlocks.lock(uid, why="given back to this AerieOS")
     return {"ok": True, "fingerprint": fingerprint(k)}, 200
 
 
@@ -319,7 +319,7 @@ def change(uid, new=""):
     if new and not KEY_RE.fullmatch(new):
         return {"error": "an account key is 64 hex characters"}, 400
     if own_of(uid):
-        return {"error": "your store is under a key of your own: give it back to this BuilderBot first, or change what you hold"}, 409
+        return {"error": "your store is under a key of your own: give it back to this AerieOS first, or change what you hold"}, 409
     old = key_of(uid)
     if old is None:
         return {"error": "no such account"}, 404

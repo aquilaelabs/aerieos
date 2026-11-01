@@ -54,7 +54,7 @@ def path(d):
 
 
 # Every change is a read, an edit and a write of one file, and the writers are
-# several processes: the dashboard's editor and each session's `bb changelog
+# several processes: the dashboard's editor and each session's `aerie changelog
 # add`, relayed to the controller and run there as a process of its own. Two
 # of those landing together each read the file, each added their line and
 # each wrote, and one line was gone (test/concurrent.mjs lost one of 72). So
@@ -335,7 +335,7 @@ def add(d, text, sha="", cat=""):
         return {"error": str(e)}
     # A stamp typed on the end of the text is read as the entry's own, the
     # way the file is read back, and the sha passed in joins it only when it
-    # is not already there: bb changelog add passes HEAD, and an entry that
+    # is not already there: aerie changelog add passes HEAD, and an entry that
     # named HEAD itself was written with the hash twice (B336).
     m = _STAMP.search(text)
     shas = m.group(1).split(", ") if m and text[:m.start()].strip() else []
@@ -446,11 +446,11 @@ def _pick(rows, ns):
         try:
             i = int(n)
         except (TypeError, ValueError) as e:
-            raise _Refused("which entry? `bb changelog unreleased` numbers them") from e
+            raise _Refused("which entry? `aerie changelog unreleased` numbers them") from e
         if not 1 <= i <= len(rows):
-            raise _Refused(f"no unreleased entry {i}: `bb changelog unreleased` "
+            raise _Refused(f"no unreleased entry {i}: `aerie changelog unreleased` "
                            f"lists {len(rows)}; a dated section is history, and "
-                           f"`bb version unroll` is how one is reopened")
+                           f"`aerie version unroll` is how one is reopened")
         if i - 1 in want:
             raise _Refused(f"entry {i} named twice")
         want.append(i - 1)
@@ -722,7 +722,7 @@ def since_minor(secs):
 def sections(text):
     """The whole file as [{"title", "entries": [{"text", "shas", "cat"}]}],
     newest first as the file is written: Unreleased, then each dated release.
-    For the welcome panel, which shows BuilderBot's own changelog and marks
+    For the welcome panel, which shows AerieOS's own changelog and marks
     where the reader last looked.
 
     The entries stay FLAT, each carrying the category it sits under, rather
@@ -769,7 +769,7 @@ _TITLE_VER = re.compile(r"^(\d+\.\d+\.\d+)\b")
 
 def stitch(ours, theirs):
     """A patch line's changelog carried into the next line's (R112 step 3,
-    bb version forward): this line's file with every dated section the patch
+    aerie version forward): this line's file with every dated section the patch
     line has and this one does not, placed among the others by version, and
     this line's Unreleased without an entry the patch already released (a fix
     made on both lines is said once, under the release that shipped it).
@@ -843,7 +843,7 @@ def editor_verb(name, req):
         return {"error": "no such component"}, 400
     if req.get("action") == "first":
         # The first line, from the page: the editor was dead until a
-        # session's `bb changelog add` made the file, and the operator
+        # session's `aerie changelog add` made the file, and the operator
         # is as entitled to the first entry as to every arrangement
         # after it (16 Sep). Only the first: a file that exists is
         # edited through the editor, whole.
@@ -874,9 +874,9 @@ def reading(name, component=""):
 
 
 def welcome(seen):
-    """BuilderBot's own changelog, for the welcome panel: the file beside
+    """AerieOS's own changelog, for the welcome panel: the file beside
     this checkout (CHANGELOG.md two levels up, which is
-    /opt/builderbot/CHANGELOG.md in the image and the repository's under bb
+    /opt/builderbot/CHANGELOG.md in the image and the repository's under aerie
     dashboard dev), and where this account last looked (`seen`, the image
     commit it acknowledged), so the panel can draw a line under what is new
     since."""

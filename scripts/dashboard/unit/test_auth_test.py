@@ -63,7 +63,7 @@ class AuthTest(unittest.TestCase):
 
     def test_bb_forge_asks_about_the_projects_own_repository_alone(self):
         # B544: the tree's origin is a session's to rewrite; pointed at
-        # another repository on the host, bb forge took the project's token
+        # another repository on the host, aerie forge took the project's token
         # there. The repository on record is the one asked about, and an
         # origin that disagrees with it is refused.
         from unittest import mock

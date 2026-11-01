@@ -13,7 +13,7 @@ there), for the folders of the projects the node holds:
   against the last bytes the controller has, anything else whole.
 - A file the controller has and this node has never had comes down when
   it is small (a memory, a short conversation). A large conversation comes
-  down when somebody resumes it here: bb-tty fetches it (bb transcripts
+  down when somebody resumes it here: bb-tty fetches it (aerie transcripts
   fetch), since copying every long conversation to every node is
   gigabytes nobody asked for.
 - A memory removed on one side is removed on the other. A conversation is
@@ -42,7 +42,7 @@ MAX_FILE = 2 * 1024 * 1024 * 1024
 TAIL = 4096
 UID = re.compile(r"u_[0-9a-f]{8}")
 TMP = ".bbsync-"
-BBIGNORE = ("BuilderBot: each account's Claude transcripts and memories, kept in step "
+BBIGNORE = ("AerieOS: each account's Claude transcripts and memories, kept in step "
             "with the controller's. Not a project.\n")
 
 

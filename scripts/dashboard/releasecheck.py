@@ -1,4 +1,4 @@
-"""A newer BuilderBot release, for a controller installed bare metal (R90
+"""A newer AerieOS release, for a controller installed bare metal (R90
 step 5): the newest published release asked of GitHub a while after the
 start and then daily, kept in memory, said on the bell and under Controller
 settings when it is newer than the build running, and applied when pressed
@@ -37,7 +37,7 @@ _window = lambda: ("", 4)   # noqa: E731 (the update window: day, hour)
 _apply = lambda v: None     # noqa: E731 (queue the update to version v)
 _applied = {"version": ""}  # the version the window last queued, so one window queues once
 # Drafts (the operator, 1 Nov): a controller in debug mode on the dev channel
-# holding a token for BuilderBot's repository sees its draft releases too,
+# holding a token for AerieOS's repository sees its draft releases too,
 # and updates from one by fetching its files with that token.
 _draft_token = lambda: ""   # noqa: E731 (configured)
 _drafts = {}                # tag: its assets, from the last check that saw drafts
@@ -83,7 +83,7 @@ def in_window(now=None):
 def window_pass(now=None):
     """One look, every few minutes from the loop: in the window with a
     newer release not yet queued, the update is queued once (the own node's
-    job: the image on BuilderBot OS, the installer elsewhere), and said
+    job: the image on AerieOS, the installer elsewhere), and said
     where the job's log and the bell say the rest. Returns what it queued."""
     v = newer() if _bare() else ""
     if not v or not in_window(now) or _applied["version"] == v:
@@ -209,7 +209,7 @@ def is_draft(tag):
     return bool(_token()) and str(tag) in _drafts
 
 
-# What a BuilderBot OS update takes from a release's folder (osimage).
+# What a AerieOS update takes from a release's folder (osimage).
 def _os_files(tag):
     ver = str(tag).lstrip("v")
     return {f"builderbot-os-{ver}.iso", f"builderbot-os-{ver}.iso.sha256", f"builderbot-os-{ver}.attestation.jsonl",
@@ -217,7 +217,7 @@ def _os_files(tag):
 
 
 def fetch_draft(tag, dest):
-    """The draft's BuilderBot OS files fetched into `dest` with the token, as
+    """The draft's AerieOS files fetched into `dest` with the token, as
     a folder update reads them: "" or why. Said on the Updates section as it
     goes (status's draft_fetch)."""
     token = _token()
@@ -232,7 +232,7 @@ def fetch_draft(tag, dest):
             return _fetch["error"]
     _fetch.update(tag=str(tag), at=int(time.time()), error="", done=False)
     if not token or not any(str(a.get("name")).endswith(".iso") for a in got):
-        _fetch["error"] = f"{tag} is not a draft this controller can see, or it carries no BuilderBot OS image yet"
+        _fetch["error"] = f"{tag} is not a draft this controller can see, or it carries no AerieOS image yet"
         return _fetch["error"]
     try:
         os.makedirs(dest, exist_ok=True)

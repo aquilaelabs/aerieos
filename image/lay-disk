@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One disk laid out as BuilderBot OS (R160 steps 1 and 2): the partitions of
+# One disk laid out as AerieOS (R160 steps 1 and 2): the partitions of
 # image/partitions.sh, GRUB for UEFI and BIOS with the menu, slot A written
 # from a root squashfs with its kernel and initrd beside it on the ESP, slot
 # B left for the first update, and the data partition made with /var's
@@ -114,4 +114,4 @@ if [ -z "$VAR" ]; then
 fi
 mkfs.ext4 -q -L "$BB_DATA_LABEL" -d "$VAR" -E lazy_itable_init=0,lazy_journal_init=0 "$(P 5)"
 cleanup; trap - EXIT
-echo "lay-disk: $DEV holds BuilderBot OS in slot A$([ "$GROW" = 1 ] && echo ', the data partition grown to the disk')"
+echo "lay-disk: $DEV holds AerieOS in slot A$([ "$GROW" = 1 ] && echo ', the data partition grown to the disk')"

@@ -7,7 +7,7 @@
 
 function nbRoadmapView({$, nb}){
   // ---- the shared to-do list ---------------------------------------------
-  // Both sides write it: the operator here, a session through `bb roadmap`. Its
+  // Both sides write it: the operator here, a session through `aerie roadmap`. Its
   // open items are appended to every Claude session bb-tty starts, which is why
   // something noticed mid-task and left undone survives the conversation.
 
@@ -245,7 +245,7 @@ function nbRoadmapView({$, nb}){
   // imperative DOM under a row, so the innerHTML below takes them and every
   // word typed into them. The poll's own guard upstream watches for STAGED
   // changes, and typing is not staged until the box's Save, so a session
-  // running `bb roadmap add` in the background deleted a half-written
+  // running `aerie roadmap add` in the background deleted a half-written
   // rewording under the finger holding it. Bugs has skipped its redraw while
   // a form is open since it was built; this is the same rule on the one view
   // that did not have it. `nb.roadmapItems` is still updated underneath, so

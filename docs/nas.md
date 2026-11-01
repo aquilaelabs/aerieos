@@ -1,4 +1,4 @@
-# BuilderBot as a NAS: the design
+# AerieOS as a NAS: the design
 
 What the installed edition does with disks, and what it leaves to the
 kernel and to the daemons that already do it well. The decisions are the
@@ -26,12 +26,12 @@ Every NAS makes one choice its own, and the comparison behind these two is
 in R56's notes: the per-disk design (a filesystem per disk behind real-time
 parity, a union layer and a mover), TrueNAS (ZFS checksums and self-heal, rigid growth, L2ARC and SLOG
 that are not a tier), Synology SHR (md slices under btrfs, an SSD cache),
-OpenMediaVault (mergerfs with SnapRAID, periodic parity). BuilderBot offers
+OpenMediaVault (mergerfs with SnapRAID, periodic parity). AerieOS offers
 two, said plainly for what each gives up.
 
 **ZFS pools, the default for matched disks.** Mirrors or RAIDZ2, a dataset
 per project and per container's data with quotas, scrubs on a schedule,
-snapshots and replication mapped onto BuilderBot's own snapshots and
+snapshots and replication mapped onto AerieOS's own snapshots and
 backups. Checksums on every block and self-heal from redundancy are what a
 build machine's data wants; the price is that a pool grows by whole vdevs,
 and disks in a vdev are alike. Never a special vdev or a SLOG on a single
@@ -47,7 +47,7 @@ A disk is added or replaced one at a time, and a single disk's files are
 readable on any machine, which is the reason to want it.
 
 **Pools by purpose, no cache tier.** No mover between a cache and the array (the
-operator, 27 Oct): an SSD is a pool of its own holding BuilderBot's hot data
+operator, 27 Oct): an SSD is a pool of its own holding AerieOS's hot data
 (/config, the project workspaces, toolchains, build caches, apps' data and
 VM disks); the hard-disk array holds the shares, media and backups; each
 share names the one pool it lives on when it is made, and nothing moves
@@ -67,7 +67,7 @@ the bell, and a dead SSD is restored from last night's.
   copy in, never pooled, unmounted cleanly before it is pulled.
 - **Backups and snapshots**: scheduled snapshots per share or pool with
   their keeping, browsable and restorable a file at a time or whole;
-  backups off the machine to another node, another BuilderBot or a cloud
+  backups off the machine to another node, another AerieOS or a cloud
   store, each with its last good run on Home and a restore that is walked,
   not assumed.
 - **Health**: disks by model, size, serial, SMART health and temperature;
@@ -90,7 +90,7 @@ the bell, and a dead SSD is restored from last night's.
   firmware with their disks where they are. Everything is said on This
   machine before it happens, and Release undoes the mounts.
 
-## What BuilderBot does not build
+## What AerieOS does not build
 
 - **A storage engine.** No filesystem, no block layer, no RAID of its own:
   ZFS, mergerfs and SnapRAID are what they are, packaged by Debian and built

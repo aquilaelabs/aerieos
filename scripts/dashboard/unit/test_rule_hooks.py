@@ -45,7 +45,7 @@ class Reading(unittest.TestCase):
                 ("echo $(apt install x)", "apt install"),
                 ("X=1 timeout 30 apt install q", "apt install"),
                 ("bash -c 'apt install jq'", "apt install"),
-                ("bb run -- apt install foo", "apt install"),
+                ("aerie run -- apt install foo", "apt install"),
                 ("$ANDROID_HOME/emulator/emulator -avd x &", "emulator -avd"),
                 ("git config user.name x", "git config user.name")]:
             self.assertEqual(self.hit(line), want, line)
@@ -92,7 +92,7 @@ class Store(unittest.TestCase):
     def test_pgrep_f_is_the_same_hazard_wherever_the_shell_puts_it(self):
         """B736: pgrep -f from a tool call matches the call's own shell, in a
         kill, in a wait loop behind the shell's own words, and run alone;
-        bb proc is the way, and pgrep by name is let be."""
+        aerie proc is the way, and pgrep by name is let be."""
         import rules
         pats = next(r for r in rules.ALWAYS if r["name"] == "pkill-by-pid")["refuse"]
         for line in ("pgrep -f ff/grant.js", "kill $(pgrep -f x.js)", "until ! pgrep -f x; do sleep 2; done",
@@ -100,26 +100,26 @@ class Store(unittest.TestCase):
                      "for i in $(seq 1 9); do pgrep -f x >/dev/null || break; done",
                      "while pgrep -f x >/dev/null; do sleep 1; done", "pgrep -af x", "pkill -9 -f x"):
             self.assertIsNotNone(cmdmatch.first_match(line, pats), line)
-        for line in ("pgrep -x firefox", "pgrep firefox", "bb proc stop ff/grant.js", "echo until done",
+        for line in ("pgrep -x firefox", "pgrep firefox", "aerie proc stop ff/grant.js", "echo until done",
                      "for i in 1 2; do echo $i; done"):
             self.assertIsNone(cmdmatch.first_match(line, pats), line)
-        self.assertIn("bb proc", next(r for r in rules.ALWAYS if r["name"] == "pkill-by-pid")["text"])
+        self.assertIn("aerie proc", next(r for r in rules.ALWAYS if r["name"] == "pkill-by-pid")["text"])
 
     def test_a_session_reaches_a_remote_through_bb_git_alone(self):
         """The operator, 27 Oct: git's own push, fetch, pull, ls-remote and
         remote update are refused however written, a token in the URL or
         not, so the controller's credential, git policy and scan cannot be
-        gone round; local git and bb git are let be."""
+        gone round; local git and aerie git are let be."""
         import rules
         g = next(r for r in rules.ALWAYS if r["name"] == "git-through-bb")
         for line in ("git push", "git push https://x:tok@github.com/o/r.git main", "git -C /w/x push",
                      "git -c credential.helper= push origin", "sudo git fetch", "bash -c 'git pull'",
                      "git --git-dir=/x/.git fetch", "git remote update", "git ls-remote origin"):
             self.assertIsNotNone(cmdmatch.first_match(line, g["refuse"]), line)
-        for line in ("bb git push", "git commit -m 'push it'", "git log --grep push", "git status",
+        for line in ("aerie git push", "git commit -m 'push it'", "git log --grep push", "git status",
                      "git remote -v", "git worktree add ../x", "git clone https://x", "echo git push"):
             self.assertIsNone(cmdmatch.first_match(line, g["refuse"]), line)
-        self.assertIn("bb git push", g["text"])
+        self.assertIn("aerie git push", g["text"])
 
     def test_the_shipped_install_rule_refuses_and_says_why(self):
         out = self.hook("bb-rule-hook", "guard", "alpha", "u_t",
@@ -133,20 +133,20 @@ class Store(unittest.TestCase):
 
     def test_a_recording_is_met_with_the_reel(self):
         """The operator, 17 Oct: a phone's screen recording was taken apart
-        with ffmpeg by hand though bb capture reel reads one. A video in the
+        with ffmpeg by hand though aerie capture reel reads one. A video in the
         person's message, or ffmpeg reached for on one, has the reel said
         beside it; anything else has nothing."""
         said = json.loads(self.hook("bb-rule-hook", "prompt", "alpha", "u_t",
                                     stdin={"prompt": 'this is slow @"/home/u/uploads/b72-screen-1.mp4"'}))
         ctx = said["hookSpecificOutput"]
         self.assertEqual(ctx["hookEventName"], "UserPromptSubmit")
-        self.assertIn("bb capture reel --video FILE", ctx["additionalContext"])
+        self.assertIn("aerie capture reel --video FILE", ctx["additionalContext"])
         self.assertIn("/home/u/uploads/b72-screen-1.mp4", ctx["additionalContext"])
         self.assertIn("--dry", ctx["additionalContext"])
         self.assertEqual(self.hook("bb-rule-hook", "prompt", "alpha", "u_t", stdin={"prompt": "why is it slow"}), "")
         out = json.loads(self.hook("bb-rule-hook", "guard", "alpha", "u_t",
                                    stdin={"tool_name": "Bash", "tool_input": {"command": "ffmpeg -i /tmp/a.mov -vf fps=1 f%d.png"}}))
-        self.assertIn("bb capture reel --video FILE", out["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("aerie capture reel --video FILE", out["hookSpecificOutput"]["additionalContext"])
         self.assertNotIn("permissionDecision", out["hookSpecificOutput"])
         self.assertEqual(self.hook("bb-rule-hook", "guard", "alpha", "u_t",
                                    stdin={"tool_name": "Bash", "tool_input": {"command": "cp a.mp4 b.mp4"}}), "")
@@ -158,20 +158,20 @@ class Store(unittest.TestCase):
         self.assertIsNotNone(rules.refusing("alpha", "git config --global user.email me@x"))
 
     def test_a_test_run_is_refused_only_in_the_foreground(self):
-        for line in ("bb tests run", "bash scripts/bb tests preflight --base HEAD",
-                     "cd /workspace/BuilderBot && timeout 900 bash scripts/bb dashboard test cards 2>&1 | tail",
+        for line in ("aerie tests run", "bash scripts/aerie tests preflight --base HEAD",
+                     "cd /workspace/AerieOS && timeout 900 bash scripts/aerie dashboard test cards 2>&1 | tail",
                      "bash scripts/dashboard/test/run.sh cards",
-                     "bash scripts/bb tests probe /tmp/x.mjs", "bb devapp rebuild --instance web-dev",
-                     "bb build", "cd app && bb build -- ./gradlew assembleDebug"):
+                     "bash scripts/aerie tests probe /tmp/x.mjs", "aerie devapp rebuild --instance web-dev",
+                     "aerie build", "cd app && aerie build -- ./gradlew assembleDebug"):
             g = rules.refusing("alpha", line)
             self.assertEqual(g and g[0]["name"], "tests-in-the-background", line)
             self.assertIsNone(rules.refusing("alpha", line, background=True), line)
-        for line in ("bb tests unit", "bb tests log", "./run.sh", "bash run.sh", "bb dashboard trace 30",
-                     "bb tests preflight --dry", "bb tests preflight --files a.py --dry 2>&1 | tail",
+        for line in ("aerie tests unit", "aerie tests log", "./run.sh", "bash run.sh", "aerie dashboard trace 30",
+                     "aerie tests preflight --dry", "aerie tests preflight --files a.py --dry 2>&1 | tail",
                      "sed -n 1,5p scripts/dashboard/test/run.sh",         # reading the runner is not running it (B700)
                      "grep -n slow scripts/dashboard/test/run.sh | head",
                      # A verb's usage runs nothing (B278).
-                     "bb dashboard test --help", "bb tests probe -h", "bb build --help 2>&1 | head"):
+                     "aerie dashboard test --help", "aerie tests probe -h", "aerie build --help 2>&1 | head"):
             self.assertIsNone(rules.refusing("alpha", line), line)     # --dry is the plan alone (B698)
 
     def test_a_wait_on_a_runs_log_is_refused_only_in_the_foreground(self):
@@ -190,21 +190,21 @@ class Store(unittest.TestCase):
         self.assertIn("Add, do not change.", out["hookSpecificOutput"]["additionalContext"])
         self.assertEqual(set(out), {"hookSpecificOutput"})
         self.assertEqual(self.hook("bb-rule-hook", "guard", "alpha", "u_t",
-                                   stdin={"tool_name": "Bash", "tool_input": {"command": "bb tests run",
+                                   stdin={"tool_name": "Bash", "tool_input": {"command": "aerie tests run",
                                                                               "run_in_background": True}}), "")
 
     def test_a_rule_keeps_its_why_and_never_sends_it(self):
-        r = rules.add("alpha", "tidy", "Run bb tidy after a task.", by="you",
+        r = rules.add("alpha", "tidy", "Run aerie tidy after a task.", by="you",
                       why="A session left an emulator running for a day once.")
         self.assertEqual(r["rule"]["why"], "A session left an emulator running for a day once.")
-        self.assertIn("Run bb tidy after a task.", rules.block("alpha"))
+        self.assertIn("Run aerie tidy after a task.", rules.block("alpha"))
         self.assertNotIn("emulator running for a day", rules.block("alpha"))
         self.assertNotIn("emulator running for a day", rules.said(rules.by_names("alpha", ["tidy"])))
         # An edit stores a new why, and one that says nothing about it keeps the old (B694).
-        r = rules.edit("alpha", "tidy", text="Run bb tidy when a task is done.", by="you",
+        r = rules.edit("alpha", "tidy", text="Run aerie tidy when a task is done.", by="you",
                        why="The emulator ran for a day.")
         self.assertEqual(r["rule"]["why"], "The emulator ran for a day.")
-        r = rules.edit("alpha", "tidy", text="Run bb tidy when a batch is done.", by="you")
+        r = rules.edit("alpha", "tidy", text="Run aerie tidy when a batch is done.", by="you")
         self.assertEqual(r["rule"]["why"], "The emulator ran for a day.")
 
     def test_turned_off_it_refuses_nothing_and_the_briefing_lines_still_do(self):
@@ -213,7 +213,7 @@ class Store(unittest.TestCase):
         self.assertEqual(rules.refusing("alpha", "pkill -f node")[0]["name"], "pkill-by-pid")
 
     def test_an_operator_rule_refuses_what_it_names(self):
-        rules.add("alpha", "builds", "Build with bb build.", by="you", refuse="./gradlew assemble, make")
+        rules.add("alpha", "builds", "Build with aerie build.", by="you", refuse="./gradlew assemble, make")
         g, cmd = rules.refusing("alpha", "cd app && ./gradlew assemble --info")
         self.assertEqual((g["name"], cmd), ("builds", "./gradlew assemble --info"))
         self.assertIsNone(rules.refusing("alpha", "./gradlew test"))

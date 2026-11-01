@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# BuilderBot entrypoint.
+# AerieOS entrypoint.
 #
 #   1. remap the `builder` user to PUID/PGID so files written into your host's
 #      shares come out owned by the right account

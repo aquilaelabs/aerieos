@@ -7,7 +7,7 @@
 # pass is a check nobody runs:
 #
 #   (default) only what this branch ADDS. That has to be zero, and it is what
-#             `bb rules check voice` runs before a session hands back.
+#             `aerie rules check voice` runs before a session hands back.
 #   --all     every one still in the tree, worst file first. The sweep's
 #             progress bar, not a gate.
 set -u

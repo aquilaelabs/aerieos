@@ -69,7 +69,7 @@ container_maker = None
 vm_runner = None
 pack_runner = None         # (project, entry, by) -> a catalog pack added (R169 step 5)
 # signing.start(principal, project, file, route), set by the server: what
-# Allow on a session's `bb sign` runs (R106), queued as the session asked.
+# Allow on a session's `aerie sign` runs (R106), queued as the session asked.
 signer = None
 # What Allow on a session's key change runs (R106 step 6), set by the
 # server: keymaker(action, project, args) -> (payload, status), where
@@ -435,7 +435,7 @@ def connect(nid, ip, port, uid, name):
     # operator, 9 Oct), whoever's phone it is.
     n = _valid_port(port)
     if not n:
-        return {"error": "the phone's connect port is needed: the BuilderBot app finds it, or read "
+        return {"error": "the phone's connect port is needed: the AerieOS app finds it, or read "
                          "it under IP address & port on Android's Wireless debugging screen (the "
                          "number after the colon) and type it in"}
     # "connected to" is a socket, not a phone: the port of something else
@@ -786,7 +786,7 @@ def requests_open(uid=None, admin=False, project=""):
     """What is waiting: everything, or only what waits on this account.
     `admin` says whether it is one, which is who a root request waits on.
     With `project`, a SESSION's read-only view instead: its own project's
-    pending requests, so `bb root` and `bb phone` in a session can say what
+    pending requests, so `aerie root` and `aerie phone` in a session can say what
     is waiting on somebody, though the session can answer none of it."""
     with _lock:
         for r in _reqs:
@@ -996,7 +996,7 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
         return {"error": f"{project or 'this project'} has no node, so there is no machine "
                          "to run anything on as root: root is asked for on the project's node"}
     if not sandbox:
-        return {"error": f"{node_name or nid} was not provisioned as a BuilderBot sandbox, so "
+        return {"error": f"{node_name or nid} was not provisioned as a AerieOS sandbox, so "
                          "root there is its owner's and not something this can ask for"}
     if locked:
         # Said now rather than after somebody pressed Allow: the lock is the
@@ -1159,7 +1159,7 @@ def ask_rebuild(why, project, instance, name, asker_uid="", asker_name="",
     `target` is the container's own key when it is not that project's
     instance (one written here that belongs to it). `ctl` asks instead to
     start, stop or restart the container called `name` on `node`, one that
-    belongs to the project and that BuilderBot may not have started.
+    belongs to the project and that AerieOS may not have started.
     """
     why = " ".join(str(why or "").split())[:300]
     if not why:
@@ -1241,7 +1241,7 @@ def ask_vm(why, project, req, asker_name=""):
             if req.get(k) not in (None, "")}
     if keep.get("node_agent"):
         shown.append("--node-agent")
-    # What the person allowing reads on the bell: the hardware as bb vm's
+    # What the person allowing reads on the bell: the hardware as aerie vm's
     # own words (R100), a disk's size, autostart's way.
     hw = keep.get("hw") if isinstance(keep.get("hw"), dict) else {}
     if "cpuset" in hw:
@@ -1257,7 +1257,7 @@ def ask_vm(why, project, req, asker_name=""):
         shown += [str(keep["disk"])] * bool(keep.get("disk")) + [f"{keep['gb']}G"]
     if action == "autostart":
         shown.append("on" if keep.get("on") else "off")
-    # A USB device to a VM (R116), as bb vm usb names it.
+    # A USB device to a VM (R116), as aerie vm usb names it.
     if action in ("usb-give", "usb-take") and isinstance(keep.get("usb"), dict):
         u = keep["usb"]
         shown = ["vm", "usb", name, "give" if action == "usb-give" else "take",
@@ -1519,7 +1519,7 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             except Exception as e:                                     # noqa: BLE001 (said, not raised)
                 res, st = {"error": str(e)}, 500
             # The answer's own output is what is cut, never the JSON around
-            # it: cut at 8 KB, a layout dump stopped parsing and bb phone ui
+            # it: cut at 8 KB, a layout dump stopped parsing and aerie phone ui
             # printed its tail as an ERROR (report #56). 256 KB holds a
             # screen's whole hierarchy.
             if isinstance(res, dict) and isinstance(res.get("out"), str) and len(res["out"]) > USE_OUT_MAX:
@@ -1702,7 +1702,7 @@ def tab_view(uid, *, admin, project, node="", probe=False, scope=None, ua="", ad
     # the list carried every phone node's name, address and handset to a
     # session (the probe of 26 Sep).
     # The row's node is its `id`: filtering on a `node` key no row has
-    # emptied the list for every scoped asker, so a session's bb phone status
+    # emptied the list for every scoped asker, so a session's aerie phone status
     # said "no node carries adb" beside a phone connected on its node
     # (report #51, 4 Oct).
     if scope is not None and isinstance(out.get("nodes"), list):
@@ -1900,7 +1900,7 @@ def verb(action, req, who, fresh):
             return no
         rec = _rec(lnid) or {}
         args = req.get("args") if isinstance(req.get("args"), dict) else {}
-        shown = ["bb", "phone", str(op)[:20]] + [f"{k}={str(v)[:120]}" for k, v in sorted(args.items())][:8]
+        shown = ["aerie", "phone", str(op)[:20]] + [f"{k}={str(v)[:120]}" for k, v in sorted(args.items())][:8]
         why = " ".join(str(req.get("why") or "").split())[:300] or f"{op} on the phone lent to {proj}"
         nname = (nodes.node(lnid) or {}).get("name") if nodes is not None else lnid
         acct = users.account_of(who) or {}

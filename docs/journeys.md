@@ -1,7 +1,7 @@
 # Journeys
 
-What a person does with BuilderBot, walked for real rather than reasoned
-about, on the dev pair: builderbot-dev (BuilderBot's own dev instance, on its
+What a person does with AerieOS, walked for real rather than reasoned
+about, on the dev pair: builderbot-dev (AerieOS's own dev instance, on its
 own share) and the bb-dev-sandbox VM. Each section is one walk with its date,
 what was pressed in what order, where it snagged, and what that moved from
 dev to alpha (house rule `vetting`). A walk that snags is the point of
@@ -10,7 +10,7 @@ walking it; the snag is fixed or filed, then the walk continues.
 ## New deploy to first project to first build and test (15 September 2026)
 
 The starting state was made by the two verbs built for it that day: **Reset
-BuilderBot** on the controller (Settings page, the word `reset` typed), which
+AerieOS** on the controller (Settings page, the word `reset` typed), which
 moved every account, node, setting, token and notebook into a dated
 directory and brought the dashboard back at *Create the owner*; and
 **Uninstall** on the node, which took the agent, its accounts, its mounts,
@@ -50,11 +50,11 @@ What was pressed, in order:
    test command and an output glob. No snag.
 7. **A session's verbs, without a session.** The dev pair has no Claude
    login, so the Claude button was not pressed; instead a session token was
-   minted against the dev controller's own state and `bb` was run on the VM
+   minted against the dev controller's own state and `aerie` was run on the VM
    as the session account with the environment `bb-tty` gives a session.
-   `bb status` named the node; `bb build` ran there and wrote the artifact
-   onto the share, listed on the Artifacts view; `bb test` ran there.
-   *Snag, already filed (B128):* `bb git policy`, a read, refused until the
+   `aerie status` named the node; `aerie build` ran there and wrote the artifact
+   onto the share, listed on the Artifacts view; `aerie test` ran there.
+   *Snag, already filed (B128):* `aerie git policy`, a read, refused until the
    owner had a commit identity on the Profile page. With one set, the policy
    read, `ls-remote` answered, and a branch pushed through the controller's
    stored credential.
@@ -103,7 +103,7 @@ and the platform tools were installed from the Toolchains page (the Library's
 toolchains today) with the node picked (a job each; the tab shows the running one). A new empty project
 (`droid`) took a one-screen Java app with Gradle 8.14 and AGP 8.10, its
 settings took the node, `./gradlew assembleDebug` and the APK glob, and
-`bb build` was run on the node under the exact environment a session gets
+`aerie build` was run on the node under the exact environment a session gets
 there (read off a live session's process). Gradle downloaded, AGP fetched
 Build-Tools 35 and platform 35 into the store against the licenses the
 recipe had accepted, and the build succeeded in under two minutes with the
@@ -111,7 +111,7 @@ APK copied into `dist/`, where the Artifacts view listed it with Download
 live and Install ghosted for want of a phone. Setting the first version from
 that view wrote `VERSION` and the block read `0.1.0-dev.2+…` at once. No
 snag in the product. *Two snags beside it:* a console login shell on the
-node had no `bb` on PATH because the provisioner's profile line named the
+node had no `aerie` on PATH because the provisioner's profile line named the
 store the node was born with, not the one Storage had moved it to (B135,
 fixed: the agent rewrites the line after every apply); and the Toolchains page (the
 Library's today) asked to install the emulator's libraries on a node that had never
@@ -215,7 +215,7 @@ to, which is the same fault as a green suite that ran somewhere else (R65).
 
 ### Walked again on the build it was meant to prove (against `3a0934b`)
 
-`bb devapp rebuild` took 136 seconds and brought the dashboard up on the
+`aerie devapp rebuild` took 136 seconds and brought the dashboard up on the
 branch head, so the same ground was covered again with that day's work
 actually present. A session token was minted against the dev controller's own
 state, which is what stands in for a Claude session there.
@@ -232,7 +232,7 @@ state, which is what stands in for a Claude session there.
    model, an effort and a commit author. The owner's row carried them under
    `yours`; `dev2`, who has the same project, carried none of them; and the
    project's own settings carried no model at all. Asked the way a session is
-   asked (`bb settings --json` for each seat), the owner's session would
+   asked (`aerie settings --json` for each seat), the owner's session would
    launch on `opus` at `high` and commit as `Stencil Alt`, while `dev2`'s on
    the same project would launch on Claude's own default and commit as
    themselves. That is the whole of what "yours, not the project's" was meant
@@ -282,7 +282,7 @@ What was run, in order:
    guest away left the other one working.
 
 Two snags, both found by running it rather than reading it, both fixed in the
-same sitting. What this does not cover is a machine with no BuilderBot on it
+same sitting. What this does not cover is a machine with no AerieOS on it
 at all, and macOS, which is R23 step 3 and wants a Mac.
 
 - Alpha, new evidence: a guest node enrolled, refused the verbs its class
@@ -292,7 +292,7 @@ at all, and macOS, which is R23 step 3 and wants a Mac.
 
 ## 20 September: the Git view on a project linked over http, and two people
 
-Walked on the dev pair after `bb devapp rebuild`, so the instance was serving
+Walked on the dev pair after `aerie devapp rebuild`, so the instance was serving
 the branch tip (05381aa) rather than whatever it was last built from, which is
 the discipline the 17 September walk cost us.
 
@@ -341,7 +341,7 @@ whoever reads it, and the two things behind it were not the same thing.
 
 ## 23 September: the tabs as a tester sees them, with the map and the trace in hand
 
-Walked on the dev pair after `bb devapp rebuild`, so the instance served the
+Walked on the dev pair after `aerie devapp rebuild`, so the instance served the
 branch tip (4fe8554). This walk was as much about the method as the product:
 a browser script signed in as each person, opened every tab, screenshotted
 it, kept the console errors and counted what each open fetched, and the
@@ -377,7 +377,7 @@ controller's own request trace was read beside it.
    pressed: the recipe fixed on 22 Sep fetched ImageMagick by tag and
    landed with resvg, oxipng, pngquant and cwebp on `bb-dev-sandbox` in
    a job the row followed, and the row now reads *installed* and says it
-   adds `bb tool graphics` to a session. `needs_missing` is empty there,
+   adds `aerie tool graphics` to a session. `needs_missing` is empty there,
    which is the fonts package present on that machine.
 6. **A step and its arrow.** With one item added to `hello`'s roadmap and
    no session running, the arrow is drawn dead, the hint under the list
@@ -423,14 +423,14 @@ holding one container, `web-dev`, on `bb-dev-sandbox`.
    showed too, carrying the same ports sentence a second time; that one
    went (`b14541f`). Canceled there.
 4. **What a session is handed.** `web`'s briefing (the Overview's
-   source, `/api/preamble`) carries the new paragraph: `bb devapp new
-   [NAME] [--branch REF]` is Send done from a session, and it, not `bb
+   source, `/api/preamble`) carries the new paragraph: `aerie devapp new
+   [NAME] [--branch REF]` is Send done from a session, and it, not `aerie
    container new`, is how the project's own code goes into Docker. The old
    *create it when it has none* is gone from it.
 
 - Alpha, new evidence: Send makes a second container of a project, named
   and built in the one gesture, on a real node.
-- Still dev: `bb devapp new` from a real session on the dev pair, which has
+- Still dev: `aerie devapp new` from a real session on the dev pair, which has
   no Claude login and so no session token. The verb is proven by the
   harness instead: run as a session against the fixture server on auto and
   on ask (made, pinned, built; the card naming the container and its
@@ -447,13 +447,13 @@ command approved at its prompt, its outputs appended to a file in the
 project and read off the dev share. On `builderbot-dev` at 1f77097, then
 e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
 
-1. **`bb devapp ls`** listed `web` and `web-dev` as the project's own.
-   **`bb devapp log web-dev`** resolved to `web-dev-web-1` (B307's fix)
+1. **`aerie devapp ls`** listed `web` and `web-dev` as the project's own.
+   **`aerie devapp log web-dev`** resolved to `web-dev-web-1` (B307's fix)
    and then failed: `docker logs` went out over `ssh://bb@devnode.lan`,
    "Host key verification failed". Only the bare reads ran through the
    agent; the container verbs took the retired ssh path (B312, fixed in
    e8c11cc). Walked again after the rebuild: nginx's log came back.
-2. **Rebuild, then curl at once.** `bb devapp --instance web-dev rebuild`
+2. **Rebuild, then curl at once.** `aerie devapp --instance web-dev rebuild`
    at 1f77097 said "no build appeared within twenty seconds" over a build
    that succeeded: the same commit, finished between two looks at the row
    (B312's other half). At e8c11cc it said "rebuilt 58e7e92; web-dev is
@@ -462,10 +462,10 @@ e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
    session's network, which is what the agent's refresh after a compose
    job is for. The compose carried capabilities and the setting was auto,
    so the build was not stopped at the confirmation.
-3. **Send from a session.** `bb devapp new --env /tmp/e2` (WEB_PORT=8090)
+3. **Send from a session.** `aerie devapp new --env /tmp/e2` (WEB_PORT=8090)
    printed "created web-2", "built 58e7e92; web-2 is up", and `curl
    :8090` answered 200 straight after; `ls` then listed three.
-4. **Ask.** With the setting at ask, `bb devapp --instance web-2 rebuild
+4. **Ask.** With the setting at ask, `aerie devapp --instance web-2 rebuild
    --why askwalk` printed "asked stencil (#1), waiting up to 15 minutes";
    Allow on the dev bell built it and the verb reported "rebuilt".
 5. **Deny.** The same command was refused with the sentence naming
@@ -474,7 +474,7 @@ e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
 - Alpha, new evidence: a session sends its project to Docker, rebuilds
   it, reads its log and reaches its port, under each of the three
   settings, on a real node with a real session.
-- Still dev: `bb container new` from a session was not walked; nor was a
+- Still dev: `aerie container new` from a session was not walked; nor was a
   session's `start`, `stop` or `restart` by an instance's name.
 
 ## 26 September, late: the operator's scanner stack on the dev pair
@@ -495,12 +495,12 @@ commented line in the compose, so a dev instance built from the compose as
 it is had no way to a scan. The line is live now, from
 `SCANNER_REPORTS_PATH` with the documented default (558f03b), and the dev
 instance names `/workspace-dev/.scanners/reports` in its env. *Snag, mine
-and filed (B314):* `bb devapp env` printed the env without a final newline,
+and filed (B314):* `aerie devapp env` printed the env without a final newline,
 so the line I appended joined the one before it and the default path was
 mounted; fixed on the same day. After the rebuild: `droid`'s Analysis view
 shows the StrandHogg error with its remedy; the Static analysis tab is live
 with a project picker, seven findings, the six unattributed ones under
-their own heading; and the Haiku session on `web` ran `bb findings` (no
+their own heading; and the Haiku session on `web` ran `aerie findings` (no
 findings for web, one line per report) and was refused `--all`, as a
 session should be.
 

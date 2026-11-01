@@ -1,4 +1,4 @@
-"""Behind `bb run`, and so `bb build` and `bb test`, when the command travels
+"""Behind `aerie run`, and so `aerie build` and `aerie test`, when the command travels
 (cmd_run in bb): this tree snapshotted, the command run on the project's node
 as a job, its log streamed here, and what --out names brought back into
 dist/.
@@ -26,7 +26,7 @@ if node:
     if not hit:
         sys.exit(f"[builderbot] ERROR: no node called {node}"
                  + (" that this session may use: a session sees only the nodes its project builds on"
-                    if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else " (bb nodes lists them)"))
+                    if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else " (aerie nodes lists them)"))
     nid = hit[0]["id"]
 r = call("/api/v1/jobs", {"action": "run", "project": proj, "role": role, "node": nid,
                           "argv": argv, "outputs": outs, "timeout": int(timeout),

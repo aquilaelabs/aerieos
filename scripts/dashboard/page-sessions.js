@@ -159,7 +159,7 @@ const withMe = p => (state?.claude_with || {})[tmuxName(p)] || (state?.claude_wi
 const othersOn = p => withMe(p).filter(n => n !== state?.me);
 // Who has a conversation open here, one line each with a dot in front:
 // bright while that session is working on a prompt, dim while it waits (the
-// operator, 24 Sep, in place of one sentence naming them all). BuilderBot
+// operator, 24 Sep, in place of one sentence naming them all). AerieOS
 // account names, not the Anthropic logins behind them: whose session it is
 // on this box is the question somebody looking at the row is asking. Your
 // own is last and says so, so the other people, the part that is news, come
@@ -211,7 +211,7 @@ function sessionRows(proj){
     : names.map(n => ({who: n, node: "", working: busy.has(n), asking: asks.has(n)}));
   // What changed since a session started that it does not see until it is
   // started again, said under it with what for (the operator, 12 Oct): a
-  // toolchain put on its node's PATH, BuilderBot updated.
+  // toolchain put on its node's PATH, AerieOS updated.
   // On Claude Code's permission prompt it is asking, whoever's it is (B104).
   return rows.map(r => `<div class="sessone"><span class="st ${r.asking ? "asking" : r.working ? "working" : "waiting"}" title="${
     r.asking ? "asking to approve something in its terminal" : r.working ? "working on a prompt" : "waiting for a prompt"}"></span>${esc(r.who)}${

@@ -163,7 +163,7 @@ class FtpServers:
                                                      "password": str(q.get("password") or ""),
                                                      "addr": str(q.get("addr") or "")}, timeout=20)
             ans = {"id": q.get("id"), "access": r.get("access", "") if st == 200 else "",
-                   "why": r.get("why", "") if st == 200 else "BuilderBot could not be asked; try again shortly."}
+                   "why": r.get("why", "") if st == 200 else "AerieOS could not be asked; try again shortly."}
             try:
                 proc.stdin.write(json.dumps(ans) + "\n")
                 proc.stdin.flush()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code hook: nothing runs while BuilderBot is away.
+"""Claude Code hook: nothing runs while AerieOS is away.
 
     bb-gate PROJECT SESSION            # PreToolUse: JSON on stdin, refuses with exit 2
     bb-gate --prompt PROJECT SESSION   # UserPromptSubmit: a no-op, kept callable
@@ -91,7 +91,7 @@ def controller_answers(project):
     """True when the controller is there to answer a status request now.
 
     Any HTTP answer counts, a refusal included: a session whose token has
-    expired is talking to a controller that is up, and telling it BuilderBot
+    expired is talking to a controller that is up, and telling it AerieOS
     is restarting sends everybody to look at an update that did nothing. The
     status decides it, never the wording, because the server's refusals are
     sentences ("not signed in") with nothing in them to test for.
@@ -242,7 +242,7 @@ def main():
         return 0
     why = ""
     if not controller_answers(project):
-        why = ("BuilderBot is not answering: it is restarting after an update, or down. "
+        why = ("AerieOS is not answering: it is restarting after an update, or down. "
                "Nothing that needs it runs until it is back: wait a minute, then try again. "
                "If it stays down, write where you are and what is next to your memory or "
                "your notes (that is allowed), then end the turn: the operator checks the "

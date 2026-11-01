@@ -216,7 +216,7 @@ FEATURES_DIR = "/etc/builderbot/features"
 
 
 def features_now():
-    """What this machine has of each feature (R91): installed by BuilderBot
+    """What this machine has of each feature (R91): installed by AerieOS
     or not (its marker, or the firewall's own file), and for a VM host what
     decides whether one can run here, read whether it is installed or not:
     /dev/kvm (absent on a VM whose host passes no virtualization through)
@@ -238,7 +238,7 @@ def features_now():
                    "libvirt": _run([virsh, "--version"], timeout=10) if virsh else ""},
         "firewall": {"installed": os.path.exists("/etc/builderbot/hosting-fw.nft")},
         # The IOMMU on the kernel's command line (R116 step 4): put there by
-        # BuilderBot (its marker), and on in the running kernel (its groups),
+        # AerieOS (its marker), and on in the running kernel (its groups),
         # which a restart and the firmware's VT-d or AMD-Vi decide.
         "iommu": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "iommu")),
                   "on": bool(glob.glob("/sys/kernel/iommu_groups/*"))},
@@ -300,7 +300,7 @@ def census(state):
         # packages, and on a GUEST node the machine is its owner's, so the
         # controller upgrading it is the one thing R23 says it must not do.
         # What is owed instead is being able to SEE it, and to be told when a
-        # node is below the floor the Git view needs (bb doctor names it).
+        # node is below the floor the Git view needs (aerie doctor names it).
         "git": _run(["git", "--version"]) if shutil.which("git") else "",
         # The daemon's OWN id, which is how the controller tells two VMs that
         # have worn one address apart: a rebuilt sandbox, or a second
@@ -341,7 +341,7 @@ def census(state):
         "features": features_now(),
         # ...and the VMs it runs, with the room their disks have (R91).
         "vms": vms_now(),
-        # ...and the domains libvirt has that BuilderBot did not make (R165 step 1).
+        # ...and the domains libvirt has that AerieOS did not make (R165 step 1).
         "vms_other": vms_other(),
         "vm_pool": vm_pool(),
         # The installer ISOs fetched onto this node (R99).
@@ -368,7 +368,7 @@ def census(state):
         # stamp alone said yes for an agent that could not, and the
         # controller queued system packages it was bound to refuse.
         "administers": os.geteuid() == 0 and os.access(SANDBOX_BIN, os.X_OK),
-        # BuilderBot OS on this machine (R160 step 4): the image, its slot and the next boot's; {} elsewhere.
+        # AerieOS on this machine (R160 step 4): the image, its slot and the next boot's; {} elsewhere.
         "os_image": os_release(),
         "os_kept": {"versions": kept_list(), "booted": kept_boot()},
         # ...and a stick boot's (R161 step 10): its system pool, what still
@@ -377,7 +377,7 @@ def census(state):
         # The machine's disks (R162 step 1): what the Storage page lists
         # for the controller's own machine before anything is written.
         "disks": disks_now(),
-        # ...and its shares (R162 step 1), as BuilderBot's own files say them.
+        # ...and its shares (R162 step 1), as AerieOS's own files say them.
         "shares": shares_now(),
         # ...and its ZFS pools (R162 step 1), as zpool says them.
         "pools": pools_now(),
@@ -899,7 +899,7 @@ class Sampler:
 
     @classmethod
     def _fence(cls):
-        """BuilderBot's memory fence here (R110 step 4), {max_mb, used_mb},
+        """AerieOS's memory fence here (R110 step 4), {max_mb, used_mb},
         or None where there is none: the provisioner's builderbot.slice, or
         the cgroup of that name OpenRC's boot script makes."""
         base = cls.FENCE_DIR

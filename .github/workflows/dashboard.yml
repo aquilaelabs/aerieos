@@ -52,7 +52,7 @@ jobs:
         # The same archive lint.yml keeps, and for the same reason: the runner
         # streams a step's output to GitHub and keeps none of it on disk, so a
         # session in this container, which has no PAT, could see that CI was
-        # red and nothing about why. `bb ci-log` reads what this writes.
+        # red and nothing about why. `aerie ci-log` reads what this writes.
         #
         # The run id is unique per workflow, so this cannot collide with the
         # lint run beside it even when both fire on the same push.
@@ -61,7 +61,7 @@ jobs:
           # .env names the node's data store, which a session there can read
           # (the runner's own home is 0700 to it). Then /config on the
           # controller, because it survives an image update; the home is the
-          # fallback. `bb ci-log` resolves the same three in the same order,
+          # fallback. `aerie ci-log` resolves the same three in the same order,
           # and fetches across when the run was on a node.
           dir="${BB_CI_LOG_DIR:-}"
           if [ -z "$dir" ]; then

@@ -1,4 +1,4 @@
-"""bb gpu (scripts/lib/gpu.py, R102): what a session is told about the
+"""aerie gpu (scripts/lib/gpu.py, R102): what a session is told about the
 node's card, and the turn a heavy job takes on it. Run as the program it
 is, with a fake sysfs, a stand-in nvidia-smi and a lock directory of its own."""
 import os

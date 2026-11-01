@@ -1,7 +1,7 @@
 // The welcome panel: the guide a new person reads, and the changelog that
 // says what moved since they last looked. One classic script beside
 // index.html, like a tab's (docs/nodes.md §13), and the first section to
-// leave the page's own script whole (R75, moved with bb map sections in
+// leave the page's own script whole (R75, moved with aerie map sections in
 // hand: seven functions, one caller from outside, all covered). Pure
 // declarations: the wiring that runs at load (the About button, the
 // modal's own close, the welcome on the first poll) stays in index.html
@@ -65,8 +65,8 @@ function abShow(which){
   if (which === "guide") abLoadGuide();
   if (which === "log" && !abLogLoaded) abLoadLog();
 }
-// ---- Credits: what BuilderBot is built on --------------------------------
-// The open-source work BuilderBot itself ships and runs, each with what it
+// ---- Credits: what AerieOS is built on --------------------------------
+// The open-source work AerieOS itself ships and runs, each with what it
 // does here and its license: what the controller's image (the Dockerfile),
 // the node provisioner, the OS image (image/mkosi.conf), the Android app
 // and the official catalog packs put there, which a change to any of those
@@ -86,10 +86,10 @@ const AB_CREDITS = [
     ["tmux", "the sessions that outlive a closed tab", "ISC", "https://github.com/tmux/tmux"],
     ["SQLite", "the controller's record of nodes and jobs", "public domain", "https://sqlite.org/"],
     ["cryptography", "every seal the controller and a node keep (ChaCha20-Poly1305, X25519, HKDF)", "Apache-2.0 or BSD-3-Clause", "https://cryptography.io/"],
-    ["ShellCheck, hadolint, actionlint, Ruff and yq", "bb lint", "GPL-3.0, GPL-3.0, MIT, MIT, MIT", "https://www.shellcheck.net/"],
+    ["ShellCheck, hadolint, actionlint, Ruff and yq", "aerie lint", "GPL-3.0, GPL-3.0, MIT, MIT, MIT", "https://www.shellcheck.net/"],
     ["uv and mise", "Python and the toolchains' versions", "MIT or Apache-2.0, MIT", "https://github.com/astral-sh/uv"],
     ["ripgrep, fd and fzf", "finding things in a tree", "MIT", "https://github.com/BurntSushi/ripgrep"],
-    ["FFmpeg and ImageMagick", "the screen recordings and pictures bb capture makes", "LGPL-2.1+, ImageMagick", "https://ffmpeg.org/"],
+    ["FFmpeg and ImageMagick", "the screen recordings and pictures aerie capture makes", "LGPL-2.1+, ImageMagick", "https://ffmpeg.org/"],
     ["Ubuntu", "the image's base", "various, free", "https://ubuntu.com/"],
   ]],
   ["On a node", [
@@ -108,7 +108,7 @@ const AB_CREDITS = [
     ["Semgrep, Trivy and mobsfscan", "the static analysis scanners a node runs over its projects", "LGPL-2.1, Apache-2.0, LGPL-3.0", "https://semgrep.dev/"],
     ["WireGuard", "a node's tunnel to the controller, where it enrolls through one", "GPL-2.0", "https://www.wireguard.com/"],
   ]],
-  ["In BuilderBot OS and the bare-metal install", [
+  ["In AerieOS and the bare-metal install", [
     ["Debian", "the image's base, pinned to one dated snapshot", "various, free", "https://www.debian.org/"],
     ["mkosi and systemd", "how the image is built and how it boots", "LGPL-2.1+", "https://github.com/systemd/mkosi"],
     ["GRUB", "the boot menu with its two slots and the fallback", "GPL-3.0", "https://www.gnu.org/software/grub/"],
@@ -132,10 +132,10 @@ function abDrawCredits(){
   if (el.dataset.drawn) return;
   el.dataset.drawn = "1";
   const cols = [{label: "What"}, {label: "Here for"}, {label: "License"}];
-  el.innerHTML = `<p>BuilderBot is built on other people's open work. Thank you to everyone behind it.</p>${
+  el.innerHTML = `<p>AerieOS is built on other people's open work. Thank you to everyone behind it.</p>${
     AB_CREDITS.map(([head, rows]) => `<h4>${esc(head)}</h4>${tblWrap(cols, rows.map(([name, what, lic, url]) =>
       tblLine(cols, [url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name), esc(what), esc(lic)])).join(""), "abcred")}`).join("")}
-    <p class="dim">The Android app is built with Kotlin and Jetpack Compose (Apache-2.0). BuilderBot itself is Apache-2.0.</p>`;
+    <p class="dim">The Android app is built with Kotlin and Jetpack Compose (Apache-2.0). AerieOS itself is Apache-2.0.</p>`;
 }
 
 async function abLoadLog(){
@@ -259,7 +259,7 @@ function closeAbout(){
 // been running it. The pair is the point: a NAS's container keeps serving
 // whatever it last pulled, so "how long has this been up" and "what is this"
 // are different questions, and only one of them used to be answerable. The
-// stamp is what /opt is serving; bb drift is what a checkout has changed since.
+// stamp is what /opt is serving; aerie drift is what a checkout has changed since.
 function drawBuild(img){
   const el = $("build"), rev = img?.rev || "", ver = img?.version || "";
   // The version when there is one, because it is the half that can be

@@ -239,7 +239,7 @@ function drawPanes(){
     if (!t){ showInStack(st, "", () =>
       `<div class="empty-pane">no tab here: “+” opens a terminal, Sessions reopens a running one</div>`);
       continue; }
-    // ...and whether BuilderBot's own terminal draws it (R133): switching
+    // ...and whether AerieOS's own terminal draws it (R133): switching
     // between the two is a different slot.
     const key = `${t.id}|${t.kind}|${t.arg}${t.gen ? "|" + t.gen : ""}${t.popped ? "|popped" : ""}${termOwn(t) ? "|own" : ""}`;
     // A terminal that was on screen a moment ago is kept alive behind the one
@@ -428,7 +428,7 @@ function dropElsewhere(keep, key){
 // device has been the one using it.
 let nudgeTimer = null, nudgedAt = 0;
 function nudgeTerminals(){
-  // BuilderBot's own terminals size themselves to their box (R133).
+  // AerieOS's own terminals size themselves to their box (R133).
   termRevive();
   // The visible ones only. A pane keeps three more frames alive behind the one
   // on screen, and they are all the same size already: thrashing their layout
@@ -459,6 +459,6 @@ function reattachTerminals(){
   document.querySelectorAll(".pane .slot:not(.on) iframe")
           .forEach(f => f.dataset.stale = "1");
   document.querySelectorAll(".pane .slot.on iframe").forEach(f => { f.src = f.src; });
-  // ...and BuilderBot's own: a socket that dropped is opened again (R133).
+  // ...and AerieOS's own: a socket that dropped is opened again (R133).
   termRevive();
 }

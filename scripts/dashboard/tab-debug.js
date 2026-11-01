@@ -42,7 +42,7 @@ function renderDebugInto(i){
     const g = debugGrant(c);
     return `<div class="row stack2 dbgrow" data-dbgproj="${esc(c.key)}"><div class="grow">
         <div class="name">${esc(c.name)}</div>
-        <div class="lbox dbgbox">${lrow("@diag", "The controller's diagnostics", "bb diag", g.diag)}${
+        <div class="lbox dbgbox">${lrow("@diag", "The controller's diagnostics", "aerie diag", g.diag)}${
           nodes.map(n => lrow(n.id, n.name, "machine logs", g.log_from.includes(n.id))).join("")}</div></div></div>`;
   };
   const html = pageHead({title: "Debug mode", pills: `<span class="pill stat ok">on</span>`,

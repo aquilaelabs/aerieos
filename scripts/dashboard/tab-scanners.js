@@ -1,4 +1,4 @@
-// The Scanners page (R145, the operator, 26 Oct): BuilderBot's own static
+// The Scanners page (R145, the operator, 26 Oct): AerieOS's own static
 // analysis scanners (Semgrep, Trivy, mobsfscan) deployed to each node that
 // holds projects and run there on one schedule. Every node at once rather
 // than one picked in the bar: the question here is whether every project

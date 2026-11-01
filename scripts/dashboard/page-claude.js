@@ -146,7 +146,7 @@ async function claudeEnd(name, n, several, slot = 1){
 
 // Restart (the operator, 12 Oct): end the session and pick its conversation
 // up again, which is how a session sees what changed since it started (a
-// toolchain on its node's PATH, BuilderBot's briefing; the project row says
+// toolchain on its node's PATH, AerieOS's briefing; the project row says
 // which). The menu turns to the model and effort first, the conversation it
 // was in already chosen; its Restart asks, and only then is the session
 // ended and started again (restartNow). Asked first and ended at once, it
@@ -541,7 +541,7 @@ function resumePicker(p, m, card, anchor, ns, several){
 // Any model's models (R144 step 3): the router's, as the project row
 // carries them, each said with its provider, its context and its price
 // where the router knows them; none when no router allows the project.
-// A model walked with the open agent and BuilderBot's tools is marked; the
+// A model walked with the open agent and AerieOS's tools is marked; the
 // rest say untested and are offered all the same. One whose context cannot
 // hold the briefing and the house rules says so here and under the picker.
 function routerModels(p){

@@ -1,7 +1,7 @@
 name: publish release
 
 # A release is made a draft (build-image.yml) and published by its owner
-# once its notes are read (the operator, 1 Nov: bb version publish, or the
+# once its notes are read (the operator, 1 Nov: aerie version publish, or the
 # Artifacts view's Publish). Publishing it is what moves the image tags
 # people follow onto the version the tag built: :dev for every release, and
 # :latest and :MAJOR.MINOR for a stable one. A release published by a

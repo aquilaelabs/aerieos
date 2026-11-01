@@ -3,7 +3,7 @@
 // article's title over a rule, its Markdown drawn line by line (headings,
 // lists, quotes, code and paragraphs), and the pages it links to with
 // [[Another page]] as chips under it. Reading only: pages are written on
-// the dashboard or by a session with bb wiki.
+// the dashboard or by a session with aerie wiki.
 package dev.builderbot.app.ui
 
 import androidx.compose.foundation.background
@@ -53,7 +53,7 @@ fun WikiView(api: Api, project: String) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp, 8.dp)) {
             list.error?.let { Problem(it) }
             if (list.value != null && pages.isEmpty())
-                Dim("No pages yet: they are written on the dashboard's Wiki, or by a session with bb wiki save.")
+                Dim("No pages yet: they are written on the dashboard's Wiki, or by a session with aerie wiki save.")
             if (pages.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (p in pages) FilterChip(selected = p.str("name") == name, onClick = { cur = p.str("name") },
                     label = { Text(p.str("title")) })
@@ -113,7 +113,7 @@ fun WikiView(api: Api, project: String) {
                     for (n in links) FilterChip(selected = false, onClick = { cur = n }, label = { Text(n.replace('-', ' ')) })
                 }
             }
-            if (pages.isNotEmpty()) Dim("Written on the dashboard's Wiki, or by a session with bb wiki save.")
+            if (pages.isNotEmpty()) Dim("Written on the dashboard's Wiki, or by a session with aerie wiki save.")
         }
     }
 }

@@ -321,7 +321,7 @@ class IfupdownNet(FilesNet):
     in that file is replaced with ours (the rest of the file is kept as it
     is), then the interface is cycled with ifdown/ifup."""
     name = "ifupdown"
-    MARK = "# BuilderBot: this interface, as the controller set it"
+    MARK = "# AerieOS: this interface, as the controller set it"
 
     @staticmethod
     def available():
@@ -431,7 +431,7 @@ class DhcpcdNet(FilesNet):
     """dhcpcd on its own (Void's default): a static address is a marked
     block in dhcpcd.conf for the interface, and the daemon is restarted."""
     name = "dhcpcd"
-    MARK = "# BuilderBot: "
+    MARK = "# AerieOS: "
 
     @staticmethod
     def available():

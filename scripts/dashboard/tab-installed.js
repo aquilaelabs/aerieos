@@ -164,13 +164,13 @@ function instAboutLines(r){
   const lines = [];
   if (r.machine){
     lines.push(r.name === TC_DRIVER ? tcDriverLine(r.machine) : tcToolkitLine(r.machine));
-    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not a BuilderBot sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
+    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not a AerieOS sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
     if (r.machine.settling) lines.push(`<span class="sub">The node is reporting what the last job left<span class="dots"></span></span>`);
     return lines.filter(Boolean).join("");
   }
   if (r.about) lines.push(`<span class="sub">${esc(r.about)}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
-    if (r.tool) lines.push(`<span class="sub">Adds <code>bb tool ${esc(r.tool)}</code> to a session.</span>`);
+    if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.${r.needed_by?.length ? ` Needed by ${esc(r.needed_by.join(", "))}.` : ""}</span>`);
     else if (r.needed_by?.length) lines.push(`<span class="sub">Needed by ${esc(r.needed_by.join(", "))}.</span>`);
     lines.push(tcSystemLine(r, !!inst?.managed));

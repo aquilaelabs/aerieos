@@ -84,13 +84,13 @@ function rolesAccessFields(name){
   const p = rolesPerson();
   if (!p) return `<div class="sub dim">${esc(name)}'s roles are not yours to give.</div>`;
   if (p.role === "owner")
-    return `<div class="sub">BuilderBot's owner: every area, everywhere, and not changed here.</div>`;
+    return `<div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div>`;
   if (!rolesPeopleDraft) rolesPeopleDraft = rolesPeopleFrom(p);
   const dr = rolesPeopleDraft;
   // Accounts and roles Read alone: the same fields, to read (B34).
   const ro = !d.admin && !!d.readonly, dead = ro ? " disabled" : "";
   const everywhere = Object.values(d.roles || {}).filter(r => r.scope === "global" && r.name !== "owner");
-  const global = d.admin || ro ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every project and on BuilderBot itself, as far as each one's areas say")}
+  const global = d.admin || ro ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every project and on AerieOS itself, as far as each one's areas say")}
       <div class="upick" id="rolesGlobal">${everywhere.map(r => `<label class="pick"><input type="checkbox" data-rglobal="${esc(r.name)}"${
         dr.roles.includes(r.name) ? " checked" : ""}${dead}> ${esc(r.label || r.name)}</label>`).join("")}</div></div>` : "";
   // The projects it is on, and only those: holding a role on a project is

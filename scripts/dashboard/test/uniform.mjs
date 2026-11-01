@@ -2330,7 +2330,7 @@ const DIALOGS = {
   senddocker: () => openSendToDocker('ep.silon'), devenv: () => openDevEnv('ep.silon', 'main'),
   relocate: () => openRelocate('ep.silon', 'main'),
   projsettings: () => renameProject('alpha'),
-  // Reset BuilderBot (the operator, 12 Oct): the nodes to un-enroll first,
+  // Reset AerieOS (the operator, 12 Oct): the nodes to un-enroll first,
   // what un-enrolling does, and the word. Opened, measured, never pressed.
   reset: () => askReset(),
   // A conversation read from a notebook's Sessions view (R83): the

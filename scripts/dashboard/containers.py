@@ -1,12 +1,12 @@
-"""Containers BuilderBot did not build from a project's compose file.
+"""Containers AerieOS did not build from a project's compose file.
 
 Three things a machine whose job is running containers has on it that are
 not a project's dev instance: whatever is on the daemon already (the
-operator asked for a manager, not a list of what BuilderBot happens to have
+operator asked for a manager, not a list of what AerieOS happens to have
 made), the containers written from a compose file on the Containers page with no
 project behind them (a stack is a name, a compose file and an environment,
 the shape every other Docker front end uses), and the record of which
-project a container BuilderBot did not start belongs to, kept by name on
+project a container AerieOS did not start belongs to, kept by name on
 its node. Their controls address a CONTAINER by name rather than a project,
 which is why they sit apart from the instance's build and run: one verb and
 one name, looked up again on the daemon before anything is acted on.
@@ -56,7 +56,7 @@ def _targets(name):
     remembered by a page from a listing five minutes old, is not that, so it
     is looked up again before it is used (R68 step 1).
 
-    The second half is what `bb devapp ls` prints: an instance under its
+    The second half is what `aerie devapp ls` prints: an instance under its
     compose name, whose containers are named for it and its services
     (mediareducer-dev-mediareducer-1). Looked up by container name alone, that
     name found nothing, and a project's own dev instance was refused to its
@@ -91,7 +91,7 @@ def container_ctl(name, what):
     """Start, stop or restart one container on the picked node.
 
     Any container, not only ours. The operator asked for a manager rather
-    than a list of what BuilderBot happens to have made, and a machine whose
+    than a list of what AerieOS happens to have made, and a machine whose
     only job is running containers is the place that is safe: the daemon is
     the sandbox VM's, and the guard above is why the reach is one verb and
     one name rather than the docker CLI.
@@ -198,8 +198,8 @@ def name_free(name):
     slug = devapp._slug(name) or ""
     if slug in devapp._load():
         return (f"{slug} already exists here. To change it, the operator removes it from "
-                "the Containers page first, or a session changes a variable with bb devapp "
-                f"--container {slug} env set FILE and then bb devapp --container {slug} rebuild")
+                "the Containers page first, or a session changes a variable with aerie devapp "
+                f"--container {slug} env set FILE and then aerie devapp --container {slug} rebuild")
     return devapp.name_clash(slug, devapp.MAIN)
 
 
@@ -283,7 +283,7 @@ def build_refusal(name, compose_text, env_text=""):
             "against the container's own data directory, which is empty, so there is nothing to "
             "build. A project's own code goes into Docker from a compose file at the project's "
             "root (docker-compose.yml or compose.yml), with Send to Docker on its Artifacts view "
-            "or bb devapp new from a session, and builds from the tree. A container written "
+            "or aerie devapp new from a session, and builds from the tree. A container written "
             "here builds from an absolute path or a git URL.")
 
 
@@ -454,7 +454,7 @@ def rename_container(name, new, instance=None):
     if why:
         return {"error": why}
     if devapp.owner_of(project, inst) == devapp.SYSTEM:
-        return {"error": f"{old} is BuilderBot's own, named for its node"}
+        return {"error": f"{old} is AerieOS's own, named for its node"}
     import devactions
     if devactions._active_job(project, inst):
         return {"error": "a job is running on it: wait for it, or Stop it, then rename it"}
@@ -498,7 +498,7 @@ def owner_named(name):
 
 
 def set_container_owner(name, owner):
-    """Which project a container BuilderBot did not start belongs to, on the
+    """Which project a container AerieOS did not start belongs to, on the
     node the current block addresses; "" for none. Only a container the
     daemon reports now, looked up again as every executing surface here is."""
     c = _known_container(name)
@@ -509,7 +509,7 @@ def set_container_owner(name, owner):
                          "project is set on that row"}
     owner = str(owner or "").strip()[:100]
     if owner == devapp.SYSTEM:
-        return {"error": f"{devapp.SYSTEM} is BuilderBot's own: the deployment that writes a "
+        return {"error": f"{devapp.SYSTEM} is AerieOS's own: the deployment that writes a "
                          "container sets it, and no picker does"}
     node = devapp._node_here()
     if owner:
@@ -520,7 +520,7 @@ def set_container_owner(name, owner):
             return {"error": why}
         # ...and under a name nothing else of the project's answers to (the
         # operator, 11 Oct): a container's name is what a session asks for
-        # (bb devapp log NAME), and one that is some instance's compose
+        # (aerie devapp log NAME), and one that is some instance's compose
         # name, or a stranger already given to this project on another
         # node, would make that ask mean two things. Renamed first.
         cname = c.get("name") or ""
@@ -583,7 +583,7 @@ def session_verb(sess, me, act, name, req, read_only=False):
             nid = cand
             break
     # ...or a service of one of the project's own instances, by the name its
-    # compose file gives it: `bb devapp log worker` for the container named
+    # compose file gives it: `aerie devapp log worker` for the container named
     # clanker-detector-worker-1 was refused as not the project's (report #97).
     # Only a container that is the project's, so a name another project's
     # service shares reaches nothing of theirs.
@@ -610,8 +610,8 @@ def session_verb(sess, me, act, name, req, read_only=False):
                 theirs = [x["name"] for x in devapp.containers().get("containers") or [] if x.get("project") == pn]
             if theirs:
                 return {"error": f"{name} is an instance, not a container: its containers are "
-                                 f"{', '.join(theirs)}; bb devapp log takes one of them"}, 400
-            return {"error": f"{name} has no containers on its node now: bb devapp says "
+                                 f"{', '.join(theirs)}; aerie devapp log takes one of them"}, 400
+            return {"error": f"{name} has no containers on its node now: aerie devapp says "
                              "whether it is built and up"}, 400
         return {"error": not_ours(name, sess)}, 403
     if act == "logs":
@@ -681,13 +681,13 @@ def tab_verb(act, name, req, seen):
     if act == "save":
         if name not in overview_names():
             return {"error": f"no container {name}"}, 400
-        # Not one of BuilderBot's own (System's, the nginx tab's today): its
+        # Not one of AerieOS's own (System's, the nginx tab's today): its
         # file is written from that tab, and the editor's copy has the
         # private key redacted (read_container), so saving that copy would
         # write the redaction over the key (B656). The tab's own Save goes
         # through update_container directly.
         if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
-            return {"error": f"{name} is BuilderBot's own, written from the nginx page: change it there"}, 403
+            return {"error": f"{name} is AerieOS's own, written from the nginx page: change it there"}, 403
         r = update_container(name, req.get("compose") or "", req.get("env") or "")
         # ...and a new name with it, while it is down (rename_container):
         # the file is saved first, so what was typed is kept either way.
@@ -699,7 +699,7 @@ def tab_verb(act, name, req, seen):
         return {"error": f"unknown action: {act}"}, 400
     # A name that is also a project would collide in the store, which is
     # keyed by one namespace for both kinds, and the collision is on the
-    # SLUG, not the typing. `builderbot` is not the project `BuilderBot`
+    # SLUG, not the typing. `builderbot` is not the project `AerieOS`
     # by string comparison and is exactly it by the time _pname has run:
     # same compose project name, same env file, same data directory, with
     # nothing anywhere saying the two had met.
@@ -782,7 +782,7 @@ def manager_view(nid, seen):
                     "routes": [{"host": r.get("host") or "*", "path": r.get("path") or "/",
                                 "port": int(r.get("port") or 0), "tls": bool(r.get("tls"))}
                                for r in (nrec.get("routes") or [])]}
-    # Which of BuilderBot's own each System row is (R181): its Configure
+    # Which of AerieOS's own each System row is (R181): its Configure
     # opens that one's page. The scanners are a compose job of their own on
     # the node, never an instance, so their containers are put under
     # System here by their compose project's name.

@@ -99,7 +99,7 @@ function nbRulesView({$, nb, project}){
             (g.words || []).length ? `<div class="bfield rltrig"><label>words</label><div class="bval">${esc(g.words.join(", "))}</div></div>` : ""}
             <div class="bfield"><label class="ndcap"><input type="checkbox" class="grHere"${here ? " checked" : ""}${g.disabled || ro ? " disabled" : ""}> On for this project</label>${
               g.disabled ? `<div class="sub">An administrator has turned it off for every project.</div>` : ""}</div>
-            <div class="actbar macts"><span class="state">${g.builtin ? "shipped with BuilderBot" : "an administrator's"}${here ? "" : " · Save applies the switch"}</span>${
+            <div class="actbar macts"><span class="state">${g.builtin ? "shipped with AerieOS" : "an administrator's"}${here ? "" : " · Save applies the switch"}</span>${
               may ? (g.builtin
                 ? `<button type="button" class="grEvery">${g.disabled ? "On everywhere" : "Off everywhere"}</button>`
                 : `<button type="button" class="danger grRm">Remove</button><button type="button" class="grEdit">Edit</button>`) : ""}</div>`}
@@ -189,7 +189,7 @@ function nbRulesView({$, nb, project}){
               aria-label="rule name">
             ${lbl("", "The rule")}
             <textarea class="rlText" spellcheck="false" maxlength="8000">${esc(r.text || "")}</textarea>
-            ${lbl("", "Why", "the reason behind it, kept here and in bb rules show; a session is sent the rule alone")}
+            ${lbl("", "Why", "the reason behind it, kept here and in aerie rules show; a session is sent the rule alone")}
             <textarea class="rlWhy" spellcheck="false" maxlength="8000" rows="2">${esc(r.why || "")}</textarea>
             <div class="two">
               <div>${lbl("", "Files it covers", "paths or globs, comma-separated; the rule arrives when a session edits one")}
@@ -206,7 +206,7 @@ function nbRulesView({$, nb, project}){
               <input class="rlDoc" autocomplete="off" spellcheck="false"
                 placeholder="docs/design-language.md"
                 value="${esc(r.doc || "")}" aria-label="document"></div>
-              <div>${lbl("", "Check", "the command that verifies it; bb rules check runs it")}
+              <div>${lbl("", "Check", "the command that verifies it; aerie rules check runs it")}
               <input class="rlCheck" autocomplete="off" spellcheck="false"
                 placeholder="bash scripts/test.sh"
                 value="${esc(r.check || "")}" aria-label="check"></div>
@@ -232,7 +232,7 @@ function nbRulesView({$, nb, project}){
             ${(r.words || []).length ? `<div class="bfield rltrig"><label>words</label><div class="bval">${esc((r.words || []).join(", "))}</div></div>` : ""}
             ${(r.overlaps || []).length ? `<div class="bfield rlover"><label>shares ground</label><div class="bval">${esc(overlapLine(r))}. Both reach a session; where they disagree it follows this one and says so.</div></div>` : ""}
             ${r.doc ? `<div class="bfield rlframe"><label>defined in</label><div class="bval">${esc(r.doc)}</div></div>` : ""}
-            ${r.check ? `<div class="bfield rlframe"><label>checked by</label><div class="bval">${esc(r.check)} <span class="dim">· bb rules check ${esc(r.name || "")}</span></div></div>` : ""}
+            ${r.check ? `<div class="bfield rlframe"><label>checked by</label><div class="bval">${esc(r.check)} <span class="dim">· aerie rules check ${esc(r.name || "")}</span></div></div>` : ""}
             ${(r.refuse || []).length ? `<div class="bfield rlframe"><label>refuses</label><div class="bval">${esc(r.refuse.join(", "))} <span class="dim">· a session's command that starts with one is refused</span></div></div>` : ""}
             ${r.replaces ? `<div class="bfield rlframe"><label>in place of</label><div class="bval">the global rule ${esc(r.replaces)}, which sessions here no longer read</div></div>` : ""}
             <div class="actbar macts">

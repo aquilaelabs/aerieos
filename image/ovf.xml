@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- BuilderBot OS as an OVA (R160 step 3): this descriptor, the disk as a
+<!-- AerieOS as an OVA (R160 step 3): this descriptor, the disk as a
      stream-optimized VMDK and a manifest of their digests, in one tar. The
      same image the raw disk and the USB stick are made from; build.sh fills
      the @NAME@, @VMDK@, @VMDK_SIZE@ and @CAPACITY@ marks. -->
@@ -11,7 +11,7 @@
     <File ovf:href="@VMDK@" ovf:id="file1" ovf:size="@VMDK_SIZE@"/>
   </References>
   <DiskSection>
-    <Info>The BuilderBot OS disk: two root slots, GRUB and the data partition</Info>
+    <Info>The AerieOS disk: two root slots, GRUB and the data partition</Info>
     <Disk ovf:capacity="@CAPACITY@" ovf:capacityAllocationUnits="byte" ovf:diskId="vmdisk1" ovf:fileRef="file1"
           ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized"/>
   </DiskSection>
@@ -20,7 +20,7 @@
     <Network ovf:name="lan"><Description>The LAN the dashboard is reached on</Description></Network>
   </NetworkSection>
   <VirtualSystem ovf:id="@NAME@">
-    <Info>BuilderBot OS</Info>
+    <Info>AerieOS</Info>
     <Name>@NAME@</Name>
     <OperatingSystemSection ovf:id="96">
       <Info>Debian 13, 64-bit</Info>
@@ -61,7 +61,7 @@
       </Item>
       <Item>
         <rasd:Caption>Disk</rasd:Caption>
-        <rasd:Description>The BuilderBot OS disk</rasd:Description>
+        <rasd:Description>The AerieOS disk</rasd:Description>
         <rasd:ElementName>disk1</rasd:ElementName>
         <rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>
         <rasd:InstanceID>4</rasd:InstanceID>

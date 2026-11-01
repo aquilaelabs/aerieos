@@ -147,7 +147,7 @@ class HeldNotes(unittest.TestCase):
         self.assertFalse(os.path.exists(hf), "gone with the first call let through")
 
     def test_the_rest_is_held_with_what_to_do(self):
-        code, said = self.run_gate(lambda home: {"tool_name": "Bash", "tool_input": {"command": "bb status"}})
+        code, said = self.run_gate(lambda home: {"tool_name": "Bash", "tool_input": {"command": "aerie status"}})
         self.assertEqual(code, 2)
         self.assertIn("write where you are and what is next", said)
         code, _ = self.run_gate(lambda home: {"tool_name": "Write", "tool_input": {"file_path": "/workspace/alpha/main.py"}})

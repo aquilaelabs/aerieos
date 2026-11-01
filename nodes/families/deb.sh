@@ -32,7 +32,7 @@ apt_waiting() {
     return "$rc"
 }
 # pkg_refresh: the package index, once, before the first install.
-# On a BuilderBot OS disk (image/, R160 step 1) the packages are the image's,
+# On a AerieOS disk (image/, R160 step 1) the packages are the image's,
 # pinned when it was built, and its root forgets at the next boot: nothing is
 # fetched, and a package the provisioner needs that the image lacks is a
 # build of the image to fix, said here by name.
@@ -53,7 +53,7 @@ pkg() {
             [ "$have" = 1 ] || miss+=("$p")
         done
         [ "${#miss[@]}" -eq 0 ] && return 0
-        echo "not in the BuilderBot OS image: ${miss[*]} (image/mkosi.conf lists what it carries; a package the node needs is added there)" >&2
+        echo "not in the AerieOS image: ${miss[*]} (image/mkosi.conf lists what it carries; a package the node needs is added there)" >&2
         return 1
     fi
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \

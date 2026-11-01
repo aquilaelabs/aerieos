@@ -1,5 +1,5 @@
 """A project's wiki (R112): pages a person or Claude writes, kept by the
-controller, readable on the notebook's Wiki view and through `bb wiki`.
+controller, readable on the notebook's Wiki view and through `aerie wiki`.
 
 Kept as a git repository of the controller's own under STATE/wiki/PROJECT,
 in the shape a forge's wiki has: one Markdown file per page at the top,
@@ -201,7 +201,7 @@ def page(project, name):
     file = file_of(name)
     blob = _blob(project, file)
     if not blob:
-        raise Refused(f"no page called {title_of(file)!r} in {project}'s wiki: bb wiki lists them")
+        raise Refused(f"no page called {title_of(file)!r} in {project}'s wiki: aerie wiki lists them")
     text = _git(project, "cat-file", "blob", blob).stdout
     by, at = _last(project, file)
     return {"name": file[:-3], "title": title_of(file), "file": file, "text": text,
@@ -222,7 +222,7 @@ def history(project, limit=30):
 # ---- writing -------------------------------------------------------------------
 
 def _commit(project, message, who):
-    name = (who or {}).get("name") or "BuilderBot"
+    name = (who or {}).get("name") or "AerieOS"
     email = (who or {}).get("email") or "wiki@builderbot.invalid"
     env = dict(_env(), GIT_AUTHOR_NAME=name, GIT_AUTHOR_EMAIL=email,
                GIT_COMMITTER_NAME=name, GIT_COMMITTER_EMAIL=email)
@@ -429,7 +429,7 @@ def pull(project, who=None):
         if not _has_head(project):
             _git(project, "reset", "--quiet", "--hard", theirs)
             return {"ok": True, "took": "all", "pages": len(pages(project))}
-        name = (who or {}).get("name") or "BuilderBot"
+        name = (who or {}).get("name") or "AerieOS"
         email = (who or {}).get("email") or "wiki@builderbot.invalid"
         menv = dict(_env(), GIT_AUTHOR_NAME=name, GIT_AUTHOR_EMAIL=email,
                     GIT_COMMITTER_NAME=name, GIT_COMMITTER_EMAIL=email)

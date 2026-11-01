@@ -1,4 +1,4 @@
-"""Behind `bb login --list` (cmd_login in bb): every account this machine is
+"""Behind `aerie login --list` (cmd_login in bb): every account this machine is
 signed in to Claude as, as JSON, changing nothing. The agent asks for it
 and carries the answer up on its heartbeat (B104). Read from the files
 rather than from `claude auth status`, for every account on the box at
@@ -215,7 +215,7 @@ def mcp_of(home):
 def plugins_of(home):
     """The Claude Code plugins this account installed here: what `claude
     plugin list --json` prints, read from the same two files it reads, so a
-    person's plugins can be seen on their Profile and in bb diag. Only the
+    person's plugins can be seen on their Profile and in aerie diag. Only the
     names, versions and scope: a plugin's settings can hold its own secrets,
     and nothing here reads them. None when the account never installed one."""
     try:
@@ -275,7 +275,7 @@ def main():
     print(json.dumps(out))
 
 
-# Imported by login-check.py for the agents' readers, run by `bb login --list`.
+# Imported by login-check.py for the agents' readers, run by `aerie login --list`.
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--forget-copilot":
         sys.exit(forget_copilot(sys.argv[2]))

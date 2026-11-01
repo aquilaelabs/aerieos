@@ -1,4 +1,4 @@
-// bb map (roadmap R75): the code map a session asks instead of grepping.
+// aerie map (roadmap R75): the code map a session asks instead of grepping.
 // No browser: the map is a python module over the tree, and what it says
 // is checked against facts the tree holds for certain: a function's callers
 // this repository's own code makes, a definition's file and line, the ids a
@@ -23,10 +23,10 @@ const def = map('find', 'openDocker');
 // too: find said nothing defines `active`, which page-state.js declares
 // on its line 30, and the answer to where a page variable lives was a
 // grep (B299). It names the file, the line and the kind, and points a
-// let at bb map state for where it is assigned.
+// let at aerie map state for where it is assigned.
 {
   const at = (name, re) => re.test(map('find', name));
-  ok(at('active', /^scripts\/dashboard\/page-state\.js:\d+  page-level let; bb map state page-state\.js says where it is assigned$/m)
+  ok(at('active', /^scripts\/dashboard\/page-state\.js:\d+  page-level let; aerie map state page-state\.js says where it is assigned$/m)
      && at('refreshBusy', /page-poll\.js:\d+  page-level let/) && at('popWins', /page-state\.js:\d+  page-level const$/m)
      && /nothing defines/.test(map('find', 'noSuchNameAnywhere')),
      `find answers for a page-level let or const with its file, line and kind, and still says when nothing defines a name (${
@@ -86,15 +86,15 @@ const pyS = map('suites', 'scripts/dashboard/roadmap.py');
 ok(/^scripts\/dashboard\/test\/roadmap\.mjs  \(\d+: .*\/api\/roadmap/m.test(pyS),
    'a python module finds the suites that ask the paths its handlers answer');
 ok(!/auth\.mjs  \(\d+: \/api\/bugs/.test(pyS), '...and not every suite that asks any path');
-ok(/^scripts\/dashboard\/test\/agent\.mjs  \(\d+: .*scripts\/bb/m.test(map('suites', 'scripts/bb')),
+ok(/^scripts\/dashboard\/test\/agent\.mjs  \(\d+: .*scripts\/bb/m.test(map('suites', 'scripts/aerie')),
    'a file a suite names outright, such as bb itself, reaches that suite');
 const names = map('suites', 'scripts/dashboard/toolchains.py', '--names').split('\n');
 ok(names.includes('toolchains') && !names.some(n => n.startsWith('lab-')),
    `--names gives one suite per line for a script, lab suites left out (${names.join(', ')})`);
 
-// bb tests preflight: the plan from named files (the copy this runs in has
+// aerie tests preflight: the plan from named files (the copy this runs in has
 // no .git, so the branch half is not asked here).
-const pre = (...files) => execFileSync('bash', [`${REPO}/scripts/bb`, 'tests', 'preflight', '--dry', '--files', ...files],
+const pre = (...files) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'tests', 'preflight', '--dry', '--files', ...files],
                                        { encoding: 'utf8', env: { ...process.env, BB_TREE: REPO } });
 const plan = pre('scripts/dashboard/tab-docker.js');
 ok(/suites:.*\bdevapp\b/.test(plan),
@@ -280,7 +280,7 @@ ok(/\(1 file scanned\)/.test(map()), '...rescanning that file alone and keeping 
 {
   const f = `${REPO}/.bb-map/map4.json`;
   const good = readFileSync(f, 'utf8');
-  writeFileSync(f, JSON.stringify({ built: 1, files: { 'scripts/bb': { mtime: 1, lang: 'sh' } }, defs: [], calls: [], draws: [] }));
+  writeFileSync(f, JSON.stringify({ built: 1, files: { 'scripts/aerie': { mtime: 1, lang: 'sh' } }, defs: [], calls: [], draws: [] }));
   ok(/^scripts\/dashboard\/tab-docker\.js:\d+ to \d+  function$/m.test(map('find', 'openDocker')),
      'an index of another format is rebuilt and the question answered');
   writeFileSync(f, good);
@@ -290,7 +290,7 @@ ok(/\(1 file scanned\)/.test(map()), '...rescanning that file alone and keeping 
 let said = '';
 try { execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', REPO, 'nope'], { encoding: 'utf8', stdio: 'pipe' }); }
 catch (e) { said = String(e.stderr); }
-ok(/no verb called nope; bb map -h lists them/.test(said), 'an unknown verb is refused with the way out');
+ok(/no verb called nope; aerie map -h lists them/.test(said), 'an unknown verb is refused with the way out');
 // A tree the map cannot write into (a project this session only reads,
 // bound read-only into its view) still answers: the map is built in
 // memory and nothing is left behind.
@@ -347,7 +347,7 @@ ok(/nothing defines noSuchFunctionAnywhere/.test(map('find', 'noSuchFunctionAnyw
                      { encoding: 'utf8', stdio: 'pipe' }); }
   catch (e) { why = String(e.stderr || ''); }
   ok(existsSync(`${plain}/.bb-map/map4.json`) && /not in a git repository/.test(why),
-     '...while a tree with no repository still gets its map, and bb map exclude says why it wrote nothing');
+     '...while a tree with no repository still gets its map, and aerie map exclude says why it wrote nothing');
   g(t, 'worktree', 'remove', '--force', `${t}-wt`);
   for (const d of [t, plain]) rmSync(d, { recursive: true, force: true });
 }

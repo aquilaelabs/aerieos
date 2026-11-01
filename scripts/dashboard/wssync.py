@@ -56,7 +56,7 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
              ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 # ...and what is out by where it is: Claude Code's worktrees for its own
 # agents, each a checkout whose .git file the controller refuses, so syncing
-# them held the project behind and bb git push with it (B68).
+# them held the project behind and aerie git push with it (B68).
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024
@@ -618,7 +618,7 @@ def _conflict_name(rel, who):
 
 # What a node may not write into git's own directory (B618): the controller
 # runs git in every project tree (the status poll, the Git view, a relayed
-# bb version), and git runs what its config and hooks name. A key here is
+# aerie version), and git runs what its config and hooks name. A key here is
 # one whose value is a program, or that points git somewhere else. Matched
 # against the lowercased key; alias only when its value runs a shell.
 GIT_EXEC = re.compile(

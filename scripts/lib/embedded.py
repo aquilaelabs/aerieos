@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Extract the programs that live inside quoted heredocs, so a linter reads them.
 
-`bb lint` builds its lists from shebangs and extensions, so a new script is
+`aerie lint` builds its lists from shebangs and extensions, so a new script is
 covered the moment it exists. A program written INSIDE another one escapes
 that: the body of a `<<'TAG'` heredoc is a string to the shell and a string
 to every linter, and nothing looks in it.
@@ -10,7 +10,7 @@ Two of those are why this exists. nodes/provision-linux.sh embeds bb-sandbox,
 around 280 lines installed to a root-only path on the sandbox VM, rather than
 fetching it, because provisioning is one file you curl onto a fresh machine;
 four bugs sat in there unlinted, two of which could damage an fstab. And
-scripts/bb does most of its reading of the controller's store in python fed
+scripts/aerie does most of its reading of the controller's store in python fed
 to `python3 -` on stdin: thousands of lines ruff had never seen.
 
     embedded.py shell  OUTDIR FILE...
@@ -50,7 +50,7 @@ def main(argv):
         return 0
     kind, out = argv[0], pathlib.Path(argv[1])
     # Numbered when a name repeats, across the whole run: one file can hold
-    # several blocks under one tag (scripts/bb feeds python3 from dozens of
+    # several blocks under one tag (scripts/aerie feeds python3 from dozens of
     # `<<'PY'`), and a second one overwriting the first would go unchecked,
     # which is the exact failure this script exists to end.
     seen = {}

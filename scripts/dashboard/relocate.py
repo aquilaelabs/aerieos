@@ -306,7 +306,7 @@ def rename_done(job, state):
 def _name_instance(project, instance, new):
     """A project's container given its own name: the record carries it
     (devapp._pname reads it), and its env file follows; the instance keeps
-    its key, so its worktree, its jobs and bb devapp --instance are where
+    its key, so its worktree, its jobs and aerie devapp --instance are where
     they were. A name that is the project's own default again is no name."""
     src = devapp.env_path(project, instance)
     with devapp._lock:

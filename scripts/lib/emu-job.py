@@ -1,4 +1,4 @@
-"""Behind `bb emu` when the emulator is on a node (emu_via_node in bb): one emu
+"""Behind `aerie emu` when the emulator is on a node (emu_via_node in bb): one emu
 job queued through the controller, its log streamed here, and the exit code
 the job's.
 

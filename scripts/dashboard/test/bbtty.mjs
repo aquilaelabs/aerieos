@@ -1,6 +1,6 @@
 // bb-tty's Claude launch, driven directly the way a terminal runs it (its
 // words as arguments, one connection) against the same private tmux server,
-// with stubs standing in for `bb` and `claude`.
+// with stubs standing in for `aerie` and `claude`.
 //
 // What it is here for: tmux hands `new-session` its command in a single 16KB
 // message and answers a longer one with `command too long`. The system prompt
@@ -118,7 +118,7 @@ chmodSync(join(bin, 'claude'), 0o755);
 // seat bb-tty is running on. These connects carry no `u:` prefix, which is a
 // terminal nobody is signed in on, so the seat is the empty one and that is
 // the key the fixtures below use. A signed-in seat is settings.mjs's, which
-// saves through the dialog and reads it back out of `bb settings --json`.
+// saves through the dialog and reads it back out of `aerie settings --json`.
 const SEAT = '';
 function connect(promptBytes, env){
   tmuxKill('claude-alpha');
@@ -166,7 +166,7 @@ ok(alive('claude-alpha'), '...the session is really there');
 }
 // The account's commit identity rides into the session as git's environment
 // (GIT_AUTHOR_* and GIT_COMMITTER_*, which outrank any user.name a
-// repository carries) from bb settings --json, which the stub answers.
+// repository carries) from aerie settings --json, which the stub answers.
 const genv = k => { try { return execFileSync('tmux', ['show-environment', '-t', 'claude-alpha', k], { encoding: 'utf8' }).trim(); } catch { return ''; } };
 ok(genv('GIT_AUTHOR_NAME') === 'GIT_AUTHOR_NAME=Pat Tester'
    && genv('GIT_COMMITTER_EMAIL') === 'GIT_COMMITTER_EMAIL=pat@example.invalid',
@@ -178,7 +178,7 @@ ok(genv('GIT_CONFIG_KEY_0') === 'GIT_CONFIG_KEY_0=credential.helper'
    && /no git credential is on this machine/.test(genv('GIT_CONFIG_VALUE_0'))
    && /bb git push/.test(genv('GIT_CONFIG_VALUE_0'))
    && genv('GIT_TERMINAL_PROMPT') === 'GIT_TERMINAL_PROMPT=0',
-   `...and a credential helper that names bb git rather than asking for a username (${
+   `...and a credential helper that names aerie git rather than asking for a username (${
      (genv('GIT_CONFIG_VALUE_0') || 'unset').slice(0, 60)})`);
 // ...and git's own user.name and user.email say the same author (B5), so
 // `git config user.name` agrees with the commits whatever a home's
@@ -231,7 +231,7 @@ ok(launcher().includes(tokWritten),
   // kept copy is still found by the project the token was minted for.
   ok(ask({ BB_TOKEN: dead, BB_PROJECT: 'beta' }) === tokWritten,
      '...and finds it under bb -p too, by the project the token names, not the one being read');
-  // ...and `bb token keep` is how a token gets INTO that file for a session
+  // ...and `aerie token keep` is how a token gets INTO that file for a session
   // nobody is typing in. A session that is talking slides its own forward on
   // every answer it gets; one idle past twelve hours has nothing to slide it,
   // and a dead token is never renewed, so the machine it runs on is handed a
@@ -247,7 +247,7 @@ ok(launcher().includes(tokWritten),
   const landed = join(keepHome, '.cache', 'builderbot', 'u', '_none', 'project', 'alpha', 'token');
   ok(existsSync(landed) && readFileSync(landed, 'utf8').trim() === fresh
      && (statSync(landed).mode & 0o077) === 0,
-     `bb token keep stores a token where that account's sessions read it, 0600 (${fresh.slice(0, 12)}…)`);
+     `aerie token keep stores a token where that account's sessions read it, 0600 (${fresh.slice(0, 12)}…)`);
   ok(execFileSync('bash', ['-c',
        'eval "$(sed -n "/^bb_token_exp()/,/^}/p;/^bb_token_project()/,/^}/p;/^bb_token_dead()/,/^}/p;/^bb_token_now()/,/^}/p" "$1")"; bb_token_now',
        'sh', BBBIN],
@@ -297,7 +297,7 @@ ok(alive('claude-alpha') && /project\/alpha\/claude-run\.sh$/.test(paneCmd()),
 // is a suggestion, the same reason `excluded` is checked in this script.
 const LOCKS = join(DIR, 'state', 'locked-projects.json');
 // An administrator's lock (R119), which holds everybody out, read from the
-// file: this suite's bb does not answer `bb settings`, so the file decides.
+// file: this suite's bb does not answer `aerie settings`, so the file decides.
 writeFileSync(LOCKS, JSON.stringify({ alpha: { by: 'u_0000aaaa', admin: true } }));
 const refusedAt = Date.now();
 out = connect(0);
@@ -553,7 +553,7 @@ if [ "\${1:-}" = login ] && [ "\${2:-}" = status ]; then
 fi
 # Its help, which the launcher reads for the hook-trust flag, as 0.163.0's;
 # with codex-164 beside it, as 0.164.0's: --no-daemon too, and an app server
-# whose hooks/list names BuilderBot's hook in the account's hooks.json (B284).
+# whose hooks/list names AerieOS's hook in the account's hooks.json (B284).
 if [ "\${1:-}" = --help ]; then
   echo "  --dangerously-bypass-hook-trust  run hooks without review"
   [ -f "${bin}/codex-164" ] && echo "  --no-daemon  run without the shared background server"
@@ -610,7 +610,7 @@ sleep 60
            (cxNoted.split('\n').find(l => /not trusted/.test(l)) || 'said nothing').slice(0, 70)})`);
       ok(!/was not trusted/.test(shell(`u:${ownerUid}:codex:${proj}:b:${boot}`)),
          '...and says nothing when it was there already');
-      // On a Codex that can say which hooks it has (0.164.0), BuilderBot's own
+      // On a Codex that can say which hooks it has (0.164.0), AerieOS's own
       // are trusted for the launch by the hash it reports, and the bypass
       // flag and its warning are gone, as is the shared server's (B284).
       writeFileSync(join(bin, 'codex-164'), '');
@@ -621,12 +621,12 @@ sleep 60
       const hs = cx164.find(x => x.startsWith('hooks.state=')) || '';
       ok(cx164.includes('--no-daemon') && /pre_tool_use:0:0"=\{trusted_hash="sha256:0abc"\}/.test(hs)
          && !hs.includes('session_start') && !cx164.includes('--dangerously-bypass-hook-trust'),
-         `...and on a Codex that lists its hooks, BuilderBot's own are trusted by their hash, a person's left alone, with no bypass flag and no shared server (${hs.slice(0, 60)}...)`);
+         `...and on a Codex that lists its hooks, AerieOS's own are trusted by their hash, a person's left alone, with no bypass flag and no shared server (${hs.slice(0, 60)}...)`);
       rmSync(join(bin, 'codex-164'));
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       await sleep(400);
-      // Its guards are its own hooks (R95 step 6): BuilderBot's, for every
+      // Its guards are its own hooks (R95 step 6): AerieOS's, for every
       // event a Claude session has them on, in the account's hooks file.
       const hk = existsSync(join(HOMEDIR, '.codex', 'hooks.json')) ? JSON.parse(readFileSync(join(HOMEDIR, '.codex', 'hooks.json'), 'utf8')) : {};
       const cmdOf = ev => (hk.hooks?.[ev] || []).flatMap(e => e.hooks || []).map(h => h.command).join(' ');
@@ -726,7 +726,7 @@ sleep 60
         ? JSON.parse(readFileSync(join(HOMEDIR, '.copilot', 'hooks', 'builderbot.json'), 'utf8')) : {};
       ok(cph.version === 1 && /bb-agent-hook copilot pre$/.test(cph.hooks?.preToolUse?.[0]?.bash || '')
          && /bb-agent-hook copilot stop$/.test(cph.hooks?.agentStop?.[0]?.bash || ''),
-         `...and its guards are Copilot's own hooks, in a file of BuilderBot's in its hooks folder (${Object.keys(cph.hooks || {}).join(', ')})`);
+         `...and its guards are Copilot's own hooks, in a file of AerieOS's in its hooks folder (${Object.keys(cph.hooks || {}).join(', ')})`);
       ok(dirs && existsSync(join(dirs, 'AGENTS.md')) && /THE HOUSE RULES/.test(readFileSync(join(dirs, 'AGENTS.md'), 'utf8'))
          && !dirs.startsWith(src),
          `...handed the briefing as an AGENTS.md in a folder of its own, outside the project's tree (${dirs})`);
@@ -765,7 +765,7 @@ sleep 60
           ? JSON.parse(readFileSync(join(HOMEDIR, '.grok', 'hooks', 'builderbot.json'), 'utf8')) : {};
         ok(/bb-agent-hook grok pre$/.test(gkh.hooks?.PreToolUse?.[0]?.hooks?.[0]?.command || '')
            && /bb-agent-hook grok stop$/.test(gkh.hooks?.Stop?.[0]?.hooks?.[0]?.command || '') && !gkh.hooks?.Notification,
-           `...its guards Grok's own hooks in a file of BuilderBot's, no asking mark among them (${Object.keys(gkh.hooks || {}).join(', ')})`);
+           `...its guards Grok's own hooks in a file of AerieOS's, no asking mark among them (${Object.keys(gkh.hooks || {}).join(', ')})`);
         tmuxKill(`grok-${proj}`);
         // Kept, as its Stop hook keeps it, but never run on this node.
         const gsid = '0199cccc-0000-7000-8000-000000000009';
@@ -825,12 +825,12 @@ sleep 60
     ok(mem.filter(d => /\/\.claude\/projects\//.test(d)).length === 1 && mem[0].endsWith(`/.claude/projects/${wt.replace(/[^A-Za-z0-9]/g, '-')}/memory`),
        `...and the memory of its own tree is a directory it may use without asking (${mem.join(', ')})`);
     // The scope file also carries the work hook, which is how the finer half
-    // of `bb work` gets anything to report.
+    // of `aerie work` gets anything to report.
     ok(JSON.stringify(scope.hooks?.Stop || {}).includes('bb-check-relay'),
        'the settings file wires the Stop hook that runs a rule\'s check before the session hands back (R31)');
     ok(JSON.stringify(scope.hooks || {}).includes('bb-work-note'),
        '...and the settings carry the hook that records what the session touches');
-    // No permission mode of BuilderBot's: what a session may do without
+    // No permission mode of AerieOS's: what a session may do without
     // asking is set in Claude Code itself (the operator's call, 15 Sep), and
     // the deny list is the wall, so a sibling project, VERSION and the rules
     // file stay refused whatever mode the app is on.
@@ -851,12 +851,12 @@ sleep 60
     writeFileSync(join(src, 'm.py'), 'def alpha():\n    return 9\n\ndef beta():\n    return 2\n');
     writeFileSync(join(wt2, 'm.py'), 'def alpha():\n    return 1\n\ndef beta():\n    return 8\n');
     writeFileSync(join(wt2, 'only-theirs.txt'), 'x\n');
-    const work = execFileSync('bash', [`${REPO}/scripts/bb`, 'work'], {
+    const work = execFileSync('bash', [`${REPO}/scripts/aerie`, 'work'], {
       encoding: 'utf8',
       env: { ...process.env, BB_PROJECT: proj, DASHBOARD_STATE: join(DIR, 'state'),
              WORKSPACE: join(DIR, 'ws') } });
     ok(/2 working trees/.test(work),
-       `bb work sees both trees (${work.split('\n')[0]})`);
+       `aerie work sees both trees (${work.split('\n')[0]})`);
     ok(/the same file, open in more than one/.test(work) && /m\.py/.test(work),
        '...and names the file both of them have uncommitted');
     ok(!/only-theirs/.test(work),
@@ -1112,7 +1112,7 @@ print(uid)`);
     const launcher = readFileSync(join(HOMEDIR, 'users', ownerUid, '.cache', 'builderbot',
                                        'u', ownerUid, 'project', proj, 'claude-run.sh'), 'utf8');
     ok(/bb settings --json/.test(launcher) && launcher.includes(`BB_TOKEN=${ownerTok}`),
-       'the launcher asks bb settings for the model when the prefs file is not here, and carries the token');
+       'the launcher asks aerie settings for the model when the prefs file is not here, and carries the token');
 
     // ---- a session's view (R35) ----------------------------------------------
     // Where the node builds one, a project's session starts through sudo and

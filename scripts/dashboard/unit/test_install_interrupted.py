@@ -49,7 +49,7 @@ class Marker(unittest.TestCase):
 
 class Tried(unittest.TestCase):
     def test_only_what_the_log_began(self):
-        log = "toolchain\n== bb toolchains install node\nok\n== bb toolchains install flutter\n[builderbot] WARN: aborted\n"
+        log = "toolchain\n== aerie toolchains install node\nok\n== aerie toolchains install flutter\n[builderbot] WARN: aborted\n"
 
         class Nodes:
             @staticmethod

@@ -4,7 +4,7 @@ minutes left, the load) so the bell says when the machine runs on battery,
 with upsmon's clean shutdown the feature's own; and the host's own package
 updates on a bare-metal install (apt), counted once an hour for the census
 and applied by the host-update job, which says when a restart is needed
-and restarts only when the job says to. BuilderBot OS keeps apt diverted:
+and restarts only when the job says to. AerieOS keeps apt diverted:
 its updates are whole images (osimage.py), and nothing here runs there.
 """
 import os
@@ -60,7 +60,7 @@ def ups_now():
 def host_updates_now(state):
     """{pending, security, reboot, checked} for a bare-metal install on a
     Debian-family system, counted once an hour as root (apt-get update,
-    then a simulated upgrade), kept in node.json between; {} on BuilderBot
+    then a simulated upgrade), kept in node.json between; {} on AerieOS
     OS, without apt, or as anybody but root. `reboot` is the flag a kernel
     or libc update leaves."""
     apt = shutil.which("apt-get")
@@ -93,7 +93,7 @@ class PowerMixin:
             say("refused: the system's packages are root's to update with apt, and this agent is not root or has no apt\n")
             return "failed", 77
         if os_release():
-            say("refused: BuilderBot OS updates as a whole image (Controller settings, Updates), never package by package\n")
+            say("refused: AerieOS updates as a whole image (Controller settings, Updates), never package by package\n")
             return "failed", 64
         quiet = ["env", "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C", apt]
         say("apt-get update\n")
@@ -110,7 +110,7 @@ class PowerMixin:
         if reboot and cfg.get("reboot") is True:
             say("a restart is needed and was asked for: the machine restarts in a minute\n")
             self.hello_again("the system's packages updated; restarting")
-            self._sh(job, ["shutdown", "-r", "+1", "BuilderBot: restarting after the system's updates"], timeout=30)
+            self._sh(job, ["shutdown", "-r", "+1", "AerieOS: restarting after the system's updates"], timeout=30)
         elif reboot:
             say("done; a restart is needed to run the new kernel or libraries: This machine's Reboot does it\n")
             self.hello_again("the system's packages updated; a restart is needed")

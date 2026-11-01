@@ -1,5 +1,5 @@
 [Unit]
-Description=BuilderBot OS: the boot's own settings for the controller, from the ESP and the kernel's command line
+Description=AerieOS: the boot's own settings for the controller, from the ESP and the kernel's command line
 ConditionKernelCommandLine=bbslot
 DefaultDependencies=no
 After=boot-efi.mount local-fs.target

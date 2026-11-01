@@ -646,7 +646,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     git('reset', '--hard', '-q', was);
   }
 
-  // Whose: a session's token cannot press these; it has bb git.
+  // Whose: a session's token cannot press these; it has aerie git.
   const tok = execFileSync('python3', ['-c', `
 import importlib.util, json, os, sys
 spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
@@ -656,7 +656,7 @@ def wj(p, d):
 u.configure(state="${DIR}/state", write_json=wj)
 print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const asSession = await act('fetch', {}, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
-  ok(asSession.status === 403 && /bb git/.test(asSession.error), "a session's token is refused the buttons, and told about bb git");
+  ok(asSession.status === 403 && /bb git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
   // Its owner's lock leaves its owner working (R119); an administrator's
   // holds the owner too, written as one here since this account owns beta.
   await page.evaluate(() => fetch('/api/lock', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -828,19 +828,19 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   };
   const bbEnv = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
                   WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'beta' };
-  const bb = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/bb`, ...a], { encoding: 'utf8', env: bbEnv, cwd: B }); }
+  const bb = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8', env: bbEnv, cwd: B }); }
                          catch (e) { return `${e.stdout || ''}${e.stderr || ''}`; } };
   ok(/push its branch: allow/.test(bb('git', 'policy')) && /push to main:\s+deny/.test(bb('git', 'policy')),
-     'bb git policy reads the defaults: a session may push its branch and not main');
+     'aerie git policy reads the defaults: a session may push its branch and not main');
   const setPol = await post('/api/prefs', { project: 'beta', gitpol: { push: 'deny' } });
   ok(setPol.status === 200 && setPol.gitpol?.push === 'deny' && setPol.gitpol?.main === 'deny',
      'the Git view saves the policy into the project\'s settings');
-  ok(/push its branch: deny/.test(bb('git', 'policy')), '...and bb git policy says so to a session');
+  ok(/push its branch: deny/.test(bb('git', 'policy')), '...and aerie git policy says so to a session');
   ok((await post('/api/prefs', { project: 'beta', gitpol: { push: 'maybe' } })).error
      && (await post('/api/prefs', { project: 'beta', gitpol: { merge: 'allow' } })).error,
      'a value or a key that is not one is refused');
 
-  // The relay is the door: a session's bb git push is judged there.
+  // The relay is the door: a session's aerie git push is judged there.
   const tok = execFileSync('python3', ['-c', `
 import importlib.util, json, os
 spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
@@ -854,7 +854,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const relay = (argv) => post('/api/v1/bb', { argv, cwd: B }, S);
   const denied = await relay(['git', 'push', 'origin', 'topic']);
   ok(denied.status === 403 && /does not let a session push/.test(denied.error),
-     'with pushing denied, a session\'s bb git push is refused on the relay, naming the policy');
+     'with pushing denied, a session\'s aerie git push is refused on the relay, naming the policy');
   await post('/api/prefs', { project: 'beta', gitpol: { push: 'allow', main: 'deny' } });
   const toMain = await relay(['git', 'push', 'origin', main]);
   ok(toMain.status === 403 && new RegExp(`push to ${main}`).test(toMain.error),
@@ -863,7 +863,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   ok(own.status === 200 && own.code === 0
      && execFileSync('git', [`--git-dir=${origin}`, 'branch', '--list', 'topic'], { encoding: 'utf8' }).includes('topic'),
      `...while its own branch goes up (${(own.out || own.err || '').trim().slice(0, 40)})`);
-  // A branch never pushed goes up on a bare bb git push and is given its
+  // A branch never pushed goes up on a bare aerie git push and is given its
   // upstream there (B220), rather than git's refusal and a hint about
   // push.autoSetupRemote.
   {
@@ -876,7 +876,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     const there = execFileSync('git', [`--git-dir=${origin}`, 'branch', '--list', 'fresh-b220'], { encoding: 'utf8' }).includes('fresh-b220');
     execFileSync('git', ['-C', B, 'checkout', '-q', was]);
     ok(first.status === 200 && first.code === 0 && there && up === 'refs/heads/fresh-b220',
-       `a branch never pushed goes up on a bare bb git push, its upstream set (${first.status} code ${first.code} ${there} ${up} ${JSON.stringify((first.err || first.error || '') + ' / ' + (first.out || '')).slice(0, 400)})`);
+       `a branch never pushed goes up on a bare aerie git push, its upstream set (${first.status} code ${first.code} ${there} ${up} ${JSON.stringify((first.err || first.error || '') + ' / ' + (first.out || '')).slice(0, 400)})`);
   }
   // B191: the policy is about REFS, not about the word `main` appearing in
   // the arguments. "Its branch" is the one the tree is on, so everything
@@ -892,7 +892,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const tag = await relay(['git', 'push', 'origin', 'v9.9.9-b397']);
   execFileSync('git', ['-C', B, 'tag', '-d', 'v9.9.9-b397']);
   ok(tag.status === 403 && /v9\.9\.9-b397 is a tag/.test(tag.error || '') && /bb version release/.test(tag.error || ''),
-     `pushing a tag the tree holds is refused as the release's, naming bb version release (${(tag.error || '').slice(0, 80)})`);
+     `pushing a tag the tree holds is refused as the release's, naming aerie version release (${(tag.error || '').slice(0, 80)})`);
   const gone = await relay(['git', 'push', 'origin', '--delete', 'topic']);
   ok(gone.status === 403 && /does not take work away/.test(gone.error || '')
      && execFileSync('git', [`--git-dir=${origin}`, 'branch', '--list', 'topic'], { encoding: 'utf8' }).includes('topic'),
@@ -962,7 +962,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const unheld = await relay(['git', 'push', '--dry-run', 'origin', cur]);
   ok(heldDry.held && off.gitpol?.scan === 'off' && off.gitpol?.push === 'allow' && unheld.code === 0 && !unheld.held,
      `with the hold off the same line goes without asking (${JSON.stringify(unheld).slice(0, 70)})`);
-  ok(/hold a sensitive push: off/.test(bb('git', 'policy')), '...and bb git policy says the hold is off');
+  ok(/hold a sensitive push: off/.test(bb('git', 'policy')), '...and aerie git policy says the hold is off');
   ok((await post('/api/prefs', { project: 'beta', gitpol: { scan: 'allow' } })).error, '...and the hold takes hold or off, nothing else');
   await post('/api/prefs', { project: 'beta', gitpol: { scan: 'hold' } });
   if (heldDry.held) await post('/api/phone', { action: 'deny', id: heldDry.held });
@@ -1048,7 +1048,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     // fetched, the refs that moved, the merge; an upstream after push -u.
     const nodeEnv = { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''),
                       BB_TOKEN: tok, BB_NODE: 'agentbox', BB_PROJECT: 'beta', WORKSPACE: `${DIR}/ws` };
-    const onNode = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/bb`, ...a], { encoding: 'utf8', env: nodeEnv, cwd: B, stdio: ['ignore', 'pipe', 'pipe'] }); }
+    const onNode = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8', env: nodeEnv, cwd: B, stdio: ['ignore', 'pipe', 'pipe'] }); }
                                catch (e) { return `FAILED ${e.status}: ${e.stdout || ''}${e.stderr || ''}`; } };
     const clone = `${DIR}/beta-clone`;
     execFileSync('git', ['-C', clone, 'pull', '-q', 'origin', main]);
@@ -1060,12 +1060,12 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     const bundles = existsSync(`${B}/.git/bb-relay`) ? execFileSync('ls', [`${B}/.git/bb-relay`], { encoding: 'utf8' }).trim() : '';
     ok(git('log', '-1', '--format=%s') === 'Waiting on the remote' && existsSync(`${B}/from-the-remote.txt`)
        && git('rev-parse', `refs/remotes/origin/${main}`) === git('rev-parse', 'HEAD') && bundles === '',
-       `bb git pull on a node brings the commit into its own tree and moves its remote-tracking ref, leaving no bundle behind (${
+       `aerie git pull on a node brings the commit into its own tree and moves its remote-tracking ref, leaving no bundle behind (${
          pulled.replace(/\s+/g, ' ').slice(0, 120)})`);
     git('checkout', '-q', '-b', 'fromnode');
     const up = onNode('git', 'push', '-u', 'origin', 'fromnode');
     ok(git('config', 'branch.fromnode.merge') === 'refs/heads/fromnode' && git('rev-parse', 'refs/remotes/origin/fromnode') === git('rev-parse', 'HEAD'),
-       `bb git push -u on a node sets the upstream and the remote-tracking ref in its own tree (${up.replace(/\s+/g, ' ').slice(0, 80)})`);
+       `aerie git push -u on a node sets the upstream and the remote-tracking ref in its own tree (${up.replace(/\s+/g, ' ').slice(0, 80)})`);
     git('checkout', '-q', main);
   }
 
@@ -1262,15 +1262,15 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   ok(tc.hash.endsWith('/' + encodeURIComponent(tc.node)), `a node page's address names its node (${tc.hash})`);
 }
 
-// bb projects lists what the dashboard lists: a directory carrying .bbignore
+// aerie projects lists what the dashboard lists: a directory carrying .bbignore
 // (the fixture's toolchain store) is not a project, and a worktree, whose .git
 // is a file naming its repository, is one and has a branch (B122).
 {
   git('worktree', 'add', '-q', `${DIR}/ws/beta-wt`, '-b', 'wtcheck');
-  const listed = execFileSync('bash', [`${REPO}/scripts/bb`, 'projects'],
+  const listed = execFileSync('bash', [`${REPO}/scripts/aerie`, 'projects'],
     { encoding: 'utf8', env: { ...process.env, WORKSPACE: `${DIR}/ws`, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/beta-wt\s+git: wtcheck/.test(listed) && !/toolstore/.test(listed) && !/beta-wt.*not a git repo/.test(listed),
-     `bb projects skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
+     `aerie projects skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
   git('worktree', 'remove', '--force', `${DIR}/ws/beta-wt`);
   git('branch', '-D', 'wtcheck');
 }
@@ -1497,7 +1497,7 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
     run: { id: 11, name: 'Android CI', branch: 'main', conclusion: 'failure', at: '2026-10-03T00:44:51Z' },
     findings: [
       { kind: 'run', sev: 'bad', where: 'run 11', url: 'https://github.com/o/beta/actions/runs/11',
-        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC). A session can read why with bb ci-log 11.' },
+        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC). A session can read why with aerie ci-log 11.' },
       { kind: 'label', sev: 'warn', where: 'android.yml:10', text: 'runs on ubuntu-latest, which GitHub moves to a new release on its own date',
         fix: { from: 'ubuntu-latest', to: 'ubuntu-24.04' } },
       { kind: 'action', sev: 'note', where: 'android.yml:14', text: 'android-actions/setup-android@v3: v4 is out' }],

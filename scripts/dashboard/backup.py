@@ -6,7 +6,7 @@ every pool of the controller's own machine (/mnt/POOL/.builderbot/backup)
 and under the state, the five newest kept in each, and downloadable. A new
 install finds the copies on its pools at first run, takes the password and
 becomes the controller as it was (move.restore with the key). Pushing a
-copy to another BuilderBot or a node is the next piece.
+copy to another AerieOS or a node is the next piece.
 """
 import base64
 import contextlib

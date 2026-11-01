@@ -1,7 +1,7 @@
 // The operator's house rules (roadmap #7): the one thing in the notebook a
 // session reads and cannot write.
 //
-// What is exercised for real: the store through `bb rules`, the tab through
+// What is exercised for real: the store through `aerie rules`, the tab through
 // the page, the standing block exactly as bb-tty composes it, and both hooks
 // with the JSON a real Claude Code would hand them. What is faked: nothing.
 // The hooks are the shipped scripts, run as processes, because "does the rule
@@ -35,7 +35,7 @@ await ready(page);
 // The listing's name column is as wide as its longest name (B233): the
 // shipped no-credentials-in-the-repo ran straight into its own text.
 ok(/ask-do-not-install\s+Never install/.test(bb()),
-   'bb rules pads the name column past its longest name');
+   'aerie rules pads the name column past its longest name');
 
 // ---- the tab ---------------------------------------------------------------
 await page.evaluate(n => openNotebook(n), 'alpha');
@@ -192,7 +192,7 @@ ok(await page.$eval('[data-ssave="briefing:rules"]', b => b.disabled),
    'canceling a row that Add made takes the row away and stages nothing');
 
 // ---- what a session is handed ----------------------------------------------
-// Exactly what bb-tty puts in front of one: `bb rules --prompt`.
+// Exactly what bb-tty puts in front of one: `aerie rules --prompt`.
 const block = bb('--prompt');
 ok(/No em dashes\./.test(block),
    'the standing rule is in the block every session here starts with');
@@ -225,7 +225,7 @@ ok(!/add, do not change/.test(
 
 // ---- a rule that carries a framework (roadmap R31) --------------------------
 // The document that defines it and the command that checks it ride on the
-// rule; the block names both, and `bb rules check` runs the command in the
+// rule; the block names both, and `aerie rules check` runs the command in the
 // tree for the rules whose files changed.
 ok(/added design/.test(bb('add', 'design', 'New surface uses the framework.', '--files', 'src',
                           '--doc', 'docs/design.md', '--check', 'test -d .git')),
@@ -237,7 +237,7 @@ ok(/defined in full in docs\/design\.md/.test(bb('--prompt'))
    && /bb rules check design/.test(bb('--prompt')),
    'the block a session is handed says where it is defined and how it is checked');
 ok(/PASS  design/.test(bb('check', 'design')),
-   'bb rules check NAME runs the check in the project tree and reports it');
+   'aerie rules check NAME runs the check in the project tree and reports it');
 ok(/nothing changed here that a rule/.test(bb('check')),
    '...and with nothing changed under a rule\'s files, bare check has nothing to run');
 {
@@ -260,13 +260,13 @@ ok(/nothing changed here that a rule/.test(bb('check')),
     let outside = '';
     try { bb('check', 'design'); } catch (e) { outside = String(e.stdout || ''); }
     ok(/PASS  design/.test(inWt) && /FAIL  design/.test(outside),
-       `bb rules check runs in the worktree it is called from, and in the project's tree from elsewhere (${
+       `aerie rules check runs in the worktree it is called from, and in the project's tree from elsewhere (${
          inWt.slice(-60)} / ${outside.slice(-60)})`);
     // Its orphan branch never had a commit, so it goes with the worktree.
     execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'worktree', 'remove', '--force', wt]);
     bb('edit', 'design', '--check', 'false');
   }
-  ok(/checked by: false/.test(bb('show', 'design')), 'bb rules show prints the doc and the check');
+  ok(/checked by: false/.test(bb('show', 'design')), 'aerie rules show prints the doc and the check');
 
   // ---- the Stop hook (R31, step 2): a failing check refuses the stop ------
   // Run the way Claude Code runs it: JSON on stdin, JSON on stdout. The
@@ -303,8 +303,8 @@ ok(/nothing changed here that a rule/.test(bb('check')),
 }
 
 // ---- reading them from a session -------------------------------------------
-ok(/^bb rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }).toString()),
-   'bb rules -h is its help, as every verb\'s is (B411)');
+ok(/^aerie rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }).toString()),
+   'aerie rules -h is its help, as every verb\'s is (B411)');
 {
   // B536: every verb's -h is its entries in the reference, exit 0, never
   // its usage error: devapp's and container's said "ERROR:" and exited 1.
@@ -315,9 +315,9 @@ ok(/^bb rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }).t
      `bb VERB -h prints that verb's entries from the reference and exits 0 (${said.map(([v, st]) => v + ':' + st).join(' ')})`);
 }
 ok(/No em dashes/.test(bb('list')) && /agent-compat/.test(bb('list')),
-   'bb rules lists what is in effect');
+   'aerie rules lists what is in effect');
 ok(/add, do not change/.test(bb('show', 'agent-compat')),
-   'bb rules show reads one in full: how a session follows the name in its block');
+   'aerie rules show reads one in full: how a session follows the name in its block');
 // What a session may NOT do is the narrow part, and it is about the whole
 // list rather than about writing at all: the tab's replace is a person's,
 // because one call rewriting every rule is exactly what the per-rule
@@ -368,7 +368,7 @@ ok(/dropped dont-edit-during-a-suite/.test(
      bb('rm', 'dont-edit-during-a-suite', 'it belongs in CLAUDE.md now')),
    'a session can drop its own, with the reason kept');
 
-// The endpoint, not just the verb. `bb rules` has no write verb and the file
+// The endpoint, not just the verb. `aerie rules` has no write verb and the file
 // tools are denied on the file, but a session has a shell and a token, and
 // that token authenticates as a principal with user rights over exactly this
 // project. Without a refusal here the HTTP route would have been the way
@@ -429,7 +429,7 @@ print(m.mint_session('alpha'))
      `a project's rules include the global one, marked (${
        (listed.split('\n').find(l => /no-secrets/.test(l)) || '').trim()})`);
   ok(/no-secrets/.test(bb('--global')) && !/\bmine\b/.test(bb('--global')),
-     '`bb rules --global` lists what applies everywhere and nothing project-specific');
+     '`aerie rules --global` lists what applies everywhere and nothing project-specific');
   ok(/Never write credentials/.test(bb('--prompt')),
      '...and it is in the standing block every session here is handed');
 
@@ -508,8 +508,8 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   const sp = (short.parts || []).find(x => x.name === 'rules') || {};
   ok(!kept.error && sp.left === 'what calls for each named rule' && sp.bytes <= sp.share
      && /long-199/.test(short.text) && !/long-199: /.test(short.text)
-     && /Checked before handing back, each with `bb rules check NAME`: long-3\./.test(short.text)
-     && /`bb rules` lists them with it/.test(short.text),
+     && /Checked before handing back, each with `aerie rules check NAME`: long-3\./.test(short.text)
+     && /`aerie rules` lists them with it/.test(short.text),
      `a list of named rules over its share gives their names without what calls for each, and still says which are checked (${sp.bytes} of ${sp.share})`);
   await call('/api/rules', { project: 'alpha', action: 'save', rules: first.rules || [], force: true });
 }
@@ -547,7 +547,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
      '...and one that shares no trigger with any of them is told nothing');
   ok(!(got.rules || []).some(r => r.name === 'house-changelog')
      && (got.rules || []).some(r => r.name === 'house-changelog-2'),
-     "a project rule cannot take a global rule's name: it is suffixed, so bb rules show NAME is never ambiguous");
+     "a project rule cannot take a global rule's name: it is suffixed, so aerie rules show NAME is never ambiguous");
   const told = execFileSync(BB, ['preamble'], { env: ENV }).toString();
   ok(/Where one of this project's rules and a global one disagree, follow the project's, and say so in your reply/.test(told),
      'a session is told which wins where they disagree, since no matching could find a disagreement in meaning');

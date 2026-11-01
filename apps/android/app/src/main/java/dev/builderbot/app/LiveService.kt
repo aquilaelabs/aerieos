@@ -4,7 +4,7 @@
 // to the dashboard instead (GET /api/phone/wait), which answers the moment
 // this account's phone asks, lease or grants change, and then runs the
 // watch's own round, so what is posted and how is the watch's. No push
-// service: the phone reaches its BuilderBot directly, as the watch does.
+// service: the phone reaches its AerieOS directly, as the watch does.
 // Android requires a note while it runs; it sits in its own channel at the
 // lowest importance, with no dot on the icon.
 package dev.builderbot.app

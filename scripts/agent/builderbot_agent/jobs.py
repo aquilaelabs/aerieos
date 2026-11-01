@@ -276,7 +276,7 @@ class Job(threading.Thread):
                 state, code = self.agent.phones_idle(self, spec)
             elif self.job.get("type") in ("claude-login", *AGENT_LOGINS):
                 # Claude's, or another coding agent's (R95 step 3): the same
-                # pty and the same channel, `bb login --flow` told which.
+                # pty and the same channel, `aerie login --flow` told which.
                 state, code = self.claude_login(spec, AGENT_LOGINS.get(self.job.get("type"), ""))
                 # Said on the next heartbeat rather than in five minutes:
                 # the row that asked is waiting to read who signed in.
@@ -398,7 +398,7 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
-        # The BuilderBot account, so the bundle's own user_home resolves the
+        # The AerieOS account, so the bundle's own user_home resolves the
         # same per-account home bb-tty gives a session here. Resolved there
         # rather than here: one implementation of "where does this account
         # live on this machine", and it is that one.
@@ -492,7 +492,7 @@ class Job(threading.Thread):
         return ("succeeded" if code == 0 else "failed"), code
 
     def claude_logout(self, spec, agent=""):
-        """`claude auth logout` on this machine for one BuilderBot account,
+        """`claude auth logout` on this machine for one AerieOS account,
         as its own user or the SESSION account, in that account's home here: the other
         half of claude_login. The login is this machine's, so this machine
         is the one that lets go of it; the heartbeat that follows says so."""
@@ -569,7 +569,7 @@ class Job(threading.Thread):
         bbv = [str(a) for a in (spec.get("bb") or [])]
         if bbv:
             # A bb verb, run from the bundle this controller ships with the
-            # store as its SDK (docs/nodes.md phase 9): `bb emu start` on a
+            # store as its SDK (docs/nodes.md phase 9): `aerie emu start` on a
             # node is this. In a directory of the project's under the data
             # store, so what the verb writes has somewhere to be collected from.
             into = self.agent.bundle(self, who)

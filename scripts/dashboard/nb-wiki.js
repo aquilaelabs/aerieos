@@ -5,7 +5,7 @@
 // are kept by the controller as a forge-shaped repository (wiki.py), so
 // Export is a zip of Markdown and Push sends them to the repository's own
 // wiki when the project has push rights there. A session writes with
-// bb wiki, under Agents may: Write the wiki. One classic script beside
+// aerie wiki, under Agents may: Write the wiki. One classic script beside
 // index.html (docs/design-language.md, Files): a factory makeNotebook calls
 // per notebook.
 
@@ -283,7 +283,7 @@ function nbWikiView({$, nb, project}){
 
   function article(){
     const meta = byName(nb.wkCur);
-    if (!meta) return `<article class="wkarticle"><div class="hint">No pages yet. Start with Home, the page a wiki opens on; a session adds pages with bb wiki save${
+    if (!meta) return `<article class="wkarticle"><div class="hint">No pages yet. Start with Home, the page a wiki opens on; a session adds pages with aerie wiki save${
       nb.wkData?.gate === "deny" ? ", though this project's Agents may: Write the wiki is deny" : ""}.</div></article>`;
     const pg = nb.wkPages[meta.name];
     // A reader (B101) gets no Edit, Rename or Remove on a page: New page,
@@ -451,7 +451,7 @@ function nbWikiView({$, nb, project}){
     if (j.error) failed(j.error); else if (j.to) notify(`pushed the wiki to ${j.to}`);
   };
 
-  // Another window's save, a session's bb wiki or a pull is news when it
+  // Another window's save, a session's aerie wiki or a pull is news when it
   // moved past what this panel read and nothing typed here would be lost;
   // the notebook's watch asks this while the view is on screen.
   const wikiNews = k => !!nb.wkData && revs[k] !== nb.wkRev && !wikiDirty();

@@ -1,5 +1,5 @@
 """What a session looks with (R95): one capture per source, shared by
-`bb capture shot` and `bb capture reel`. A source is anything that draws: a page Playwright
+`aerie capture shot` and `aerie capture reel`. A source is anything that draws: a page Playwright
 opens, the running emulator's screen, an X display. A shot is that source
 at rest (frames a quarter second apart until a second of them match); a
 reel is its recording, which reel.py turns into the frames that changed.
@@ -176,13 +176,13 @@ def prune(dist, days=None, names=()):
 
 def _adb():
     return os.environ.get("BB_CAPTURE_ADB") or shutil.which("adb") or die(
-        "adb is not on this node: bb emu says what the emulator needs")
+        "adb is not on this node: aerie emu says what the emulator needs")
 
 
 def emu_ready(adb):
     r = run([adb, "get-state"], timeout=20)
     if r.returncode or "device" not in (r.stdout or ""):
-        die("no emulator is running: bb emu start boots one")
+        die("no emulator is running: aerie emu start boots one")
 
 
 def in_front(adb, pkg):
@@ -226,7 +226,7 @@ def display_ready(display):
     num = display.lstrip(":").split(".")[0]
     if not num.isdigit() or not os.path.exists(f"/tmp/.X11-unix/X{num}"):
         die(f"no X display {display} on this node: a server install has none, and the "
-            "provisioner adds Xvfb and xdotool (nodes/provision-linux.sh); bb capture reel --display "
+            "provisioner adds Xvfb and xdotool (nodes/provision-linux.sh); aerie capture reel --display "
             "then records one an app was started on (Xvfb :9 & DISPLAY=:9 the-app &)")
 
 
@@ -333,7 +333,7 @@ def mark(path, source):
 # ---- the sources: each ends with a video file ---------------------------------------
 
 def from_url(url, seconds, drive, work):
-    """A page recorded by Playwright while a script drives it, the way bb
+    """A page recorded by Playwright while a script drives it, the way aerie
     capture shot opens one. The driver gets the page and the seconds it has.
     The recording lands under `work`, the capture's scratch directory."""
     node_path, chrome = os.environ.get("BB_CAPTURE_NODE_PATH", ""), os.environ.get("BB_CAPTURE_CHROME", "")
@@ -392,10 +392,10 @@ def from_emu(pkg, seconds, drive, work, out):
     `out`): a software-rendered capture is about 10fps, so the timing is
     read there, not off the frames."""
     adb = os.environ.get("BB_CAPTURE_ADB") or shutil.which("adb") or die(
-        "adb is not on this node: bb emu says what the emulator needs")
+        "adb is not on this node: aerie emu says what the emulator needs")
     r = run([adb, "get-state"], timeout=20)
     if r.returncode or "device" not in (r.stdout or ""):
-        die("no emulator is running: bb emu start boots one")
+        die("no emulator is running: aerie emu start boots one")
     if pkg:
         bring_up(adb, pkg)
         run([adb, "shell", "dumpsys", "gfxinfo", pkg, "reset"], timeout=20)
@@ -423,7 +423,7 @@ def from_display(display, seconds, drive, work):
     num = display.lstrip(":").split(".")[0]
     if not num.isdigit() or not os.path.exists(f"/tmp/.X11-unix/X{num}"):
         die(f"no X display {display} on this node: a server install has none, and the "
-            "provisioner adds Xvfb and xdotool (nodes/provision-linux.sh); bb capture reel --display "
+            "provisioner adds Xvfb and xdotool (nodes/provision-linux.sh); aerie capture reel --display "
             "then records one an app was started on (Xvfb :9 & DISPLAY=:9 the-app &)")
     video = os.path.join(work, "display.mp4")
     size = display_size(display)
@@ -461,7 +461,7 @@ def main():
     ap.add_argument("names", nargs="*")
     a = ap.parse_args()
     if a.what == "mark":
-        # A page's shot, taken by bb capture shot's browser: `out` is the
+        # A page's shot, taken by aerie capture shot's browser: `out` is the
         # file and the names are the URLs it was taken from.
         mark(a.out, " ".join(a.names))
         return
@@ -469,11 +469,11 @@ def main():
         # `out` is the project's dist/ here, and the names are captures to
         # remove now whatever their age.
         if a.what == "prune" and not a.names and a.days is None:
-            die("bb capture prune NAME... removes those; --days N removes every capture older than that")
+            die("aerie capture prune NAME... removes those; --days N removes every capture older than that")
         rows = prune(a.out, a.days, set(a.names)) if a.what == "prune" else captures(a.out)
         missing = set(a.names) - {c["name"] for c in rows}
         if missing:
-            die(f"no such capture: {', '.join(sorted(missing))}; bb capture ls names them")
+            die(f"no such capture: {', '.join(sorted(missing))}; aerie capture ls names them")
         for c in rows:
             print(f"  {c['kind']:<5} {c['name']:<32} {ago(c['at']):>8}  {c['by'] or 'nobody'}"
                   + (f"  {c['frames']} frames" if c["kind"] == "reel" else ""))

@@ -252,7 +252,7 @@ MACHINE = "machine"
 
 def view(projects=None):
     """Every VM record, the node's census laid over it, for the page and for
-    `bb vm list`: only the projects named, when `projects` is given."""
+    `aerie vm list`: only the projects named, when `projects` is given."""
     d = _load()
     nodes = {n["id"]: n for n in node_list()}
     out = []
@@ -306,7 +306,7 @@ def view(projects=None):
 
 
 def others():
-    """The libvirt domains on each node that BuilderBot did not make (R165
+    """The libvirt domains on each node that AerieOS did not make (R165
     step 1), as its census says: an administrator reads them on the VMs page
     by name, state and size, and nothing acts on one from here."""
     out = []
@@ -400,7 +400,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
         if not ISO_RE.fullmatch(iso):
             return {"error": f"not an ISO's name: {iso}"}
         if req.get("node_agent") is True:
-            return {"error": "a VM from an installer cannot be made a node: its system is the installer's, not one BuilderBot enrolls"}
+            return {"error": "a VM from an installer cannot be made a node: its system is the installer's, not one AerieOS enrolls"}
         img = {"id": "installer", "name": f"From {iso}", "family": "installer",
                "boot": "uefi" if req.get("boot") == "uefi" else "bios"}
     else:
@@ -431,7 +431,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     if bad:
         return {"error": f"not an ssh public key: {bad[0]}…"}
     if not keys and not iso:
-        return {"error": "a VM needs an ssh public key to let anyone in: give one (bb vm new reads ~/.ssh/id_ed25519.pub)"}
+        return {"error": "a VM needs an ssh public key to let anyone in: give one (aerie vm new reads ~/.ssh/id_ed25519.pub)"}
     # A VM made a node gets its sessions' account from the enroll script
     # (builder, without sudo): its own account, which cloud-init gives sudo,
     # is another, or every session there would be root (R97's walk).
@@ -439,7 +439,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) or user == "root":
         return {"error": f"the VM's account is a plain Linux name, not {user}"}
     if req.get("node_agent") is True and user in ("builder", "bb"):
-        return {"error": f"a VM made a node keeps {user} for BuilderBot's own accounts: name its account something else (admin, say)"}
+        return {"error": f"a VM made a node keeps {user} for AerieOS's own accounts: name its account something else (admin, say)"}
     can = [n for n in hosts() if n["id"] in nodes_allowed]
     want = str(req.get("node") or "")
     if want:
@@ -483,7 +483,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
                  "alpine": "alpine", "almalinux": "almalinux", "centos": "centos", "arch": "arch",
                  "opensuse": "opensuse", "gentoo": "gentoo"}.get(img.get("family") or "")
         if not sysid or enroll_script is None:
-            return {"error": f"{img['name']} has no enroll script BuilderBot makes, so it cannot be made a node"}
+            return {"error": f"{img['name']} has no enroll script AerieOS makes, so it cannot be made a node"}
         enroll = enroll_script(principal, {"name": f"{project}-{name}", "controller": str(req.get("ctl") or ""),
                                            "reach": "lan", "sessions": True, "system": sysid, "user": "bb",
                                            "script": True})
@@ -621,7 +621,7 @@ def _net_name(subnet):
 
 def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
     """A VM's hardware beyond size from what New VM, the Hardware dialog or
-    bb vm asked (R100): (record, "") or (None, why). A device passed through
+    aerie vm asked (R100): (record, "") or (None, why). A device passed through
     is an administrator's; the LAN is a person's, since it takes the VM past
     the firewall that keeps a project's VMs off it; a shared folder is one of
     the project's own; a CPU thread another VM on the node is pinned to is

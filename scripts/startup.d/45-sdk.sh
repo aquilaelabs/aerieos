@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Put whatever `bb toolchains install` has put on the toolchain store onto every shell's
+# Put whatever `aerie toolchains install` has put on the toolchain store onto every shell's
 # PATH.
 #
-# The toolchains live outside the image on purpose (see `bb toolchains`), which
+# The toolchains live outside the image on purpose (see `aerie toolchains`), which
 # means the image cannot bake their PATH entries in: what is installed is
 # only known at runtime, and changes without a rebuild. So this regenerates
 # one small file on every start and makes sure the user's shell reads it.
@@ -31,9 +31,9 @@ mkdir -p "$ROOT" 2>/dev/null || true
 # written).
 ENV_FILE="$(run_as_builder bash -c '. /opt/builderbot/scripts/lib/common.sh; . /opt/builderbot/scripts/lib/sdk.sh; sdk_env_file')"
 mkdir -p "$(dirname "$ENV_FILE")" 2>/dev/null || true
-# Written by bb so the file and `bb toolchains env` can never disagree: one
+# Written by bb so the file and `aerie toolchains env` can never disagree: one
 # generator, two ways of asking for it.
-if run_as_builder bb toolchains env > "$ENV_FILE.new" 2>/dev/null; then
+if run_as_builder aerie toolchains env > "$ENV_FILE.new" 2>/dev/null; then
     mv -f "$ENV_FILE.new" "$ENV_FILE"
 else
     rm -f "$ENV_FILE.new"

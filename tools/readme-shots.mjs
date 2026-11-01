@@ -1,8 +1,8 @@
 // The README's pictures, from a dashboard that is already running (the dev
-// instance is the usual one: a lived-in BuilderBot with real nodes, which a
+// instance is the usual one: a lived-in AerieOS with real nodes, which a
 // staged copy could only imitate):
 //
-//     NODE_PATH="$(bb capture shot --print-node-path)" \
+//     NODE_PATH="$(aerie capture shot --print-node-path)" \
 //     README_SHOT_URL=http://HOST:PORT README_SHOT_AUTH=user:password \
 //         node tools/readme-shots.mjs docs/screenshots
 //
@@ -135,7 +135,7 @@ const shell = async (page, tidy) => {
   const t = await page.$('.tab:has-text("sh: ")');
   if (t && await t.isVisible()) await t.click();
   await page.waitForTimeout(3500);
-  // The terminal's own input: drawn in the page itself (BuilderBot's own
+  // The terminal's own input: drawn in the page itself (AerieOS's own
   // terminal), where a click on its box does not reach xterm's textarea.
   const input = page.locator('.xterm-helper-textarea').first();
   if (input && tidy && await input.count()){

@@ -1,5 +1,5 @@
 """The node's half of a held push (scripts/lib/relay.py, R219): a relayed
-`bb git push` the controller holds waits on the ask the way bb root run
+`aerie git push` the controller holds waits on the ask the way aerie root run
 does, and when the person approves, what the controller's push answered is
 printed here and its apply (an upstream set by -u) lands in this tree, as
 the session. Proven against a stand-in controller, since the harness drives

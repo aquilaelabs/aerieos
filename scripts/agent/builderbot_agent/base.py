@@ -100,7 +100,7 @@ SESSION_BIN = os.environ.get("BUILDERBOT_SESSION_BIN", "/usr/local/sbin/bb-sessi
 # (bb-sandbox out of the provisioner, and bb-session): root-owned, 0700,
 # written from the tar as it is unpacked and never from the toolchain store,
 # which belongs to the job account. Reading them from the store let any job,
-# and so any session through bb run, plant root code that landed on the
+# and so any session through aerie run, plant root code that landed on the
 # next hello (the review of 26 Sep).
 TOOLS_DIR = os.environ.get("BUILDERBOT_TOOLS_DIR", "/var/lib/builderbot/agent/tools")
 # The bundle a terminal runs where accounts are their own users (R125): a
@@ -128,8 +128,8 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # stands its own script in with BUILDERBOT_<ID>_INSTALLER. Checked against
 # Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct).
 # Each coding agent's sign-in and sign-out jobs, by the controller's agent
-# table (agents.py login_job, logout_job), to the agent `bb login --flow` and
-# `bb login --out` are run for. Claude's are the claude-login and
+# table (agents.py login_job, logout_job), to the agent `aerie login --flow` and
+# `aerie login --out` are run for. Claude's are the claude-login and
 # claude-logout of old, which name no agent.
 AGENT_LOGINS = {"codex-login": "codex", "copilot-login": "copilot", "grok-login": "grok"}
 AGENT_LOGOUTS = {"codex-logout": "codex", "copilot-logout": "copilot", "grok-logout": "grok"}

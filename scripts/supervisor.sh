@@ -104,7 +104,7 @@ shutdown() {
 trap shutdown TERM INT
 
 # The container NAME is what `docker exec` needs, and it is not the hostname:
-# A NAS host may name the container BuilderBot while the hostname is builderbot,
+# A NAS host may name the container AerieOS while the hostname is builderbot,
 # and docker matches names case-sensitively. Such a host exports HOST_CONTAINERNAME;
 # fall back to the hostname elsewhere.
 CONTAINER_NAME="${HOST_CONTAINERNAME:-${HOSTNAME:-}}"
@@ -112,10 +112,10 @@ CONTAINER_NAME="${HOST_CONTAINERNAME:-${HOSTNAME:-}}"
 # exec into: the installer's bb on the PATH runs as the controller's account,
 # with its env file, for anybody who may sudo.
 if [ "${BB_INSTALL:-}" = bare-metal ]; then
-    SHELL_HOW="sudo bb shell"
+    SHELL_HOW="sudo aerie shell"
     SHELL_WHO="the controller's account (${USER:-builderbot})"
 else
-    SHELL_HOW="docker exec -it ${CONTAINER_NAME} bb shell"
+    SHELL_HOW="docker exec -it ${CONTAINER_NAME} aerie shell"
     SHELL_WHO="the builder user"
 fi
 

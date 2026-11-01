@@ -4,7 +4,7 @@
 README.md                        the front page: what it is, its features, screenshots, and the way into docs/
 CLAUDE.md                        working inside this repository: what a session here is told
 CONTRIBUTING.md                  a person's way in: a checkout, seeing a change, proving it, the house rules, landing it
-CHANGELOG.md                     the user-facing record, by release and category; bb changelog writes it
+CHANGELOG.md                     the user-facing record, by release and category; aerie changelog writes it
 VERSION                          this repository's own version, moved per commit by tools/version-stamp
 LICENSE                          the Apache License 2.0
 NOTICE                           the copyright line the license's notice section asks a redistribution to keep
@@ -14,12 +14,12 @@ ruff.toml                        the python linter's settings for the controller
 Dockerfile                       image definition
 docker-compose.yml               compose variant of the stack
 .env.example                     annotated compose configuration
-lab/compose.yml                  the lab's Gitea and Forgejo for bb tests lab, a stack of its own beside the dev instance
+lab/compose.yml                  the lab's Gitea and Forgejo for aerie tests lab, a stack of its own beside the dev instance
 lab/.env.example                 the lab's one setting: the address other machines reach it at
 platforms/                       each place the container edition installs (R98 step 1), its template and generated files; the installed
                                  edition's own parts (host/, modules/, installer/, image/) land beside it as they are built (R56)
   unraid/builderbot.xml          Unraid Docker template (one-click updates)
-image/                           BuilderBot OS, the appliance image the installed editions are made from (R160 step 1): Debian stable by mkosi, pinned to the snapshot in SNAPSHOT, the controller staged in, sealed as a squashfs and laid into a disk with two root slots by build.sh; docs/image.md says what persists and how it boots
+image/                           AerieOS, the appliance image the installed editions are made from (R160 step 1): Debian stable by mkosi, pinned to the snapshot in SNAPSHOT, the controller staged in, sealed as a squashfs and laid into a disk with two root slots by build.sh; docs/image.md says what persists and how it boots
   SNAPSHOT                       the snapshot.debian.org timestamp every package is pinned to
   mkosi.conf                     the tree: Debian trixie, its packages (the controller's own come from config/controller-packages.tsv)
   mkosi.postinst                 inside the tree once its packages are in: install-controller.sh --stage, apt diverted, the services enabled
@@ -28,7 +28,7 @@ image/                           BuilderBot OS, the appliance image the installe
   partitions.sh                  the disk's fixed partition UUIDs, sizes and labels, one place for build.sh, the initramfs, fstab and GRUB
   grub.cfg                       GRUB's menu on the ESP: the two slots, bb_slot from grubenv naming the one to boot
   iso-grub.cfg                   the ISO's menu (R160 step 2): the same root booted live, with the installer or without
-  lay-disk                       one disk laid out as BuilderBot OS: the partitions, GRUB for both firmwares, slot A and the data partition; build.sh runs it on a loop device, the installer on a person's disk
+  lay-disk                       one disk laid out as AerieOS: the partitions, GRUB for both firmwares, slot A and the data partition; build.sh runs it on a loop device, the installer on a person's disk
   ovf.xml                        the OVA's descriptor (the VM disk for VMware and VirtualBox, R160 step 3), its marks filled by build.sh
   build.sh                       the build: mkosi, the squashfs, the disk on a loop device with GRUB for UEFI and BIOS, the stamps
 scripts/
@@ -38,97 +38,98 @@ scripts/
   mint-runner-token              root-only token helper (one of the two sudo commands)
   deploy-key                     root-only deploy key helper: make, keep, forget, load (the other)
   healthcheck.sh                 docker healthcheck
-  bb                             in-container helper CLI
+  aerie                          in-container helper CLI
+  bb                             the same command under its old name, forwarding to aerie
   as-builder                     privilege-dropping wrapper for docker exec
   lib/common.sh                  shared shell helpers
   lib/host-env.sh                the image's ENV, the release's stamp and the env file, for a bare-metal install's service and its bb (R90)
   lib/boot.sh                    the boot's steps both installs take: secrets shield, ssh-agent, home seed, hooks, state gate (R90)
   lib/controller-packages.sh     the controller's package list read one way, for the Dockerfile and a bare-metal install (R90)
-  lib/relay-verbs                the bb verbs a node relays to the controller (bb and bbrelay.py both read it)
-  lib/sdk.sh                     the toolchain manager: `bb toolchains`, sourced by bb
-  lib/preflight.sh               `bb tests preflight`, sourced by bb
+  lib/relay-verbs                the aerie verbs a node relays to the controller (bb and bbrelay.py both read it)
+  lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by bb
+  lib/preflight.sh               `aerie tests preflight`, sourced by bb
   lib/bbapi.py                   the controller's API from bb: one client, the loopback or BB_CONTROLLER, pinned https
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
   lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
   lib/syncwait.py                a session's bb on a synced node waits for its copy to be in step with the controller's (R163)
-  lib/codemap.py                 the code map bb map answers from: an index over the tree, rebuilt when a source is newer (R75)
-  lib/trace-verbs.py             bb dashboard trace: what the server was asked over a window, by endpoint and asker
+  lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
+  lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
   lib/sdkmeta.py                 reads config/toolchains.json for bb, with the tool packs beside it: fields, argv, versions
-  lib/toolpack-run.py            `bb tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
-  lib/docker-probe.py            which daemon is live, for `bb doctor` and the boot log
+  lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
+  lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
-  lib/embedded.py                pulls scripts and python out of quoted heredocs so `bb lint` sees them
+  lib/embedded.py                pulls scripts and python out of quoted heredocs so `aerie lint` sees them
   lib/waits.py                   the wait for a person's Allow and the job-log stream, shared by the verbs below
-  lib/devapp-verbs.py            `bb devapp`: status, rebuild, test, new, env, remove, ls, log, start, stop, restart
-  lib/capture.py                 `bb capture`: the sources anything that draws gives (a page, the emulator, an X display) and a shot at rest
-  lib/reel.py                    `bb capture reel`: the frames of a recording that changed, stamped and tiled
-  lib/touch.py                   `bb emu touch` and a drive script's $BB_TOUCH: a tap, hold or glide with its timing kept, through sendevent
-  lib/hand.py                    a finger's path through points for a glide (curved, eased, overshooting, wobbling, by seed), played by `bb emu touch` and `bb phone touch`
-  lib/sound.py                   `bb tool sound`: sound effects from sfxr's presets and plain tones, into dist/sound/ as OGG with a waveform and a spectrogram (ffmpeg)
-  lib/cilog-hosted.py            `bb ci-log` for a project on GitHub's own runners: the runs and a run's failed jobs, from the controller
-  lib/docs.py                    `bb tool docs`: a document as Markdown (markitdown) or its pages as pictures (PyMuPDF), run with the documents toolchain's Python
+  lib/devapp-verbs.py            `aerie devapp`: status, rebuild, test, new, env, remove, ls, log, start, stop, restart
+  lib/capture.py                 `aerie capture`: the sources anything that draws gives (a page, the emulator, an X display) and a shot at rest
+  lib/reel.py                    `aerie capture reel`: the frames of a recording that changed, stamped and tiled
+  lib/touch.py                   `aerie emu touch` and a drive script's $BB_TOUCH: a tap, hold or glide with its timing kept, through sendevent
+  lib/hand.py                    a finger's path through points for a glide (curved, eased, overshooting, wobbling, by seed), played by `aerie emu touch` and `aerie phone touch`
+  lib/sound.py                   `aerie tool sound`: sound effects from sfxr's presets and plain tones, into dist/sound/ as OGG with a waveform and a spectrogram (ffmpeg)
+  lib/cilog-hosted.py            `aerie ci-log` for a project on GitHub's own runners: the runs and a run's failed jobs, from the controller
+  lib/docs.py                    `aerie tool docs`: a document as Markdown (markitdown) or its pages as pictures (PyMuPDF), run with the documents toolchain's Python
   lib/poppler.py                 the pdftoppm and pdfinfo Claude Code's PDF reader asks for, drawn with PyMuPDF; the documents toolchain installs them
   lib/bbftp.py                   bb-ftpd: one project's tree over FTPS, each login asked of the controller through the agent; the ftp toolchain installs it (R151)
   lib/gradle-local-build.gradle  the Gradle init script bb-tty puts in a project's Gradle home: its build folders on the node's disk, linked from app/build (B439)
-  lib/tmux.conf                  BuilderBot's tmux settings: the controller copies them to ~/.tmux.builderbot.conf, bb-tty applies them to a node's tmux server
+  lib/tmux.conf                  AerieOS's tmux settings: the controller copies them to ~/.tmux.builderbot.conf, bb-tty applies them to a node's tmux server
   lib/tmux-keys.conf             the keys the dashboard's terminal sends down its socket (a line of history up or down, leaving copy mode before what is typed), which bb-tty gives every tmux server before each attach
-  lib/gpu.py                     `bb gpu`: the node's NVIDIA card from where a session stands, and a turn on it for a heavy job
-  lib/tidy.py                    `bb tidy`: what a task left holding (its emulator, the card, build daemons, browsers, /tmp) given back
-  lib/unitpar.py                 `bb tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130)
+  lib/gpu.py                     `aerie gpu`: the node's NVIDIA card from where a session stands, and a turn on it for a heavy job
+  lib/tidy.py                    `aerie tidy`: what a task left holding (its emulator, the card, build daemons, browsers, /tmp) given back
+  lib/unitpar.py                 `aerie tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130)
   lib/bottleneck.py              what bounded a run of the dashboard suites, from its own numbers: the floor, the machine, the reruns (R130)
-  lib/browser.mjs                `bb browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
-  lib/proc-verbs.py              `bb proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
-  lib/container-verbs.py         `bb container`: status and new
-  lib/pack-verbs.py              `bb tool search` and `bb tool install`: the vetted catalog looked through, a pack asked for as the project's Install a tool pack setting says (R169 step 5)
-  lib/vm-verbs.py                `bb vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
-  lib/phone-verbs.py             `bb phone`: status and run
-  lib/root-verbs.py              `bb root`: status and run
-  lib/report.py                  `bb report`, and file/close from BuilderBot's side
-  lib/pc.py                      `bb pc`: a person's Windows PC lent to the project, its verbs asked and their results read
-  lib/diag.py                    `bb diag`
-  lib/node-log.py                `bb logs --node`
-  lib/login-check.py             `bb login --check`: who this account is signed in to each agent as on this machine, told to the controller
-  lib/emu-job.py                 `bb emu` as a job on the project's node
-  lib/run-job.py                 `bb run`: the snapshot, the job, the log back
-  lib/build-or-test.py           the command, place and outputs `bb build` and `bb test` read from the settings
-  lib/git-policy.py              `bb git policy`
+  lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
+  lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
+  lib/container-verbs.py         `aerie container`: status and new
+  lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a pack asked for as the project's Install a tool pack setting says (R169 step 5)
+  lib/vm-verbs.py                `aerie vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
+  lib/phone-verbs.py             `aerie phone`: status and run
+  lib/root-verbs.py              `aerie root`: status and run
+  lib/report.py                  `aerie report`, and file/close from AerieOS's side
+  lib/pc.py                      `aerie pc`: a person's Windows PC lent to the project, its verbs asked and their results read
+  lib/diag.py                    `aerie diag`
+  lib/node-log.py                `aerie logs --node`
+  lib/login-check.py             `aerie login --check`: who this account is signed in to each agent as on this machine, told to the controller
+  lib/emu-job.py                 `aerie emu` as a job on the project's node
+  lib/run-job.py                 `aerie run`: the snapshot, the job, the log back
+  lib/build-or-test.py           the command, place and outputs `aerie build` and `aerie test` read from the settings
+  lib/git-policy.py              `aerie git policy`
   lib/relay.py                   a notebook verb relayed from a node to the controller
-  lib/release-edit.py            `bb version release --edit`: the notes and files read where it is typed, the edit asked over the API
-  lib/forge-verbs.py             `bb forge`: a verb and its arguments asked of the controller, which works the git host with the project's token
-  lib/controller-stamp.py        the controller's build, for `bb status` and `bb catchup`
+  lib/release-edit.py            `aerie version release --edit`: the notes and files read where it is typed, the edit asked over the API
+  lib/forge-verbs.py             `aerie forge`: a verb and its arguments asked of the controller, which works the git host with the project's token
+  lib/controller-stamp.py        the controller's build, for `aerie status` and `aerie catchup`
   lib/dash.py                    the dashboard's modules loaded by path for the notebook verbs, and the account name and "who wrote it" they share
   lib/markup.py                  YAML's subset, JSON, TOML, XML and Markdown's headings read in the standard library, for the records and the code map (R167)
-  lib/roadmap-verbs.py           `bb roadmap`
-  lib/bug-verbs.py               `bb bug`
-  lib/brief-verbs.py             `bb brief`: a new project's brief, and bb-tty's take of it for a first session
-  lib/design-verbs.py            `bb design`: a project's design language and pages, as the notebook's Design view keeps them
-  lib/wiki-verbs.py              `bb wiki`: a project's wiki pages, listed, shown, saved and removed under Agents may: Write the wiki
-  lib/transcripts-verbs.py       `bb transcripts`: the account's own conversations with each agent on a project, listed and printed
-  lib/memory-verbs.py            `bb memory`: the account's memories on a repository, kept for every coding agent, listed, read, added and forgotten
-  lib/nb-history.py              `bb history`: the notebook's logs merged
-  lib/rules-verbs.py             `bb rules`, except check
-  lib/rules-check.py             `bb rules check`: a rule's check command, run in this tree
-  lib/tests-verbs.py             `bb tests`: the registry verbs
-  lib/tests-verdict.py           what went wrong, from a run's log (bb tests last, the end of a run)
+  lib/roadmap-verbs.py           `aerie roadmap`
+  lib/bug-verbs.py               `aerie bug`
+  lib/brief-verbs.py             `aerie brief`: a new project's brief, and bb-tty's take of it for a first session
+  lib/design-verbs.py            `aerie design`: a project's design language and pages, as the notebook's Design view keeps them
+  lib/wiki-verbs.py              `aerie wiki`: a project's wiki pages, listed, shown, saved and removed under Agents may: Write the wiki
+  lib/transcripts-verbs.py       `aerie transcripts`: the account's own conversations with each agent on a project, listed and printed
+  lib/memory-verbs.py            `aerie memory`: the account's memories on a repository, kept for every coding agent, listed, read, added and forgotten
+  lib/nb-history.py              `aerie history`: the notebook's logs merged
+  lib/rules-verbs.py             `aerie rules`, except check
+  lib/rules-check.py             `aerie rules check`: a rule's check command, run in this tree
+  lib/tests-verbs.py             `aerie tests`: the registry verbs
+  lib/tests-verdict.py           what went wrong, from a run's log (aerie tests last, the end of a run)
   lib/tests-away.py              which node a project's suites go to (R151): the test node its settings name, its workers from its cores and memory, its queue
-  lib/preamble-verbs.py          `bb preamble`
-  lib/router-key.py              `bb router-key`: the model router's address, this project's own key and its models (R144)
-  lib/findings-verbs.py          `bb findings history` and `bb findings sample`
-  lib/settings-verbs.py          `bb settings`: show, set for build, test and outputs, and node from a controller shell
-  lib/projects-adopt.py          `bb projects adopt`: a folder already under the share made a project
-  lib/sign-verbs.py              `bb sign`: a build signed on the node with one of the project's keys, and its keys and mapping
-  lib/busy-verbs.py              `bb node busy` and `bb node wait-quiet`: how busy this node is before a measurement
-  lib/users-verbs.py             `bb users`: list, claim, passwd, add, token
-  lib/nodes-verbs.py             `bb nodes` (and enroll-token) and `bb ci-labels`
-  lib/jobs-verbs.py              `bb jobs`
-  lib/work-verbs.py              `bb work`
-  lib/version-verbs.py           `bb version`
-  lib/changelog-verbs.py         `bb changelog`
-  lib/token-verbs.py             `bb token keep`
-  lib/login-list.py              `bb login --list`: every account this machine is signed in as
+  lib/preamble-verbs.py          `aerie preamble`
+  lib/router-key.py              `aerie router-key`: the model router's address, this project's own key and its models (R144)
+  lib/findings-verbs.py          `aerie findings history` and `aerie findings sample`
+  lib/settings-verbs.py          `aerie settings`: show, set for build, test and outputs, and node from a controller shell
+  lib/projects-adopt.py          `aerie projects adopt`: a folder already under the share made a project
+  lib/sign-verbs.py              `aerie sign`: a build signed on the node with one of the project's keys, and its keys and mapping
+  lib/busy-verbs.py              `aerie node busy` and `aerie node wait-quiet`: how busy this node is before a measurement
+  lib/users-verbs.py             `aerie users`: list, claim, passwd, add, token
+  lib/nodes-verbs.py             `aerie nodes` (and enroll-token) and `aerie ci-labels`
+  lib/jobs-verbs.py              `aerie jobs`
+  lib/work-verbs.py              `aerie work`
+  lib/version-verbs.py           `aerie version`
+  lib/changelog-verbs.py         `aerie changelog`
+  lib/token-verbs.py             `aerie token keep`
+  lib/login-list.py              `aerie login --list`: every account this machine is signed in as
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
-  lib/lint-checks.py             bb lint's own checks: runner label pinning, XML well-formedness, settings agreement
+  lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
   startup.d/*.sh                 startup hooks
   dashboard/                     web dashboard: server.py (the routes, the transport and the gates, each handler one call
                                  into a module beside it); index.html (markup, stylesheet, the wiring that runs at load);
@@ -145,8 +146,8 @@ scripts/
     vendor/                      xterm.js 5.5.0 and its fit addon 0.10.0 as npm publishes them, with xterm's MIT license (R133), served by name under /vendor/
     bb-tty                       what a terminal runs: which tmux session it is, and whose
     bb-agent-hook                Codex's and Copilot's own hooks holding Claude's guards: their payload in Claude's shape, the same hooks run (R95)
-    bb-codex-trust               BuilderBot's own Codex hooks trusted for one launch, by the hashes that Codex reports for them (B284)
-    bb-check-relay               the relay's own check, run by bb tests preflight
+    bb-codex-trust               AerieOS's own Codex hooks trusted for one launch, by the hashes that Codex reports for them (B284)
+    bb-check-relay               the relay's own check, run by aerie tests preflight
     bb-gate                      the hook every tool call asks before it runs, on a node
     bb-prompt-relay              a node session's prompts and answers, back to the controller
     bb-work-note                 what a session is changing, for the overlap warning, and the named rules its file raises
@@ -179,16 +180,16 @@ scripts/
     preamble.py                  what every session on a project starts with, assembled once
     brief.py                     a new project's brief: kept out of CLAUDE.md, handed to its first session through a dialog
     design.py                    the notebook's Design view: a project's design language and pages, the prompts a session is pointed at, and docs/design-language.md written from them
-    cilogs.py                    a project's CI on GitHub's own runners: its runs and the end of a failed job's log, read with the controller's token for `bb ci-log`
+    cilogs.py                    a project's CI on GitHub's own runners: its runs and the end of a failed job's log, read with the controller's token for `aerie ci-log`
     BbGlide.java                 a lent phone's glide as one held stroke: built on the node with javac and d8, run with app_process (R126)
     forgerelease.py              Release's forge half: the GitHub, Gitea or GitLab release beside a pushed tag, its notes the changelog's section and its builds attached
-    ciwatch.py                   a project's CI watched once a day and at link: a moving runner label, an action a major behind, a red main branch and GitHub's notices on it, for the Git view, bb catchup and the bell
+    ciwatch.py                   a project's CI watched once a day and at link: a moving runner label, an action a major behind, a red main branch and GitHub's notices on it, for the Git view, aerie catchup and the bell
     wiki.py                      the notebook's Wiki view: a project's wiki kept as a forge-shaped git repository of its own, exported as a zip and pushed to or pulled from the repository's wiki
     names.py                     what things are called: a project, a tmux session, a project's agent sessions
     agents.py                    the coding agents a session may run, one adapter each (R95): how each installs, signs in, is launched, briefed, guarded and read; page-agents.js is the page's copy
     projects.py                  new project / link and unlink a remote, the worker that clones and pushes, the locks and the pins Home shows
     forges.py                    which git host a remote is on, and the two things a host can be asked that git cannot
-    forgeaccess.py               what an agent may do on a project's git host: the abilities, the token measured without changing anything, the project's Allow or Deny, and bb forge's verbs on GitHub, GitLab and Gitea
+    forgeaccess.py               what an agent may do on a project's git host: the abilities, the token measured without changing anything, the project's Allow or Deny, and aerie forge's verbs on GitHub, GitLab and Gitea
     systems.py                   the systems a node can be: what Enroll node's pulldown offers, each with its provisioner family and its vetting (R204)
     ftp.py                       a project's file access over FTP and in an editor: the switches, the port, each account's access, and access_for, the one answer both doors give (R151, R159)
     wssync.py                    a node's projects as a synced copy: the index, state, since, get and put for its agent, and conflicts (R162)
@@ -202,9 +203,9 @@ scripts/
     git.py                       the notebook's Git view: the repository read out, and its writes
     codebase.py                  the code base counted, by language, for the notebook's Overview
     logs.py                      what is kept, for how long, and the downloads behind the gear menu
-    roadmap.py                   the roadmap; `bb roadmap` drives the same file
+    roadmap.py                   the roadmap; `aerie roadmap` drives the same file
     records.py                   the notebook's records whole as JSON, YAML or Markdown, and read back in (R167)
-    bugs.py                      the bug tracker; `bb bug` drives the same file
+    bugs.py                      the bug tracker; `aerie bug` drives the same file
     notebook.py                  one batch over both of those, so half of one cannot exist
     pending.py                   what a session wants to add to the notebook, held for the operator
     ids.py                       one letter per notebook tab, so a number says which list it came from
@@ -224,27 +225,27 @@ scripts/
     devapp.py                    a project's dev instance: built here, run here, driven from Artifacts
     devactions.py                the layer that runs and reports an instance: up, down, rebuild, test, remove, state and act, the compose plan and job runners, on the base devapp.py keeps
     relocate.py                  copying or moving a dev instance to another node, its volumes and data directory with it: three jobs, packed on the old node, unpacked on the new, then its rebuild
-    containers.py                containers BuilderBot did not build: the daemon's list and controls, ones written from a compose file, and whose each is; the Docker manager's view and verbs
+    containers.py                containers AerieOS did not build: the daemon's list and controls, ones written from a compose file, and whose each is; the Docker manager's view and verbs
     imagecheck.py                every container's registry images against what their registries serve (R195): a weekly check, Check for updates on the Containers page, Update on a row
     vms.py                       the VM manager (R91): each project's VMs on the nodes with VM host, the OS catalog matched by name, the limits, and the vm jobs
     gitcreds.py                  who gave a project a token, a line per person in /config/gitcreds naming their key store's entry, and the credential git work is handed: theirs while they are signed in (R135, R159)
     logins.py                    who is signed in now: a row per browser sign-in the cookie names, and a device signed in as the account, in /config/logins.json (R159)
     git-credential-bb            git's credential helper for that token: opened for the scheme and host it was written for, and nothing kept (R135)
-    termws.py                    BuilderBot's own terminal, the controller's half (R133): /termws in a pty here, or carried signed to a node's /term
+    termws.py                    AerieOS's own terminal, the controller's half (R133): /termws in a pty here, or carried signed to a node's /term
     tokenkeys.py                 the controller's half of the sealed sign-ins (R126): each account's public key per node, made from the account's own key, and the keys a person's own terminal carries, each seal's by the key it names
     installkey.py                the install key the install made itself (R154): where it is kept, its fingerprint, shown to save, changed with everything kept under it sealed again
     accountkeys.py               each account's own key for its sign-ins on the nodes (R154), in account-keys.json sealed under the install key, changed from Profile
     router.py                    a model router on a node (R144): LiteLLM with the provider keys and Ollama as a written container, a key per allowed project, the models and the spend read at the router
     reach.py                     the bell's rows sent elsewhere per person (R149): email over SMTP, a webhook and its presets, each destination's kinds and quiet window, the minute loop holding a repeat while unchanged
-    releasecheck.py              a newer BuilderBot release for a bare-metal install (R90 step 5): asked of GitHub daily, said on the bell and under Controller settings, applied through the own node
+    releasecheck.py              a newer AerieOS release for a bare-metal install (R90 step 5): asked of GitHub daily, said on the bell and under Controller settings, applied through the own node
     checks.py                    update checks on one clock (R176): each check's cadence a setting under Controller settings, when it last ran, Check for updates
     firstboot.py                 a stick's prepared configuration at its first boot (R161 step 8): the owner and the people made, the setup page skipped where asked, the rest kept waiting, said on This machine
     adoptapps.py                 the containers another system ran, made again here (R163 step 10): each template's compose with the exact image it ran, its network of fixed addresses, started with the machine where it was, its paths said where the adopted disks do not hold or may not write them; made and started through the Containers page's own calls
     held.py                      a held start on a bare-metal install (R56 step 9): held after an unclean stop or when armed for the next restart, lifted by Start on This machine
     move.py                      moving this controller to another home (R90 step 12): the sealed bundle and its token, the nodes' challenges, the restore under the version gate, the old home marked moved
     backup.py                    the configuration backed up (R161 step 4): the move's bundle under a password's key, written onto the pools after every change, found and restored at a first run
-    scanners.py                  BuilderBot's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows
-    nginxproxy.py                one nginx per node, BuilderBot's own (R171): the routes and certificate kept here, the compose file generated from them, deployed and rebuilt through containers.py
+    scanners.py                  AerieOS's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows
+    nginxproxy.py                one nginx per node, AerieOS's own (R171): the routes and certificate kept here, the compose file generated from them, deployed and rebuilt through containers.py
     acme.py                      an ACME client on the cryptography library: Let's Encrypt certificates for the nginx page by HTTP-01 or DNS-01, renewed (R150)
     unlocks.py                   a person's tokens opened per use for the window they pick and logged, git's handout of an opened one, and a store under a key of the person's own opened only while unlocked (R158 step 5, R157)
     hardening.py                 the dashboard's process kept from core files and swap, not dumpable, and wipe() for a key let go (R158 step 6)
@@ -267,12 +268,12 @@ scripts/
     idle.py                      ending sessions nobody has used for a while
     home.py                      Home's numbers across the install: nodes online, containers running, jobs running, failed today and the last ten
     notices.py                   what the page said to each account, kept per account (<state>/notices/UID.json, the newest 300): the Notifications page's history
-    helpdocs.py                  BuilderBot's own docs for the Help page: the docs README lists, one read by name, and a search across them
+    helpdocs.py                  AerieOS's own docs for the Help page: the docs README lists, one read by name, and a search across them
     projsessions.py              every account's sessions on a project, and an administrator ending one
-    reports.py                   problems with BuilderBot reported by any project's session (bb report)
+    reports.py                   problems with AerieOS reported by any project's session (aerie report)
     diag.py                      the Diagnostics section of Controller settings: reports, images, errors, the audit trail, and the download
     featuresoff.py               the features an install switches off from its environment (FEATURES_OFF): the list, the sentence, and what the page and the routes read of it (R81)
-    doctor.py                    `bb doctor` run on a timer and cached, for the Doctor card
+    doctor.py                    `aerie doctor` run on a timer and cached, for the Doctor card
     runners.py                   a node's CI runners: the root-only token helper, and the Runner card's list
     findings.py                  the scanner's reports read and attributed, and what they used to say
     gitrelay.py                  a node session's push, fetch and pull, done in a repository of the controller's own
@@ -285,7 +286,7 @@ scripts/
     qr.py                        a QR code as an SVG, for an authenticator app to scan (R127)
     transcripts.py               an account's conversations with each agent as a text to download, from a notebook's Sessions view
     fields.py                    one field out of a request body, read one way by the server and the modules it calls
-    timing.py                    where a request's time went: named parts and its own CPU, for bb dashboard trace
+    timing.py                    where a request's time went: named parts and its own CPU, for aerie dashboard trace
     share.py                     a part's share of what a session is sent: the rules, the roadmap and the bugs say less per row before they leave one out
     layout.py                    what the page keeps here: each account's tabs and panes, the dock's terminals among them
     bellseen.py                  what each account has dismissed from its bell: an update to one version, until a newer one is out
@@ -294,8 +295,8 @@ scripts/
                                  what a run measured it costing
     notify.py                    getting a line into a running session, and knowing it landed
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
-    test/                        its Playwright suite: `bb dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
-    unit/                        its python unit tier: `bb tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
+    test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
+    unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
   agent/builderbot_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
     __init__.py                  what the agent is and how it runs, and AGENT_VERSION
@@ -308,7 +309,7 @@ scripts/
     vms.py                       the VMs a node runs (R91): the vm job's fixed table of virsh and qemu-img commands, cloud-init, the census of them, and their network's firewall
     vmhw.py                      a VM's hardware beyond size (R100): the host's CPUs and devices, pinning, the balloon, the network, a virtiofs folder, passthrough, the vBIOS dump
     screen.py                    the node's one port for the controller's sockets, 7684, signed by the controller: the terminals (term.py) and a VM's screen for the dock (R99), relayed to its VNC on the loopback
-    term.py                      BuilderBot's own terminal (R133): a pty per tab on the screen relay's port, running what its kind runs (rw, ro, ctr), signed by the controller
+    term.py                      AerieOS's own terminal (R133): a pty per tab on the screen relay's port, running what its kind runs (rw, ro, ctr), signed by the controller
     toolchains.py                the toolchain store (R19): what is installed, who uses it, a session's environment
     gpu.py                       the NVIDIA card: its sample, its memory's holders, the driver and container toolkit
     sessnet.py                   each session kept to its own project's network (R79)
@@ -324,40 +325,40 @@ scripts/
     wssync.py                    keeps a node's synced copy of its projects in step with the controller's (R162)
     claudesync.py                keeps a synced node's agents' conversations and memories in step with the controller's (B613)
     sessions.py                  the session half (#24): what each terminal kind runs, tokens, firewall and upkeep, as Agent's methods
-    workspace.py                 a job's source on disk, its artifacts, and the bundle of bb
+    workspace.py                 a job's source on disk, its artifacts, and the bundle of aerie
     work.py                      compose, toolchains, signing, images and system packages, as Agent's methods
     keyops.py                    the controller's signing key work on this node: a keystore checked, a key made or wrapped, a rotation's proof, a release's APK signed (R106)
     configplane.py               the configuration plane: the node's system, storage and network, as root
-    osimage.py                   BuilderBot OS on the machine (R160 step 4): the image, its slot and the next boot's for the census, and the os-update job that writes the other slot
+    osimage.py                   AerieOS on the machine (R160 step 4): the image, its slot and the next boot's for the census, and the os-update job that writes the other slot
     disks.py                     the machine's disks for the census (R162 step 1): lsblk's JSON and smartctl's, each whole disk with what its partitions hold
-    shares.py                    the machine's SMB and NFS shares for the census and the storage-share job (R162 step 1): BuilderBot's own two files, read and written whole
+    shares.py                    the machine's SMB and NFS shares for the census and the storage-share job (R162 step 1): AerieOS's own two files, read and written whole
     pools.py                     the machine's ZFS pools for the census and the storage-pool job (R162 step 1): made, grown, scrubbed, a member replaced, exported, destroyed, each disk held to the census
     array.py                     the machine's array of mixed disks for the census and the storage-array job (R162 step 2): the record, snapraid.conf and the fstab lines rendered from it, made, a disk added or replaced, synced, scrubbed, checked, destroyed
     adopt.py                     another NAS's array and pools taken as they are for the census and the storage-adopt job (R163 step 8): each data disk found by its serial and mounted with the filesystem it holds, read-only unless writable is asked, parity left alone, the pools writable, the old paths and merged trees kept; never formatted or partitioned
     http80.py                    plain http://THE-MACHINE/ on a controller's own machine: a redirect to the dashboard on port 80, letting go for nginx and for a compose job (R202)
-    console.py                   a way in at BuilderBot OS's screen (R194): the admin account made with sudo from the console password's hash kept on the data partition, at every start, and the console job that sets or takes it
+    console.py                   a way in at AerieOS's screen (R194): the admin account made with sudo from the console password's hash kept on the data partition, at every start, and the console job that sets or takes it
     power.py                     the machine's UPS through NUT and its own packages' updates for the census, and the host-update job (R164 step 3)
     extmounts.py                 the other disks and shares the hello names (R162 step 4): each mounted at /mnt/other/NAME or unmounted as the record says, an SMB share's credentials root's alone, the census's rows
-    packconfig.py                what each added pack is configured with here (R172): the hello's rows written as one env file per pack under the store's .bb/config, the session account's alone, which bb tool reads into a verb's environment
+    packconfig.py                what each added pack is configured with here (R172): the hello's rows written as one env file per pack under the store's .bb/config, the session account's alone, which aerie tool reads into a verb's environment
     backups.py                   the storage-backup job (R162 step 5): rsync of a folder to another place, each run hard-linked to the one before, the oldest pruned, the last run for the census
     agent.py                     Agent: hello, the loop and self-update, made of the parts above
     cli.py                       enroll, run, status, sample
-    coverage.py                  function coverage under bb tests coverage only
+    coverage.py                  function coverage under aerie tests coverage only
   agent/ruff.toml                the linter's settings for the agent, pinned to the python a Rocky node carries
-packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official and bundled for an install with no network, written by tools/packs-export.py from the tables and held to them by bb lint
+packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official and bundled for an install with no network, written by tools/packs-export.py from the tables and held to them by aerie lint
 tools/catalog-mirror.py          makes the vetted catalog's mirror on a machine with the network: the signed index and a git bundle per repository at every commit it pins, for a controller that cannot reach the catalog (R169 step 6)
     official/                    one folder per shipped toolchain (a colon in its name a hyphen), its bbtool.json carrying the recipe config/toolchains.json has under shipped
     agents/                      one folder per coding agent, its bbtool.json carrying the adapter agents.py's table has under agent
-    services/                    one folder per deployed thing of BuilderBot's that is a pack (R172): the model router, its service block and its config block, what its Installed row asks for per node
+    services/                    one folder per deployed thing of AerieOS's that is a pack (R172): the model router, its service block and its config block, what its Installed row asks for per node
 apps/                            the companions a person installs (R98 step 1): the phone app, the editor extension and the
                                  Windows companion, each released by its own workflow and offered as a card in the Library
   android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin
-  vscode/                          BuilderBot for VS Code (R159): plain JavaScript, no build step and no dependencies
+  vscode/                          AerieOS for VS Code (R159): plain JavaScript, no build step and no dependencies
     package.json                   the extension's manifest: its commands, its settings, and builderbotApi, the Files API it speaks
     extension.js                   the builderbot: file system, the sign-in, open project, search and the session's terminal
     lib/client.js                  the controller as the extension speaks to it: sign-in through /login, the Files API, /term
     lib/ws.js                      a websocket client in Node's own modules, for the terminal
-    lib/term.js                    BuilderBot's own terminal on /termws, from VS Code: the frames the dashboard's dock speaks
+    lib/term.js                    AerieOS's own terminal on /termws, from VS Code: the frames the dashboard's dock speaks
     README.md                      what VS Code shows on the extension's page: setting it up, installing and using it
   windows/                         the Windows companion app (R270): a person's machine keeping a project's folder in step through the device door
     README.md                      what it does, signing in, picking a project and a folder, building it
@@ -381,7 +382,7 @@ nodes/cloud-init/                the seed a cloud image boots from: meta-data an
 config/skel/                     home directory skeleton
 config/icon.png                  the icon the Unraid template shows
 config/toolchains.json           the toolchains the Library offers, and how to install each
-config/release-signers           the keys a release's SHA256SUMS.sig must verify against (R199), as ssh-keygen's allowed signers: what BuilderBot OS's updater, the stick maker and the installer check a release by
+config/release-signers           the keys a release's SHA256SUMS.sig must verify against (R199), as ssh-keygen's allowed signers: what AerieOS's updater, the stick maker and the installer check a release by
 config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against
 config/release-keys/README.md    where each publisher release key came from, and how one is refreshed (R137)
 config/release-keys/node.asc     the Node.js release team keys that sign each release SHASUMS256.txt
@@ -391,14 +392,14 @@ config/controller-packages.tsv   what the controller needs installed, per provis
 config/vm-images.json            the operating systems a VM is made from: each publisher's cloud image and its checksum file (R91)
 config/templates/                briefing.md, assembled per session by preamble.py; nothing is copied into a project
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
-tools/bb-ref.sh                  writes the bb block of docs/reference.md from bb help; bb lint holds the two equal
+tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/builderbot-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
 tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
 tools/builderbot-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step builderbot-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
-tools/api-doc.py                 writes docs/api.md from server.py's route tables; bb lint holds the two equal
-tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; bb lint holds the two equal
-tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; bb lint's --check holds them to it (R169 step 1)
+tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
+tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
+tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; aerie lint's --check holds them to it (R169 step 1)
 tools/check-sysdeps.py           checks every recipe's system packages, and with --controller the controller's own list, against each distribution's package index
 tools/agent-version.sh           the lint check that the agent's version moved with its file
 tools/no-em-dash.sh              the house rule voice's check: no em dash on a line this branch adds
@@ -409,18 +410,18 @@ test/nettest/.env.example        the two addresses it needs: the controller's an
 tools/american-spelling.sh       the house rule spelling's check: no British spelling on a line this branch adds
 tools/no-net-growth.sh           the everything-files against their ceilings in tools/ratchet.txt (R77)
 tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite; a release runs it
-tools/vscode-vsix.py             packages apps/vscode/ as a .vsix with python's zipfile, BuilderBot's version inside (R159)
+tools/vscode-vsix.py             packages apps/vscode/ as a .vsix with python's zipfile, AerieOS's version inside (R159)
 tools/companion-build.py         builds the Windows companion as one .pyz with the four agent modules its sync is (R270)
-tools/app-schemes.py             writes the Android app's twelve color schemes, both halves, from the design record (bb design json | tools/app-schemes.py)
+tools/app-schemes.py             writes the Android app's twelve color schemes, both halves, from the design record (aerie design json | tools/app-schemes.py)
 tools/ratchet.txt                those ceilings, one per file
 pyrightconfig.json               how pyright (the pyright-lsp plugin, or the CLI) reads this repo: each directory's imports and Python
                                  version, with the None checks off, since a module's configure() fills what it declares as None
 tools/version-stamp              this repo's own stamp hook: a bump moves the compatibility
                                  window in the agent and the template with it, or refuses
 docs/README.md                   the index of these docs, linked from the README
-docs/reference.md                the configuration reference, every bb command (its bb block written by tools/bb-ref.sh) and signing Android releases
+docs/reference.md                the configuration reference, every aerie command (its aerie block written by tools/bb-ref.sh) and signing Android releases
 docs/unraid.md                   step-by-step Unraid walkthrough
-docs/image.md                    BuilderBot OS, the appliance image: what it is, the disk and its slots, what persists, how it boots, how it is built
+docs/image.md                    AerieOS, the appliance image: what it is, the disk and its slots, what persists, how it boots, how it is built
 docs/install.md                  setup, start to finish: the checklist with the decisions each step needs
 docs/architecture.md             the map: the seven parts, how they reach each other, where each is explained
 docs/api.md                      every /api/ route with its method, handler, first sentence and what it refuses on, written by tools/api-doc.py
@@ -435,38 +436,38 @@ docs/toolchains.md               the toolchain store, the Library, the Installed
 docs/agents.md                   the coding agents: the agent table, the Library and the Installed page, installing and signing in to each on a node (R95)
 docs/tool-packs.md               tool packs: adding one, a project's Toolchains setting, and writing a bbtool.json
 docs/containers.md               the Containers page and nginx: dev instances, how one is reached, networks, image updates
-docs/scanners.md                 the Scanners page: BuilderBot's own scanners on each node, their schedule, and the reports
-docs/versions.md                 versions and release lines: bb version line, forward, backport, a patch line's rules
-docs/vms.md                      the VMs page and bb vm: VM host, the OS catalog, the dial, the limits, the network, snapshots, a VM made a node
+docs/scanners.md                 the Scanners page: AerieOS's own scanners on each node, their schedule, and the reports
+docs/versions.md                 versions and release lines: aerie version line, forward, backport, a patch line's rules
+docs/vms.md                      the VMs page and aerie vm: VM host, the OS catalog, the dial, the limits, the network, snapshots, a VM made a node
 docs/nas.md                      the installed edition's storage design (R56): Python the management plane and never the data path, the two storage profiles, what is not built
 docs/machines.md                 Controller settings, Nodes, Storage, the logs, the Jobs page, a Mac as a node
 docs/people.md                   the first account, Users and Roles, owners and invitations, the chat, your Profile
-docs/bb-command.md               the bb verbs with more behind them: the test harness, the code map, capture, sound and documents
+docs/aerie-command.md               the aerie verbs with more behind them: the test harness, the code map, capture, sound and documents
 docs/privacy.md                  data and privacy: what an install keeps, what it contacts, how to remove it
 docs/security.md                 the threat model: who is trusted for what, what each store protects and does not, and the line each hardening step closes (R158)
-docs/features.md                 everything BuilderBot does, by area, linked from each release's notes
+docs/features.md                 everything AerieOS does, by area, linked from each release's notes
 docs/companion-app.md            the companion app for an Android phone: pairing, its lock, notifications, how it is built
 docs/decisions.md                the design decisions, with their dates and reasons
-docs/layout.md                   this list, held to the tree by bb lint
+docs/layout.md                   this list, held to the tree by aerie lint
 docs/screenshots/                the README's pictures, regenerated by tools/readme-shots.mjs, and the mark at 512px (mark-512.png) a release's page shows
-docs/start-here.md               the one page for somebody given an account on somebody else's BuilderBot
-docs/journeys.md                 what a person does with BuilderBot, walked for real, dated
+docs/start-here.md               the one page for somebody given an account on somebody else's AerieOS
+docs/journeys.md                 what a person does with AerieOS, walked for real, dated
 docs/sandbox-vm.md               the Docker sandbox VM: why, how, and pointing this at it
 docs/nodes.md                    design: controller + nodes, homelab-default and enterprise-scalable
 docs/users.md                    design: accounts, roles, and what each one may reach
 docs/design-language.md          what the dashboard's surfaces owe each other: held by the
                                  house rule `design` and measured by test/uniform.mjs
-.hadolint.yaml                   Dockerfile lint config, shared by CI and bb lint
+.hadolint.yaml                   Dockerfile lint config, shared by CI and aerie lint
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
   build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs; a tag's build and its release, made a draft
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
-  os-image.yml                   BuilderBot OS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
+  os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       the linters, on a pull request, on this runner
   dashboard.yml                  the dashboard's browser suite, on a pull request that changes it, on this runner
   android-app.yml                the companion app's build
   companion-app.yml              the Windows companion's .exe: PyInstaller on a hosted Windows runner, on a published release or by hand, attached to the release
-  release-rehearsal.yml          every build a release's tag runs, on a branch by hand or bb version rehearse, publishing nothing
+  release-rehearsal.yml          every build a release's tag runs, on a branch by hand or aerie version rehearse, publishing nothing
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

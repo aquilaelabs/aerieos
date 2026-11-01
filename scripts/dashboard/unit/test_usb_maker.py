@@ -1,4 +1,4 @@
-"""BuilderBot USB Maker (R198, tools/builderbot-usb-maker.py): the window is
+"""AerieOS USB Maker (R198, tools/builderbot-usb-maker.py): the window is
 tkinter's and not tested here, where there is none; what it decides without
 a screen is. The settings page's fields become the stick's builderbot.env
 lines or are refused with why, and the releases offered are the published

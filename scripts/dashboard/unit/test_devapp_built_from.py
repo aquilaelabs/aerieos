@@ -1,4 +1,4 @@
-"""What bb devapp says a build was made from (B735): a commit, or for a
+"""What aerie devapp says a build was made from (B735): a commit, or for a
 container written here, which has no repository, its definition hashed,
 said as that rather than as a hash a session takes for a commit and cannot
 find."""

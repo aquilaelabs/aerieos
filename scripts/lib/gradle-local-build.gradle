@@ -1,4 +1,4 @@
-// BuilderBot: a Gradle project's build folders on the node's own disk (B439).
+// AerieOS: a Gradle project's build folders on the node's own disk (B439).
 //
 // A project's tree is on the projects share, an NFS mount, and NFS keeps a
 // file that is deleted while a process holds it open as a hidden .nfsXXXX
@@ -23,7 +23,7 @@ import java.nio.file.Path
 // which matches a directory and not a link, so git status listed app/build
 // as untracked and `git add -A` would have committed it. Its exact path goes
 // into the repository's own info/exclude, never the project's .gitignore,
-// which is the project's to write; the way bb map keeps .bb-map/ out.
+// which is the project's to write; the way aerie map keeps .bb-map/ out.
 //
 // Found by reading files, never by running git: Gradle's configuration
 // cache refuses an external process at configuration time, and a `git
@@ -99,7 +99,7 @@ if (base) {
                 Files.createSymbolicLink(link, target.toPath())
                 excludeLink(p.rootDir, link)
             } catch (Exception e) {
-                p.logger.warn("BuilderBot: could not put a link at ${link} to ${target}: ${e.message}")
+                p.logger.warn("AerieOS: could not put a link at ${link} to ${target}: ${e.message}")
             }
         }
     }

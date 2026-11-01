@@ -7,7 +7,7 @@ import java.lang.reflect.Method;
 /**
  * One held touch stroke through the points: BbGlide MS X Y X Y...
  *
- * bb phone touch glide on an unrooted phone (R126). `input motionevent` is a
+ * aerie phone touch glide on an unrooted phone (R126). `input motionevent` is a
  * process per event, each with its own down-time and a few hundred
  * milliseconds to start on a real phone, so a keyboard saw taps where a glide
  * was meant (report #56: h-e-l-l-o typed "Hakt1"). The shell user may inject

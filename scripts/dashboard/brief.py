@@ -13,7 +13,7 @@ the notebook's Briefing view shows it.
 
 The handover crosses machines: the dialog runs in a browser, the session
 starts on a node. So Build it STAGES the text for the account that pressed
-it, and bb-tty, starting that account's new session, TAKES it (bb brief
+it, and bb-tty, starting that account's new session, TAKES it (aerie brief
 take, through the API as the session), which is the moment it moves out of
 the tree. A take by anybody else, or with nothing staged, answers nothing.
 

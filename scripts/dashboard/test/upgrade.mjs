@@ -49,7 +49,7 @@ async function start(w){
   const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
     ...process.env, WORKSPACE: `${w}/workspace`, DASHBOARD_STATE: `${w}/config`,
     DASHBOARD_PORT: String(port),
-    BUILDER_HOME: `${w}/home`, BB_VERSION: BUILD, BB_BIN: `${DIR}/bin/bb`,
+    BUILDER_HOME: `${w}/home`, BB_VERSION: BUILD, BB_BIN: `${DIR}/bin/aerie`,
     BB_DOCKER_BIN: `${DIR}/bin/docker`, BB_ADB_BIN: `${DIR}/bin/adb`, BB_WEBEXT_BIN: `${DIR}/bin/web-ext`,
     BB_DOCTOR_FIXTURE: `${DIR}/doctor.txt`, BB_DEV_DATA_DIR: `${w}/devdata`, BB_ARCHIVE_SPOOL: `${w}/spool`,
     TC_AUTOCHECK: '0', BB_NODE_POLL: '3', BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',

@@ -121,7 +121,7 @@ KEYS = {
     # machine's pools are sealed under a key it derives; eight characters
     # at least, sealed here like every secret.
     "backup_password": {"default": "", "kind": "secret", "applied": "now"},
-    # A GitHub token that may read BuilderBot's repository, with which a
+    # A GitHub token that may read AerieOS's repository, with which a
     # controller in debug mode sees and fetches unpublished (draft) builds
     # (the operator, 1 Nov); debug mode's alone, cleared at a start without it.
     "release_token": {"default": "", "kind": "secret", "applied": "now"},
@@ -138,7 +138,7 @@ KEYS = {
        for k in ("release", "images", "nginx", "scanners", "catalog")},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
     # How many versions an update pushes out of its slot stay on the boot
-    # menu (R201), 0 for none; BuilderBot OS alone.
+    # menu (R201), 0 for none; AerieOS alone.
     "os_keep": {"default": 3, "kind": "number", "min": 0, "max": 10, "applied": "now"},
     # The room a node keeps for itself (R110): the disk left free under
     # which the bell warns and a build, a test or a container's rebuild is

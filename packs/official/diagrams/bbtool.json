@@ -1,5 +1,5 @@
 {
- "about": "What bb tool diagrams runs: PlantUML and Mermaid, diagrams drawn from text. Needs jdk and playwright beside it.",
+ "about": "What aerie tool diagrams runs: PlantUML and Mermaid, diagrams drawn from text. Needs jdk and playwright beside it.",
  "label": "Diagram renderers (PlantUML, Mermaid)",
  "layout": {
   "bin": [

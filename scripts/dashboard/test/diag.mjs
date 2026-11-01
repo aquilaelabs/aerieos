@@ -1,4 +1,4 @@
-// The controller's diagnostics (diag.py, POST /api/diag, bb diag). No
+// The controller's diagnostics (diag.py, POST /api/diag, aerie diag). No
 // browser: it is the gate and the report, asked for with real credentials.
 // An administrator reads it anywhere. A session reads it only when debug mode
 // is on, its node is ticked for it on Debug settings, and its account is an
@@ -51,7 +51,7 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
   ok(!CRED.test(JSON.stringify(r.body)), 'and nothing in it is shaped like a credential');
 }
 
-// bb diag, the way a person reads it: the verb against this server.
+// aerie diag, the way a person reads it: the verb against this server.
 {
   const out = (() => { try {
     return execFileSync('bash', [join(HERE, '..', 'bb'), 'diag', 'controller', 'nodes', 'jobs'],
@@ -61,7 +61,7 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
   } catch (e) { return `EXIT ${e.status}: ${e.stdout || ''}${e.stderr || ''}`; } })();
   ok(/== controller ==/.test(out) && /ships agent/.test(out) && /== jobs ==/.test(out)
      && /last 24h:/.test(out) && !/== audit ==/.test(out),
-     `bb diag prints the sections asked for, readably (${out.trim().split('\n').slice(0, 3).join(' | ').slice(0, 90)})`);
+     `aerie diag prints the sections asked for, readably (${out.trim().split('\n').slice(0, 3).join(' | ').slice(0, 90)})`);
 }
 
 // The redactor on its own, over the shapes it exists for.

@@ -11,7 +11,7 @@ sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 
 agent = agentpkg.load("builderbot_agent_tell")
-LINE = ("BuilderBot is back after an update. Pick up where you stopped: read the note you "
+LINE = ("AerieOS is back after an update. Pick up where you stopped: read the note you "
         "left on where you were and what was next, and carry on.")
 
 

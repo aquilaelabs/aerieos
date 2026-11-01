@@ -70,10 +70,10 @@ class Model(unittest.TestCase):
         self.assertTrue(self.g({"name": "s", "role": "user", "roles": ["seer"], "projects": []}, "containers-read"))
 
     def test_roles_are_named_for_a_person(self):
-        # R255 step 1: BuilderBot's owner, an administrator, and the Owner of
+        # R255 step 1: AerieOS's owner, an administrator, and the Owner of
         # a project told apart by name, not by their keys.
         roles.ensure_owner_role("alpha")
-        self.assertEqual(roles.label("owner"), "BuilderBot's owner")
+        self.assertEqual(roles.label("owner"), "AerieOS's owner")
         self.assertEqual(roles.label("admin"), "Administrator")
         self.assertEqual(roles.label("alpha_owner"), "Owner of alpha")
         self.assertEqual(roles.label("nosuch"), "nosuch")
@@ -299,7 +299,7 @@ class Migration(unittest.TestCase):
         self.assertEqual(u.get("ann")["roles"], ["tester"], "user taken off, a role of its own kept")
         self.assertEqual(u.get("bob")["roles"], [])
         self.assertEqual(u.get("ann")["project_roles"], {"alpha": ["alpha_owner"]})
-        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "BuilderBot's owner needs none")
+        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "AerieOS's owner needs none")
         self.assertEqual(u.get("adm")["role"], "admin")
         self.assertFalse(u.migrate_r152({"alpha": "u_4"}), "once")
 

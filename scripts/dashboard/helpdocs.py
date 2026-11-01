@@ -1,4 +1,4 @@
-"""BuilderBot's own documentation, read in the dashboard (R258, the operator
+"""AerieOS's own documentation, read in the dashboard (R258, the operator
 16 Oct): the Help page lists the docs, reads one, and searches them all.
 
 The docs are docs/*.md beside scripts/ in this tree, which the image carries

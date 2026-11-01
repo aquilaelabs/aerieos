@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Web dashboard: the page, its API and the browser terminals, all on
-# DASHBOARD_PORT. The terminals are BuilderBot's own (R133), websockets on
+# DASHBOARD_PORT. The terminals are AerieOS's own (R133), websockets on
 # that port, so there is one port and one sign-in.
 #
 # Numbered 15 so it starts BEFORE the slow hooks rather than after them. It
@@ -93,4 +93,4 @@ nohup env "${unset_args[@]}" DASHBOARD_PORT="$PORT" \
     | /opt/builderbot/scripts/lib/log-split.sh "$(bb_log_dir)/dashboard.log" dashboard &
 
 # It is not supervised: a dashboard that dies should not take the workstation
-# with it, and the container is useful without it. `bb logs` names the files.
+# with it, and the container is useful without it. `aerie logs` names the files.

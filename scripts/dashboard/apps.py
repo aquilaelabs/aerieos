@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-# The releases are BuilderBot's own on GitHub; a test points this at a file.
+# The releases are AerieOS's own on GitHub; a test points this at a file.
 RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
                 or "https://api.github.com/repos/aquilaelabs/builderbot/releases")
 BOOT_DELAY = float(os.environ.get("BB_APPS_BOOT_DELAY") or 30)
@@ -146,7 +146,7 @@ def path(name, file):
 
 
 def _get(url, limit=MAX_BYTES, accept="application/octet-stream, application/json"):
-    # No credential: the apps come from BuilderBot's public releases alone
+    # No credential: the apps come from AerieOS's public releases alone
     # (the operator, 20 Oct), so a controller holds no GitHub token for them.
     req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": "builderbot-apps"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:                   # noqa: S310 (our releases, or a test's file)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -188,7 +188,7 @@ def check():
     except (OSError, ValueError) as e:
         err = f"the releases did not answer: {e}"
         if "404" in str(e):
-            err += " (the apps come from BuilderBot's public releases, and its repository is not public yet)"
+            err += " (the apps come from AerieOS's public releases, and its repository is not public yet)"
     DIR.mkdir(parents=True, exist_ok=True)
     # An app the release carries no file of at all is said on its own row,
     # not as a look that did not work: a release may go out without one.

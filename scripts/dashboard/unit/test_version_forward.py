@@ -1,4 +1,4 @@
-"""A released patch line merged forward (R112 step 3, bb version forward):
+"""A released patch line merged forward (R112 step 3, aerie version forward):
 its fixes carried into the later line's branch, that line's VERSION kept,
 the patch's dated changelog section placed among the others by version,
 and an entry it already released taken out of the later line's

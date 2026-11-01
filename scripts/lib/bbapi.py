@@ -1,4 +1,4 @@
-"""The controller's API, from `bb`: one client for the verbs that reach it.
+"""The controller's API, from `aerie`: one client for the verbs that reach it.
 
 bb used to carry four copies of the same twelve lines: build a Request to
 http://127.0.0.1:<port>, send the auth header, decode the answer or the
@@ -44,7 +44,7 @@ def keep_token(tok):
     rather than the environment, because bb runs with BB_PROJECT set and a
     hook may not. Best effort: a token that could not be kept is a token
     that expires on schedule, which is what happened before. Returns "" when
-    it was kept and why not otherwise, so `bb token keep` (the agent's idle
+    it was kept and why not otherwise, so `aerie token keep` (the agent's idle
     refresh) can say so rather than succeed at nothing."""
     try:
         raw = tok[len("bbs_"):]
@@ -152,7 +152,7 @@ def request(path, body=None, auth="", method="", timeout=30):
     timeout, a pin that did not match. call() cannot say that, because a
     refusal the server words ("not signed in") and a refused connection both
     come back as {"error": sentence}, and telling them apart by the wording
-    is how bb-gate came to report an expired token as BuilderBot being down.
+    is how bb-gate came to report an expired token as AerieOS being down.
 
     A refused connection, or one that found no route to the host (B771),
     is waited out (R251): the request never reached a server, so asking

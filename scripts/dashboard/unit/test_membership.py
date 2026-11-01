@@ -1,7 +1,7 @@
 """membership.py: every project has an owner; an invite-only project's
-people are its owner's (and BuilderBot's owner's) to change, so an
+people are its owner's (and AerieOS's owner's) to change, so an
 administrator cannot add themselves; people join by accepting an
-invitation from their bell; BuilderBot's owner can always add itself."""
+invitation from their bell; AerieOS's owner can always add itself."""
 import json
 import os
 import shutil

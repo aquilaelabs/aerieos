@@ -1,5 +1,5 @@
 // The Library (R170, the operator, 28 Oct: one place for everything a
-// BuilderBot installs or runs, not a page each for toolchains, agents and
+// AerieOS installs or runs, not a page each for toolchains, agents and
 // apps): one list, read whole from /api/library for one node, of the
 // toolchains the catalog offers and what the node's store holds, the coding
 // agents with their versions, the tool packs a person added, the apps a NAS
@@ -202,7 +202,7 @@ function devHow(name){
   const at = `<code>${esc(location.origin)}</code>`;
   return {
     android: `Install it, open it and sign in at ${at} with your name and password.`,
-    vscode: `In VS Code: Extensions, the ⋯ menu, Install from VSIX; then BuilderBot: Connect, at ${at}.`,
+    vscode: `In VS Code: Extensions, the ⋯ menu, Install from VSIX; then AerieOS: Connect, at ${at}.`,
     companion: `Run it, sign in at ${at} with your name and password, and pick a project and a folder.`,
   }[name] || "";
 }
@@ -216,12 +216,12 @@ function libDetail(r){
   const lines = [];
   if (r.platforms?.length) lines.push(`<span class="sub">Platforms: ${esc(r.platforms.join(", "))}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
-    if (r.tool) lines.push(`<span class="sub">Adds <code>bb tool ${esc(r.tool)}</code> to a session.</span>`);
+    if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.</span>`);
     lines.push(tcTermsLine(r));
     if (r.size) lines.push(`<span class="sub">About ${esc(r.size)} on the store.</span>`);
     if (r.machine) lines.push(`<span class="sub">${r.name === TC_DRIVER ? "Built for the machine's kernel, installed as root, taking the card at the next restart." : "From NVIDIA's own package source, which installing adds and removing takes away."} Its state and Remove are on the Installed page.</span>`);
-    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>bb tool ${esc(r.name)}</code>.</span>`);
+    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.</span>`);
     if (r.catalog) lines.push(`<span class="sub">From <code>${esc(r.catalog.url)}</code>${r.catalog.path ? ` (${esc(r.catalog.path)})` : ""} at ${esc((r.catalog.commit || "").slice(0, 12))}, its archive's sha256 checked on the way in. Install opens the Add tool pack dialog on that commit, and Add keeps exactly that.</span>`);
     if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);

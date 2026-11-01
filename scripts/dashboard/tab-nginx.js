@@ -1,5 +1,5 @@
 // The nginx tab (R171, the operator, 10 Oct): one reverse proxy per node,
-// BuilderBot's own. One node at a time, picked in the bar like Toolchains
+// AerieOS's own. One node at a time, picked in the bar like Toolchains
 // (the node-switcher rule; the operator, 11 Oct: every tab about settings
 // on nodes picks one the same way): a state row saying whether its nginx
 // is deployed, the routes (a hostname or path, to a port a container on
@@ -350,8 +350,8 @@ function nginxBody(n){
     ? `<div class="field"><div class="hint bad">${esc(n.clash.join(", "))} ${n.clash.length === 1 ? "holds" : "hold"} a port nginx needs on this node: it listens on 80 and 443 there, so one of them has to give way.</div></div>` : "";
   const hostN = (nginxHostnames || []).length;
   const hosts = ngSect("hostnames", hostN ? `${hostN} name${hostN === 1 ? "" : "s"}` : "none yet",
-    `<div class="field"><div class="hint">The names this BuilderBot answers for, picked on any route.${helpIcon(
-      "The public names this BuilderBot answers for, on every node's nginx: added once here, picked on any route below. Each points at the node its routes are on (a DNS record, or a tunnel's). Added and deleted at the press.")}</div></div>
+    `<div class="field"><div class="hint">The names this AerieOS answers for, picked on any route.${helpIcon(
+      "The public names this AerieOS answers for, on every node's nginx: added once here, picked on any route below. Each points at the node its routes are on (a DNS record, or a tunnel's). Added and deleted at the press.")}</div></div>
       ${nginxHostLines()}`);
   const routes = ngSect("routes", count ? `${count} route${count === 1 ? "" : "s"}` : "no route yet",
     `<div class="field"><div class="hint">Each hostname or path to a port a container publishes on ${esc(n.name)}.${helpIcon(

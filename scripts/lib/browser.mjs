@@ -1,12 +1,12 @@
-// bb browser: a browser with an extension loaded, Chrome or Firefox, that a
+// aerie browser: a browser with an extension loaded, Chrome or Firefox, that a
 // session drives from one verb (R247).
 //
-//   bb browser open --ext DIR [--firefox] [--url URL] [--headed]
-//   bb browser go ID URL          (ext:popup.html is the extension's own page)
-//   bb browser eval ID JS         the value, as JSON
-//   bb browser shot ID FILE       a PNG of the page on show
-//   bb browser list
-//   bb browser stop ID | --all
+//   aerie browser open --ext DIR [--firefox] [--url URL] [--headed]
+//   aerie browser go ID URL          (ext:popup.html is the extension's own page)
+//   aerie browser eval ID JS         the value, as JSON
+//   aerie browser shot ID FILE       a PNG of the page on show
+//   aerie browser list
+//   aerie browser stop ID | --all
 //
 // Each browser runs detached in its own process group, on a debugging port
 // of its own and a profile of its own under ~/.cache/builderbot/browser, and
@@ -58,8 +58,8 @@ function records(){
 const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 function record(id){
   const r = records().find(x => x.id === id);
-  if (!r) die(`no browser ${id} of yours: bb browser list says which are open`);
-  if (!alive(r.pid)) die(`${id} is not running any more (it exited, or was ended): bb browser stop ${id} clears it`);
+  if (!r) die(`no browser ${id} of yours: aerie browser list says which are open`);
+  if (!alive(r.pid)) die(`${id} is not running any more (it exited, or was ended): aerie browser stop ${id} clears it`);
   return r;
 }
 
@@ -125,7 +125,7 @@ function extUrl(r, url){
   // options pages are Chrome's to look at here; what the extension does on
   // a site, its content scripts, works in both.
   die(`Firefox does not let WebDriver BiDi open an extension's own page (moz-extension://${r.extUuid || '...'}/${path}); `
-      + 'open it in Chrome (bb browser open --ext DIR), where ext:PAGE works, or test what it does on a site here');
+      + 'open it in Chrome (aerie browser open --ext DIR), where ext:PAGE works, or test what it does on a site here');
 }
 
 // ---- the verbs -------------------------------------------------------------
@@ -139,9 +139,9 @@ async function open(args){
     else if (a === '--firefox') want.kind = 'firefox';
     else if (a === '--chrome') want.kind = 'chrome';
     else if (a === '--headed') want.headed = true;
-    else die(`bb browser open takes --ext DIR, --firefox or --chrome, --url URL and --headed, not ${a}`);
+    else die(`aerie browser open takes --ext DIR, --firefox or --chrome, --url URL and --headed, not ${a}`);
   }
-  if (!want.ext) die('bb browser open needs --ext DIR: the unpacked extension, the folder its manifest.json is in');
+  if (!want.ext) die('aerie browser open needs --ext DIR: the unpacked extension, the folder its manifest.json is in');
   if (!existsSync(join(want.ext, 'manifest.json'))) die(`${want.ext} holds no manifest.json`);
   const ext = realpathSync(want.ext);
   const exe = want.kind === 'firefox' ? FIREFOX : CHROME;
@@ -218,13 +218,13 @@ async function open(args){
   console.log(want.kind === 'chrome'
     ? `  drive it over the DevTools protocol at http://127.0.0.1:${port} (Playwright: chromium.connectOverCDP)`
     : `  drive it over WebDriver BiDi at ws://127.0.0.1:${port}/session, one session at a time`);
-  console.log(`  bb browser go ${id} URL (ext:popup.html for its own pages), eval ${id} JS, shot ${id} FILE, stop ${id}`);
+  console.log(`  aerie browser go ${id} URL (ext:popup.html for its own pages), eval ${id} JS, shot ${id} FILE, stop ${id}`);
 }
 
 function readLog(r){ try { return readFileSync(join(r.profile, 'browser.log'), 'utf8'); } catch { return ''; } }
 
 async function go(id, url, quiet = false){
-  if (!url) die('bb browser go ID URL');
+  if (!url) die('aerie browser go ID URL');
   const r = record(id);
   const to = extUrl(r, url);
   if (r.kind === 'chrome'){
@@ -248,7 +248,7 @@ async function go(id, url, quiet = false){
 }
 
 async function evaluate(id, js){
-  if (!js) die('bb browser eval ID JS');
+  if (!js) die('aerie browser eval ID JS');
   const r = record(id);
   let value;
   if (r.kind === 'chrome'){
@@ -269,7 +269,7 @@ async function evaluate(id, js){
 }
 
 async function shot(id, file){
-  if (!file) die('bb browser shot ID FILE');
+  if (!file) die('aerie browser shot ID FILE');
   const r = record(id);
   let data;
   if (r.kind === 'chrome'){
@@ -311,7 +311,7 @@ async function main(argv){
     }
     case 'stop': {
       const rs = rest[0] === '--all' ? records() : records().filter(r => r.id === rest[0]);
-      if (!rest[0]) die('bb browser stop ID, or --all');
+      if (!rest[0]) die('aerie browser stop ID, or --all');
       if (!rs.length) die(`no browser ${rest[0]} of yours`);
       for (const r of rs){ await stopOne(r); console.log(`[builderbot] ended ${r.id} (${r.kind}, pid ${r.pid}) and removed its profile`); }
       return;
@@ -321,7 +321,7 @@ async function main(argv){
       console.log(doc.join('\n'));
       return;
     }
-    default: die(`bb browser takes open, go, eval, shot, list or stop, not ${verb}`);
+    default: die(`aerie browser takes open, go, eval, shot, list or stop, not ${verb}`);
   }
 }
 

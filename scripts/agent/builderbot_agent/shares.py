@@ -1,5 +1,5 @@
 """SMB and NFS shares on the controller's own machine (R162 step 1): each
-share as BuilderBot's own two files say it (/etc/samba/smb.conf.d/
+share as AerieOS's own two files say it (/etc/samba/smb.conf.d/
 builderbot.conf, included by smb.conf; /etc/exports.d/builderbot.exports),
 read whole for the census and written whole by the storage-share job, which
 checks the name, the path (a folder under /mnt or /srv that is there) and
@@ -46,7 +46,7 @@ def _read(path):
 
 def shares_now():
     """[{name, path, smb: {on, guest, ro, users}, nfs: {on, ro, clients}}]
-    from BuilderBot's own two files; [] where neither is here."""
+    from AerieOS's own two files; [] where neither is here."""
     smb, nfs = {}, {}
     cur = None
     for line in _read(_env("BB_SMB_FILE", SMB_FILE)).splitlines():
@@ -100,8 +100,8 @@ def shares_now():
 
 def render(shares):
     """The two files from the record: Samba's sections and NFS's lines."""
-    smb = ["# Written by BuilderBot (the Storage page): every share here is one it makes. Do not edit; the page writes it whole.\n"]
-    nfs = ["# Written by BuilderBot (the Storage page): do not edit; the page writes it whole.\n"]
+    smb = ["# Written by AerieOS (the Storage page): every share here is one it makes. Do not edit; the page writes it whole.\n"]
+    nfs = ["# Written by AerieOS (the Storage page): do not edit; the page writes it whole.\n"]
     for s in shares:
         if s["smb"]["on"]:
             smb.append(f"[{s['name']}]\n    path = {s['path']}\n    browseable = yes\n    read only = {'yes' if s['smb']['ro'] else 'no'}\n")

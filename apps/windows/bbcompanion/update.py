@@ -39,7 +39,7 @@ def controller_too_old(answer):
     if theirs >= NEEDS_DOOR:
         return ""
     return (f"the controller speaks door {theirs} and this companion needs {NEEDS_DOOR} or newer: "
-            "update BuilderBot on the controller, or use the companion it offers")
+            "update AerieOS on the controller, or use the companion it offers")
 
 
 def version():

@@ -1,9 +1,9 @@
-"""A way in at the console of BuilderBot OS (R194, the operator, 1 Nov): a
+"""A way in at the console of AerieOS (R194, the operator, 1 Nov): a
 password set on This machine logs in at the screen as admin, with sudo for
 root. Root itself stays without one. The image's root is read-only and
 forgets at every boot, so the password's hash is kept on the data partition
 (/var) and the account is made again from it at each start of the agent.
-Only on BuilderBot OS: on a Linux of the person's own, its accounts are
+Only on AerieOS: on a Linux of the person's own, its accounts are
 theirs and none is made here.
 """
 import os
@@ -36,7 +36,7 @@ def kept():
 
 
 def console_now():
-    """For the census: whether this is BuilderBot OS and whether a console
+    """For the census: whether this is AerieOS and whether a console
     password is set."""
     return {"os": on_os(), "set": bool(kept())} if on_os() else {}
 
@@ -65,7 +65,7 @@ class ConsoleMixin:
         """Set the console password from the hash the controller made, or
         take it away; applied at once and at every start after."""
         if not on_os():
-            job.say("refused: a console password is BuilderBot OS's; on a Linux of your own, log in with its own accounts\n")
+            job.say("refused: a console password is AerieOS's; on a Linux of your own, log in with its own accounts\n")
             return "failed", 65
         h = str(cfg.get("hash") or "")
         path = _env("BB_CONSOLE_HASH", HASH_FILE)

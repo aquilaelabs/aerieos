@@ -1,5 +1,5 @@
 // The bug tracker: the notebook's third view, /api/bugs behind it, and the
-// `bb bug` CLI a session drives. Write-through, unlike the roadmap (a bug
+// `aerie bug` CLI a session drives. Write-through, unlike the roadmap (a bug
 // report is a form submitted once, not a list curated in place), and nothing
 // is ever deleted: a bug closes as fixed or wontfix, each with a note, because
 // a closed bug is the record that stops the same report being chased twice.
@@ -62,17 +62,17 @@ ok(await page.$eval('#bugList .bug .sev', el => el.textContent) === 'high',
    '...and the row leads with its severity, the way a memory leads with its type');
 
 // ---- the session's half ----------------------------------------------------
-// --here: the title names a bb verb, which bb bug add now asks about on a
-// project other than BuilderBot (reports.mjs holds that); this one is alpha's own.
-bbBug('add', 'bb lint misses compose files in subdirectories', '--here', '--sev', 'low',
-      '--area', 'scripts/bb', '--repro', 'put a compose file under tools/ and run bb lint', '--reproduces', 'always');
+// --here: the title names a bb verb, which aerie bug add now asks about on a
+// project other than AerieOS (reports.mjs holds that); this one is alpha's own.
+bbBug('add', 'aerie lint misses compose files in subdirectories', '--here', '--sev', 'low',
+      '--area', 'scripts/aerie', '--repro', 'put a compose file under tools/ and run aerie lint', '--reproduces', 'always');
 ok(read().length === 2 && read()[1].by === 'claude',
-   'a session files one through bb bug, marked as its own');
+   'a session files one through aerie bug, marked as its own');
 const listed = bbBug();
 ok(/\bB2\b.*compose files/.test(listed) && /\bB1\b.*picker loses/.test(listed),
-   'bb bug lists the open ones');
+   'aerie bug lists the open ones');
 ok(/repro: put a compose file/.test(bbBug('show', '2')),
-   'bb bug show gives one in full, fields and all');
+   'aerie bug show gives one in full, fields and all');
 ok(/happens: always/.test(bbBug('show', '2')) && /happens: sometimes/.test(bbBug('show', '1')),
    '...and beside its repro, whether it happens every time (R124)');
 // The opened row says it as a fact, and a chip narrows the list by it.
@@ -104,7 +104,7 @@ ok(/R2 is a roadmap item; a bug is B2/.test((() => {
    '...while the roadmap\'s letter is refused, naming both tabs');
 bbBug('note', '2', 'the file list is built from names, not from content');
 ok(/file list is built from names/.test(read()[1].notes || ''),
-   'bb bug note appends what a session learned, dated, without replacing what was there');
+   'aerie bug note appends what a session learned, dated, without replacing what was there');
 
 const prompt = bbBug('--prompt');
 ok(/bug tracker with 2 open \(1 high, 1 low\)/.test(prompt) && !/the picker loses/.test(prompt),
@@ -148,7 +148,7 @@ ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
   ok(/bRm/.test(bar.last),
      '...and Delete is last, being the one that cannot be undone');
 }
-ok(/\[fixed\]/.test(bbBug('all')), '...but never the tracker: bb bug all still has it');
+ok(/\[fixed\]/.test(bbBug('all')), '...but never the tracker: aerie bug all still has it');
 ok(/bug tracker with 1 open \(1 low\)/.test(bbBug('--prompt')),
    '...and the next session is not told of a bug that is already fixed');
 
@@ -179,7 +179,7 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
 // A tree with no commits has nothing honest to say about its version, and
 // nothing is said: a blank, never a made-up number. Its own project rather
 // than alpha, which another file commits in (B144). A project with a commit
-// gets the same identity `bb version` prints, on filing and again on closing.
+// gets the same identity `aerie version` prints, on filing and again on closing.
 {
   const N = `${DIR}/ws/eta`;
   execFileSync('git', ['init', '-q', N]);
@@ -206,7 +206,7 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   ok(typeof z.seen_in === 'string' && z.seen_in.length > 0,
      `a report is stamped with the project's version when it is filed (${z.seen_in})`);
   ok(new RegExp(`seen in: ${z.seen_in.replace(/[.+]/g, '\\$&')}`).test(bbZ('show', '1')),
-     '...and bb bug show prints it');
+     '...and aerie bug show prints it');
   execFileSync('git', ['-C', Z, 'commit', '-q', '--allow-empty', '-m', 'two'], { env: genv });
   bbZ('fix', '1', 'done');
   const zc = zread()[0];
@@ -371,7 +371,7 @@ bbBug('add', 'filed by a session in error');
 const oops = String(read().at(-1).id);
 bbBug('rm', oops, 'a mis-file: the session meant the other project');
 ok(!read().some(b => String(b.id) === oops),
-   'bb bug rm deletes one, for the mis-file that closing would lie about');
+   'aerie bug rm deletes one, for the mis-file that closing would lie about');
 
 // ---- not applicable --------------------------------------------------------
 // The third way a bug leaves the open list: it was real, and it stopped
@@ -400,7 +400,7 @@ ok(/\[na\]/.test(bbBug('all')), '...but stays in the tracker, as its own kind of
 bbBug('reopen', naId);
 const naSaid = bbBug('na', naId, 'removed again in the CLI').trim();
 ok(read().find(b => String(b.id) === naId).status === 'na',
-   'bb bug na does the same from a session');
+   'aerie bug na does the same from a session');
 // B58: and says so in a sentence, not "B7 na".
 ok(naSaid === `B${naId} closed as not applicable`, `...in words (${naSaid})`);
 
@@ -489,7 +489,7 @@ const merged = execFileSync(BB, ['history', '--find', 'compose files'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
 ok(/bugs\s+claude\s+filed/.test(merged),
-   'bb history finds a bug by its words, tagged with which log it came from');
+   'aerie history finds a bug by its words, tagged with which log it came from');
 
 const post = body => page.evaluate(async b => {
   const r = await fetch('/api/bugs', { method: 'POST',
@@ -582,13 +582,13 @@ await page.waitForFunction(() => !document.querySelector('.sendbox'),
                            null, { timeout: 20000 });
 const sent = tmuxCapture('claude-alpha');
 ok(new RegExp(`bug B${first}\\b`).test(sent)
-   && new RegExp(`bb bug show B${first}`).test(sent),
+   && new RegExp(`aerie bug show B${first}`).test(sent),
    'the line names the bug and tells the session to look it up');
 ok(!/expected:|actual:|repro:/i.test(sent),
    '...and carries none of the fields, which is the whole point');
 ok(/it happens on the second run/.test(sent),
    '...but does carry the operator\'s note');
-ok(new RegExp(`bb bug fix B${first}`).test(sent),
+ok(new RegExp(`aerie bug fix B${first}`).test(sent),
    '...and says how to close it when it is dealt with');
 // Back into the notebook: the send above lands you in the session's tab.
 await page.evaluate(n => openNotebook(n), 'alpha');

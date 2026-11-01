@@ -75,7 +75,7 @@ ok(staged.pending && staged.staged && staged.text === EDITED.trim()
 
 // ---- the session takes it as it starts ----------------------------------------
 // What bb-tty does for a new session, as the session: its token, its project.
-const token = project => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', project, 'test'],
+const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const tok = token('briefly');
 const asSession = async body => (await fetch(base + '/api/brief', { method: 'POST',
@@ -89,12 +89,12 @@ ok(took.text === EDITED.trim() && !existsSync(`${DIR}/ws/briefly/BUILDERBOT-BRIE
    `the session's take is the brief as edited, which leaves the tree then and is kept as sent (${JSON.stringify(after.kept).slice(0, 80)})`);
 ok((await asSession({ action: 'take', project: 'briefly' })).text === '',
    '...and only once: the next session takes nothing');
-// bb brief, the verb a session reads it back with.
-const said = execFileSync('bash', [`${REPO}/scripts/bb`, 'brief'], { encoding: 'utf8',
+// aerie brief, the verb a session reads it back with.
+const said = execFileSync('bash', [`${REPO}/scripts/aerie`, 'brief'], { encoding: 'utf8',
   env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: base, BB_TOKEN: tok, BB_PROJECT: 'briefly',
          XDG_CACHE_HOME: `${DIR}/cache-brief` } });
 ok(/was started from this brief, sent to the first session/.test(said) && said.includes('Added in the dialog.'),
-   `bb brief prints the brief the project was started from (${said.split('\n')[0].slice(0, 80)})`);
+   `aerie brief prints the brief the project was started from (${said.split('\n')[0].slice(0, 80)})`);
 await refreshUntil(page, () => state?.projects?.find(p => p.name === 'briefly')?.brief === false, { timeout: 20000 });
 await page.evaluate(() => { tabs.filter(t => t.arg?.startsWith('claude:briefly')).forEach(t => dropTab(t.id)); });
 await page.evaluate(() => startClaude('briefly', null, ''));

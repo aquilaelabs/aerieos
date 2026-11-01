@@ -13,7 +13,7 @@ in [dashboard.md](dashboard.md#the-dock-and-its-terminals).
 
 Each agent is used the same way, and the same things hold for each: one
 briefing, the house rules' guards, the project's view and walls, the dock's
-working, waiting and asking states, the transcripts and Resume, and `bb`.
+working, waiting and asking states, the transcripts and Resume, and `aerie`.
 Where they differ is how each takes those, in its own form:
 
 - **The briefing**: Claude reads it as a system prompt file; ChatGPT as
@@ -48,7 +48,7 @@ turns to the same Model and Effort before resuming the conversation; and
 the project's card says, under that session in the warning color, what has
 changed since it started that it will not see until it is started again (a
 toolchain installed on its node that puts something on `PATH`, or
-BuilderBot updated, whose briefing a session reads once), and why.
+AerieOS updated, whose briefing a session reads once), and why.
 
 **Changing it while a session is running asks about that session.** Some
 settings a session takes only when it starts: the
@@ -222,7 +222,7 @@ mount, PID and IPC namespace built by `nodes/bb-session`, a root helper that
 is the session account's one sudo rule. Inside it `/workspace` holds only the
 project, its worktrees and the account's Claude share (other projects'
 transcripts are empty); the account's home is the only home and its
-BuilderBot cache keeps only this project's folder; `/tmp`, `/var/tmp` and
+AerieOS cache keeps only this project's folder; `/tmp`, `/var/tmp` and
 `/dev/shm` are the session's own; the agent's stores keep only the
 emulator's logs and the project's own CI logs and artifacts; the toolchain
 store is read-only, so nothing a session writes can reach
@@ -304,11 +304,11 @@ session, since it has no address of its own to allow.
 
 **Reads.** In What sessions reach, a project's settings name the other projects a
 session on it may read: their trees, bound read-only at `/workspace/NAME`
-into the session's view on a node, and their notebooks, which `bb roadmap`,
-`bb bug`, `bb rules`, `bb design` and the rest answer for with `bb -p NAME`
+into the session's view on a node, and their notebooks, which `aerie roadmap`,
+`aerie bug`, `aerie rules`, `aerie design` and the rest answer for with `bb -p NAME`
 in front. Their running containers answer the session too, on its own
 project's nodes, so a page of theirs can be opened and photographed with
-`bb capture`; a read project's node the reading project is not on stays
+`aerie capture`; a read project's node the reading project is not on stays
 out until the operator adds it. Every write is refused by name, on the API
 and on the relayed verbs alike, and a session's Claude gets the same wall:
 Read allowed, Edit denied. The briefing names the projects a session reads,
@@ -349,7 +349,7 @@ an index of the rest of how this machine works, then the open roadmap and
 the open bugs. The rest is **topics**: each section of the briefing after the
 core (start, where, map, build, tidy, speed, capture, asks, notebook,
 versions, git, android, gpu, containers) is named in the index with a gist
-and read whole with `bb help TOPIC` when the work reaches it, so a session
+and read whole with `aerie help TOPIC` when the work reaches it, so a session
 pays for the manual only where it needs it, and what it is held to comes
 first and short, because a rule read after five thousand words of how-to is
 read at the same weight as the how-to. A topic the tree gates out (Android on
@@ -368,7 +368,7 @@ added are marked, so you can see what it put there. It is given as context
 rather than instructions: a session works an item when you ask, or when it is
 plainly part of what you asked, and adds one when it notices something out of
 scope for what it is on. A step that is done is counted and not printed: the
-plan's past is a `bb roadmap show` away. The block travels to the session in a
+plan's past is a `aerie roadmap show` away. The block travels to the session in a
 file rather than on tmux's command line, which takes at most 16KB and answers a
 longer one with `command too long` and nothing else.
 
@@ -379,7 +379,7 @@ hundred open bugs; forty standing rules and two hundred named ones), and the
 block is an index into it. The rules have a share of a session's prompt,
 16 KB: every standing rule whole, since that is what a session is held to,
 and over the share the named ones without what calls for each. The roadmap
-and the bugs are a count and the verbs: `bb roadmap` and `bb bug` list them,
+and the bugs are a count and the verbs: `aerie roadmap` and `aerie bug` list them,
 `show` prints one whole, and the items and bugs a prompt names, by their
 number or by words shared with the title, arrive on that prompt through the
 same hook that brings a named rule, once a conversation. What a part left out
@@ -392,7 +392,7 @@ briefing's core, the house rules, the project's lines and the index of
 topics, then the roadmap and the tracker as counts, with its size on the
 heading and each part's size under it, the rules against their share, so a
 part that has started saying less is seen there before a session meets it. It is the same string, not a rendering
-of the same idea: the page and `bb-tty` both ask `bb preamble` for it, so the
+of the same idea: the page and `bb-tty` both ask `aerie preamble` for it, so the
 fold cannot quietly stop describing what sessions get. Shut by default, since
 it is a thing to check rather than to read every time.
 
@@ -405,9 +405,9 @@ govern the replies and the asks only, so the notebook, commits and files are
 written as ever.
 
 A running session keeps the block it started with. What it hears live: a
-named rule on the turn it applies, whatever a `bb` verb answers, and, on
+named rule on the turn it applies, whatever a `aerie` verb answers, and, on
 its next prompt after the controller was rebuilt to another build, one line
-saying so and pointing at `bb catchup` and `bb preamble`, once per build.
+saying so and pointing at `aerie catchup` and `aerie preamble`, once per build.
 
 ## Holding a session to its rules
 
@@ -423,26 +423,26 @@ checked are checked as well as said:
   conversation, the briefing and the standing rules stay in the system
   prompt but a named rule told earlier would be lost; a hook remembers which
   ones a conversation was told and says them again in full.
-- **A rule can refuse.** A rule's *Commands it refuses* (`bb rules add
+- **A rule can refuse.** A rule's *Commands it refuses* (`aerie rules add
   --refuse`) are the starts of commands a session's shell call may not run:
   the call is refused with the rule's text as the reason. The shipped
   ask-do-not-install refuses the system package managers, and three of the
   briefing's never-do lines are refused in every project (`pkill -f`, the
   emulator binary, setting the account's commit identity). A pattern that
   starts with `!` is an exception, such as a package manager's dry run.
-- **A project rule replaces a global one by name.** *In place of* (`bb rules
+- **A project rule replaces a global one by name.** *In place of* (`aerie rules
   add --replaces NAME`) takes a global rule out of that project's block, so
   a session reads one rule rather than two and an instruction to prefer one.
 - **The map first.** A search for where a name is defined or called (a grep
   for `def NAME`, `function NAME` or `NAME(`, or the Grep tool's) is handed
-  `bb map find NAME`'s answer beside it, a few lines, so the reads the map
+  `aerie map find NAME`'s answer beside it, a few lines, so the reads the map
   saves are not spent; the search still runs, and a name the map does not
   know adds nothing.
 - **Test runs in the background.** A suite started in the foreground is
   refused, since it holds every reply until it ends and a new ask could
   never cut into it the way the project's *While a test runs* setting
   says; the unit tier runs either way.
-- **And it can be counted.** `bb rules audit [DAYS]` reads the account's
+- **And it can be counted.** `aerie rules audit [DAYS]` reads the account's
   own conversations on the project and counts the commands a rule refuses,
   run or tried, and how often the code map was asked against a grep of the
   code, so whether sessions keep to a rule is a number rather than a feeling.
@@ -462,7 +462,7 @@ or turns a shipped one off, for every project from the same place.
 None of it is copied into the project. There is no file to render, push, or
 keep in step, and nothing to go stale: the briefing is one file in the image
 (`config/templates/briefing.md`), the rules live in `/config`, and a project
-that has never heard of BuilderBot gets the same briefing as one that has.
+that has never heard of AerieOS gets the same briefing as one that has.
 The parts that only apply to some projects are marked in that file with the
 evidence that decides them, matched as globs against the project's tree, so a
 project with no Android in it is not told how to drive an emulator.
@@ -471,7 +471,7 @@ project with no Android in it is not told how to drive an emulator.
 to generate. **A session is still held to the current environment**: a hook on
 every tool call (`bb-gate`) refuses to run anything while the controller is
 not answering, which is what a restart after an update looks like. That is
-waited out (R251): a `bb` command that meets a refused connection asks again
+waited out (R251): a `aerie` command that meets a refused connection asks again
 for up to ninety seconds (`BB_CONTROLLER_WAIT`; a hook asks once), saying it
 is waiting, since a refused connection never reached a server and asking
 again cannot do anything twice; the first refusal tells the gate at once, so
@@ -484,13 +484,13 @@ with the first call it lets through; the node's agent reports the marks with
 its heartbeat, so once the controller answers again the bell lists each
 session an update stopped, for its own account or an administrator, with a
 Resume that types into it (the roadmap's send, which presses Enter only if
-the line echoed) that BuilderBot is back and to pick up from its note.
+the line echoed) that AerieOS is back and to pick up from its note.
 
 The compatibility window still holds a project whose *node* runs an agent
 from another window, and the Nodes page's Update is what clears it. Inside a
 window an agent behind the controller is updated by the controller itself
 once its node is idle (R253): until then it takes no job but its own update,
-so a session's job refused for that alone has `bb` wait for the update (up
+so a session's job refused for that alone has `aerie` wait for the update (up
 to two and a half minutes, saying so) and send it again, and the bell's
 agent row says the update is automatic, and why when its last try failed.
 
@@ -500,20 +500,20 @@ agent row says the update is automatic, and why when its last try failed.
 minted per connection, so opening the session's tab refreshes it, but the
 `claude` already running keeps the environment it started in, and nothing
 outside a process can change that. So `bb-tty` also writes the fresh token
-beside the launcher in the account's own cache (0600), and `bb` reads it the
+beside the launcher in the account's own cache (0600), and `aerie` reads it the
 moment the one in its environment has expired. A long session therefore
-recovers by having its tab opened, and until it is, `bb` says the token
+recovers by having its tab opened, and until it is, `aerie` says the token
 expired and when, rather than "not signed in", which sent somebody looking
 for a sign-in that was never the problem.
 
 **And it renews itself while the session works.** Past half its life, every
-authenticated answer from the controller: a `bb` verb, the hook that runs
+authenticated answer from the controller: a `aerie` verb, the hook that runs
 on each prompt: carries a fresh token in an `X-BB-Session` header, and the
-client writes it into that same cache file; `bb` then sends whichever of
+client writes it into that same cache file; `aerie` then sends whichever of
 its two tokens expires later. A session in use therefore never runs out; only
 one idle for twelve hours does, and that one is told to have its tab opened.
 An expired token is never renewed, which is what keeps twelve hours meaning
-something for one that leaked. `bb status` says which copy is in use and
+something for one that leaked. `aerie status` says which copy is in use and
 when it runs out (the environment's, or the kept one once that has been
 renewed past it), so renewal is something to see.
 
@@ -531,7 +531,7 @@ entrypoint appends a line to `/config/image-log.tsv` whenever the stamp differs
 from the last one: first-seen, commit, version, build time. A restart writes
 nothing; a rollback writes a line, which is the point.
 
-The second is `bb catchup`, which reads both of those plus git and the
+The second is `aerie catchup`, which reads both of those plus git and the
 notebook's own logs and prints one screen: the image this box is running and
 how far behind `origin/main` it is, recent commits **with the first line of
 each body** (the line that says *why*, which `--oneline` throws away) what

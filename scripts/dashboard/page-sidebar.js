@@ -18,7 +18,7 @@ const isBroken = p => p.issues.some(i => i.level === "error");
 
 // Why no Claude session may run on this project right now, from the server:
 // its own node's agent from another compatibility window than this
-// BuilderBot (the briefing is assembled per session since R63 step 3, so
+// AerieOS (the briefing is assembled per session since R63 step 3, so
 // nothing in the tree can be). Drift INSIDE the window (the agent behind
 // on a build) is not here: the row offers the update and the button stays
 // live. Across a window the promise was never

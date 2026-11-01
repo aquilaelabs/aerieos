@@ -1,4 +1,4 @@
-"""bb transcripts show prints the newest part of a long conversation: read
+"""aerie transcripts show prints the newest part of a long conversation: read
 from the start, a day-long one (900 MB on 19 Oct) outran the verb's wait and
 printed nothing, when the end is what a session coming back to it needs."""
 import json

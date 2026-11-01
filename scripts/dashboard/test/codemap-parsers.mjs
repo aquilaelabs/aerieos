@@ -1,4 +1,4 @@
-// bb map against real parsers (roadmap R158): what the map says about this
+// aerie map against real parsers (roadmap R158): what the map says about this
 // tree, and about small trees in the languages babel and python cannot
 // read, checked against babel's parse of every .js and .mjs here and the
 // page's inline scripts, against python's own ast for every .py, and

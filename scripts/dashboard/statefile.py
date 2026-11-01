@@ -11,13 +11,13 @@ is unique per call, from mkstemp. It used to be a fixed `<name>.json.tmp`, and
 the dashboard is a threading server: two saves landing together each opened the
 SAME temp file, the second truncating what the first was writing, and whichever
 renamed first published a torn file. That was fixed in the server and NOT in
-the five copies inside `bb`, which is the ordinary fate of a function that
+the five copies inside `aerie`, which is the ordinary fate of a function that
 exists six times.
 
 **The lock.** roadmap.py and bugs.py already wrap every read-modify-write in
 `with _lock:`, which was a threading.Lock. A threading lock guards the
 threads of ONE process. The notebook has two writers: the dashboard, and a
-`bb roadmap`/`bb bug` invocation, which is a separate short-lived process. Both
+`aerie roadmap`/`aerie bug` invocation, which is a separate short-lived process. Both
 would load the file, both mutate their own copy, both write; os.replace makes
 each write atomic and does nothing whatever about the second one landing on top
 of the first. An item added from a terminal while the panel was saving simply

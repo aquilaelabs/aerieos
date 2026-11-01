@@ -16,7 +16,7 @@ phone is not handing over the phone:
     log       a lease package's logcat
     shot / record   the screen, into the project's dist/phone/ as a capture
 
-Anything else (another app, Settings, a shell) is still `bb phone run --why`,
+Anything else (another app, Settings, a shell) is still `aerie phone run --why`,
 which asks the owner one command at a time, as before.
 
 Everything runs over adb from the node (phone._adb, a node job), never on the
@@ -192,7 +192,7 @@ def _ours_in_front(pkgs):
 
 # A recording started and left running on the phone while a session works it
 # (the operator, 5 Oct): one job is a recording and each touch another, and
-# a node runs one at a time, so a glide asked during `bb phone record N` ran
+# a node runs one at a time, so a glide asked during `aerie phone record N` ran
 # after it ended and was never in it. start leaves screenrecord running on
 # the phone and answers at once; stop interrupts it (which closes the file
 # whole), pulls it and uploads it. In memory, per node: a controller restart
@@ -203,7 +203,7 @@ _recording = {}
 
 def _rec_start(project, nid, serial, args):
     if nid in _recording and time.time() < _recording[nid]["until"]:
-        return {"error": "a recording is already going on this phone: bb phone record stop collects it"}, 409
+        return {"error": "a recording is already going on this phone: aerie phone record stop collects it"}, 409
     try:
         secs = max(1, min(REC_LIVE_MAX, int(args.get("seconds") or 60)))
     except (TypeError, ValueError):
@@ -216,13 +216,13 @@ def _rec_start(project, nid, serial, args):
     now = time.time()
     _recording[nid] = {"file": tmp, "until": now + secs, "project": project}
     return {"ok": True, "until": int(now + secs),
-            "out": f"recording, for up to {secs} s: work the phone, then bb phone record stop"}, 200
+            "out": f"recording, for up to {secs} s: work the phone, then aerie phone record stop"}, 200
 
 
 def _rec_stop(project, nid, serial, args):
     cur = _recording.pop(nid, None)
     if not cur or cur.get("project") != project:
-        return {"error": "no recording is going on this phone: bb phone record start begins one"}, 409
+        return {"error": "no recording is going on this phone: aerie phone record start begins one"}, 409
     tmp = cur["file"]
     script = (f'adb -s "$1" shell "pkill -INT screenrecord; sleep 2"; adb -s "$1" pull {tmp} "$2"; rc=$?; '
               f'adb -s "$1" shell rm -f {tmp}; [ "$rc" = 0 ] && [ -s "$2" ]')
@@ -310,7 +310,7 @@ def use(project, op, args):
     nid, got = leased_to(project)
     if not got:
         return {"error": f"no phone is lent to {project}: its owner lends one from the Phone page, on its node, "
-                         "and bb phone run --why asks for one command meanwhile"}, 403
+                         "and aerie phone run --why asks for one command meanwhile"}, 403
     dev = phone.phone_on(nid)
     if not dev:
         return {"error": "the lent phone is not connected right now"}, 409
@@ -345,7 +345,7 @@ def use(project, op, args):
     if op in ("start", "stop", "ime", "log"):
         if pkg not in pkgs:
             return {"error": f"{pkg or 'that'} is not one of this lease's apps: install the build "
-                             "with bb phone install first" + (f" (it has {', '.join(pkgs)})" if pkgs else "")}, 403
+                             "with aerie phone install first" + (f" (it has {', '.join(pkgs)})" if pkgs else "")}, 403
         q = shlex.quote(pkg)
         if op == "start":
             r = _shell(nid, serial, f"monkey -p {q} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 "
@@ -389,7 +389,7 @@ def use(project, op, args):
                                            "separate swipes, which a keyboard reads as taps\n")
         if "bb-not-yours" in r["out"]:
             return {"error": "none of this lease's apps is in front or is the keyboard, so the phone is "
-                             "not touched: bb phone start PKG first (" + r["out"].strip()[-160:] + ")"}, 409
+                             "not touched: aerie phone start PKG first (" + r["out"].strip()[-160:] + ")"}, 409
         return {"code": r["code"], "out": r["out"]}, 200
     return {"error": f"unknown: {op}"}, 400
 
@@ -401,7 +401,7 @@ _hand_mod = None            # hand.py once loaded (declared here: injected.mjs)
 
 def _hand():
     """scripts/lib/hand.py, the finger's path a glide plays (R127), loaded
-    by path the way artifacts.py loads capture.py: the one copy bb emu
+    by path the way artifacts.py loads capture.py: the one copy aerie emu
     touch uses too, so both glides move the same way."""
     global _hand_mod
     if _hand_mod is None:
@@ -467,7 +467,7 @@ def _glide(project, nid, serial, guard, args):
         return None
     if "bb-not-yours" in out:
         return {"error": "none of this lease's apps is in front or is the keyboard, so the phone is "
-                         "not touched: bb phone start PKG first (" + out.strip()[-160:] + ")"}, 409
+                         "not touched: aerie phone start PKG first (" + out.strip()[-160:] + ")"}, 409
     # Said, with the seed, so the same stroke can be sent again.
     return {"code": r.get("code") or 0, "out": out + "glide: " + hand.summary(stroke) + "\n",
             "seed": stroke["seed"]}, 200
@@ -557,14 +557,14 @@ def check(project, op, args):
     pkg = str(args.get("pkg") or (pkgs[0] if pkgs else ""))
     if op in ("start", "stop", "ime", "log") and pkg not in pkgs:
         return {"error": f"{pkg or 'that'} is not one of this lease's apps: install the build "
-                         "with bb phone install first" + (f" (it has {', '.join(pkgs)})" if pkgs else "")}, 403
+                         "with aerie phone install first" + (f" (it has {', '.join(pkgs)})" if pkgs else "")}, 403
     return None
 
 
 def _install(project, nid, serial, rel):
     """One of the project's own builds from its dist/, installed, and the
     package it carries added to the lease (aapt2 from the node's
-    android-tools reads it, as bb sign does)."""
+    android-tools reads it, as aerie sign does)."""
     r = _dist_apk(project, rel)
     if isinstance(r[0], dict):
         return r

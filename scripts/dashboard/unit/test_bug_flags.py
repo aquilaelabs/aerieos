@@ -1,6 +1,6 @@
-"""bb bug add's flags (diagnostics #112): --help prints the usage, an
+"""aerie bug add's flags (diagnostics #112): --help prints the usage, an
 unknown flag is refused, and neither is glued onto the title the way
-`bb bug add "T" --help` filed "T --help"; after -- every word is the title's."""
+`aerie bug add "T" --help` filed "T --help"; after -- every word is the title's."""
 import ast
 import contextlib
 import io
@@ -41,7 +41,7 @@ class Flags(unittest.TestCase):
         got, code, out, _ = self.run_it(["a title", "--help"])
         self.assertIsNone(got)
         self.assertEqual(code, 0)
-        self.assertIn("usage: bb bug add TITLE", out)
+        self.assertIn("usage: aerie bug add TITLE", out)
 
     def test_an_unknown_flag_is_refused(self):
         got, code, _, err = self.run_it(["a title", "--severity-high"])
@@ -60,7 +60,7 @@ class Flags(unittest.TestCase):
 
 
 class OwnTree(unittest.TestCase):
-    """B743: on BuilderBot's own tree a bug naming bb is this tracker's."""
+    """B743: on AerieOS's own tree a bug naming bb is this tracker's."""
 
     def test_builderbot_source_is_its_own(self):
         bt = lift("builderbot_tree")

@@ -1,7 +1,7 @@
 """Archive is out of sight only, and a lock says whose it is (R119, the
 operator, 23 Oct): an owner's lock holds everybody but the owner, an
 administrator's holds the owner too; the migration from the list Archive
-used to write; and `bb settings` answering for the seat that asks."""
+used to write; and `aerie settings` answering for the seat that asks."""
 import importlib.util
 import json
 import os
@@ -89,7 +89,7 @@ class Locks(unittest.TestCase):
         self.assertEqual(json.loads((self.tmp / "archived-projects.json").read_text()), ["alpha", "beta"])
 
     def settings_locked(self, uid):
-        # As `bb settings --json` runs it.
+        # As `aerie settings --json` runs it.
         env = {**os.environ, "DASHBOARD_STATE": str(self.tmp), "BB_WORKSPACE": str(self.ws),
                "BB_SETTINGS_JSON": "1", "BB_ACCOUNT_UID": uid}
         out = subprocess.run([sys.executable, os.path.join(HERE, "..", "..", "lib", "settings-verbs.py"),

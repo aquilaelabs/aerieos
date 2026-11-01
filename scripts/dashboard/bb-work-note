@@ -7,7 +7,7 @@ the account baked into its command line by bb-tty's claude_scope(). It does two
 things and neither of them is a refusal:
 
   * writes the file (and a guess at the symbol) into overlap.py's notes, so
-    `bb work` can say what each session has been touching;
+    `aerie work` can say what each session has been touching;
   * when another session's notes name the same file, says so back into this
     one, before the edit rather than at the merge.
 
@@ -22,7 +22,7 @@ what this says.
 The symbol is a GUESS and is recorded as one. It reads the definition line
 enclosing the edit, which is right for the languages whose definitions start a
 line and wrong wherever that is not true. The exact answer is the git half of
-`bb work`, which needs no hook and cannot be wrong about which files are open.
+`aerie work`, which needs no hook and cannot be wrong about which files are open.
 
 Never fatal: a hook that errors takes the tool call with it, and a note is not
 worth an edit. Everything below is wrapped, and the exit is always 0.
@@ -158,7 +158,7 @@ def main():
                     + ", ".join(others)
                     + ". You are each in your own worktree, so nothing is being "
                       "overwritten, but you will be merging against their version "
-                      "of this file. `bb work` shows what overlaps.")
+                      "of this file. `aerie work` shows what overlaps.")
     if ruled:
         said.append(ruled)
         # ...remembered, so a summary of this conversation does not drop it

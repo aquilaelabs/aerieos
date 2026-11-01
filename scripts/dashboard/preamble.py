@@ -10,7 +10,7 @@ the moment the Briefing tab wanted to SHOW a person what their sessions are
 sent. Two assemblies of the same text drift, and the one that drifts is the
 one nobody runs.
 
-So it is here, the launcher asks for it through `bb preamble`, and the tab
+So it is here, the launcher asks for it through `aerie preamble`, and the tab
 renders exactly the string that goes in front of a session rather than an
 approximation of it.
 
@@ -56,7 +56,7 @@ SHARES = {"rules": 16 * 1024, "memory": 8 * 1024}
 _CORE_END = "<!-- BUILDERBOT:CORE-END -->"
 # The rest of the template is topics (R202): each `## Heading` after the
 # core carries a TOPIC marker with its slug and a gist, the block carries
-# the index of them where the TOPICS marker stands, and `bb help TOPIC`
+# the index of them where the TOPICS marker stands, and `aerie help TOPIC`
 # prints one when the work reaches it. A session read the whole manual
 # on every conversation (38 KB of 62) and the rules at its volume.
 _TOPICS = "<!-- BUILDERBOT:TOPICS -->"
@@ -73,7 +73,7 @@ def configure(*, rules_mod, roadmap_mod, bugs_mod, live=None, prefs_mod=None):
     """The three stores, injected rather than imported.
 
     Same shape as every other module here: server.py owns configuring them,
-    and `bb` hands in the same three after configuring them itself. `live`
+    and `aerie` hands in the same three after configuring them itself. `live`
     is the server's: what build is running, for the briefing (R75 step 5);
     bb, which has no server, hands in nothing and the part is left out.
     """
@@ -211,14 +211,14 @@ def identity_line(project):
 
 # The project's Agents may dials as they stand (the operator, 27 Oct: a
 # session told only the defaults said a release would wait on the owner's
-# answer where the dial was auto), in the words bb settings and the
+# answer where the dial was auto), in the words aerie settings and the
 # Permissions view use; the same record and defaults as settings-verbs.py.
 DIALS = (("Add to roadmap", "gate.roadmap", "auto"), ("File bugs", "gate.bugs", "auto"),
          ("Add rules", "gate.rules", "auto"), ("Fill in build and test", "gate.settings", "auto"),
          ("Add to the design", "gate.design", "auto"), ("Write the wiki", "gate.wiki", "auto"),
          ("Run its container", "devbuild", "deny"), ("Make VMs", "makevms", "deny"),
          ("Install a tool pack", "installpacks", "ask"),
-         ("Report BuilderBot bugs", "report", "auto"), ("Sign a build", "sign", "ask"),
+         ("Report AerieOS bugs", "report", "auto"), ("Sign a build", "sign", "ask"),
          ("Manage signing keys", "keys", "ask"), ("Tag and publish a release", "release", "ask"),
          ("Use a lent PC", "pc", "deny"))
 # (project) -> what a session may move the version by (version.policy), set
@@ -245,7 +245,7 @@ def dials_line(project):
         try:
             said.append(f"Move the version {version_policy(project)}")
         except Exception:                                        # noqa: BLE001
-            said.append("Move the version unknown (bb version policy says)")
+            said.append("Move the version unknown (aerie version policy says)")
     return ("This project's Agents may, as set now (auto runs at once, ask waits for its person's answer "
             "on the bell, deny is refused; say which applies rather than the default): " + "; ".join(said) + ".")
 
@@ -268,10 +268,10 @@ def reads_line(project):
         return ""
     names = ", ".join(_shown(r) for r in reads)
     return (f"This project reads {names}: each is at /workspace/NAME, read-only, and "
-            f"`bb -p NAME` in front of `bb roadmap`, `bb bug`, `bb rules`, `bb design`, "
-            f"`bb tests` or `bb map` makes the verb answer for it, so its notebook and its code "
+            f"`bb -p NAME` in front of `aerie roadmap`, `aerie bug`, `aerie rules`, `aerie design`, "
+            f"`aerie tests` or `aerie map` makes the verb answer for it, so its notebook and its code "
             f"are yours to read, and its containers answer from here on this project's nodes, so "
-            f"`bb -p NAME devapp` says where its page is and `bb capture shot` photographs it; "
+            f"`bb -p NAME devapp` says where its page is and `aerie capture shot` photographs it; "
             f"`bb -p NAME transcripts` lists this account's own conversations there, every agent's, "
             f"and `show ID` prints one, and their files are under ~/.claude/projects read-only. "
             f"Nothing there is yours to change: a write to its tree fails, a write to its notebook is "
@@ -282,7 +282,7 @@ def reads_line(project):
 # What the notebook's Design view holds, said in the briefing when there is
 # one, so a project designed before its first line of code is built to the
 # design from the start (the operator, 28 Sep): the themes, the pages by
-# name, the rules, and where bb design show reads each.
+# name, the rules, and where aerie design show reads each.
 _DESIGN = "<!-- BUILDERBOT:DESIGN -->"
 
 
@@ -302,8 +302,8 @@ def design_line(project):
         # session finds it there.
         return ("The notebook's Design view is empty: no theme, no page, no design rule. Build as you "
                 "would and choose the look yourself; then put what you arrived at into the design with "
-                "`bb design save` (the themes with their colors as tokens, the type, corners, space and "
-                "motion you settled on, the pages you built, the rules you followed; `bb design schema` "
+                "`aerie design save` (the themes with their colors as tokens, the type, corners, space and "
+                "motion you settled on, the pages you built, the rules you followed; `aerie design schema` "
                 "prints the shape) so the next session finds it there. "
                 f"Under the project's dial Agents may: Add to the design, {fill}.")
     lang, pages = rec["language"], rec["pages"]
@@ -327,12 +327,12 @@ def design_line(project):
     return (f"This project's notebook holds a design already: {'; '.join(bits)}. "
             + ("The tree has no code yet, so the design, the rules and the roadmap are the "
                "specification: build to them from the first file. " if empty else "")
-            + "Read `bb design show` before laying out or styling anything, `bb design show NAME` for "
+            + "Read `aerie design show` before laying out or styling anything, `aerie design show NAME` for "
               "one page or one theme. docs/design-language.md is yours to write and commit with the work "
-              "(`bb design file > docs/design-language.md`); the notebook never writes it into the tree by itself. What the "
+              "(`aerie design file > docs/design-language.md`); the notebook never writes it into the tree by itself. What the "
               "design leaves open and you had to decide (a color it does not name, a page it does not have, "
               "a choice of its language nobody has made) "
-              f"goes back into it with `bb design save` so it is complete; under the project's dial, {fill}.")
+              f"goes back into it with `aerie design save` so it is complete; under the project's dial, {fill}.")
 
 
 def _design_dial(project):
@@ -381,7 +381,7 @@ _END = "<!-- BUILDERBOT:END -->"
 def briefing(project, gates=True):
     """How this machine works, as every session on it is told (R63), whole:
     the core, the project's own lines and every topic. `gates` off keeps
-    the sections the tree would leave out, for `bb help TOPIC` on a
+    the sections the tree would leave out, for `aerie help TOPIC` on a
     project that is not an Android one.
 
     It used to be a 53KB block rendered into every project as CLAUDE.md and
@@ -390,7 +390,7 @@ def briefing(project, gates=True):
     here instead, from one file, at the moment a session starts, so there is
     no copy to be out of date and nothing to push.
 
-    What is in it is what would surprise somebody. The `bb` reference that
+    What is in it is what would surprise somebody. The `aerie` reference that
     made up most of the old block is a `bb <verb> -h` away and does not need
     paying for on every conversation.
 
@@ -461,7 +461,7 @@ def split(text):
         kept.append(line)
     index = ""
     if topics:
-        index = ("Topics of this briefing, each read with `bb help TOPIC` when the work reaches it:\n"
+        index = ("Topics of this briefing, each read with `aerie help TOPIC` when the work reaches it:\n"
                  + "\n".join(f"- {slug}: {gist}" for slug, _, gist, _ in topics))
     out = "\n".join(kept).replace(_TOPICS, index)
     out = re.sub(r"\n{3,}", "\n\n", out)
@@ -474,7 +474,7 @@ def topics(project):
 
 
 # The tool packs added here (R77), name to {label, guidance}: set by the
-# server (toolpacks.packs) and by bb preamble, which reads the same file.
+# server (toolpacks.packs) and by aerie preamble, which reads the same file.
 packs_of = None
 
 
@@ -499,19 +499,19 @@ def packs_line(project):
         mode = (prefs_mod.get(project) or {}).get("installpacks") or "ask" if prefs_mod and project else "ask"
     except Exception:                                                # noqa: BLE001
         mode = "ask"
-    ask = (f"`bb tool search WORDS` looks through the vetted catalog's packs, and `bb tool install NAME --why \"...\"` "
+    ask = (f"`aerie tool search WORDS` looks through the vetted catalog's packs, and `aerie tool install NAME --why \"...\"` "
            f"asks for one ({'refused here' if mode == 'deny' else 'added at once' if mode == 'auto' else 'a person answers on the bell'}: "
            f"Install a tool pack is {mode}); a session never installs a pack on a node itself.")
     if not on:
         return ask
-    names = ", ".join(f"{(r.get('label') or n)} (`bb tool {n}`)" for n, r in sorted(on.items()))
-    return (f"This project's sessions may use the tool packs {names}: `bb tool NAME` lists a pack's verbs, "
-            f"and `bb help tool-NAME` prints what the pack says about using them. A person here added each; "
-            f"none is shipped with BuilderBot. " + ask)
+    names = ", ".join(f"{(r.get('label') or n)} (`aerie tool {n}`)" for n, r in sorted(on.items()))
+    return (f"This project's sessions may use the tool packs {names}: `aerie tool NAME` lists a pack's verbs, "
+            f"and `aerie help tool-NAME` prints what the pack says about using them. A person here added each; "
+            f"none is shipped with AerieOS. " + ask)
 
 
 def topic(project, slug):
-    """One topic's text, headed, for `bb help TOPIC`; None when there is
+    """One topic's text, headed, for `aerie help TOPIC`; None when there is
     none by that name. Every topic answers, the tree's gates aside: a
     question about the emulator on a project with no Android is still a
     question. tool-NAME is a tool pack's own guidance, for a project that
@@ -520,7 +520,7 @@ def topic(project, slug):
         rec = _packs_on(project).get(slug[5:])
         if rec is not None:
             return (f"## {rec.get('label') or slug[5:]} (a tool pack)\n\n"
-                    + (rec.get("guidance") or f"The pack says nothing more: `bb tool {slug[5:]}` lists its verbs."))
+                    + (rec.get("guidance") or f"The pack says nothing more: `aerie tool {slug[5:]}` lists its verbs."))
     for s, title, _, body in split(briefing(project, gates=False))[1]:
         if s == slug:
             return f"## {title}\n\n{body}"
@@ -569,8 +569,8 @@ def memory_part(project, uid="", agent=""):
     first = members[0][1]
     head = ["## Memories", "",
             "What you remember is each repository's, kept for your account across sessions and coding agents: "
-            "`bb memory` lists a repository's, `bb memory show NAME` reads one whole, and "
-            "`bb memory add NAME --type user|feedback|project|reference --about \"one line\" \"...\"` saves one, "
+            "`aerie memory` lists a repository's, `aerie memory show NAME` reads one whole, and "
+            "`aerie memory add NAME --type user|feedback|project|reference --about \"one line\" \"...\"` saves one, "
             + ("with `bb -p REPO` on the repository it is about, so it stays with that repository if it moves to another "
                f"project; one about the project as a whole goes on {first}."
                if many else "so a session of any agent here starts knowing it.")]
@@ -717,7 +717,7 @@ def mentioned(project, text, told=()):
         steps = [s for s in r.get("steps") or [] if not s.get("done")]
         found.append((score, 0, name, f"{label('roadmap', r['id'])} {str(r.get('text', ''))[:140]}"
                       + (f" ({len(steps)} step{'s' if len(steps) != 1 else ''} open)" if steps else "")
-                      + f": `bb roadmap show {label('roadmap', r['id'])}`"))
+                      + f": `aerie roadmap show {label('roadmap', r['id'])}`"))
     try:
         bugs = bugs_mod.open_bugs(project)
     except Exception:                                    # noqa: BLE001
@@ -728,7 +728,7 @@ def mentioned(project, text, told=()):
         if name in told or score < 2:
             continue
         found.append((score, 1, name, f"{label('bugs', b['id'])} [{b.get('severity', 'medium')}] "
-                      f"{str(b.get('title', ''))[:140]}: `bb bug show {label('bugs', b['id'])}`"))
+                      f"{str(b.get('title', ''))[:140]}: `aerie bug show {label('bugs', b['id'])}`"))
     if not found:
         return "", []
     keep = []
@@ -747,7 +747,7 @@ def for_agent(agent_id, text):
     a = agents.get(agent_id)
     if not a or a.id == "claude" or not text:
         return text
-    return (f"This session runs {a.product}, BuilderBot's {a.name} agent. Everything below holds for it "
+    return (f"This session runs {a.product}, AerieOS's {a.name} agent. Everything below holds for it "
             "as for a Claude session: where this briefing says Claude, read the session you are; "
             "the house rules, the project's Agents may settings and bb apply to you alike.\n\n" + text)
 
@@ -758,7 +758,7 @@ def block(project, reply="", asks="", uid="", agent=""):
 
 
 def payload(project, reply="", asks="", uid="", agent=""):
-    """What the notebook's Overview draws, and what `bb preamble --json` prints.
+    """What the notebook's Overview draws, and what `aerie preamble --json` prints.
     `reply` and `asks` are the asker's own settings on the project (prefs
     USER_CHOICES): how Claude writes to them and how often it asks them.
     Each part carries its size, its share where it has one, and what it

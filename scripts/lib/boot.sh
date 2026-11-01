@@ -202,7 +202,7 @@ SED
 
     # Say plainly what was and wasn't found: a missing /secrets mount or a
     # misnamed file used to fail silently, leaving "no runner credential" in
-    # bb doctor with nothing in the log to explain it.
+    # aerie doctor with nothing in the log to explain it.
     if [ "$found" -gt 0 ]; then
         log "secrets: loaded ${found} value(s) [${names}]"
     elif [ -d "$BB_SECRETS_DIR" ]; then
@@ -429,7 +429,7 @@ seed_home() {
     for f in "$BUILDER_HOME"/.bashrc "$BUILDER_HOME"/.profile; do
         [ "$(stat -c %u "$f" 2>/dev/null)" = 0 ] && { chown "$PUID:$PGID" "$f" 2>/dev/null || true; }
     done
-    # /config is BuilderBot's own state, never a share: one Docker made for a
+    # /config is AerieOS's own state, never a share: one Docker made for a
     # missing host path, or a new named volume, is root's, and the dashboard,
     # which runs as the account, could keep nothing in it (B120). Only its
     # top: what root keeps in it on purpose (runner tokens, signing keys,

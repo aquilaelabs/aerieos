@@ -1,4 +1,4 @@
-# BuilderBot OS (R160): the appliance image built by mkosi and image/build.sh,
+# AerieOS (R160): the appliance image built by mkosi and image/build.sh,
 # then booted under QEMU until its dashboard answers. Called by
 # build-image.yml for a release's tag, a manual run and the weekly rebuild,
 # which publishes what it built; and run on its own when a branch push
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 jobs:
-  # The appliance image (R160 step 1): BuilderBot OS, built by image/build.sh
+  # The appliance image (R160 step 1): AerieOS, built by image/build.sh
   # on a hosted runner, since mkosi installs packages and the disk is laid
   # out on a loop device, neither of which the self-hosted node's container
   # has. On a tag, on a dispatch with its box ticked, and on the weekly

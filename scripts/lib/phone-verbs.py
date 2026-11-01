@@ -1,4 +1,4 @@
-"""Behind `bb phone` (cmd_phone in bb): what phone each node carries, and one adb
+"""Behind `aerie phone` (cmd_phone in bb): what phone each node carries, and one adb
 command put in front of the operator with its reason, run when they allow it.
 
 The first argument is the verb (status or run); for run the rest are the adb
@@ -34,11 +34,11 @@ def status():
         lease = n.get("lease") or {}
         if p and who and proj:
             if lease.get("project") == proj:
-                print(f"{'':<16} lent to {proj} by {lease.get('by_name') or who}: bb phone install, start, shot and touch work")
+                print(f"{'':<16} lent to {proj} by {lease.get('by_name') or who}: aerie phone install, start, shot and touch work")
             elif lease.get("project"):
                 print(f"{'':<16} lent to {lease['project']}, not {proj}")
             else:
-                print(f"{'':<16} not lent to {proj}: {who} lends it from the project's row or the Phone page; bb phone run --why asks them for one command meanwhile")
+                print(f"{'':<16} not lent to {proj}: {who} lends it from the project's row or the Phone page; aerie phone run --why asks them for one command meanwhile")
         elif p and not who:
             print(f"{'':<16} seen by adb but connected outside the Phone page, so nobody answers for it: connect it there")
     for a in d.get("asks") or []:
@@ -125,7 +125,7 @@ def lent():
         left = r.get("left")
         print(f"{r['model']}, lent to {os.environ.get('BB_PHONE_PROJECT')} by {r.get('by') or 'its owner'}"
               + (f", {left // 60} min left" if left is not None else ", until taken back"))
-        print("apps: " + (", ".join(r.get("pkgs") or []) or "none yet: bb phone install dist/APP.apk"))
+        print("apps: " + (", ".join(r.get("pkgs") or []) or "none yet: aerie phone install dist/APP.apk"))
     elif op == "shot":
         print(use("shot", quiet=True)["path"])
     elif op == "record" and rest[:1] == ["start"]:
@@ -142,7 +142,7 @@ def lent():
             print(f"{r['sheet']}  (the frames that changed, with their times)")
     elif op == "install":
         if not rest:
-            sys.exit("usage: bb phone install dist/APP.apk")
+            sys.exit("usage: aerie phone install dist/APP.apk")
         print(f"installed {use('install', {'file': rest[0]}, quiet=True)['pkg']}")
     elif op in ("start", "stop", "ime"):
         use(op, {"pkg": rest[0] if rest else ""})
@@ -159,7 +159,7 @@ def lent():
         anyapp = "--any-app" in rest
         rest = [w for w in rest if w != "--any-app"]
         if not rest:
-            sys.exit("usage: bb phone touch tap X Y | hold X Y [--ms N] | glide X Y X Y... [--hand NAME] [--seed N] "
+            sys.exit("usage: aerie phone touch tap X Y | hold X Y [--ms N] | glide X Y X Y... [--hand NAME] [--seed N] "
                      "| text \"...\" | key NAME   [--any-app]")
         kind = rest[0]
         ms = flag(rest, "--ms")

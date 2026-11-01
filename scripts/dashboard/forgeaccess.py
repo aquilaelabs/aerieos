@@ -11,7 +11,7 @@ Three things, each built on the one before:
     the host refuses for its content when the token may make it (an issue
     with no title answers 422) and refuses outright when it may not (403),
     so nothing ever lands. Kept per project, with when it was taken.
-  * **the relay**: `bb forge VERB`, a table of fixed verbs run here with
+  * **the relay**: `aerie forge VERB`, a table of fixed verbs run here with
     the token, which never reaches a node (the MACROS rule: no command
     strings). Each verb names its ability; one the token lacks is refused
     with what to enable, and the project's own override (Permissions, On
@@ -49,18 +49,18 @@ def configure(*, state, write_json, target, prefs_get):     # noqa: A002 - injec
 # ---- the abilities ---------------------------------------------------------
 #
 # `gh` is the fine-grained permission and level, `classic` the classic
-# token's scope, `gitlab` and `gitea` theirs. `verbs` are bb forge's verbs
+# token's scope, `gitlab` and `gitea` theirs. `verbs` are aerie forge's verbs
 # that use it ("" for one used another way, said in `how`). `default` is the
 # project's override until somebody changes it: allow, except merging, which
 # lands work on a branch somebody else may protect by hand.
 ABILITIES = (
     {"id": "code_read", "label": "Read the code and its history",
      "gh": ("Contents", "read"), "classic": "repo, or public_repo for a public repository",
-     "gitlab": "read_repository", "gitea": "read:repository", "how": "git fetch and pull (bb git)",
+     "gitlab": "read_repository", "gitea": "read:repository", "how": "git fetch and pull (aerie git)",
      "verbs": (), "default": "allow", "fixed": "always: a session has the tree itself"},
     {"id": "push", "label": "Push branches",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "write_repository",
-     "gitea": "write:repository", "how": "bb git push, under Permissions: Pushing",
+     "gitea": "write:repository", "how": "aerie git push, under Permissions: Pushing",
      "verbs": (), "default": "allow", "fixed": "set under Pushing"},
     {"id": "workflows", "label": "Change CI workflow files",
      "gh": ("Workflows", "write"), "classic": "workflow", "gitlab": "write_repository",
@@ -92,7 +92,7 @@ ABILITIES = (
      "how": "", "verbs": ("release list", "release view"), "default": "allow"},
     {"id": "releases_write", "label": "Publish and edit releases",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "api", "gitea": "write:repository",
-     "how": "bb version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow",
+     "how": "aerie version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow",
      "fixed": "set under Agents may: Tag and publish a release"},
 )
 BY_ID = {a["id"]: a for a in ABILITIES}
@@ -138,7 +138,7 @@ def _call(t, method, path, data=None, raw=False):
     job's log)."""
     base = forges.api_base(t["forge"], t["host"], t["scheme"])
     url = path if path.startswith("https://") else base + path
-    headers = {"User-Agent": "BuilderBot", **forges._auth(t["forge"]["kind"], t["token"])}
+    headers = {"User-Agent": "AerieOS", **forges._auth(t["forge"]["kind"], t["token"])}
     body = None
     if data is not None:
         body = json.dumps(data).encode()
@@ -393,7 +393,7 @@ def briefing(project):
             return ""
         threading.Thread(target=measure, args=(project, t), daemon=True).start()
         return ("Your git host: not measured yet, so what this project's token may do there is unknown; "
-                "`bb forge whoami` measures it now.")
+                "`aerie forge whoami` measures it now.")
     if m.get("error") and not m.get("has"):
         return f"Your git host: {m['error']}."
     pol = override(project)
@@ -405,7 +405,7 @@ def briefing(project):
     exp = f", expiring {m['expires']}" if m.get("expires") else ""
     lines = [f"Your git host: {m.get('forge') or m.get('host')} {m.get('repo')}{who}, a {m.get('token') or ''} "
              f"token{exp}, measured {time.strftime('%d %b %H:%M', time.localtime(m.get('at') or 0))}. "
-             "`bb forge whoami` prints it whole, `bb forge VERB` does it."]
+             "`aerie forge whoami` prints it whole, `aerie forge VERB` does it."]
     if yes:
         lines.append("You may: " + "; ".join(a["label"].lower() for a in yes) + ".")
     for a in no:
@@ -419,7 +419,7 @@ def briefing(project):
 # ---- the verbs -------------------------------------------------------------
 #
 # Each takes the parsed arguments and the target and returns (payload, code).
-# Arguments arrive as {"pos": [...], "flags": {...}} from bb forge; nothing in
+# Arguments arrive as {"pos": [...], "flags": {...}} from aerie forge; nothing in
 # them reaches a path but numbers, refs checked against REF, and the words
 # the verb itself names.
 
@@ -569,7 +569,7 @@ def v_issue_create(t, a):
     data = {"title": _text(a, "title", True), "body": _text(a, "body") or ""}
     lab = _text(a, "label")
     if lab and t["forge"]["kind"] == "gitea":
-        raise ValueError("Gitea takes labels by their number: create it, then bb forge issue label N NAME")
+        raise ValueError("Gitea takes labels by their number: create it, then aerie forge issue label N NAME")
     if lab:
         data["labels"] = [x.strip() for x in lab.split(",") if LABEL.fullmatch(x.strip())]
     c, b, _h = _call(t, "POST", f"/repos/{t['repo']}/issues", data)
@@ -654,7 +654,7 @@ def v_run_log(t, a):
 def v_run_rerun(t, a):
     n = _num(a, 0, "the run")
     if t["forge"]["kind"] == "gitea":
-        raise ValueError("Gitea's API has no rerun: start the workflow again with bb forge run dispatch")
+        raise ValueError("Gitea's API has no rerun: start the workflow again with aerie forge run dispatch")
     path = f"/repos/{t['repo']}/actions/runs/{n}/" + ("rerun-failed-jobs" if (a.get("flags") or {}).get("failed") else "rerun")
     c, b, _h = _call(t, "POST", path, {})
     return _ok(c, b, lambda _x: {"rerun": n})
@@ -934,7 +934,7 @@ ABILITY_OF = {v: a["id"] for a in ABILITIES for v in a["verbs"]}
 
 
 def run(project, verb, args):
-    """One bb forge verb for this project: (payload, status)."""
+    """One aerie forge verb for this project: (payload, status)."""
     if verb == "whoami":
         m = fresh(project)
         return {"measure": m, "override": override(project), "briefing": briefing(project)}, 200
@@ -942,7 +942,7 @@ def run(project, verb, args):
         return measure(project), 200
     fn = VERBS.get(verb)
     if fn is None:
-        return {"error": f"bb forge has no {verb}: {', '.join(['whoami', 'measure', *VERBS])}"}, 400
+        return {"error": f"aerie forge has no {verb}: {', '.join(['whoami', 'measure', *VERBS])}"}, 400
     t = target_of(project)
     if t.get("error"):
         return {"error": t["error"]}, 400
@@ -953,4 +953,4 @@ def run(project, verb, args):
     try:
         return fn[1 if t["forge"]["kind"] == "gitlab" else 0](t, args)
     except ValueError as e:
-        return {"error": f"bb forge {verb}: {e}"}, 400
+        return {"error": f"aerie forge {verb}: {e}"}, 400

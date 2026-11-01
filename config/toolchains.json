@@ -1,10 +1,10 @@
 {
   "_comment": [
     "Everything the container needs in order to offer, fetch and install a toolchain.",
-    "The dashboard's Library renders it and `bb toolchains` acts on it; adding a toolchain",
+    "The dashboard's Library renders it and `aerie toolchains` acts on it; adding a toolchain",
     "here is the whole job, as long as it fits one of the five kinds below.",
     "",
-    "  name     what `bb toolchains install|remove` is called with.",
+    "  name     what `aerie toolchains install|remove` is called with.",
     "  probe    where it lands, so the page can tell installed from not: a bare",
     "           name is a directory under the toolchain store root, android:<pkg> a package",
     "           directory under ANDROID_HOME. System images are not toolchains;",
@@ -111,7 +111,7 @@
     "flavors": {
       "google_apis": {
         "label": "Google APIs",
-        "about": "Google Play services (Maps, sign-in, push) but no Play Store app. Rootable: `adb root` works, which the Play Store images refuse. This is the default, and what bb emu create fetches.",
+        "about": "Google Play services (Maps, sign-in, push) but no Play Store app. Rootable: `adb root` works, which the Play Store images refuse. This is the default, and what aerie emu create fetches.",
         "xml": "https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml"
       },
       "google_apis_playstore": {
@@ -232,7 +232,7 @@
           "JAVA_HOME": "{dir}/../jdk"
         },
         "after": [
-          "system images and the emulator install through it: bb toolchains install android:emulator, bb emu image add ID"
+          "system images and the emulator install through it: aerie toolchains install android:emulator, aerie emu image add ID"
         ],
         "download": {
           "resolver": "approximate",
@@ -1015,7 +1015,7 @@
       "requires": [
         "node"
       ],
-      "about": "Chromium, Firefox and WebKit with the module that drives them, for bb capture shot and browser tests. Needs node.",
+      "about": "Chromium, Firefox and WebKit with the module that drives them, for aerie capture shot and browser tests. Needs node.",
       "source": {
         "kind": "command",
         "requires": "npm",
@@ -1069,7 +1069,7 @@
       "platforms": [
         "linux/amd64"
       ],
-      "about": "What bb lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, bb lint on a node skips its checks.",
+      "about": "What aerie lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, aerie lint on a node skips its checks.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1178,7 +1178,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "What bb tool sound say and hear run: piper turns text into speech, and whisper turns a recording back into text with its times. About 800 MB.",
+      "about": "What aerie tool sound say and hear run: piper turns text into speech, and whisper turns a recording back into text with its times. About 800 MB.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1290,7 +1290,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "What bb tool graphics runs: ImageMagick for resizing, cropping and comparing images, resvg for SVG to PNG, and oxipng, pngquant and cwebp for shrinking what an app ships.",
+      "about": "What aerie tool graphics runs: ImageMagick for resizing, cropping and comparing images, resvg for SVG to PNG, and oxipng, pngquant and cwebp for shrinking what an app ships.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1378,7 +1378,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "What bb tool diagrams runs: PlantUML and Mermaid, diagrams drawn from text. Needs jdk and playwright beside it.",
+      "about": "What aerie tool diagrams runs: PlantUML and Mermaid, diagrams drawn from text. Needs jdk and playwright beside it.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1437,7 +1437,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "What bb tool docs runs: reads a PDF, Word document, slide deck or spreadsheet as Markdown, draws a PDF's pages as pictures, and converts with pandoc. Also lets Claude Code read PDFs. About 650 MB.",
+      "about": "What aerie tool docs runs: reads a PDF, Word document, slide deck or spreadsheet as Markdown, draws a PDF's pages as pictures, and converts with pandoc. Also lets Claude Code read PDFs. About 650 MB.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1449,7 +1449,7 @@
         "run": [
           "sh",
           "-ec",
-          "dst=\"$2\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" 'markitdown[pdf,docx,pptx,xlsx,xls]' pymupdf; ln -sf ../venv/bin/markitdown \"$dst/bin/markitdown\"; v=\"$(tag jgm/pandoc)\"; get \"https://github.com/jgm/pandoc/releases/download/$v/pandoc-$v-linux-amd64.tar.gz\" \"$t/pandoc.tgz\"; tar -xzf \"$t/pandoc.tgz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/pandoc' -type f | head -1)\" \"$dst/bin/pandoc\"; chmod +x \"$dst/bin/pandoc\"; test -f \"${BB_LIB:-}/poppler.py\" || { echo \"poppler.py is not beside bb: install this from bb toolchains\" >&2; exit 1; }; cp \"$BB_LIB/poppler.py\" \"$dst/libexec/poppler.py\"; for n in pdftoppm pdfinfo; do printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/poppler.py\" %s \"$@\"\\n' \"$n\" > \"$dst/bin/$n\"; chmod +x \"$dst/bin/$n\"; done; rm -rf \"$t\"",
+          "dst=\"$2\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" 'markitdown[pdf,docx,pptx,xlsx,xls]' pymupdf; ln -sf ../venv/bin/markitdown \"$dst/bin/markitdown\"; v=\"$(tag jgm/pandoc)\"; get \"https://github.com/jgm/pandoc/releases/download/$v/pandoc-$v-linux-amd64.tar.gz\" \"$t/pandoc.tgz\"; tar -xzf \"$t/pandoc.tgz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/pandoc' -type f | head -1)\" \"$dst/bin/pandoc\"; chmod +x \"$dst/bin/pandoc\"; test -f \"${BB_LIB:-}/poppler.py\" || { echo \"poppler.py is not beside bb: install this from aerie toolchains\" >&2; exit 1; }; cp \"$BB_LIB/poppler.py\" \"$dst/libexec/poppler.py\"; for n in pdftoppm pdfinfo; do printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/poppler.py\" %s \"$@\"\\n' \"$n\" > \"$dst/bin/$n\"; chmod +x \"$dst/bin/$n\"; done; rm -rf \"$t\"",
           "--",
           "{script}",
           "{dir}"
@@ -1494,7 +1494,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "What bb tool office runs: LibreOffice without a window, to turn documents, decks and spreadsheets into PDFs. About 750 MB.",
+      "about": "What aerie tool office runs: LibreOffice without a window, to turn documents, decks and spreadsheets into PDFs. About 750 MB.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1542,7 +1542,7 @@
         "linux/amd64"
       ],
       "updatable": true,
-      "about": "The server behind a project's File access setting: FTPS on the project's node, where people sign in with their own BuilderBot name and password. About 60 MB.",
+      "about": "The server behind a project's File access setting: FTPS on the project's node, where people sign in with their own AerieOS name and password. About 60 MB.",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1554,7 +1554,7 @@
         "run": [
           "sh",
           "-ec",
-          "dst=\"$2\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" pyftpdlib pyopenssl; test -f \"${BB_LIB:-}/bbftp.py\" || { echo \"bbftp.py is not beside bb: install this from bb toolchains\" >&2; exit 1; }; cp \"$BB_LIB/bbftp.py\" \"$dst/libexec/bbftp.py\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/bbftp.py\" \"$@\"\\n' > \"$dst/bin/bb-ftpd\"; chmod +x \"$dst/bin/bb-ftpd\"; rm -rf \"$t\"",
+          "dst=\"$2\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst/bin\" \"$dst/libexec\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" pyftpdlib pyopenssl; test -f \"${BB_LIB:-}/bbftp.py\" || { echo \"bbftp.py is not beside bb: install this from aerie toolchains\" >&2; exit 1; }; cp \"$BB_LIB/bbftp.py\" \"$dst/libexec/bbftp.py\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$here/../libexec/bbftp.py\" \"$@\"\\n' > \"$dst/bin/bb-ftpd\"; chmod +x \"$dst/bin/bb-ftpd\"; rm -rf \"$t\"",
           "--",
           "{script}",
           "{dir}"
@@ -1721,7 +1721,7 @@
         ],
         "after": [
           "a Windows target also needs a linker: rustup target add x86_64-pc-windows-gnu,",
-          "then EXTRA_APT_PACKAGES=gcc-mingw-w64, or bb toolchains install zig + cargo-zigbuild"
+          "then EXTRA_APT_PACKAGES=gcc-mingw-w64, or aerie toolchains install zig + cargo-zigbuild"
         ],
         "download": {
           "resolver": "url-matches",

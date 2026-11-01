@@ -1,6 +1,6 @@
-# How BuilderBot works
+# How AerieOS works
 
-BuilderBot is one container, the **controller**, and the machines it enrolls,
+AerieOS is one container, the **controller**, and the machines it enrolls,
 the **nodes**. The controller serves the dashboard and keeps every project's
 notebook and record; the nodes run the work: the agents' sessions, builds, tests,
 CI, the emulator and containers. This page is the overview: what the image
@@ -27,7 +27,7 @@ edge:
 | Sessions | each agent's sessions: starting one, what it sees, what it is told | [sessions.md](sessions.md) |
 | People, Settings | Users, Roles, and your Profile | [people.md](people.md) |
 | Build > Library, Phone | The companion app for an Android phone | [companion-app.md](companion-app.md) |
-| (a terminal) | The `bb` command | [bb-command.md](bb-command.md) and [reference.md](reference.md) |
+| (a terminal) | The `aerie` command | [aerie-command.md](aerie-command.md) and [reference.md](reference.md) |
 
 ## What's in the image
 
@@ -42,14 +42,14 @@ edge:
 | **Docker** | CLI + compose/buildx plugins; no daemon and no host socket here, so containers run on a node |
 | **Search** | ripgrep, fd, fzf, jq, yq |
 | **Build** | build-essential, cmake, pkg-config |
-| **Lint** | shellcheck, hadolint, actionlint, ruff, node --check: `bb lint` runs the right ones over a repo |
+| **Lint** | shellcheck, hadolint, actionlint, ruff, node --check: `aerie lint` runs the right ones over a repo |
 | **Media** | ffmpeg, imagemagick |
 | **Runner** | Not in the image: CI runners are a node's, added on the CI runner page under Build |
 | **Versioning** | `mise` for per-project tool pinning (gradle, go, rust, on demand) |
 
 Slimmer builds: `--build-arg INSTALL_PLAYWRIGHT=false`, `INSTALL_ANDROID=false`.
 The heavyweight toolchains (Flutter, .NET, Swift, extra Android packages)
-are never in the image at all; `bb toolchains install` puts them on a share that an
+are never in the image at all; `aerie toolchains install` puts them on a share that an
 update cannot touch. See [the toolchain store lives outside the image](toolchains.md#the-toolchain-store-lives-outside-the-image).
 
 ## Security model, in short
@@ -67,7 +67,7 @@ update cannot touch. See [the toolchain store lives outside the image](toolchain
   commands: `mint-runner-token`, which only emits 1-hour tokens, and
   `deploy-key`, which keeps a project's deploy key root-only and loads it
   into the agent.
-- **Your root door** is host-side: `docker exec -it -u 0 BuilderBot bash`.
+- **Your root door** is host-side: `docker exec -it -u 0 AerieOS bash`.
 - Don't attach the runner to public repos; treat container-produced commits
   and packages with normal review.
 
@@ -112,6 +112,6 @@ and the SDK/Playwright hooks, so the web UI is reachable in seconds rather
 than after the whole start-up. For a few of those seconds it knows less than
 it will: the toolchain store is listed as a project until the hook that marks
 it runs, and the git facts on the cards are blank. All of that corrects itself on the next
-poll. `bb logs` times each
+poll. `aerie logs` times each
 hook and prints how far into the boot it started, so "what is the wait" is a
 question the log answers.

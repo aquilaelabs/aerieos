@@ -195,7 +195,7 @@ function jobsShowSet(v){
 
 // Who asked: every job has an asker, so it is a column and not a line
 // under each row; an account is named without its "user:" prefix.
-// A job BuilderBot asked for itself is "system:WHAT", said in words, or
+// A job AerieOS asked for itself is "system:WHAT", said in words, or
 // a bare "system" (a toolchain's daily check), said as automatic as well.
 // One word, which the By column holds whole at a desk beside the Job
 // column's room ("automatic update" was cut to "automatic …"); the Kind

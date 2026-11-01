@@ -1,4 +1,4 @@
-"""Behind `bb changelog` (cmd_changelog in bb): this project's CHANGELOG.md
+"""Behind `aerie changelog` (cmd_changelog in bb): this project's CHANGELOG.md
 as dashboard/changelog.py reads it, the same module the notebook's
 Changelog view and a version bump use.
 
@@ -60,7 +60,7 @@ if "--no-stamp" in argv:
 
 if argv and argv[0] == "add":
     if len(argv) < 2 or not argv[1].strip():
-        print('bb changelog add "what changed, for the person using it" '
+        print('aerie changelog add "what changed, for the person using it" '
               '--cat NAME [--for DIR]\n' + changelog.rules(), file=sys.stderr)
         raise SystemExit(1)
     # A category is asked for rather than assumed. Filed under none, an entry
@@ -108,8 +108,8 @@ if argv and argv[0] == "unreleased":
 if argv and argv[0] == "edit":
     words = argv[2] if len(argv) > 2 else None
     if len(argv) < 2 or (words is None and not moving) or (words is not None and not words.strip()):
-        print('bb changelog edit N "the line as it should read now" [--cat NAME]\n'
-              "bb changelog edit N --cat NAME        move it, leaving the words alone",
+        print('aerie changelog edit N "the line as it should read now" [--cat NAME]\n'
+              "aerie changelog edit N --cat NAME        move it, leaving the words alone",
               file=sys.stderr)
         raise SystemExit(1)
     # Nothing is claimed for a move on its own: the entry says what it said.
@@ -125,7 +125,7 @@ if argv and argv[0] == "edit":
 
 if argv and argv[0] == "merge":
     if len(argv) < 4 or not argv[-1].strip():
-        print('bb changelog merge N M [...] "the one line for all of them" '
+        print('aerie changelog merge N M [...] "the one line for all of them" '
               '[--for DIR]', file=sys.stderr)
         raise SystemExit(1)
     r = changelog.merge(d, argv[1:-1], argv[-1], cat=cat or None)
@@ -137,7 +137,7 @@ if argv and argv[0] == "merge":
 
 if argv and argv[0] == "split":
     if len(argv) < 2:
-        print("bb changelog split N [--for DIR]", file=sys.stderr)
+        print("aerie changelog split N [--for DIR]", file=sys.stderr)
         raise SystemExit(1)
     r = changelog.split(d, argv[1])
     if r.get("error"):
@@ -149,7 +149,7 @@ if argv and argv[0] == "split":
 
 if argv and argv[0] == "rm":
     if len(argv) < 2:
-        print("bb changelog rm N [--for DIR]", file=sys.stderr)
+        print("aerie changelog rm N [--for DIR]", file=sys.stderr)
         raise SystemExit(1)
     r = changelog.remove(d, argv[1])
     if r.get("error"):
@@ -159,15 +159,15 @@ if argv and argv[0] == "rm":
     raise SystemExit(0)
 
 if argv:
-    print("bb changelog [--for DIR]         read it\n"
-          'bb changelog add "..." [--cat NAME]  log a user-facing change\n'
-          "bb changelog unreleased          the entries waiting for a bump, numbered\n"
-          'bb changelog edit N "..."        reword one of them; --cat NAME moves it,\n'
+    print("aerie changelog [--for DIR]         read it\n"
+          'aerie changelog add "..." [--cat NAME]  log a user-facing change\n'
+          "aerie changelog unreleased          the entries waiting for a bump, numbered\n"
+          'aerie changelog edit N "..."        reword one of them; --cat NAME moves it,\n'
           "                                 and on its own moves it without rewording\n"
           "                                 (--no-stamp: a correction, not a change)\n"
-          'bb changelog merge N M "..."     one line for several, carrying their commits\n'
-          "bb changelog split N             back into one line per commit\n"
-          "bb changelog rm N                drop one that stopped being true\n"
+          'aerie changelog merge N M "..."     one line for several, carrying their commits\n'
+          "aerie changelog split N             back into one line per commit\n"
+          "aerie changelog rm N                drop one that stopped being true\n"
           "\nA category is a `### Name` subsection. Which ones exist and what\n"
           "order they and their lines sit in is the operator's, on the\n"
           "Changelog editor beside the version.",
@@ -177,6 +177,6 @@ if argv:
 text = changelog.read(d)
 if text is None:
     print(f"no {changelog.FILE} here yet; the first "
-          f"`bb changelog add` creates it")
+          f"`aerie changelog add` creates it")
     raise SystemExit(0)
 print(text, end="")

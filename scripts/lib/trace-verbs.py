@@ -1,4 +1,4 @@
-"""Behind `bb dashboard trace [SECONDS]` (cmd_dashboard in bb): what the
+"""Behind `aerie dashboard trace [SECONDS]` (cmd_dashboard in bb): what the
 dashboard was asked over the last SECONDS, from the ring the server keeps
 (server.py trace_since), grouped by endpoint and by who asked, with how many
 times and how long each took. BB_TRACE_AUTH is the auth header.
@@ -14,7 +14,7 @@ def main():
     try:
         secs = max(1, int(sys.argv[1] if len(sys.argv) > 1 else 60))
     except ValueError:
-        sys.exit("[builderbot] ERROR: bb dashboard trace [SECONDS]")
+        sys.exit("[builderbot] ERROR: aerie dashboard trace [SECONDS]")
     d = bbapi.call(f"/api/trace?since={int(time.time()) - secs}", auth=os.environ["BB_TRACE_AUTH"])
     if d.get("error"):
         sys.exit(f"[builderbot] ERROR: {d['error']}")

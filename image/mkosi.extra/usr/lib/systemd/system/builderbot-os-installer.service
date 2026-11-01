@@ -1,5 +1,5 @@
 [Unit]
-Description=BuilderBot OS installer, on the console of a machine booted from the ISO
+Description=AerieOS installer, on the console of a machine booted from the ISO
 # Only on the ISO (bbinstaller=1 on the kernel's command line): on a disk
 # this unit never runs, and the controller's own first boot does.
 ConditionKernelCommandLine=bbinstaller=1

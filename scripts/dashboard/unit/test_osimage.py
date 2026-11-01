@@ -1,4 +1,4 @@
-"""BuilderBot OS updated from the page (R160 step 4): the agent's os-update
+"""AerieOS updated from the page (R160 step 4): the agent's os-update
 job fetches the release's ISO (or takes it from a folder), holds it to its
 sha256, takes the slot, kernel, initrd and release stamp out of its live/
 folder, writes the slot not in use, puts the kernel beside it on
@@ -49,7 +49,7 @@ IN_ISO = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz"
 
 
 class World:
-    """A BuilderBot OS machine in a folder: the release file, a slot tool that
+    """A AerieOS machine in a folder: the release file, a slot tool that
     keeps the next slot in a file, two slot partitions as files, an ESP, and
     a release's files served by file://."""
     def __init__(self, slot="a", version="0.9.0"):
@@ -196,7 +196,7 @@ class TheAgent(unittest.TestCase):
             with open(os.path.join(w.esp, "builderbot", "b", piece), "rb") as f:
                 self.assertEqual(f.read(), files[piece])
         self.assertEqual(open(w.nextf).read().strip(), "b")
-        self.assertIn("slot b holds BuilderBot OS 0.9.1", text)
+        self.assertIn("slot b holds AerieOS 0.9.1", text)
         # On trial (R161 step 2), going back to slot a; and the configuration
         # as it was kept beside it, without its logs.
         self.assertEqual(open(w.trialf).read().strip(), "prev=a ver=0.9.1")

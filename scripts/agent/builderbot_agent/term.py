@@ -1,4 +1,4 @@
-"""BuilderBot's own terminal on a node (R133): a pty per browser tab, served
+"""AerieOS's own terminal on a node (R133): a pty per browser tab, served
 on the screen relay's port (screen.py), which every node's firewall already
 opens to the controller alone.
 

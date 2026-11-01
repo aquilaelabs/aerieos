@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """One batch across the whole notebook, for a session working something out.
 
-`bb roadmap begin`, then edit the roadmap and the tracker as much as you like,
-then `bb roadmap commit`, and each log gets one account of what changed
+`aerie roadmap begin`, then edit the roadmap and the tracker as much as you like,
+then `aerie roadmap commit`, and each log gets one account of what changed
 rather than every step of arriving at it. `revert` puts both back.
 
 **Why it spans both.** A session reworking a plan usually files, notes or

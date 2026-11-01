@@ -36,7 +36,7 @@ settings = None           # the settings module
 nodes = None              # the node registry
 db = None                 # the store
 plugins = None            # plugins.py: each account's Claude plugins
-reports = None            # reports.py: problems with BuilderBot, from any project's session
+reports = None            # reports.py: problems with AerieOS, from any project's session
 users = None              # the account store, for names
 log_dir = None            # () -> Path of the controller's logs
 state_dir = None          # () -> Path of /config, for its state version
@@ -167,7 +167,7 @@ def nodes_now():
 
 def plugins_now():
     """The Claude plugins each account installed, per node, by name: what a
-    session that behaves oddly may be carrying beside BuilderBot's own hooks
+    session that behaves oddly may be carrying beside AerieOS's own hooks
     and briefing (plugins.py). Names and versions only."""
     who = {u.get("uid"): n for n, u in (users.load().get("users") or {}).items()}
     where = {n["id"]: n.get("name") for n in nodes.node_list(all=True)}
@@ -222,7 +222,7 @@ def audit(n=30):
 
 
 def reports_now(n=40):
-    """What sessions and people have reported about BuilderBot, newest
+    """What sessions and people have reported about AerieOS, newest
     first, when each was made. Their
     words were redacted when they were stored. One that carries its
     reporter's conversation names the file it is in, which the downloaded

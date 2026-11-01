@@ -64,7 +64,7 @@ class Reason(unittest.TestCase):
         # B83: a tool pack's install, as bb-dev-sandbox logged it; the row
         # was cut by characters from the end and began '3pack · * branch'.
         out = "Permission denied: " + "x" * 300
-        got = self.why("== bb toolchains install wordy\n"
+        got = self.why("== aerie toolchains install wordy\n"
                        "[builderbot] fetching wordy at 047e27a1b2c3 into /mnt/bbdata/toolchains/n_6d799c7c/wordy\n"
                        "From http://192.168.1.16:3000/labadmin/r3pack\n"
                        " * branch            047e27a1b2c3d4e5f60718293a4b5c6d7e8f9012 -> FETCH_HEAD\n"

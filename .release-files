@@ -1,4 +1,4 @@
-# The files every release of BuilderBot carries, one a line, @VER@ the
+# The files every release of AerieOS carries, one a line, @VER@ the
 # release's version (0.9.0, 0.9.0-dev.4501) and * as a shell pattern. The
 # controller checks each release against the list at its own tag once CI
 # has had three hours, and says on the bell what is missing and why

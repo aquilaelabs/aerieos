@@ -18,7 +18,7 @@
 //
 // Nothing here touches another app or reads the screen; it is network
 // discovery on the phone's own network and calls to the person's own
-// BuilderBot, so Play Protect has nothing new to look at.
+// AerieOS, so Play Protect has nothing new to look at.
 package dev.builderbot.app
 
 import android.app.NotificationManager
@@ -111,7 +111,7 @@ object PhonePair {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.notify(ID_PAIR, NotificationCompat.Builder(context, App.CH_ASK)
             .setSmallIcon(R.drawable.ic_stat_bb)
-            .setContentTitle("Pair with BuilderBot")
+            .setContentTitle("Pair with AerieOS")
             .setContentText("Type the six digits Android shows, here, without leaving that screen")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOnlyAlertOnce(true)
@@ -151,7 +151,7 @@ class PairReceiver : BroadcastReceiver() {
         val port = intent.getIntExtra("port", 0)
         val api = Store(context).api() ?: return
         if (code.length != 6) { PhonePair.said(context, "The pairing code is six digits"); return }
-        PhonePair.said(context, "Pairing with BuilderBot…")
+        PhonePair.said(context, "Pairing with AerieOS…")
         val pending = goAsync()
         Thread {
             val said = try {

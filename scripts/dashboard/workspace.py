@@ -23,7 +23,7 @@ What this module owns:
     name the node chose and this side sanitized, plus dist/.provenance/ with
     the chain (job, node, source digest, command, sha256).
   - bundle(): bb and its library plus the toolchain catalog as one tar, which
-    is what a node needs to run `bb toolchains install` against its own toolchain
+    is what a node needs to run `aerie toolchains install` against its own toolchain
     store: the toolchain recipes stay in one catalog (§6) and travel to the
     node by digest, like the agent itself does.
 """
@@ -305,7 +305,7 @@ def provenance(project, rel):
 # rest of scripts/dashboard (the notebook modules, users.py, server.py),
 # because a node has no /config for them to read; the verbs that need them
 # are relayed back here (server._bb_relay).
-BUNDLE_PARTS = ("scripts/bb", "scripts/lib", "config/toolchains.json",
+BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains.json",
                 # The publishers' release keys a download is checked against (R137).
                 "config/release-keys",
                 "nodes/provision-linux.sh", "nodes/families",
@@ -324,7 +324,7 @@ BUNDLE_PARTS = ("scripts/bb", "scripts/lib", "config/toolchains.json",
                 # controller is not answering, so a node's sessions stop for
                 # an update the same way the controller's do.
                 "scripts/dashboard/bb-gate",
-                # The record documents bb design show NAME, bb wiki and bb
+                # The record documents aerie design show NAME, aerie wiki and bb
                 # roadmap --format print, which the verbs in scripts/lib
                 # import from beside the dashboard (B426: a node's bb
                 # had no records module).

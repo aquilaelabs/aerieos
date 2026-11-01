@@ -1,4 +1,4 @@
-"""bb devapp probe (R248): whether an instance answers on its node's
+"""aerie devapp probe (R248): whether an instance answers on its node's
 loopback, from its own published ports only, through the node's agent and
 a program the controller fixes word for word (nodes.PROBE), so a session
 reads it with no root ask and a hosting-only node accepts it and nothing

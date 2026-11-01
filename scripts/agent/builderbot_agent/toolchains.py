@@ -35,18 +35,18 @@ def tc_dir(store, name, entry, action):
     return d if os.path.isdir(d) else ""
 
 
-# The recipes `bb toolchains update` knows (sdk.sh sdk_update); an android:*
+# The recipes `aerie toolchains update` knows (sdk.sh sdk_update); an android:*
 # package is updated by sdkmanager. Any other is updated by a remove and an
 # install, whatever its catalog says.
 UPDATE_VERBS = ("flutter", "dotnet", "swift", "playwright")
 
 
 def tc_verbs(store, name, entry, action):
-    """The bb toolchains verbs a job runs for one name, in order. An install
+    """The aerie toolchains verbs a job runs for one name, in order. An install
     of a toolchain that is there already is an update: `update` for a recipe
     that verb knows, and for the rest a remove and then the install (R193,
     the operator, 11 Oct: "have it uninstall and reinstall automatically"),
-    where bb toolchains install alone dies with "already installed" on a
+    where aerie toolchains install alone dies with "already installed" on a
     fresh_only recipe. Swift is updatable and fresh_only both, and this
     sent it to `install` on a node, which refused it every time (12 Oct).
     Not installed, or any other action: the one verb."""
@@ -366,7 +366,7 @@ def sdk_images(state):
     """The android system images in this node's toolchain store, and which of
     its AVDs are built on each.
 
-    A directory walk, deliberately, and not `bb emu images`, which is the same
+    A directory walk, deliberately, and not `aerie emu images`, which is the same
     listing plus a `du -sk` per image. The controller's own copy can afford
     that; a node cannot. The toolchain store is commonly an NFS export here
     and the tree runs to tens of gigabytes, so a size measured every census
@@ -433,7 +433,7 @@ def sdk_env(state, who=None):
     store. What the image gets from its Dockerfile, a node gets from here.
 
     EVERY job, not only a bb verb. It used to be applied in the bb branch of
-    Job.exec alone, so `bb build` and `bb test` (a plain exec) ran with a
+    Job.exec alone, so `aerie build` and `aerie test` (a plain exec) ran with a
     bare PATH: measured on a real node, java and go were both NOT-ON-PATH
     and JAVA_HOME unset, on a node whose census reported java 21.0.12.1 and
     go present. The placement gate said yes and then ./gradlew could not
@@ -445,7 +445,7 @@ def sdk_env(state, who=None):
     if store:
         android = os.path.join(store, "android")
         env.update({"SDK_ROOT": store, "BUILDER_HOME": store, "BB_NODE_TOOLCHAINS": "1",
-                    # The scope bb scopes by (common.sh sdk_scope), so a bb run
+                    # The scope bb scopes by (common.sh sdk_scope), so a aerie run
                     # here installs into and reads this node's own directory
                     # (R196) rather than the platform's shared one.
                     "BB_SDK_SCOPE": tc_scope(),
@@ -472,7 +472,7 @@ def sdk_env(state, who=None):
         env["PATH"] = ":".join(front + [env["PATH"]])
     env["ANDROID_AVD_HOME"] = os.path.join(stores.get("data") or "/tmp", "avd")
     # Where CI logs are archived on this node (roadmap #24, step 4). The
-    # workflows honor BB_CI_LOG_DIR and so does `bb ci-log`; without it the
+    # workflows honor BB_CI_LOG_DIR and so does `aerie ci-log`; without it the
     # runner kept them under its own home, 0700, where a session on the node
     # (a different account) could not read them. The data store is the
     # one directory both accounts see, and the runner's .env (written by
@@ -481,7 +481,7 @@ def sdk_env(state, who=None):
     env["BB_CI_LOG_DIR"] = ci_log_dir(state)
     # How many workers a test run here may use (R81): the node's setting,
     # else its cores. A project's test command reads it as it likes;
-    # BuilderBot's own harness shards its suites across it.
+    # AerieOS's own harness shards its suites across it.
     env["BB_TEST_WORKERS"] = str(state.get("test_workers") or os.cpu_count() or 1)
     return env
 
@@ -531,7 +531,7 @@ def sdk_verified(state):
 
 
 def sdk_versions(state):
-    """What `bb toolchains versions` reports on this node: {name: version}.
+    """What `aerie toolchains versions` reports on this node: {name: version}.
 
     The SAME generator the controller runs for its own list, so the two
     describe one store the same way. Before this, a node's versions came

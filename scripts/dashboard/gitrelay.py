@@ -518,10 +518,10 @@ def bad_args(args):
         if a in FLAGS:
             continue
         if a.startswith("-"):
-            return (f"bb git: '{a}' is not accepted: only remote names, refspecs and a few "
+            return (f"aerie git: '{a}' is not accepted: only remote names, refspecs and a few "
                     "plain flags reach the controller's git")
         if not ARG.fullmatch(a):
-            return f"bb git: '{a}' is not a remote name or refspec"
+            return f"aerie git: '{a}' is not a remote name or refspec"
     return ""
 
 
@@ -597,7 +597,7 @@ def _scan(d, project, name, pos, head_ref, branch, tree_refs):
 
 def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=True):
     if verb not in VERBS:
-        raise Refused(f"bb git takes {', '.join(VERBS)} or policy; plain git does everything else")
+        raise Refused(f"aerie git takes {', '.join(VERBS)} or policy; plain git does everything else")
     why = bad_args(args)
     if why:
         raise Refused(why)
@@ -630,15 +630,15 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
     merge_ref = ""
     if verb == "pull":
         if len(pos) > 2:
-            raise Refused("bb git pull takes a remote and at most one branch")
+            raise Refused("aerie git pull takes a remote and at most one branch")
         if len(pos) == 2:
             merge_ref = f"refs/remotes/{name}/{pos[1]}"
         elif not branch:
-            raise Refused("HEAD is not on a branch: name the one to pull, as in bb git pull origin main")
+            raise Refused("HEAD is not on a branch: name the one to pull, as in aerie git pull origin main")
         else:
             up = _last(cfg, f"branch.{branch}.merge")
             if not up.startswith("refs/heads/"):
-                raise Refused(f"{branch} has no upstream to pull: name it, as in bb git pull {name} {branch}")
+                raise Refused(f"{branch} has no upstream to pull: name it, as in aerie git pull {name} {branch}")
             merge_ref = f"refs/remotes/{name}/{up[len('refs/heads/'):]}"
         if not ref_ok(merge_ref):
             raise Refused(f"'{merge_ref}' is not a branch name git accepts")

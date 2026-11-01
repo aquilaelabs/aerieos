@@ -193,7 +193,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
             // A build named with no version (the operator, 6 Oct): the
             // sweep cannot tell when it is out of date, so it says so, in
             // the warning color, and offers Remove.
-            a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with bb version --file</span>` : ""}${
+            a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
             // What built it, when a job did (docs/nodes.md §6): the job,
             // the node, the snapshot. A file somebody copied in says nothing.
             a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
@@ -259,7 +259,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       const days = art.capture_days ?? 7;
       capBox.innerHTML = !caps.length ? "" : docSection("artifacts", "captures", "Captures",
         `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
-        `<div class="hint">What a session looked with: a reel's sheet (<b>bb capture reel</b>) or an
+        `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
            emulator shot, not what the project ships. ${days
              ? `Each is removed ${days} day${days === 1 ? "" : "s"} after it was taken`
              : "Kept until somebody removes one"}; the project's settings say how long.</div>`
@@ -578,7 +578,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     // order, the order inside them, the words: all of it here.
     //
     // Unreleased only. Everything below it is a release somebody may have
-    // read, shown as the text it is; `bb version unroll` is how one is
+    // read, shown as the text it is; `aerie version unroll` is how one is
     // reopened, which is a gesture that says what it is.
     function drawChangelog(pane, comp, j){
       let gs = JSON.parse(JSON.stringify(j.groups || []));
@@ -748,7 +748,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
         if (j.error){ pane.textContent = `changelog: ${j.error}`; return; }
         if (j.text == null){
           // No file yet. The first line can be written here as well as by
-          // a session's `bb changelog add`: the editor used to sit dead
+          // a session's `aerie changelog add`: the editor used to sit dead
           // until Claude made the file.
           pane.innerHTML = `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
             <div class="actbar"><input id="clFirst" maxlength="300" autocomplete="off"
@@ -898,7 +898,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
     const cost = v.component ? null : ver?.window_cost;
     // Where the number here lives against the branch builds come from, and
     // where a staged bump would land: the server's sentences (version.lands),
-    // so the row and bb version say the same thing. A bump on a branch
+    // so the row and aerie version say the same thing. A bump on a branch
     // already merged, unpushed, read as the project's version here while
     // main still had the old one, and nothing on the row said so (B338).
     const lands = v.lands || {};

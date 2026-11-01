@@ -1,4 +1,4 @@
-"""Behind `bb tool PACK [VERB ARGS...]` for a tool pack (R77): the verb's
+"""Behind `aerie tool PACK [VERB ARGS...]` for a tool pack (R77): the verb's
 words from the pack's manifest, as the catalog carries them, with the
 placeholders filled in, run in place of this process. Nothing here is a
 shell: a verb is a list of words a person approved when the pack was added,
@@ -26,28 +26,28 @@ def die(msg):
 if name == "--list":
     packs = [p for p in sdkmeta.catalog() if p.get("pack")]
     if packs:
-        print("\n  tool packs added here (bb tool PACK lists a pack's verbs):")
+        print("\n  tool packs added here (aerie tool PACK lists a pack's verbs):")
     off = set(os.environ.get("BB_TOOLCHAINS_OFF", "").split())
     for p in packs:
         # One this project's settings switch off is said so here, where a
         # session looks first, not only when it is run.
-        print(f"  bb tool {p['name']} {'|'.join(sorted(p.get('verbs') or {}))} ..."
+        print(f"  aerie tool {p['name']} {'|'.join(sorted(p.get('verbs') or {}))} ..."
               + ("   (switched off for this project: its settings' Toolchains group turns it on)" if p["name"] in off else ""))
     raise SystemExit(0)
 row = next((p for p in sdkmeta.catalog() if p.get("name") == name), None)
 if not row or not row.get("pack"):
-    die(f"no tool called {name}: bb tool lists them")
+    die(f"no tool called {name}: aerie tool lists them")
 verbs = row.get("verbs") or {}
 
 
 def usage():
-    print(f"bb tool {name}: {row.get('label') or name}, a tool pack added by "
+    print(f"aerie tool {name}: {row.get('label') or name}, a tool pack added by "
           f"{(row['pack'].get('by') or 'an administrator')} from {row['pack'].get('url')}")
     for v, spec in sorted(verbs.items()):
-        print(f"  bb tool {name} {v} {spec.get('usage') or ''}".rstrip())
+        print(f"  aerie tool {name} {v} {spec.get('usage') or ''}".rstrip())
         if spec.get("about"):
             print(f"      {spec['about']}")
-    print(f"  bb help tool-{name} is how the pack says to use them")
+    print(f"  aerie help tool-{name} is how the pack says to use them")
 
 
 if not rest or rest[0] in ("-h", "--help"):
@@ -58,7 +58,7 @@ if name in os.environ.get("BB_TOOLCHAINS_OFF", "").split():
     die(f"{name} is switched off for this project: its settings' Toolchains group turns it on")
 spec = verbs.get(verb)
 if not spec:
-    die(f"{name} has no verb {verb}: " + ", ".join(sorted(verbs)) + f" (bb tool {name})")
+    die(f"{name} has no verb {verb}: " + ", ".join(sorted(verbs)) + f" (aerie tool {name})")
 if not pack_dir:
     die(f"{name} is not installed on this node: the Library installs it")
 dist = os.path.join(project_dir, "dist") if project_dir else os.path.join(os.getcwd(), "dist")

@@ -3,7 +3,7 @@
 // keystore, so a password never sits in plain text. Everything else the app
 // remembers is ordinary preferences.
 //
-// More than one BuilderBot (R132): each pairing has a name, an address and
+// More than one AerieOS (R132): each pairing has a name, an address and
 // an account, and one of them is current, which is the one the screens show
 // and the phone is lent from. The watch and the live connection cover every
 // pairing, each with its own memory of what it has already said, so a note

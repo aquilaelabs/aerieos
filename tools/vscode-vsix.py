@@ -8,8 +8,8 @@ the plain JavaScript with no build step and no dependencies it is.
 
     tools/vscode-vsix.py --version X.Y.Z --out dist/NAME.vsix
 
-The version is BuilderBot's own (bb version --semver), written into the
-package.json inside the archive, so an install says which BuilderBot it came
+The version is AerieOS's own (aerie version --semver), written into the
+package.json inside the archive, so an install says which AerieOS it came
 from; the Files API version it speaks is package.json's builderbotApi.
 """
 import argparse
@@ -71,7 +71,7 @@ def main():
         for f in FILES:
             body = json.dumps(pkg, indent=2) + "\n" if f == "package.json" else (HERE / f).read_text()
             z.writestr(f"extension/{f}", body)
-    print(f"{out} ({out.stat().st_size} bytes): BuilderBot for VS Code {a.version}")
+    print(f"{out} ({out.stat().st_size} bytes): AerieOS for VS Code {a.version}")
 
 
 if __name__ == "__main__":

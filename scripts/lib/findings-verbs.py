@@ -1,4 +1,4 @@
-"""Behind `bb findings history` and `bb findings sample` (cmd_findings_history
+"""Behind `aerie findings history` and `aerie findings sample` (cmd_findings_history
 and cmd_findings_sample in bb): the scanner log's history, read through
 dashboard/findings.py, and a sample SARIF report written for the Analysis
 tab to show when no scanner has run.
@@ -56,7 +56,7 @@ def history():
         elif a in ("--find", "-f") and i + 1 < len(argv):
             find = argv[i + 1]; i += 2
         else:
-            print("usage: bb findings history [-n N|--all] [--since 7d|YYYY-MM-DD] "
+            print("usage: aerie findings history [-n N|--all] [--since 7d|YYYY-MM-DD] "
                   "[--find TEXT]", file=sys.stderr)
             sys.exit(1)
 

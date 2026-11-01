@@ -280,7 +280,7 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
     when = time.strftime("%d %b %Y %H:%M UTC", time.gmtime(expires))
     lines = [
         "#!/usr/bin/env bash",
-        f"# BuilderBot: enroll {name} {'again ' if again else ''}as a node of {ans['controller']}.",
+        f"# AerieOS: enroll {name} {'again ' if again else ''}as a node of {ans['controller']}.",
         *(["# Made for the machine it enrolled from: it refuses to run on another, and",
            "# so does the controller. The node keeps its own secrets; none is in here.",
            "# Running it is the repair: every step checks before it acts, puts back what",

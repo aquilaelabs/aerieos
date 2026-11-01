@@ -117,7 +117,7 @@ fun PhoneScreen(store: Store) {
                         val p = PhonePair.port(context, "_adb-tls-pairing._tcp", 60_000)
                             ?: return@act "Did not find the pairing screen within a minute: open Pair device with pairing code, then press Pair again"
                         PhonePair.ask(context, node.str("id"), ip, p)
-                        "Now type the six digits into the BuilderBot notification"
+                        "Now type the six digits into the AerieOS notification"
                     }
                 }) { Text("Pair") }
 

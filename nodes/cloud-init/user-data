@@ -23,14 +23,14 @@ users:
     shell: /bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
-      # <-- BuilderBot's public key. This is how it connects, and the reason
+      # <-- AerieOS's public key. This is how it connects, and the reason
       #     no Docker port has to be opened at all.
       - ssh-ed25519 AAAA_REPLACE_ME
 
 package_update: true
 packages: [ca-certificates, curl, gnupg, qemu-guest-agent, nfs-common]
 
-# Mounted at the SAME paths BuilderBot uses. Not a style preference: a compose
+# Mounted at the SAME paths AerieOS uses. Not a style preference: a compose
 # file's bind mounts are resolved by whoever runs the container, so identical
 # paths on both sides mean a relative bind is the same directory either way
 # and nothing has to translate. Get this wrong and docker creates the missing

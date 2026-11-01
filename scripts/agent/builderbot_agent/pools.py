@@ -161,7 +161,7 @@ def snapshots_now():
 
 
 def safe_mode():
-    """Safe mode on BuilderBot OS (R161 step 2): bbsafe=1 on the kernel's
+    """Safe mode on AerieOS (R161 step 2): bbsafe=1 on the kernel's
     command line; every encrypted pool stays locked in it."""
     try:
         with open(os.environ.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:

@@ -56,7 +56,7 @@ r = await bare('/login');
 {
   const html = await r.text();
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
-  // ...in BuilderBot's own colors: nobody is signed in, so no scheme a person
+  // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
   // picked is worn there (the operator, 17 Oct).
   ok(html.includes('--bg:#1a1f26') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
@@ -118,7 +118,7 @@ ok(r.headers.get('content-encoding') === 'gzip'
 r = await bare('/api/status', { headers: { ...AUTHH, 'Accept-Encoding': 'identity' } });
 ok(!r.headers.get('content-encoding'), 'a client that cannot take gzip gets plain bytes');
 
-// A browser with preemptive basic auth (bb capture shot, curl -u, these tests) still
+// A browser with preemptive basic auth (aerie capture shot, curl -u, these tests) still
 // works exactly as before: the whole page, no login step.
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -173,7 +173,7 @@ await ctx2.close();
   const { readFileSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', ...args],
+  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
@@ -188,7 +188,7 @@ await ctx2.close();
 
   bb(['add', 'alt', '--role', 'user'], 'firstpass1\nfirstpass1\n');
   await member('alt');
-  ok(read().users.alt?.role === 'user', 'bb users add makes an ordinary account');
+  ok(read().users.alt?.role === 'user', 'aerie users add makes an ordinary account');
   const signin = (u, pw) => bare('/login', { method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=${u}&password=${pw}&next=/` });
@@ -261,14 +261,14 @@ ${code}`], { encoding: 'utf8' });
      'a short password and an empty name are both refused');
   ok(existsSync(`${fresh}/users.json`), 'and the store is written where it will persist');
 
-  // `bb users add` on an empty store makes the owner as the form does, with
+  // `aerie users add` on an empty store makes the owner as the form does, with
   // an id of its own (diag report #116: written by hand it had none).
   const bare2 = mkdtempSync(`${tmpdir()}/bbsetup-`);
-  execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'firstboss'],
+  execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'firstboss'],
     { input: 'longenough1\nlongenough1\n', encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: bare2 } });
   const first = JSON.parse(readFileSync(`${bare2}/users.json`, 'utf8')).users.firstboss;
   ok(first?.role === 'owner' && /^u_[0-9a-f]{8}$/.test(first?.uid || ''),
-     `bb users add on an empty store makes the owner with an id, as the first-run form does (${first?.role} ${first?.uid})`);
+     `aerie users add on an empty store makes the owner with an id, as the first-run form does (${first?.role} ${first?.uid})`);
 
   // ...and the door is shut on a server that already has an owner, which is
   // this one. A second claim through the form would be a second owner.
@@ -291,7 +291,7 @@ ${code}`], { encoding: 'utf8' });
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', ...args],
+  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
@@ -399,7 +399,7 @@ ${code}`], { encoding: 'utf8' });
     // the record, so what is under test is the path that makes one.
     // WORKSPACE too: the verb checks the project is one, off the filesystem.
     const token = who => execFileSync('bash',
-      [`${REPO}/scripts/bb`, 'users', 'token', 'beta', who],
+      [`${REPO}/scripts/aerie`, 'users', 'token', 'beta', who],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
                                  WORKSPACE: `${DIR}/ws` } }).trim();
     const report = (who, email) => bare('/api/v1/claude-login', { method: 'POST',
@@ -409,7 +409,7 @@ ${code}`], { encoding: 'utf8' });
     ok((await report('test', 'tester@example.com')).status === 200
        && (await mine(owner))[box.id]?.email === 'tester@example.com' && !(box.id in await mine(other)),
        'a node reports the account it signed one account in as, and that is that account\'s alone');
-    // Two BuilderBot accounts on one Anthropic login: each signed in for
+    // Two AerieOS accounts on one Anthropic login: each signed in for
     // itself, neither refused a session. The Users tab says they share.
     ok((await report('sharer', 'tester@example.com')).status === 200
        && (await mine(other))[box.id]?.email === 'tester@example.com',
@@ -829,7 +829,7 @@ print(u.remove("renamed"))`], { encoding: 'utf8' });
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', ...args],
+  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const py = (code) => execFileSync('python3', ['-c', `
 import importlib.util, json
@@ -924,7 +924,7 @@ ${code}`], { encoding: 'utf8' }).trim();
 }
 
 // ---- the Users tab (roadmap #22 step 3) ---------------------------------
-// The surface accounts are actually managed from; bb users is the way back in
+// The surface accounts are actually managed from; aerie users is the way back in
 // when this cannot be reached, not the way in generally.
 {
   await page.evaluate(() => { const c = document.getElementById('cardTools');
@@ -1003,7 +1003,7 @@ ${code}`], { encoding: 'utf8' }).trim();
        `...with the name and email given, and no git identity (${JSON.stringify(made?.profile)})`);
   }
 
-  // Which Anthropic account each BuilderBot account is signed in as, taken
+  // Which Anthropic account each AerieOS account is signed in as, taken
   // from the record a node reported, since no login lives here (R47), and two
   // on one login said out loud, since Anthropic's terms allow one person per
   // Claude account.
@@ -1026,7 +1026,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   await pick('test');
   const testSays = await detail();
   ok(/same Claude account as test/.test(tabmadeSays) && /same Claude account as tabmade/.test(testSays),
-     'two BuilderBot accounts on one Claude login are told so on both');
+     'two AerieOS accounts on one Claude login are told so on both');
   rmSync(`${DIR}/home/users/${uidOf}/.claude/.bb-grant.json`, { force: true });
   // The owner's seed goes back: the rest of this file reads the fixture
   // node as signed in, and a Claude press on a node that is not goes to its
@@ -1095,7 +1095,7 @@ ${code}`], { encoding: 'utf8' }).trim();
                Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
     body: JSON.stringify({ action: 'remove', name: 'test' }) });
   ok(refused.status === 400 && /cannot be deleted/.test((await refused.json()).error || ''),
-     'and the store refuses it too, so bb users is held to the same rule');
+     'and the store refuses it too, so aerie users is held to the same rule');
 
   // A `user` cannot reach this tab's verbs at all.
   const notYours = await bare('/api/users', { method: 'POST',
@@ -1294,7 +1294,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   const wm = await page.$eval('.profiletab', el => ({ bar: el.closest('.doc')?.querySelector('.docbarrow')?.textContent || '',
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])) }));
   // Its roles a fact of the page's head now (the operator, 25 Oct).
-  ok(/BuilderBot's owner/.test(wm.facts.Roles || '') && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Projects === 'Write',
+  ok(/AerieOS's owner/.test(wm.facts.Roles || '') && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Projects === 'Write',
      `...and what it may do: its roles by name, and each area with its level (${JSON.stringify(wm).slice(0, 160)})`);
   ok(await page.evaluate(() => !!document.querySelector('#rail [data-rail="people"]') && railAllows('settings') && railAllows('users')),
      'an administrator is offered People and the controller\'s settings on the rail');
@@ -1325,7 +1325,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   await page.click('.profiletab .help.on');
   await page.setViewportSize({ width: 1280, height: 800 });
   // No author, no terminal and no git: an account with no name and email
-  // is refused a shell as well as a session at the door, and bb git for it
+  // is refused a shell as well as a session at the door, and aerie git for it
   // is refused on the relay: every project is a repository, and a shell is
   // where git is typed. The account made above has no author until it is
   // given one; then everything opens.
@@ -1343,11 +1343,11 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
       headers: { ...noauthor, 'Content-Type': 'application/json' },
       body: JSON.stringify({ argv: ['git', 'fetch'], cwd: `${DIR}/ws/beta` }) });
     ok(git.status === 403 && /no name and email/.test((await git.json()).error || ''),
-       '...and bb git fetch for it is refused on the relay');
+       '...and aerie git fetch for it is refused on the relay');
     const pol = await bare('/api/v1/bb', { method: 'POST',
       headers: { ...noauthor, 'Content-Type': 'application/json' },
       body: JSON.stringify({ argv: ['git', 'policy'], cwd: `${DIR}/ws/beta` }) });
-    ok(pol.status !== 403, `...while bb git policy, a read, answers it (${pol.status})`);
+    ok(pol.status !== 403, `...while aerie git policy, a read, answers it (${pol.status})`);
     // The status payload says whether the account administers this
     // controller, which is what words an empty Projects card for a user
     // with nothing granted rather than telling them the share is missing.
@@ -1460,7 +1460,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
          && plr.status === 200 && pl.keys && typeof pl.map === 'object' && !JSON.stringify(pl).includes('pass'),
          `a session reaches no signing key, not even the list or a backup, and a person reads only which exist (${sl.status}/${sb.status}/${plr.status})`);
     }
-    // bb sign (R106 step 3): a session asks only to sign its own project's
+    // aerie sign (R106 step 3): a session asks only to sign its own project's
     // build, under its dial. A key and a build are put in place for it; the
     // session never reads either back. Ask (the default) waits on the
     // project's owner, Deny names the setting, and nothing it cannot sign
@@ -1486,7 +1486,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
          && /no Play upload key/.test(noKey.body.error || '') && /bb build/.test(noFile.body.error || '')
          && asked.status === 200 && asked.body.id && ask && ask.kind === 'sign'
          && ask.cmd.join(' ') === 'sign alpha-release.apk --for sideload',
-         `a session's bb sign waits on the project's owner, and what it could not sign is refused before anybody is asked (${asked.body.to || JSON.stringify(asked.body)}; ${JSON.stringify(setNode).slice(0, 80)})`);
+         `a session's aerie sign waits on the project's owner, and what it could not sign is refused before anybody is asked (${asked.body.to || JSON.stringify(asked.body)}; ${JSON.stringify(setNode).slice(0, 80)})`);
       await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
       await bare('/api/prefs', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ project: 'alpha', sign: 'deny' }) });
       const denied = await sign({ file: 'alpha-release.apk', route: 'sideload', why: 'for testers' });
@@ -1543,7 +1543,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
       await bare('/api/signing', { method: 'POST', headers: ownerAuth,
         body: JSON.stringify({ action: 'backup-password', project: 'alpha', current: 'a-backup-password', new: '' }) });
       rmSync(`${DIR}/state/signing/alpha`, { recursive: true, force: true });
-      // bb version release (R138): a session asks to tag and publish its
+      // aerie version release (R138): a session asks to tag and publish its
       // own project's release, under its dial. What could not be released is
       // refused before anybody is asked; Ask names the tag and the commit to
       // the project's owner; Deny names the setting; another project is
@@ -1580,7 +1580,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         ok(/has no version/.test(noVersion.body.error || '') && /uncommitted changes/.test(dirtyAsked.body.error || '')
            && asked.status === 200 && ask && ask.kind === 'release'
            && ask.tag === 'v1.2.3' && ask.sha === sha && !gitR('tag', '--list', 'v1.2.3'),
-           `a session's bb version release is refused before anybody is asked when it could not happen, then waits on the project's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
+           `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the project's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
         await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
         // An Android APK the release could not have signed is said before
         // the tag (R134 step 4), and --without-apk goes on to the ask.
@@ -1607,7 +1607,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         ok(denied.status === 403 && /Tag and publish a release/.test(denied.body.error || '') && [400, 403].includes(other.status)
            && !gitR('tag', '--list', 'v1.2.3'),
            `...at Deny it is refused naming the setting, another project is never its to release, and nothing was tagged (${denied.status}/${other.status})`);
-        // bb version release --edit (R139): the published release's notes
+        // aerie version release --edit (R139): the published release's notes
         // and files, under the same dial, each edit its own ask that the
         // owner reads whole. What may be attached is the project's own: a
         // build in dist/ or a committed file, checked before anybody is asked.
@@ -1644,7 +1644,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       ok(nb.status === 403, `a session asks how busy only its own project's nodes are (${nb.status})`);
     }
     // A project's owner and its people (membership.py, the operator, 1 Oct).
-    // Invite only keeps an administrator from adding themselves; BuilderBot's
+    // Invite only keeps an administrator from adding themselves; AerieOS's
     // owner is never kept out; people join by accepting an invitation.
     {
       const post = async (h, path, body) => {
@@ -1654,7 +1654,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       await post(ownerAuth, '/api/users', { action: 'add', name: 'adminone', password: 'adminonepw1', role: 'admin' });
       const adminAuth = { 'Content-Type': 'application/json',
         Authorization: 'Basic ' + Buffer.from('adminone:adminonepw1').toString('base64') };
-      // Which other projects a project's sessions may read is BuilderBot's
+      // Which other projects a project's sessions may read is AerieOS's
       // owner's alone (the operator, 6 Oct): an administrator on the project
       // is refused a change and may still save the dialog around it.
       {
@@ -1666,9 +1666,9 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         const can = await bare('/api/status', { headers: adminAuth }).then(r => r.json()).then(j => j.can?.reads);
         await post(ownerAuth, '/api/prefs', { project: 'alpha', reads: [] });
         await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: [] });
-        ok(adminTry.status === 403 && /BuilderBot's owner alone/.test(adminTry.body.error || '') && ownerTry.status === 200
+        ok(adminTry.status === 403 && /AerieOS's owner alone/.test(adminTry.body.error || '') && ownerTry.status === 200
            && adminSame.status === 200 && adminOff.status === 403 && can === false,
-           `only BuilderBot's owner changes which projects a project's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
+           `only AerieOS's owner changes which projects a project's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
       }
       // A key's backup goes to a person with Releases write ON the project
       // (the operator, 1 Oct; R255 step 3): adminone sees alpha and holds no
@@ -1686,7 +1686,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
            && listOff.body.may_backup === false && listOn.body.may_backup === true,
            `a signing key's backup is for a person with a role on the project only, and the dialog offers it only to them (${off.status}/${on.status})`);
         // A backup password, the project's owner's (the operator, 1 Oct):
-        // then every download needs it, BuilderBot's owner's included,
+        // then every download needs it, AerieOS's owner's included,
         // carried in a POST body and never a URL; five misses hold them.
         const notOwner = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'a-long-password' });
         const short = await post(ownerAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'short' });
@@ -1728,7 +1728,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       ok(view.status === 200 && view.body.owner === 'test' && set.body.invite_only === true
          && /invite only/.test(self.body.error || '') && notOwner.status === 403,
          `gamma belongs to the owner, who makes it invite only, and an administrator then cannot add themselves to it or lift that (${view.body.owner}; ${(self.body.error || '').slice(0, 60)})`);
-      // BuilderBot's owner may add THEMSELVES to an invite-only project
+      // AerieOS's owner may add THEMSELVES to an invite-only project
       // (R135), the one difference from an administrator.
       {
         const list = (await (await bare('/api/users', { headers: ownerAuth })).json()).users.find(u => u.name === 'test').projects;
@@ -1749,7 +1749,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       ok(inv.status === 200 && mine && mine.by === 'test' && acc.body.joined === true
          && after.body.members.includes('adminone') && !after.body.invites.length,
          `...the owner invites them, the invitation waits in their status for the bell, and accepting puts them on it (${after.body.members.join(', ')})`);
-      // Handing it on: BuilderBot's owner moves it at once; its own owner
+      // Handing it on: AerieOS's owner moves it at once; its own owner
       // offers it, and it changes hands when the other accepts.
       const moved = await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', owner: 'adminone' });
       const offer = await post(adminAuth, '/api/members', { action: 'set', project: 'gamma', owner: 'plainone' });
@@ -1759,7 +1759,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       const now = await post(ownerAuth, '/api/members', { action: 'view', project: 'gamma' });
       ok(moved.body.owner === 'adminone' && offer.body.owner === 'adminone' && offer.body.offered === 'plainone'
          && off && off.by === 'adminone' && took.body.owner === true && now.body.owner === 'plainone',
-         `BuilderBot's owner hands a project on at once; its own owner offers it, and it moves when accepted (${moved.body.owner} -> offered ${offer.body.offered} -> ${now.body.owner})`);
+         `AerieOS's owner hands a project on at once; its own owner offers it, and it moves when accepted (${moved.body.owner} -> offered ${offer.body.offered} -> ${now.body.owner})`);
       // The owner role the handover made is gamma's alone (B726): the roles
       // payload says whose it is, and the People section offers it under
       // gamma and no other project.
@@ -1846,7 +1846,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
 {
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-  const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', ...args], { input, encoding: 'utf8', env });
+  const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args], { input, encoding: 'utf8', env });
   users(['add', 'maintuser', '--role', 'user'], 'maintpass11\nmaintpass11\n');
   users(['add', 'maintadm', '--role', 'admin'], 'maintpass22\nmaintpass22\n');
   await member('maintuser');
@@ -1855,7 +1855,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   const form = (u, pw) => bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=${u}&password=${pw}&next=/` });
   const theirCookie = ((await form('maintuser', 'maintpass11')).headers.get('set-cookie') || '').split(';')[0];
-  const token = who => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', ...(who ? [who] : [])], { encoding: 'utf8', env }).trim();
+  const token = who => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', ...(who ? [who] : [])], { encoding: 'utf8', env }).trim();
   const ownerTok = token('test'), userTok = token('maintuser');
   const set = (h, on) => bare('/api/settings', { method: 'POST', headers: h, body: JSON.stringify({ set: { maintenance_mode: on } }) });
   const SAID = /down for maintenance: only its owner can sign in/;

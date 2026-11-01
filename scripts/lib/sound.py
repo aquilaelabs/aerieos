@@ -1,19 +1,19 @@
-"""Behind `bb tool sound` (R107): sound effects a session makes for an app, and
+"""Behind `aerie tool sound` (R107): sound effects a session makes for an app, and
 the pictures that let it check one it cannot hear.
 
-    bb tool sound make PRESET [--seed N] [--name NAME] [--wav]
+    aerie tool sound make PRESET [--seed N] [--name NAME] [--wav]
         a sound effect from one of sfxr's presets (blip, pickup, jump, laser,
         hit, powerup, explosion, bloop), a fresh variation for each seed,
         into dist/sound/ as OGG (WAV with --wav or without ffmpeg)
-    bb tool sound tone HZ [--ms N] [--to HZ] [--wave sine|square|saw|noise] [--name NAME]
+    aerie tool sound tone HZ [--ms N] [--to HZ] [--wave sine|square|saw|noise] [--name NAME]
         a plain tone or sweep with a quick fade, for a beep or a chime
-    bb tool sound look FILE
+    aerie tool sound look FILE
         a waveform and a spectrogram of any sound file, as PNGs beside it
-    bb tool sound presets
+    aerie tool sound presets
         the presets, in a line each
-    bb tool sound say "TEXT" [--name NAME] [--ogg]
+    aerie tool sound say "TEXT" [--name NAME] [--ogg]
         speech, from piper, as a WAV to feed an app's microphone
-    bb tool sound hear FILE
+    aerie tool sound hear FILE
         what is said in a recording, as text with its times, from whisper
 
 sfxr is Tomas Pettersson's generator for game sounds (public domain); this is
@@ -151,7 +151,7 @@ def preset(name, rnd):
         p.attack, p.sustain, p.decay = 0.0, 0.05 + r() * 0.05, 0.15 + r() * 0.1
         p.lpf, p.lpf_ramp = 0.5 + r() * 0.2, -0.05
     else:
-        fail(f"no preset called {name}: bb tool sound presets lists them")
+        fail(f"no preset called {name}: aerie tool sound presets lists them")
     return p
 
 
@@ -387,7 +387,7 @@ def voice(d):
 def say(text, name, as_ogg):
     d = audio_tc()
     if not text.strip():
-        fail('bb tool sound say "TEXT": something to say')
+        fail('aerie tool sound say "TEXT": something to say')
     os.makedirs("dist/sound", exist_ok=True)
     stem = name or "say-" + (re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40] or "speech")
     wav = f"dist/sound/{stem}.wav"
@@ -458,7 +458,7 @@ def main(argv):
             print(f"  {k:<10} {v}")
     elif verb == "make":
         if not args:
-            fail("bb tool sound make PRESET [--seed N]: bb tool sound presets lists them")
+            fail("aerie tool sound make PRESET [--seed N]: aerie tool sound presets lists them")
         kind = args[0].lower()
         seed = opt(args, "--seed", "0")
         if not seed.isdigit():
@@ -469,7 +469,7 @@ def main(argv):
         print(f"  seed {seed}: the same seed makes the same sound; another makes a variation")
     elif verb == "tone":
         if not args:
-            fail("bb tool sound tone HZ [--ms N] [--to HZ] [--wave sine|square|saw|noise]")
+            fail("aerie tool sound tone HZ [--ms N] [--to HZ] [--wave sine|square|saw|noise]")
         hz = ms = to = None
         try:
             hz = float(args[0])
@@ -486,11 +486,11 @@ def main(argv):
         say(" ".join(args), name, as_ogg)
     elif verb == "hear":
         if not args or not os.path.isfile(args[0]):
-            fail("bb tool sound hear FILE: a recording that is there")
+            fail("aerie tool sound hear FILE: a recording that is there")
         hear(args[0])
     elif verb == "look":
         if not args or not os.path.isfile(args[0]):
-            fail("bb tool sound look FILE: a sound file that is there")
+            fail("aerie tool sound look FILE: a sound file that is there")
         made = look(args[0])
         if not made:
             fail("no ffmpeg here to draw it: the Library installs ffmpeg")

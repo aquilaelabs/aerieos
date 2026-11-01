@@ -3,7 +3,7 @@
 // No browser: version.py has no UI yet, and the part worth protecting is the
 // policy gate: a session must not be able to bump past what the operator
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
-// reachable through `bb version`, which is the same module the notebook will
+// reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
 import { launch, newPage, ready, ok, done, sleep, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
@@ -101,7 +101,7 @@ setPolicyFor(PROJ, 'minor');
 r = bb('bump', 'major');
 ok(r.code !== 0 && /not major/.test(r.out),
    'a policy of minor still keeps major with the operator');
-// bb version set: straight to a later version in one commit, asked of the
+// aerie version set: straight to a later version in one commit, asked of the
 // policy as the largest part it moves (report #48: 0.1.0 to 0.5.0 took four
 // minor bumps or the operator).
 r = bb('set', '1.0.0');
@@ -414,7 +414,7 @@ ok(bare('--code').out === '1',
   execFileSync('git', ['-C', WT, 'commit', '-qm', 'side work'], { env });
   const inWt = (...a) => execFileSync('bash', [BB, 'version', ...a], { cwd: WT, env }).toString().trim();
   ok(inWt('--code') === '2' && bare('--code').out === '1',
-     `bb version asked from a worktree answers for that tree (${inWt('--code')} there, ${bare('--code').out} in the project directory)`);
+     `aerie version asked from a worktree answers for that tree (${inWt('--code')} there, ${bare('--code').out} in the project directory)`);
   ok(inWt('--file') !== bare('--file').out,
      '...so a package built there is named after the commit it holds');
   execFileSync('git', ['-C', BARE, 'worktree', 'remove', '--force', WT], { env });
@@ -509,7 +509,7 @@ execFileSync('git', ['-C', M, 'commit', '--allow-empty', '-q', '-m', 'Another pa
 const listed = cl('unreleased').out;
 ok(/^\s*1\s+Pairing works across screen switches\s+\([0-9a-f]{7}\)/m.test(listed)
    && /^\s*2\s+Pairing shows the code larger/m.test(listed),
-   'bb changelog unreleased numbers the entries waiting for a bump');
+   'aerie changelog unreleased numbers the entries waiting for a bump');
 ok(cl('edit', '2', 'Pairing shows the code larger, and reads it aloud').code === 0,
    'a session can reword an unreleased entry instead of logging the same thing twice');
 const reworded = cl().out;
@@ -866,7 +866,7 @@ ub('version', 'unbump');
 ok(/already returned/.test(ub('version', 'unbump').out),
    'a second unbump refuses instead of quietly re-bumping');
 
-// The mechanical estimate that used to live here is gone. `bb version
+// The mechanical estimate that used to live here is gone. `aerie version
 // suggest` counted commits and read a manifest, and the judgment it produced
 // was worth less than nothing once Ask Claude existed: a number handed to a
 // session ANCHORS it, inviting it to justify 0.2.0 rather than read the code.
@@ -1070,7 +1070,7 @@ await page.waitForFunction(async () => {
 }, { timeout: 20000 });
 const polAfter = execFileSync('bash', [BB, 'version', 'policy'], { cwd: A, env }).toString();
 ok(/minor/.test(polAfter),
-   'the policy set in the tab is the one bb version reports to a session');
+   'the policy set in the tab is the one aerie version reports to a session');
 
 // Every project has this tab, not only the ones that opted in, so a project
 // with no VERSION file has to say how to opt in rather than render a broken
@@ -1468,13 +1468,13 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 
 // ---- a repo's own stamps travel with the number ----------------------------
 // A project may carry its version somewhere else, and a bump that moves one
-// and not the other commits a lie. BuilderBot is the case: its minor IS the
+// and not the other commits a lie. AerieOS is the case: its minor IS the
 // compatibility window, written again in the agent, and 0.5.0 only came out
 // consistent because a person moved both by hand before pressing Bump (B91).
 //
 // The hook is generic (an executable tools/version-stamp, run from the repo
 // root with the new version and the part), so this exercises the mechanism on
-// a repository of its own rather than on BuilderBot's two files, and rather
+// a repository of its own rather than on AerieOS's two files, and rather
 // than on the shared fixture, whose ordinal everything above depends on.
 {
   const S = `${WS}/stampproj`;
@@ -1515,7 +1515,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
      '...leaving VERSION exactly where it was');
 
   // And the stamps come BACK with the number. Without this, taking a bump
-  // back leaves what the bump moved where it was: for BuilderBot, a
+  // back leaves what the bump moved where it was: for AerieOS, a
   // controller returned to its old version still promising the new
   // compatibility window to every node and every briefing.
   writeFileSync(`${S}/tools/version-stamp`,
@@ -1538,7 +1538,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 
   // ---- what a window move costs, before it is pressed (B92) --------------
   // One project can move the compatibility window: the one whose checkout IS
-  // BuilderBot. What that window holds, now a session's briefing is assembled
+  // AerieOS. What that window holds, now a session's briefing is assembled
   // per session and cannot be from another one (R63 step 3), is a node's
   // AGENT: every project bound to a node is held until that node is updated,
   // and the sessions on it end. Nothing said so before the button was pressed.
@@ -1703,11 +1703,11 @@ ok((await page.errors).every(e => /400/.test(e)),
   const bumped = lb('bump', 'patch');
   ok(bumped.code === 0 && bumped.out.includes('0.8.1 is committed on claude/polish and not pushed. '
                                               + 'Builds come from main, which reads 0.7.0 as last fetched.'),
-     `bb version bump says the same where a session bumps (${bumped.out.trim().split('\n').pop()})`);
+     `aerie version bump says the same where a session bumps (${bumped.out.trim().split('\n').pop()})`);
   g('push', '-q', 'origin', 'claude/polish');
   const shown = lb().out;
   ok(/branch\s+0\.8\.1 is committed on claude\/polish\. Builds come from main, which reads 0\.7\.0 as last fetched\./.test(shown),
-     `...and bb version, once the branch is pushed, drops "not pushed" and still says what main reads (${
+     `...and aerie version, once the branch is pushed, drops "not pushed" and still says what main reads (${
        (shown.match(/branch\s+.*/) || [''])[0].trim()})`);
   g('checkout', '-q', 'main');
   ok(!/branch\s/.test(lb().out), '...and on main, level with the remote, it says nothing');

@@ -1,4 +1,4 @@
-"""Behind `bb transcripts` (cmd_transcripts in bb): the account's own
+"""Behind `aerie transcripts` (cmd_transcripts in bb): the account's own
 conversations with Claude on a project, through the controller's API as
 the caller (transcripts.py on the dashboard's side, the Profile page's
 list and download). `list` prints them newest first with the first thing
@@ -9,7 +9,7 @@ file itself into this machine's folder for it, which is how a synced node
 resumes a conversation it does not have (B613). A session reads its
 account's conversations on its own project and on one its project reads
 (`bb -p NAME transcripts`), and nobody else's: the controller looks under
-the account's transcripts and nowhere else. `audit [DAYS]` is `bb rules
+the account's transcripts and nowhere else. `audit [DAYS]` is `aerie rules
 audit`: the same conversations counted against the rules that refuse
 commands (R200). BB_TRANSCRIPTS_AUTH is the
 auth header and BB_TRANSCRIPTS_PROJECT the project.
@@ -64,11 +64,11 @@ if verb == "list":
         print(f"made visible to every session on {proj} by their person:")
         for row in seen:
             line(row, f"({row.get('by') or '?'}) ")
-    print("bb transcripts show ID prints one: what was said, every command it ran and what it answered")
+    print("aerie transcripts show ID prints one: what was said, every command it ran and what it answered")
     raise SystemExit(0)
 
 if verb == "audit":
-    # `bb rules audit [DAYS]` (R200): the account's conversations here over
+    # `aerie rules audit [DAYS]` (R200): the account's conversations here over
     # the last DAYS, counted against the rules that refuse commands.
     days = argv[1] if len(argv) > 1 and argv[1].isdigit() else "7"
     q = urllib.parse.urlencode({"project": proj, "audit": days})
@@ -95,7 +95,7 @@ if verb == "audit":
 if verb == "show":
     sid = argv[1] if len(argv) > 1 and not argv[1].startswith("--") else ""
     if not sid:
-        fail("bb transcripts show ID [--tz ZONE] [--all]: the id from bb transcripts")
+        fail("aerie transcripts show ID [--tz ZONE] [--all]: the id from aerie transcripts")
     tz = ""
     if "--tz" in argv:
         k = argv.index("--tz")
@@ -118,7 +118,7 @@ if verb == "fetch":
     import re
     sid = argv[1] if len(argv) > 1 and not argv[1].startswith("--") else ""
     if not sid or not re.fullmatch(r"[0-9A-Za-z-]+", sid):
-        fail("bb transcripts fetch ID [--into DIR]: the id from bb transcripts")
+        fail("aerie transcripts fetch ID [--into DIR]: the id from aerie transcripts")
     into = ""
     if "--into" in argv:
         k = argv.index("--into")
@@ -164,4 +164,4 @@ if verb == "fetch":
     print(f"fetched {sid} ({size(n)}) from the controller")
     raise SystemExit(0)
 
-fail("bb transcripts [list | show ID [--tz ZONE] | fetch ID [--into DIR]]")
+fail("aerie transcripts [list | show ID [--tz ZONE] | fetch ID [--into DIR]]")

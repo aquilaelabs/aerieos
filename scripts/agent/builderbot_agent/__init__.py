@@ -1,4 +1,4 @@
-"""BuilderBot's node agent: one file, standard library only, dialing OUT.
+"""AerieOS's node agent: one file, standard library only, dialing OUT.
 
 A node runs this under systemd. It enrolls once with a token the operator
 minted on the Nodes page, then loops for the life of the machine: say hello,
@@ -35,11 +35,11 @@ Three rules this file keeps that are worth knowing before changing it:
     controller's row says. The row is a claim, the enrollment is the fact.
   * Jobs never run as root. The unit runs the agent as root so that phase 5's
     system jobs (mounts, network) can, but an exec job drops to the account
-    the provisioner enrolled (the same `bb` that docker runs as) before it
+    the provisioner enrolled (the same `aerie` that docker runs as) before it
     runs anything. A session that reaches this box through a job has the
     reach it already had over ssh, and no more.
   * Sessions run here too (roadmap #24), and as a THIRD account. Beside the
-    jobs this opens BuilderBot's own terminals (R133) on the screen relay's
+    jobs this opens AerieOS's own terminals (R133) on the screen relay's
     port, running bb-tty from the bb bundle the controller ships,
     so a Claude session on this node's projects lives on this node, with
     this node's toolchains and its synced copy of the projects. They run as
@@ -60,16 +60,16 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # WINDOW.BUILD, and the two halves answer different questions.
 #
 # The WINDOW is the project's semver minor, and it is the compatibility
-# promise: while BuilderBot is 0.4.x, any 0.4 agent works with any 0.4
+# promise: while AerieOS is 0.4.x, any 0.4 agent works with any 0.4
 # controller and the other way round. 0.5.0 is where that promise ends and
 # where breaking changes and the removal of stale compatibility paths belong.
 # A test holds this half to the VERSION file, so the two cannot drift apart
 # quietly; see test/agent.mjs.
 #
 # The BUILD is the agent's own counter and moves only when the agent moves,
-# which is why it is not BuilderBot's patch number: most patches ship no new
+# which is why it is not AerieOS's patch number: most patches ship no new
 # agent. It does NOT reset at a window boundary (0.5.28 follows 0.4.27), so
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.364"
+AGENT_VERSION = "0.9.365"

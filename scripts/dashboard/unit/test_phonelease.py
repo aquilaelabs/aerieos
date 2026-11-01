@@ -388,7 +388,7 @@ class Session(unittest.TestCase):
 
     def test_a_long_answer_comes_back_whole(self):
         # Report #56: the answer was cut at 8 KB as JSON, so a layout dump
-        # stopped parsing and bb phone ui printed its tail as an ERROR.
+        # stopped parsing and aerie phone ui printed its tail as an ERROR.
         big = "<node/>" * 15000
         pl.use = lambda proj, op, args: ({"code": 0, "out": big}, 200)
         sess = {"name": "session:app", "uid": "u3", "aname": "Asker", "session": "app"}
@@ -415,7 +415,7 @@ class Session(unittest.TestCase):
 class Scope(unittest.TestCase):
     """report #51: the rows are the asker's scope, matched on the row's id.
     Matched on a `node` key no row has, a session's list came back empty and
-    bb phone status said no node carries adb beside a connected phone."""
+    aerie phone status said no node carries adb beside a connected phone."""
 
     def test_a_scoped_asker_sees_its_own_node(self):
         real = phone.payload

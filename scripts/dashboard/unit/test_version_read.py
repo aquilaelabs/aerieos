@@ -1,5 +1,5 @@
 """A VERSION file the controller could not read was taken as a project that
-has not adopted one, and bb version --file then answered with git describe:
+has not adopted one, and aerie version --file then answered with git describe:
 Shebang-DevBoard at 0.5.5 was told v0.5.4-13-g7766f70 and filed builds under
 it (B524). A failed read falls back to the committed file, and only a file in
 neither place is a project with no VERSION."""

@@ -1,4 +1,4 @@
-"""The node's one port for the controller's sockets: BuilderBot's own
+"""The node's one port for the controller's sockets: AerieOS's own
 terminals (R133, term.py) at /term, and a VM's screen for the dock (R99),
 relaying one connection to one of this machine's VMs' VNC, which libvirt
 listens for on the loopback alone.

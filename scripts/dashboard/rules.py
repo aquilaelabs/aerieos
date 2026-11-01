@@ -66,7 +66,7 @@ import re
 import sys
 import time
 
-# `bb` execs this module by path, so its directory is not on sys.path the way
+# `aerie` execs this module by path, so its directory is not on sys.path the way
 # it is for the dashboard's own import. Same reasoning as bugs.py: one module
 # object per process, because statefile's in-process half is a dict in there.
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -126,13 +126,13 @@ def replay(project, verb, args):
     return {"error": f"not a rules change that can be replayed: {verb}"}
 
 
-# flock on the file itself, so a `bb` process and the dashboard wait for each
+# flock on the file itself, so a `aerie` process and the dashboard wait for each
 # other rather than overwriting. See statefile.py; bugs.py's comment has the
 # measurement that made it a lock rather than a threading.Lock.
 _lock = statefile.on(lambda: FILE)
 
 # A name is what the standing block calls a conditional rule and what
-# `bb rules show` takes, so it has to be typeable and stable.
+# `aerie rules show` takes, so it has to be typeable and stable.
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
 # Long enough for a real rule (the worked example that prompted this is four
@@ -155,7 +155,7 @@ MAX_REFUSE = 200
 # both, and only the reading differs.
 GLOBAL = "*"
 
-# The global rules BuilderBot itself ships. Read-only on purpose: the next
+# The global rules AerieOS itself ships. Read-only on purpose: the next
 # image would bring an edited one back, and a change nobody can see reverted
 # is worse than no change, so the operator turns one off instead.
 #
@@ -173,8 +173,8 @@ GLOBAL = "*"
 BUILTIN = [
     {"name": "ask-do-not-install",
      "text": "Never install a tool with a system package manager: it is invisible"
-             " to `bb toolchains` and gone when the node is rebuilt. Say what is"
-             " missing and which toolchain carries it (`bb toolchains`); installing is"
+             " to `aerie toolchains` and gone when the node is rebuilt. Say what is"
+             " missing and which toolchain carries it (`aerie toolchains`); installing is"
              " the operator's, from the Library.",
      # Refused, not only said (R200): the one rule here a command shows
      # being broken, so the guard stops it with this text as the reason.
@@ -186,9 +186,9 @@ BUILTIN = [
                 "!apt install* --simulate*", "!dnf install* --assumeno*"]},
     {"name": "file-what-you-find",
      "text": "What you notice goes on the record as you meet it, not only in a"
-             " reply: a bug with `bb bug add`, work worth doing with `bb roadmap"
-             " add`. Close what you finish as it lands: `bb bug fix`, `bb roadmap"
-             " step done`, `bb roadmap done`."},
+             " reply: a bug with `aerie bug add`, work worth doing with `aerie roadmap"
+             " add`. Close what you finish as it lands: `aerie bug fix`, `aerie roadmap"
+             " step done`, `aerie roadmap done`."},
     {"name": "side-quests",
      "text": "A bug met mid-task is fixed only when your own change caused it"
              " or it blocks the work: the smallest fix, in its own commit, said"
@@ -196,8 +196,8 @@ BUILTIN = [
              " a bug found while fixing one of those is filed, not chased."},
     {"name": "prove-in-the-app",
      "text": "Tests passing is not done: where the project has a dev instance"
-             " (`bb devapp`) or an app on the emulator, use the change there the way"
-             " a person would before calling it done (`bb capture shot` or `reel`"
+             " (`aerie devapp`) or an app on the emulator, use the change there the way"
+             " a person would before calling it done (`aerie capture shot` or `reel`"
              " to see it), and say what you saw."},
 ]
 
@@ -212,13 +212,13 @@ ALWAYS = [
     {"name": "pkill-by-pid",
      "text": "A `pkill -f PATTERN` or `pgrep -f PATTERN` run from a tool call matches the shell running"
              " that call, because the pattern is on its command line: pkill kills it, and a wait on"
-             " pgrep never ends (B736). `bb proc PATTERN` lists what holds it, `bb proc stop PATTERN`"
-             " ends it and `bb proc wait PATTERN` waits for it to go, never touching the call's own"
+             " pgrep never ends (B736). `aerie proc PATTERN` lists what holds it, `aerie proc stop PATTERN`"
+             " ends it and `aerie proc wait PATTERN` waits for it to go, never touching the call's own"
              " shell; or end a process by its pid, or with `pkill -x NAME`.",
      "refuse": ["pkill -f", "pkill --full", "pkill -* -f", "pkill -*f",
                 "pgrep -f", "pgrep --full", "pgrep -* -f", "pgrep -*f"]},
     {"name": "emulator-through-bb",
-     "text": "The emulator is started with `bb emu start` and stopped with `bb emu stop`, never the"
+     "text": "The emulator is started with `aerie emu start` and stopped with `aerie emu stop`, never the"
              " emulator binary: bb picks the GPU, waits for the boot, keeps the log and saves its"
              " state on stop.",
      "refuse": ["emulator -avd", "emulator @*"]},
@@ -230,16 +230,18 @@ ALWAYS = [
              " the way your tool runs one detached (Claude Code's run_in_background), and wait on its"
              " notification, answering meanwhile: one in the foreground holds every reply until it"
              " ends, so a new ask cannot cut into it the way the project's While a test runs setting"
-             " says. The unit tier (bb tests unit) is quick enough to run either way.",
+             " says. The unit tier (aerie tests unit) is quick enough to run either way.",
      # A probe is a run against the kept fixture, a rebuild is minutes of a
      # job, and a build can be longer than either (the operator, 16 Oct:
      # messages queued behind them, on every project as on this one).
-     "refuse": ["bb build", "bb test", "bb tests run", "bb tests preflight", "bb tests lab", "bb tests coverage",
-                "bb tests probe", "bb devapp rebuild",
-                "bb dashboard test", "*/dashboard/test/run.sh",
-                "!bb tests preflight* --dry*",          # the plan only: nothing runs (B698)
-                # ...and a verb's usage, which runs nothing either (B278).
-                "!bb * --help*", "!bb * -h", "!bb *help"],
+     # The command by either name: bb still forwards to aerie.
+     "refuse": [f"{cli} {verb}" for cli in ("aerie", "bb")
+                for verb in ("build", "test", "tests run", "tests preflight", "tests lab", "tests coverage",
+                             "tests probe", "devapp rebuild", "dashboard test")]
+               + ["*/dashboard/test/run.sh"]
+               # the plan only: nothing runs (B698), and a verb's usage, which runs nothing either (B278).
+               + [f"!{cli} {tail}" for cli in ("aerie", "bb")
+                  for tail in ("tests preflight* --dry*", "* --help*", "* -h", "*help")],
      "foreground": True},
     # ...and the wait for one is not a foreground loop either (the operator,
     # 16 Oct: a session went unresponsive while it watched a gate's log).
@@ -253,14 +255,14 @@ ALWAYS = [
              " turn, and act on the notification.",
      "refuse": ["grep *exited*"],
      "foreground": True},
-    # git's network half goes through bb git (the operator, 27 Oct): the
+    # git's network half goes through aerie git (the operator, 27 Oct): the
     # controller holds the credential and the project's git policy and its
     # secret scan stand in front of it, so a session's own git push or fetch,
     # with a token it was handed, would go round all three. A local git
     # (commit, branch, log, a worktree) is the session's own.
     {"name": "git-through-bb",
-     "text": "A session reaches a remote only through bb git: `bb git push`, `bb git fetch`, `bb git pull`"
-             " and `bb git ls-remote`, which the controller runs with the project's credential, under"
+     "text": "A session reaches a remote only through aerie git: `aerie git push`, `aerie git fetch`, `aerie git pull`"
+             " and `aerie git ls-remote`, which the controller runs with the project's credential, under"
              " its git policy and its scan for secrets. git's own push, fetch, pull, ls-remote and"
              " remote update are refused, with a token or without; everything local to the repository"
              " is git's as ever.",
@@ -269,7 +271,7 @@ ALWAYS = [
                             " --git-dir *", " --work-tree=*", " --no-pager", " -P")]},
     {"name": "identity-is-given",
      "text": "Your commit identity arrives as git's environment, so a commit that cannot find an"
-             " author is a fault to report with `bb report`, not one to fix with git config"
+             " author is a fault to report with `aerie report`, not one to fix with git config"
              " --global user.name or user.email.",
      # The account's own, never a throwaway repository's: a test fixture
      # sets an identity in its scratch repo, which an audit found (12 Oct).
@@ -345,7 +347,7 @@ def set_project_off(project, names, by="you"):
 
 
 def builtins():
-    """The global rules BuilderBot ships, each marked as read-only and
+    """The global rules AerieOS ships, each marked as read-only and
     carrying whether it is currently off."""
     off = _off()
     out = []
@@ -428,7 +430,7 @@ def _clean(r, i):
     # A framework's two halves (roadmap R31): the document in the repo that
     # defines it in full, and the command that verifies it. A path is kept
     # repo-relative and cannot climb; a command is any line, run from the
-    # project root by whoever runs `bb rules check`, which is a session on its
+    # project root by whoever runs `aerie rules check`, which is a session on its
     # own tree, so it is no more than the session could type.
     doc = str(r.get("doc") or "").strip().replace("\\", "/").lstrip("/")[:200]
     if ".." in doc.split("/"):
@@ -439,7 +441,7 @@ def _clean(r, i):
             "words": [w.lower() for w in bits(r.get("words"))],
             "doc": doc,
             "check": " ".join(str(r.get("check") or "").split())[:300],
-            # Why the rule is what it is, kept for `bb rules show` and the
+            # Why the rule is what it is, kept for `aerie rules show` and the
             # tab, never sent in the block (R202): a reason read at a rule's
             # volume dilutes the rule.
             "why": str(r.get("why") or "").strip()[:MAX_TEXT],
@@ -516,11 +518,11 @@ def replace(project, rules, rev=None, force=False):
                ((load().get("projects") or {}).get(project) or {}).get("rules") or []}
     # A saved global rule cannot take a shipped one's name: the built-ins are
     # not in this list, so a collision would shadow one and leave two rules
-    # answering to the same `bb rules show`. Suffixed, the way a duplicate
+    # answering to the same `aerie rules show`. Suffixed, the way a duplicate
     # inside the list already is.
     keep = []
     # ...and a project's rule cannot take a GLOBAL rule's name, shipped or the
-    # operator's. `bb rules show NAME` walks the global rules first, so a
+    # operator's. `aerie rules show NAME` walks the global rules first, so a
     # project rule that shared one was shadowed by it and could never be read
     # by name. Names carry no other meaning: sharing one is not how a project
     # overrides anything (see block() for what is).
@@ -549,7 +551,7 @@ def replace(project, rules, rev=None, force=False):
         d = load()
         # The tab writes the WHOLE list, so a list that moved since it was
         # loaded is somebody else's work about to be overwritten: a rule a
-        # session added with `bb rules add`, one an administrator approved
+        # session added with `aerie rules add`, one an administrator approved
         # from the pending queue, another person's reword (B195). It used to
         # go through, and the log then said "you removed" a rule the person
         # saving had never seen. Checked inside the lock that guards the
@@ -581,7 +583,7 @@ MAX_HISTORY = 300
 def _log(d, project, by, ev):
     """Record one change, inside the lock and before the save it describes, so
     the record and the change land together or neither does. Same shape as
-    roadmap.py's, since one merged history is what `bb history` reads."""
+    roadmap.py's, since one merged history is what `aerie history` reads."""
     h = d.setdefault("history", {}).setdefault(project, [])
     h.append({"at": int(time.time()),
               "by": "claude" if by == "claude" else "you", **agents.asker(by),
@@ -657,10 +659,10 @@ def add(project, name, text, paths="", words="", by="claude", doc="", check="", 
     return {"ok": True, "rule": r}
 
 
-# Said the way `bb toolchains install` says its refusal: a sentence a session
+# Said the way `aerie toolchains install` says its refusal: a sentence a session
 # can quote back, naming who does it and where, rather than a door that looks
 # like a fault.
-_NOT_YOURS = ("a global rule reaches every project on this BuilderBot, so only "
+_NOT_YOURS = ("a global rule reaches every project on this AerieOS, so only "
               "the operator adds or changes one. Say in your reply what you "
               "would add and why, and they add it from a project's Briefing")
 
@@ -674,7 +676,7 @@ def _replaces_bad(project, replaces):
     if project == GLOBAL:
         return "a global rule applies everywhere; only a project's rule replaces one"
     if n not in {r["name"] for r in globals_now()}:
-        return (f"there is no global rule called {n}; `bb rules --global` lists them")
+        return (f"there is no global rule called {n}; `aerie rules --global` lists them")
     return ""
 
 
@@ -738,7 +740,7 @@ def edit(project, name, *, text=None, paths=None, words=None, by="claude",
     if project == GLOBAL and by == "claude":
         return {"error": _NOT_YOURS}
     if project == GLOBAL and str(name or "").strip().lower() in _builtin_names():
-        return {"error": "that rule ships with BuilderBot and is read-only: turn "
+        return {"error": "that rule ships with AerieOS and is read-only: turn "
                          "it off for a project, or for every project, from a project's Briefing"}
     bad = _replaces_bad(project, replaces)
     if bad:
@@ -770,7 +772,7 @@ def remove(project, name, why="", by="claude"):
     if project == GLOBAL and by == "claude":
         return {"error": _NOT_YOURS}
     if project == GLOBAL and str(name or "").strip().lower() in _builtin_names():
-        return {"error": "that rule ships with BuilderBot and is read-only: turn "
+        return {"error": "that rule ships with AerieOS and is read-only: turn "
                          "it off for a project, or for every project, from a project's Briefing"}
     with _lock:
         d = load()
@@ -827,7 +829,7 @@ def fitted(project, budget=None):
 
 
 def block(project):
-    """The rules' block with nothing left out: `bb rules --prompt`."""
+    """The rules' block with nothing left out: `aerie rules --prompt`."""
     return fitted(project)[0]
 
 
@@ -838,11 +840,11 @@ def _block(rs, triggers):
     # Short, because every session pays for it: the one thing it has to
     # carry is whose each rule is.
     out = ["House rules in effect here. * marks a session's own note, which"
-           " you may change or drop with `bb rules`; the rest are the"
+           " you may change or drop with `aerie rules`; the rest are the"
            " operator's, and you cannot change them, so say in your reply if"
            " one seems wrong."
            + (" A rule marked (global) is set for every project on this"
-              " BuilderBot." if any(r.get("scope") == "global" for r in rs) else "")
+              " AerieOS." if any(r.get("scope") == "global" for r in rs) else "")
            # Specific beats general, and it is said rather than computed: a
            # project's rule and a global one that disagree cannot be found by
            # matching their words, and a session is the one reader here that
@@ -860,11 +862,11 @@ def _block(rs, triggers):
         if r.get("scope") == "global":
             bits.append("global")
         if r.get("design"):
-            bits.append("the design's" if short else "the design's: bb design show reads it")
+            bits.append("the design's" if short else "the design's: aerie design show reads it")
         if r.get("doc"):
             bits.append(f"defined in full in {r['doc']}, read first")
         if r.get("check"):
-            bits.append(f"checked by `bb rules check {r['name']}`, run before handing back")
+            bits.append(f"checked by `aerie rules check {r['name']}`, run before handing back")
         named = [x for x in r.get("refuse") or [] if not x.startswith("!")]
         if named and not short:
             bits.append("a command it names is refused when you run it: " + ", ".join(named[:4])
@@ -883,11 +885,11 @@ def _block(rs, triggers):
         # (bb-work-note on a covered file, bb-prompt-relay on a word). An
         # excerpt here was ninety characters a session paid for on every
         # conversation and read on none.
-        out.append("Named, not quoted: `bb rules show <name>` reads one, and "
+        out.append("Named, not quoted: `aerie rules show <name>` reads one, and "
                    "its text arrives on the turn you edit a file or are asked "
                    "about a word it names."
                    + (" One marked the design's is the notebook's Design view's, "
-                      "and `bb design show <name>` reads it too."
+                      "and `aerie design show <name>` reads it too."
                       if any(r.get("design") for r in named) else ""))
         if triggers:
             for r in named:
@@ -900,11 +902,11 @@ def _block(rs, triggers):
             # acts on without being called: which it must check before it
             # hands back, and which have a document to read first.
             out.append("The rules are longer than their share of your prompt, so this leaves out "
-                       "what calls for each: `bb rules` lists them with it.")
+                       "what calls for each: `aerie rules` lists them with it.")
             out.append("  " + ", ".join(("*" if r.get("by") == "claude" else "") + r["name"] for r in named))
             checked = [r["name"] for r in named if r.get("check")]
             if checked:
-                out.append("Checked before handing back, each with `bb rules check NAME`: "
+                out.append("Checked before handing back, each with `aerie rules check NAME`: "
                            + ", ".join(checked) + ".")
             docs = [f"{r['name']} in {r['doc']}" for r in named if r.get("doc")]
             if docs:
@@ -996,7 +998,7 @@ def said(hit, *, path="", again=False):
         who = ("* a note a session left, yours to change" if r.get("by") == "claude"
                else "the operator's, not yours to change")
         doc = f"\nDefined in full in {r['doc']}; read it first." if r.get("doc") else ""
-        chk = f"\nRun `bb rules check {r['name']}` before calling the work done." if r.get("check") else ""
+        chk = f"\nRun `aerie rules check {r['name']}` before calling the work done." if r.get("check") else ""
         out.append(f"\n[{r['name']}] ({who})\n{r['text']}{doc}{chk}")
     return "\n".join(out)
 

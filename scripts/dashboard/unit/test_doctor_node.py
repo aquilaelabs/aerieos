@@ -1,4 +1,4 @@
-"""bb doctor on a node says the docker daemons are the controller's to check
+"""aerie doctor on a node says the docker daemons are the controller's to check
 (B148): a node holds no /config, and the probe named a file that was not
 there, or answered "no node" from a store it could not read."""
 import os

@@ -16,7 +16,7 @@
     "android": {
       "contract": "apps/android/api-surface.json",
       "suite": "appapi.mjs",
-      "says": {"User-Agent": "BuilderBot-app/VERSION api/TARGET_API"},
+      "says": {"User-Agent": "AerieOS-app/VERSION api/TARGET_API"},
       "handshake": "GET /api/meta answers api (server.py APP_API); the app says plainly when that is older or newer than its TARGET_API"
     },
     "companion": {

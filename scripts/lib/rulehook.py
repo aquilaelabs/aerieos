@@ -124,7 +124,7 @@ def refused(guards, command, background=False):
 
 def refusal(g, command):
     """What a refused Bash call is told, in place of running."""
-    whose = {"builderbot": "BuilderBot's briefing", "claude": "a note a session left"}.get(
+    whose = {"builderbot": "AerieOS's briefing", "claude": "a note a session left"}.get(
         g.get("by"), "the operator's house rule")
     return (f"Refused by {whose} [{g.get('name', '')}]: `{command[:160]}` is a command it does not "
             f"let run.\n{g.get('text', '')}\n"
@@ -135,7 +135,7 @@ def refusal(g, command):
 # ---- the map first (the operator, 12 Oct) -----------------------------------
 # A grep for where something is defined, or where it is called, is a
 # question the code map answers in one call with the function's own
-# comment (`bb map find`). A session that greps for it anyway is handed
+# comment (`aerie map find`). A session that greps for it anyway is handed
 # the map's answer beside its search, so the lookups the map would have
 # saved are not spent. The search still runs: this adds, never refuses.
 
@@ -188,7 +188,7 @@ def search_patterns(command):
 
 
 # ---- the rule checks run in the background (B824) ----------------------------
-# bb-check-relay starts `bb rules check` detached for a project whose new
+# bb-check-relay starts `aerie rules check` detached for a project whose new
 # asks cut a test run, so the person's next message is not held behind the
 # suite. Its run is one record beside the stamp: the tree it measured, its
 # process, and once it ends its exit and output; bb-prompt-relay says a

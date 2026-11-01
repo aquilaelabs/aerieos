@@ -10,7 +10,7 @@ mount, PID and IPC namespace in which:
 
   * /workspace holds only the project, its worktrees and the account's Claude
     share, and in that share the other projects' transcripts are empty;
-  * the account's home is the only home, and its BuilderBot cache holds only
+  * the account's home is the only home, and its AerieOS cache holds only
     this project's folder and the account's own;
   * /tmp, /var/tmp and /dev/shm are the session's own, made new with every
     start, but for what Claude Code keeps there between the turns of one
@@ -297,7 +297,7 @@ def wall_conf():
         st = os.stat(path)
     except OSError:
         if any(m and os.path.lexists(m) for m in marks):
-            raise Refused(f"bb-session: this machine carries a BuilderBot controller and no wall ({path}): "
+            raise Refused(f"bb-session: this machine carries a AerieOS controller and no wall ({path}): "
                           "run nodes/install-controller.sh --install again to write it") from None
         return ""
     if path == WALL and (st.st_uid != 0 or st.st_mode & 0o022):
@@ -538,7 +538,7 @@ def plan(c, a, uid, wall=None):
         raise Refused(f"bb-session: {cwd} is not inside {project}, its project's other repositories or their worktrees")
 
     base = home != home_root        # the account's home is under users; the base home is another's
-    # BuilderBot's caches, by where they really are. An account's home links
+    # AerieOS's caches, by where they really are. An account's home links
     # .cache to the base home's (common.sh shares the tool folders), so the
     # two can be one folder, and covering one folder twice buries what the
     # first cover kept. A cache that is itself a link is refused rather than
@@ -581,7 +581,7 @@ def plan(c, a, uid, wall=None):
             raise Refused(f"bb-session: '{p}' is not a place a project could be shown")
         if name in SYSTEM or _inside(p, (ws, home_root, state, data, art, store)) \
                 or _holds(p, (ws, home_root, state, data, art, store)):
-            raise Refused(f"bb-session: {p} is the machine's own or BuilderBot's, not a place a project could be shown")
+            raise Refused(f"bb-session: {p} is the machine's own or AerieOS's, not a place a project could be shown")
         if _real_dir(p) and not _inside(p, sees):
             sees = [s for s in sees if not _inside(s, (p,))] + [p]
 
@@ -650,7 +650,7 @@ def plan(c, a, uid, wall=None):
         steps.append(("bind", p, f"{STAGE}/sees{i}"))
     # The GPU display's socket (R20): /tmp is the session's own below, so
     # the X server's socket directory is staged here and bound back, and a
-    # `bb emu start` inside the session finds :0.
+    # `aerie emu start` inside the session finds :0.
     x11 = _real_dir("/tmp/.X11-unix")
     if x11:
         steps.append(("bind", "/tmp/.X11-unix", f"{STAGE}/x11"))
@@ -729,7 +729,7 @@ def plan(c, a, uid, wall=None):
         steps.append(("tmpfs", users, "mode=0755"))
         if base:
             steps.append(("bind", f"{STAGE}/home", f"{users}/{account}"))
-    # BuilderBot's caches: this project's folder, the account's and the
+    # AerieOS's caches: this project's folder, the account's and the
     # machine's; the base home's down to the machine's.
     for i, (cache, keep) in enumerate(caches):
         steps.append(("tmpfs", cache, "mode=0700,owned"))
@@ -1794,7 +1794,7 @@ def main(argv):
                 # a key so it can be read: anything else, a traceback
                 # included, scrolled past before the tab could show it (R132).
                 why = str(e) if isinstance(e, Refused) else f"bb-session failed: {type(e).__name__}: {e}"
-                sys.stdout.write(f"BuilderBot: this terminal was refused: {why}\r\n"
+                sys.stdout.write(f"AerieOS: this terminal was refused: {why}\r\n"
                                  "Close the tab, or press Enter to try again.\r\n")
                 sys.stdout.flush()
                 if sys.stdin.isatty():

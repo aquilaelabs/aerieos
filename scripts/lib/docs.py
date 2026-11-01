@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Behind `bb tool docs` (tool_docs in bb): a document a session can read.
+"""Behind `aerie tool docs` (tool_docs in bb): a document a session can read.
 
     docs.py read FILE...                   Markdown on stdout, one file after another
     docs.py pages FILE [--pages A-B] [--dpi N] [--out DIR]
@@ -36,7 +36,7 @@ def say(msg):
 
 def read(files):
     if not files:
-        die("bb tool docs read FILE...: a PDF, .docx, .pptx, .xlsx, .xls, .html, .epub or text")
+        die("aerie tool docs read FILE...: a PDF, .docx, .pptx, .xlsx, .xls, .html, .epub or text")
     from markitdown import MarkItDown
     md = MarkItDown(enable_plugins=False)
     for i, f in enumerate(files):
@@ -50,7 +50,7 @@ def read(files):
             print(f"{'' if i == 0 else chr(10)}<!-- {f} -->")
         print(text.strip())
         if not text.strip():
-            say(f"{f}: no text in it; a scan or a picture of text has none, and bb tool docs pages {f} draws it to look at")
+            say(f"{f}: no text in it; a scan or a picture of text has none, and aerie tool docs pages {f} draws it to look at")
 
 
 def span(s, total):
@@ -74,7 +74,7 @@ def as_pdf(f, work):
     so = os.environ.get("BB_DOCS_SOFFICE") or ""
     if not (so and os.access(so, os.X_OK)):
         die(f"{f} is not a PDF, and its pages are drawn from one: LibreOffice makes it, which is the office "
-            "toolchain; install it from the Library with this node picked (bb tool docs read gives its text now)")
+            "toolchain; install it from the Library with this node picked (aerie tool docs read gives its text now)")
     prof = os.path.join(work, "profile")
     r = subprocess.run([so, f"-env:UserInstallation=file://{prof}", "--headless", "--norestore",
                         "--convert-to", "pdf", "--outdir", work, f],
@@ -105,9 +105,9 @@ def pages(args):
         elif f is None:
             f = a
         else:
-            die("bb tool docs pages takes one FILE")
+            die("aerie tool docs pages takes one FILE")
     if not f:
-        die("bb tool docs pages FILE [--pages N-M] [--dpi N] [--out DIR]")
+        die("aerie tool docs pages FILE [--pages N-M] [--dpi N] [--out DIR]")
     if not os.path.isfile(f):
         die(f"no such file: {f}")
     import pymupdf
@@ -140,7 +140,7 @@ def main(argv):
     elif argv[0] == "pages":
         pages(list(argv[1:]))
     else:
-        die("bb tool docs read FILE... | pages FILE [--pages N-M] [--dpi N] [--out DIR]")
+        die("aerie tool docs read FILE... | pages FILE [--pages N-M] [--dpi N] [--out DIR]")
     return 0
 
 

@@ -3,7 +3,7 @@ beside How to reproduce. A session that gives the steps says how often they
 showed it; a person's report is untried until somebody says; an edit moves
 it; the page's older edits leave it alone; a held report keeps it. Every
 bug and report from before the field reads as untried, with nothing
-rewritten. bb report carries it to the diagnostics, and bb bug add --report N
+rewritten. aerie report carries it to the diagnostics, and aerie bug add --report N
 carries a report's words, area, repro and answer into the tracker."""
 import ast
 import contextlib
@@ -83,7 +83,7 @@ class Reports(unittest.TestCase):
         reports.configure(write_json=write_json, state=self.tmp)
 
     def test_a_report_keeps_its_answer_and_says_it(self):
-        r = reports.add("p", "it hangs", repro="bb emu start", reproduces="sometimes")
+        r = reports.add("p", "it hangs", repro="aerie emu start", reproduces="sometimes")
         self.assertTrue(r.get("ok"), r)
         self.assertEqual(reports._view(reports._load()["reports"][-1])["reproduces"], "sometimes")
         self.assertEqual(reports._load()["reports"][-1]["reproduces"], "sometimes")

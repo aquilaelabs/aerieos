@@ -161,7 +161,7 @@ async function refresh(){
     reapDeadTerminals();
     if ($("dot").classList.contains("off")) $("dot").classList.remove("off");
     setAttr($("dot"), "aria-label", null);
-    // The container's hostname, which answers "which BuilderBot am I looking
+    // The container's hostname, which answers "which AerieOS am I looking
     // at", and on the ordinary box, where the container is called builderbot,
     // answers it with the word already three inches to its left. Two of the
     // same word reads as a rendering fault rather than as information, so it
@@ -371,7 +371,7 @@ async function pollRevsOnce(){
     // tokens are watched by notebooks and by nothing else, so asking for the
     // whole share's would be a directory walk per project per second and a
     // half for panes nobody has open. Always sent, empty included: an absent
-    // `p` means "all of them", which is what `bb` and the tests want.
+    // `p` means "all of them", which is what `aerie` and the tests want.
     const ps = [...new Set(tabs.filter(t => t.kind === "notebook").map(t => t.arg))];
     const r = await fetch("/api/revs?p=" + encodeURIComponent(ps.join(",")));
     if (!r.ok) return;

@@ -1,17 +1,17 @@
-# The lab (roadmap R54): a real Gitea and Forgejo for `bb tests lab`, a
-# stack of its own beside BuilderBot's dev instance, never a service in
-# BuilderBot's docker-compose.yml (the operator, 17 Oct): the dev instance is
+# The lab (roadmap R54): a real Gitea and Forgejo for `aerie tests lab`, a
+# stack of its own beside AerieOS's dev instance, never a service in
+# AerieOS's docker-compose.yml (the operator, 17 Oct): the dev instance is
 # the one container built from the tree, rebuilt and pinned to a branch with
 # it, and the lab is neither. Images only, nothing built from the tree, so it
 # is made as any container beside a project is:
 #
-#   bb container new --why "the lab's Gitea and Forgejo for bb tests lab" \
+#   aerie container new --why "the lab's Gitea and Forgejo for aerie tests lab" \
 #     --name builderbot-lab --compose lab/compose.yml --env lab/.env.example
 #
 # BB_LAB_HOST (lab/.env.example) is the address other machines reach it at.
 
 services:
-  # A real Gitea, for `bb tests lab` to prove the link, unlink and runner
+  # A real Gitea, for `aerie tests lab` to prove the link, unlink and runner
   # paths against. Nothing here is a secret: it exists to be tested
   # against, and its volume can be thrown away. Actions are on so the
   # runner half can be proved too.

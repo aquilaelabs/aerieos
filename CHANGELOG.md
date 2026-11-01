@@ -5,28 +5,30 @@
 ### Added
 
 - A project's FTP access can be kept on for an hour, a day or a week, then turns itself off
-- BuilderBot OS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
+- AerieOS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
 - A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
-- An installed BuilderBot takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
+- An installed AerieOS takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
 - The image is tagged :dev when a release or dev build is published, so an install can follow the dev channel by its compose file or template (1b8ce1d)
-- bb version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
-- bb version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
+- aerie version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
+- aerie version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
 - A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
-- A release can be signed with an offline release key (tools/release-sign.py): BuilderBot OS's updater, the stick maker and the installer refuse a release the install's own config/release-signers does not verify, so a change to the repository or its CI cannot hand an install an update (7f98d53)
+- A release can be signed with an offline release key (tools/release-sign.py): AerieOS's updater, the stick maker and the installer refuse a release the install's own config/release-signers does not verify, so a change to the repository or its CI cannot hand an install an update (7f98d53)
 - On a USB stick, This machine can name a folder already on the machine's disks as the projects folder, so a controller moved there works on its projects where they are, with nothing copied (7c24926)
 - On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
 - A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
 - Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
-- BuilderBot OS keeps the versions an update replaces, the three newest by default: each is on the boot menu under Older versions and on This machine, a visit lasting one boot with the configuration as it was (300599f)
+- AerieOS keeps the versions an update replaces, the three newest by default: each is on the boot menu under Older versions and on This machine, a visit lasting one boot with the configuration as it was (300599f)
 - On a bare-metal or USB install, plain http://the-machine/ finds the dashboard: a redirect on port 80 until nginx or anything else takes the port (2a102c2)
 
 ### Changed
 
+- BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
+- The command is aerie, in every shell and session
 - A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
 - On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
 - The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)
 - A project's Agents may says what each of its parts is for: Coding agents says Claude always may and an unticked agent does not start there, Start opens and Sessions each carry a line under them, and each agent's guards fold under How each agent is guarded (6ae825f)
-- A session's bb version release from a branch other than main makes a dev pre-release unless --stable is said, and its first line names the channel the release lands on (7a8e367)
+- A session's aerie version release from a branch other than main makes a dev pre-release unless --stable is said, and its first line names the channel the release lands on (7a8e367)
 - bb sign release waits for its look and says what it found, run by run, or why it found nothing to sign (7a8e367)
 - Pages read alike: sizes say their unit after a space and in TB past a terabyte, a list narrowed two ways shows one All with the second row starting at Any source or Any version, a view's status line is a note unless it says what stops a press, the Wiki view's controls are one row, Commit all and the Design view's new page sit on one line, and where any coding agent is meant the page says agent (56bc704)
 - A project's Permissions, On the git host: Change CI workflow files set to Deny now refuses a session's push that changes a workflow file (a workflow runs with the repository's secrets); Push branches, Read the code and Publish and edit releases have no switch there any more, each showing the setting that governs it (Pushing, or Agents may: Tag and publish a release), since a Deny on them was told to sessions but never enforced (30cba84)
@@ -35,7 +37,7 @@
 
 ### Fixed
 
-- The VMs page lists a VM BuilderBot did not make whose name has a space in it, where it was missing (7f8d87a)
+- The VMs page lists a VM AerieOS did not make whose name has a space in it, where it was missing (7f8d87a)
 - A project's FTP access keeps working after its node's agent updates itself, where the old server held the port and refused every login while the new one could not start (Address already in use). A node already in that state mends itself once its agent is updated: the agent ends the old server it finds on the port and starts its own
 - The Windows companion's .exe starts again, where it stopped at once with No module named bbcompanion.__main__ because its build left the app's own package out
 - A node no longer goes quiet for good after its agent's token changes: two of its calls carrying a new token at the same moment left it with a token that expired three minutes on, and its agent was turned away until the node was enrolled again. A node shut out that way comes back by itself at its next call (6058f86)
@@ -61,6 +63,7 @@
 
 ### Upgrading
 
+- The command is now aerie. bb still works and forwards to it, deprecated, and goes in a later release; change any script of your own that calls it. Folders, services, the image and the repository keep their names, so nothing on an install moves
 - A container following :latest now moves only when a stable release is published; to follow every change on main as before, point it at :main (c4879b7)
 
 ## 0.9.0: 2026-10-30

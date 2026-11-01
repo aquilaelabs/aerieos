@@ -1,6 +1,6 @@
 """Start on boot (R122): a container's restart policy is read with the list,
 set by boot-on and boot-off through the same verb as start and stop, kept
-for an instance of BuilderBot's own, and put back by the next listing when a
+for an instance of AerieOS's own, and put back by the next listing when a
 rebuild has reset it. Drives devapp and containers against a stand-in
 docker that records what it was asked."""
 import os
@@ -68,7 +68,7 @@ class Boot(unittest.TestCase):
 
     def test_an_instance_of_several_services_is_stopped_together(self):
         # B770: container_ctl names every container an instance means in one
-        # docker stop, and the guard took exactly one name, so bb devapp stop
+        # docker stop, and the guard took exactly one name, so aerie devapp stop
         # builderbot-dev was refused as a bug.
         containers._targets = lambda name: [{"id": "c1", "name": "dev-ctl-1"}, {"id": "c2", "name": "dev-git-1"}]
         built = []

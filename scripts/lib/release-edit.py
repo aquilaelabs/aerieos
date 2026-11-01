@@ -1,4 +1,4 @@
-"""Behind `bb version release --edit` (R139), and --remove, which takes files
+"""Behind `aerie version release --edit` (R139), and --remove, which takes files
 off the release as its own ask: the published release's notes
 replaced and files attached, made by the controller with the project's own
 token under Agents may: Tag and publish a release, every edit its own ask.
@@ -9,7 +9,7 @@ controller, which sees /workspace and nothing else, so a scratchpad file
 was "No such file or directory" and stdin arrived empty (report 60,
 Shebang-DevBoard, 5 Oct). Only the API call goes to the controller.
 
-Arguments: the project, then the words after `bb version`: [--for DIR]
+Arguments: the project, then the words after `aerie version`: [--for DIR]
 release --edit --why "..." [--tag TAG] [--notes FILE|-] [--attach FILE]...
 BB_VERSION_AUTH is the session's credential, BB_WORKSPACE where the
 projects are.
@@ -44,14 +44,14 @@ withdraw = ""
 if "--withdraw" in rest:
     i = rest.index("--withdraw")
     if i + 1 >= len(rest):
-        fail("--withdraw needs the release's tag: bb version release --withdraw v1.2.3-dev.45 --why \"...\"")
+        fail("--withdraw needs the release's tag: aerie version release --withdraw v1.2.3-dev.45 --why \"...\"")
     withdraw = rest[i + 1]
     del rest[i:i + 2]
 root = os.path.realpath(os.path.join(os.environ.get("BB_WORKSPACE", "/workspace"), proj))
 while rest:
     flag = rest.pop(0)
     if flag not in ("--why", "--tag", "--notes", "--attach", "--remove") or not rest:
-        fail(f"bb version release --edit takes --why, --tag, --notes FILE and --attach FILE, and --remove "
+        fail(f"aerie version release --edit takes --why, --tag, --notes FILE and --attach FILE, and --remove "
              f"takes --why, --tag and NAME, each with its value, not {flag}" + ("" if rest else " alone"))
     val = rest.pop(0)
     if flag == "--why":

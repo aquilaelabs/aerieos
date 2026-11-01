@@ -237,7 +237,7 @@ function nbGitView({$, nb, project}){
           title="write ${esc(f.fix.to)} on that line, in the working tree; you commit it">Fix</button>` : ""}</div>`).join("");
     const run = ci.run?.id ? ` The newest run on ${esc(ci.run.branch)} ${esc(ci.run.ended || "ended " + ci.run.conclusion)}.` : "";
     const body = `<div class="sub dim">${ci.at ? `Checked ${esc(ago(ci.at))}${ci.repo ? ` at ${esc(ci.repo)} on GitHub` : ""}.${run}` :
-        "Not checked yet."}${none ? " The tree has no workflow in .github/workflows, .gitea/workflows or .forgejo/workflows, so there is no CI here to watch." : ""} Checked once a day and when the project is linked; a session reads a run with bb ci-log.</div>${
+        "Not checked yet."}${none ? " The tree has no workflow in .github/workflows, .gitea/workflows or .forgejo/workflows, so there is no CI here to watch." : ""} Checked once a day and when the project is linked; a session reads a run with aerie ci-log.</div>${
       ci.error ? `<div class="sub bad">${esc(ci.error)}</div>` : ""}${rows}
       <div class="actbar"><button type="button" id="gitCiLook">Check now</button>${ci.run?.id
         ? `<button type="button" data-cilog="${esc(String(ci.run.id))}" title="its jobs and the end of each one's log, in the dock">Its log</button>` : ""}</div>`;

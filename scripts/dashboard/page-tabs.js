@@ -110,7 +110,7 @@ const bootFor = arg => {
 const termArg = arg => agentOfArg(arg) && bootFor(arg) ? `${arg}:b:${bootFor(arg)}` : arg;
 // A tab on a page of its own: a VM's screen (R99), noVNC's own page speaking
 // to this controller's relay for that VM, scaled to the dock's size; any
-// other, BuilderBot's terminal page (terminal.html), for a tab popped out.
+// other, AerieOS's terminal page (terminal.html), for a tab popped out.
 const tabUrl = (arg, label) => arg.startsWith("screen:")
   ? `/novnc/vnc_lite.html?scale=true&path=${encodeURIComponent(`screen/ws?vm=${arg.split(":")[1]}/${arg.split(":")[2]}`)}`
   : `/terminal?arg=${encodeURIComponent(termArg(arg))}${label ? "&label=" + encodeURIComponent(label) : ""}`;
@@ -221,7 +221,7 @@ const TABKINDS = {
   notebook:     { multi: true, label: t => "Notebook: " + projLabel(t.arg),
               icon: TOOL_ICONS.notebook,
               render: (i, t) => renderNotebookInto(i, t.arg), live: "always" },
-  // The Library (R170): one list of everything a BuilderBot installs or
+  // The Library (R170): one list of everything a AerieOS installs or
   // runs, for one node; its own read, the node list, and the sign-in,
   // which rides the status poll (an agent's row carries it).
   library:  { multi: false, label: () => "Library",
@@ -304,7 +304,7 @@ const TABKINDS = {
               icon: TOOL_ICONS.nginx,
               render: (i) => renderNginxInto(i), live: () => `${nginxRev}/${nodesRev}`,
               open: () => loadNginx() },
-  // The Scanners page (R145): BuilderBot's own scanners on each node.
+  // The Scanners page (R145): AerieOS's own scanners on each node.
   scanners: { multi: false, label: () => "Scanners",
               icon: TOOL_ICONS.scanners,
               render: (i) => renderScannersInto(i), live: () => `${scannersRev}/${nodesRev}/${jobsRev}`,

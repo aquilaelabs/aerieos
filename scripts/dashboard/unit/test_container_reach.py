@@ -48,7 +48,7 @@ class Reach(unittest.TestCase):
         self.assertEqual(self.visited[:2], ["n_own", "n_host"], "its own nodes first, then the hosting node")
 
     def test_the_node_an_instance_was_put_on_is_looked_on(self):
-        # bb devapp new --node: a node the project neither works on nor
+        # aerie devapp new --node: a node the project neither works on nor
         # names as a host, which the session that made it could not reach.
         self.lives = "n_vps"
         devapp._load = lambda: {"alpha": {"site": {"owner": "alpha", "node": "n_vps"}}}

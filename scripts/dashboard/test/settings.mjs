@@ -4,7 +4,7 @@
 // identity, which became a project's own setting in its dialog. What is
 // exercised for real: the store through the endpoint, the tab's rows, the
 // identity landing in the repo's own config through /api/prefs and coming out
-// of bb settings, and bb_setting (the boot scripts' read) run as bash
+// of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
 import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, sleep } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -58,12 +58,12 @@ ok(marked.vscode && marked.companion && !marked.android && switches.join() === '
    `...and a dev feature says dev where it is offered: the VS Code and companion cards and switches, not Android's (${JSON.stringify({ marked, switches })})`);
 await post('/api/settings', { set: { offer_unvetted: false } });
 await page.waitForFunction(() => document.querySelector('#devtag')?.hidden, null, { timeout: 30000 });
-// Reset BuilderBot: a red verb at the foot of the tab behind a typed word,
+// Reset AerieOS: a red verb at the foot of the tab behind a typed word,
 // refused without it, and never pressed here, since it re-executes the
 // server this whole suite is talking to. The move itself is proved at the
 // module below, on a directory of its own.
-ok(await page.$eval('.settingstab [data-group="Reset"] #setReset', b => /Reset BuilderBot/.test(b.textContent) && b.classList.contains('danger')),
-   'Reset BuilderBot sits in its own section as a red verb');
+ok(await page.$eval('.settingstab [data-group="Reset"] #setReset', b => /Reset AerieOS/.test(b.textContent) && b.classList.contains('danger')),
+   'Reset AerieOS sits in its own section as a red verb');
 await splitPick(page, 'reset');
 await page.click('.settingstab #setReset');
 await page.waitForSelector('#resetmodal:not([hidden]) #resetGo', { timeout: 10000 });
@@ -125,7 +125,7 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify({set: b})})).json(), v));
   const good = await set({catalog_url: 'https://example.com/catalog/'});
   const bad = await set({catalog_url: 'ftp://example.com/catalog/'});
-  const mail = await set({smtp_port: '587', smtp_from: 'BuilderBot <bb@example.com>', tls_email: 'me@example.com'});
+  const mail = await set({smtp_port: '587', smtp_from: 'AerieOS <bb@example.com>', tls_email: 'me@example.com'});
   await set({catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/', smtp_port: '', smtp_from: '', tls_email: ''});
   ok(/builderbot-catalog/.test(drawn.url) && /No mirror imported/.test(drawn.said) && good.ok && /an address like/.test(bad.error || '') && mail.ok,
      `Vetted catalog draws the catalog's address and says no mirror is held; an address saves, a port, a From line and an email too, and ftp is refused (${drawn.url}; ${bad.error}; ${mail.error || 'mail saved'})`);
@@ -299,7 +299,7 @@ ok(setting('nothing_saved', 'dflt') === 'dflt', '...and the default when nothing
 
 // ---- the commit identity is the account's ----------------------------------
 // Set on the Profile tab, never in a project: two people on one project are
-// two authors. It reaches a session as git's environment, and `bb settings
+// two authors. It reaches a session as git's environment, and `aerie settings
 // --json` is how bb-tty asks for it, for the seat BB_ACCOUNT_UID names.
 const prof = await post('/api/profile', { action: 'save',
   profile: { full_name: 'Test Person', email: 'test@example.invalid' } });
@@ -319,12 +319,12 @@ const st = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'setti
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner } }));
 ok(st.git_name === 'T. Person' && st.git_email === 'tp@users.noreply.invalid',
-   '...and bb settings --json carries it for the seat asking, which is how bb-tty puts it in a session');
+   '...and aerie settings --json carries it for the seat asking, which is how bb-tty puts it in a session');
 const bare = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'],
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: '', BB_ACCOUNT_UID: owner }, cwd: '/' }));
 ok(bare.git_name === 'T. Person', '...for a shell with no project too');
-// The projects this one reads (prefs.reads) show in bb settings, so a
+// The projects this one reads (prefs.reads) show in aerie settings, so a
 // session knows its own list without the briefing.
 {
   const envs = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner };
@@ -333,7 +333,7 @@ ok(bare.git_name === 'T. Person', '...for a shell with no project too');
   const text = execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings'], { encoding: 'utf8', env: envs });
   const asJson = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'], { encoding: 'utf8', env: envs }));
   ok(/^  reads\s+beta$/m.test(text) && asJson.reads.join() === 'beta',
-     `bb settings names the projects this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
+     `aerie settings names the projects this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: [] }) })).json()));
 }

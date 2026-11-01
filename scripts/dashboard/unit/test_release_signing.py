@@ -71,7 +71,7 @@ class Signing(unittest.TestCase):
             raise SystemExit(s)
         with unittest.mock.patch.multiple(stick, RELEASE_SIGNERS=self.line + "\n", fetch=fetch, say=said.append, die=die):
             stick.signed("v0.9.0", self.image)
-            self.assertTrue(any("signed by BuilderBot's release key" in s for s in said))
+            self.assertTrue(any("signed by AerieOS's release key" in s for s in said))
             open(self.image, "wb").write(b"another image")
             with self.assertRaises(SystemExit):
                 stick.signed("v0.9.0", self.image)

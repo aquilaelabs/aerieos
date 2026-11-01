@@ -295,7 +295,7 @@ class Move(unittest.TestCase):
         self.assertIn("no move", move.forget("user:ann")["error"])
         m, why = move.read_manifest(str(self.state / "users.json"))
         self.assertIsNone(m)
-        self.assertIn("not a BuilderBot move bundle", why)
+        self.assertIn("not a AerieOS move bundle", why)
 
 
     def test_the_landing_is_told_both_ways_and_the_pull_is_proved(self):

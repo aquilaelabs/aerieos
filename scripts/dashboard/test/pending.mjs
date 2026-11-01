@@ -98,7 +98,7 @@ ok(/reworded R\d+/.test(bb('roadmap', 'edit', `R${firstId}`, 'a thing added unde
 const listed = bb('roadmap', 'pending');
 ok(/make the picker wrap/.test(listed) && /↳.*details/.test(listed) && /↳.*fix it/.test(listed)
    && /setting.*ask/.test(listed),
-   'bb roadmap pending lists what is waiting, the follow-ups under their item, and the setting');
+   'aerie roadmap pending lists what is waiting, the follow-ups under their item, and the setting');
 const second = bb('roadmap', 'add', 'a second held item');
 ok(Number((second.match(/R(\d+)/) || [])[1]) === Number(num) + 1,
    'a second held add gets the next number: the reserved one is not handed out twice');
@@ -115,7 +115,7 @@ ok(/still waiting/.test(bbErr('bug', 'fix', `B${bnum}`, 'x')),
 // ---- the fourth gate: a session filling in build and test -------------------
 const sheld = bb('settings', 'set', 'test', 'echo held-test');
 ok(/held for approval: test for alpha/.test(sheld) && !(file('claude-prefs.json').projects?.alpha?.test),
-   `under ask a session's bb settings set is held, and the field stays empty (${sheld.trim().slice(0, 60)})`);
+   `under ask a session's aerie settings set is held, and the field stays empty (${sheld.trim().slice(0, 60)})`);
 ok(waiting().some(r => r.kind === 'settings' && /test: echo held-test/.test(r.summary)),
    '...as a settings change whose summary is the command, since that is what is being approved');
 
@@ -269,7 +269,7 @@ ok(ap.status === 200 && ap.body.approved?.length === 2
    && rulesOf().some(r => r.name === 'no-em-dashes' && r.text === 'No em dashes, ever.' && r.by === 'claude'),
    `approved, the rule lands with the final wording, marked as the session's (${ap.status} ${JSON.stringify(ap.body).slice(0, 200)} / ${JSON.stringify(rulesOf()).slice(0, 200)})`);
 ok(/no rule is waiting/.test(bb('rules', 'pending')),
-   'and bb rules pending says so');
+   'and aerie rules pending says so');
 
 await done(browser);// A session asking for an item back off the shelf (R78) is held whatever the
 // gate says, with its reason, and a person's Approve replays it: a decision

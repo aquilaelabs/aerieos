@@ -1,4 +1,4 @@
-"""An approved bb root run prints what the command said, from who allowed it
+"""An approved aerie root run prints what the command said, from who allowed it
 on, without the agent's own lines about the job before it ("system: root", a
 sandbox tool refreshed from the bundle), which the Jobs page keeps (B58)."""
 import os
@@ -20,7 +20,7 @@ class RootSaid(unittest.TestCase):
         self.assertEqual(phone.root_said(HEAD), HEAD)
 
     def test_a_refusal_without_it_is_left_whole(self):
-        log = "system: root\nrefused: this node was not provisioned as a BuilderBot sandbox\n"
+        log = "system: root\nrefused: this node was not provisioned as a AerieOS sandbox\n"
         self.assertEqual(phone.root_said(log), log)
 
 

@@ -3,7 +3,7 @@
 else wants port 80 this answers there with a redirect to it.
 
 It wants nothing for itself. It lets go the moment a nginx container exists
-(BuilderBot's own holds 80 and 443 on the machine, and closes a request naming
+(AerieOS's own holds 80 and 443 on the machine, and closes a request naming
 none of its sites: it never points a stranger at the dashboard, so from then on
 the address with its port is the way in) and for as long as a compose job runs, so a container that
 publishes 80 is never told the port is taken by this; it takes the port back
@@ -89,7 +89,7 @@ def answer(head, port, scheme="http", here="localhost"):
 
 
 def docker_look():
-    """(whether docker runs, whether a container of BuilderBot's nginx is on
+    """(whether docker runs, whether a container of AerieOS's nginx is on
     this machine, up or not: its restart policy then wants the port). A daemon
     that is held (a stick before its pool) is not asked: docker's socket would
     try to start it. Where docker answers oddly, nginx is taken to be there,

@@ -29,15 +29,15 @@ def run(files, rules=RULES):
 
 class Patch(unittest.TestCase):
     def test_a_change_under_a_patch_rule_fails_naming_it(self):
-        code, out = run(["scripts/dashboard/statemigrations/0004_x.py", "scripts/bb"])
+        code, out = run(["scripts/dashboard/statemigrations/0004_x.py", "scripts/aerie"])
         self.assertEqual(code, 1, out)
         self.assertIn("FAIL  patch: a patch line may not change scripts/dashboard/statemigrations/0004_x.py", out)
         self.assertIn("PASS  patch-api", out)
         self.assertNotIn("tests", out, "only the patch rules are this check's")
 
     def test_clean_passes_and_none_says_how_to_add_one(self):
-        self.assertEqual(run(["scripts/bb"])[0], 0)
-        code, out = run(["scripts/bb"], rules=[])
+        self.assertEqual(run(["scripts/aerie"])[0], 0)
+        code, out = run(["scripts/aerie"], rules=[])
         self.assertEqual(code, 0)
         self.assertIn("no patch rule here", out)
 

@@ -14,12 +14,12 @@
 #trivy:ignore:AVD-DS-0002
 
 ##############################################################################
-# BuilderBot: a Claude Code workstation and the controller for build nodes,
+# AerieOS: a Claude Code workstation and the controller for build nodes,
 # the machines where builds, tests, CI and the Android emulator actually run.
 ##############################################################################
 FROM ubuntu:24.04
 
-LABEL org.opencontainers.image.title="BuilderBot" \
+LABEL org.opencontainers.image.title="AerieOS" \
       org.opencontainers.image.description="Claude Code workstation and build-node controller" \
       org.opencontainers.image.source="https://github.com/aquilaelabs/builderbot" \
       org.opencontainers.image.licenses="Apache-2.0"
@@ -129,7 +129,7 @@ RUN set -eux; \
 #
 # The point of having them *in the image* rather than only in CI: a session
 # (or a person) can run the same checks CI will run, before the push. That
-# is what `bb lint` does.
+# is what `aerie lint` does.
 # ---------------------------------------------------------------------------
 COPY scripts/lib/gh-fetch /usr/local/bin/bb-gh-fetch
 RUN --mount=type=secret,id=gh_token,required=false \
@@ -246,7 +246,7 @@ RUN set -eux; \
     npm cache clean --force
 
 # ---------------------------------------------------------------------------
-# BuilderBot scripts + home skeleton
+# AerieOS scripts + home skeleton
 # ---------------------------------------------------------------------------
 # noVNC: the browser's half of a VM's screen (R99), the page and the RFB
 # client it imports, served by the dashboard under /novnc/. MPL-2.0, its
@@ -282,9 +282,9 @@ RUN --mount=type=secret,id=gh_token,required=false \
 COPY scripts/ /opt/builderbot/scripts/
 COPY config/skel/ /opt/builderbot/skel/
 COPY config/templates/ /opt/builderbot/templates/
-# The toolchain catalog the Toolchains tab renders and `bb toolchains` walks.
+# The toolchain catalog the Toolchains tab renders and `aerie toolchains` walks.
 # Under config/ so that the path relative to both bb and server.py is the same
-# here as it is in a checkout, which is what lets `bb dashboard dev` and the
+# here as it is in a checkout, which is what lets `aerie dashboard dev` and the
 # tests read it.
 COPY config/toolchains.json /opt/builderbot/config/toolchains.json
 # ...and the publishers' release keys a download is checked against (R137).
@@ -307,7 +307,7 @@ COPY nodes/provision-macos.sh /opt/builderbot/nodes/provision-macos.sh
 # its agent installs it (R35).
 COPY nodes/bb-session /opt/builderbot/nodes/bb-session
 COPY nodes/vm/ /opt/builderbot/nodes/vm/
-# BuilderBot's own docs, for the Help page (helpdocs.py, R258): the Markdown
+# AerieOS's own docs, for the Help page (helpdocs.py, R258): the Markdown
 # alone, two levels above server.py as in a checkout; the screenshots stay
 # out of the image.
 COPY docs/*.md /opt/builderbot/docs/
@@ -324,11 +324,13 @@ COPY config/icon.png /opt/builderbot/icon.png
 
 RUN set -eux; \
     chmod -R +x /opt/builderbot/scripts; \
+    ln -sf /opt/builderbot/scripts/aerie /usr/local/bin/aerie; \
     ln -sf /opt/builderbot/scripts/bb /usr/local/bin/bb; \
     # /opt/builderbot/bin sits first on PATH and holds privilege-dropping
     # wrappers, so `docker exec -it builderbot bb` runs as `builder`
     # (correct HOME, correct file ownership) instead of as root.
     mkdir -p /opt/builderbot/bin; \
+    ln -sf /opt/builderbot/scripts/as-builder /opt/builderbot/bin/aerie; \
     ln -sf /opt/builderbot/scripts/as-builder /opt/builderbot/bin/bb; \
     chown -R builder:builder /opt/builderbot/skel
 

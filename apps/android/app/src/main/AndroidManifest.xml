@@ -23,7 +23,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.BuilderBot">
+        android:theme="@style/Theme.AerieOS">
         <!-- usesCleartextTraffic is on purpose: the dashboard is served over
              plain http on a home LAN unless the operator puts TLS in front of
              it (README, Nodes), and the app has to reach it either way. The

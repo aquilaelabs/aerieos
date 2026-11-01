@@ -7,7 +7,7 @@
 # toolchains it found, the dashboard prints its URL), and the daemon that the
 # dev-instance controls are built on was the one that did not, so "is the
 # sandbox up" was a question you could only answer by opening the dashboard or
-# running `bb doctor`. The boot log is where you look when something is wrong,
+# running `aerie doctor`. The boot log is where you look when something is wrong,
 # and a capability that is silent there looks like one that is absent.
 #
 #

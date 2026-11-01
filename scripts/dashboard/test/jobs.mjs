@@ -148,7 +148,7 @@ await ready(page);
   const jtiles = await page.$$eval('.jobstab .tiles .tile .tl', ls => ls.map(l => l.textContent.trim()));
   ok(jtiles.includes('running') && jtiles.includes('succeeded'),
      `the Jobs page opens on tiles of what runs and what finished (${jtiles.join(', ')})`);
-  // By names an account without its prefix, and a job BuilderBot asked for in words (B31).
+  // By names an account without its prefix, and a job AerieOS asked for in words (B31).
   const by = await page.evaluate(() => [jobBy({ requested_by: 'user:alice' }),
     jobBy({ requested_by: 'system:auto-update' })]);
   ok(by[0] === 'alice' && by[1] === 'automatic',
@@ -303,7 +303,7 @@ await ready(page);
      `a running or waiting job says the time it began, an ended one how long ago (${when.join(' | ')})`);
 }
 
-// bb jobs reads the same listing the tab does, through the API as the
+// aerie jobs reads the same listing the tab does, through the API as the
 // caller: an administrator sees every job, and a session its own project's
 // and no other, by name or by id (B317: it read the store directly, which
 // on the machine holding the controller's state showed a session every
@@ -311,10 +311,10 @@ await ready(page);
 {
   const admin = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_AUTH: 'test:test',
                   BB_CONTROLLER: base, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-  const bbj = (...a) => execFileSync('bash', ['scripts/bb', 'jobs', ...a], { encoding: 'utf8', cwd: REPO, env: admin });
+  const bbj = (...a) => execFileSync('bash', ['scripts/aerie', 'jobs', ...a], { encoding: 'utf8', cwd: REPO, env: admin });
   const out = bbj();
   ok(/canceled/.test(out) && /exit 7/.test(out) && /controller/.test(out) && /exec sh -c/.test(out),
-     'bb jobs lists the recent jobs with state, node and reason');
+     'aerie jobs lists the recent jobs with state, node and reason');
   // ...and one job's LOG, which is the half that was missing: a failed job
   // with an exit code and nothing to read is not something anybody can act
   // on. The listing has never been per project (it reads the store, not the
@@ -323,7 +323,7 @@ await ready(page);
   ok(!!id, `the listing names ids that can be asked about (${id || "none"})`);
   const one = bbj(id);
   ok(one.split('\n').filter(l => /\bj_[0-9a-f]{8}\b/.test(l)).length === 1,
-     'bb jobs ID answers about that job alone, not the whole list');
+     'aerie jobs ID answers about that job alone, not the whole list');
   ok(/---- log|wrote nothing/.test(one),
      '...and prints what it wrote, or says plainly that it wrote nothing');
   let missing = '';
@@ -336,22 +336,22 @@ await ready(page);
   await exec({ id: 'local', project: 'beta', argv: ['true'] });
   const all = (await (await fetch(base + '/api/v1/jobs?n=100', { headers: H })).json()).jobs || [];
   const theirs = all.filter(j => j.project && j.project !== 'alpha').map(j => j.id);
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const sess = { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: base, BB_TOKEN: tok, BB_PROJECT: 'alpha',
                  XDG_CACHE_HOME: `${DIR}/cache-jobs` };
-  const bbs = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/bb`, 'jobs', ...a],
+  const bbs = (...a) => { try { return execFileSync('bash', [`${REPO}/scripts/aerie`, 'jobs', ...a],
     { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: sess, stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (e) { return (e.stdout || '') + (e.stderr || ''); } };
   const mineOut = bbs();
   ok(!theirs.some(id => mineOut.includes(id)) && (theirs.length ? /no such job/.test(bbs(theirs[0])) : true),
-     `a session's bb jobs lists its own project's jobs and answers "no such job" for another project's (${
+     `a session's aerie jobs lists its own project's jobs and answers "no such job" for another project's (${
         theirs.length} of others' kept out; ${mineOut.trim().split('\n')[0].slice(0, 70)})`);
-  // A container written for alpha (bb container new --for alpha) carries
+  // A container written for alpha (aerie container new --for alpha) carries
   // its own name as its jobs' project, and those are alpha's to see (B321):
   // its record says whose it is. And -n counts what the session sees, not
   // the node's last n before the filter: three of beta's queued after
-  // alpha's used to leave bb jobs -n 2 with nothing of alpha's.
+  // alpha's used to leave aerie jobs -n 2 with nothing of alpha's.
   const { readFileSync: rf, writeFileSync: wf } = await import('node:fs');
   const store = `${DIR}/state/devapps.json`;
   let dev = {}; try { dev = JSON.parse(rf(store, 'utf8')); } catch {}
@@ -367,7 +367,7 @@ await ready(page);
   ok(!/no such job/.test(bbs(box.job)), '...and reads one of those by id');
   const two = bbs('-n', '2').trim().split('\n').filter(l => /^\s*j_/.test(l));
   ok(two.length === 2 && two.some(l => l.includes(box.job)) && two.some(l => l.includes(own.job)),
-     `bb jobs -n 2 is the session's own last two, whatever else the node ran since (${two.map(l => l.trim().slice(0, 12)).join(', ')})`);
+     `aerie jobs -n 2 is the session's own last two, whatever else the node ran since (${two.map(l => l.trim().slice(0, 12)).join(', ')})`);
 }
 
 {

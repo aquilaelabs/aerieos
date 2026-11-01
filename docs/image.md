@@ -1,6 +1,6 @@
-# BuilderBot OS: the appliance image
+# AerieOS: the appliance image
 
-The installed editions of BuilderBot (the installable OS, its VM disk, and
+The installed editions of AerieOS (the installable OS, its VM disk, and
 the USB edition) are made from one image: Debian stable, built by
 [mkosi](https://mkosi.systemd.io/) from the definition in `image/`, sealed as
 a read-only root and laid into a disk with two root slots. An update is a
@@ -19,7 +19,7 @@ how it boots, and how it is built. The decisions behind it are in
 - **The controller staged in**, exactly as a bare-metal install lays it out
   (`nodes/install-controller.sh --stage`, run inside the tree by
   `image/mkosi.postinst`): the account, `/opt/builderbot`, the env file,
-  `bb`, the sudo rule and the service, enabled for the first boot. Its
+  `aerie`, the sudo rule and the service, enabled for the first boot. Its
   packages come from the one list the container image and a bare-metal
   install read, `config/controller-packages.tsv`.
 - **Everything the node half needs**: what `nodes/provision-linux.sh`
@@ -37,7 +37,7 @@ how it boots, and how it is built. The decisions behind it are in
 
 `image/build.sh` lays the image into one GPT disk, `builderbot-os-VERSION.raw`
 (compressed with xz), and the same disk with the slot loaded into memory at boot as `builderbot-os-VERSION.stick.raw.xz`, the USB edition's. Every partition has a fixed UUID, the same on every
-disk BuilderBot makes, held in `image/partitions.sh` and read by the build,
+disk AerieOS makes, held in `image/partitions.sh` and read by the build,
 the initramfs, `fstab` and GRUB alike:
 
 | Partition | Size | What |
@@ -130,12 +130,12 @@ lists the copies found on the machine's pools (newest first, with the
 machine and the version each came from) and takes the password, or takes a
 copy you kept; held to the same gate as a move (never onto an older build),
 restored and restarted, the machine is the controller as it was, its nodes
-checking back in. Pushing a copy to another BuilderBot or a node is not
+checking back in. Pushing a copy to another AerieOS or a node is not
 here yet.
 
 ## The stick maker
 
-On Windows, **BuilderBot USB Maker** (`builderbot-usb-maker-VERSION.exe`,
+On Windows, **AerieOS USB Maker** (`builderbot-usb-maker-VERSION.exe`,
 attached to every release) does it in a window: which release (the newest,
 the newest dev build, one by name, or an image file you have), which stick
 (the removable disks alone), a few settings for the first boot (the dev
@@ -230,8 +230,8 @@ later, the same way.
 
 ## At the console
 
-A machine running BuilderBot OS welcomes whoever is at its screen with
-BuilderBot's logo above the login prompt, the release and slot it runs, and
+A machine running AerieOS welcomes whoever is at its screen with
+AerieOS's logo above the login prompt, the release and slot it runs, and
 the address to open the dashboard at (this machine's address and the
 dashboard's port), which the console fills in and redraws as the network
 comes up. The installer opens on the same logo. Both are plain characters,
@@ -354,7 +354,7 @@ unless Controller settings' Update checks says otherwise, and on **Check
 now** under Controller settings, Updates, and said on the bell). It follows
 the release line the install is on (`BB_RELEASE_LINE`, which the stick
 maker's `--set` writes) and the releases as published; the dev builds'
-channel is in [versions.md](versions.md#two-channels). On BuilderBot OS **Update** does not run the installer: the own
+channel is in [versions.md](versions.md#two-channels). On AerieOS **Update** does not run the installer: the own
 node's root agent fetches the release's ISO, checks it against the sha256
 the release carries and against its build attestation (`gh attestation
 verify`; an image that does not verify, or a machine without `gh`, writes
@@ -364,7 +364,7 @@ back at the slot running now, writes the slot not in use, puts the kernel
 beside it on the ESP, and only then names that slot for the next boot, on
 trial, in one write. An update is refused while the slot running now is
 itself on trial, since the other slot is then the only good one, and when
-a second BuilderBot disk or stick in the machine carries the same slot.
+a second AerieOS disk or stick in the machine carries the same slot.
 Nothing running changes until you restart
 from This machine, and the slot running now stays to fall back to: at the
 GRUB menu, or with `slot next a`. The Updates section says which slot runs
@@ -376,11 +376,11 @@ release's ISO with its `.sha256` and its `.attestation.jsonl` beside it,
 all three from the release. The ISO is checked against both with no
 network: the attestation against the trusted root the running image was
 built with, so a folder on a share others can write cannot hand over an
-image BuilderBot's release workflow did not build. A release's attestation
+image AerieOS's release workflow did not build. A release's attestation
 is read from GitHub's public API, and neither way asks for a sign-in.
 
 **The release key.** The sha256 and the attestation prove a file is the one
-BuilderBot's release workflow built, which is not enough when the workflow
+AerieOS's release workflow built, which is not enough when the workflow
 or the repository itself is changed by someone else: they would build and
 attest a release of their own. So a release also carries `SHA256SUMS` and
 `SHA256SUMS.sig`, the list of its files' sha256 signed with an Ed25519 key
@@ -394,7 +394,7 @@ fetched against the list) and the installer alike. Each checks with
 OpenSSH's `ssh-keygen -Y verify`. While `config/release-signers` holds no
 key the check is skipped and said so, which is how a build before the first
 key behaves; once it holds one, an unsigned release is refused. The key's
-fingerprint is published on builderbot.dev to check the file against.
+fingerprint is published on aerieos.org to check the file against.
 
 **On trial.** The slot an update wrote boots on trial: GRUB counts each
 boot of it in its environment, and the health check
@@ -414,7 +414,7 @@ is kept in `/var/lib/builderbot-os/rolled-back-TIME/`. A patch carries no
 configuration change, so falling back on one boots the same configuration
 as it is.
 
-**Older versions.** A slot holds a whole BuilderBot OS, its controller and
+**Older versions.** A slot holds a whole AerieOS, its controller and
 agent with it. When an update is about to overwrite the slot not in use, the
 version in it is kept instead of lost, as files under
 `/var/lib/builderbot-os/kept/` with the configuration's copy from when it was

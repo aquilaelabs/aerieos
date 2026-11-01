@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Turn a fresh Linux machine into a BuilderBot node: the Debian, RHEL, Arch and
+# Turn a fresh Linux machine into a AerieOS node: the Debian, RHEL, Arch and
 # SUSE families, Alpine, Void and Gentoo; see "the machine's own tools" below.
 #
 # The sandbox exists so that a Claude session can build, run and destroy
-# containers without any of that reaching the server's real ones. BuilderBot
+# containers without any of that reaching the server's real ones. AerieOS
 # itself stays the container it is (or a controller installed bare metal,
 # nodes/install-controller.sh, which runs this script with --beside-controller
 # to make its own machine a node); this box is only ever a Docker host, and
@@ -19,7 +19,7 @@
 # enrolls the machine as a node: the agent is fetched from the controller and
 # left running under systemd, dialing out.
 #
-# It makes two accounts. `bb` runs Docker and answers ssh (the one jobs
+# It makes two accounts. `aerie` runs Docker and answers ssh (the one jobs
 # run as) with no sudo and no bb-sandbox, so the mounts this machine has
 # stay a decision made by a person with root at a console. And `builder` is
 # the one a Claude SESSION
@@ -109,14 +109,14 @@ it, which is a paste rather than a questionnaire.
                        agent's screen relay opens its terminals, which the
                        dashboard's reach through the controller; Claude Code is installed into its home.
                        `none` makes no such account, and no sessions run here.
-  --remove             take BuilderBot off this machine: the agent, the
+  --remove             take AerieOS off this machine: the agent, the
                        accounts, the mounts it used, its stores on this disk,
                        the firewall rule, bb-sandbox itself. Docker and the
                        packages stay, so does everything on the shares. It
                        says what will go and asks; --remove --yes does not.
   --guest              provision this machine as a GUEST node: somebody's own
                        machine rather than a sandbox built to be a node.
-                       Everything BuilderBot puts here is one directory
+                       Everything AerieOS puts here is one directory
                        (~/.builderbot) and one systemd user unit, and the
                        controller changes nothing outside them: no accounts,
                        no docker, no fstab, no netplan, no firewall, and
@@ -142,7 +142,7 @@ it, which is a paste rather than a questionnaire.
   --share TAG:PATH[:ro]  a virtiofs/9p share the HYPERVISOR passes in, mounted
                        at PATH. Requires one: on bare metal there is nothing
                        to pass a share in, so use --nfs instead. Repeatable.
-                       PATH MUST match the path BuilderBot uses. `:ro` mounts
+                       PATH MUST match the path AerieOS uses. `:ro` mounts
                        it read-only. Never /workspace: a node's projects are
                        a synced copy there, not a share. Leave it off a share containers keep their
                        data on.
@@ -152,7 +152,7 @@ it, which is a paste rather than a questionnaire.
                        a pool path like /mnt/cache/...: that spelling is for
                        bind mounts and is not what the server offers, so the
                        mount fails, quietly, because of nofail.
-  --controller URL     BuilderBot's dashboard, and --token the one-time
+  --controller URL     AerieOS's dashboard, and --token the one-time
   --token bbe_…        enrollment token its Nodes page minted. Given together,
                        this machine also becomes a NODE: the agent is
                        downloaded from the controller, enrolled, and left
@@ -223,11 +223,11 @@ it, which is a paste rather than a questionnaire.
 
 Path parity is not a style preference. A compose file's bind mounts are
 resolved by whatever runs the container, so a share this VM mounts at the
-path BuilderBot uses means the same directory on both sides and nothing has
+path AerieOS uses means the same directory on both sides and nothing has
 to translate between them. Mount it anywhere else and every compose file
 naming it becomes wrong in a way that fails silently: docker creates the
 missing directory and mounts it empty. The projects themselves are not a
-share: each node holds a synced copy at /workspace, as BuilderBot does.
+share: each node holds a synced copy at /workspace, as AerieOS does.
 EOF
 }
 
@@ -248,7 +248,7 @@ remove_if_asked() {
         rm -f "$tmp"
         exec /usr/local/sbin/bb-sandbox uninstall "$@"
     fi
-    echo "nothing of BuilderBot's is installed here (no /usr/local/sbin/bb-sandbox)"
+    echo "nothing of AerieOS's is installed here (no /usr/local/sbin/bb-sandbox)"
     exit 0
 }
 
@@ -369,7 +369,7 @@ warn() { printf '\n!! %s\n' "$*" >&2; }
 # of them afterwards through the config plane. That is right for a sandbox VM
 # built to be one and wrong for a laptop somebody also works on.
 #
-# A guest is the other class. Everything BuilderBot puts here lives in ONE
+# A guest is the other class. Everything AerieOS puts here lives in ONE
 # directory and ONE service unit, both removable in a line, and the controller
 # changes nothing outside them: Storage and Network refuse on a guest node and
 # say why (the per-verb gate, 6 Sep). No root is used or asked for, which is
@@ -479,7 +479,7 @@ guest_run() {
     mkdir -p "$(dirname "$unit")"
     cat > "$unit" <<EOF
 [Unit]
-Description=BuilderBot node agent (guest footprint)
+Description=AerieOS node agent (guest footprint)
 After=network-online.target
 
 [Service]
@@ -516,7 +516,7 @@ EOF
 
 [ "${GUEST:-0}" = 1 ] && guest_run
 
-# This is for a VM, and a container is not one. BuilderBot's own base is
+# This is for a VM, and a container is not one. AerieOS's own base is
 # Ubuntu and runs as root under `docker exec`, so both checks above pass there
 # and the script would go on to install seven packages before failing on
 # `systemctl enable --now docker`: a container has no systemd, and the error
@@ -536,8 +536,8 @@ in_container() {
 if [ "${BB_PROVISION_LIB:-0}" != 1 ] && in_container; then
     warn "this is a container, and this script provisions a VM."
     if [ -d /opt/builderbot ]; then
-        printf '   You are inside BuilderBot. It is the thing that TALKS to the\n'
-        printf '   sandbox; the sandbox is the separate machine BuilderBot lists as a node.\n'
+        printf '   You are inside AerieOS. It is the thing that TALKS to the\n'
+        printf '   sandbox; the sandbox is the separate machine AerieOS lists as a node.\n'
         printf '   Run this in a console on that VM, not in here.\n\n'
         printf '   Nothing outside the volumes survives a restart here, so if a\n'
         printf '   run got further than this: restart the container and it is\n'
@@ -554,7 +554,7 @@ ID=""; ID_LIKE=""; PRETTY_NAME=""; VERSION_ID=""; VERSION_CODENAME=""; UBUNTU_CO
 [ -r /etc/os-release ] && . /etc/os-release
 : "$VERSION_ID" "$VERSION_CODENAME" "$UBUNTU_CODENAME"   # the family file's to read
 # --- the machine's own tools -------------------------------------------------
-# One script, many distributions. Everything BuilderBot's own (the accounts,
+# One script, many distributions. Everything AerieOS's own (the accounts,
 # the stores, fstab, the agent) is the same on all of them, because none of
 # it is the distribution's. What differs is the package manager, where Docker
 # comes from, who owns the firewall, and which init system runs a
@@ -734,7 +734,7 @@ supervisor=supervise-daemon
 command="${cmd%% *}"
 command_args="${cmd#* }"
 # Kept, where OpenRC has no journal: supervise-daemon sent it to /dev/null.
-# The agent keeps the file to its size (cap_logs) and bb logs --node reads it.
+# The agent keeps the file to its size (cap_logs) and aerie logs --node reads it.
 output_log="/var/log/${name}.log"
 error_log="/var/log/${name}.log"
 respawn_delay=5
@@ -998,7 +998,7 @@ if [ "$REACH" = public ]; then
     rdig="$(tr -d '\r' < "$rhdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
     rm -f "$rhdr"
     if [ "$code" = 200 ] && [ -z "$rdig" ]; then
-        warn "${CONTROLLER} answers 200 on the agent's API, but not as BuilderBot does (no X-Agent-Digest, nothing in the body): the hostname's rule for /api/v1/agent/ goes somewhere other than the controller. In Zero Trust its service is http://localhost:7680 when the controller runs the tunnel itself, or the controller's LAN address and port (http://ADDRESS:7680) when cloudflared runs elsewhere at home; curl -sI ${CONTROLLER%/}/api/v1/agent/nosuch should answer 404"
+        warn "${CONTROLLER} answers 200 on the agent's API, but not as AerieOS does (no X-Agent-Digest, nothing in the body): the hostname's rule for /api/v1/agent/ goes somewhere other than the controller. In Zero Trust its service is http://localhost:7680 when the controller runs the tunnel itself, or the controller's LAN address and port (http://ADDRESS:7680) when cloudflared runs elsewhere at home; curl -sI ${CONTROLLER%/}/api/v1/agent/nosuch should answer 404"
         exit 1
     fi
     case "$code" in
@@ -1039,7 +1039,7 @@ if [ "$DOOR" = cloudflared ]; then
     elif [ ! -s /etc/cloudflared/env ]; then
         warn "no tunnel token: the door's secret left the enroll script once it ran; make a new script on the Nodes page"; exit 1
     fi
-    svc_install cloudflared "BuilderBot: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
+    svc_install cloudflared "AerieOS: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
     printf '   up; in Zero Trust the tunnel'"'"'s public hostname %s goes to ssh://localhost:22, and Cloudflare Access decides who reaches it\n' "$DOOR_HOST"
 elif [ "$DOOR" = tailscale ]; then
     say "door: Tailscale, this machine on your tailnet with ssh"
@@ -1070,9 +1070,9 @@ fi
 command -v docker >/dev/null 2>&1 && svc_enable docker
 
 # --- the stamp ----------------------------------------------------------
-# A label on the daemon saying this machine is BuilderBot's sandbox.
+# A label on the daemon saying this machine is AerieOS's sandbox.
 #
-# It is what BuilderBot checks before it will talk to a daemon at all, and the
+# It is what AerieOS checks before it will talk to a daemon at all, and the
 # reason it checks: everything the manager does beyond compose runs a container
 # as root on the far side, which is fine on a box whose whole job is being
 # wrecked and reset, and is a different act entirely against a NAS, a
@@ -1081,7 +1081,7 @@ command -v docker >/dev/null 2>&1 && svc_enable docker
 # says so, on the machine, and nothing else can.
 #
 # Written into daemon.json rather than kept beside it, because `docker info`
-# reports it: BuilderBot reads the stamp over the connection it already has,
+# reports it: AerieOS reads the stamp over the connection it already has,
 # with no second channel and nothing else on this box to keep in step.
 stamp_daemon() {
     local f=/etc/docker/daemon.json label="builderbot.sandbox=1" tmp
@@ -1110,7 +1110,7 @@ stamp_daemon() {
 }
 have_jq() { command -v jq >/dev/null 2>&1; }
 
-# The fence (R110 step 4): everything BuilderBot runs here (its containers,
+# The fence (R110 step 4): everything AerieOS runs here (its containers,
 # and the agent with the sessions and jobs it starts) inside one cgroup
 # whose memory stops short of the machine's, so a runaway build or app is
 # killed inside it and the system itself keeps running. The reserve left
@@ -1129,12 +1129,12 @@ fence_bytes() {
 }
 write_fence() {
     local max
-    max="$(fence_bytes)" || { warn "could not read this machine's memory: BuilderBot's work is not fenced"; return 1; }
+    max="$(fence_bytes)" || { warn "could not read this machine's memory: AerieOS's work is not fenced"; return 1; }
     case "$INIT" in
         systemd)
             cat > "/etc/systemd/system/${FENCE}" <<UNIT
 [Unit]
-Description=BuilderBot: its containers, sessions and jobs, kept short of the whole machine's memory
+Description=AerieOS: its containers, sessions and jobs, kept short of the whole machine's memory
 
 [Slice]
 MemoryAccounting=yes
@@ -1142,11 +1142,11 @@ MemoryMax=${max}
 UNIT
             systemctl daemon-reload ;;
         openrc)
-            [ -f /sys/fs/cgroup/cgroup.controllers ] || { warn "cgroups v2 is not mounted: BuilderBot's work is not fenced"; return 1; }
+            [ -f /sys/fs/cgroup/cgroup.controllers ] || { warn "cgroups v2 is not mounted: AerieOS's work is not fenced"; return 1; }
             install -d -m 0755 /etc/local.d
             cat > "/etc/local.d/${FENCE}.start" <<START
 #!/bin/sh
-# BuilderBot's fence (R110): its containers' cgroup, kept short of the machine.
+# AerieOS's fence (R110): its containers' cgroup, kept short of the machine.
 mkdir -p /sys/fs/cgroup/${FENCE}
 echo "+memory +pids" > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
 echo ${max} > /sys/fs/cgroup/${FENCE}/memory.max
@@ -1160,10 +1160,10 @@ START
             install -d -m 0755 /etc/conf.d
             printf 'rc_cgroup_settings="memory.max %s"\n' "$max" > /etc/conf.d/builderbot-agent ;;
         *)
-            warn "${INIT} has no cgroups of its own: BuilderBot's work is not fenced from the system's memory here"
+            warn "${INIT} has no cgroups of its own: AerieOS's work is not fenced from the system's memory here"
             return 1 ;;
     esac
-    say "BuilderBot's work is fenced at $(( max >> 30 )) GB of memory"
+    say "AerieOS's work is fenced at $(( max >> 30 )) GB of memory"
 }
 # Docker puts its containers in the fence: by the slice's name where it
 # drives cgroups through systemd, by its path where it writes them itself.
@@ -1198,11 +1198,11 @@ if [ -n "$stamped" ]; then
     # and doing that on a re-run that changed nothing would be rude.
     svc_restart docker || warn "docker did not restart; restart it by hand so its settings are read"
     if [ "$BESIDE_CONTROLLER" = 1 ]; then say "this daemon's containers are fenced"
-    else say "stamped this daemon as BuilderBot's sandbox"; fi
+    else say "stamped this daemon as AerieOS's sandbox"; fi
 fi
 
 # The journal kept across boots (R185): a fresh VPS keeps it in memory only,
-# so after a crash `bb logs --node NAME --crash` met "No journal boot entry
+# so after a crash `aerie logs --node NAME --crash` met "No journal boot entry
 # found for the specified boot (-1)" on a hosting node (11 Oct). A drop-in rather
 # than an edit of journald.conf, so the distribution's own file is left as it
 # was; journald restarted only when the drop-in is new.
@@ -1211,7 +1211,7 @@ keep_journal() {
     command -v journalctl >/dev/null 2>&1 || return 1
     # The same bytes as the agent's JOURNAL_DROPIN (configplane.py), and at
     # most 1G of journal: an older drop-in without the ceiling is replaced.
-    local want='# Written by BuilderBot (R185): keep the journal across boots, and at most 1G of it.
+    local want='# Written by AerieOS (R185): keep the journal across boots, and at most 1G of it.
 [Journal]
 Storage=persistent
 SystemMaxUse=1G'
@@ -1258,7 +1258,7 @@ authorize() {
 }
 
 say "user ${USER_NAME}"
-# An account here before BuilderBot is somebody's own: noted, so Uninstall
+# An account here before AerieOS is somebody's own: noted, so Uninstall
 # leaves it and its home where it found them.
 KEPT_ACCOUNTS=/etc/builderbot/kept-accounts
 keep_account() {
@@ -1272,14 +1272,14 @@ made_account() {
     install -d -m 0755 /etc/builderbot
     grep -qx "$1" "$MADE_ACCOUNTS" 2>/dev/null || echo "$1" >> "$MADE_ACCOUNTS"
 }
-# Never one that is already here and not BuilderBot's: an account is
+# Never one that is already here and not AerieOS's: an account is
 # somebody's, and taking it over (or deleting it at Uninstall) is never
 # ours to do, whatever it is called. A machine already enrolled has made its
 # own, which a run again keeps using.
 if id -u "$USER_NAME" >/dev/null 2>&1; then
     if [ ! -f /etc/builderbot/node.json ]; then
         keep_account "$USER_NAME"
-        warn "${USER_NAME} is already an account on this machine, and not one BuilderBot made: run again with --user NAME, a name that is not taken (bbjobs, say)"; exit 1
+        warn "${USER_NAME} is already an account on this machine, and not one AerieOS made: run again with --user NAME, a name that is not taken (bbjobs, say)"; exit 1
     fi
 else
     useradd -m -s /bin/bash "$USER_NAME"
@@ -1299,7 +1299,7 @@ fi
 # ...and kvm, where the host exposes it. Without this the Android emulator on
 # this node runs with no hardware acceleration and is unusably slow, measured
 # on bb-sandbox, where /dev/kvm is present and root:kvm 0660, and a job as the
-# enrolled account got EACCES opening it. `bb emu start` warns and carries on,
+# enrolled account got EACCES opening it. `aerie emu start` warns and carries on,
 # so the symptom is a boot that never finishes rather than an error naming the
 # group. Absent on a host without KVM, which is why it is conditional.
 getent group kvm >/dev/null 2>&1 && usermod -aG kvm "$USER_NAME"
@@ -1310,7 +1310,7 @@ if [ -n "$SSH_KEY" ]; then
     # provisioning has finished and you have walked away. And a PRIVATE key
     # pasted here is a secret written onto the machine whose whole premise is
     # that it holds nothing: authorized_keys wants the .pub half, and the
-    # private one never leaves BuilderBot's shielded agent.
+    # private one never leaves AerieOS's shielded agent.
     authorize "$USER_NAME" "$SSH_KEY"
 fi
 
@@ -1325,7 +1325,7 @@ fi
 # docker group is root on this machine to anyone who wants it: one
 # `docker run -v /:/host --privileged` and the separation is over. That is not
 # a hole to plug, it is the whole point of the VM: it exists to be wrecked, and
-# BuilderBot needs the daemon to do its job. What the split buys is that the
+# AerieOS needs the daemon to do its job. What the split buys is that the
 # machine's OWN configuration is not one command away from a session that
 # wandered: the fstab that decides what this machine mounts, and read-only,
 # needs root, which neither account here has.
@@ -1357,11 +1357,11 @@ elif [ "$SESSION_NAME" = "$USER_NAME" ]; then
     printf '   pick a different --session-user, or none\n'
     SESSION_NAME=""
 elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/builderbot/node.json ]; then
-    # Already an account here, and not one BuilderBot made: somebody's, and
+    # Already an account here, and not one AerieOS made: somebody's, and
     # maybe one that can sudo, which a session never may (a cloud image's own
     # account, R97's walk). Left as it is; sessions wait for another name.
     keep_account "$SESSION_NAME"
-    warn "${SESSION_NAME} is already an account on this machine, and not one BuilderBot made"
+    warn "${SESSION_NAME} is already an account on this machine, and not one AerieOS made"
     printf '   run again with --session-user NAME, a name that is not taken (bbsession, say), or none\n'
     SESSION_NAME=""
 else
@@ -1406,21 +1406,21 @@ else
     # shellcheck disable=SC2046
     pkg $(pkg_names session) >/dev/null 2>&1 \
         || warn "tmux, jq or git did not install; sessions will not start until they do"
-    # A display for bb capture reel (R95): not fatal, since a node without one still
-    # builds and tests; bb capture reel --display says what is missing.
+    # A display for aerie capture reel (R95): not fatal, since a node without one still
+    # builds and tests; aerie capture reel --display says what is missing.
     # shellcheck disable=SC2046
     pkg $(pkg_names reel) >/dev/null 2>&1 \
-        || warn "Xvfb, xdotool or xdpyinfo did not install; bb capture reel --display needs them"
+        || warn "Xvfb, xdotool or xdpyinfo did not install; aerie capture reel --display needs them"
     # Claude Code is not installed here: the Library does it on
     # purpose, so whoever enrolls a node sees what is put on it (R145), and a
     # session refuses to start until it is there.
     # A login shell as this account gets what a dashboard session gets: the
     # role, the controller's address, and bb from the bundle the agent keeps
     # current under the toolchain store. That is what makes proving the node
-    # by hand (ssh in, run bb-tty, run bb roadmap) the same path the
+    # by hand (ssh in, run bb-tty, run aerie roadmap) the same path the
     # dashboard takes, rather than a second one.
     cat > /etc/profile.d/builderbot-session.sh <<EOF
-# Written by BuilderBot's provision-linux.sh. A session on this node, at a console.
+# Written by AerieOS's provision-linux.sh. A session on this node, at a console.
 case "\$(id -un)" in
     ${SESSION_NAME})
         export BUILDERBOT_ROLE=node WORKSPACE=/workspace
@@ -1445,7 +1445,7 @@ say "bb-sandbox"
 # VM, and a second download is a second thing that can be unreachable at the
 # moment you are standing in front of a machine with no shares.
 #
-# Root-only, and deliberately not reachable from BuilderBot. The point of this
+# Root-only, and deliberately not reachable from AerieOS. The point of this
 # VM is that a session can build and destroy containers without touching
 # anything that matters, and a path from the container into the VM's own
 # configuration would hand back exactly what the arrangement buys.
@@ -1483,7 +1483,7 @@ CONF=/etc/bb-sandbox.conf
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
 APPDATA="${APPDATA:-}"
-# The account BuilderBot ssh's in as, recorded by provision-linux.sh because this is
+# The account AerieOS ssh's in as, recorded by provision-linux.sh because this is
 # the one thing here it knows and the tool cannot work out. `logname` was the
 # guess before, and it answers with whoever ran sudo: a different name the
 # moment the operator administers this box from an account of their own, and
@@ -1821,7 +1821,7 @@ print(json.load(open(sys.argv[1])).get("user") or "")' "$NODE_JSON" 2>/dev/null)
     [ -n "$store" ] || die "this node has no toolchain store"
     # The newest bundle the agent has unpacked. It appears the first time a
     # toolchain job runs here, so before that there is honestly nothing to run.
-    newest="$(ls -1dt "$store"/.bb/*/scripts/bb 2>/dev/null | head -1 || true)"
+    newest="$(ls -1dt "$store"/.bb/*/scripts/aerie 2>/dev/null | head -1 || true)"
     [ -n "$newest" ] || die "no bb on this machine yet: the controller unpacks one into
    ${store}/.bb the first time a toolchain job runs on this node. Install
    something from the dashboard's Library and it will be here."
@@ -1932,7 +1932,7 @@ cmd_appdata() {
     say "$path is where containers keep their data"
 }
 
-# The lines to put in BuilderBot's own template. This machine cannot set them
+# The lines to put in AerieOS's own template. This machine cannot set them
 # (they are the CONTAINER's environment, on the other box), so it prints them
 # rather than pretending. Derived from what is actually mounted here, which is
 # the half that is easy to get wrong by hand.
@@ -1941,21 +1941,21 @@ cmd_settings() {
     ip="$(my_ip || true)"
     while read -r path; do
         [ -n "$path" ] || continue
-        # Parity: BuilderBot mounts the same share at the same path, so the
+        # Parity: AerieOS mounts the same share at the same path, so the
         # mapping is an identity and the translation falls silent. A path this
-        # VM has and BuilderBot does not still belongs in neither list.
+        # VM has and AerieOS does not still belongs in neither list.
         pairs="${pairs:+$pairs,}$path:$path"
     done < <(ours)
     cat <<EOF
 
-On BuilderBot's dashboard, Nodes page, on this machine's row (${ip:-<this-vm>}):
+On AerieOS's dashboard, Nodes page, on this machine's row (${ip:-<this-vm>}):
 
   Path mapping:    ${pairs:-<none yet>}
 
-Only for the paths BuilderBot ALSO mounts at the same place: a share that is
-this machine's alone belongs in neither list, and BuilderBot will say so.
+Only for the paths AerieOS ALSO mounts at the same place: a share that is
+this machine's alone belongs in neither list, and AerieOS will say so.
 ${APPDATA:+
-Container appdata is ${APPDATA}. Mount that same share in BuilderBot at that
+Container appdata is ${APPDATA}. Mount that same share in AerieOS at that
 same path, and set its /devdata to it.}
 EOF
 }
@@ -1967,7 +1967,7 @@ EOF
 menu_whiptail() {
     local choice
     while :; do
-        choice="$(whiptail --title "BuilderBot sandbox" --menu \
+        choice="$(whiptail --title "AerieOS sandbox" --menu \
             "This VM's Docker sandbox" 18 68 8 \
             list     "what is mounted, and from where" \
             nfs      "add an NFS mount" \
@@ -2036,11 +2036,11 @@ EOF
 }
 
 
-# uninstall: take BuilderBot's software off this machine and leave the rest.
-# What goes is what provision-linux.sh put here for BuilderBot alone: the
+# uninstall: take AerieOS's software off this machine and leave the rest.
+# What goes is what provision-linux.sh put here for AerieOS alone: the
 # agent and its unit, the session-ports rule, the two accounts and their
 # homes (Claude Code, the runners' directories, caches), the mounts
-# BuilderBot used (whatever a store sits on, and a /workspace share left from
+# AerieOS used (whatever a store sits on, and a /workspace share left from
 # before every node held a synced copy), the stores on
 # this disk, this tool. What stays is shared with the rest of the machine:
 # docker and the packages the provisioner installed (nfs-common, python3,
@@ -2081,12 +2081,12 @@ cmd_uninstall() {
             *) [ -n "$(stores_under "$p")" ] && mounts="$mounts $p" ;;
         esac
     done
-    say "uninstall BuilderBot from this machine"
+    say "uninstall AerieOS from this machine"
     printf '   goes:  the agent and its unit, the session firewall rules and the sessions'"'"' own networks,\n'
-    printf '          the account%s %s with their homes (those BuilderBot made), /etc/builderbot, and this tool\n' \
+    printf '          the account%s %s with their homes (those AerieOS made), /etc/builderbot, and this tool\n' \
         "${session_user:+s}" "${DOCKER_USER}${session_user:+ and ${session_user}}"
     [ "$stores" = 1 ] && printf '   also:  the stores on this disk (%s), /workspace, /var/lib/builderbot\n' "${store_dirs:- none}"
-    [ "$configured" = 1 ] && printf '   also:  the mounts BuilderBot used (%s), the runners, the GPU display\n' "${mounts:- none}"
+    [ "$configured" = 1 ] && printf '   also:  the mounts AerieOS used (%s), the runners, the GPU display\n' "${mounts:- none}"
     [ "$doors" = 1 ] && printf '   also:  cloudflared and its token, Tailscale'"'"'s login, the port 22 rule, the hosting firewall, the nginx container\n'
     printf '   stays: docker, nfs-common, python3, tmux, jq, curl, the empty mountpoints,\n'
     printf '          everything on the shares (other nodes may use them)%s\n' "$([ "$stores" = 1 ] || printf ', the stores')"
@@ -2098,7 +2098,7 @@ cmd_uninstall() {
         [ "$a" = uninstall ] || die "left as it was"
     fi
     say "stopping the agent and the session port's rule"
-    # The GPU display's unit too (B394): left enabled, a machine BuilderBot
+    # The GPU display's unit too (B394): left enabled, a machine AerieOS
     # had left still started an Xorg on the card at every boot.
     local units="builderbot-agent builderbot-session-ports"
     [ "$configured" = 1 ] && units="$units builderbot-gpu-display builderbot-gpu-nodes"
@@ -2185,7 +2185,7 @@ cmd_uninstall() {
         f="$(mktemp)"
         if jq 'del(."cgroup-parent")' /etc/docker/daemon.json > "$f" 2>/dev/null; then
             cat "$f" > /etc/docker/daemon.json
-            say "BuilderBot's fence is out of /etc/docker/daemon.json (it takes at docker's next restart)"
+            say "AerieOS's fence is out of /etc/docker/daemon.json (it takes at docker's next restart)"
         fi
         rm -f "$f"
     fi
@@ -2195,16 +2195,16 @@ cmd_uninstall() {
     for u in "$session_user" "$DOCKER_USER"; do
         id -u "$u" >/dev/null 2>&1 || continue
         [ "$(id -u "$u")" != 0 ] || continue
-        # One that was here before BuilderBot is somebody's own: left, home
+        # One that was here before AerieOS is somebody's own: left, home
         # and all (it took the session account's name on a cloud image).
         if grep -qx "$u" /etc/builderbot/kept-accounts 2>/dev/null; then
-            say "kept ${u}: it was an account here before BuilderBot"
+            say "kept ${u}: it was an account here before AerieOS"
             continue
         fi
         # Only one this script made, where it has kept that list; a node
         # provisioned before the list keeps the old reading (B516).
         if [ -f /etc/builderbot/made-accounts ] && ! grep -qx "$u" /etc/builderbot/made-accounts; then
-            say "kept ${u}: BuilderBot did not make it"
+            say "kept ${u}: AerieOS did not make it"
             continue
         fi
         case "$(getent passwd "$u" | cut -d: -f6)" in
@@ -2212,7 +2212,7 @@ cmd_uninstall() {
             *) userdel "$u" >/dev/null 2>&1 || true ;;
         esac
     done
-    say "removing BuilderBot's files"
+    say "removing AerieOS's files"
     # The session account's sudo rule first: it is the one grant here that
     # reaches root, and it must not outlive the helper it names (R35).
     rm -f /etc/sudoers.d/builderbot-session /etc/bb-session.conf /usr/local/sbin/bb-session
@@ -2252,7 +2252,7 @@ cmd_uninstall() {
         have systemctl && systemctl disable --now wg-quick@bb >/dev/null 2>&1 || true
         rm -f /etc/wireguard/bb.conf
     fi
-    say "BuilderBot is off this machine; docker, the packages, the empty mountpoints and the shares' contents are as they were$([ "$stores" = 1 ] || printf ', and so are the stores')"
+    say "AerieOS is off this machine; docker, the packages, the empty mountpoints and the shares' contents are as they were$([ "$stores" = 1 ] || printf ', and so are the stores')"
     rm -f /usr/local/sbin/bb-sandbox
     exit 0
 }
@@ -2264,7 +2264,7 @@ cmd_uninstall() {
 # slower road than the emulator's own SwiftShader. So: the distribution's
 # NVIDIA driver, a real Xorg on it with no monitor, as a unit of this
 # machine's own, and one line in $GPU_STATE saying what it found, which
-# `bb emu gpu`, `bb doctor` and the Nodes tab read. The driver takes the card
+# `aerie emu gpu`, `aerie doctor` and the Nodes tab read. The driver takes the card
 # only after a reboot (nouveau holds it until then), so `gpu` says when one
 # is needed rather than pretending; Reboot on the node's row is that press.
 GPU_STATE=/run/builderbot-gpu-display
@@ -2373,7 +2373,7 @@ cmd_gpu() {
 # Android emulator's -gpu host; bounded restarts, so a card the host has
 # taken back is said in $GPU_STATE rather than retried forever.
 [Unit]
-Description=BuilderBot GPU display: a headless X server on the NVIDIA card
+Description=AerieOS GPU display: a headless X server on the NVIDIA card
 After=multi-user.target
 StartLimitIntervalSec=900
 StartLimitBurst=3
@@ -2524,7 +2524,7 @@ gpu_nodes_unit() {
 # at boot as root: a session runs with no-new-privileges, so the setuid
 # nvidia-modprobe cannot make them on a program's first use.
 [Unit]
-Description=BuilderBot GPU nodes: the NVIDIA device nodes for sessions
+Description=AerieOS GPU nodes: the NVIDIA device nodes for sessions
 After=systemd-modules-load.service
 
 [Service]
@@ -2808,7 +2808,7 @@ cmd_gpu_container() {
 # What a node has beyond the base, each an install and a remove, run by the
 # provisioner's flag at enrollment and by the agent's `feature` system job
 # from the Nodes page: one copy, so the two ways cannot drift. A marker
-# under /etc/builderbot/features says BuilderBot put it there, and lists the
+# under /etc/builderbot/features says AerieOS put it there, and lists the
 # packages it added, so a remove takes those and leaves what the machine
 # had before.
 FEATURES_DIR=/etc/builderbot/features
@@ -2891,7 +2891,7 @@ vmhost_virtiofsd() {
     install -d -m 0755 /usr/local/libexec
     cat > "$VIRTIOFSD_WRAP" <<'WRAP'
 #!/bin/sh
-# BuilderBot's virtiofsd for a VM's shared folder: see vmhost_virtiofsd in
+# AerieOS's virtiofsd for a VM's shared folder: see vmhost_virtiofsd in
 # provision-linux.sh. libvirt passes --shared-dir; the rest goes through.
 real=$(command -v virtiofsd || ls /usr/libexec/virtiofsd /usr/lib/qemu/virtiofsd 2>/dev/null | head -n 1)
 dir="" prev=""
@@ -2972,7 +2972,7 @@ feature_vmhost() {
             say "VM host installed${added:+ ($(printf '%s' "$added" | wc -w) packages added)}; ${DOCKER_USER} runs the VMs, and no session can" ;;
         remove)
             [ -f "$FEATURES_DIR/vmhost.partial" ] && [ ! -f "$FEATURES_DIR/vmhost" ] && mv "$FEATURES_DIR/vmhost.partial" "$FEATURES_DIR/vmhost"
-            [ -f "$FEATURES_DIR/vmhost" ] || { say "VM host was not installed by BuilderBot here; nothing to remove"; return 0; }
+            [ -f "$FEATURES_DIR/vmhost" ] || { say "VM host was not installed by AerieOS here; nothing to remove"; return 0; }
             if have virsh; then
                 n="$(virsh -c qemu:///system list --all --name 2>/dev/null | grep -c . || true)"
                 [ "${n:-0}" -eq 0 ] || die "${n} VM(s) are on this machine: remove them first, then VM host"
@@ -3055,7 +3055,7 @@ NFT
             if have systemctl; then
                 cat > /etc/systemd/system/builderbot-hosting-fw.service <<UNIT
 [Unit]
-Description=BuilderBot: a hosting-only box takes in 80 and 443
+Description=AerieOS: a hosting-only box takes in 80 and 443
 After=network-pre.target
 Before=docker.service
 [Service]
@@ -3118,7 +3118,7 @@ feature_iommu() {
             printf 'way=%s\nargs=%s\n' "$way" "$args" > "$marker"
             say "IOMMU on at the next restart ($args, by $way); restart the machine, and if its groups stay empty turn VT-d or AMD-Vi on in the firmware" ;;
         remove)
-            [ -f "$marker" ] || { say "the IOMMU line was not put there by BuilderBot; nothing to remove"; return 0; }
+            [ -f "$marker" ] || { say "the IOMMU line was not put there by AerieOS; nothing to remove"; return 0; }
             way="$(sed -n 's/^way=//p' "$marker")"; args="$(sed -n 's/^args=//p' "$marker")"
             say "taking $args off the kernel's command line (by $way)"
             case "$way" in
@@ -3143,7 +3143,7 @@ grub_regen() {
 # storage (ZFS, mergerfs, SnapRAID and SMART for the Storage page's pools and
 # array) and shares (Samba and NFS), each installed with exactly its
 # packages and removed with them, their services the machine's own, run by
-# the root agent and never by the controller's account. On a BuilderBot OS
+# the root agent and never by the controller's account. On a AerieOS
 # disk the packages are the image's (pkg says so when one is missing).
 storage_pkgs() {
     case "$1" in
@@ -3188,7 +3188,7 @@ feature_pkgs() {
             rm -f "${FEATURES_DIR:?}/${id:?}.partial" ;;
         remove)
             [ -f "$FEATURES_DIR/$id.partial" ] && [ ! -f "$FEATURES_DIR/$id" ] && mv "$FEATURES_DIR/$id.partial" "$FEATURES_DIR/$id"
-            [ -f "$FEATURES_DIR/$id" ] || { say "$what was not installed by BuilderBot here; nothing to remove"; return 0; }
+            [ -f "$FEATURES_DIR/$id" ] || { say "$what was not installed by AerieOS here; nothing to remove"; return 0; }
             added="$(sed -n 's/^packages=//p' "$FEATURES_DIR/$id")"
             # shellcheck disable=SC2086
             [ -z "${added// /}" ] || pkgs_drop "$fam" $added || warn "the packages did not all come off; the output above says why"
@@ -3223,7 +3223,7 @@ feature_shares() {
             # each), the daemons the machine's own units, never the controller's.
             install -d -m 0755 /etc/samba/smb.conf.d /etc/exports.d
             grep -q '^include = /etc/samba/smb.conf.d/builderbot.conf' /etc/samba/smb.conf 2>/dev/null \
-                || printf '\n# BuilderBot: the shares the Storage page makes.\ninclude = /etc/samba/smb.conf.d/builderbot.conf\n' >> /etc/samba/smb.conf
+                || printf '\n# AerieOS: the shares the Storage page makes.\ninclude = /etc/samba/smb.conf.d/builderbot.conf\n' >> /etc/samba/smb.conf
             [ -f /etc/samba/smb.conf.d/builderbot.conf ] || : > /etc/samba/smb.conf.d/builderbot.conf
             have systemctl && { systemctl enable --now smbd.service nmbd.service nfs-server.service >/dev/null 2>&1 || true; }
             say "shares installed: each share is made on the Storage page, given to accounts there" ;;
@@ -3232,7 +3232,7 @@ feature_shares() {
                 die "shares are served from this machine: remove them on the Storage page first, then shares"
             fi
             have systemctl && systemctl disable --now smbd.service nmbd.service nfs-server.service >/dev/null 2>&1 || true
-            sed -i '/^# BuilderBot: the shares the Storage page makes.$/d; \#^include = /etc/samba/smb.conf.d/builderbot.conf$#d' /etc/samba/smb.conf 2>/dev/null || true
+            sed -i '/^# AerieOS: the shares the Storage page makes.$/d; \#^include = /etc/samba/smb.conf.d/builderbot.conf$#d' /etc/samba/smb.conf 2>/dev/null || true
             feature_pkgs shares remove "" "shares" ;;
     esac
 }
@@ -3247,23 +3247,23 @@ feature_ups() {
         install)
             feature_pkgs ups install "$(ups_pkgs "$(os_family)")" "ups: NUT"
             install -d -m 0755 /etc/nut
-            if ! grep -qs '^# BuilderBot' /etc/nut/ups.conf; then
-                printf '# BuilderBot (the Features section): a USB UPS, standalone. Edit if yours needs another driver.\n[ups]\n    driver = usbhid-ups\n    port = auto\n    desc = "UPS"\n' > /etc/nut/ups.conf
+            if ! grep -qs '^# AerieOS' /etc/nut/ups.conf; then
+                printf '# AerieOS (the Features section): a USB UPS, standalone. Edit if yours needs another driver.\n[ups]\n    driver = usbhid-ups\n    port = auto\n    desc = "UPS"\n' > /etc/nut/ups.conf
             fi
-            if ! grep -qs '^# BuilderBot' /etc/nut/upsd.users; then
+            if ! grep -qs '^# AerieOS' /etc/nut/upsd.users; then
                 pw="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 20)"
-                printf '# BuilderBot (the Features section)\n[monuser]\n    password = %s\n    upsmon primary\n' "$pw" > /etc/nut/upsd.users
-                printf '# BuilderBot (the Features section): the machine shuts down cleanly when the UPS says low battery.\nMONITOR ups@localhost 1 monuser %s primary\nSHUTDOWNCMD "/sbin/shutdown -h +0"\nMINSUPPLIES 1\nPOLLFREQ 5\nPOLLFREQALERT 5\nHOSTSYNC 15\nDEADTIME 15\nPOWERDOWNFLAG /etc/killpower\nRBWARNTIME 43200\nNOCOMMWARNTIME 300\nFINALDELAY 5\n' "$pw" > /etc/nut/upsmon.conf
+                printf '# AerieOS (the Features section)\n[monuser]\n    password = %s\n    upsmon primary\n' "$pw" > /etc/nut/upsd.users
+                printf '# AerieOS (the Features section): the machine shuts down cleanly when the UPS says low battery.\nMONITOR ups@localhost 1 monuser %s primary\nSHUTDOWNCMD "/sbin/shutdown -h +0"\nMINSUPPLIES 1\nPOLLFREQ 5\nPOLLFREQALERT 5\nHOSTSYNC 15\nDEADTIME 15\nPOWERDOWNFLAG /etc/killpower\nRBWARNTIME 43200\nNOCOMMWARNTIME 300\nFINALDELAY 5\n' "$pw" > /etc/nut/upsmon.conf
                 chmod 0640 /etc/nut/upsd.users /etc/nut/upsmon.conf
                 chgrp nut /etc/nut/upsd.users /etc/nut/upsmon.conf 2>/dev/null || true
             fi
-            printf '# BuilderBot (the Features section)\nMODE=standalone\n' > /etc/nut/nut.conf
+            printf '# AerieOS (the Features section)\nMODE=standalone\n' > /etc/nut/nut.conf
             have systemctl && { systemctl enable --now nut-driver-enumerator.service nut-server.service nut-monitor.service >/dev/null 2>&1 || true; }
             say "ups installed: a USB UPS answers on This machine's Power section; the machine shuts down cleanly on a low battery" ;;
         remove)
             have systemctl && systemctl disable --now nut-monitor.service nut-server.service >/dev/null 2>&1 || true
             for f in /etc/nut/ups.conf /etc/nut/upsd.users /etc/nut/upsmon.conf /etc/nut/nut.conf; do
-                grep -qs '^# BuilderBot' "$f" && rm -f "$f"
+                grep -qs '^# AerieOS' "$f" && rm -f "$f"
             done
             feature_pkgs ups remove "" "ups" ;;
     esac
@@ -3323,7 +3323,7 @@ chown root:root /usr/local/sbin/bb-sandbox 2>/dev/null || true
 [ -s /usr/local/sbin/bb-sandbox ] \
     || { warn "bb-sandbox did not install"; exit 1; }
 
-# The account BuilderBot will ssh in as. Recorded now because it is decided
+# The account AerieOS will ssh in as. Recorded now because it is decided
 # here and nowhere else: bb-sandbox prints it back in `settings`, and guessing
 # it from whoever ran sudo is wrong the moment this box is administered from
 # an account of its own.
@@ -3376,7 +3376,7 @@ if [ "${#MOUNTED[@]}" -gt 0 ]; then
 fi
 
 # Docker listens on its socket and nothing else. An open 2375 is root on this
-# machine to anyone who can reach it, and BuilderBot will not talk to one
+# machine to anyone who can reach it, and AerieOS will not talk to one
 # anyway: ssh is the only way in, which is why no port has to be opened here.
 if [ -f /etc/systemd/system/docker.service.d/tcp.conf ]; then
     say "closing tcp/2375, which an earlier run opened"
@@ -3412,7 +3412,7 @@ Slice=${FENCE}
 OOMScoreAdjust=200"
 fi
 
-AGENT_DESC="BuilderBot node agent - dials in to the controller and runs its jobs"
+AGENT_DESC="AerieOS node agent - dials in to the controller and runs its jobs"
 if [ -n "$CONTROLLER" ]; then
     say "agent: enrolling with ${CONTROLLER}"
     # shellcheck disable=SC2046
@@ -3438,7 +3438,7 @@ if [ -n "$CONTROLLER" ]; then
     # an empty file ran as an empty script, said nothing, exited 0, and the
     # node never enrolled (11 Oct).
     if [ -z "$want" ] || [ ! -s "${AGENT}.new" ]; then
-        warn "what ${CONTROLLER} sent for the agent is not BuilderBot's ($(stat -c %s "${AGENT}.new" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
+        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(stat -c %s "${AGENT}.new" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
         rm -f "${AGENT}.new"; exit 1
     fi
     chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
@@ -3481,7 +3481,7 @@ if [ -n "$DOOR" ] && [ "$DOOR_CLOSE22" = 1 ] && [ -n "$door_up" ]; then
     command -v nft >/dev/null 2>&1 || pkg $(pkg_names nft) >/dev/null 2>&1 || true
     install -d -m 0755 /etc/builderbot
     cat > /etc/builderbot/door-22.nft <<'NFT'
-# Written by BuilderBot's provision-linux.sh: port 22 from the loopback and the tailnet only.
+# Written by AerieOS's provision-linux.sh: port 22 from the loopback and the tailnet only.
 table inet builderbot_door
 delete table inet builderbot_door
 table inet builderbot_door {
@@ -3498,7 +3498,7 @@ NFT
         if [ "$INIT" = systemd ]; then
             cat > /etc/systemd/system/builderbot-door-22.service <<UNIT
 [Unit]
-Description=BuilderBot: port 22 reachable through the door only
+Description=AerieOS: port 22 reachable through the door only
 After=network-pre.target
 [Service]
 Type=oneshot
@@ -3622,7 +3622,7 @@ if [ -n "$SESSION_NAME" ] && [ -n "$ctl_url" ]; then
         case "$ctl_ip" in *:*) fam=ip6 ;; *) fam=ip ;; esac
         install -d -m 0755 /etc/builderbot
         cat > /etc/builderbot/session-ports.nft <<EOF
-# Written by BuilderBot's provision-linux.sh: the agent's screen relay, reachable from the
+# Written by AerieOS's provision-linux.sh: the agent's screen relay, reachable from the
 # controller (${ctl_host}) and the loopback, and from nowhere else.
 table inet builderbot_session
 delete table inet builderbot_session
@@ -3643,7 +3643,7 @@ EOF
                 systemd)
                     cat > /etc/systemd/system/builderbot-session-ports.service <<EOF
 [Unit]
-Description=BuilderBot: the session port open to the controller only
+Description=AerieOS: the session port open to the controller only
 After=network-pre.target
 Wants=network-pre.target
 Before=network.target builderbot-agent.service
@@ -3660,7 +3660,7 @@ EOF
                     systemctl enable builderbot-session-ports >/dev/null 2>&1 || true ;;
                 openrc)
                     install -d -m 0755 /etc/local.d
-                    printf '#!/bin/sh\n# BuilderBot: the session port open to the controller only\n%s\n' "$nft_cmd" \
+                    printf '#!/bin/sh\n# AerieOS: the session port open to the controller only\n%s\n' "$nft_cmd" \
                         > /etc/local.d/builderbot-session-ports.start
                     chmod 0755 /etc/local.d/builderbot-session-ports.start
                     rc-update add local default >/dev/null 2>&1 || true ;;
@@ -3723,7 +3723,7 @@ controller's. Each person signs in to each agent on this node from its
 row on the dashboard's Installed page (Machines, Installed), once per account.
 
 bb itself is not on this account's PATH: it is the controller's, fetched
-into the toolchain store by the agent (<store>/<scope>/.bb/current/scripts/bb)
+into the toolchain store by the agent (<store>/<scope>/.bb/current/scripts/aerie)
 and put on PATH for ${USER_NAME} and ${SESSION_NAME} by
 /etc/profile.d/builderbot-session.sh. A shell as either account has it;
 this one does not, and needs none.
@@ -3733,7 +3733,7 @@ fi
 
 cat <<EOF
 
-Those paths have to be the ones BuilderBot uses. A compose file resolves a
+Those paths have to be the ones AerieOS uses. A compose file resolves a
 relative bind against whoever runs the container, so a path that means
 something different on each side is an app that comes up with no data.
 

@@ -5,7 +5,7 @@
 // second and a half, which is stats and counters and is what a view watches
 // to know it must re-read. Anything a person is waiting for after pressing
 // something is redrawn by the handler itself; anything arriving from
-// elsewhere (another window, a session, `bb`, a node) arrives on the
+// elsewhere (another window, a session, `aerie`, a node) arrives on the
 // revisions poll.
 //
 // What this file measures is the join between the two halves, because that is

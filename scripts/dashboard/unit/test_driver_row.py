@@ -97,7 +97,7 @@ class DriverError(unittest.TestCase):
 
     def test_without_one_the_helpers_last_word(self):
         self.assertIn("is not a driver package", self.why("!! nvidia-driver-9 is not a driver package: nvidia-driver-NNN\n"))
-        self.assertIn("not provisioned", self.why("refused: the NVIDIA driver is this machine's own, and this node was not provisioned as a BuilderBot sandbox\n"))
+        self.assertIn("not provisioned", self.why("refused: the NVIDIA driver is this machine's own, and this node was not provisioned as a AerieOS sandbox\n"))
 
 
 class DriverName(unittest.TestCase):

@@ -1,5 +1,5 @@
 'use strict';
-// BuilderBot for VS Code (R159): a project's files opened as a folder of
+// AerieOS for VS Code (R159): a project's files opened as a folder of
 // their own, builderbot:/PROJECT/..., read and saved through the
 // controller's Files API, with no share mounted here; the changes a coding
 // agent's session makes appear in open editors as it saves them; and any
@@ -29,7 +29,7 @@ async function connect(context) {
   if (client) return client;
   const url = base();
   const cookie = url ? await context.secrets.get(`${SECRET}:${url}`) : '';
-  if (!url || !cookie) throw new Refused(401, 'Not signed in to BuilderBot: run BuilderBot: Sign In.');
+  if (!url || !cookie) throw new Refused(401, 'Not signed in to AerieOS: run AerieOS: Sign In.');
   client = new Client(url, cookie, tls());
   return client;
 }
@@ -145,7 +145,7 @@ class BuilderBotFS {
       } catch (e) {
         // Access taken away or signed out: the server said so; stop asking.
         if (e instanceof Refused && (e.status === 401 || e.status === 403)) {
-          vscode.window.showWarningMessage(`BuilderBot stopped following ${project}: ${e.message}`);
+          vscode.window.showWarningMessage(`AerieOS stopped following ${project}: ${e.message}`);
           return;
         }
         await sleep(5000);
@@ -163,7 +163,7 @@ function sleep(ms) {
 }
 
 function say(e) {
-  vscode.window.showErrorMessage(`BuilderBot: ${e.message || e}`);
+  vscode.window.showErrorMessage(`AerieOS: ${e.message || e}`);
 }
 
 async function pickProject(context, why) {
@@ -242,16 +242,16 @@ async function signInWith(context, url, name, password) {
 
 async function cmdSignIn(context) {
   const url = await vscode.window.showInputBox({
-    prompt: 'BuilderBot\'s address, as you open the dashboard', value: base() || 'https://', ignoreFocusOut: true,
+    prompt: 'AerieOS\'s address, as you open the dashboard', value: base() || 'https://', ignoreFocusOut: true,
   });
   if (!url) return;
-  const name = await vscode.window.showInputBox({ prompt: 'Your BuilderBot name', ignoreFocusOut: true });
+  const name = await vscode.window.showInputBox({ prompt: 'Your AerieOS name', ignoreFocusOut: true });
   if (!name) return;
-  const password = await vscode.window.showInputBox({ prompt: `${name}'s BuilderBot password`, password: true, ignoreFocusOut: true });
+  const password = await vscode.window.showInputBox({ prompt: `${name}'s AerieOS password`, password: true, ignoreFocusOut: true });
   if (!password) return;
   try {
     await signInWith(context, url, name, password);
-    vscode.window.showInformationMessage(`Signed in to BuilderBot as ${name}.`);
+    vscode.window.showInformationMessage(`Signed in to AerieOS as ${name}.`);
   } catch (e) {
     say(e);
   }
@@ -261,7 +261,7 @@ async function cmdSignOut(context) {
   const url = base();
   if (url) await context.secrets.delete(`${SECRET}:${url}`);
   client = null;
-  vscode.window.showInformationMessage('Signed out of BuilderBot here.');
+  vscode.window.showInformationMessage('Signed out of AerieOS here.');
 }
 
 async function cmdOpenProject(context) {
@@ -269,7 +269,7 @@ async function cmdOpenProject(context) {
     const project = await pickProject(context, 'A project to open as a folder');
     if (!project) return;
     const n = (vscode.workspace.workspaceFolders || []).length;
-    vscode.workspace.updateWorkspaceFolders(n, 0, { uri: at(project), name: `${project} (BuilderBot)` });
+    vscode.workspace.updateWorkspaceFolders(n, 0, { uri: at(project), name: `${project} (AerieOS)` });
   } catch (e) {
     say(e);
   }
@@ -297,12 +297,12 @@ async function cmdOpenSession(context, project, agent) {
         t.on('output', s => write.fire(s));
         // Why it ended stays on screen, as in the dashboard's tab; one
         // that ended with nothing to say closes.
-        t.on('close', why => { if (why) write.fire(`\r\n[BuilderBot] ${why}\r\n`); else closed.fire(); });
-        t.on('error', e => write.fire(`\r\n[BuilderBot] ${e.message}\r\n`));
+        t.on('close', why => { if (why) write.fire(`\r\n[AerieOS] ${why}\r\n`); else closed.fire(); });
+        t.on('error', e => write.fire(`\r\n[AerieOS] ${e.message}\r\n`));
         try {
           await t.open(dims ? dims.columns : 80, dims ? dims.rows : 24);
         } catch (e) {
-          write.fire(`\r\n[BuilderBot] ${e.message}\r\n`);
+          write.fire(`\r\n[AerieOS] ${e.message}\r\n`);
           closed.fire();
         }
       },

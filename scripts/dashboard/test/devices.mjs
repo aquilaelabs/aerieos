@@ -19,7 +19,7 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', name, '--role', 'user'],
+const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
   { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
@@ -65,7 +65,7 @@ ok(who.status === 200 && who.account === 'dv.rw' && who.name === 'TEST-PC', `...
 
 // ---- each door stays shut to the other's credential ---------------------------------
 const onPage = await fetch(`${base}/api/status`, { headers: { Authorization: `Bearer ${a.token}` } });
-const sess = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
+const sess = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
 const sessOnDoor = await dev(sess, 'whoami', {});
 ok(onPage.status === 401 && sessOnDoor.status === 401,
    `a device token opens nothing on the dashboard, and a session's token nothing on the device door (${onPage.status} ${sessOnDoor.status})`);
@@ -166,11 +166,11 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     for (let i = 0; i < 60 && !down; i++) { down = existsSync(`${folder}/made-elsewhere.txt`); if (!down) await new Promise(r => setTimeout(r, 500)); }
     ok(down && readFileSync(`${folder}/made-elsewhere.txt`, 'utf8') === 'from another device\n',
        '...and one made elsewhere comes down into the folder within seconds, woken by its long poll');
-    // A session on alpha asks for them with bb pc, under the project's
+    // A session on alpha asks for them with aerie pc, under the project's
     // Agents may: Use a lent PC: refused on Deny, run on Auto with the PC's
     // folder written as the project's path, and on Ask refused by an app
     // with no window to ask in.
-    const stok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'dv.rw'], { encoding: 'utf8', env }).trim();
+    const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'dv.rw'], { encoding: 'utf8', env }).trim();
     const pcApi = async body => {
       const r = await fetch(`${base}/api/pc`, { method: 'POST', headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' },
                                                 body: JSON.stringify(body) });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The console's welcome at every boot (R185): BuilderBot's logo, the release
+# The console's welcome at every boot (R185): AerieOS's logo, the release
 # this slot runs and the address the dashboard answers at, above the login
 # prompt. Written to /run/issue.d, which the console's getty reads with
 # /etc/issue (blank in the image, so Debian's own line goes); its \4 is the
@@ -16,7 +16,7 @@ mkdir -p "$(dirname "$OUT")"
 {
     printf '\n'
     sed 's/\\/\\\\/g' "$LIB/logo"
-    printf '\n        BuilderBot OS%s, slot %s\n' "${ver:+ $ver}" "$("$LIB/slot" current 2>/dev/null || echo "?")"
+    printf '\n        AerieOS%s, slot %s\n' "${ver:+ $ver}" "$("$LIB/slot" current 2>/dev/null || echo "?")"
     printf '        Open http://\\4:%s/ in a browser on this network.\n' "${port:-7680}"
     # The way in at this screen (R194): admin, once a console password is
     # set on This machine; until then, where to set one.

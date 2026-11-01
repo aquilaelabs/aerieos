@@ -1,5 +1,5 @@
 [Unit]
-Description=BuilderBot OS: a stick's system pool, where docker, VMs, the toolchains and the projects write instead of the stick
+Description=AerieOS: a stick's system pool, where docker, VMs, the toolchains and the projects write instead of the stick
 ConditionKernelCommandLine=bbtoram=1
 After=local-fs.target zfs-mount.service
 Before=containerd.service docker.service libvirtd.service

@@ -54,7 +54,7 @@ from pathlib import Path
 
 # The shipped machine. Two directories up from this module is the repo root
 # in a checkout and /opt/builderbot in the image, so one expression finds it
-# in both, which is what `bb dashboard dev` needs to serve the checkout's.
+# in both, which is what `aerie dashboard dev` needs to serve the checkout's.
 TEMPLATE = Path(__file__).resolve().parents[2] / "nodes" / "unraid-vm.xml"
 
 # ---- the hypervisors -------------------------------------------------------

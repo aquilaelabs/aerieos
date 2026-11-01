@@ -1,4 +1,4 @@
-"""Behind `bb brief` (cmd_brief in bb): a new project's brief, through the
+"""Behind `aerie brief` (cmd_brief in bb): a new project's brief, through the
 controller's API as the caller (brief.py on the dashboard's side).
 
 The first argument is the verb: show prints the brief waiting in the tree,

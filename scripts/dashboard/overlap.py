@@ -126,7 +126,7 @@ def collisions(project, worktrees, names=None):
 #
 # One record per (project, session), holding the files it has touched and the
 # symbol it was in when it touched them. Written by the hook on every edit and
-# read by `bb work`; nothing else depends on it, so a hook that never runs
+# read by `aerie work`; nothing else depends on it, so a hook that never runs
 # leaves the git half working on its own.
 
 def key(uid, agent="", slot=1):
@@ -150,7 +150,7 @@ def said(k, names=None):
     who = (names or {}).get(uid) or uid or "owner"
     product = agent or "Claude Code"
     try:
-        # Loaded by path from bb work too (dash.load), so the table beside
+        # Loaded by path from aerie work too (dash.load), so the table beside
         # this file is put on the path first (B229).
         here = os.path.dirname(os.path.abspath(__file__))
         if here not in sys.path:

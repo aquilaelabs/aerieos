@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What a BuilderBot OS boot hands the controller's environment beyond its env
+# What a AerieOS boot hands the controller's environment beyond its env
 # file (R161 step 6): the lines of builderbot.env on the ESP, the stick's
 # plain config partition, which a person edits with the stick in another
 # machine when the dashboard will not come up, and builderbot.debug=1 typed

@@ -22,7 +22,7 @@ class StaleNote(unittest.TestCase):
         self.assertEqual(len(names), 1)
         self.assertEqual(hooks.stale_note("app", "u_00000001", "claude", 1, told=names), ("", []),
                          "once for each change")
-        hooks.behind = lambda p, u, a, s: ["docs added", "BuilderBot updated since it started"]
+        hooks.behind = lambda p, u, a, s: ["docs added", "AerieOS updated since it started"]
         self.assertTrue(hooks.stale_note("app", "u_00000001", "claude", 1, told=names)[0], "a new change is said again")
 
     def test_nothing_behind_says_nothing(self):

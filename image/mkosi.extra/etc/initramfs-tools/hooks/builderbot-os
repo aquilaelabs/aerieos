@@ -1,5 +1,5 @@
 #!/bin/sh
-# What the initramfs carries for BuilderBot OS: losetup, for the slot loaded
+# What the initramfs carries for AerieOS: losetup, for the slot loaded
 # into RAM (scripts/local-top/builderbot-os-toram), and od to read its size.
 PREREQ=""
 prereqs() { echo "$PREREQ"; }

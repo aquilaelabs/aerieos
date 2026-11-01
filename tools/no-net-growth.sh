@@ -31,7 +31,7 @@ while IFS= read -r line; do
         printf '%s %s\n' "$file" "$max" >> "$tmp"
     fi
     if [ "$now" -gt "$max" ]; then
-        printf '  %-36s %6s lines, over its ceiling of %s by %s: move something out (bb map sections), or raise it in tools/ratchet.txt in this commit and say why\n' \
+        printf '  %-36s %6s lines, over its ceiling of %s by %s: move something out (aerie map sections), or raise it in tools/ratchet.txt in this commit and say why\n' \
             "$file" "$now" "$max" "$((now - max))"
         rc=1
     else

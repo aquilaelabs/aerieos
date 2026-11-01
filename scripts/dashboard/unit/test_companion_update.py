@@ -99,7 +99,7 @@ class Handshake(unittest.TestCase):
         with mock.patch.object(update, "NEEDS_DOOR", 3):
             said = update.controller_too_old({"door": 2})
             self.assertIn("speaks door 2", said)
-            self.assertIn("update BuilderBot on the controller", said)
+            self.assertIn("update AerieOS on the controller", said)
             self.assertIn("speaks door 1", update.controller_too_old({}))
         self.assertIn("speaks door 0", update.controller_too_old({"door": 0}))
 

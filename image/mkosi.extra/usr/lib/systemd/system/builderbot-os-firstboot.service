@@ -1,5 +1,5 @@
 [Unit]
-Description=BuilderBot OS: this machine made its own controller's first node, once
+Description=AerieOS: this machine made its own controller's first node, once
 # Once: install-controller.sh --firstboot writes the own-node marker when
 # the node is enrolled, and the unit does not run again. The controller's
 # service is the image's, enabled when it was built, so it is up first.

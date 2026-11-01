@@ -4,17 +4,17 @@ A small virtual machine whose only job is to run Docker, so that a
 session can build, run and destroy containers without any of it reaching the
 server's real ones.
 
-BuilderBot's controller stays exactly what it is: the container, on the
+AerieOS's controller stays exactly what it is: the container, on the
 projects share, holding the record (or the same controller installed bare
 metal, [install.md](install.md)). Only the *daemon* moves, onto a machine
-enrolled as a node like any other; nothing on BuilderBot's side is a setting.
+enrolled as a node like any other; nothing on AerieOS's side is a setting.
 
 ## Why a VM rather than a network
 
-Four separate paths reach the box's real containers from inside BuilderBot,
+Four separate paths reach the box's real containers from inside AerieOS,
 and a shared Docker network closes only the first:
 
-1. **Container to container.** BuilderBot sits on the default bridge, flat
+1. **Container to container.** AerieOS sits on the default bridge, flat
    with every other bridge-mode container on the box.
 2. **Host-published ports, through the default gateway.** Measured: a `curl`
    to `172.17.0.1:<published>` answers. Network membership does not close
@@ -40,13 +40,13 @@ finds no host to talk to, and is otherwise the same script.
 
 A VM answers all four at once, and the point worth holding on to is that it
 does not *add* a layer. It takes one away: dev instances run in the VM, so
-**BuilderBot has no reason to reach the host's daemon at all**, and it no
+**AerieOS has no reason to reach the host's daemon at all**, and it no
 longer can, because the socket mount and the proxy it used to accept are both
 gone from the code.
 
 Two things also get better on the way:
 
-- **The layer cache comes back.** BuilderBot used to force the classic builder
+- **The layer cache comes back.** AerieOS used to force the classic builder
   (`DOCKER_BUILDKIT=0`), because buildx boots a helper container and *attaches*
   to it, which a filtered socket refuses. Nothing is in the way of the VM's own
   daemon, so it does not any more: measured on 21 September, a build as the
@@ -57,7 +57,7 @@ Two things also get better on the way:
 
 ## Path parity, which is the whole design
 
-Mount the projects share into the VM **at the same path BuilderBot uses**:
+Mount the projects share into the VM **at the same path AerieOS uses**:
 `/workspace`.
 
 This is not tidiness. A compose file's bind-mount *source* is resolved by
@@ -68,21 +68,21 @@ worst way available: Docker does not fail on a missing bind source, it creates
 an empty directory and mounts that, and the app comes up with no data.
 
 A node's path mapping, under Advanced on its Nodes page, exists for a daemon
-whose paths are not BuilderBot's. Give the sandbox parity and that mapping
+whose paths are not AerieOS's. Give the sandbox parity and that mapping
 becomes an identity you can leave empty.
 
 **The dev-data path is the sandbox's alone.** `/devdata`, where a compose
 that opts in with `${BB_DEV_DATA}/...` puts its volumes: needs mounting on
-the VM and **not** in BuilderBot, which has no setting for it.
+the VM and **not** in AerieOS, which has no setting for it.
 
 The per-instance directory has to exist before a bind can use it, and docker's
-own attempt fails on a share that squashes root, so BuilderBot asks the
-sandbox to make it, in a one-shot `alpine` container owned by BuilderBot's own
+own attempt fails on a share that squashes root, so AerieOS asks the
+sandbox to make it, in a one-shot `alpine` container owned by AerieOS's own
 uid. It never needs to read the directory, only to name it, so the share is
 configured once on the machine that uses it and `/workspace` is the only path
 the two sides have to agree about.
 
-That also answers the question the arrangement invites: no, BuilderBot does
+That also answers the question the arrangement invites: no, AerieOS does
 not ssh into the VM to do this, and it has no ssh dependency at all. Every
 call it makes goes through the docker CLI, which carries the ssh transport
 itself, so the one credential involved is the shielded key that already
@@ -126,7 +126,7 @@ sudo bb-sandbox add-share workspace:/workspace:ro
 sudo bb-sandbox appdata /devdata     # which mount holds container appdata
 sudo bb-sandbox readonly /workspace  # ...and back with: readonly /workspace off
 sudo bb-sandbox check                # is every mount really there
-sudo bb-sandbox settings             # the lines to paste into BuilderBot
+sudo bb-sandbox settings             # the lines to paste into AerieOS
 ```
 
 Once the machine is enrolled as a node, the same mounts (and the agent's
@@ -136,15 +136,15 @@ applies them through these very verbs as audited `system` jobs, and
 console fallback, reading and writing the same fstab; see docs/nodes.md §12.
 
 **No administrator account is made, and none is wanted.** The provisioner
-used to add one with sudo; nothing in BuilderBot ever used it. The agent runs
+used to add one with sudo; nothing in AerieOS ever used it. The agent runs
 as root under systemd and drops to the docker account for every job,
 `bb-sandbox` refuses to run as anyone but root whoever invokes it, and the
 controller never names it. Whatever already has root on this machine: your
 own account, a cloud image's `ubuntu` or `ec2-user`, or root itself: runs
 `sudo bb-sandbox`. How that account is set up is yours, not this script's.
 
-**Two accounts, and the split is the point.** `bb` runs Docker and answers
-ssh: the one BuilderBot uses, and so the one a job runs as. It has no sudo
+**Two accounts, and the split is the point.** `aerie` runs Docker and answers
+ssh: the one AerieOS uses, and so the one a job runs as. It has no sudo
 and cannot read `bb-sandbox`, which is installed `0750 root:root`. So what
 this machine mounts is a decision made by somebody with root at a console
 rather than something available to whatever is building a container this
@@ -161,11 +161,11 @@ exactly as one saved from the controller is; a different uid would leave the
 share with files the rest of the array does not expect. `provision-linux.sh`
 installs tmux, jq and git for it (the coding agents are installed
 later, from the Library), and a `/etc/profile.d` entry so a login shell as that
-account has the role, the controller's address and `bb` (from the bundle the
+account has the role, the controller's address and `aerie` (from the bundle the
 agent keeps under the toolchain store at `.bb/current`): the same
 environment a dashboard session gets, which is what makes proving the node
 by hand the same path: `sudo -iu builder`, then
-`bb-tty u:<uid>:claude:<project>` with `BB_TOKEN` from `bb users token
+`bb-tty u:<uid>:claude:<project>` with `BB_TOKEN` from `aerie users token
 <project> <account>` on the controller. The projects share has to be mounted
 at `/workspace` for any of it to have a tree to work in: one more row in
 the node's mounts on the Nodes page (Storage).
@@ -176,13 +176,13 @@ the node picked (Sign in), and the login stays in that account's home on that ma
 accounts on one node are two homes and two logins, and a login on one node
 does nothing for another. Nothing is copied between machines and the
 controller holds no credential: a refresh rotates the refresh token, so two
-machines holding one grant sign each other out. `bb login` from a shell on
+machines holding one grant sign each other out. `aerie login` from a shell on
 the node is the same flow typed by hand.
 
-Be clear about what this does *not* do: `bb` is in the `docker` group, and that
+Be clear about what this does *not* do: `aerie` is in the `docker` group, and that
 group is root on this machine to anyone who wants it. One
 `docker run -v /:/host --privileged` and the separation is over. That is not a
-hole to plug: the VM exists to be wrecked, and BuilderBot needs the daemon to
+hole to plug: the VM exists to be wrecked, and AerieOS needs the daemon to
 do its job. What the split buys is that the machine's own configuration, the
 fstab deciding whether `/workspace` is the projects share and read-only, is not
 one command away from a session that wandered.
@@ -210,7 +210,7 @@ comments in it were paid for one silent failure at a time: a mountpoint left
 silent no-op, `mount -a` skipping a busy mountpoint so a rewritten entry stayed
 on the old export and looked perfectly mounted.
 
-**It is root on this machine, run by a person, and BuilderBot cannot reach it.**
+**It is root on this machine, run by a person, and AerieOS cannot reach it.**
 That is the point rather than an omission. This VM exists so a session can
 build and destroy containers without touching anything that matters; a path
 from the container into the VM's own configuration would hand back exactly what
@@ -218,11 +218,11 @@ the arrangement buys. The dashboard can *see* what is mounted; it asks the
 daemon, and changing it is a decision made here.
 
 `settings` is the seam between the two machines. This VM cannot reach into
-BuilderBot, so it prints what to enter on the dashboard's Nodes page: the
+AerieOS, so it prints what to enter on the dashboard's Nodes page: the
 address to add this machine as a node, and the path mapping to set on its
 page, built from the mounts that actually exist here. Only the paths
-BuilderBot *also* mounts at the same place belong in it: a share this
-machine alone has belongs in neither list, and BuilderBot will say so on the
+AerieOS *also* mounts at the same place belong in it: a share this
+machine alone has belongs in neither list, and AerieOS will say so on the
 Containers page rather than leaving the line looking like it does something.
 
 ## Building it
@@ -260,7 +260,7 @@ wrong for this particular machine:
   snapshots LVM would give you are already available a layer down, in qcow2.
   No encryption: it would want a passphrase at every boot on a headless box.
 - **Install OpenSSH server: tick it.** It is off by default and it is how
-  BuilderBot reaches the daemon; skip it and you are fixing that through the
+  AerieOS reaches the daemon; skip it and you are fixing that through the
   VNC console. Import or paste the key here.
 - **Featured snaps; do not tick Docker.** The snap is not what
   `provision-linux.sh` installs, and two Dockers will argue.
@@ -268,7 +268,7 @@ wrong for this particular machine:
   web UI you open point at it, so a lease that moves breaks both. Set it
   static, or reserve it on the router against the MAC in the domain XML.
 
-Use `bb` as the username so it matches `--user bb` below, and take the normal
+Use `aerie` as the username so it matches `--user bb` below, and take the normal
 Ubuntu Server rather than *minimized*: minimized strips editors and man
 pages, and this is a box you will eventually log into to work something out.
 
@@ -299,7 +299,7 @@ reason: NixOS is declarative, so an imperative install would not survive the
 next rebuild (the honest form is a module, not yet written), and Slackware
 ships no Docker.
 
-The differences inside are the distribution's, not BuilderBot's, and the
+The differences inside are the distribution's, not AerieOS's, and the
 script keeps them behind four small functions: `pkg`, `svc_enable`,
 `svc_install`, `pkg_names`, so the rest of it never names a distribution's
 tool:
@@ -339,10 +339,10 @@ below are what to add to it when this machine is not the plain case:
 
 The repository is private, so the VM cannot fetch the script itself: copy it
 over. **From the Unraid terminal**, where that path is the host's own; inside
-BuilderBot the same file is `/workspace/BuilderBot/nodes/provision-linux.sh`.
+AerieOS the same file is `/workspace/AerieOS/nodes/provision-linux.sh`.
 
 ```bash
-scp /mnt/user/projects/BuilderBot/nodes/provision-linux.sh bb@<vm-ip>:
+scp /mnt/user/projects/AerieOS/nodes/provision-linux.sh bb@<vm-ip>:
 ssh bb@<vm-ip>
 ```
 
@@ -369,7 +369,7 @@ asking "will this work here?" on a variant you are not sure about.
 
 Both steps ask for the password you set in the installer, because the VM has
 no `authorized_keys` yet: `--key` is what puts one there, so the first
-connection is necessarily password-based. After this, BuilderBot gets in
+connection is necessarily password-based. After this, AerieOS gets in
 without one.
 
 Do not try to save the copy by piping the script into `ssh`: `sudo` wants a
@@ -386,7 +386,7 @@ alone, so re-running the provisioner for a mount does not re-enroll.
 
 **`--key` is a PUBLIC key**: the `.pub` half, appended to the VM's
 `authorized_keys`. Nothing private is ever put on this machine. The private
-key stays on BuilderBot in `/secrets/ssh`, loaded into the root-owned agent,
+key stays on AerieOS in `/secrets/ssh`, loaded into the root-owned agent,
 where sessions can use it to connect but cannot read it; the VM holds only the
 line that authorizes the connection and never dials out itself.
 
@@ -397,7 +397,7 @@ reason silently breaks the sandbox. On the host:
 
 ```bash
 ssh-keygen -t ed25519 -N "" -C bb-sandbox \
-    -f /mnt/user/appdata/BuilderBot/secrets/ssh/bb_sandbox
+    -f /mnt/user/appdata/AerieOS/secrets/ssh/bb_sandbox
 ```
 
 The private half lands where the entrypoint loads it into the agent at boot;
@@ -467,16 +467,16 @@ Then what differs from Unraid's placeholder, each for a reason:
 
 - **Network: bridged (`br0`).** The VM gets its own address on your LAN, which
   is what makes a container's web UI reachable at `http://<vm-ip>:<port>` from
-  your browser with no forwarding and no proxy, *and* lets BuilderBot reach
+  your browser with no forwarding and no proxy, *and* lets AerieOS reach
   the daemon.
 
   **`br0` exists only if bridging is on**: Settings → Network Settings →
   *Enable bridging* → Yes, which needs the array stopped. If the VM dialog
   offers you `virbr0` and `bond0` but no `br0`, that is what is missing.
-  `virbr0` is libvirt's NAT network: BuilderBot can still reach the VM, but
+  `virbr0` is libvirt's NAT network: AerieOS can still reach the VM, but
   your browser needs a port forward for every web UI. Avoid `bond0` unless you
   can confirm it gives a real bridge rather than **macvtap**, which blocks
-  host-to-guest traffic by design and would leave BuilderBot unable to reach
+  host-to-guest traffic by design and would leave AerieOS unable to reach
   the daemon at all. That failure is quiet: everything looks up.
 
 - **Network model: `virtio-net`.** The others are emulated legacy NICs, for
@@ -543,10 +543,10 @@ Then what differs from Unraid's placeholder, each for a reason:
   an address the exports do not admit.
 
   `all_squash` with `anonuid=99,anongid=100` is the part that matters beyond
-  access control. BuilderBot runs as uid 99 / gid 100, which is what the array
+  access control. AerieOS runs as uid 99 / gid 100, which is what the array
   files already are; the VM's own user is uid 1000 and containers inside it
   often write as root. Without squashing, anything the sandbox creates lands
-  owned by 1000 or 0 and **BuilderBot cannot modify it**: a permission error
+  owned by 1000 or 0 and **AerieOS cannot modify it**: a permission error
   in a session, on a file it made a minute earlier. Most Unraid examples show
   `no_root_squash`, which produces exactly that.
 
@@ -590,7 +590,7 @@ Then what differs from Unraid's placeholder, each for a reason:
 - **Guest agent.** `qemu-guest-agent` is installed by both paths so Unraid can
   shut the VM down cleanly instead of pulling the plug.
 
-## Pointing BuilderBot at it
+## Pointing AerieOS at it
 
 Three steps, none of them on the container's template, then the proxy comes off.
 
@@ -607,17 +607,17 @@ leaves it, because a rebuilt VM and something worth looking at produce the
 same message. If the machine really was rebuilt, clear its line:
 
 ```bash
-docker exec -u builder BuilderBot ssh-keygen -R <vm-ip>
+docker exec -u builder AerieOS ssh-keygen -R <vm-ip>
 ```
 
 `bb-sandbox sdk` is the one verb that reads rather than configures, and the
-one that needs no root: it hands you the controller's own `bb`, the copy
+one that needs no root: it hands you the controller's own `aerie`, the copy
 the agent unpacks into the toolchain store to run jobs with, so `bb-sandbox
 sdk versions` at this console answers with exactly what the Installed page shows
 for this node, from the same generator. Read-only verbs only; installing
 from here would go around the one-install-at-a-time rule the controller
 keeps across every machine sharing a store, so it says so and points at the
-Library. Nothing to run until a toolchain job has put a `bb` there.
+Library. Nothing to run until a toolchain job has put a `aerie` there.
 
 **2. Enroll it as a node.** On the dashboard's Nodes page, **Enroll node**
 mints a one-time token; run `provision-linux.sh --controller URL --token bbe_…` on
@@ -634,7 +634,7 @@ decides that. An address of any other kind grays every Docker control out with
 a sentence saying why, rather than half-working, and so does an ssh address
 whose daemon does not **say it is the sandbox**. `provision-linux.sh` writes a
 `builderbot.sandbox` label into `/etc/docker/daemon.json` and restarts the
-daemon; BuilderBot reads it back with `docker info` over the connection it
+daemon; AerieOS reads it back with `docker info` over the connection it
 already has and refuses to drive anything without it.
 
 The reason is the reason for the VM itself: the manager makes directories and
@@ -655,7 +655,7 @@ daemon is plugged in.
 
 **3. The path mapping, on the node's page (Advanced): `/workspace:/workspace`**, and a
 pair for any other share you mounted on *both* sides. `/devdata` is not one of them: it belongs
-to the VM alone, BuilderBot never touches it, and naming it here would be a
+to the VM alone, AerieOS never touches it, and naming it here would be a
 line of configuration nothing acts on (the Containers page says so when
 you leave one in). An identity mapping, because the VM has the shares at
 the same paths this container does. It is accepted without being checked
@@ -664,7 +664,7 @@ nothing about the VM's, and it makes the path checks fall silent: a bind the
 daemon resolves to the same directory is not a problem, and is no longer
 reported as one.
 
-Then delete the socket proxy container, if you had one. BuilderBot has no
+Then delete the socket proxy container, if you had one. AerieOS has no
 reason to reach the host's daemon and no way to: the actual prize, and not
 another layer of filtering but one fewer thing holding the keys to the real
 containers.
@@ -676,7 +676,7 @@ half that is easy to miss while thinking about what it takes away. The
 dev-instance *controls* stay the operator's, and the dashboard's own compose
 project names stay the dashboard's.
 
-**The builder changed with it.** BuilderBot forced `DOCKER_BUILDKIT=0` for as
+**The builder changed with it.** AerieOS forced `DOCKER_BUILDKIT=0` for as
 long as a socket proxy stood between it and a daemon, because buildx attaches
 to a helper container and the proxy refused that. Against a node's own daemon
 nothing refuses it, so compose's own builder is what runs, and the layer cache

@@ -1,4 +1,4 @@
-"""Behind `bb memory` (cmd_memory in bb): a repository's memories, the
+"""Behind `aerie memory` (cmd_memory in bb): a repository's memories, the
 account's own, through the controller's API as the caller (memory.py on the
 dashboard's side, the notebook's Memory view). Every coding agent keeps
 them here, in the folder Claude Code reads for that repository, so a
@@ -52,7 +52,7 @@ if verb == "list":
     r = read()
     ms = r.get("memories") or []
     if not ms:
-        print(f"no memories of yours on {proj} yet: bb memory add saves one")
+        print(f"no memories of yours on {proj} yet: aerie memory add saves one")
         raise SystemExit(0)
     print(f"your memories on {proj}, newest first:")
     for m in ms:
@@ -61,10 +61,10 @@ if verb == "list":
         print(f"  ! {i.get('text')}")
 elif verb == "show":
     if len(argv) < 2:
-        fail("bb memory show NAME")
+        fail("aerie memory show NAME")
     m = named(read(), argv[1])
     if not m:
-        fail(f"no memory called {argv[1]} on {proj}: bb memory list names them")
+        fail(f"no memory called {argv[1]} on {proj}: aerie memory list names them")
     print(m.get("text") or "", end="" if (m.get("text") or "").endswith("\n") else "\n")
 elif verb == "add":
     args, name, mtype, about, body = argv[1:], "", "", "", []
@@ -81,7 +81,7 @@ elif verb == "add":
             body.append(a)
             i += 1
     if not name or not body:
-        fail('bb memory add NAME --type user|feedback|project|reference --about "one line" "what to remember"')
+        fail('aerie memory add NAME --type user|feedback|project|reference --about "one line" "what to remember"')
     if mtype not in TYPES:
         fail(f"--type is one of: {', '.join(TYPES)}")
     if not about:
@@ -91,11 +91,11 @@ elif verb == "add":
     print(f"saved {r.get('file')} on {proj}")
 elif verb == "forget":
     if len(argv) < 2:
-        fail("bb memory forget NAME")
+        fail("aerie memory forget NAME")
     m = named(read(), argv[1])
     if not m:
         fail(f"no memory called {argv[1]} on {proj}")
     post({"action": "delete", "file": m["file"]})
     print(f"forgot {m['file']} on {proj}")
 else:
-    fail("bb memory [list | show NAME | add NAME --type T --about \"...\" BODY | forget NAME]")
+    fail("aerie memory [list | show NAME | add NAME --type T --about \"...\" BODY | forget NAME]")

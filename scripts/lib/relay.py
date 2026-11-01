@@ -1,6 +1,6 @@
 """Behind every relayed verb on a node (bb_relay in bb, roadmap #24): the same
 words sent to the controller's /api/v1/bb with the session's token, the
-controller's own bb run in this project's tree, and what it printed printed
+controller's own aerie run in this project's tree, and what it printed printed
 here, with its exit code. A git verb's network half ran there, in a
 repository of its own (B148), and what this tree needs from it is applied
 here, as this session.
@@ -50,7 +50,7 @@ if r.get("error") and "code" not in r:
     sys.exit(f"[builderbot] ERROR: {r['error']}")
 if r.get("held"):
     # A push held for a person (R219): the flagged lines wait on the bell,
-    # and this waits on the answer the way bb root run does; an approval
+    # and this waits on the answer the way aerie root run does; an approval
     # ran the push on the controller, and its outcome is what to print and
     # apply here.
     import waits

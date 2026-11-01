@@ -3,14 +3,14 @@
 # job gets), so the build is `gradlew` and nothing else. The build is an
 # UNSIGNED release APK, always: no key, alias or password is a GitHub secret
 # (R106, the operator 22 Oct: four hand-set secrets failed three ways and one
-# put a password in a public log). It lands in BuilderBot's own dist/ on the
+# put a password in a public log). It lands in AerieOS's own dist/ on the
 # projects share when the runner's machine mounts it (the sandbox does, at
-# /workspace), where the Artifacts tab lists it and bb sign can sign it.
+# /workspace), where the Artifacts tab lists it and aerie sign can sign it.
 #
 # For a release, the unsigned APK is handed to the controller as a workflow
 # artifact named bb-release-apk-TAG, kept three days: the controller that
 # made the release fetches it, signs it with the project's own sideload key
-# as bb sign does, and attaches it to the release with its sha256 and its
+# as aerie sign does, and attaches it to the release with its sha256 and its
 # certificate's fingerprint (releasesign.py). Nothing else is uploaded as an
 # artifact: a 14 MB one per push kept 90 days filled the account's 0.5 GB of
 # Actions storage in a month (B669).
@@ -68,11 +68,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
-          fetch-depth: 0   # bb version counts commits
+          fetch-depth: 0   # aerie version counts commits
           ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Open a log this container can read afterwards
-        # As dashboard.yml and lint.yml keep theirs, for `bb ci-log`: the
+        # As dashboard.yml and lint.yml keep theirs, for `aerie ci-log`: the
         # runner keeps no step output on disk, and a failed build of the app
         # on 11 Oct (run 38155552427) could be read nowhere but on GitHub,
         # which a session has no token for (B665).
@@ -97,7 +97,7 @@ jobs:
           } > "$log"
 
       # One identity for the app and the thing it talks to. The APK's name,
-      # its versionName and its versionCode all come from `bb version` here
+      # its versionName and its versionCode all come from `aerie version` here
       # rather than from three places that drift: the app said 0.1.0 on the
       # day the project reached 0.5.0. Passed in rather than left for gradle
       # to work out, so the build does not depend on what is on its PATH.
@@ -112,9 +112,9 @@ jobs:
           # Every one falls back, so a version that cannot be read costs a
           # worse name and not a wrong one.
           sha="$(git rev-parse --short HEAD)"
-          v="$(BB_RELAYED=1 bash scripts/bb version --file 2>/dev/null || true)"
-          s="$(BB_RELAYED=1 bash scripts/bb version --semver 2>/dev/null || true)"
-          c="$(BB_RELAYED=1 bash scripts/bb version --code 2>/dev/null || true)"
+          v="$(BB_RELAYED=1 bash scripts/aerie version --file 2>/dev/null || true)"
+          s="$(BB_RELAYED=1 bash scripts/aerie version --semver 2>/dev/null || true)"
+          c="$(BB_RELAYED=1 bash scripts/aerie version --code 2>/dev/null || true)"
           {
             echo "file=${v:-$sha}"
             echo "semver=${s:-0.0.0-unknown+$sha}"
@@ -155,10 +155,10 @@ jobs:
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Land it in BuilderBot's dist/ where the share is mounted
+      - name: Land it in AerieOS's dist/ where the share is mounted
         run: |
           exec > >(tee -a "$CI_LOG") 2>&1
-          echo "== Land it in BuilderBot's dist/"
+          echo "== Land it in AerieOS's dist/"
           # The project is found by its remote, not its folder's name: the
           # folder is whatever the controller named it, and a name written
           # here went on landing APKs in an old project after a move (B105).

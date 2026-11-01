@@ -1,14 +1,14 @@
 """Tool packs (R77): toolchains a person adds from a git repository of their
-own choosing, which BuilderBot neither ships nor lists anywhere.
+own choosing, which AerieOS neither ships nor lists anywhere.
 
 A pack is a repository with a bbtool.json at its root. The manifest says how
 the toolchain installs (the catalog's own recipe machinery, its source being
 the pack's repository at the commit that was approved), the verbs a session
-calls through `bb tool PACK VERB`, and a guidance file a session reads before it
+calls through `aerie tool PACK VERB`, and a guidance file a session reads before it
 uses them. An administrator adds a pack by its URL: the controller fetches the
 repository at its current commit, shows the manifest, and keeps it pinned to
 that commit until somebody approves another. The record lives here, in
-/config/toolpacks.json, and never in BuilderBot's repository.
+/config/toolpacks.json, and never in AerieOS's repository.
 
 What a pack becomes is one catalog row (recipe()), shipped to the nodes in the
 bundle beside config/toolchains.json, so it installs, checks and removes the
@@ -45,7 +45,7 @@ _lock = threading.RLock()
 
 MANIFEST = "bbtool.json"
 NAME = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
-# bb tool's own words (scripts/bb cmd_tool): a pack of somebody's named one
+# aerie tool's own words (scripts/aerie cmd_tool): a pack of somebody's named one
 # would never be reached, so none may be (R169 step 5 added search and
 # install); the official packs behind graphics, diagrams and office are the
 # toolchains those words run.
@@ -84,7 +84,7 @@ HOSTED_MAX = 8 << 20
 HOSTED_FILES = 2000
 STAGE_TTL = 30 * 60
 STAGE_ID = re.compile(r"^[0-9a-f]{16}$")
-AUTHOR = ("-c", "user.name=BuilderBot", "-c", "user.email=builderbot@localhost")
+AUTHOR = ("-c", "user.name=AerieOS", "-c", "user.email=builderbot@localhost")
 
 
 def configure(*, state, write_json, unpack=None):
@@ -160,7 +160,7 @@ def _agent(a, errors):
     if out["briefing"] not in AGENT_BRIEFING:
         errors.append(f"agent.briefing is one of {', '.join(AGENT_BRIEFING)}")
     if out["guards"] not in AGENT_GUARDS:
-        errors.append(f"agent.guards is one of {', '.join(AGENT_GUARDS)}: an agent that cannot take BuilderBot's guards is not listed")
+        errors.append(f"agent.guards is one of {', '.join(AGENT_GUARDS)}: an agent that cannot take AerieOS's guards is not listed")
     if out["state"] not in AGENT_STATES:
         errors.append(f"agent.state is one of {', '.join(AGENT_STATES)}")
     if out["transcripts"] and not REL.fullmatch(out["transcripts"]):
@@ -204,7 +204,7 @@ def _pack_agent(name, a, errors):
     if not PACK_AGENT.fullmatch(name):
         errors.append("a pack that brings a coding agent is named 2 to 16 of a-z and 0-9, starting with a letter: its sessions are named after it")
     elif name in SHIPPED_AGENTS:
-        errors.append(f"{name} is a coding agent BuilderBot ships; a pack's agent takes a name of its own")
+        errors.append(f"{name} is a coding agent AerieOS ships; a pack's agent takes a name of its own")
     out = {}
     for k, cap in (("name", 30), ("product", 60), ("provider", 60)):
         v = a.get(k, "")
@@ -230,7 +230,7 @@ def _pack_agent(name, a, errors):
         out["briefing"]["env"] = str(b.get("env") or "")
     h = a.get("hooks")
     if not isinstance(h, dict):
-        errors.append("agent.hooks is an object: file, shape, payload and events (pre, prompt and stop at least): an agent that cannot take BuilderBot's guards is not listed")
+        errors.append("agent.hooks is an object: file, shape, payload and events (pre, prompt and stop at least): an agent that cannot take AerieOS's guards is not listed")
         h = {}
     if not (isinstance(h.get("file"), str) and REL.fullmatch(h["file"])):
         errors.append("agent.hooks.file is its hooks file's path under the account's home, e.g. .foo/hooks/builderbot.json")
@@ -241,12 +241,12 @@ def _pack_agent(name, a, errors):
     evs = h.get("events") if isinstance(h.get("events"), dict) else {}
     for k in evs:
         if k not in PACK_AGENT_EVENTS:
-            errors.append(f"agent.hooks.events.{k} is not one of BuilderBot's: {', '.join(PACK_AGENT_EVENTS)}")
+            errors.append(f"agent.hooks.events.{k} is not one of AerieOS's: {', '.join(PACK_AGENT_EVENTS)}")
         elif not (isinstance(evs[k], str) and EVENT_NAME.fullmatch(evs[k])):
             errors.append(f"agent.hooks.events.{k} is the agent's own name for that event")
     missing = [k for k in PACK_AGENT_NEEDS if k not in evs]
     if missing:
-        errors.append(f"agent.hooks.events names no {', '.join(missing)}: an agent that cannot take BuilderBot's guards is not listed")
+        errors.append(f"agent.hooks.events names no {', '.join(missing)}: an agent that cannot take AerieOS's guards is not listed")
     tools = h.get("tools") if isinstance(h.get("tools"), dict) else {}
     for k, v in tools.items():
         if k not in ("shell", "edit", "grep") or not (isinstance(v, list) and len(v) <= 8 and all(isinstance(t, str) and TOOL_NAME.fullmatch(t) for t in v)):
@@ -260,7 +260,7 @@ def _pack_agent(name, a, errors):
         errors.append("agent.env maps up to 8 NAME to plain words (an updater off, a telemetry switch), never a path or a secret")
         env = {}
     if any(k.startswith("BB_") or k in ("PATH", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH") for k in env):
-        errors.append("agent.env sets none of PATH, HOME, LD_* or BuilderBot's own BB_ names")
+        errors.append("agent.env sets none of PATH, HOME, LD_* or AerieOS's own BB_ names")
     out["env"] = dict(env)
     si = a.get("signin") if isinstance(a.get("signin"), dict) else {}
     for k, v in (("respawn", a.get("respawn")), ("signin.login", si.get("login"))):
@@ -358,7 +358,7 @@ def _config(c, errors, depth=0):
 
 
 def validate(m, shipped=()):
-    """A manifest checked and cut down to what BuilderBot reads: (clean,
+    """A manifest checked and cut down to what AerieOS reads: (clean,
     errors). Nothing in it is run here; the errors say what to fix. An
     official pack (tier official, R169 step 1) may carry a shipped
     toolchain's recipe or an agent's adapter in place of install steps and
@@ -376,9 +376,9 @@ def validate(m, shipped=()):
     if not (NAME_OFFICIAL if official else NAME).fullmatch(name):
         errors.append("name is 2 to 40 of a-z, 0-9 and -, starting with a letter")
     elif name in shipped and not official:
-        errors.append(f"{name} is a toolchain BuilderBot ships; a pack takes a name of its own")
+        errors.append(f"{name} is a toolchain AerieOS ships; a pack takes a name of its own")
     elif name in BB_TOOL_WORDS and not official:
-        errors.append(f"{name} is one of bb tool's own words; a pack takes a name of its own")
+        errors.append(f"{name} is one of aerie tool's own words; a pack takes a name of its own")
     out: dict = {"name": name, "tier": tier,
            "label": str(m.get("label") or name)[:80],
            "about": str(m.get("about") or "")[:400]}
@@ -400,7 +400,7 @@ def validate(m, shipped=()):
     if m.get("service") is not None:
         sv = m["service"] if isinstance(m["service"], dict) else {}
         if not official:
-            errors.append("service (a deployed thing of BuilderBot's) is an official pack's alone")
+            errors.append("service (a deployed thing of AerieOS's) is an official pack's alone")
         elif str(sv.get("kind") or "") not in SERVICES:
             errors.append(f"service.kind is one of {', '.join(SERVICES)}")
         else:
@@ -434,12 +434,12 @@ def validate(m, shipped=()):
     if tch.get("root") not in (None, True, False):
         errors.append("touches.root is true or false")
     out["touches"] = {"hosts": hosts, "root": tch.get("root") is True}
-    # The BuilderBot versions it works with (R169 step 6), by release line
+    # The AerieOS versions it works with (R169 step 6), by release line
     # ("0.9", "0.10"); none named, every one. Checked before it is added and
     # said on the bell when this install moves to a line it does not name.
     ww = m.get("works_with") if m.get("works_with") is not None else []
     if not isinstance(ww, list) or len(ww) > 16 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
-        errors.append("works_with lists the BuilderBot release lines it works with, e.g. [\"0.9\", \"0.10\"]")
+        errors.append("works_with lists the AerieOS release lines it works with, e.g. [\"0.9\", \"0.10\"]")
         ww = []
     out["works_with"] = ww
     inst = m.get("install") or {}
@@ -943,14 +943,14 @@ def unfit():
         m = (r or {}).get("manifest") or {}
         if line and not fits(m):
             out.append({"kind": "pack", "name": n, "key": f"pack:unfit:{n}:{line}",
-                        "said": f"the pack {n} says it works with BuilderBot {', '.join(m.get('works_with') or [])}, and this is {line}: "
+                        "said": f"the pack {n} says it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}: "
                                 "update it from the Library, or remove it"})
     return out
 
 
 def _unfit_why(m):
     line = line_of(running_version())
-    return f"{m['name']} works with BuilderBot {', '.join(m.get('works_with') or [])}, and this is {line}: a newer commit of it may name {line}"
+    return f"{m['name']} works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}: a newer commit of it may name {line}"
 
 
 def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=False):

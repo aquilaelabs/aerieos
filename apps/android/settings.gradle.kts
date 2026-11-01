@@ -14,5 +14,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "BuilderBot"
+rootProject.name = "AerieOS"
 include(":app")

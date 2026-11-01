@@ -286,7 +286,7 @@ class RunnersMixin:
         with open(os.path.join(d, ".builderbot-labels"), "w") as f:
             f.write(",".join(labels))
         # The runner reads .env into every job it runs: the node's toolchain,
-        # so CI sees what bb build sees, and where the workflows' archive
+        # so CI sees what aerie build sees, and where the workflows' archive
         # step lands (see runner_env_text). The log directory is made here,
         # readable, so the session account can read what lands in it.
         logs = ci_log_dir(self.state)
@@ -336,7 +336,7 @@ class RunnersMixin:
         the foreground under this agent, which supervises it the way it
         does GitHub's runner on a node without systemd. Every label is
         `name:host`, so a job lands on this machine's own toolchain rather
-        than in a container, which is what a BuilderBot node is for."""
+        than in a container, which is what a AerieOS node is for."""
         exe = os.path.join(d, "act_runner")
         if not want:
             if not installed:

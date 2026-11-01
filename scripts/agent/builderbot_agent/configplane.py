@@ -47,7 +47,7 @@ from .jobs import Job, pump
 # ceiling is a tenth of the filesystem up to 4 GB, which on a small VPS is
 # more than the machine can spare and on a large one more than anyone reads.
 # The same bytes as provision-linux.sh's keep_journal writes.
-JOURNAL_DROPIN = ("# Written by BuilderBot (R185): keep the journal across boots, and at most 1G of it.\n"
+JOURNAL_DROPIN = ("# Written by AerieOS (R185): keep the journal across boots, and at most 1G of it.\n"
                   "[Journal]\nStorage=persistent\nSystemMaxUse=1G\n")
 
 
@@ -78,7 +78,7 @@ class ConfigPlaneMixin:
         # nor any reason to be refused either of those.
         if what in ("storage", "network", "root", "gpu", "gpu-off", "feature") and not os.access(SANDBOX_BIN, os.X_OK):
             job.say(f"refused: {what} edits this machine's own configuration, and this node "
-                    f"was not provisioned as a BuilderBot sandbox ({SANDBOX_BIN} is not here)\n")
+                    f"was not provisioned as a AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
             return "failed", 77
         cfg = spec.get("config") if isinstance(spec.get("config"), dict) else {}
         if what == "root":
@@ -114,7 +114,7 @@ class ConfigPlaneMixin:
         if what == "storage-array":
             return self._apply_storage_array(job, cfg)
         if what == "console":
-            # A way in at the console of BuilderBot OS (console.py, R194).
+            # A way in at the console of AerieOS (console.py, R194).
             return self._apply_console(job, cfg)
         if what == "storage-adopt":
             # Another NAS's array and pools taken as they are (adopt.py).
@@ -135,7 +135,7 @@ class ConfigPlaneMixin:
             # A folder on the machine's disks as the projects folder (R163).
             return self._apply_projects_folder(job, cfg)
         if what == "os-update":
-            # BuilderBot OS: the next image into the other slot (osimage.py).
+            # AerieOS: the next image into the other slot (osimage.py).
             return self._apply_os_update(job, cfg)
         if what == "gpu-off":
             # The emulator off the card (R102): the display's unit stopped,
@@ -279,7 +279,7 @@ class ConfigPlaneMixin:
 
     def _apply_lockdown(self, job):
         """Lock down (R92): every container here stopped and kept from
-        starting again at a boot (BuilderBot's nginx among them), and the
+        starting again at a boot (AerieOS's nginx among them), and the
         door in shut. The controller retires this node when this ends, so
         its credential goes with it; a part that fails is said and the rest
         still done."""
@@ -536,7 +536,7 @@ class ConfigPlaneMixin:
                 log(f"sessions: could not write {UNIT_DROPIN}: {e}")
         if os.path.isdir(NEEDRESTART_DIR):
             conf = os.path.join(NEEDRESTART_DIR, "conf.d", "builderbot.conf")
-            body = ("# Written by the BuilderBot agent (B538): a restart of the agent after a\n"
+            body = ("# Written by the AerieOS agent (B538): a restart of the agent after a\n"
                     "# library upgrade ended every Claude session on the node.\n"
                     "$nrconf{override_rc}{qr(^builderbot-agent\\.service$)} = 0;\n")
             try:
@@ -618,7 +618,7 @@ class ConfigPlaneMixin:
             log(f"the session's view: {', '.join(wrote)} written from the bundle")
 
     def _apply_uninstall(self, job, cfg=None):
-        """Take BuilderBot off this machine, from the Nodes page. The runners
+        """Take AerieOS off this machine, from the Nodes page. The runners
         first, deregistered on their forges with the tokens the controller
         mints while this agent can still ask; then `bb-sandbox uninstall`,
         started detached from this process because it removes this process
@@ -821,7 +821,7 @@ class ConfigPlaneMixin:
         root = tc_root(self.state)
         ctl = (self.ctl.url or "").rstrip("/")
         text = (
-            "# Written by BuilderBot's agent. A session on this node, at a console.\n"
+            "# Written by AerieOS's agent. A session on this node, at a console.\n"
             'case "$(id -un)" in\n'
             f"    {who})\n"
             "        export BUILDERBOT_ROLE=node WORKSPACE=/workspace\n"

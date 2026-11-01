@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The nginx tab (R171): one reverse proxy per node, BuilderBot's own. A
+// The nginx tab (R171): one reverse proxy per node, AerieOS's own. A
 // section per node with its routes and certificate; Save keeps them, Deploy
 // writes the container from them on the node and builds it, Remove takes it
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
@@ -101,11 +101,11 @@ const written = await api('/api/container', { action: 'read', name: 'nginx-sandb
 ok(rec?.main?.source === 'file' && rec.main.node === sandbox.node && rec.main.for === 'System'
    && /network_mode: host/.test(written.compose || '') && /container_name: nginx-sandbox/.test(written.compose || '') && /www\.example\.com/.test(written.compose || '')
    && /proxy_pass http:\/\/127\.0\.0\.1:8080/.test(written.compose || ''),
-   `Deploy writes nginx-sandbox on the node as System's, BuilderBot's own (R180), its compose carrying the config inline (${JSON.stringify(rec?.main).slice(0, 80)})`);
+   `Deploy writes nginx-sandbox on the node as System's, AerieOS's own (R180), its compose carrying the config inline (${JSON.stringify(rec?.main).slice(0, 80)})`);
 // System is the deployment's to set and nobody's to pick: the owner verb
 // refuses the word however it is asked.
 const sysPick = await api('/api/dockerctl', { action: 'owner', container: 'nginx-sandbox', owner: 'System', node: sandbox.node });
-ok(/no project called System|BuilderBot's own/.test(sysPick.error || ''),
+ok(/no project called System|AerieOS's own/.test(sysPick.error || ''),
    `...and no picker puts a container under System (${(sysPick.error || 'allowed').slice(0, 60)})`);
 // The section is drawn after the answer lands, so its Remove is waited
 // for rather than read the moment the list moved.
@@ -327,7 +327,7 @@ const sysBtns = await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', 
   conf: r.querySelector('.dmacts [data-dmconf="nginx"]')?.textContent.trim() || '' }));
 ok(['down', 'remove', 'nginx-update'].every(b => sysBtns.has.includes(b)) && !sysBtns.has.includes('edit') && !sysBtns.has.includes('rebuild') && !sysBtns.rel
    && sysBtns.conf === 'Configure',
-   `BuilderBot's nginx row keeps Down, Remove and the update, loses Edit, Rebuild and Copy or move, and carries Configure (${sysBtns.has.join(', ')}; ${sysBtns.rel ? 'copy or move' : 'no copy or move'})`);
+   `AerieOS's nginx row keeps Down, Remove and the update, loses Edit, Rebuild and Copy or move, and carries Configure (${sysBtns.has.join(', ')}; ${sysBtns.rel ? 'copy or move' : 'no copy or move'})`);
 // System's section is pinned above every project's (R181).
 ok(await page.$eval('.dmtab', t => t.querySelector('.dmcard .dmgroup b')?.textContent === 'System'),
    'System\'s containers are the first section of the Containers page');
@@ -411,7 +411,7 @@ ok(two.ok && two.deployed && /location \/relay\/ \{ proxy_pass http:\/\/127\.0\.
   // in the instant it opened, under a whole run's load it was not yet.
   const locked = () => document.getElementById('cName').disabled && document.getElementById('cGo').disabled
     && document.getElementById('cEnv').readOnly && document.getElementById('cYml').readOnly
-    && /BuilderBot manages this one/.test(document.getElementById('cNameHint').textContent);
+    && /AerieOS manages this one/.test(document.getElementById('cNameHint').textContent);
   ok(await page.waitForFunction(locked, null, { timeout: 15000 }).then(() => true, () => false),
      '...and its Edit dialog is for reading: name, compose file and env locked, Save ghosted');
   await page.evaluate(() => { document.getElementById('cmodal').hidden = true; openNginxTab(); });

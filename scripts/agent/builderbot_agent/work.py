@@ -328,9 +328,9 @@ class WorkMixin:
 
     def avd_remove(self, job, spec):
         """A project's phone off this node (R123): one account's AVD, its
-        .avd folder and its .ini, which bb emu start makes again. Refused
+        .avd folder and its .ini, which aerie emu start makes again. Refused
         while the emulator holds it; every name checked against the shape
-        bb emu gives it, and the folder found only under the homes'
+        aerie emu gives it, and the folder found only under the homes'
         avd-projects, so a spec names nothing else."""
         project, uid, name = (str(spec.get(k) or "") for k in ("project", "uid", "name"))
         if not storage.NAME_RE.match(project) or not storage.AVD_RE.match(name) \
@@ -343,7 +343,7 @@ class WorkMixin:
             job.say(f"{name} is not one of {project}'s phones on this node\n")
             return "failed", 2
         if storage.avd_running(avd):
-            job.say(f"{name} is running: stop it (bb emu stop in the project's session) and remove it then\n")
+            job.say(f"{name} is running: stop it (aerie emu stop in the project's session) and remove it then\n")
             return "failed", 75
         shutil.rmtree(avd, ignore_errors=True)
         with contextlib.suppress(OSError):
@@ -351,7 +351,7 @@ class WorkMixin:
         if os.path.isdir(avd):
             job.say(f"could not remove all of {avd}\n")
             return "failed", 1
-        job.say(f"removed {name}, {project}'s phone: its next bb emu start makes it again\n")
+        job.say(f"removed {name}, {project}'s phone: its next aerie emu start makes it again\n")
         job.say("measuring the disks again for the Storage page\n")
         storage.measure(self.state)
         self.hello()
@@ -369,7 +369,7 @@ class WorkMixin:
 
     # -- toolchains (docs/nodes.md §6) --------------------------------------------
     def toolchain(self, job, spec):
-        """`bb toolchains install|remove NAME` against this node's toolchain store,
+        """`aerie toolchains install|remove NAME` against this node's toolchain store,
         with the bb the controller ships: the bundle (bb, its library, the
         catalog) is fetched by digest into the store and run from there as
         the enrolled account, SDK_ROOT pointing at the store. One catalog,
@@ -445,11 +445,11 @@ class WorkMixin:
             # controller, because the answer is about this store: the version
             # a recipe would fetch is the same everywhere, but what is
             # installed to compare it against is the node's. One command for
-            # every name, because `bb toolchains check` with no argument
+            # every name, because `aerie toolchains check` with no argument
             # already means all of them, and the controller reads the TSV out
             # of this job's log (R67).
             job.step("checking")
-            job.say(f"== bb toolchains check {' '.join(names)}\n")
+            job.say(f"== aerie toolchains check {' '.join(names)}\n")
             return job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
                                        "toolchains", "check", *names],
                               "cwd": store, "timeout": spec.get("timeout") or 900,
@@ -485,7 +485,7 @@ class WorkMixin:
             # cannot update in place (tc_verbs, R193): the remove that fails
             # ends this name there, with the old one still installed.
             for verb in tc_verbs(store, name, cat.get(name), action):
-                job.say(f"== bb toolchains {verb} {name}\n")
+                job.say(f"== aerie toolchains {verb} {name}\n")
                 st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
                                                 "toolchains", verb, name],
                                        "cwd": store, "timeout": spec.get("step_timeout") or spec.get("timeout") or 3600,
@@ -517,7 +517,7 @@ class WorkMixin:
                 # The stamp, as every job that changes the machine itself
                 # asks; bb-sandbox refuses by itself where it is not root.
                 job.say(f"refused: {mine} is this machine's own, and this node was not "
-                        f"provisioned as a BuilderBot sandbox ({SANDBOX_BIN} is not here)\n")
+                        f"provisioned as a AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
                 bad += 1
             else:
                 self.refresh_sandbox_tool(job)
@@ -807,7 +807,7 @@ class WorkMixin:
             shutil.rmtree(work, ignore_errors=True)
 
     def image(self, job, spec):
-        """`bb emu image add|remove ID`: an Android system image onto this
+        """`aerie emu image add|remove ID`: an Android system image onto this
         node's toolchain store, or off it. Not a toolchain (it exists at
         every API level at once), but it lives on the same store and goes
         through the same bundle, account and one-at-a-time rule, so this is
@@ -833,7 +833,7 @@ class WorkMixin:
         st_, code = "succeeded", 0
         for iid in ids:
             job.step(iid)
-            job.say(f"== bb emu image {action} {iid}\n")
+            job.say(f"== aerie emu image {action} {iid}\n")
             st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
                                             "emu", "image", action, iid],
                                    "cwd": store, "timeout": spec.get("step_timeout") or spec.get("timeout") or 3600,

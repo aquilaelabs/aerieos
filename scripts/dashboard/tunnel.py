@@ -2,7 +2,7 @@
 
 A node off the LAN reaches the controller at a public hostname a tunnel from
 home publishes (R170). Rather than a cloudflared somebody sets up beside
-BuilderBot, the controller carries cloudflared in its own image and runs it
+AerieOS, the controller carries cloudflared in its own image and runs it
 from two settings: the tunnel's token, pasted once from Zero Trust, and the
 hostname. The process is this module's child, started when the settings
 say so, restarted when it dies, stopped when the token is taken away; its
@@ -292,7 +292,7 @@ def publish(api_token):
     if err:
         return {"error": err}
     rec = {"type": "CNAME", "name": host, "content": target, "proxied": True, "ttl": 1,
-           "comment": "BuilderBot: the controller's public hostname (R176)"}
+           "comment": "AerieOS: the controller's public hostname (R176)"}
     have = next((r for r in recs or [] if r.get("type") == "CNAME"), None)
     if have and have.get("content") == target and have.get("proxied"):
         did.append(f"DNS: {host} already points at the tunnel")

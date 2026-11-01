@@ -145,7 +145,7 @@ def self_signed(names):
             alts.append(x509.DNSName(n))
     now = datetime.datetime.now(datetime.timezone.utc)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, names[0][:64]),
-                         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "BuilderBot")])
+                         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AerieOS")])
     cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(now - datetime.timedelta(days=1))
             .not_valid_after(now + datetime.timedelta(days=SELF_DAYS))

@@ -71,7 +71,7 @@ def pack():
     """The router as an official pack (R172): a service a node deploys from
     its Library card, its configuration the fields the Node settings
     section asked before, written to packs/services/model-router by
-    tools/packs-export.py and held to this by bb lint."""
+    tools/packs-export.py and held to this by aerie lint."""
     return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
             "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the projects you allow: "
                      "each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
@@ -215,7 +215,7 @@ def compose_text(nid, rec, gpu=False):
             env.append(f"      {p['env']}: {_qc(k)}")
     for i, c in enumerate(rec.get("custom") or []):
         env.append(f"      CUSTOM_{i}_KEY: {_qc(_open(c.get('key')) or 'none')}")
-    out = ["# Written by BuilderBot from a node's Model router section (router.py); Save there rewrites it.",
+    out = ["# Written by AerieOS from a node's Model router section (router.py); Save there rewrites it.",
            "services:",
            "  litellm:",
            f"    image: {IMAGE}",
@@ -571,7 +571,7 @@ def refresh_models(nid):
     return {"ok": True, "models": models}
 
 
-# The models walked with the open agent and BuilderBot's tools (R144 step
+# The models walked with the open agent and AerieOS's tools (R144 step
 # 3): a session on one ran the briefing, bb, the hooks and a transcript
 # end to end. One goes here when that walk is done; the picker marks the
 # rest untested rather than hiding them, since the router routes to any.

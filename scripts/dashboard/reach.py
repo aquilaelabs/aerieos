@@ -221,7 +221,7 @@ def forget(uid):
 # ---- sending --------------------------------------------------------------------
 
 def _post(url, data, headers=None):
-    req = urllib.request.Request(url, data=data, method="POST", headers={"User-Agent": "BuilderBot", **(headers or {})})
+    req = urllib.request.Request(url, data=data, method="POST", headers={"User-Agent": "AerieOS", **(headers or {})})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return r.status
 
@@ -302,7 +302,7 @@ def test(uid, did, who=""):
     if not dest:
         return {"error": "no such destination"}
     try:
-        _send(dest, "BuilderBot can reach you here", [f"A test from BuilderBot{(' for ' + who) if who else ''}: the bell's rows you picked arrive this way."])
+        _send(dest, "AerieOS can reach you here", [f"A test from AerieOS{(' for ' + who) if who else ''}: the bell's rows you picked arrive this way."])
     except Exception as e:                                  # noqa: BLE001 (said to the person, not raised)
         why = _why(e)
         _said(uid, did, False, why)
@@ -366,7 +366,7 @@ def tick(rows_for, people, base_url="", now=None):
             if not due or _in_quiet(dest.get("quiet"), now):
                 continue
             due = due[:MAX_ROWS]
-            title = due[0]["title"] if len(due) == 1 else f"BuilderBot: {len(due)} things for you"
+            title = due[0]["title"] if len(due) == 1 else f"AerieOS: {len(due)} things for you"
             lines = [f"{r['title']}: {r['text']}" if r.get("text") else r["title"] for r in due]
             url = (due[0].get("url") or base_url) if len(due) == 1 else base_url
             try:

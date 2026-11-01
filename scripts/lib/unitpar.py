@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bb tests unit, across the machine's cores (R130).
+"""aerie tests unit, across the machine's cores (R130).
 
 The unit tier ran as one unittest process, 1460 tests in about 155 s on
 bb-sandbox's eight cores with seven of them idle; its slowest module alone

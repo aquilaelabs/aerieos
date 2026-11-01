@@ -1,6 +1,6 @@
 // The notebook's Wiki view (wiki.py, nb-wiki.js, R112): pages as rows that
 // open to be read, New page at the top, Edit on a row, written through with
-// no notebook foot; Export as a zip; and bb wiki for a session, under
+// no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
 import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
@@ -96,19 +96,19 @@ const zip = await page.evaluate(async p => {
 }, P);
 ok(zip.status === 200 && zip.pk && /alpha-wiki\.zip/.test(zip.cd), `Export is a zip of the pages (${JSON.stringify(zip)})`);
 
-// ---- a session, through bb wiki, under each setting ------------------------------
-const token = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', P, 'test'],
+// ---- a session, through aerie wiki, under each setting ------------------------------
+const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', P, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/bb`, 'wiki', ...a], { encoding: 'utf8',
+const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'wiki', ...a], { encoding: 'utf8',
   env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
          XDG_CACHE_HOME: `${DIR}/cache-wiki` } });
 const bbErr = (...a) => { try { bb(...a); return ''; } catch (e) { return String(e.stderr); } };
 const src = `${DIR}/wiki-page.md`;
-writeFileSync(src, 'How to build: `bb build`.\n');
+writeFileSync(src, 'How to build: `aerie build`.\n');
 ok(/saved Build-and-test/.test(bb('save', 'Build and test', src, '--why', 'how to build')),
-   'bb wiki save writes a page under auto');
-ok(/Build-and-test/.test(bb()) && bb('show', 'Build and test') === 'How to build: `bb build`.\n',
-   'bb wiki lists it and shows it as kept');
+   'aerie wiki save writes a page under auto');
+ok(/Build-and-test/.test(bb()) && bb('show', 'Build and test') === 'How to build: `aerie build`.\n',
+   'aerie wiki lists it and shows it as kept');
 await page.waitForFunction(() => /Build and test/.test(document.querySelector('.nb .wknav')?.textContent || ''), null, { timeout: 15000 });
 ok(true, 'the open view picks up a session\'s page on the poll');
 // A page in the list opens in place of the one on screen.

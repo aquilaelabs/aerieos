@@ -17,7 +17,7 @@ Flutter, .NET: is a recipe installed into a **node's toolchain store**, from
 the Library with that node picked; the page lists nodes and nothing else,
 and with none enrolled it says so. The controller's own store: the SDK
 share, mapped at `/sdk` (on a NAS host `/mnt/user/sdk`): holds
-only what its boot keeps for `bb capture shot`, the Playwright browsers; nothing is
+only what its boot keeps for `aerie capture shot`, the Playwright browsers; nothing is
 installed on the controller from the dashboard. A node enrolled with the same
 share is recognized as sharing it, and each keeps its own directory there.
 
@@ -27,20 +27,20 @@ binaries land on another's, whatever distro each runs; this container keeps
 its own under `<store>/<os>-<arch>` (`linux-x86_64`). The Android
 system images, the same bytes on every host and tens of gigabytes, live once
 under `<store>/shared/android/system-images` with each platform's
-`android/system-images` a link to them, and `bb toolchains root` names the scoped
+`android/system-images` a link to them, and `aerie toolchains root` names the scoped
 directory.
 
 ```bash
-bb toolchains                     # what is installed, where, and how much room is left
-bb toolchains install flutter     # or: playwright · dotnet · swift · go · rust · zig · android:<pkg>
-bb toolchains install android:ndk        # or cmake · emulator · platform-tools · platforms · build-tools
-bb toolchains list                # every toolchain the catalog offers
-bb toolchains plan swift          # what installing it would fetch and run, exactly
-bb toolchains versions            # what is installed, asking nobody
-bb toolchains check               # ...and whether anything newer exists
-bb toolchains update flutter      # each the way its own tooling expects
-bb toolchains remove flutter
-bb toolchains env                 # the PATH lines; new shells get them automatically
+aerie toolchains                     # what is installed, where, and how much room is left
+aerie toolchains install flutter     # or: playwright · dotnet · swift · go · rust · zig · android:<pkg>
+aerie toolchains install android:ndk        # or cmake · emulator · platform-tools · platforms · build-tools
+aerie toolchains list                # every toolchain the catalog offers
+aerie toolchains plan swift          # what installing it would fetch and run, exactly
+aerie toolchains versions            # what is installed, asking nobody
+aerie toolchains check               # ...and whether anything newer exists
+aerie toolchains update flutter      # each the way its own tooling expects
+aerie toolchains remove flutter
+aerie toolchains env                 # the PATH lines; new shells get them automatically
 ```
 
 The NDK, CMake, the SDK platform and build-tools are versioned rows: each
@@ -89,7 +89,7 @@ display, which needs the driver and says so until it is there. The install
 also writes a boot unit that makes the card's device nodes,
 `/dev/nvidia-uvm` among them, as root: a session runs with
 no-new-privileges, so CUDA's setuid helper cannot make them on a program's
-first use. `bb toolchains` names where the driver stands too.
+first use. `aerie toolchains` names where the driver stands too.
 
 **The NVIDIA container toolkit is the row under it**, shown where the node
 has the card and Docker: what lets a container there reserve the card. It
@@ -112,7 +112,7 @@ compose file asks for the card the way compose always has
 starts: where the node has no card, no running driver or no toolkit, or the
 node's switch or the project's *The node's GPU* setting says the card is
 not for it, the Containers page's row says the compose cannot start as written
-and why, and an Up or a Rebuild asked anyway (a session's `bb devapp
+and why, and an Up or a Rebuild asked anyway (a session's `aerie devapp
 rebuild` included) is refused in the same words, rather than failing after
 the build with Docker's "could not select device driver".
 
@@ -127,11 +127,11 @@ had none. Where either says no, a session started from then on has
 `CUDA_VISIBLE_DEVICES` empty and the unified-memory device CUDA cannot start
 without covered in its view, so a program finds no card and takes its CPU
 path; the card's other device files stay, because the emulator's rendering
-opens those from inside the session and is its own switch. `bb gpu` says
+opens those from inside the session and is its own switch. `aerie gpu` says
 what the card is, how much of its memory is free, who is computing on it and
-whether this session may, and `bb status` carries the same in a line. The
+whether this session may, and `aerie status` carries the same in a line. The
 card's memory is one pool for every session on the node, so a heavy job is
-started as `bb gpu run [--mem MB] -- CMD`, which takes a lease (one at a
+started as `aerie gpu run [--mem MB] -- CMD`, which takes a lease (one at a
 time per node), waits for its turn and for that much free memory, and lets
 go when the command ends. The briefing tells a session all of this only
 where its project's node reports a card.
@@ -140,12 +140,12 @@ The Android system images live on the same store without being toolchains
 (one exists at every API level at once), so they have verbs of their own:
 
 ```bash
-bb emu images                     # the system images on this machine's store, with sizes
-bb emu images --available         # ...and every one that could be added
-bb emu flavors                    # google_apis · +playstore · tv · wear, and which to pick
-bb emu image add tv               # the newest of a flavor, or a full id:
-bb emu image add "system-images;android-35;google_apis;x86_64"
-bb emu image remove "system-images;android-35;google_apis;x86_64"
+aerie emu images                     # the system images on this machine's store, with sizes
+aerie emu images --available         # ...and every one that could be added
+aerie emu flavors                    # google_apis · +playstore · tv · wear, and which to pick
+aerie emu image add tv               # the newest of a flavor, or a full id:
+aerie emu image add "system-images;android-35;google_apis;x86_64"
+aerie emu image remove "system-images;android-35;google_apis;x86_64"
 ```
 
 **The recipes are a file, not code.**
@@ -153,7 +153,7 @@ bb emu image remove "system-images;android-35;google_apis;x86_64"
 needs in order to offer, fetch and install a toolchain: the URL, the branch, the
 installer's arguments, the environment it wants, how many directory levels to
 strip out of the archive, what to run afterwards to prove it worked. Both the
-dashboard and `bb toolchains` read it, so adding a toolchain is one edit: as long as
+dashboard and `aerie toolchains` read it, so adding a toolchain is one edit: as long as
 it fits one of five shapes:
 
 | kind | what it does |
@@ -164,8 +164,8 @@ it fits one of five shapes:
 | `command` | run something already in the image, pointed at the directory |
 | `sdkmanager` | an Android package, or an image flavor by kind |
 
-The shapes stay in `bb` because they are genuinely different jobs, and a
-table that could express all five would be a programming language. **`bb toolchains
+The shapes stay in `aerie` because they are genuinely different jobs, and a
+table that could express all five would be a programming language. **`aerie toolchains
 plan <toolchain>`** prints what a recipe resolves to: version, URL, the exact
 commands, without downloading anything, which is how a catalog edit gets
 checked before it is trusted.
@@ -205,19 +205,19 @@ with a `~` everywhere it appears and replaced by a measurement the moment the
 toolchain has been installed here once.
 
 **Nothing installs, updates or removes itself, and no session can do it for
-you.** `bb toolchains install|update|remove` refuses to run when `CLAUDECODE` or
+you.** `aerie toolchains install|update|remove` refuses to run when `CLAUDECODE` or
 `BB_AGENT` is in the environment; one of them is in everything a session runs,
 whichever agent it is, and
 the dashboard drops it at startup precisely so that this page is never
 mistaken for one, and tells the session to ask instead. It is a guardrail
 rather than a boundary (a session has a shell, and could call `sdkmanager`
 directly), and it says how the human at the keyboard overrides it:
-`env -u CLAUDECODE bb toolchains install …`.
+`env -u CLAUDECODE aerie toolchains install …`.
 
 **A removal sticks.** The Playwright browsers are fetched on the first boot
-of a fresh share, because a container that comes up "ready" with `bb capture shot`
+of a fresh share, because a container that comes up "ready" with `aerie capture shot`
 broken is worse than a slow first start. A share somebody has just cleared looks
-identical to a fresh one from a startup hook, so `bb toolchains remove` leaves a
+identical to a fresh one from a startup hook, so `aerie toolchains remove` leaves a
 marker under `.removed/` on the share and the hooks respect it; installing
 the toolchain again clears it. Without that, an uninstall lasted until the next
 restart, which is not an uninstall.
@@ -233,7 +233,7 @@ Install was one mis-click from being expensive.
 
 **A job can be stopped.** **Abort** empties the queue and interrupts the
 toolchain being worked on: the whole process group, so the download it is
-waiting on goes too, and `bb` removes the half-installed directory on its way
+waiting on goes too, and `aerie` removes the half-installed directory on its way
 out, the same cleanup a failed install gets. Everything already installed
 stays; the abort is for the rest of the queue, not for undoing what worked.
 
@@ -261,7 +261,7 @@ controller has no Android SDK at all since it stopped building; see
 [CI runs on a node](nodes.md#18-the-controller-runs-nothing).) The other toolchains land in their
 own directory under the
 share and are put on `PATH` by a generated `env.sh` that every shell sources;
-`bb toolchains remove` is `rm -rf` of one directory, because nothing was installed
+`aerie toolchains remove` is `rm -rf` of one directory, because nothing was installed
 anywhere else.
 
 | Toolchain | Size | What it gets you |
@@ -271,11 +271,11 @@ anywhere else.
 | `zig` | ~300MB | A C/C++ cross-compiler: `zig cc -target x86_64-windows-gnu` makes this box a Windows toolchain |
 | Android packages | 800MB emulator, 3GB NDK | Platforms, build-tools, emulator, NDK, CMake |
 | Android system images | 1–2GB each | One per API level per flavor; see [below](#the-toolchain-store-lives-outside-the-image) |
-| `playwright` | ~1.3GB | Chromium, Firefox and WebKit: fetched on a fresh share, since `bb capture shot` and the dashboard's tests need them; removing it stays removed |
+| `playwright` | ~1.3GB | Chromium, Firefox and WebKit: fetched on a fresh share, since `aerie capture shot` and the dashboard's tests need them; removing it stays removed |
 | `flutter` | ~1.3GB | Flutter + the bundled Dart SDK; builds Android APKs here |
 | `dotnet` | ~4GB | .NET SDK plus the `maui-android` workload |
 | `swift` | ~3GB | The Swift toolchain, for shared logic and server-side code |
-| `tizen` | manual | Samsung TVs, signage and appliances. No headless installer exists, so `bb toolchains install tizen` prints the steps and is not in the dashboard's list; everything there installs |
+| `tizen` | manual | Samsung TVs, signage and appliances. No headless installer exists, so `aerie toolchains install tizen` prints the steps and is not in the dashboard's list; everything there installs |
 
 **From the dashboard.** The **Library**, under Build on the rail, offers
 everything above as a card each for the node picked in the group's header:
@@ -310,7 +310,7 @@ and MSIX packaging need Windows itself.
 **Tizen is Samsung's, and where it runs decides whether you care.** TVs,
 signage and appliances still run it and Samsung still ships it; that is the
 reason to install it. Watches are not: Galaxy Watch moved to Wear OS with the
-Watch 4 in 2021, so a watch app is `bb emu image add wear`. Phones ended
+Watch 4 in 2021, so a watch app is `aerie emu image add wear`. Phones ended
 in 2017. There is no headless installer, so it is a CLI pointer rather than a
 row in the dashboard's list, where everything installs.
 
@@ -326,7 +326,7 @@ and which flavor, never whether. The four flavors, and why you would pick one:
 
 | Flavor | What it is |
 |---|---|
-| **Google APIs** | Play *services* (Maps, sign-in, push), but no Play Store app. Rootable: `adb root` works. The default, and what `bb emu create` fetches |
+| **Google APIs** | Play *services* (Maps, sign-in, push), but no Play Store app. Rootable: `adb root` works. The default, and what `aerie emu create` fetches |
 | **Google APIs + Play Store** | The same plus the Play Store app itself, for anything that signs in to Play, checks a license or takes an in-app payment. A Play-certified build, so **not** rootable |
 | **Android TV** | Leanback layout, remote-control navigation |
 | **Wear OS** | What modern Galaxy and Pixel watches run |
@@ -345,7 +345,7 @@ against. Rarely both, and the image list says which AVDs are built on each,
 so the one that is actually spare is visible rather than guessed at.
 
 The Emulator page offers a level and a flavor and adds it to the picked node;
-`bb emu images --available` is the same list on the command line, sizes and all. Real Samsung
+`aerie emu images --available` is the same list on the command line, sizes and all. Real Samsung
 or Oppo hardware is an `adb connect` away over the network, and Samsung's
 Remote Test Lab rents you real devices, but neither is something to install
 here.
@@ -368,7 +368,7 @@ once per share; from then on updates cost nothing.
 
 ## The Library
 
-**Build** opens on the **Library**: everything a BuilderBot installs or
+**Build** opens on the **Library**: everything a AerieOS installs or
 runs as one list for one node, picked in the Build group's header over
 the page (the pick holds across the Library, the Emulator, the Phone and
 the CI runner, and a sub-tab says *not here* when the node lacks what it
@@ -378,7 +378,7 @@ Copilot CLI, Grok Build, OpenCode), the toolchains a project builds with,
 the tool packs a person added, the services a node runs for the others
 (the model router), the apps a NAS runs as containers, and under **For
 you** the companions a person downloads for their own machines. Every row
-is one shape: its name, its tier (official, shipped with BuilderBot;
+is one shape: its name, its tier (official, shipped with AerieOS;
 vetted, from the catalog the maintainers sign; sideloaded, added by URL or
 made here), what is installed and what an update would move it to, one
 line saying what it is, and at its right the one verb it takes: Install,
@@ -435,8 +435,8 @@ holds there, as the Library has a card per toolchain the catalog offers:
 each with its size, its installed version, its path, and an amber line
 when a check finds a newer one. Install and Update are on the Library's
 card; Remove is on the Installed page's row. A recipe that gives a session
-commands says under which name: they live under `bb tool NAME` (`bb tool
-graphics`, `bb tool diagrams`), one name per recipe, so the card says what
+commands says under which name: they live under `aerie tool NAME` (`aerie tool
+graphics`, `aerie tool diagrams`), one name per recipe, so the card says what
 installing it adds, two toolchains may both have a `render`, and none can
 shadow a verb of bb's own; the suite holds the catalog to the script. A
 coding agent (Claude Code, Codex CLI, Copilot CLI, Grok Build) is a kind of
@@ -453,7 +453,7 @@ real package indexes of Ubuntu 22.04 to 26.04, Debian 12 and 13, Rocky 9
 and 10, Fedora, Arch, openSUSE and Alpine. A recipe's system libraries are each machine's own,
 outside the store, so when a node lacks some for a toolchain its store
 already holds (a package removed since, or a machine rebuilt under its
-store), a node BuilderBot manages installs them by itself the next time it
+store), a node AerieOS manages installs them by itself the next time it
 reports in, once per missing set, and never while its system changes are
 locked to its console. Anywhere it cannot (a guest node, a locked one, an
 install that failed) the Installed page says which over its rows and
@@ -481,7 +481,7 @@ it is not needed to *be* a node (the agent is Python, and the provisioner
 installs that), but a project built with npm needs it, and so does anything
 driving a browser through Playwright, which declares it.
 
-**Two machines may share one toolchain store, and BuilderBot recognizes the
+**Two machines may share one toolchain store, and AerieOS recognizes the
 pair.** An NFS export mounted by the controller and by a node is one
 directory, and two machines unpacking one toolchain into it at once is a
 broken install nobody can debug, so a job waits for one on a machine that
@@ -503,7 +503,7 @@ machine runs a binary another put there.
 
 ### Licenses and agreements
 
-Every row names what its tool is under, with a link. BuilderBot ships none of
+Every row names what its tool is under, with a link. AerieOS ships none of
 these tools: an install downloads each from its own vendor onto your node.
 
 A few install under an agreement rather than a license alone: Google's
@@ -512,7 +512,7 @@ Their cards say "Installing it asks you to accept", and Install
 names each agreement with its link and asks **Accept and install** before
 anything is fetched. The server refuses an install under an agreement that
 was not accepted, and keeps who accepted it, when, and for which toolchains
-in the audit log. A session is never the one to accept: `bb
+in the audit log. A session is never the one to accept: `aerie
 toolchains install android:...` from a session, on a store nobody has
 accepted Google's terms for, is refused and sent to the Library.
 
@@ -521,15 +521,15 @@ accepted Google's terms for, is refused and sent to the Library.
 Nothing Android is in the image: the SDK, the emulator and the system images
 are a node's, in its toolchain store. An API level exists where that store
 holds a system image for it: add one on the Emulator page with the node picked,
-or let `bb emu create <api>` fetch it on demand. Each is given an AVD named
+or let `aerie emu create <api>` fetch it on demand. Each is given an AVD named
 `builderbot-<api>`:
 
 ```bash
-bb emu list          # levels with an image here, and which AVDs exist
-bb emu start 37      # boot Android 17
-bb emu start         # the newest level with an image
-bb emu stop
-bb emu log -p        # the previous boot's log: the post-mortem after a death
+aerie emu list          # levels with an image here, and which AVDs exist
+aerie emu start 37      # boot Android 17
+aerie emu start         # the newest level with an image
+aerie emu stop
+aerie emu log -p        # the previous boot's log: the post-mortem after a death
 ```
 
 As of 2026 the supported range is **34–37** (Android 14 through 17). API 33 and
@@ -544,20 +544,20 @@ them. Budget roughly **2 GB per API level**. If that is tight, pick the plain
 price of Play services.
 
 Two practical limits: an Android 17 phone AVD wants **4 GB of RAM minimum**, and
-`bb emu` runs one emulator at a time; this is for testing across versions in
+`aerie emu` runs one emulator at a time; this is for testing across versions in
 sequence, not a device farm.
 
 **Rendering is software, and it fails in ways that look like your bug.** Under
 `swiftshader_indirect` the guest has no DRM render node, so HWUI's default
 Vulkan backend cannot start and every frame comes out blank while the app draws
 perfectly: the view hierarchy is complete and the pixels are empty, with one
-`E/MESA: Failed to open rendernode` in logcat as the only hint. `bb emu start`
+`E/MESA: Failed to open rendernode` in logcat as the only hint. `aerie emu start`
 sets `debug.hwui.renderer=skiagl` at boot to head that off; a shell `setprop`
 does the same but does not survive a reboot, which is what made it look
 intermittent. Two related failures are worth knowing: a window can stop
 updating part-way through a long session (restart the app: the host log says
 `Failed to find EmulatedEglImage`), and the emulator can exit silently under
-load, after which `bb emu log -p` is the account of why. The log rotates on
+load, after which `aerie emu log -p` is the account of why. The log rotates on
 each start rather than being overwritten, so a death survives the restart that
 follows it.
 
@@ -580,23 +580,23 @@ line opens the Library until the driver is there), which writes
 what it found to `/run/builderbot-gpu-display` and restarts a dead server
 three times before saying so. The driver takes the card only after a reboot,
 which the section says and Reboot under Advanced does; bb-session binds the
-server's socket into each session's own `/tmp`, so `bb emu start` inside a
-session finds `:0`. `bb emu start` **tests** for
+server's socket into each session's own `/tmp`, so `aerie emu start` inside a
+session finds `:0`. `aerie emu start` **tests** for
 the hardware path rather than trusting it: EGL has to answer on an X server
 with a vendor driver, and Mesa answering counts as failure for exactly the
-reason above, and it falls back to software when it does not. `bb emu gpu`
+reason above, and it falls back to software when it does not. `aerie emu gpu`
 says which you have and why, in one line.
 
 **Each project has its own emulator**, so one project's sessions never boot
-a phone another project installed and signed into things on. `bb emu` keeps each project's AVDs in
+a phone another project installed and signed into things on. `aerie emu` keeps each project's AVDs in
 a folder of its own (`~/.android/avd-projects/PROJECT`), and a project's
-first `bb emu start` makes its phone. With nothing making projects take
-turns, `bb emu start` decides whether the node has room for another: not
+first `aerie emu start` makes its phone. With nothing making projects take
+turns, `aerie emu start` decides whether the node has room for another: not
 while the node is saturated, and only with the phone's memory, the
 emulator's own and 2 GB for builds free, waiting up to five minutes for
 room and then refusing with the numbers; a card short of a few hundred MB
 free renders that phone in software. Phones made before AVDs were kept per
-project are one project's to keep (`bb emu adopt`, or automatically for the project named
+project are one project's to keep (`aerie emu adopt`, or automatically for the project named
 in the old folder's `.heir`), and a `bb-scrub.txt` beside an adopted phone
 names packages another project left there, removed on its first boot.
 
@@ -607,7 +607,7 @@ names packages another project left there, removed on its first boot.
   node that has it installed.
 - **Android**: `./gradlew assembleRelease` runs on the project's node once
   the Library has installed the JDK and the Android tools there; the
-  emulator is that node's too, `bb emu start`. See
+  emulator is that node's too, `aerie emu start`. See
   [Multiple Android versions](#multiple-android-versions) to emulate more
   than one API level.
 - **Claude Code plugins**: `/plugin` inside a session installs one for that
@@ -615,8 +615,8 @@ names packages another project left there, removed on its first boot.
   `.claude/settings.json` can name plugins everybody on it is offered. Each
   person's, and the MCP servers they added to each coding agent, are listed
   on that agent's row of the **Installed** page with the node picked, and every account's in
-  `bb diag plugins`, since a plugin adds its own hooks and instructions beside
-  BuilderBot's and a session that behaves oddly may be carrying one. The
+  `aerie diag plugins`, since a plugin adds its own hooks and instructions beside
+  AerieOS's and a session that behaves oddly may be carrying one. The
   language-server plugins run a server a session cannot `npm install -g`
   into the store, so the Library carries them: **language-servers** (pyright
   and typescript-language-server, for pyright-lsp and typescript-lsp) and
@@ -625,7 +625,7 @@ names packages another project left there, removed on its first boot.
 - **Training or running a model on the card**: the **pytorch** toolchain is a
   Python of its own, run as `python-ml`, with PyTorch built for CUDA (13 today, so a driver of 580 or newer),
   numpy and ONNX. PyTorch's wheels carry the CUDA libraries, so a node needs
-  only its NVIDIA driver; a heavy job runs as `bb gpu run --mem MB --
+  only its NVIDIA driver; a heavy job runs as `aerie gpu run --mem MB --
   python-ml train.py`. A project wanting more packages makes its own
   environment over it (`python-ml -m venv --system-site-packages .venv`), so
   the store's copy stays as installed. Its install works in a folder beside
@@ -635,7 +635,7 @@ names packages another project left there, removed on its first boot.
   allow on its node (`gh release create`, Gradle publish tasks); from a shell
   on the controller, `npm publish` with an `NPM_TOKEN` from an `*.env` file
   in the secrets folder. An Android build is
-  signed with `bb sign`, on the node, with a key the session never sees;
+  signed with `aerie sign`, on the node, with a key the session never sees;
   any other signing key belongs in CI secrets, never the image.
 
 ## A phone, and asking before touching it
@@ -685,7 +685,7 @@ because the phone is on their desk and they are the one who said yes to it.
 
 **A session never touches the phone itself.** It is kept on an adb server of
 its own on the node, so a plain `adb devices` in a session shows the emulator
-and nothing else. To reach the handset a session runs `bb phone run --why
+and nothing else. To reach the handset a session runs `aerie phone run --why
 "..." -- …`, which puts the reason and the exact command in front of the
 phone's owner and waits; on **Allow** the node runs it and hands back the
 output. The reason is required, not optional: approving a command you did
@@ -694,12 +694,12 @@ not write, with no sentence saying what it is for, is a guess.
 **Lent to a project, a phone is driven without asking, and only for that
 project's app.** Its owner lends it from the project's menu (**Lend your phone**) to one project on its
 node, for an hour, four hours or until taken back. That project's sessions
-then install one of its own builds (`bb phone install dist/APP.apk`, whose
+then install one of its own builds (`aerie phone install dist/APP.apk`, whose
 package the lease learns), start, stop or pick it as the keyboard, read its
 logcat, take screenshots and recordings into `dist/phone/`, read the
 screen's layout, and tap, swipe, glide and type, the last two only while one
 of the lease's apps is in front or is the keyboard. Everything else, another
-app, Settings, a shell, still goes through `bb phone run --why`. The section
+app, Settings, a shell, still goes through `aerie phone run --why`. The section
 shows the lease, the newest screenshot a session took (it updates on the
 next poll as a session works), Check now and Take back; a lease also ends
 when its time is up or the phone disconnects. All of it is adb from the node,
@@ -720,7 +720,7 @@ connect by the phone's VPN address, and the node finds the port; Android
 still wants the phone on Wi-Fi for wireless debugging.
 
 **Root on a node has the same shape.** A session has no sudo there and gets
-none; what it can do is `bb root run --why "..." -- CMD`, which puts the
+none; what it can do is `aerie root run --why "..." -- CMD`, which puts the
 reason and the exact command in front of a person, on the Notifications page and the
 bell, and waits. Which person is decided by the session that asks: the
 account it belongs to, when that account is an administrator, and every

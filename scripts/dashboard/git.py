@@ -141,7 +141,7 @@ MERGERS = re.compile(r"^merge\.[^.]+\.driver$")
 STATE_FILES = ("MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "ORIG_HEAD",
                "CHERRY_PICK_HEAD", "REVERT_HEAD", "AUTO_MERGE")
 ZERO = "0" * 40
-# BuilderBot's code map under a tree (codemap.py's INDEX_DIR), never the
+# AerieOS's code map under a tree (codemap.py's INDEX_DIR), never the
 # project's to commit.
 MAP_DIR = ".bb-map/"
 
@@ -206,7 +206,7 @@ def _own(repo, write=False):
             text.append(f'[{kind} "{gitrelay._q(name)[1:-1]}"]')
             text += [f"\t{k} = {gitrelay._q(v)}" for k, v in pairs]
         _atomic(d / "config", "\n".join(text) + "\n")
-        # The tree's own exclude file, where BuilderBot keeps its paths (the
+        # The tree's own exclude file, where AerieOS keeps its paths (the
         # code map's .bb-map/, a new project's brief) out of the project's
         # git: git reads it from the git dir, so a status through this one
         # listed them as untracked and Commit all would take them. Patterns
@@ -1272,7 +1272,7 @@ def _merge_off_tree(repo, name, into, env, unrelated=False):
         new, msg = b, f"{into}: fast-forward to {name}"
     else:
         # git 2.38 (Oct 2022) and the oldest thing this module requires of
-        # git; `bb doctor` checks for it by name, because the controller and
+        # git; `aerie doctor` checks for it by name, because the controller and
         # a node are built from different Ubuntus and have differed by a
         # release without anything saying so.
         r = _run(repo, "merge-tree", "--write-tree",

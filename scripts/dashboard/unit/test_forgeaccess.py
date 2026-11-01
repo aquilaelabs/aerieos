@@ -1,6 +1,6 @@
 """What an agent may do on a project's git host (R188): the token measured
 against a recorded host without changing anything, the project's Allow or
-Deny over it, the briefing's lines, and bb forge's verbs in each host's
+Deny over it, the briefing's lines, and aerie forge's verbs in each host's
 dialect."""
 import json
 import os

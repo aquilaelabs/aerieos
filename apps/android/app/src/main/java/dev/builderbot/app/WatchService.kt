@@ -134,7 +134,7 @@ object Watch {
         // (restart), a session that put its tests in the background and
         // handed the turn back can be interrupted, so it is waiting; where a
         // new ask waits for the run (wait), the note waits for the run too,
-        // and comes when the tests finish. The run itself is what `bb test`
+        // and comes when the tests finish. The run itself is what `aerie test`
         // reports to the dashboard (the project's `testing`).
         // Any agent's session of the account's own (R128), the first running
         // per project as the page reads it; which agent is named on the note.

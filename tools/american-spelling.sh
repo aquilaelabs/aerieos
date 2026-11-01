@@ -5,7 +5,7 @@
 # Two modes, as tools/no-em-dash.sh has them:
 #
 #   (default) only what this branch ADDS. That has to be zero, and it is what
-#             `bb rules check spelling` runs before a session hands back.
+#             `aerie rules check spelling` runs before a session hands back.
 #   --all     every one in the tree, worst file first.
 #
 # The words are the ones this tree has actually carried, each by the part
@@ -57,7 +57,7 @@ for f in $(git diff -M --name-only "$base" 2>/dev/null; git ls-files --others --
     bad=$((bad + n))
 done
 if [ "$bad" -gt 0 ]; then
-    echo "$bad British spelling(s) on lines this branch adds: the American form, everywhere (bb rules show spelling)"
+    echo "$bad British spelling(s) on lines this branch adds: the American form, everywhere (aerie rules show spelling)"
     exit 1
 fi
 echo "American spelling on every line this branch adds"

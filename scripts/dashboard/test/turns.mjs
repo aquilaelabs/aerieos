@@ -136,12 +136,12 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   // they land (the operator, 25 Sep).
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found one', severity: 'low' });
   const nb = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's bugs: read `bb bug`/.test(nb.line || ''),
+  ok(/somebody else changed this project's bugs: read `aerie bug`/.test(nb.line || ''),
      `a bug the operator filed is named on the next prompt (${(nb.line || 'no line').slice(0, 90)})`);
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
   const own = await sess({ node: 'nodeA' });
   ok(!/somebody else changed/.test(own.line || ''), `...and the session's own bug is not (${(own.line || 'no line').slice(0, 90)})`);
-  // ...nor one it filed with bb bug add, which reaches the controller
+  // ...nor one it filed with aerie bug add, which reaches the controller
   // through the relay and not the notebook's route, and was told back to
   // the session that filed it as somebody else's (B375). A read through
   // the relay marks nothing: what the operator did is still news after it.
@@ -149,7 +149,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   const filed = await relay(['bug', 'add', 'the session found another', '--sev', 'low', '--here']);
   const ownRelay = await sess({ node: 'nodeA' });
   ok(/filed B\d+/.test(filed.out || '') && !/somebody else changed/.test(ownRelay.line || ''),
-     `...nor one it filed with bb bug add (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
+     `...nor one it filed with aerie bug add (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found a second', severity: 'low' });
   await relay(['bug']);
   const afterRead = await sess({ node: 'nodeA' });
@@ -157,7 +157,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
      `...while a read of the list by the session hides nothing the operator did (${(afterRead.line || 'no line').slice(0, 90)})`);
   await call('/api/prefs', { project: 'alpha', build: 'make it' });
   const st = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's settings: read `bb settings`/.test(st.line || ''),
+  ok(/somebody else changed this project's settings: read `aerie settings`/.test(st.line || ''),
      `a setting the operator changed is named too (${(st.line || 'no line').slice(0, 90)})`);
   await call('/api/prefs', { project: 'alpha', build: '' });
   await sess({ node: 'nodeA' });
@@ -170,7 +170,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   tweak.rules = [...(tweak.rules || []), { name: 'b218', text: 'A rule added in the Design view.' }];
   await call('/api/design', { project: 'alpha', action: 'save', language: tweak, pages: des.pages || [] });
   const dz = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's design: read `bb design show`, and write docs\/design-language.md again with `bb design file`/.test(dz.line || ''),
+  ok(/somebody else changed this project's design: read `aerie design show`, and write docs\/design-language.md again with `aerie design file`/.test(dz.line || ''),
      `...and a design saved in the Design view is told the same way, with the file to write again (${(dz.line || 'no line').slice(0, 140)})`);
   // A setting a session takes when it starts says so, once (report #81).
   await call('/api/prefs', { project: 'alpha', reads: ['beta'] });
@@ -208,7 +208,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await rep('the first report');
   const noRule = await asOwner({ node: 'nodeA' });
   ok(!/diagnostics/.test(noRule.line || ''), `a project without the rule hears nothing of reports (${(noRule.line || 'no line').slice(0, 60)})`);
-  await relay(['rules', 'add', 'watch-diagnostics', 'After each prompt, read bb diag reports for new ones.']);
+  await relay(['rules', 'add', 'watch-diagnostics', 'After each prompt, read aerie diag reports for new ones.']);
   await rep('a report while the project may not read them');
   const ungranted = await asOwner({ node: 'nodeA' });
   ok(!/diagnostics/.test(ungranted.line || ''),

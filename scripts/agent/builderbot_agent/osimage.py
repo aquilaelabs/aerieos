@@ -1,4 +1,4 @@
-"""BuilderBot OS on this machine (R160 step 4): what the image says of
+"""AerieOS on this machine (R160 step 4): what the image says of
 itself for the census, and the update that writes the next image into the
 slot not in use. The disk is image/partitions.sh's: two root slots found by
 fixed partition UUIDs, each slot's kernel and initrd under /builderbot/SLOT
@@ -82,7 +82,7 @@ def _env(name, default):
 
 
 def os_release():
-    """{version, snapshot, built, slot, next} on a BuilderBot OS disk, {}
+    """{version, snapshot, built, slot, next} on a AerieOS disk, {}
     anywhere else: the release file the image carries, and the slot tool's
     reading of this boot and the next."""
     path = _env("BB_OS_RELEASE", RELEASE_FILE)
@@ -195,7 +195,7 @@ def kept_list():
 def write_kept_menu(esp=None):
     """GRUB's Older versions, from what is kept: grub.cfg sources this file
     (nothing kept, an empty one). The root is on the same disk's data
-    partition, the fifth, never another BuilderBot disk's."""
+    partition, the fifth, never another AerieOS disk's."""
     grub = os.path.join(esp or _env("BB_OS_ESP", ESP), "grub")
     if not os.path.isdir(grub):
         return
@@ -211,7 +211,7 @@ def write_kept_menu(esp=None):
         for r in rows:
             v = r["version"]
             at = f"$bb_data/lib/builderbot-os/kept/{v}"
-            text += (f'    menuentry "BuilderBot OS {v}" --id kept-{v} {{\n'
+            text += (f'    menuentry "AerieOS {v}" --id kept-{v} {{\n'
                      f"        linux {at}/vmlinuz root=/dev/loop0 bbkept={v} $bb_keptram rootfstype=squashfs ro overlayroot=tmpfs "
                      "bbslot=$bb_slot panic=15 console=ttyS0,115200 console=tty0 quiet systemd.show_status=auto $bb_args\n"
                      f"        initrd {at}/initrd\n    }}\n")
@@ -365,7 +365,7 @@ def _copy_from(r, f, dest, total, say):
 def stick_status():
     """A stick boot's state (R161 step 10, the system-pool tool's status):
     {stick, pool, ready, on_stick, written_kb, boot_written_kb}, or {} where
-    the tool is not here (no BuilderBot OS)."""
+    the tool is not here (no AerieOS)."""
     tool = _env("BB_OS_POOL", POOL_TOOL)
     if not os.path.isfile(tool):
         return {}
@@ -385,7 +385,7 @@ def stick_status():
 
 
 class OsImageMixin:
-    """Agent's BuilderBot OS update: one of the parts class Agent (agent.py)
+    """Agent's AerieOS update: one of the parts class Agent (agent.py)
     is made of."""
 
     def _apply_os_kept(self, job, cfg):
@@ -394,7 +394,7 @@ class OsImageMixin:
         tool = _env("BB_OS_SLOT", SLOT_TOOL)
         verb, ver = str(cfg.get("verb") or ""), str(cfg.get("version") or "")
         if not os.path.isfile(tool):
-            job.say("refused: this machine does not run BuilderBot OS\n")
+            job.say("refused: this machine does not run AerieOS\n")
             return "failed", 77
         if not KEPT_VER.fullmatch(ver) or not os.path.isdir(os.path.join(kept_dir(), ver)):
             job.say(f"refused: {ver or 'that version'} is not kept here\n")
@@ -448,7 +448,7 @@ class OsImageMixin:
             url = _env("BB_OS_ATTEST_URL", ATTEST_URL).format(repo=repo, digest=digest)
             try:
                 req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
-                                                           "User-Agent": "BuilderBot"})
+                                                           "User-Agent": "AerieOS"})
                 with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 (GitHub's API, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                     got = json.loads(r.read(4 << 20) or b"{}")
             except (OSError, ValueError) as e:
@@ -465,7 +465,7 @@ class OsImageMixin:
         if rc != 0:
             say("the image's build attestation did not verify: nothing written\n")
             return False
-        say("the image's build attestation verifies: built by BuilderBot's release workflow\n")
+        say("the image's build attestation verifies: built by AerieOS's release workflow\n")
         return True
 
     def _iso_pieces(self, job, iso, work):
@@ -506,7 +506,7 @@ class OsImageMixin:
         tool = _env("BB_OS_POOL", POOL_TOOL)
         path = str(cfg.get("path") or "")
         if not os.path.isfile(tool):
-            job.say("refused: this machine does not run BuilderBot OS, so it has no stick\n")
+            job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
         if not path.startswith("/") or ".." in path.split("/"):
             job.say("refused: a pool is named by its mount point\n")
@@ -523,7 +523,7 @@ class OsImageMixin:
         binds it and restarts the controller on it; then a hello."""
         tool = _env("BB_OS_POOL", POOL_TOOL)
         if not os.path.isfile(tool):
-            job.say("refused: this machine does not run BuilderBot OS, so it has no stick\n")
+            job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
         if cfg.get("release"):
             rc = self._sh(job, ["bash", tool, "projects", "--release"], timeout=600)
@@ -555,7 +555,7 @@ class OsImageMixin:
         rel = os_release()
         tool = _env("BB_OS_SLOT", SLOT_TOOL)
         if not rel or not os.path.isfile(tool):
-            say("refused: this machine does not run BuilderBot OS (no image release here), so there is no slot to write\n")
+            say("refused: this machine does not run AerieOS (no image release here), so there is no slot to write\n")
             return "failed", 77
         cur, other = rel.get("slot") or "", ""
         if cur in ("a", "b"):
@@ -651,7 +651,7 @@ class OsImageMixin:
             if listed.get(fn) != have:
                 say(f"{fn} is not the image the release signed: nothing written\n")
                 return "failed", 69
-            say(f"{fn} is signed by BuilderBot's release key\n")
+            say(f"{fn} is signed by AerieOS's release key\n")
         else:
             say("this install holds no release key yet, so the release's signature is not checked\n")
         job.step("reading the image")
@@ -667,7 +667,7 @@ class OsImageMixin:
         if not os.path.exists(dev):
             say(f"slot {other}'s partition is not here ({dev}): nothing written\n")
             return "failed", 70
-        # Every BuilderBot disk shares its partitions' UUIDs, so with a second
+        # Every AerieOS disk shares its partitions' UUIDs, so with a second
         # one in the machine (a stick) the name could be either (B470).
         if not _env(f"BB_OS_DEV_{other.upper()}", ""):
             uuid = os.path.basename(SLOT_DEV[other])
@@ -675,7 +675,7 @@ class OsImageMixin:
                                timeout=30, check=False)
             if len(r.stdout.split()) > 1:
                 say(f"refused: {len(r.stdout.split())} disks here carry slot {other} ({', '.join(r.stdout.split())}): "
-                    "take out the other BuilderBot disk or stick, then update\n")
+                    "take out the other AerieOS disk or stick, then update\n")
                 return "failed", 70
         # GRUB pointed back at this slot, trial off, before the other is
         # touched: a slot left half written by a lost power or a failed
@@ -722,7 +722,7 @@ class OsImageMixin:
             return "failed", 73
         with contextlib.suppress(OSError):
             os.unlink(os.path.join(_env("BB_OS_WORK", "/var/lib/builderbot-os"), "fell-back"))
-        say(f"slot {other} holds BuilderBot OS {ver}, and the next boot starts it: restart this machine to finish (Reboot under This machine's Advanced). "
+        say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under This machine's Advanced). "
             f"Slot {cur} keeps {rel.get('version') or 'the image running now'} to fall back to.\n")
-        self.hello_again(f"BuilderBot OS {ver} written to slot {other}")
+        self.hello_again(f"AerieOS {ver} written to slot {other}")
         return "succeeded", 0

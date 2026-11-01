@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""A finger's path through points, for a glide (R127): bb emu touch glide
-and bb phone touch glide play what this makes, so a keyboard under test
+"""A finger's path through points, for a glide (R127): aerie emu touch glide
+and aerie phone touch glide play what this makes, so a keyboard under test
 meets a stroke shaped like a person's rather than a ruler's.
 
     hand.py X Y X Y... [--hand steady|normal|shaky|ruler] [--seed N] [DIALS]

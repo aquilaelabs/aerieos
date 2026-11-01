@@ -1,5 +1,5 @@
 """A branch's line (R112, the operator, 22 Oct): the release it works
-toward, said with bb version line or read off a branch named for it; a dev
+toward, said with aerie version line or read off a branch named for it; a dev
 build there heads for it, and its version moves to it and nowhere else."""
 import os
 import subprocess

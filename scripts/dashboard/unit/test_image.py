@@ -139,7 +139,7 @@ class SlotTool(unittest.TestCase):
     def test_a_boot_that_names_no_slot_is_said(self):
         r = self.run_tool("current", cmdline="root=/dev/sda1 ro")
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("not a BuilderBot OS boot", r.stderr)
+        self.assertIn("not a AerieOS boot", r.stderr)
 
     def test_next_is_slot_a_until_grub_says_otherwise_and_cannot_be_set_without_the_esp(self):
         self.assertEqual(self.run_tool("next").stdout.strip(), "a")
@@ -196,7 +196,7 @@ class DebianOnTheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             r = sh(". nodes/families/deb.sh; pkg bash no-such-package-zz", env)
             self.assertNotEqual(r.returncode, 0)
-            self.assertIn("not in the BuilderBot OS image: no-such-package-zz", r.stderr)
+            self.assertIn("not in the AerieOS image: no-such-package-zz", r.stderr)
 
 
 def workflows():
@@ -554,7 +554,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(mib, 16)
 
     def test_the_console_welcomes_with_the_logo_the_release_and_the_address(self):
-        # R185: BuilderBot's logo, plain characters a serial console draws and
+        # R185: AerieOS's logo, plain characters a serial console draws and
         # no backslash (an escape in an issue file), opens the installer and
         # sits over every boot's login prompt with the release, the slot and
         # the dashboard's address, the getty's own \\4 standing for this
@@ -581,7 +581,7 @@ class Workflow(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             issue = open(os.path.join(out, "10-builderbot.issue")).read()
             self.assertIn("A E R I E O S", issue)
-            self.assertIn("BuilderBot OS 0.9.0, slot a", issue)
+            self.assertIn("AerieOS 0.9.0, slot a", issue)
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
             os.unlink(env_file)
             sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file})

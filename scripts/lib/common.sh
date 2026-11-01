@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for BuilderBot startup scripts.
+# Shared helpers for AerieOS startup scripts.
 # shellcheck shell=bash
 
 BUILDER_HOME="${BUILDER_HOME:-/home/builder}"
@@ -9,7 +9,7 @@ WORKSPACE="${WORKSPACE:-/workspace}"
 #
 # The dashboard is started BY a hook (15-dashboard.sh) and the hooks after it
 # keep running. So anything the dashboard measures in that window is measuring
-# a half-built container, and `bb doctor`'s answer there is not just early, it
+# a half-built container, and `aerie doctor`'s answer there is not just early, it
 # is wrong, and it is cached for half an hour, so it stays wrong.
 #
 # In /run rather than /run/builderbot, which is 0700 root because it holds the
@@ -19,7 +19,7 @@ WORKSPACE="${WORKSPACE:-/workspace}"
 # "ready" before this boot had done anything. server.py names the same path.
 BOOT_READY_FILE="${BOOT_READY_FILE:-/run/builderbot-ready}"
 
-# Which half of BuilderBot this process is running on (roadmap #21, #24).
+# Which half of AerieOS this process is running on (roadmap #21, #24).
 #
 # `controller` is the management instance: the dashboard, the notebook, the
 # queue and the record. `node` is a machine that enrolled with a controller
@@ -192,11 +192,11 @@ sdk_have() {
 # A toolchain the operator deliberately removed.
 #
 # Two startup hooks fetch things on a fresh share (the browsers, the
-# emulator) because a container that comes up "ready" with `bb capture shot` broken
+# emulator) because a container that comes up "ready" with `aerie capture shot` broken
 # is worse than a slow first boot. But a fresh share and a share somebody just
 # cleared look identical, so an uninstall used to last until the next restart
-# and no further. This is how the intent outlives it: `bb toolchains remove` leaves a
-# marker, `bb toolchains install` clears it, and a hook that finds one keeps its
+# and no further. This is how the intent outlives it: `aerie toolchains remove` leaves a
+# marker, `aerie toolchains install` clears it, and a hook that finds one keeps its
 # hands off. On the share, because an image update must not forget it.
 sdk_removed_marker() {
     printf '%s/.removed/%s' "$(sdk_root)" "$(printf '%s' "$1" | tr ':/' '--')"
@@ -358,7 +358,7 @@ github_api() {
 # So connect to it rather than stat it. Python because it is guaranteed here
 # and bash cannot open a unix socket.
 #
-# Here rather than in `bb` because the GPU startup hook asks the same question
+# Here rather than in `aerie` because the GPU startup hook asks the same question
 # before deciding whether to start a server, and two spellings of "is X up"
 # that can disagree is exactly how a dead display kept looking like a live one.
 # Where the GPU display hook records what happened to its server: `up`,
@@ -366,13 +366,13 @@ github_api() {
 # nothing else: a state file that outlived its server would be the same kind
 # of lie as the stale socket that made this bug expensive.
 #
-# Read by `bb emu gpu` and `bb doctor`. Named here because the hook writes it
+# Read by `aerie emu gpu` and `aerie doctor`. Named here because the hook writes it
 # and both of those read it, which is three files that must agree on one path.
 # A SIBLING of /run/builderbot, not a file inside it: the same shape
 # BOOT_READY_FILE above uses, and for the same reason. That directory is
 # 0700 root because it holds the secrets stash, so a state file inside it is
-# unreadable by the builder account, which is what `bb emu gpu` and
-# `bb doctor` run as: gpu_display_note() returned empty for everyone but
+# unreadable by the builder account, which is what `aerie emu gpu` and
+# `aerie doctor` run as: gpu_display_note() returned empty for everyone but
 # root, and the whole point of writing the state was that the drop to
 # software should be STATED rather than silent. Measured on the box 3 Sep:
 # the supervisor was running and had written 'up', and both commands printed
@@ -495,7 +495,7 @@ unshare_dotfiles() {
 #
 # Prints the path and nothing else, so a caller can use it directly. An empty
 # or unrecognizable id answers the box's own home, which is what every path
-# that has no account behind it (a boot hook, `bb` on the command line) should
+# that has no account behind it (a boot hook, `aerie` on the command line) should
 # get.
 user_home() {
     local uid="${1:-}" home d target
@@ -565,7 +565,7 @@ user_home() {
 #
 # NOT the login: ~/.claude/.credentials.json stays in the home. A share is
 # the wrong place for a credential; the login follows the account another
-# way (bb login on a node fetches it with the session's token).
+# way (aerie login on a node fetches it with the session's token).
 #
 # The directory is the account's: /workspace/.claude/<uid>/projects, 0700.
 # Other accounts' are walled off in a session by bb-tty exactly as sibling
@@ -615,7 +615,7 @@ claude_projects_link() {
     fi
     if [ ! -d "$share" ]; then
         mkdir -p "$share" 2>/dev/null || return 0
-        printf 'BuilderBot: each account'"'"'s Claude transcripts and memories, shared by the controller and its nodes. Not a project.\n' \
+        printf 'AerieOS: each account'"'"'s Claude transcripts and memories, shared by the controller and its nodes. Not a project.\n' \
             > "$share/.bbignore" 2>/dev/null || true
     fi
     mkdir -p "$target" 2>/dev/null || return 0

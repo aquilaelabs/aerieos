@@ -24,32 +24,32 @@ if [ -n "$kept" ]; then
     data=/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0d
     i=0
     while [ ! -b "$data" ] && [ "$i" -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
-    [ -b "$data" ] || panic "BuilderBot OS: the data partition holding version $kept is not here"
+    [ -b "$data" ] || panic "AerieOS: the data partition holding version $kept is not here"
     mkdir -p /run/bbdata /run/bbroot
-    mount -t ext4 -o ro "$data" /run/bbdata || panic "BuilderBot OS: the data partition did not mount to read version $kept"
+    mount -t ext4 -o ro "$data" /run/bbdata || panic "AerieOS: the data partition did not mount to read version $kept"
     file="/run/bbdata/lib/builderbot-os/kept/$kept/root.squashfs"
-    [ -f "$file" ] || panic "BuilderBot OS: version $kept is not kept here any more"
+    [ -f "$file" ] || panic "AerieOS: version $kept is not kept here any more"
     mb=$(( ($(wc -c < "$file") + 1048575) / 1048576 ))
-    mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "BuilderBot OS: no memory for version $kept ($mb MB)"
-    log_begin_msg "BuilderBot OS: loading version $kept ($mb MB) into memory"
-    cp "$file" /run/bbroot/root.squashfs || panic "BuilderBot OS: version $kept did not copy into memory"
+    mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "AerieOS: no memory for version $kept ($mb MB)"
+    log_begin_msg "AerieOS: loading version $kept ($mb MB) into memory"
+    cp "$file" /run/bbroot/root.squashfs || panic "AerieOS: version $kept did not copy into memory"
     log_end_msg
     umount /run/bbdata
-    losetup /dev/loop0 /run/bbroot/root.squashfs || panic "BuilderBot OS: /dev/loop0 did not take version $kept"
+    losetup /dev/loop0 /run/bbroot/root.squashfs || panic "AerieOS: /dev/loop0 did not take version $kept"
     exit 0
 fi
 [ "$toram" = 1 ] && [ -n "$slotdev" ] || exit 0
 case "$slotdev" in PARTUUID=*) dev="/dev/disk/by-partuuid/${slotdev#PARTUUID=}" ;; *) dev="$slotdev" ;; esac
 i=0
 while [ ! -b "$dev" ] && [ "$i" -lt 200 ]; do sleep 0.1; i=$((i + 1)); done
-[ -b "$dev" ] || panic "BuilderBot OS: the slot to load into RAM ($slotdev) is not here"
+[ -b "$dev" ] || panic "AerieOS: the slot to load into RAM ($slotdev) is not here"
 # The squashfs superblock's bytes_used, at offset 40, little-endian.
 bytes="$(od -An -t u8 -j 40 -N 8 "$dev" 2>/dev/null | tr -d ' ')"
-case "$bytes" in ''|*[!0-9]*) panic "BuilderBot OS: $dev does not hold a squashfs" ;; esac
+case "$bytes" in ''|*[!0-9]*) panic "AerieOS: $dev does not hold a squashfs" ;; esac
 mb=$(( (bytes + 1048575) / 1048576 ))
 mkdir -p /run/bbroot
-mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "BuilderBot OS: no memory for the root slot ($mb MB)"
-log_begin_msg "BuilderBot OS: loading slot ($mb MB) into memory"
-dd if="$dev" of=/run/bbroot/root.squashfs bs=1M count="$mb" 2>/dev/null || panic "BuilderBot OS: the slot did not copy into memory"
+mount -t tmpfs -o "size=$((mb + 64))m,mode=0700" tmpfs /run/bbroot || panic "AerieOS: no memory for the root slot ($mb MB)"
+log_begin_msg "AerieOS: loading slot ($mb MB) into memory"
+dd if="$dev" of=/run/bbroot/root.squashfs bs=1M count="$mb" 2>/dev/null || panic "AerieOS: the slot did not copy into memory"
 log_end_msg
-losetup /dev/loop0 /run/bbroot/root.squashfs || panic "BuilderBot OS: /dev/loop0 did not take the slot's copy"
+losetup /dev/loop0 /run/bbroot/root.squashfs || panic "AerieOS: /dev/loop0 did not take the slot's copy"

@@ -1,4 +1,4 @@
-// The Library (R170): one page under Build for everything a BuilderBot
+// The Library (R170): one page under Build for everything a AerieOS
 // installs or runs on a node, as one list of one shape. Opens on the
 // harness's stub node, a section per kind always drawn, the rows read from
 // /api/library; the search and the chips narrow the list and save nothing;

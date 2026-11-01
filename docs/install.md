@@ -1,4 +1,4 @@
-# Installing BuilderBot
+# Installing AerieOS
 
 The Unraid-specific detail for every step lives in
 **[unraid.md](unraid.md)**; this is the complete checklist with the
@@ -7,10 +7,10 @@ decisions you need to make.
 The image, `ghcr.io/aquilaelabs/builderbot`, is public: pulling it needs no
 login.
 
-BuilderBot comes in four editions, one controller in four shapes. This
+AerieOS comes in four editions, one controller in four shapes. This
 checklist is the **container** edition, on any host with Docker. The
 **bare-metal install** puts the same controller on a Linux machine of its
-own, which is also its own node ([Bare metal](#bare-metal)). **BuilderBot
+own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS
 OS** is that install as an appliance, from an ISO or a VM image, and the
 **USB edition** runs it from a stick ([image.md](image.md)); those two are
 new in 0.9 and experimental. A controller moves between any of them
@@ -28,8 +28,8 @@ there before going on.
 ### 1. Create the state directories
 
 ```bash
-mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
-chown -R 99:100 /mnt/user/appdata/BuilderBot
+mkdir -p /mnt/user/appdata/AerieOS/{home,config/startup.d}
+chown -R 99:100 /mnt/user/appdata/AerieOS
 ```
 
 | Dir | Holds |
@@ -45,18 +45,18 @@ Keep `home/` on a cache/SSD-backed share: it does heavy small-file IO.
 Root-owned, so its contents are **never readable by sessions**:
 
 ```bash
-mkdir -p /mnt/user/appdata/BuilderBot/secrets/ssh
+mkdir -p /mnt/user/appdata/AerieOS/secrets/ssh
 
-cp /path/to/git-key /mnt/user/appdata/BuilderBot/secrets/ssh/id_ed25519
+cp /path/to/git-key /mnt/user/appdata/AerieOS/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
 # is loaded the same way. The install key is made here by the first start.
-cat > /mnt/user/appdata/BuilderBot/secrets/builderbot.env <<'EOF'
+cat > /mnt/user/appdata/AerieOS/secrets/builderbot.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF
 
-chown -R root:root /mnt/user/appdata/BuilderBot/secrets
-chmod -R go-rwx    /mnt/user/appdata/BuilderBot/secrets
+chown -R root:root /mnt/user/appdata/AerieOS/secrets
+chmod -R go-rwx    /mnt/user/appdata/AerieOS/secrets
 ```
 
 The install key seals the settings' tokens, the signing keys and the git
@@ -93,7 +93,7 @@ Required / usually touched:
 | Field | Set it to |
 |---|---|
 | Projects folder | One mapping for all of them: `/mnt/user/projects` → `/workspace`. Every folder inside it is a project |
-| State paths | Pre-wired to `/mnt/user/appdata/BuilderBot/{home,config}` |
+| State paths | Pre-wired to `/mnt/user/appdata/AerieOS/{home,config}` |
 | **Secrets directory** | The folder from step 2 (or leave empty if unshielded) |
 
 Everything else has sane defaults: full reference in [reference.md](reference.md#configuration-reference).
@@ -114,8 +114,8 @@ Everything else has sane defaults: full reference in [reference.md](reference.md
 ### 6. First boot
 
 ```bash
-docker logs -f BuilderBot          # banner → hooks → ready
-docker exec -it BuilderBot bb doctor
+docker logs -f AerieOS          # banner → hooks → ready
+docker exec -it AerieOS aerie doctor
 ```
 
 Then open the dashboard. The first page makes the owner account; the setup
@@ -130,7 +130,7 @@ asked; their defaults are under Controller settings. After Finish, each page
 gives a short tour the first time an account opens it; **Skip tour** with its
 box skips them all, and About or your Profile brings them back.
 
-Every `bb doctor` line should be `[ok]` or an expected `[skip]`. On the
+Every `aerie doctor` line should be `[ok]` or an expected `[skip]`. On the
 controller it verifies: the workspace and home are writable, git is new
 enough, each account has a commit identity, GitHub is reachable, a node can
 take a session, the **Docker daemon** on each node that has one
@@ -164,8 +164,8 @@ jobs:
 **Every label in `runs-on` must be one some runner carries.** A job asking for
 a label nothing has sits in *Waiting for a runner* forever while the runners
 show *Idle*: the job is simply not addressed to any of them, and neither
-screen mentions the other. `bb ci-labels` lists every label the registry
-knows, `bb lint` refuses a `runs-on` naming one that nothing carries, and
+screen mentions the other. `aerie ci-labels` lists every label the registry
+knows, `aerie lint` refuses a `runs-on` naming one that nothing carries, and
 stale **Offline** runners carrying a label a job wants are worth deleting for
 the same reason; they make a job look routable when nothing will pick it up.
 
@@ -176,13 +176,13 @@ project's card or page, and runs on that project's node. There is no
 `claude`, `codex` or `copilot` in this container to exec into.
 
 ```bash
-docker exec -it BuilderBot bb shell                        # shell as builder
-docker exec -it BuilderBot bb status                       # what this box is
+docker exec -it AerieOS aerie shell                        # shell as builder
+docker exec -it AerieOS aerie status                       # what this box is
 ```
 
 **Adding a project**: **New project** on the Projects page makes one, as a
 fresh repository, a clone of one on a git host, or from an archive you already
-have. Only BuilderBot makes a project: a folder made by hand on the projects
+have. Only AerieOS makes a project: a folder made by hand on the projects
 share is not listed. A project with a problem says so on its card: no git
 repository or the wrong ownership in red.
 
@@ -248,10 +248,10 @@ it.
 ## Bare metal
 
 The same controller can be installed on a Linux machine of its own, without
-the container: the same dashboard, state, `bb` and updates, laid out under
+the container: the same dashboard, state, `aerie` and updates, laid out under
 `/opt/builderbot` the way the image lays it out, run by the machine's own
 service manager (systemd, OpenRC or runit) with an env file in place of
-compose's. It is for a machine that is only BuilderBot, a small server or
+compose's. It is for a machine that is only AerieOS, a small server or
 a NAS, and it can use that machine as one of its own nodes, so one box runs
 the dashboard and the builds and sessions with it.
 
@@ -280,7 +280,7 @@ container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
 it to answer rather than for a node you enroll; Enroll another machine is
 there for more, and none is needed. `sudo bb ...` is the container's `docker exec -it
-BuilderBot bb ...`.
+AerieOS bb ...`.
 
 Options worth knowing: `--workspace PATH` (the projects folder, by default
 `/srv/builderbot/projects`), `--port N`, `--no-node` (the controller alone),
@@ -331,11 +331,11 @@ node, whose root agent is the only account that runs it, and the page comes
 back on the new release.
 
 **Taking it away.** `--remove` stops the controller and takes away its
-release, service, `bb` and wall, and this machine's node; the state, the
+release, service, `aerie` and wall, and this machine's node; the state, the
 env file, the secrets, the account and the projects stay, and `--install`
 puts it back on them. `--remove --purge` takes all but the projects.
 
-**The appliance image.** A machine that is only BuilderBot can run the
+**The appliance image.** A machine that is only AerieOS can run the
 installed edition from the appliance image instead: Debian pinned to a
 snapshot with the controller staged in, a read-only root in two slots so an
 update is a whole image and a bad one falls back, and the machine its own
@@ -374,7 +374,7 @@ container to a machine of its own, and back.
    the first-run card press **Moving a controller here?** and give the
    token with the old controller's address, while it still runs: the new
    home pulls the bundle from it, packed at that moment, under a proof
-   derived from the token. A BuilderBot OS stick takes the move later
+   derived from the token. A AerieOS stick takes the move later
    instead, once its disks hold the projects: make a setup account, set
    the disks up on This machine, and land it from Controller settings,
    **Move a controller here**, with the same token and address or bundle
@@ -406,7 +406,7 @@ container to a machine of its own, and back.
    containers and its synced copies). The list empties as each says hello.
 5. A bare-metal source's own machine is not a node of the new home (its
    row is retired there). A bare-metal destination keeps the node its own
-   machine already is: BuilderBot OS enrolls it at the first boot, and the
+   machine already is: AerieOS enrolls it at the first boot, and the
    landing carries that node and its credential into the moved state, so
    its agent goes on without enrolling again; a stick's prepared plan of
    disks to adopt is kept the same way. A bare-metal install whose machine

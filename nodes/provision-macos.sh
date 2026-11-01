@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Enroll a Mac as a BuilderBot node, a GUEST node (roadmap R23): one
+# Enroll a Mac as a AerieOS node, a GUEST node (roadmap R23): one
 # directory and one launchd agent, and nothing outside them. The Mac stays
 # its owner's machine: no accounts made, no daemon, no root, nothing in
 # /etc, and --remove takes exactly what this put there back out again.
@@ -78,7 +78,7 @@ warn() { printf '\n!! %s\n' "$1" >&2; }
 
 # ---- taking it away --------------------------------------------------------
 if [ "$REMOVE" = 1 ]; then
-    say "removing the BuilderBot footprint"
+    say "removing the AerieOS footprint"
     if [ -f "$PLIST" ]; then
         launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null || true
         rm -f "$PLIST" && printf '   removed %s\n' "$PLIST"

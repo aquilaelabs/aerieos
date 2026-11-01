@@ -1,4 +1,4 @@
-"""Behind five probes bb makes of the machine it is on, for `bb doctor` and
+"""Behind five probes bb makes of the machine it is on, for `aerie doctor` and
 the verbs that share its questions (gpu_gles_ok, project_node and
 cmd_doctor in bb): does hardware GLES work here, which node a project is
 assigned, whether the accounts carry a commit identity, whether any node
@@ -141,7 +141,7 @@ def login():
 
 
 def signed():
-    """Codex's, Copilot's or Grok's account here, read as `bb login --list` reads
+    """Codex's, Copilot's or Grok's account here, read as `aerie login --list` reads
     it (login-list.py), so doctor and the Installed page cannot disagree."""
     import importlib.util
     spec = importlib.util.spec_from_file_location(

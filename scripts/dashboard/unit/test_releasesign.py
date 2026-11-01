@@ -128,7 +128,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         SEEN.clear(); REL.clear()
         REL["v0.7.0"] = {"id": 7, "html_url": "https://github.com/o/app/releases/tag/v0.7.0",
-                         "body": "### Added\n\n- A thing\n\nSigned by BuilderBot: an old line",
+                         "body": "### Added\n\n- A thing\n\nSigned by AerieOS: an old line",
                          "assets": [{"id": 5, "name": "app-0.7.0.apk"}]}
         self.srv = ThreadingHTTPServer(("127.0.0.1", 0), GitHub)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
@@ -201,7 +201,7 @@ class Signs(Base):
         body = REL["v0.7.0"]["body"]
         self.assertIn("### Added\n\n- A thing", body)
         self.assertNotIn("an old line", body)
-        self.assertTrue(body.endswith("Signed by BuilderBot: app-0.7.0.apk with the sideload key default, "
+        self.assertTrue(body.endswith("Signed by AerieOS: app-0.7.0.apk with the sideload key default, "
                                       "certificate SHA-256 AB:CD"), body)
         st = releasesign.status("app")
         self.assertEqual(st["signed"][0]["tag"], "v0.7.0")

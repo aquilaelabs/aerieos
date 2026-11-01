@@ -11,7 +11,7 @@ import toolchains  # noqa: E402
 NODE = {"id": "n1", "name": "box", "kind": "agent", "state": "online", "live": True,
         "reported": {"os": "linux x86_64", "toolchains": {"jdk": "21.0.4", "go": "1.22.0"},
                      "stores": {"toolchains": {"path": "/s"}}}}
-CHECK = "== bb toolchains check\njdk\t21.0.4\t21.0.5\tupdate\ngo\t1.22.0\t1.23.0\tupdate\n"
+CHECK = "== aerie toolchains check\njdk\t21.0.4\t21.0.5\tupdate\ngo\t1.22.0\t1.23.0\tupdate\n"
 
 
 class AfterInstall(unittest.TestCase):

@@ -12,7 +12,7 @@ sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 agent = agentpkg.load("login_copilot")
 
-# A stand-in for `bb login --flow --agent copilot`: the link, then Copilot's
+# A stand-in for `aerie login --flow --agent copilot`: the link, then Copilot's
 # question, then what it was told, written where the test can read it.
 FAKE = """#!/bin/bash
 echo "To authenticate, visit https://github.com/login/device and enter code ABCD-1234"

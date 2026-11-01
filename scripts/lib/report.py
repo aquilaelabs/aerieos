@@ -1,6 +1,6 @@
-"""Behind `bb report` (cmd_report in bb): a problem with BuilderBot itself, from a
+"""Behind `aerie report` (cmd_report in bb): a problem with AerieOS itself, from a
 session on any project, sent to the controller's reports rather than the
-project's tracker, where whoever looks after this install's BuilderBot reads
+project's tracker, where whoever looks after this install's AerieOS reads
 it in the diagnostics. Nothing comes back: there is no answer to follow up.
 
 Arguments: the words of the report and its --area, --repro and --reproduces, or for
@@ -29,7 +29,7 @@ def flags(names):
             i += 2
             continue
         if a.startswith("--"):
-            sys.exit(f"[builderbot] ERROR: bb report: no such option {a}")
+            sys.exit(f"[builderbot] ERROR: aerie report: no such option {a}")
         words.append(a)
         i += 1
     return words, got
@@ -51,11 +51,11 @@ if sub == "add":
               "area": got.get("area", ""), "repro": got.get("repro", ""),
               "reproduces": got.get("reproduces", "")})
     fail(d)
-    print(f"[builderbot] reported #{d['id']}: it is in BuilderBot's diagnostics now, not this "
+    print(f"[builderbot] reported #{d['id']}: it is in AerieOS's diagnostics now, not this "
           "project's tracker, and nothing more is needed from this session")
 else:
     if not args:
-        sys.exit("usage: bb report conversation N")
+        sys.exit("usage: aerie report conversation N")
     d = post({"action": "conversation", "id": args[0]})
     fail(d)
     sys.stdout.write(d.get("text") or "")

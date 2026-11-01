@@ -3,7 +3,7 @@
 can do on a project's git host, and what to enable on GitHub, GitLab and
 Gitea for each. The table is the one the controller measures a token
 against and the relay refuses by, so the page is that table, never a copy
-of it: bb lint holds the two equal with --check.
+of it: aerie lint holds the two equal with --check.
 
     python3 tools/git-hosts-doc.py           write the page
     python3 tools/git-hosts-doc.py --check   fail when the page is behind
@@ -20,7 +20,7 @@ PAGE = os.path.join(HERE, "..", "docs", "git-hosts.md")
 HEAD = """# What an agent can do on your git host
 
 A session works its project's git host (GitHub, GitLab, Gitea or Forgejo)
-with `bb forge`: pull requests, issues, CI runs and their logs, releases.
+with `aerie forge`: pull requests, issues, CI runs and their logs, releases.
 Every verb runs on the controller with the access token linked to the
 project, so the token never reaches a node or a session. What a verb may do
 is decided twice:
@@ -32,7 +32,7 @@ is decided twice:
    outright when it may not), keeps the answer, and measures again when the
    token changes, when Measure is pressed and once a day.
 2. **The project.** The project's Permissions view, On the git host, has
-   Allow or Deny for each ability below that `bb forge` works, and for
+   Allow or Deny for each ability below that `aerie forge` works, and for
    changing CI workflow files, where Deny refuses a session's push that
    changes one (a workflow runs with the repository's secrets). Deny takes
    the ability away whatever the token allows; Allow can never give more
@@ -42,7 +42,7 @@ is decided twice:
    may: Tag and publish a release).
 
 Every session is told at its start what the token lets it do and what to
-ask for (`bb forge whoami` prints the same), and a verb the token cannot
+ask for (`aerie forge whoami` prints the same), and a verb the token cannot
 do is refused with the permission it needs.
 
 The token is linked on the project's settings, Git, or when the project is
@@ -64,7 +64,7 @@ giving a new one replaces the one before for every project that used it.
 |---|---|---|---|---|---|
 | Reading only | Read-only | Read-only | Read-only | Read-only | |
 | Branches and pull requests | Read and write | Read and write | Read-only | Read-only | |
-| Everything BuilderBot offers | Read and write | Read and write | Read and write | Read and write | Read and write |
+| Everything AerieOS offers | Read and write | Read and write | Read and write | Read and write | Read and write |
 
 On GitLab a project access token with the Developer role and the `api`
 scope covers everything offered; `read_api` and `read_repository` alone
@@ -91,7 +91,7 @@ def render():
         gh = f"{a['gh'][0]}: {'Read and write' if a['gh'][1] == 'write' else 'Read-only'}"
         if a.get("also"):
             gh += f", {a['also'][0]}: Read and write"
-        how = ", ".join(f"`bb forge {v}`" for v in a["verbs"]) or a["how"]
+        how = ", ".join(f"`aerie forge {v}`" for v in a["verbs"]) or a["how"]
         start = " (starts at Deny)" if a["default"] == "deny" else ""
         out.append(f"| {a['label']}{start} | {gh} | {a['classic']} | {a['gitlab']} | {a['gitea']} | {how} |")
     out += ["", "Where a host has no word for something, the verb says so rather than doing",

@@ -1,4 +1,4 @@
-"""Behind `bb nodes` and `bb ci-labels` (cmd_nodes and cmd_ci_labels in bb):
+"""Behind `aerie nodes` and `aerie ci-labels` (cmd_nodes and cmd_ci_labels in bb):
 the enrolled machines, and the runner labels the registry knows, read from
 the node store the way the Nodes page reads it (dashboard/nodes.py), and
 read-only.
@@ -62,7 +62,7 @@ def _agent(n):
 
 
 def show(name):
-    """One node in full, by its name or id: `bb nodes show NAME`."""
+    """One node in full, by its name or id: `aerie nodes show NAME`."""
     try:
         nodes.db.open_readonly(os.environ["DASHBOARD_STATE"])
         rows = [n for n in nodes.node_list() if n["kind"] != "local"]
@@ -71,7 +71,7 @@ def show(name):
         raise SystemExit(0) from None
     n = next((r for r in rows if name in (r["name"], r["id"])), None)
     if not n:
-        raise SystemExit(f"[builderbot] ERROR: no node called {name}; bb nodes lists them: "
+        raise SystemExit(f"[builderbot] ERROR: no node called {name}; aerie nodes lists them: "
                          + ", ".join(r["name"] for r in rows))
     ag = n.get("agent") or {}
     rows_out = [("node", f'{n["name"]} ({n["id"]})'), ("state", n["state"] + (", dialing in" if n.get("live") else "")),
@@ -101,7 +101,7 @@ def enroll_token():
     controller installed bare metal (R90)."""
     rest = sys.argv[3:]
     if not rest or rest[0].startswith("-"):
-        sys.exit("[builderbot] ERROR: bb nodes enroll-token NAME [--user U] [--own]: which name?")
+        sys.exit("[builderbot] ERROR: aerie nodes enroll-token NAME [--user U] [--own]: which name?")
     name, user = rest[0], "bb"
     if "--user" in rest:
         i = rest.index("--user")

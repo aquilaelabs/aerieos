@@ -28,7 +28,7 @@ class Api(val base: String, private val user: String, private val password: Stri
         val cred = Base64.encodeToString("$user:$password".toByteArray(), Base64.NO_WRAP)
         c.setRequestProperty("Authorization", "Basic $cred")
         c.setRequestProperty("Accept", "application/json")
-        c.setRequestProperty("User-Agent", "BuilderBot-app/${BuildConfig.VERSION_NAME} api/${BuildConfig.TARGET_API}")
+        c.setRequestProperty("User-Agent", "AerieOS-app/${BuildConfig.VERSION_NAME} api/${BuildConfig.TARGET_API}")
         return c
     }
 
@@ -167,7 +167,7 @@ class Api(val base: String, private val user: String, private val password: Stri
         "/api/transcript?project=${enc(project)}&id=${enc(id)}&tz=${enc(java.util.TimeZone.getDefault().id)}"
     // The version, and where a bump would land.
     suspend fun version(project: String) = get("/api/version?project=${enc(project)}")
-    // BuilderBot's own changelog, as the welcome panel shows it.
+    // AerieOS's own changelog, as the welcome panel shows it.
     suspend fun welcome() = get("/api/welcome")
     // A project's containers, on its own node, and the three verbs a person
     // presses on one: they run as jobs, and the row says what became of them.
@@ -221,7 +221,7 @@ class Api(val base: String, private val user: String, private val password: Stri
         c.instanceFollowRedirects = false
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-        c.setRequestProperty("User-Agent", "BuilderBot-app/${BuildConfig.VERSION_NAME} api/${BuildConfig.TARGET_API}")
+        c.setRequestProperty("User-Agent", "AerieOS-app/${BuildConfig.VERSION_NAME} api/${BuildConfig.TARGET_API}")
         try {
             val form = "username=${enc(user)}&password=${enc(password)}&next=%2F"
             c.outputStream.use { it.write(form.toByteArray()) }
@@ -234,7 +234,7 @@ class Api(val base: String, private val user: String, private val password: Stri
             cookie
         } finally { c.disconnect() }
     }
-    /** BuilderBot's own terminal on a page of its own (R133): xterm.js on
+    /** AerieOS's own terminal on a page of its own (R133): xterm.js on
      *  the dashboard's /termws, the same terminal its dock opens. */
     fun termUrl(arg: String) = base.trimEnd('/') + "/terminal?arg=" + enc(arg)
 
@@ -259,10 +259,10 @@ class Api(val base: String, private val user: String, private val password: Stri
     }
 
     /** Where the companion APK is served from, given the bare filename
-     *  /api/meta reports. BuilderBot's own dist/, which is the one project
+     *  /api/meta reports. AerieOS's own dist/, which is the one project
      *  that builds this app. */
     fun apkPath(apk: String) =
-        "/api/artifact?project=BuilderBot&path=" + enc("dist/$apk")
+        "/api/artifact?project=AerieOS&path=" + enc("dist/$apk")
 
     companion object {
         fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")

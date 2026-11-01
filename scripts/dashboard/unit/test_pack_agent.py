@@ -1,5 +1,5 @@
 """A coding agent from a vetted pack (R169 step 8): its adapter is data in
-the manifest, held to the shapes BuilderBot already writes for the shipped
+the manifest, held to the shapes AerieOS already writes for the shipped
 agents, and refused when it cannot take the guards or reaches past what a
 session may set."""
 import copy
@@ -56,13 +56,13 @@ class PackAgent(unittest.TestCase):
         _, errors = toolpacks.validate(with_agent(hooks=hooks))
         self.assertTrue(any("names no stop" in e and "guards" in e for e in errors), errors)
         _, errors = toolpacks.validate(with_agent(hooks=None))
-        self.assertTrue(any("cannot take BuilderBot's guards" in e for e in errors), errors)
+        self.assertTrue(any("cannot take AerieOS's guards" in e for e in errors), errors)
         hooks = dict(KITE["agent"]["hooks"], shape="yaml")
         _, errors = toolpacks.validate(with_agent(hooks=hooks))
         self.assertTrue(any("agent.hooks.shape is one of grouped, flat" in e for e in errors), errors)
 
     def test_its_name_is_its_sessions_and_never_a_shipped_agents(self):
-        for name, said in (("claude", "a coding agent BuilderBot ships"), ("kite-cli", "2 to 16 of a-z and 0-9")):
+        for name, said in (("claude", "a coding agent AerieOS ships"), ("kite-cli", "2 to 16 of a-z and 0-9")):
             _, errors = toolpacks.validate(dict(KITE, name=name))
             self.assertTrue(any(said in e for e in errors), (name, errors))
 

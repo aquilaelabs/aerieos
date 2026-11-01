@@ -132,10 +132,10 @@ class SessionsMixin:
     def keep_session_tokens(self, rows):
         """Store each live session's fresh token where that session reads it.
 
-        Handed to the BUNDLE's own `bb token keep` rather than written here,
+        Handed to the BUNDLE's own `aerie token keep` rather than written here,
         and as the session account rather than the job one. Both halves of
         "where does this token go" already live in bb: which home this
-        BuilderBot account has on this machine (user_home) and what the cache
+        AerieOS account has on this machine (user_home) and what the cache
         file is called (bbapi.keep_token). A copy of either here would be a
         second thing to keep in step with the controller, which is the fault
         claudegrant.py was written to stop repeating.
@@ -193,11 +193,11 @@ class SessionsMixin:
                                    **({"user": run_who["user"], "group": run_who["group"],
                                        "extra_groups": run_who["extra_groups"]} if run_who else {}))
             except (OSError, subprocess.SubprocessError) as e:
-                self.keep_said(f"{uid}/{project}", f"bb token keep did not run: {e}")
+                self.keep_said(f"{uid}/{project}", f"aerie token keep did not run: {e}")
                 return
             if p.returncode:
                 said = ((p.stderr or "") + (p.stdout or "")).strip().splitlines()
-                self.keep_said(f"{uid}/{project}", f"bb token keep failed (exit {p.returncode}): "
+                self.keep_said(f"{uid}/{project}", f"aerie token keep failed (exit {p.returncode}): "
                                                     + (said[-1][-300:] if said else "it said nothing"))
             else:
                 self.__dict__["_keep_ok"] = int(time.time())
@@ -266,7 +266,7 @@ class SessionsMixin:
         # session's shell was started whenever it was started and keeps the
         # PATH it was given, so a session that has been open since before an
         # update went on running the bundle it began with. What that looks
-        # like is a typo (`bb tests` printing bb's usage on a node whose
+        # like is a typo (`aerie tests` printing bb's usage on a node whose
         # controller has the verb) rather than a machine that is behind.
         #
         # Through `current`, every bb invocation in every shell, however old,
@@ -288,7 +288,7 @@ class SessionsMixin:
                                + [os.path.join(home, ".local", "bin"),
                                   os.path.join(home, ".npm-global", "bin"), env["PATH"]])
         # AVDs under the account's own ~/.android rather than the data store,
-        # which the job account owns: a session's `bb emu create` has to be
+        # which the job account owns: a session's `aerie emu create` has to be
         # able to write where its emulator keeps state.
         env.pop("ANDROID_AVD_HOME", None)
         env.update({"BUILDER_HOME": home, "BUILDERBOT_ROLE": "node",
@@ -428,7 +428,7 @@ class SessionsMixin:
         heartbeat task that runs bb (an idle session's token, the logins
         list, the census's versions) and every shell's PATH need it there.
         A store emptied by hand took it (the operator, 12 Oct: "no bundle bb
-        at .../.bb/current/scripts/bb, so no idle session's token is
+        at .../.bb/current/scripts/aerie, so no idle session's token is
         refreshed"), and only the next job or session start fetched it.
         Once a minute at most while it is missing."""
         store = tc_root(self.state)
@@ -540,7 +540,7 @@ class SessionsMixin:
     LOGINS_EVERY = 300
 
     def logins_now(self):
-        """Which Anthropic account each BuilderBot account here is signed in
+        """Which Anthropic account each AerieOS account here is signed in
         as, or None when there is nothing new to say (B104).
 
         The controller holds no credential and learns of a login only when

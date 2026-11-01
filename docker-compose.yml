@@ -1,4 +1,4 @@
-# BuilderBot: Claude Code workstation + GitHub Actions runner for a NAS.
+# AerieOS: Claude Code workstation + GitHub Actions runner for a NAS.
 #
 #   docker compose up -d
 #   docker exec -it builderbot claude
@@ -8,7 +8,7 @@
 services:
   builderbot:
     image: ghcr.io/aquilaelabs/builderbot:${BUILDERBOT_TAG:-latest}
-    # An install pulls the image; BuilderBot's own dev instance on a node
+    # An install pulls the image; AerieOS's own dev instance on a node
     # builds this checkout instead, the way any project's dev instance is
     # built from its tree: its env file sets BUILDERBOT_PULL=build and a tag
     # of its own (BUILDERBOT_TAG=dev). With the default policy compose pulls
@@ -16,9 +16,9 @@ services:
     # on a fresh install is unchanged.
     build:
       context: .
-      # The stamp the header and `bb status` read, and the agents compare
+      # The stamp the header and `aerie status` read, and the agents compare
       # their version against. CI passes these three; a dev instance gets
-      # them from BuilderBot, which sets BB_BUILD_REV, BB_BUILD_AT and
+      # them from AerieOS, which sets BB_BUILD_REV, BB_BUILD_AT and
       # BB_BUILD_VERSION for any compose it builds (the same convention as
       # BB_DEV_DATA). A hand-run `docker compose build` leaves them blank.
       args:
@@ -33,8 +33,8 @@ services:
       memlock: -1
       core: 0
     # Same name the Unraid template uses, so every `docker exec -it
-    # BuilderBot ...` command in the docs works under either install method.
-    container_name: BuilderBot
+    # AerieOS ...` command in the docs works under either install method.
+    container_name: AerieOS
     hostname: builderbot
     # What the container prints, kept by Docker on the host: bounded, since
     # the json-file driver keeps all of it by default. The same output is in
@@ -54,7 +54,7 @@ services:
     env_file:
       - path: .env
         required: false
-    # Only what the container needs before BuilderBot runs; everything else
+    # Only what the container needs before AerieOS runs; everything else
     # is set in the dashboard (Settings, a project's settings, the Nodes tab).
     environment:
       PUID: ${PUID:-99}
@@ -84,8 +84,8 @@ services:
       - ${WORKSPACE_PATH:-/mnt/user/projects}:/workspace
 
       # --- this checkout, for the container's own tests ---------------------
-      # The tree the image was built from, where a `bb devapp test` on the
-      # BuilderBot project runs its suite: the exec starts in the directory
+      # The tree the image was built from, where a `aerie devapp test` on the
+      # AerieOS project runs its suite: the exec starts in the directory
       # that carries the project, and this is it once /workspace is a share
       # that does not hold this checkout (a dev instance on its own share,
       # 15 Sep). Outside /workspace on purpose, so it is not a project of
@@ -94,7 +94,7 @@ services:
       - .:/opt/builderbot/src
 
       # --- the toolchain store --------------------------------------------
-      # This controller's own toolchains (the browsers `bb capture shot`
+      # This controller's own toolchains (the browsers `aerie capture shot`
       # uses), outside the image so an update never downloads them again.
       # A node keeps its own, in a directory of its own on the store its
       # row names.
@@ -103,13 +103,13 @@ services:
       # --- persistent container state --------------------------------------
       # Each account's home on the controller, and its state: accounts,
       # settings, notebooks, logs.
-      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/home:/home/builder
+      - ${APPDATA_PATH:-/mnt/user/appdata/AerieOS}/home:/home/builder
       # Drop your own *.sh startup hooks in here.
-      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/config:/config
+      - ${APPDATA_PATH:-/mnt/user/appdata/AerieOS}/config:/config
       # The runners' registration tokens, root-only (0700) by design so a
       # session can never read one. A named volume rather than a directory
       # under /config: on an appdata path that is a squashed NFS share
-      # (all_squash, the shape a dev instance of BuilderBot lands on) root
+      # (all_squash, the shape a dev instance of AerieOS lands on) root
       # cannot own anything, and the store cannot be made at all. Local to
       # the daemon, it survives an update like the rest of /config.
       - runner-tokens:/config/runner-tokens
@@ -117,11 +117,11 @@ services:
       # Static-analysis reports, READ-ONLY. The scanner stays on the host by
       # design: mounting only its output means nothing in this container can
       # run it, reconfigure it, or rewrite what it found. Read them with
-      # `bb findings`. Mounted whether or not a scanner writes there, as the
-      # Unraid template mounts it, so a dev instance of BuilderBot names its
+      # `aerie findings`. Mounted whether or not a scanner writes there, as the
+      # Unraid template mounts it, so a dev instance of AerieOS names its
       # own directory in its env and reads a scan the same way (26 Sep); with
       # no scanner the directory is empty and the Analysis view says so.
-      # Deprecated in 0.9.0 (the Scanners page runs BuilderBot's own on each
+      # Deprecated in 0.9.0 (the Scanners page runs AerieOS's own on each
       # node and takes their reports up); still read, gone the release after.
       - ${SCANNER_REPORTS_PATH:-/mnt/user/appdata/scanners/reports}:/reports:ro
 
@@ -143,14 +143,14 @@ services:
       # is mounted read-write. Secrets provided here are shielded from Claude
       # sessions (keys are served via a root-owned ssh-agent); keys in
       # home/.ssh are not.
-      # - /mnt/user/appdata/BuilderBot/secrets:/secrets
+      # - /mnt/user/appdata/AerieOS/secrets:/secrets
 
       # --- host Docker access (OFF by default) ------------------------------
 
     # Web dashboard + browser terminals, one port: terminals are proxied
     # through it under /term, behind the same sign-in. Published on the same
     # number it listens on, so DASHBOARD_PORT moves both, and a dev instance
-    # of BuilderBot on a node is reachable the way any project's is. The
+    # of AerieOS on a node is reachable the way any project's is. The
     # terminal port stays inside the container: nothing on the node's own
     # 7681 is touched.
     ports:

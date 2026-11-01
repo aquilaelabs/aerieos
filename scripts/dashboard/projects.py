@@ -163,7 +163,7 @@ def _scope_to_token(dest, helper):
 def rescope_store_helpers():
     """Each checkout whose credential.helper still names git's own store on
     its project's token file, from before tokens were sealed (R135) and kept
-    in a person's store (R154), pointed at BuilderBot's helper instead: git's
+    in a person's store (R154), pointed at AerieOS's helper instead: git's
     store reads neither, so a push with the tree's own config (a release's
     tag) went with no credential. At start; returns the projects moved."""
     moved = []
@@ -851,7 +851,7 @@ def drop_push(project):
 
 
 HOOK = """#!/bin/sh
-# Written by BuilderBot. This working copy was cloned read-only: nobody asked
+# Written by AerieOS. This working copy was cloned read-only: nobody asked
 # for push rights on it, so pushing is refused here rather than being allowed
 # to surprise somebody.
 #
@@ -869,7 +869,7 @@ def set_push_hook(dest, allowed):
     h = Path(dest) / ".git" / "hooks" / "pre-push"
     try:
         if allowed:
-            if h.is_file() and "Written by BuilderBot" in h.read_text():
+            if h.is_file() and "Written by AerieOS" in h.read_text():
                 h.unlink()
             return
         h.parent.mkdir(parents=True, exist_ok=True)
@@ -896,7 +896,7 @@ def check_token_push(token, repo):
         f"https://api.github.com/repos/{repo}",
         headers={"Authorization": f"Bearer {token}",
                  "Accept": "application/vnd.github+json",
-                 "User-Agent": "BuilderBot"})
+                 "User-Agent": "AerieOS"})
     try:
         # The host is the literal above; only the repo path varies, and it is quoted.
         with urllib.request.urlopen(req, timeout=20) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -2079,7 +2079,7 @@ def create_from_dialog(req, *, env, account, may_node):
     # default a project gets anyway.
     for key, dflt, label in (("sign", "ask", "Sign a build"), ("keys", "ask", "Manage signing keys"),
                              ("release", "ask", "Tag and publish a release"),
-                             ("report", "auto", "Report BuilderBot bugs")):
+                             ("report", "auto", "Report AerieOS bugs")):
         v = req.get(key)
         if v and v != dflt:
             r = set_prefs(name, **{key: str(v)})
@@ -2509,7 +2509,7 @@ def forge_target(name):
     stored = token_target(name) or {}
     tok = _stored_token(name)
     if not forge.get("kind"):
-        return {"error": f"{host or 'its host'} has no API BuilderBot knows: git alone reaches it"}
+        return {"error": f"{host or 'its host'} has no API AerieOS knows: git alone reaches it"}
     if not tok:
         return {"error": "this project has no access token: link one under its settings, Git"}
     if not repo:

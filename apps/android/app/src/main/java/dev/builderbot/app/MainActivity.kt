@@ -134,7 +134,7 @@ class MainActivity : FragmentActivity() {
                 override fun onAuthenticationError(code: Int, msg: CharSequence) { prompting = false }
             })
         prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock BuilderBot")
+            .setTitle("Unlock AerieOS")
             .setSubtitle("Your fingerprint, face or phone PIN")
             .setAllowedAuthenticators(allowed())
             .build())
@@ -218,7 +218,7 @@ fun BuilderBotApp(openOn: String, activity: MainActivity) {
         BuilderBotTheme {
             Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center,
                    horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("BuilderBot", style = MaterialTheme.typography.headlineMedium, color = Ink)
+                Text("AerieOS", style = MaterialTheme.typography.headlineMedium, color = Ink)
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { activity.unlock() }) { Text("Unlock") }
             }

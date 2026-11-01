@@ -1,4 +1,4 @@
-"""Behind three of `bb lint`'s own checks (cmd_lint in bb): whether this
+"""Behind three of `aerie lint`'s own checks (cmd_lint in bb): whether this
 project's workflows pin its node's runner, whether an XML file is
 well-formed, and whether the container's settings agree across compose,
 .env.example, the Unraid template and docs/reference.md.
@@ -50,7 +50,7 @@ def runner():
                   f"{len(loose)} workflow job{'s' if len(loose) > 1 else ''} "
                   f"do{'' if len(loose) > 1 else 'es'} not pin it "
                   f"({', '.join(loose[:6])}{', …' if len(loose) > 6 else ''})")
-            print("         their runs-on matches every BuilderBot runner, so GitHub sends the")
+            print("         their runs-on matches every AerieOS runner, so GitHub sends the")
             print("         job to whichever is idle, which may be a machine without the")
             print("         toolchain. To land on this project's node:")
             print(f"           runs-on: [self-hosted, {label}]")
@@ -216,7 +216,7 @@ def _shingles(text, n=8):
 # History in an instruction: a date, a bug or roadmap number of two digits
 # or more (R4 and B7 are the examples the verbs are shown with), "bug 13",
 # or an attribution to the operator. The why lives in docs/decisions.md
-# and bb rules show; the prompt carries the instruction.
+# and aerie rules show; the prompt carries the instruction.
 HISTORY = re.compile(r"\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b"
                      r"|\b[BR]\d{2,4}\b|\b(?:bug|roadmap|issue) #?\d+\b|\(the operator,|\bthe operator, \d")
 SHINGLE = 8
@@ -303,7 +303,7 @@ def shipped():
                        "put the change in a new one")
     # A patch carries no migration (R113): migrations number in one sequence
     # across releases, and a 0.6.2 taking the next number would collide with
-    # the one the 0.7.0 branch already holds. The branch's line is bb version
+    # the one the 0.7.0 branch already holds. The branch's line is aerie version
     # line's (its git config, else a branch named for a version).
     br = git("rev-parse", "--abbrev-ref", "HEAD").stdout.decode().strip()
     ln = git("config", f"branch.{br}.bbline").stdout.decode().strip() if br and br != "HEAD" else ""

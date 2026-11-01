@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import toolchains  # noqa: E402
 
-CHECK = "== bb toolchains check\njdk\t21.0.4\t21.0.5\tupdate\ngo\t1.22.0\t1.22.0\tcurrent\n"
+CHECK = "== aerie toolchains check\njdk\t21.0.4\t21.0.5\tupdate\ngo\t1.22.0\t1.22.0\tcurrent\n"
 JOBS = [{"id": "i1", "state": "succeeded", "ended": 200, "spec": {"action": "install", "names": ["jdk", "go"]}},
         {"id": "c1", "state": "succeeded", "ended": 100, "spec": {"action": "check"}}]
 

@@ -1,4 +1,4 @@
-# A BuilderBot node on VMware: Workstation, Fusion or ESXi.
+# A AerieOS node on VMware: Workstation, Fusion or ESXi.
 #
 # Rendered by the dashboard's Create sandbox VM (vmtemplate.py). Save it as
 # <name>.vmx in a folder of its own, make the disk beside it, and open it.

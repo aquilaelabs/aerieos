@@ -1,4 +1,4 @@
-// BuilderBot's own terminal (R133): a dock tab drawn by xterm.js in the page
+// AerieOS's own terminal (R133): a dock tab drawn by xterm.js in the page
 // itself, joined to /termws. One classic script beside index.html
 // (docs/nodes.md §13); terminal.html is the same terminal on a page of its
 // own, for a tab popped out and for the Android app.

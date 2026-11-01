@@ -1,4 +1,4 @@
-"""Behind `bb jobs` (cmd_jobs in bb): the queue, read-only: the recent jobs
+"""Behind `aerie jobs` (cmd_jobs in bb): the queue, read-only: the recent jobs
 and what became of them, or one job's log, from the controller's API as
 the caller, which narrows it the way the Jobs page is narrowed: a session
 to its own project's jobs, an account to its projects', an administrator

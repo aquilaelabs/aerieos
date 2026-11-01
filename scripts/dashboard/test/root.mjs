@@ -46,7 +46,7 @@ ok(/empty argument/.test((await api('/api/phone', { action: 'ask', kind: 'root',
    '...and one with an empty argument, which the node would drop: the command shown must be the command run');
 
 // ---- a second account, of the kind that is not asked ---------------------------
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'visitor', '--role', 'user'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--role', 'user'],
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
@@ -63,7 +63,7 @@ ok((await api('/api/phone')).body.asks.some(a => a.id === asked.body.id && a.kin
    '...and the administrator is, with the request marked as a root one and naming whose session asked');
 // A second administrator is not asked about the first one's own request:
 // the answer is routed to the session that asked, when it can be.
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'ops', '--role', 'admin'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'ops', '--role', 'admin'],
   { input: 'opspassword1\nopspassword1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const ops = asUser('ops', 'opspassword1');
@@ -190,7 +190,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   ok(sess.status === 200 && sess.body.id > 0, `a session token may ask for root on its project's node (${sess.status})`);
   const mine = (await api('/api/phone', undefined, alpha)).body.asks || [];
   ok(mine.some(a => a.id === sess.body.id) && !mine.some(a => a.project !== 'alpha'),
-     "...and reading the list from a session shows its own project's waiting requests and no other's, which is what bb root prints");
+     "...and reading the list from a session shows its own project's waiting requests and no other's, which is what aerie root prints");
   ok((await api('/api/phone', { action: 'allow', id: sess.body.id }, alpha)).status === 403,
      '...but may not answer its own question');
   ok((await api('/api/phone', { action: 'outcome', id: sess.body.id }, beta)).body.error,
@@ -199,7 +199,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
 }
 
 // ---- a machine log off the node, which is the same root job ----------------
-// `bb logs --node X --agent|--runner|--terminal` and the Debug grant behind
+// `aerie logs --node X --agent|--runner|--terminal` and the Debug grant behind
 // it. Here rather than in nodes.mjs because the gate is only half of it: past
 // the grant this IS root_wait, so proving WHICH command it runs needs a node
 // that runs one, and this file's stub is the only one that does.

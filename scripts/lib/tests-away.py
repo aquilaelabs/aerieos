@@ -1,4 +1,4 @@
-"""Behind `bb tests` when the project's settings name a test node that is not
+"""Behind `aerie tests` when the project's settings name a test node that is not
 this machine (R151, tests_node_away in bb): which node, how many workers it
 has room for, and its place in that node's queue, printed one per line for
 bb to read:
@@ -27,7 +27,7 @@ nodes = bbapi.call("/api/v1/nodes", auth=auth).get("nodes") or []
 hit = next((n for n in nodes if n.get("id") == want or n.get("name") == want), None)
 if not hit:
     sys.exit(f"[builderbot] ERROR: the test node {want} in {project}'s settings is not one this session may use"
-             " (bb nodes lists them); its settings dialog picks another, or none for this machine")
+             " (aerie nodes lists them); its settings dialog picks another, or none for this machine")
 if hit.get("state") not in ("online", "draining") or not hit.get("live", True):
     sys.exit(f"[builderbot] ERROR: the test node {hit.get('name')} is {hit.get('state') or 'not online'}: the suites would wait on it;"
              " its settings dialog picks another, or none for this machine")

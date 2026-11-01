@@ -1,7 +1,7 @@
 {
   "name": "builderbot",
-  "displayName": "BuilderBot",
-  "description": "Open a BuilderBot project's files with no share mounted, see a coding agent session's changes as it saves them, and work in any agent's session terminal, as your own BuilderBot account.",
+  "displayName": "AerieOS",
+  "description": "Open a AerieOS project's files with no share mounted, see a coding agent session's changes as it saves them, and work in any agent's session terminal, as your own AerieOS account.",
   "version": "0.2.0",
   "publisher": "builderbot",
   "license": "Apache-2.0",
@@ -12,19 +12,19 @@
   "builderbotApi": 1,
   "contributes": {
     "commands": [
-      { "command": "builderbot.signIn", "title": "Sign In", "category": "BuilderBot" },
-      { "command": "builderbot.signOut", "title": "Sign Out", "category": "BuilderBot" },
-      { "command": "builderbot.openProject", "title": "Open Project", "category": "BuilderBot" },
-      { "command": "builderbot.openSession", "title": "Open Agent Session", "category": "BuilderBot" },
-      { "command": "builderbot.search", "title": "Search Project Files", "category": "BuilderBot" }
+      { "command": "builderbot.signIn", "title": "Sign In", "category": "AerieOS" },
+      { "command": "builderbot.signOut", "title": "Sign Out", "category": "AerieOS" },
+      { "command": "builderbot.openProject", "title": "Open Project", "category": "AerieOS" },
+      { "command": "builderbot.openSession", "title": "Open Agent Session", "category": "AerieOS" },
+      { "command": "builderbot.search", "title": "Search Project Files", "category": "AerieOS" }
     ],
     "configuration": {
-      "title": "BuilderBot",
+      "title": "AerieOS",
       "properties": {
         "builderbot.url": {
           "type": "string",
           "default": "",
-          "description": "BuilderBot's address, as you open the dashboard. Sign In sets it."
+          "description": "AerieOS's address, as you open the dashboard. Sign In sets it."
         },
         "builderbot.allowSelfSignedCertificate": {
           "type": "boolean",

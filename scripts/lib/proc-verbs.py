@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bb proc [PATTERN] | stop PATTERN [--grace S] | wait PATTERN [--timeout S]
+"""aerie proc [PATTERN] | stop PATTERN [--grace S] | wait PATTERN [--timeout S]
 
 This account's processes whose command line holds PATTERN, read from /proc
 and never the ones this call runs under: its own shell, the tool call that
@@ -9,10 +9,10 @@ shell because the pattern is on its command line (B736: on Turing Lens, 14
 Oct, a cleanup step killed its own run that way, and a wait loop on
 `! pgrep -f` could never end).
 
-  bb proc PATTERN              pid, how long it has run, and its command line
-  bb proc stop PATTERN         SIGTERM to each, SIGKILL to what is left after
+  aerie proc PATTERN              pid, how long it has run, and its command line
+  aerie proc stop PATTERN         SIGTERM to each, SIGKILL to what is left after
                                --grace seconds (3), and what it ended
-  bb proc wait PATTERN         returns once none is left, or exits 1 after
+  aerie proc wait PATTERN         returns once none is left, or exits 1 after
                                --timeout seconds (600), saying what is left
 
 A pattern is plain text, matched as a substring of the command line; an
@@ -43,7 +43,7 @@ def started(pid):
 
 def matching(pattern, spare=None):
     """[(pid, args)] of this account's processes whose command line holds
-    pattern, never this call's ancestry nor a bb proc run itself."""
+    pattern, never this call's ancestry nor a aerie proc run itself."""
     uid = os.getuid()
     spare = tidy.ancestors(root=PROC) if spare is None else spare
     out = []
@@ -54,7 +54,7 @@ def matching(pattern, spare=None):
         if not info or info[2] != uid:
             continue
         args = info[1] or info[0]
-        # Another bb proc, which carries the pattern as its argument the way
+        # Another aerie proc, which carries the pattern as its argument the way
         # a pgrep would: never a match, whichever call it belongs to.
         if "proc-verbs.py" in args:
             continue
@@ -111,7 +111,7 @@ def main(argv):
     timeout = flag(rest, "--timeout", 600.0)
     pattern = " ".join(rest)
     if verb != "list" and not pattern.strip():
-        sys.exit(f"[builderbot] ERROR: bb proc {verb} takes a pattern: a word of the command line, "
+        sys.exit(f"[builderbot] ERROR: aerie proc {verb} takes a pattern: a word of the command line, "
                  "never empty, so it cannot reach every process of yours")
     rows = matching(pattern)
     if verb == "list":

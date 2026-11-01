@@ -211,7 +211,7 @@ function drawUiMenu(){
     <h4>Account</h4><div class="popbody">
     <div class="acctrow">
       <button type="button" id="uiProfile">Profile</button>
-      <button type="button" id="uiReport" class="narrowonly" aria-label="report a bug" title="report a bug in BuilderBot: it goes to the diagnostics">${$("bReport")?.querySelector("svg")?.outerHTML || "Report a bug"}</button>
+      <button type="button" id="uiReport" class="narrowonly" aria-label="report a bug" title="report a bug in AerieOS: it goes to the diagnostics">${$("bReport")?.querySelector("svg")?.outerHTML || "Report a bug"}</button>
       <button type="button" id="uiOut" class="narrowonly" aria-label="sign out" title="sign out: back to the login page">${$("bOut")?.querySelector("svg")?.outerHTML || "Sign out"}</button>
     </div></div>`;
   el.querySelectorAll(".sw").forEach(b =>

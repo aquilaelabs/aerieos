@@ -100,7 +100,7 @@ if [ -z "$TREE" ]; then
           --force build
     TREE="$OUT/mkosi/tree"
 fi
-[ -d "$TREE/usr/lib/builderbot-os" ] || die "no BuilderBot OS tree at $TREE"
+[ -d "$TREE/usr/lib/builderbot-os" ] || die "no AerieOS tree at $TREE"
 # What the installer on the ISO lays a disk out with (R160 step 2): the
 # same layout script, numbers and menu this build uses, in the image.
 install -m 0755 "$HERE/lay-disk" "$TREE/usr/lib/builderbot-os/lay-disk"

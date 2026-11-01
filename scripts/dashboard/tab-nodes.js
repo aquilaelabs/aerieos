@@ -786,7 +786,7 @@ function nodeFeaturesSection(n){
     rows.push(row("iommu", "IOMMU", !!io.installed,
       `Lets a PCI device or a whole USB controller go to a VM (intel_iommu=on or amd_iommu=on with iommu=pt on the kernel's command line).${
         io.installed ? (io.on ? " On now." : " Not on yet: restart the machine; if it stays off after that, turn VT-d or AMD-Vi on in its firmware.")
-          : io.on || n.reported?.vm_host?.iommu ? " On already, set outside BuilderBot." : ""}`,
+          : io.on || n.reported?.vm_host?.iommu ? " On already, set outside AerieOS." : ""}`,
       ""));
   // The features installed elsewhere on the page (R91 step 1): each said as
   // the machine reports it, with the press that installs or removes it where
@@ -863,19 +863,19 @@ function nodeHostRow(n){
 }
 
 // Un-enroll (the operator, 11 Oct): the one way off. Where the machine can
-// be cleaned (its agent dialing in, provisioned by BuilderBot) the dialog
+// be cleaned (its agent dialing in, provisioned by AerieOS) the dialog
 // says what always goes (the agent, the session isolation, the accounts)
 // and offers three rings to tick: the stores on its disk, what was
 // configured from the dashboard after enrolling, and a hosting node's
 // doors and proxy, ticked for one. Anywhere else the node is removed here
-// only, and the dialog says BuilderBot's pieces stay on the machine.
+// only, and the dialog says AerieOS's pieces stay on the machine.
 // What un-enrolling takes off a machine and what it leaves, said the same
-// way in a node's Un-enroll and in Reset BuilderBot (the operator, 12 Oct).
+// way in a node's Un-enroll and in Reset AerieOS (the operator, 12 Oct).
 // `all`: everything goes (Reset un-enrolls with every part); otherwise the
 // parts the dialog's boxes choose are said as such.
 function unenrollWhat(all){
   return `<div class="resetwhat">
-      <b>What un-enrolling takes off a machine BuilderBot set up</b>
+      <b>What un-enrolling takes off a machine AerieOS set up</b>
       <ul>
         <li>The agent and its service, and the tunnel to this controller.</li>
         <li>The sessions' firewall rules and networks, and the job and session accounts with their homes.</li>
@@ -889,7 +889,7 @@ function unenrollWhat(all){
         <li>Anything the provisioner installed for the machine itself.</li>
       </ul>
       The node leaves the Nodes page and its tokens stop working; to use the machine again, enroll it again.
-      A machine that is only removed here keeps BuilderBot's pieces until <code>sudo bb-sandbox uninstall</code> is run on it.
+      A machine that is only removed here keeps AerieOS's pieces until <code>sudo bb-sandbox uninstall</code> is run on it.
     </div>`;
 }
 
@@ -900,7 +900,7 @@ function openUnenroll(n){
   const host = !!n.config?.host_only;
   document.getElementById("ndTitle").textContent = `Un-enroll ${n.name}?`;
   body.innerHTML = clean ? `<div class="field">
-      <div class="hint">Are you sure? BuilderBot is uninstalled from ${esc(n.name)}, then the node is removed here. Its job account is <code>${esc(n.config?.user || "bb")}</code>.</div>
+      <div class="hint">Are you sure? AerieOS is uninstalled from ${esc(n.name)}, then the node is removed here. Its job account is <code>${esc(n.config?.user || "bb")}</code>.</div>
       ${unenrollWhat(false)}
       <label class="ndcap"><input type="checkbox" id="ndUnStores"> Also delete the stores on its disk: the toolchains, the caches, the artifacts, dev instance data, and the synced project copies</label>
       <label class="ndcap"><input type="checkbox" id="ndUnConf"> Also undo what was set up from the dashboard after enrolling: the mounts and their fstab lines, the runners, the GPU display</label>
@@ -908,7 +908,7 @@ function openUnenroll(n){
     </div>
     ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Un-enroll</button>`)}`
   : `<div class="field">
-      <div class="hint bad">Are you sure? The machine cannot be cleaned from here: ${n.live ? "it was not provisioned by BuilderBot" : "its agent is not dialing in"}. The node is removed here and its tokens revoked; BuilderBot's pieces stay on the machine until <code>sudo bb-sandbox uninstall</code> is run there.</div>
+      <div class="hint bad">Are you sure? The machine cannot be cleaned from here: ${n.live ? "it was not provisioned by AerieOS" : "its agent is not dialing in"}. The node is removed here and its tokens revoked; AerieOS's pieces stay on the machine until <code>sudo bb-sandbox uninstall</code> is run there.</div>
     </div>
     ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Remove it here</button>`)}`;
   modal.hidden = false;
@@ -1068,7 +1068,7 @@ function nodeAgentsLine(n){
 // says about it underneath, a reason in red when it is on and not in force.
 // Root asks on a hosting-only node (the operator, 11 Oct): no session runs
 // here, but a session of a project that hosts its containers here may ask
-// for a root command by name (bb root run --node NAME), and this switch
+// for a root command by name (aerie root run --node NAME), and this switch
 // decides, as the Sessions section's does on a node that runs them. A
 // draft until its Save, like that one.
 function nodeHostRootRow(n){
@@ -1079,7 +1079,7 @@ function nodeHostRootRow(n){
   }
   return `<div class="field">
     <label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
-      let a session of a project that hosts containers here ask for a root command (bb root run --node ${esc(n.name)}), which a person then allows or denies</label>
+      let a session of a project that hosts containers here ask for a root command (aerie root run --node ${esc(n.name)}), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
   </div>`;
 }
@@ -1152,7 +1152,7 @@ function nodeSessNetRow(n){
       own ? ", which is what keeps one off the controller's own ports" : ""}.</div>
     ${line}</div>
     <div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
-      let a session ask for a root command (bb root run), which a person then allows or denies</label>
+      let a session ask for a root command (aerie root run), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}</div>
     <div class="field"><div class="sub">Each account here is a user of its own, so no account and no shell as the session account reaches another's sign-ins or terminals.</div>
     ${acctLine}</div>
@@ -1260,8 +1260,8 @@ function nodeAdvancedSection(n, stale, inflight){
         n.state === "disabled" ? "Disabled: off every picker and handed no work or session. Enable offers it again." : "Keeps it enrolled and configured, but off every picker and handed no work or session until Enable.",
         `<button type="button" data-nd="${n.state === "disabled" ? "enable" : "disable"}">${n.state === "disabled" ? "Enable" : "Disable"}</button>`)}
     ${act("Un-enroll", n.live && n.reported?.sandbox
-        ? "Takes BuilderBot off the machine (its agent, accounts, mounts, runners and files; Docker and the shares stay) and removes the node here."
-        : `Removes the node here; BuilderBot's pieces stay on the machine, since ${n.live ? "BuilderBot did not provision it" : "its agent is not dialing in"}.`,
+        ? "Takes AerieOS off the machine (its agent, accounts, mounts, runners and files; Docker and the shares stay) and removes the node here."
+        : `Removes the node here; AerieOS's pieces stay on the machine, since ${n.live ? "AerieOS did not provision it" : "its agent is not dialing in"}.`,
         `<button type="button" class="danger" data-nd="unenroll" ${inflight("uninstall") ? "disabled" : ""}>${inflight("uninstall") ? "Un-enrolling…" : "Un-enroll"}</button>`)}
     ${n.kind !== "agent" ? "" : act("Reboot or shut down",
         !n.live ? `<span class="bad">They need the agent dialing in, and it is away: power the machine from its console or its hypervisor.</span>`
@@ -1913,7 +1913,7 @@ function ndRowHtml(n){
         // Its facts in the facts voice, its id among them (R218 step 26):
         // the id is the one in its enroll script's name.
         ndFacts([where, census, seen, agentVer, n.kind === "agent" ? n.config?.user || "" : "",
-                 // A VM BuilderBot made on another node (R91 step 14).
+                 // A VM AerieOS made on another node (R91 step 14).
                  n.config?.vm_of ? `${(nodesList || []).find(x => x.id === n.config.vm_of)?.name || n.config.vm_of}, as a VM` : "", n.id])}
         ${keepLine(n)}
         ${agentBar}${pendingBar}
@@ -2188,7 +2188,7 @@ function ndDialogs(){
         <label class="ndcap"><input type="checkbox" id="ndEnVm"> VM host: run virtual machines on it</label>
         <div class="hint" id="ndEnVmHint" hidden>KVM through libvirt, installed once it has enrolled. It needs /dev/kvm: on a VM, its host passes virtualization through (CPU mode host-passthrough). Its Features section on this page installs and removes it later too.</div>
         <label class="ndcap"><input type="checkbox" id="ndEnNginx"> Put nginx on it once it is enrolled</label>
-        <div class="hint" id="ndEnNginxHint" hidden>BuilderBot's own reverse proxy, deployed the moment the node enrolls, with the routes and certificate the nginx page holds for it (set them there first or after).</div>
+        <div class="hint" id="ndEnNginxHint" hidden>AerieOS's own reverse proxy, deployed the moment the node enrolls, with the routes and certificate the nginx page holds for it (set them there first or after).</div>
       </div>
       <div class="field">
         <div class="setrow col ctlrow">${lbl("ndEnReach", "Reaches the controller",
@@ -2571,7 +2571,7 @@ function wireNodesTab(root){
                       + "its data stay on the machine; the row is kept as "
                       + "history.")) return;
       if (act === "uninstall"
-          && !await askYes("Uninstall BuilderBot from this machine?\n\nThe agent, its accounts, "
+          && !await askYes("Uninstall AerieOS from this machine?\n\nThe agent, its accounts, "
                       + "mounts and runners are removed. Docker and the shares stay. "
                       + "Enrolling it again starts from scratch.")) return;
       // A reboot ends every session on the node, so the press names them,
@@ -2657,7 +2657,7 @@ function wireNodesTab(root){
       if (act === "feature" && b.dataset.op === "remove"){
         const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
         if (!await askYes(b.dataset.feature === "vmhost"
-              ? `Uninstall VM host from ${name}?\n\nThe packages BuilderBot added for it come off; what the machine had before stays. It is refused while any VM is still there.`
+              ? `Uninstall VM host from ${name}?\n\nThe packages AerieOS added for it come off; what the machine had before stays. It is refused while any VM is still there.`
               : b.dataset.feature === "iommu"
               ? `Take the IOMMU off ${name}'s kernel command line?\n\nAfter its next restart no PCI device or USB controller can go to a VM there.`
               : `Turn the hosting firewall off on ${name}?\n\nEvery port this box and its containers publish is reachable from the internet again.`)) return;

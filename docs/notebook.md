@@ -122,9 +122,9 @@ details while you reword the same line is two people doing two things, and
 reporting that as a conflict would offer a choice between two things that do
 not disagree.
 
-`bb` is held to the same rule from the other side: a session that has not
+`aerie` is held to the same rule from the other side: a session that has not
 re-read the roadmap since it moved is refused when it tries to reword, drop
-or tick off an item, and told to run `bb roadmap` first. There is no
+or tick off an item, and told to run `aerie roadmap` first. There is no
 `--force`: re-reading is one command, and a flag would make the dishonest
 path the shorter one.
 
@@ -140,7 +140,7 @@ says so rather than leaving the seat to time out.
 
 Beside it, **when a session here last read the roadmap**, which is a
 different claim from having been told. Being told rides in on the session's
-next prompt; going to look is `bb roadmap`, and after changing something that
+next prompt; going to look is `aerie roadmap`, and after changing something that
 is the question worth answering.
 
 **Every view keeps its history.** The roadmap, the bug tracker and the
@@ -151,13 +151,13 @@ person or a session, and with several people on a project that does not say
 which of them dropped an item. A session carries its account's name too, because a session
 has an author: the person it was minted for. The memory log records what the *notebook* changed
 (wrote, edited, forgot): Claude's own memory writes are files, not events,
-so they have no entry to make. For a session, `bb history --find X` is one
-search across all three logs, merged by time and tagged by source; `bb roadmap
-history` and `bb bug history` scope to one.
+so they have no entry to make. For a session, `aerie history --find X` is one
+search across all three logs, merged by time and tagged by source; `aerie roadmap
+history` and `aerie bug history` scope to one.
 
 ## The roadmap
 
-**The roadmap** is `bb roadmap` in a terminal. Saving does not leave it; the
+**The roadmap** is `aerie roadmap` in a terminal. Saving does not leave it; the
 Save button simply goes dead until there is something to save again, and the
 button beside it is **Revert**, which throws away what has not been saved
 and is dead whenever there is nothing to throw. Leaving the view asks first
@@ -173,12 +173,12 @@ like that?* and *who dropped the third one?* need a record.
 **History**, at the top of the view where the other views keep theirs, is
 the answer: one line per change, newest
 first, each with its date and time and whether you or a session made it. A
-reword shows both wordings, the old one struck through. `bb roadmap history`
+reword shows both wordings, the old one struck through. `aerie roadmap history`
 prints the same log in a terminal.
 
 That log is also what makes deleting safe, because the list holds nothing
 but outstanding work. **A ticked-off item comes off it**: a list is read to
-find out what is left, and a thing that is finished is not left. `bb roadmap
+find out what is left, and a thing that is finished is not left. `aerie roadmap
 done N` moves it into the log under *done*, where `rm N` would have put it
 under *dropped*; both leave, and the log says which happened. Only a session
 ticks things off, because only the session that did the work knows.
@@ -206,12 +206,12 @@ wait. When the batch commits the notebook says so and offers to reload, since
 what it is holding is now out of date.
 
 **That hold is the page's own, and it is not a lock.** Nothing here
-serializes writers: `bb` and a second session write straight through an open
+serializes writers: `aerie` and a second session write straight through an open
 batch, and two browsers can have the same notebook open. What stops the loss
 is per write, below.
 
 **One batch covers the whole notebook**, not just the roadmap. Bugs filed,
-noted or closed while one is open are staged the same way, and `bb bug begin`,
+noted or closed while one is open are staged the same way, and `aerie bug begin`,
 `commit` and `revert` are the same three commands reached from the other view's
 name: `notebook.py` sequences the two halves so that half a batch is a state
 the front door cannot reach. A plan usually moves *because* of what the tracker
@@ -221,11 +221,11 @@ afterwards able to notice. The memories are outside it: a session writes those
 as files with its own tools, so there is no write to intercept and `revert`
 will not put one back.
 
-A session gets the same idea in a different shape: `bb roadmap begin`, then work,
-then `bb roadmap commit`: the changes land on the list as they are made, because
+A session gets the same idea in a different shape: `aerie roadmap begin`, then work,
+then `aerie roadmap commit`: the changes land on the list as they are made, because
 that is how you can see what a session is doing, but the *record* is written
 once at commit. Rewording the same step four times is one history entry rather
-than four. `bb roadmap revert` puts the list back and writes nothing, and refuses
+than four. `aerie roadmap revert` puts the list back and writes nothing, and refuses
 if you have touched the list yourself since the batch opened.
 
 **Dropping something asks why.** The bin opens a box under the row with an
@@ -234,7 +234,7 @@ searchable, because nothing here can be undone, and that note is the only
 thing between a dropped line and somebody adding it straight back. The log
 can be narrowed rather than read whole: search the lines, their previous
 wordings and the reasons things went, over a window of time, capped to a
-count. `bb roadmap history --find picker --since 7d` does the same in a
+count. `aerie roadmap history --find picker --since 7d` does the same in a
 terminal, which is how a session reads it without spending its context on
 the whole thing.
 
@@ -246,7 +246,7 @@ it applies to an item, never to one step of a plan, because the thing you
 have decided not to do now is the whole plan. Shelved items do not count
 towards the number on the project's card. A session can shelve (something turns
 out to be blocked, and saying so on the item beats saying it in a reply nobody
-re-reads), and can ask for one back with `bb roadmap unshelve N WHY`: taking
+re-reads), and can ask for one back with `aerie roadmap unshelve N WHY`: taking
 one off reverses a decision it was not told the reason for, so the request
 is held on the notebook with its reason, whatever the roadmap gate says, and
 a user or administrator on the project approves or denies it there.
@@ -254,33 +254,33 @@ a user or administrator on the project approves or denies it there.
 plans they had, below the shelved ones; they are hidden until asked for,
 because a list is read to find out what is left.
 
-**A session can correct a plan, not just follow it**: `bb roadmap edit N`,
-`bb roadmap step add|edit|rm|mv|done`, `bb roadmap mv N up|down`, which matters when the design moves under a plan
+**A session can correct a plan, not just follow it**: `aerie roadmap edit N`,
+`aerie roadmap step add|edit|rm|mv|done`, `aerie roadmap mv N up|down`, which matters when the design moves under a plan
 written a week ago. Every one of those lands in the history under `claude`,
 so nothing gets quietly rewritten.
 
 **Every record whole, in the form a tool wants.** `--format json`, `yaml`
-or `markdown` (`--json` for short) on `bb roadmap`, `bb roadmap show N`,
-`bb bug`, `bb bug all`, `bb bug show N`, `bb rules`, `bb rules show NAME`,
-`bb wiki list|show`, `bb design list|json` and `bb map find|who-calls|defs`
+or `markdown` (`--json` for short) on `aerie roadmap`, `aerie roadmap show N`,
+`aerie bug`, `aerie bug all`, `aerie bug show N`, `aerie rules`, `aerie rules show NAME`,
+`aerie wiki list|show`, `aerie design list|json` and `aerie map find|who-calls|defs`
 prints the records as a document (`format`, `kind`, `project`, `records`,
 and on the roadmap `as_of`, the list's revision), from one serializer, so a
 script or a session never parses the text form. The same formats come
-back in: `bb roadmap add --from FILE` and `bb bug add --from FILE` add each
+back in: `aerie roadmap add --from FILE` and `aerie bug add --from FILE` add each
 record in the file (an item with its steps, details and target in one
-change), and `bb roadmap apply FILE` writes an edited show back, field by
+change), and `aerie roadmap apply FILE` writes an edited show back, field by
 field and each step by its id, adding steps that have none and removing
 nothing; it is refused when the list moved since the document was printed.
 
-**Steps move between items without losing anything.** `bb roadmap step mv
+**Steps move between items without losing anything.** `aerie roadmap step mv
 N M TO [POSITION]` takes step M of N to item TO whole: its words, details,
-done or sent mark, and its own target; N says where it went. `bb roadmap
+done or sent mark, and its own target; N says where it went. `aerie roadmap
 split N --into "TITLE" 3 4 --into "TITLE" 7` moves those steps to new items
-in one change, each pointing back at N's details, and `bb roadmap fold N
+in one change, each pointing back at N's details, and `aerie roadmap fold N
 INTO M` makes N a step of M with N's steps following (`INTO M.K` adds N's
 words to step K's details instead); `restore` undoes a fold. A step keeps the
-number it was first given, so `bb roadmap show R56.9` finds R56's old step 9
-wherever it is now, and `bb roadmap refs` lists every R number or step the
+number it was first given, so `aerie roadmap show R56.9` finds R56's old step 9
+wherever it is now, and `aerie roadmap refs` lists every R number or step the
 list's own words name that finds nothing. On the view a step's open row has
 Move to, an item's has Split and Fold into, and in Reorder a step drags onto
 another item.
@@ -288,7 +288,7 @@ another item.
 **The list reads top down, and the top is what matters most**: new items go
 on the end, and the arrows in Reorder are how something gets promoted. Each
 item wears its number: `R4` is the item's own name, not its position, so it is
-what `bb roadmap done R4` takes, what a session means when it says "R4", and what
+what `aerie roadmap done R4` takes, what a session means when it says "R4", and what
 survives the list being rearranged. The R is the roadmap's letter and B is the
 bug tracker's, so a number in a reply or a commit says which list it is from;
 every verb takes the bare number too, and refuses the other list's letter. The
@@ -302,7 +302,7 @@ functions, the approach. They live under a "▸ details" fold on the row (the
 words are the decision; this is the workings), travel with a step when it is
 sent, and ride in the block a session starts with, so the session that works
 the step does not start from a cold grep. Claude writes them with
-`bb roadmap info N [M] "..."`, usually when it writes the plan; the pencil edits
+`aerie roadmap info N [M] "..."`, usually when it writes the plan; the pencil edits
 them alongside the words.
 
 **An item can name the release it is meant for**, its target: the
@@ -310,9 +310,9 @@ project's own version, as `0.6.0`. It shows as a tag above the item's words
 and among its facts, and a line of chips under the list's own narrows it to
 one release, or to the items meant for none yet; the Finished section
 narrows with it, so what went into a release can be read back. The Reword
-box sets it, and a session sets it with `bb roadmap target N 0.6.0` (or
-`--target` on `bb roadmap add`), and lists one release's with
-`bb roadmap --target 0.6.0`. It is a plan, not a gate: nothing holds a
+box sets it, and a session sets it with `aerie roadmap target N 0.6.0` (or
+`--target` on `aerie roadmap add`), and lists one release's with
+`aerie roadmap --target 0.6.0`. It is a plan, not a gate: nothing holds a
 release for it, and what shipped an item is still read off the changelog.
 
 **A group is one goal with an order to it.** Its title is that goal in plain
@@ -344,11 +344,11 @@ struck line is how you notice. It stays sendable, so "that did not take, do it
 again" is one tap on the same arrow.
 
 **Done is the session's mark, and it is a different one.** A session that
-finishes a step says so with `bb roadmap step done N M`: the step it was
+finishes a step says so with `aerie roadmap step done N M`: the step it was
 sent, or one it was told to go ahead with in chat. The line is struck the same way but wears a tick instead of its
 number, the frontier moves past it, and the log says a session finished it
 and when. Only a session sets it. A whole item is ticked off by a session
-with `bb roadmap done` or by a person with Done on its row (the operator,
+with `aerie roadmap done` or by a person with Done on its row (the operator,
 16 Oct), and goes under Finished, where Reopen puts it back until a release
 ships it. Sending a done
 step again is the override: the mark comes off, and the log shows the send
@@ -422,7 +422,7 @@ plans: the session is working from the file, and the file has never heard of
 it.
 
 **An item can be an ordered group of steps.** From a terminal that is
-`bb roadmap add "rework the picker" --step "widen the select" --step "then
+`aerie roadmap add "rework the picker" --step "widen the select" --step "then
 re-measure it"`; on the view it is **+ step** under any item, which turns a
 plain one into a plan, and the field stays open, so three steps is three lines
 of typing rather than three dialogs. A step is **sent with the plan around
@@ -464,27 +464,27 @@ report). Deny refuses the add outright, with a sentence the session can quote
 so it says the thing in its reply instead. It covers creation only: what is
 already on a list a session may still tick, note and reword under every
 setting, and the session is told on its next turn what you decided. The
-settled ones are in `bb history` under *waiting*.
+settled ones are in `aerie history` under *waiting*.
 
 ## Bugs
 
-**The bug tracker** is the Bugs view, under Plan, and `bb bug` in a terminal.
+**The bug tracker** is the Bugs view, under Plan, and `aerie bug` in a terminal.
 The roadmap is for things somebody decided to build; a bug is a different
 record; it has a severity, a place it lives, a way to make it happen, and a
 gap between expected and actual, which are exactly its fields, plus a notes
-field the analysis accumulates in (`bb bug note N "..."` appends, dated,
+field the analysis accumulates in (`aerie bug note N "..."` appends, dated,
 rather than replacing: the last analysis is how the next one starts). Either
 side writes it: you report from the view, a session files what it trips over
-with `bb bug add "..." --sev high --area "..." --repro "..." --reproduces
+with `aerie bug add "..." --sev high --area "..." --repro "..." --reproduces
 sometimes`. Beside how to make it happen, a report says whether that works:
 **always**, **sometimes**, **once** (seen the one time) or **not tried**,
 which is what every report from before the question says. A session that
 gives the steps answers it; the form asks it under the steps, the opened row
 says it as *Happens*, a chip narrows the list by it, and the Sort orders by
-it. `bb bug add --report N` files BuilderBot's diagnostics report N (`bb
+it. `aerie bug add --report N` files AerieOS's diagnostics report N (`aerie
 diag reports`) with its words, area, repro and that answer. It is
 write-through, not staged: a report is a form submitted once. Each report
-is stamped with the project's version as `bb version` prints it, on filing
+is stamped with the project's version as `aerie version` prints it, on filing
 (*in 0.4.0-dev.390+045bb5a* on the row) and again on closing (*closed in*),
 plus the image the container was running when it was filed; a report that
 predates the stamp stays blank rather than being backfilled with a guess.
@@ -497,7 +497,7 @@ three ways, and the difference is what the next reader is told: **fixed**
 (somebody fixed it), **won't fix** (a decision to leave it), and **not
 applicable** (it was real and stopped applying, because the feature it was
 about went away: neither of the other two is true of that). Each asks for
-the note that is the point of closing, and `bb bug all` still lists it,
+the note that is the point of closing, and `aerie bug all` still lists it,
 because a closed bug is the record that stops the same report being chased
 twice.
 
@@ -528,7 +528,7 @@ The list **sorts** by severity, newest, oldest, recently changed or title,
 from the same bar shape the log's filters use. Open before closed is not one
 of the choices (a tracker is read to find what is outstanding), so every
 order works within that. Open bugs ride into every session's starting prompt by number,
-severity and title, with the fields on disk behind `bb bug show N`.
+severity and title, with the fields on disk behind `aerie bug show N`.
 
 ## Git
 
@@ -556,7 +556,7 @@ repository itself reports before it reaches a command.
 The view acts too, each button one fixed git command with checked arguments,
 run under your author and the project's own credentials: **Fetch**, **Pull**
 (fast-forward only, refused with uncommitted changes) and **Push** (through
-the same path `bb git push` takes, offered only to a project with push
+the same path `aerie git push` takes, offered only to a project with push
 rights) at the right of the view's control row, the branch picker at its
 left, what is to push or pull counted in the tiles under it; **Commit all** with a message at the
 top of Changes and **Discard** on each file; **New branch** at the top of
@@ -577,9 +577,9 @@ both ahead and behind. **A push is read before it goes** (`pushscan.py`,
 R219): the added lines of what it would send are looked at for a token, a
 key, a password, a private key block, an address with a password in it, an
 email address or an IP address, in the relay's own repository and never in
-the tree. A session's `bb git push` with such lines is held: the bell shows
+the tree. A session's `aerie git push` with such lines is held: the bell shows
 them whole, each with its file and line, Approve pushes and Deny drops it,
-and `bb git push` waits on the answer the way `bb root run` does. The Git
+and `aerie git push` waits on the answer the way `aerie root run` does. The Git
 view's Push shows the same lines in a confirm. An approved line in a file
 is okayed for that project (`/config/pushok.json`) and passes from then on;
 a line that changes is asked about again. The hold is the third answer of
@@ -590,7 +590,7 @@ whether `main` already has every commit on it, and offers **Delete on
 `<host>`** for the ones where it does, which is the only case where removing
 a branch there can lose nothing. **Revert** and **Branch here**
 on a picked commit. A session's token
-has none of these (it has `bb git`), and a project locked against the account takes no action.
+has none of these (it has `aerie git`), and a project locked against the account takes no action.
 
 ## Tests
 
@@ -600,7 +600,7 @@ The Tests view is the project's test registry, described in [building.md](buildi
 
 **Analysis**, under Code, is the scanner's findings for that
 project alone, worst level first, read-only: the scan runs on the host, and
-`bb findings` reads the same digest in a terminal, and **Analysis** under
+`aerie findings` reads the same digest in a terminal, and **Analysis** under
 Projects on the rail opens the whole report as a page, with a project
 selector and the same filter bar. Findings whose paths
 resolve into anything other than a **valid** project: one that is listed and
@@ -663,7 +663,7 @@ its size and age, newest first. Everything can be **downloaded**.
 What a session looked with lands in `dist/` too: a reel's sheet under
 `dist/reel/NAME`, a page's shot under `dist/shot` and an emulator's under
 `dist/emu`, each with a record
-of who asked and when (`bb capture`, R96). Those are not what ships, so the
+of who asked and when (`aerie capture`, R96). Those are not what ships, so the
 list leaves them out and the view draws them as one **Captures** fold, shut,
 saying how many and how long they are kept; open, each row says whose it is
 and offers Download and Remove. The recording and the full-size frames never
@@ -675,7 +675,7 @@ with: two sessions on one project may each be reading a reel the other made,
 and a session ending is not evidence that its reel is. So the project's
 settings carry **Captures kept for N days** (7; 0 keeps them), the server
 sweeps what is older on the read that draws the view, a person removes one
-from the fold, and a session lets one of its own go with `bb capture prune
+from the fold, and a session lets one of its own go with `aerie capture prune
 NAME`, the same rule applied from the node.
 
 A **script** is the one kind the extension cannot settle on its own: a shipped
@@ -725,7 +725,7 @@ Containers page. How those containers are built and run is
 
 The **Wiki** is the project's wiki, for whoever uses or works on it: pages
 of Markdown that a person writes on the view or a session writes with
-`bb wiki save`, under the project's dial Agents may: Write the wiki (auto
+`aerie wiki save`, under the project's dial Agents may: Write the wiki (auto
 lands a page, ask holds it on the notebook for approval with its text, deny
 refuses it, and hidden keeps the wiki from sessions altogether, reading
 included, for notes that are the people's alone). It reads like an encyclopedia: one article at a time, its title over a
@@ -750,7 +750,7 @@ wiki says to make one page there; that page (GitHub calls it Home) is then
 the forge's own, and Push offers to replace the forge's wiki with this one,
 which is what a first push wants, or Pull to merge the two. GitHub's fine-grained tokens cannot write
 a wiki; a classic token with the repo scope can. Pushing and pulling are a
-person's: they reach outside BuilderBot.
+person's: they reach outside AerieOS.
 
 ## Design
 
@@ -777,7 +777,7 @@ included, and a new page from a template or as a copy of a page here.
 The pages and the themes show one at a time, chosen on a pulldown. A frame
 is one screen and a page may be longer than one, up to 240 rows, which
 scrolls, and a page keeps where its blocks sit on each frame it has been
-laid out for, which `bb design show` and the file say after the frame it is
+laid out for, which `aerie design show` and the file say after the frame it is
 on. Blocks may overlap, and the blocks' order is the drawing order, a later
 one over an earlier one, which a layers list beside the board shows top
 first, a row selecting a block another covers and its arrows moving it up
@@ -801,9 +801,9 @@ rules and the roadmap are the specification, and that what the design leaves
 open goes back into it, under the project's dial. Every edit is staged behind
 Save; nothing on the view is a prompt and nothing on it reaches into a
 session. A session meets the design by itself and piece by piece, through
-the rules its briefing names and `bb design show`, which prints the
+the rules its briefing names and `aerie design show`, which prints the
 language, one page, one theme or one rule. A session asked to put a design
-into the notebook writes the same record with `bb design save`, which keeps a
+into the notebook writes the same record with `aerie design save`, which keeps a
 record as it was sent or refuses it whole with everything wrong with it
 listed, never moving a block to fit or dropping a layout. **Write the file**
 puts `docs/design-language.md` into the tree for every session to read.

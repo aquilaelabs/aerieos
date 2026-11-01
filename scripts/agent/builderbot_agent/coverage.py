@@ -1,4 +1,4 @@
-"""Function coverage (roadmap R76), under bb tests coverage only."""
+"""Function coverage (roadmap R76), under aerie tests coverage only."""
 import contextlib
 import json
 import os
@@ -8,7 +8,7 @@ import time
 
 
 # ---- function coverage (roadmap R76) ----------------------------------------
-# Under `bb tests coverage` the harness names a file (PID in the name is this
+# Under `aerie tests coverage` the harness names a file (PID in the name is this
 # process's, so an agent that re-execs itself on a self-update keeps its
 # counts apart from its successor's), and every function of this package any
 # thread enters is counted and written there, every few seconds and on the

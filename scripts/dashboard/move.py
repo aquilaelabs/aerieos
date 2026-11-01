@@ -706,7 +706,7 @@ def _peer_json(url, body=None, timeout=None):
     """One call to the other controller: (status, dict)."""
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
                                  method="POST" if body is not None else "GET",
-                                 headers={"User-Agent": "BuilderBot", **({"Content-Type": "application/json"} if body is not None else {})})
+                                 headers={"User-Agent": "AerieOS", **({"Content-Type": "application/json"} if body is not None else {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout or PEER_TIMEOUT, context=_peer_ctx()) as r:
             raw = r.read()
@@ -839,7 +839,7 @@ def fetch_bundle(old_url, token, dest):
     key = key_of(token)
     nonce = secrets.token_hex(16)
     q = urllib.parse.urlencode({"hash": token_hash(token), "nonce": nonce, "proof": fetch_proof(key, nonce)})
-    req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "BuilderBot"})
+    req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "AerieOS"})
     try:
         with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r:
             why = room_for(int(r.headers.get("Content-Length") or 0), Path(dest).parent)
@@ -902,7 +902,7 @@ def read_manifest(path):
         with open(path, "rb") as f:
             head = f.readline()
             if head not in (HEADER, BACKUP_HEADER):
-                return None, "not a BuilderBot move bundle or backup"
+                return None, "not a AerieOS move bundle or backup"
             line = f.readline()
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:

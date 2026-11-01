@@ -1,5 +1,5 @@
 """Reset un-enrolls the nodes it is given first (the operator, 12 Oct): a
-node BuilderBot set up and can reach is uninstalled, any other is retired
+node AerieOS set up and can reach is uninstalled, any other is retired
 here, and a refusal (a node in use) comes back named rather than skipped."""
 import os
 import sys

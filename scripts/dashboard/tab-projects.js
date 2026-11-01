@@ -70,7 +70,7 @@ function askPurge(name){
   if (!row || row.querySelector(".dropbox")) return;
   const box = document.createElement("div");
   box.className = "dropbox ctlown";
-  // The type-to-confirm shape Reset BuilderBot has: what goes, then the
+  // The type-to-confirm shape Reset AerieOS has: what goes, then the
   // word to type labeled over its field, then the drop box's Keep it and
   // the red verb.
   box.innerHTML = `<div class="hint bad">This deletes every file in
@@ -682,7 +682,7 @@ const devClaudeMode = name => {
 // ---- the new-project dialog ------------------------------------------------
 // One dialog, three modes: a new local repo, a clone, and linking a project
 // to a git host. The host catalog and the agent's keys arrive per open from
-// /api/pubkeys. Moved here from index.html with bb map sections in hand: the
+// /api/pubkeys. Moved here from index.html with aerie map sections in hand: the
 // dialog is the Projects feature's. Its fields, its submit and the name
 // that follows the address are wired from index.html.
 
@@ -903,7 +903,7 @@ const pGateNow = () => Object.fromEntries(
 // session does lands in the notebook or the settings with its history and
 // is undone in a press: the roadmap, bugs, rules, build and test, the
 // design, the wiki (each page's history is kept), and a report to
-// BuilderBot's own tracker. Ask where it reaches
+// AerieOS's own tracker. Ask where it reaches
 // past that: its container, which runs the project's code on a shared
 // machine and publishes ports (ask rather than the deny a project has
 // without a choice, so a session can propose a rebuild at all, having no

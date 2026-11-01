@@ -444,7 +444,7 @@ private fun Artifacts(api: dev.builderbot.app.Api, project: String) {
             }
         }
         items(rows) { a ->
-            // A build signed by BuilderBot (R106) says with which key.
+            // A build signed by AerieOS (R106) says with which key.
             val signed = a.obj("prov").obj("signed")
             val how = if (signed.length() == 0) "" else "signed with the " +
                 (if (signed.str("key").isNotBlank() && signed.str("key") != "default") "${signed.str("key")} key's " else "") +

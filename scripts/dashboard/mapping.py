@@ -1,7 +1,7 @@
 """The code map, built for a project the moment the project exists.
 
 A session's first questions about a tree it has never seen are the map's
-(`bb map find`, `who-calls`, `sections`: roadmap R75), and the first
+(`aerie map find`, `who-calls`, `sections`: roadmap R75), and the first
 question builds the index if nothing has, which on a large checkout is
 the first minute of the conversation spent waiting. So the build starts
 in the background the moment a project is created (a fresh repo, a clone,

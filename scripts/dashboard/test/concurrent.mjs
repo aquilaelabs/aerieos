@@ -1,5 +1,5 @@
 // Many people and many Claude sessions writing one project's notebook at the
-// same moment. Every session's `bb roadmap`, `bb bug` and `bb changelog` is
+// same moment. Every session's `aerie roadmap`, `aerie bug` and `aerie changelog` is
 // relayed to the controller and run there as a process of its own, so six
 // sessions typing at once are six processes on one set of files, beside the
 // dashboard's own writes from somebody at the Roadmap tab. Nothing written

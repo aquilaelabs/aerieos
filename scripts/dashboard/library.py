@@ -1,4 +1,4 @@
-"""The Library (R170): everything a BuilderBot installs or runs, as one
+"""The Library (R170): everything a AerieOS installs or runs, as one
 list of one shape, for one node. The toolchains the catalog offers with
 what the node's store holds (toolchains.payload_for_node), the coding
 agents with their version against the latest (agentcode.rows), the tool
@@ -67,7 +67,7 @@ def _tier(t):
 
 def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(), pack_values=None, pack_mine=None):
     """The one list, in the page's order: agents, toolchains, packs, the
-    services (R172: a deployed thing of BuilderBot's, its configuration on
+    services (R172: a deployed thing of AerieOS's, its configuration on
     the card), apps, the catalog's offers, the companions. `services` is
     [{manifest, status, ready, all_projects}] and `pack_values` {pack name:
     its answers on this node} for the packs with a config block."""

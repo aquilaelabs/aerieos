@@ -2,7 +2,7 @@
 disks of mixed sizes, each its own XFS or btrfs filesystem, pooled into one
 tree by mergerfs with parity on one or two disks kept by SnapRAID, which
 is periodic rather than real time: a file written since the last sync is
-unprotected until the next, and the page says so. BuilderBot's own record
+unprotected until the next, and the page says so. AerieOS's own record
 (/etc/builderbot/array.json, written whole by the storage-array job) is
 what snapraid.conf and the array's fstab lines are rendered from; the
 census reads the record, each disk's room and the state file the last
@@ -91,7 +91,7 @@ def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
     a content file on the system and on every data disk, each data disk by
     its slot."""
-    out = ["# Written by BuilderBot (the Storage page): the array's SnapRAID layout. Do not edit; the page writes it whole.\n"]
+    out = ["# Written by AerieOS (the Storage page): the array's SnapRAID layout. Do not edit; the page writes it whole.\n"]
     for p in rec.get("parity") or []:
         n = int(p["slot"])
         out.append(f"{'' if n == 1 else f'{n}-'}parity {mount_of('p', n)}/snapraid.{'' if n == 1 else f'{n}-'}parity\n")

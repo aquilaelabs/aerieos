@@ -90,7 +90,7 @@ def guest_root(name):
 
 
 def vm_memory():
-    """{domain: [usable MB, available MB]} for every running VM BuilderBot
+    """{domain: [usable MB, available MB]} for every running VM AerieOS
     made, from the balloon's statistics in one domstats call, for the
     heartbeat (R110 step 8). A VM whose balloon has no stats period yet is
     given one, so its next heartbeat has them."""
@@ -123,7 +123,7 @@ def own_here():
 
 
 def vms_other():
-    """The libvirt domains on this machine that BuilderBot did not make
+    """The libvirt domains on this machine that AerieOS did not make
     (R165 step 1): a name without the bbvm- prefix, or one with the prefix
     and without the agent's own metadata marker. Name, state, vCPUs and
     memory, for the VMs page to list read-only for an administrator;
@@ -152,7 +152,7 @@ def vms_other():
 
 
 def vms_now():
-    """The VMs this machine runs that BuilderBot made (their name prefix), as
+    """The VMs this machine runs that AerieOS made (their name prefix), as
     libvirt says, for the census: name, state, the address its network
     leased it, its vCPUs and memory, and its snapshots. Empty where there is
     no libvirt or it does not answer."""
@@ -335,7 +335,7 @@ def sums_lookup(text, filename):
     return only.lower() if re.fullmatch(r"[0-9a-fA-F]{64}|[0-9a-fA-F]{128}", only) else ""
 
 
-ENROLL_HEAD = "#!/usr/bin/env bash\n# BuilderBot: enroll "
+ENROLL_HEAD = "#!/usr/bin/env bash\n# AerieOS: enroll "
 
 
 def user_data(hostname, user, keys, enroll=""):
@@ -417,7 +417,7 @@ def domain_xml(name, project, vcpus, mem_mb, disk, seed, network, boot="bios", f
                extra=(), installer=False, mac="", vnc_pw=""):
     """The domain, from a fixed shape: KVM, the host's CPU, virtio disk and
     network on the project's own network, the seed as a cdrom, a serial
-    console and no graphics, and BuilderBot's marker in <metadata>. `boot`
+    console and no graphics, and AerieOS's marker in <metadata>. `boot`
     uefi is the q35 machine on the firmware VM host installs (OVMF), with
     Secure Boot off, for an image whose kernel will not start under BIOS.
     `lan`, the host's interface, puts it on the LAN instead (macvtap), as a
@@ -516,7 +516,7 @@ class VmsMixin:
             job.say(f"refused: {action or 'no action'} is not a VM action (one of {', '.join(ACTIONS)})\n")
             return "failed", 64
         if not DOMAIN_RE.fullmatch(name) and not action.startswith("iso-") and action != "vbios":
-            job.say(f"refused: {name or 'no name'} is not a BuilderBot VM's name\n")
+            job.say(f"refused: {name or 'no name'} is not a AerieOS VM's name\n")
             return "failed", 64
         if not shutil.which("virsh") or not os.path.isdir(VM_DIR):
             job.say("refused: this node's VM host feature is not installed (its Features section installs it)\n")
@@ -566,7 +566,7 @@ class VmsMixin:
                 job.say(f"could not keep {d} the agent's own: {e}\n")
 
     def _vm_owner(self, name, who):
-        """The project the domain's BuilderBot marker names, "" for a domain
+        """The project the domain's AerieOS marker names, "" for a domain
         without one, None for no such domain."""
         p = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True, check=False, **who)
         if p.returncode != 0:

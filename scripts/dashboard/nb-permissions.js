@@ -116,7 +116,7 @@ function nbPermsView({$, nb, project, root}){
       const set = hostDraft[r.id] || r.set;
       const tok = r.token === true ? `<span class="ok">the token may</span>` : r.token === false
         ? `the token may not: it needs ${esc(r.needs)}` : "not measured";
-      const how = r.verbs.length ? `bb forge ${r.verbs.join(", ")}` : r.how;
+      const how = r.verbs.length ? `aerie forge ${r.verbs.join(", ")}` : r.how;
       // One another setting governs has no switch here, only where it is
       // set (B559): its deny was told to sessions and enforced nowhere.
       return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how && !r.fixed ? ` · ${esc(how)}` : ""}</div></div>

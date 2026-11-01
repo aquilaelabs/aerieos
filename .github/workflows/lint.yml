@@ -9,7 +9,7 @@ name: lint
 #
 # The one case it gives up: a commit pushed straight to main, bypassing a PR,
 # is not linted. That is deliberate (work here lands on a branch and merges
-# through a PR), and `bb lint` in the container is the same set of tools if
+# through a PR), and `aerie lint` in the container is the same set of tools if
 # something ever does need checking by hand.
 on:
   pull_request:
@@ -23,9 +23,9 @@ concurrency:
 
 jobs:
   lint:
-    # The BuilderBot container itself, not ubuntu-latest: self-hosted minutes
+    # The AerieOS container itself, not ubuntu-latest: self-hosted minutes
     # are free where hosted ones bill against the plan, and the image bakes
-    # the same linters `bb lint` uses, so this job also proves, on every
+    # the same linters `aerie lint` uses, so this job also proves, on every
     # push, that the runner picks up jobs and carries its advertised
     # toolchain. One job rather than one per tool because a single runner
     # serves jobs serially; splitting only adds queueing.
@@ -54,7 +54,7 @@ jobs:
         # it printed. So a session inside
         # this container, which has no PAT and cannot ask the API, could see
         # that CI was red and nothing about why, for a job that ran a few
-        # inches away. Every check below tees into this file, and `bb ci-log`
+        # inches away. Every check below tees into this file, and `aerie ci-log`
         # reads it.
         #
         # /config because it survives an image update; /tmp does not, and a
@@ -65,7 +65,7 @@ jobs:
           # .env names the node's data store, which a session there can read
           # (the runner's own home is 0700 to it). Then /config on the
           # controller, because it survives an image update; the home is the
-          # fallback. `bb ci-log` resolves the same three in the same order,
+          # fallback. `aerie ci-log` resolves the same three in the same order,
           # and fetches across when the run was on a node.
           dir="${BB_CI_LOG_DIR:-}"
           if [ -z "$dir" ]; then
@@ -132,7 +132,7 @@ jobs:
           # argument, went unlinted. A shebang cannot be forgotten.
           # The whole repository by its first line, and the scripts that live
           # inside quoted heredocs (bb-sandbox in the provisioner), which is
-          # the selection bb lint makes, so the two agree about what a clean
+          # the selection aerie lint makes, so the two agree about what a clean
           # tree is (B145).
           mapfile -t tracked < <(git ls-files)
           files=()
@@ -148,14 +148,14 @@ jobs:
 
       - name: Dockerfile
         # Ignores live in .hadolint.yaml, which hadolint picks up on its own:
-        # one config for this job and for `bb lint`, so the two can never
+        # one config for this job and for `aerie lint`, so the two can never
         # disagree about what a clean Dockerfile is.
         run: hadolint Dockerfile 2>&1 | tee -a "$CI_LOG"
 
       - name: Agent version moves with its file
         # A node compares the agent FILE and the Nodes tab names its NUMBER,
         # so the file may not change against main without AGENT_VERSION's
-        # patch moving (B221). The same script `bb lint` runs; main is
+        # patch moving (B221). The same script `aerie lint` runs; main is
         # fetched shallowly because the checkout above is one commit deep.
         run: |
           git fetch --no-tags --depth=1 origin main 2>&1 | tee -a "$CI_LOG"
@@ -164,7 +164,7 @@ jobs:
       - name: Shipped migrations unchanged
         # What a release has run on an install's /config is never edited
         # (R79): every migration at the newest v* tag, byte-for-byte, the
-        # check bb lint runs. The release tags are fetched because the
+        # check aerie lint runs. The release tags are fetched because the
         # checkout above carries none, and without them this passes by
         # omission. A repository with no release yet (a fork, a fresh one)
         # has nothing to fetch, and a glob that matches nothing fails the
@@ -177,11 +177,11 @@ jobs:
 
       - name: Python
         # The dashboard, the agent, the library and the hook scripts: by
-        # extension and by shebang, the same selection bb lint makes. The
+        # extension and by shebang, the same selection aerie lint makes. The
         # rules are ruff.toml's at the root; the agent's own pins it to the
         # python a Rocky node carries.
         # And the python a shell script feeds to python3 from a quoted heredoc
-        # (scripts/bb does it dozens of times), extracted with its line numbers
+        # (scripts/aerie does it dozens of times), extracted with its line numbers
         # kept. Its own run, with the root's config named: the copies sit
         # outside the checkout, where ruff would find no config of its own.
         run: |
@@ -196,7 +196,7 @@ jobs:
 
       - name: Workflows
         # The runner labels a runs-on may target live in .github/actionlint.yaml,
-        # shared with `bb lint`.
+        # shared with `aerie lint`.
         run: actionlint -color 2>&1 | tee -a "$CI_LOG"
 
       - name: Compose file and Unraid template

@@ -1,4 +1,4 @@
-"""Behind `bb root` (cmd_root in bb): one command as root on the project's node
+"""Behind `aerie root` (cmd_root in bb): one command as root on the project's node
 (roadmap R38), the phone's shape applied to root: the reason and the exact
 command in front of a person, Allow runs it on the node, Deny says no.
 

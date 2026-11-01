@@ -1,5 +1,5 @@
-"""bb git policy's printer (scripts/lib/git-policy.py, B734): the first line
-says whether a push can happen at all, from the push state bb settings
+"""aerie git policy's printer (scripts/lib/git-policy.py, B734): the first line
+says whether a push can happen at all, from the push state aerie settings
 --json carries, before the policy under it."""
 import json
 import os

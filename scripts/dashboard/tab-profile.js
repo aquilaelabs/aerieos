@@ -240,7 +240,7 @@ function wireShares(root){
 }
 
 // Your terminal (R133 step 10): its text size, cursor and colors, yours in
-// every tab of BuilderBot's own terminal, applied as picked as the gear's
+// every tab of AerieOS's own terminal, applied as picked as the gear's
 // appearance is. A project's own colors, in your settings for it, win there.
 const PF_TERM = [
   ["size", "Text size", [9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 24].map(n => [String(n), `${n}px`]), "13"],
@@ -629,7 +629,7 @@ function wireTwoFactor(root){
         const o = await pfTf({action: "2fa-passkey-begin"});
         // The PRF extension asked for at creation (R157): an authenticator
         // that answers it can hold a key of the person's own.
-        const c = await navigator.credentials.create({publicKey: {challenge: pfU8(o.challenge), rp: {name: "BuilderBot", id: location.hostname},
+        const c = await navigator.credentials.create({publicKey: {challenge: pfU8(o.challenge), rp: {name: "AerieOS", id: location.hostname},
           user: {id: pfU8(o.user), name: o.name, displayName: o.name}, pubKeyCredParams: [{type: "public-key", alg: -7}],
           authenticatorSelection: {residentKey: "preferred", userVerification: "preferred"}, attestation: "none", timeout: 60000,
           excludeCredentials: (o.exclude || []).map(id => ({type: "public-key", id: pfU8(id)})), extensions: {prf: {}}}});

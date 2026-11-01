@@ -1,11 +1,11 @@
-"""Behind `bb pc` (cmd_pc in bb): a person's Windows PC lent to this project
+"""Behind `aerie pc` (cmd_pc in bb): a person's Windows PC lent to this project
 by the Windows companion (R270 step 6). A fixed table of verbs, each run on
 the PC as its person set it up there, under the project's Agents may: Use a
 lent PC; never a command string.
 
-    bb pc                         the PCs lending this project, and what each lends
-    bb pc VERB [--why "..."]      run one and wait for what it did
-    bb pc editor-call METHOD PATH [--body JSON] [--why "..."]
+    aerie pc                         the PCs lending this project, and what each lends
+    aerie pc VERB [--why "..."]      run one and wait for what it did
+    aerie pc editor-call METHOD PATH [--body JSON] [--why "..."]
                                   one request to the editor's local interface
 
 BB_PC_AUTH is the auth header bb chose.
@@ -52,7 +52,7 @@ verb = args.pop(0)
 call = {}
 if verb == "editor-call":
     if len(args) < 2:
-        sys.exit("usage: bb pc editor-call METHOD PATH [--body JSON] [--why \"...\"]")
+        sys.exit("usage: aerie pc editor-call METHOD PATH [--body JSON] [--why \"...\"]")
     call = {"method": args[0], "path": args[1], "body": body}
 d = post({"action": "run", "verb": verb, "args": call, "why": why})
 fail(d)
@@ -73,4 +73,4 @@ while time.time() < end:
         if res.get("picture"):
             print(f"[builderbot] the picture is {res['picture']} in the project")
         sys.exit(0 if res.get("ok") else 1)
-sys.exit(f"[builderbot] ERROR: {d['pc']} took longer than 15 minutes; bb pc result is not kept past that")
+sys.exit(f"[builderbot] ERROR: {d['pc']} took longer than 15 minutes; aerie pc result is not kept past that")

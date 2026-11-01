@@ -86,7 +86,7 @@ function nbPendingView({$, nb, project, root}){
 // Top-level rather than the notebook's, because the bell reaches it too. It
 // draws from one fetch and redraws from the answer to its own action, so a
 // row is never ticked twice: what was approved is gone from the reply.
-// Moved here from index.html with bb map sections in hand: the modal is the
+// Moved here from index.html with aerie map sections in hand: the modal is the
 // pending feature's, and a feature lives in one file.
 
 let pendFor = null;

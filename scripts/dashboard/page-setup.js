@@ -90,8 +90,8 @@ function drawSetup(){
   const nodeName = s.node ? esc(s.node.name) : "";
   el.innerHTML = `<div class="setuppage">
     <div class="setuphead">
-      <h2>Set up BuilderBot</h2>
-      <p>BuilderBot works on nodes: machines you enroll, where projects are kept, built and worked on. One is all it needs to start.</p>
+      <h2>Set up AerieOS</h2>
+      <p>AerieOS works on nodes: machines you enroll, where projects are kept, built and worked on. One is all it needs to start.</p>
     </div>
     ${s.own ? card(1, "This machine", !!s.node, !s.node, s.node
       ? `<p><b>${nodeName}</b>, the machine this controller runs on, is enrolled and answering: it is your first node${
@@ -277,7 +277,7 @@ function setupDisksCard(num){
   }
   const free = (n.disks || []).filter(setupDiskFree);
   if (!free.length) return `<section class="setstep">${head(false, `<span class="pill">later</span>`)}<div class="setstepbody">
-    <p>No disk here but the one BuilderBot runs from. Add disks and set them up on ${pageLink("storage", "the Storage page")}.</p></div></section>`;
+    <p>No disk here but the one AerieOS runs from. Add disks and set them up on ${pageLink("storage", "the Storage page")}.</p></div></section>`;
   const use = d => !setupDiskHeld(d) || setupDisks.use.has(d.name);
   const plan = setupDiskPlan(free.filter(use), setupDisks);
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
@@ -290,7 +290,7 @@ function setupDisksCard(num){
   const lose = [[0, "No copy: all the space"], [1, "One disk may fail"], [2, "Two disks may fail"]];
   const lays = [["", "As recommended"], ["mirror", "ZFS mirror"], ["raidz1", "ZFS raidz1"], ["raidz2", "ZFS raidz2"], ["single", "ZFS, one group"], ["array", "Array with parity"]];
   return `<section class="setstep">${head(false, `<span class="pill">to do</span>`)}<div class="setstepbody">
-    <p>Where your files and BuilderBot's own data will live. Nothing is written until you press Make it, which names every disk it erases first.</p>
+    <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.</p>
     <div class="rows">${free.map(row).join("")}</div>
     <div class="setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
       ${setupDisks.adv ? `<div class="setrow col ctlrow">${lbl("setLayout", "Layout")}<select id="setLayout">${optionList(lays, setupDisks.layout)}</select></div>` : ""}</div>

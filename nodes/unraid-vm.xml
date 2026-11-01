@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!--
-  A BuilderBot node as an Unraid VM: the Docker sandbox, and since the
+  A AerieOS node as an Unraid VM: the Docker sandbox, and since the
   controller stopped building anything itself, the machine a project's
   builds, tests, CI runner, Android emulator and Claude sessions all run on.
 
@@ -26,7 +26,7 @@
 <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
   <uuid>b091db01-cbdd-07b7-c797-79ca40d31a00</uuid>
   <name>bb-sandbox</name>
-  <description>BuilderBot node: builds, tests, CI, the emulator and sessions run here; containers it can wreck</description>
+  <description>AerieOS node: builds, tests, CI, the emulator and sessions run here; containers it can wreck</description>
   <metadata>
     <vmtemplate xmlns="http://unraid" name="Linux" icon="linux.png" os="linux" storage="default"/>
   </metadata>
@@ -54,7 +54,7 @@
        on for the kvm module. On Unraid that is one file, then a reboot:
          /boot/config/modprobe.d/kvm-amd.conf    options kvm-amd nested=1
          /boot/config/modprobe.d/kvm-intel.conf  options kvm-intel nested=1
-       `bb emu gpu` and the Nodes page's census say whether the guest got it. -->
+       `aerie emu gpu` and the Nodes page's census say whether the guest got it. -->
   <cpu mode="host-passthrough" migratable="on">
     <topology sockets="1" cores="6" threads="1"/>
     <cache mode="passthrough"/>
@@ -159,13 +159,13 @@
          docs/sandbox-vm.md for both, including how to put virtiofs back once
          the machine is up and you can read a log if it complains.
 
-         Either way they land at the SAME paths BuilderBot uses. That is the
+         Either way they land at the SAME paths AerieOS uses. That is the
          point of the design: a compose file's bind source is resolved by
          whoever runs the container, so identical paths mean a relative bind
          is the same directory on both sides and nothing has to translate. -->
 
     <!-- br0 gives the VM its own LAN address, which is what makes a
-         container's web UI reachable from your browser AND lets BuilderBot
+         container's web UI reachable from your browser AND lets AerieOS
          reach the daemon. It exists only if Settings -> Network Settings ->
          Enable bridging is on. If it is not, change this to virbr0 and reach
          web UIs through a port forward instead. -->
@@ -232,7 +232,7 @@
     <!-- The GPU, when it moves here (roadmap R20): the emulator renders on
          the card instead of falling back to software. Both functions of the
          card go together (the video device and its audio function), and the
-         BuilderBot container has to give the card up first (its NVIDIA_*
+         AerieOS container has to give the card up first (its NVIDIA_*
          settings off, then a restart), because a device is one guest's at a
          time. Find the addresses under Tools -> System Devices and bind them
          to VFIO there; then uncomment this with them filled in. The guest

@@ -1034,7 +1034,7 @@ rmSync(`${DIR}/dockerstate/up.fail`);
 await dmClick('down');
 await pillIs('down');
 
-// A build in flight when BuilderBot restarts is lost: compose build is a
+// A build in flight when AerieOS restarts is lost: compose build is a
 // subprocess of the dashboard and dies with it. Everything already recovered
 // correctly (the last SUCCESSFUL build is still what built_rev says, and
 // Rebuild is live because the code moved), but the operator was told nothing
@@ -1477,7 +1477,7 @@ calls.clear()
 # Bind directories on the DAEMON's side. The shares are mounted over there
 # and not here, which is the shipped arrangement, and which shares the VM has
 # is the VM's business: nothing is declared on this side, so a share added
-# over there next month needs no BuilderBot setting touched. Neither share is
+# over there next month needs no AerieOS setting touched. Neither share is
 # in the fake mount table above, so nothing goes down the local branch.
 # Names no machine has. missing_dirs skips a bind whose source EXISTS, on the
 # real filesystem, so a fixture share called /auxiliary was silently dropped
@@ -1549,7 +1549,7 @@ ok(/sandbox VM/.test(DDD.guard['ours, on the proxy']),
 ok(JSON.stringify(DDD.split[0]) === JSON.stringify(
      ['/bbfix-aux/plex-library', '/bbfix-devdata/sonarr/config', '/bbfix-devdata/sonarr/data'])
    && JSON.stringify(DDD.split[1]) === JSON.stringify(['/bbfix-lone']),
-   "every bind under a share of the daemon's is BuilderBot's to make, with "
+   "every bind under a share of the daemon's is AerieOS's to make, with "
    + 'nothing declared anywhere; only a bind AT a share root is not, since '
    + 'docker itself creates that one as root');
 ok(DDD.made[0].length === 3 && !DDD.made[1].length
@@ -2275,7 +2275,7 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
   {
     const { fileURLToPath } = await import('node:url');
     const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
-    const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'ep.silon', 'test'],
+    const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const grant = async arg => {
       const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/tty-grant', { method: 'POST',
@@ -2853,9 +2853,9 @@ ok(true, '...and a daemon coming back needs no un-gating: the next draw is clean
   // note one call found was gone by the next (B161).
   const note = await page.waitForFunction(() => {
     const t = document.querySelector('.dmtab .dmnote')?.textContent || '';
-    return /not a BuilderBot sandbox/.test(t) && t;
+    return /not a AerieOS sandbox/.test(t) && t;
   }, null, { timeout: 15000 }).then(h => h.jsonValue(), () => '');
-  ok(/not a BuilderBot sandbox/.test(note),
+  ok(/not a AerieOS sandbox/.test(note),
      'a daemon with no provisioner stamp is refused, and named as the reason');
   // The provisioner's own name, which is provision-linux.sh since there is a
   // macos one beside it. `provision\.sh` matched the name it had before that
@@ -3424,7 +3424,7 @@ await page.waitForSelector('.dmtab .row[data-inst="radarr|main"]', { timeout: 20
 
 // ---- a manager, not a list (R68 steps 1 and 2) ---------------------------
 // Start, stop, restart and the log work on ANY container the daemon
-// reported, including the ones BuilderBot did not create. What makes that
+// reported, including the ones AerieOS did not create. What makes that
 // acceptable is the machine: the daemon belongs to a VM whose only job is
 // running containers. What keeps it honest is the guard, which lets through
 // one verb and one name rebuilt here, and the lookup, which asks the daemon
@@ -3891,7 +3891,7 @@ ok(await page.$('#devSend'),
 {
   const { fileURLToPath } = await import('node:url');
   const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'ep.silon', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
                                WORKSPACE: `${DIR}/ws` } }).trim();
   // From NODE, not from the page: a fetch in the browser carries the
@@ -4385,8 +4385,8 @@ ok(await page.$('#devSend'),
 
 
 // ---- the tests inside the dev instance (roadmap R48, step 1) --------------
-// The container is the boundary: a suite that tests BuilderBot must not
-// disturb the BuilderBot it runs on. The project's recorded test command,
+// The container is the boundary: a suite that tests AerieOS must not
+// disturb the AerieOS it runs on. The project's recorded test command,
 // and nothing else, runs through `compose exec` in the service the project
 // builds, as a compose job; the stub docker runs the command right here,
 // which proves the wiring, the log and the exit code without a container.
@@ -4394,7 +4394,7 @@ ok(await page.$('#devSend'),
 // rebuild. A container that is down is said so, never started.
 {
   const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'ep.silon', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
                                WORKSPACE: `${DIR}/ws` } }).trim();
   const api = (body) => page.evaluate(async b => (await (await fetch('/api/devapp', {
@@ -4431,7 +4431,7 @@ ok(await page.$('#devSend'),
      '...through compose exec into the service the project builds, with timing on for the registry, and no working directory when nothing mounts the project');
   // A compose that mounts the project (or the whole share it sits in) puts
   // the tests in the project's directory inside the container: the first
-  // run of BuilderBot's own suite inside its instance ran at / instead.
+  // run of AerieOS's own suite inside its instance ran at / instead.
   writeFileSync(stubCfg, JSON.stringify({ services: { app: { build: { context: '.' },
     volumes: [{ type: 'bind', source: `${DIR}/ws`, target: '/workspace' }] } } }));
   const j1b = await finished((await asSession({ project: 'ep.silon', action: 'test', args: ['wd'] })).job);
@@ -4444,7 +4444,7 @@ ok(await page.$('#devSend'),
   ok(/-e BB_IN_INSTANCE=1/.test(j1.log || '') && /-e BB_IN_INSTANCE=1/.test(j1b.log || ''),
      '...carrying the mark that says this run is the instance\'s own');
   rmSync(stubCfg, { force: true });
-  // Where bb test runs, from a session on the node, with the instance UP
+  // Where aerie test runs, from a session on the node, with the instance UP
   // (B241): on the node by default, never asking about the container, since
   // an image built to ship carries no tests and a run inside one found none
   // and passed; inside it only where the project says so.
@@ -4453,10 +4453,10 @@ ok(await page.$('#devSend'),
                       BB_TOKEN: tok, BB_NODE: 'agentbox', BB_PROJECT: 'ep.silon',
                       BB_TREE: '/workspace/ep.silon' };
     const { spawnSync } = await import('node:child_process');
-    // Both streams: where bb test says it runs is on stderr, the tests' own
+    // Both streams: where aerie test says it runs is on stderr, the tests' own
     // output on stdout.
     const bbTest = () => {
-      const r = spawnSync('bash', [`${REPO}/scripts/bb`, 'test', 'where'],
+      const r = spawnSync('bash', [`${REPO}/scripts/aerie`, 'test', 'where'],
         { encoding: 'utf8', cwd: `${DIR}/ws/ep.silon`, env: nodeEnv, timeout: 120000 });
       return { code: r.status, out: String(r.stdout || '') + String(r.stderr || '') };
     };
@@ -4465,7 +4465,7 @@ ok(await page.$('#devSend'),
     const onNode = bbTest();
     ok(onNode.code === 0 && /TEST-RAN-where/.test(onNode.out) && !/run inside it/.test(onNode.out)
        && /tests run on the node, as its settings say \(Tests run\)/.test(onNode.out),
-       `by default bb test runs on the node with the instance up, and says why there (${
+       `by default aerie test runs on the node with the instance up, and says why there (${
          onNode.out.replace(/\s+/g, ' ').slice(0, 140)})`);
     await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project: 'ep.silon', tests_in: 'up' }) }));
@@ -4481,19 +4481,19 @@ ok(await page.$('#devSend'),
   ok(j2.state === 'failed' && j2.exit_code === 1,
      `a failing test command is a failed job carrying its exit code (${j2.state} ${j2.exit_code})`);
   // A request naming no instance means the project's only one, whatever it
-  // is called: BuilderBot's own is builderbot-dev, and a session's bb devapp
+  // is called: AerieOS's own is builderbot-dev, and a session's aerie devapp
   // answered for a `main` that did not exist.
   const only = await page.evaluate(async () => (await (await fetch('/api/devapp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'ep.silon', action: 'state' }) })).json()));
   ok((only.state || only).name === 'ep-silon' || (only.state || only).instance === 'main',
      `a request naming no instance is answered for the project's only one (${JSON.stringify(only.state || only).slice(0, 60)})`);
-  // ...and one named by the compose name bb devapp ls shows it under is
+  // ...and one named by the compose name aerie devapp ls shows it under is
   // that one too, where --instance took only `main` (B396).
   const byName = await page.evaluate(async () => (await (await fetch('/api/devapp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'ep.silon', instance: 'ep-silon', action: 'state' }) })).json()));
-  ok(!byName.error, `an instance named as bb devapp ls shows it is found (${JSON.stringify(byName).slice(0, 80)})`);
+  ok(!byName.error, `an instance named as aerie devapp ls shows it is found (${JSON.stringify(byName).slice(0, 80)})`);
   const bad = await asSession({ project: 'ep.silon', action: 'test', args: ['$(rm -rf /)'] });
   ok(bad.status === 400 && /argument the test command cannot take/.test(bad.error || ''),
      'an argument that is not a plain word is refused before anything runs');
@@ -4507,7 +4507,7 @@ ok(await page.$('#devSend'),
      `a container that is down is said so and never started behind the operator's back (${down.error})`);
   // The refusal that makes the container the only way (step 3): from a
   // session on a node, with the row set to `only` and the instance down,
-  // bb test names the instance and runs nothing on the node. With the row
+  // aerie test names the instance and runs nothing on the node. With the row
   // on `either` the same call would queue a job on the node, which the
   // fixture has none of, so that half is the routing step 1 already proves.
   {
@@ -4521,12 +4521,12 @@ ok(await page.$('#devSend'),
                       BB_TREE: '/workspace/ep.silon' };
     let out = '', code = 0;
     try {
-      out = execFileSync('bash', [`${REPO}/scripts/bb`, 'test'],
+      out = execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'],
         { encoding: 'utf8', cwd: `${DIR}/ws/ep.silon`, env: nodeEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) { code = e.status; out = String(e.stderr || '') + String(e.stdout || ''); }
     ok(code !== 0 && /tests run only inside its dev instance \(ep-silon\), which is not running: Up on the Containers page/.test(out)
        && /Nothing runs on the node/.test(out),
-       `with the row on only and the instance down, bb test from a session refuses, naming the instance (${
+       `with the row on only and the instance down, aerie test from a session refuses, naming the instance (${
          code}: ${out.replace(/\s+/g, ' ').slice(0, 120)})`);
     await setWhere('node');
   }
@@ -4770,7 +4770,7 @@ print(json.dumps(out))
   ok(dkIdle <= 1, `the project's Docker view, left alone for 8 s, reads the manager ${dkIdle} time${dkIdle === 1 ? '' : 's'} (at most 1: it re-reads on the devapp token, never on the status poll)`);
 
   // ---- what its session can reach ------------------------------------------------
-  const tok = execFileSync('bash', [`${fileURLToPath(new globalThis.URL('../../../', import.meta.url))}scripts/bb`,
+  const tok = execFileSync('bash', [`${fileURLToPath(new globalThis.URL('../../../', import.meta.url))}scripts/aerie`,
                                     'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const as = async (path, body) => {
@@ -4789,7 +4789,7 @@ print(json.dumps(out))
      && JSON.stringify(seen.refs) === '{}',
      `a session lists only what belongs to its project, on its node (${JSON.stringify([
        (seen.instances || []).map(d => d.name), (seen.containers || []).map(c => c.name)])})`);
-  // Anybody else naming the project reads the same node (bb devapp ls outside a session).
+  // Anybody else naming the project reads the same node (aerie devapp ls outside a session).
   const byProject = await api('/api/docker?project=ep.silon');
   const noProject = await api('/api/docker?project=no-such-project');
   ok(byProject.node === seen.node && noProject.status === 400,
@@ -4806,7 +4806,7 @@ print(json.dumps(out))
      `...reads one written for it by name, and not its own project's container sent to no project (${st.status}, ${theirs.error})`);
   const log = await as('/api/dockerctl', { action: 'logs', container: 'someone-elses' });
   ok(/hello from someone-elses/.test(log.text || ''), `...reads the log of one somebody else started, put under it (${log.status})`);
-  // ...and one of its own by the name bb devapp ls prints, which is the
+  // ...and one of its own by the name aerie devapp ls prints, which is the
   // compose name: its containers are named for it and its services, and
   // looked up by container name alone the name found nothing and the
   // project's own instance was refused to its session as not its own, its
@@ -4832,7 +4832,7 @@ print(json.dumps(out))
      `...and the log of its own container by the name ls prints, which is its services' (${own.status}: ${
         String(own.error || own.text).trim().slice(0, 60)})`);
   // ...and by the name its compose file gives the service, which is the
-  // name a session reaches for: `bb devapp log app` (report #97, B591).
+  // name a session reaches for: `aerie devapp log app` (report #97, B591).
   const bySvc = await as('/api/dockerctl', { action: 'logs', container: 'app' });
   ok(bySvc.status === 200 && /hello from helper-for-eps-app-1/.test(bySvc.text || ''),
      `...and by its service's own name, as the compose file calls it (${bySvc.status}: ${
@@ -4862,14 +4862,14 @@ print(json.dumps(out))
   const out = await as('/api/phone', { action: 'outcome', id: asked.id });
   ok(out.state === 'done' && !out.code && readFileSync(`${DIR}/dockerstate/ctl.log`, 'utf8').slice(before).includes('someone-elses'),
      `...and Allow stops it, the outcome going back to the session (${JSON.stringify(out).slice(0, 70)})`);
-  // bb devapp ls, as a session runs it.
+  // aerie devapp ls, as a session runs it.
   const cache = `${DIR}/cache-owners`;
-  const ls = execFileSync('bash', [`${fileURLToPath(new globalThis.URL('../../../', import.meta.url))}scripts/bb`, 'devapp', 'ls'],
+  const ls = execFileSync('bash', [`${fileURLToPath(new globalThis.URL('../../../', import.meta.url))}scripts/aerie`, 'devapp', 'ls'],
     { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''),
                                BB_TOKEN: tok, BB_PROJECT: 'ep.silon', XDG_CACHE_HOME: cache },
       stdio: ['ignore', 'pipe', 'pipe'] });
   ok(/helper-for-eps\s+written here/.test(ls) && /someone-elses\s+not ours/.test(ls) && !/loose/.test(ls),
-     `bb devapp ls lists what belongs to the project and nothing else (${ls.trim().replace(/\s+/g, ' ').slice(0, 120)})`);
+     `aerie devapp ls lists what belongs to the project and nothing else (${ls.trim().replace(/\s+/g, ' ').slice(0, 120)})`);
   // An administrator not on a project acts on none of its containers, as
   // anybody (R274): the server refuses, and the page draws its group after
   // the administrator's own, dimmed, its controls dead and the way onto it
@@ -5189,7 +5189,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
   rmSync(`${D}/docker-compose.yml`, { force: true });
 }
 
-// bb devapp rebuild when the controller is slow to answer the rebuild
+// aerie devapp rebuild when the controller is slow to answer the rebuild
 // request itself (B298): the build went ahead while the verb said "timed
 // out" and stopped. Driven in process with the API call replaced, the way
 // toolchains.mjs drives its module: the request times out, and the verb says
@@ -5222,12 +5222,12 @@ print(json.dumps({"asked": asked, "code": code}))`], { encoding: 'utf8' });
   ok(got.code === 0 && (got.asked || []).some(([a, t]) => a === 'rebuild' && t === 180)
      && /may have started it, so this watches for the build/.test(run.stderr || '')
      && /rebuilt from commit bbb; alpha-dev is up/.test(run.stdout || ''),
-     `bb devapp rebuild waits three minutes for the controller, and a timeout there watches for the build rather than giving up (${
+     `aerie devapp rebuild waits three minutes for the controller, and a timeout there watches for the build rather than giving up (${
        JSON.stringify(got).slice(0, 90)} ${(run.stderr || '').split('\n').filter(Boolean).pop() || ''})`);
 }
 
 // B537: an empty listing says what the session can do next. With a compose
-// file at the root that is its own bb devapp new, not the operator's Docker
+// file at the root that is its own aerie devapp new, not the operator's Docker
 // tab, which is what it said to the aquilaeLabs session before its first
 // instance existed.
 {
@@ -5250,10 +5250,10 @@ except SystemExit:
   const withFile = said(true), without = said(false);
   ok(/bb devapp new builds its dev instance/.test(withFile) && !/Containers page/.test(withFile)
      && /compose file at its root/.test(without),
-     `bb devapp ls with nothing yet points at bb devapp new, and says a compose file is what it needs where there is none (${withFile.trim().slice(0, 70)})`);
+     `aerie devapp ls with nothing yet points at aerie devapp new, and says a compose file is what it needs where there is none (${withFile.trim().slice(0, 70)})`);
 }
 
-// bb devapp rebuild follows the job its answer names (B312): a rebuild of an
+// aerie devapp rebuild follows the job its answer names (B312): a rebuild of an
 // unchanged commit that ended between two looks showed the row neither a
 // running job nor a new revision, and the verb said no build appeared over
 // one that had. Driven in process: the row never changes, the job says
@@ -5284,7 +5284,7 @@ except SystemExit as e:
 print(json.dumps({"asked": asked, "code": code}))`], { encoding: 'utf8' });
   const got = JSON.parse((run.stdout || '').trim().split('\n').pop() || '{}');
   ok(got.code === 0 && (got.asked || []).includes('/api/v1/jobs?id=j9') && /rebuilt from commit aaa; alpha-dev is up/.test(run.stdout || ''),
-     `bb devapp rebuild follows the job its answer names, so a fast rebuild of the same commit is reported built (${
+     `aerie devapp rebuild follows the job its answer names, so a fast rebuild of the same commit is reported built (${
         JSON.stringify(got).slice(0, 80)})`);
 }
 
@@ -5314,7 +5314,7 @@ print(json.dumps({"ran": ran, "out": out}))`], { encoding: 'utf8' });
         (run.stderr || '').split('\n').filter(Boolean).pop() || JSON.stringify(got).slice(0, 80)})`);
 }
 
-// bb devapp new sends the project to Docker the way Send does (the operator,
+// aerie devapp new sends the project to Docker the way Send does (the operator,
 // 26 Sep): on auto it makes the container, then builds that one and waits
 // for the verdict; on ask the one request carries the branch, Allow makes
 // and builds it, and the verb follows that build rather than asking for
@@ -5359,7 +5359,7 @@ print(json.dumps(out))`], { encoding: 'utf8' });
   ok(got.auto?.code === 0 && got.auto.bodies[0].action === 'new' && !got.auto.bodies[0].instance
      && got.auto.bodies[0].ref === 'sendbranch' && acts('auto') === 'new state:alpha-2 rebuild:alpha-2 job:j1 state:alpha-2'
      && /created alpha-2/.test(run.stderr || '') && /built from commit ccc; alpha-2 is up/.test(run.stdout || ''),
-     `bb devapp new on auto makes the container and builds that one, waiting for the verdict (${acts('auto')})`);
+     `aerie devapp new on auto makes the container and builds that one, waiting for the verdict (${acts('auto')})`);
   ok(got.ask?.code === 0 && acts('ask') === 'new job:j1 state:alpha-2'
      && /asked the administrators \(#7\) to send it to Docker as alpha-2/.test(run.stderr || ''),
      `...and on ask it follows the build Allow starts instead of asking for another (${acts('ask')})`);
@@ -5390,7 +5390,7 @@ print(json.dumps(out))`], { encoding: 'utf8' });
 }
 
 // ---- a route through the node's nginx, from the row (R209, 13 Oct) ----------
-// With BuilderBot's nginx deployed on the node, a container's row offers a
+// With AerieOS's nginx deployed on the node, a container's row offers a
 // certificate (none: any hostname on 80) and one of its published ports, and
 // Add route writes the route on the nginx tab and applies it; the same port
 // again is refused by name, and the port reads as routed in the pulldown.

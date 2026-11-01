@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bb tests preflight: the suites and checks a change touches, run before a
+# aerie tests preflight: the suites and checks a change touches, run before a
 # push. Sourced by bb, which keeps the rest of the CLI; a file of its own
 # under the rule growth (25 Sep), the first verb moved out of bb whole.
 #
@@ -17,11 +17,11 @@ cmd_tests_preflight() {
             --dry) dry=1; shift ;;
             --base) base="$2"; shift 2 ;;
             --files) shift; named=1; while [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; do files+=("$1"); shift; done ;;
-            *) die "bb tests preflight [--dry] [--base REF] [--files F...]" ;;
+            *) die "aerie tests preflight [--dry] [--base REF] [--files F...]" ;;
         esac
     done
     if [ "${#files[@]}" -eq 0 ]; then
-        git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git tree: bb tests preflight --files F... names the files instead"
+        git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git tree: aerie tests preflight --files F... names the files instead"
         local defaulted=""
         if [ -z "$base" ]; then
             base="$(git rev-parse --verify -q origin/main >/dev/null 2>&1 && echo origin/main || echo main)"
@@ -43,7 +43,7 @@ cmd_tests_preflight() {
     # and nothing more: what it names is what it asks of the page and the
     # server, which it cannot change, and the map added every suite naming
     # the same endpoint, 27 for one change to roles.mjs (B244). The rest
-    # is measured by the covered run when there is one (bb map affected,
+    # is measured by the covered run when there is one (aerie map affected,
     # the operator, 29 Sep): the functions the changed lines fall in and
     # the suites that reached them, so a change to one handler in
     # server.py is that handler's suites and not, as it was, all 49 for
@@ -83,7 +83,7 @@ cmd_tests_preflight() {
             else
                 # Said, since a suite the map misses is one the gate never
                 # runs, and the gate still says clean.
-                printf '%s\n' "suites: planned by the map's reading alone$([ -n "$named" ] && echo ' (files named outright)' || echo ': no covered run on record, which a whole gate or bb tests coverage makes')" >&2
+                printf '%s\n' "suites: planned by the map's reading alone$([ -n "$named" ] && echo ' (files named outright)' || echo ': no covered run on record, which a whole gate or aerie tests coverage makes')" >&2
                 while IFS= read -r f; do
                     [ -n "$f" ] && case " ${suites[*]:-} " in *" $f "*) ;; *) suites+=("$f") ;; esac
                 done < <(cmd_map suites "${mapped[@]}" --names)
@@ -166,7 +166,7 @@ cmd_tests_preflight() {
             esac
         done
     fi
-    [ "${#unplaced[@]}" -eq 0 ] || printf '  WARN: no suite reaches %s: the map could not place it, so this is not a clean verdict; bb map suites FILE says what it knows (B280)\n' "${unplaced[*]}"
+    [ "${#unplaced[@]}" -eq 0 ] || printf '  WARN: no suite reaches %s: the map could not place it, so this is not a clean verdict; aerie map suites FILE says what it knows (B280)\n' "${unplaced[*]}"
     # A patch line's own rules (R112 step 5): on a branch working toward
     # X.Y.Z with Z above 0, the house rules named patch say what a patch may
     # not change, and a file this branch changed under one fails the gate.
@@ -202,7 +202,7 @@ cmd_tests_preflight() {
     # A gate's verdict is on the change, never on a kept world: its server
     # is the keep's own copy and holds what probes left in it.
     export BB_TEST_FRESH=1
-    # Kept whole in the same log bb tests run writes, so bb tests log prints
+    # Kept whole in the same log aerie tests run writes, so aerie tests log prints
     # this run when it was the last: a flake named only in the terminal's
     # scroll was gone with the scroll (B328).
     local rl="${BB_REPO:-$PWD}/.bb-test-run.log"

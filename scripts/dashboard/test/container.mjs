@@ -51,7 +51,7 @@ ok(/not a project: zeta/.test((await ask({ for: 'zeta' })).body.error || ''),
    '...and one for a project the asker cannot see');
 
 // ---- a second account, of the kind that is never asked --------------------
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'visitor', '--role', 'user'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--role', 'user'],
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
@@ -127,7 +127,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
 // So the session that asked can see what it asked for once it exists, and
 // work on it as its project's settings allow (the operator, 24 Sep).
 {
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   // The dial at ask: the fixture's default is deny, and a session's is
   // under it (below).
@@ -197,7 +197,7 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
      && /own data directory, which is empty/.test(r.body.error || '')
      && /bb devapp new/.test(r.body.error || '') && /docker-compose\.yml or compose\.yml/.test(r.body.error || '')
      && !asks.some(a => a.kind === 'container' && a.name === 'd2-armor-web'),
-     `an ask whose compose builds from a relative path is refused before the bell, naming bb devapp new (${
+     `an ask whose compose builds from a relative path is refused before the bell, naming aerie devapp new (${
         r.status}: ${(r.body.error || '').slice(0, 90)})`);
   const made = await api('/api/container', { action: 'create', name: 'd2-armor-web', compose: BUILT, env: '' });
   ok(/builds app from a relative path/.test(made.body.error || '')

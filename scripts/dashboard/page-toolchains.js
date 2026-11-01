@@ -71,8 +71,8 @@ let tcDots = 0, tcDotsTimer = null;
 // which each set here before they read. Empty until tcPick() chooses one,
 // and empty when there is none to choose: toolchains are installed on
 // NODES (roadmap #26), and this container is never offered: what it keeps is
-// the Playwright browsers its boot hook put on its store for bb capture shot.
-// "local" is still what that installer is called (`bb toolchains install`
+// the Playwright browsers its boot hook put on its store for aerie capture shot.
+// "local" is still what that installer is called (`aerie toolchains install`
 // from a shell and the suite address it) but no page sets it.
 let tcNode = "";
 let tcLoadSeq = 0;         // each load's number, in the order asked
@@ -153,7 +153,7 @@ function tcTermsLine(p){
 
 // How an installed toolchain's download was checked when it was installed
 // (R137): against what its publisher states, or not, and why not. Nothing
-// for one installed before BuilderBot checked.
+// for one installed before AerieOS checked.
 function tcVerifiedLine(p){
   const v = p.installed ? p.verified : null;
   if (!v) return "";
@@ -197,10 +197,10 @@ function tpSeen(seen, was, offer = true){
   const mark = (now, then) => !was ? "" : then === undefined ? ` <span class="pill warn">new</span>`
     : same(now, then) ? "" : ` <span class="pill warn">changed</span> <span class="sub">was ${w(then)}</span>`;
   const verbs = Object.entries(m.verbs || {}).map(([v, x]) =>
-    `<div class="sub">bb tool ${esc(m.name)} ${esc(v)} ${esc(x.usage || "")} runs ${w(x.run)}${mark(x.run, was?.runs?.[v])}${
+    `<div class="sub">aerie tool ${esc(m.name)} ${esc(v)} ${esc(x.usage || "")} runs ${w(x.run)}${mark(x.run, was?.runs?.[v])}${
       x.about ? `: ${esc(x.about)}` : ""}</div>`).join("")
     + Object.keys(was?.runs || {}).filter(v => !(v in (m.verbs || {})))
-      .map(v => `<div class="sub">bb tool ${esc(m.name)} ${esc(v)} <span class="pill warn">gone</span></div>`).join("");
+      .map(v => `<div class="sub">aerie tool ${esc(m.name)} ${esc(v)} <span class="pill warn">gone</span></div>`).join("");
   const steps = (m.steps || []).map(w).join(", ") + (was && !same(m.steps || [], was.steps || [])
     ? ` <span class="pill warn">changed</span>${(was.steps || []).length ? ` <span class="sub">was ${(was.steps || []).map(w).join(", ")}</span>` : ""}` : "");
   return `<div class="tpseen">
@@ -212,10 +212,10 @@ function tpSeen(seen, was, offer = true){
     ${verbs}
     ${Object.keys(m.system || {}).length ? `<div class="sub">System packages it installs first: ${Object.entries(m.system).map(([k, v]) => `${esc(k)} <code>${esc(v.join(" "))}</code>`).join("; ")}; a node of another package manager is not offered it.</div>` : ""}
     ${(m.touches?.hosts || []).length ? `<div class="sub">Its install fetches from ${m.touches.hosts.map(h => `<code>${esc(h)}</code>`).join(", ")}.</div>` : ""}
-    ${(m.works_with || []).length ? `<div class="sub">It works with BuilderBot ${esc(m.works_with.join(", "))}.</div>` : ""}
+    ${(m.works_with || []).length ? `<div class="sub">It works with AerieOS ${esc(m.works_with.join(", "))}.</div>` : ""}
     ${m.touches?.root ? `<div class="hint warn">It needs root on the node to install: only an administrator adds it.</div>` : ""}
     ${(m.terms || []).length ? `<div class="sub">Under ${m.terms.map(t => t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.label)}</a>` : esc(t.label)).join(", ")}.</div>` : ""}
-    ${seen.guidance ? `<div class="sub">Comes with guidance a session reads as <code>bb help tool-${esc(m.name)}</code>.</div>` : ""}
+    ${seen.guidance ? `<div class="sub">Comes with guidance a session reads as <code>aerie help tool-${esc(m.name)}</code>.</div>` : ""}
     ${seen.plain && offer ? `<div class="hint warn">Fetched over plain http: what Add keeps is this commit, checked by its hash, but read what it runs here before you add it.</div>` : ""}
   </div>`;
 }
@@ -273,14 +273,14 @@ async function tpOpenApp(id){
 // Where a new pack comes from, and a pack made here's own two: its
 // manifest as text, and an archive of its files.
 // What is being added: a tool pack (a toolchain of the person's choosing,
-// giving sessions bb tool verbs) or an app (a container the Containers page
+// giving sessions aerie tool verbs) or an app (a container the Containers page
 // runs). An agent pack is a tool pack with an agent block, so it is the first.
 function tpWhatHtml(f){
   return `<div class="field"><label id="tpWhatLabel">What</label>
     <div class="pseg" role="group" aria-labelledby="tpWhatLabel">${[["pack", "A tool pack"], ["app", "An app"]]
       .map(([k, t]) => `<button type="button" data-tpwhat="${k}" class="${f.what === k ? "on" : ""}" aria-pressed="${f.what === k}">${t}</button>`).join("")}</div>
     <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the shipped ones, kept as sideloaded."
-      : "A tool pack installs on a node like any toolchain and gives a session bb tool verbs; a pack with an agent block is a coding agent. Help's Tool packs says how to write one."}</div></div>`;
+      : "A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's Tool packs says how to write one."}</div></div>`;
 }
 function tpFromHtml(f, here){
   const seg = here ? "" : `<div class="field"><label id="tpFromLabel">From</label>

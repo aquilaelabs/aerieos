@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BuilderBot USB Maker (R198): the stick maker (builderbot-stick.py) in a
+"""AerieOS USB Maker (R198): the stick maker (builderbot-stick.py) in a
 window, for Windows above all, where it is built into one .exe that asks for
 Administrator once at start. Nothing here writes a disk itself: every step
 is builderbot-stick.py's own (the disks it lists, the release it fetches and
@@ -8,7 +8,7 @@ can never write a stick two ways.
 
     python tools/builderbot-usb-maker.py      the window (Python's own tkinter)
 
-The steps, one page each: which BuilderBot (the newest release, the newest
+The steps, one page each: which AerieOS (the newest release, the newest
 dev build, a release by name, or an image file you have); which stick (the
 removable disks alone, the system disk never listed); a few settings for
 the stick's first boot; the last page naming the stick by model, size and drive letter,
@@ -31,7 +31,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 HERE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-TITLE = "BuilderBot USB Maker"
+TITLE = "AerieOS USB Maker"
 
 
 def load(name, file):
@@ -123,7 +123,7 @@ class Maker(tk.Tk):
         self.back.pack(side="left")
         self.next = ttk.Button(bar, text="Next", command=lambda: self.go(1))
         self.next.pack(side="right")
-        self.pages = [*(self.extra.get("pages") or []), ("Which BuilderBot", self.page_release), ("Which stick", self.page_disk),
+        self.pages = [*(self.extra.get("pages") or []), ("Which AerieOS", self.page_release), ("Which stick", self.page_disk),
                       ("The stick's first boot", self.page_settings), ("Write it", self.page_confirm),
                       ("Writing", self.page_write)]
         self.at, self.check = 0, None
@@ -170,8 +170,8 @@ class Maker(tk.Tk):
                 row.pack(anchor="w", padx=24, fill="x")
                 ttk.Entry(row, textvariable=self.choice["file"], width=48).pack(side="left")
                 ttk.Button(row, text="Browse", command=lambda: self.choice["file"].set(
-                    filedialog.askopenfilename(parent=self, filetypes=[("BuilderBot OS stick image", "*.raw.xz")]) or self.choice["file"].get())).pack(side="left", padx=6)
-        ttk.Label(f, text="The image is fetched from BuilderBot's releases, its checksum and its build's attestation checked.",
+                    filedialog.askopenfilename(parent=self, filetypes=[("AerieOS stick image", "*.raw.xz")]) or self.choice["file"].get())).pack(side="left", padx=6)
+        ttk.Label(f, text="The image is fetched from AerieOS's releases, its checksum and its build's attestation checked.",
                   foreground="gray", wraplength=560).pack(anchor="w", pady=(12, 0))
 
         def check():
@@ -241,7 +241,7 @@ class Maker(tk.Tk):
         ttk.Label(f, text="Everything on this stick is erased and cannot be brought back. Check it is the stick you mean, "
                           "and that nothing on it is needed.", wraplength=560, foreground="#b42318").pack(anchor="w", pady=12)
         self.choice["ack"].set(False)
-        ttk.Checkbutton(f, text="Erase this stick and write BuilderBot to it", variable=self.choice["ack"]).pack(anchor="w")
+        ttk.Checkbutton(f, text="Erase this stick and write AerieOS to it", variable=self.choice["ack"]).pack(anchor="w")
         return lambda: None if self.choice["ack"].get() else "Tick the box to say this is the stick to erase."
 
     def page_write(self, f):
@@ -258,7 +258,7 @@ class Maker(tk.Tk):
     def work(self):
         # Downloads, not AppData: the Microsoft Store's Python keeps a private
         # copy of AppData, so the image and the log were where nobody looks.
-        work_dir = os.path.join(os.path.expanduser("~"), "Downloads", "BuilderBot USB Maker")
+        work_dir = os.path.join(os.path.expanduser("~"), "Downloads", "AerieOS USB Maker")
         os.makedirs(work_dir, exist_ok=True)
         self.log_path = os.path.join(work_dir, "usb-maker.log")
         logf = open(self.log_path, "a", encoding="utf-8")

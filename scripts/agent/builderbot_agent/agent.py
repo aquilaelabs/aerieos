@@ -758,7 +758,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if pub is not None:
                 sample["published"] = pub
             # ...and a fingerprint of its containers, for the Containers
-            # page to re-read on when one changes outside BuilderBot.
+            # page to re-read on when one changes outside AerieOS.
             dig = timed("containers", self.containers_now)
             if dig is not None:
                 sample["ctr_digest"] = dig

@@ -1,4 +1,4 @@
-"""bb map's scanners against what the tree really holds: the JS scanner's
+"""aerie map's scanners against what the tree really holds: the JS scanner's
 words are JavaScript's own, an expression arrow is a function that ends
 where its expression does and holds its calls, a shell function ends at
 its own `}` and calls what the files around it define, quoted shell text

@@ -27,7 +27,7 @@ APPS = [{"id": "jellyfin", "name": "Jellyfin", "what": "media", "port": 8096, "m
 INDEX = {"packs": [{"name": "ghidra", "url": "https://example.com/g", "commit": "a" * 40, "sha256": "c" * 64, "tier": "vetted", "about": "a decompiler"},
                    {"name": "radare", "url": "https://example.com/r", "commit": "d" * 40, "sha256": "e" * 64, "tier": "vetted", "about": "another", "platforms": ["linux/*"]},
                    {"name": "gone", "url": "https://example.com/x", "commit": "f" * 40, "sha256": "0" * 64, "tier": "vetted", "withdrawn": True}]}
-COMP = {"apps": [{"name": "android", "title": "BuilderBot for Android", "does": "the phone app", "offered": True, "version": "0.9.0",
+COMP = {"apps": [{"name": "android", "title": "AerieOS for Android", "does": "the phone app", "offered": True, "version": "0.9.0",
                   "files": [{"file": "a.apk", "sha256": "1" * 64, "size": 1, "url": "/apps/a.apk"}]},
                  {"name": "vscode", "title": "VS Code extension", "does": "the extension", "offered": True, "version": "", "absent": "0.9.0", "files": []},
                  {"name": "companion", "title": "Windows companion", "does": "not offered here", "offered": False, "version": "", "files": []}]}

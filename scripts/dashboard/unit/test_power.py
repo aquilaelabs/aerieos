@@ -84,7 +84,7 @@ class TheAgent(unittest.TestCase):
             self.assertEqual(again["pending"], 3)
         with mock.patch.object(self.pw.shutil, "which", return_value="/usr/bin/apt-get"), mock.patch.object(self.pw.os, "geteuid", return_value=0), \
              mock.patch.object(self.pw, "os_release", return_value={"version": "0.9.0"}):
-            self.assertEqual(self.pw.host_updates_now({}), {}, "BuilderBot OS updates whole")
+            self.assertEqual(self.pw.host_updates_now({}), {}, "AerieOS updates whole")
 
     def test_the_update_job_runs_apt_and_restarts_only_when_asked(self):
         a = self.A()

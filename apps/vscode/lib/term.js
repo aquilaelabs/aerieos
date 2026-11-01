@@ -1,5 +1,5 @@
 'use strict';
-// BuilderBot's own terminal (R133) on the controller's /termws: the same
+// AerieOS's own terminal (R133) on the controller's /termws: the same
 // terminal the dashboard's dock opens, spoken from VS Code. To the server a
 // type byte (0 keys, 1 a resize as JSON cols/rows) and its body; from it
 // the terminal's bytes. A close carries why the terminal ended.

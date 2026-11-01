@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""bb tidy [--keep KIND]... [--dry]: give back what a task left holding.
+"""aerie tidy [--keep KIND]... [--dry]: give back what a task left holding.
 
 After a task or a batch of tasks, a session ends what it started and no
-longer needs and clears its scratch out of memory: its emulator (through bb
+longer needs and clears its scratch out of memory: its emulator (through aerie
 emu stop, so its state is saved), anything else of its own holding the
 NVIDIA card, its Gradle and Kotlin daemons, the headless browsers a test
 left running, a server it started and left listening (a dev server put in
@@ -132,7 +132,7 @@ def ppid_of(pid, root=PROC):
 
 
 # What a tool call's background job runs under between Claude Code and its
-# server: the call's own shell, bb run's, and what wraps a command.
+# server: the call's own shell, aerie run's, and what wraps a command.
 LAUNCHERS = ("bash", "sh", "env", "timeout", "nohup", "setsid")
 
 
@@ -141,7 +141,7 @@ def orphaned(pid, root=PROC):
     session's first process or by Claude Code, which adopts what a tool
     call put in the background once that call's shell has ended. Or it is a
     background tool call's own job still running, reached from Claude Code
-    through nothing but shells and bb run: nobody keeps that open once the
+    through nothing but shells and aerie run: nobody keeps that open once the
     task is done, and tidy said nothing was running beside one (B840)."""
     ppid = ppid_of(pid, root)
     if ppid < 0:
@@ -301,7 +301,7 @@ SPARE_PHONE_DAYS = 14
 
 
 def phones_dir():
-    """This project's phones, where bb emu keeps them (B511)."""
+    """This project's phones, where aerie emu keeps them (B511)."""
     project = os.environ.get("BB_PROJECT", "")
     if not project or "/" in project:
         return ""
@@ -311,7 +311,7 @@ def phones_dir():
 
 
 def phone_running(avd):
-    """The emulator holds its multiinstance.lock (bb emu's emu_held)."""
+    """The emulator holds its multiinstance.lock (aerie emu's emu_held)."""
     import fcntl
     lock = os.path.join(avd, "multiinstance.lock")
     if not os.path.exists(lock):
@@ -337,9 +337,9 @@ def phone_last_run(avd):
 
 
 def default_phone():
-    """The AVD bb emu start runs, as bb emu list says it."""
+    """The AVD aerie emu start runs, as aerie emu list says it."""
     with contextlib.suppress(OSError, subprocess.SubprocessError):
-        out = subprocess.run(["bb", "emu", "list"], capture_output=True, text=True, timeout=60).stdout
+        out = subprocess.run(["aerie", "emu", "list"], capture_output=True, text=True, timeout=60).stdout
         for line in out.splitlines():
             if line.startswith("default for"):
                 return line.rsplit(":", 1)[-1].strip()
@@ -389,7 +389,7 @@ def main(argv):
         if a == "--keep" and argv:
             k = argv.pop(0)
             if k not in KINDS:
-                sys.exit(f"[builderbot] ERROR: bb tidy --keep takes one of {', '.join(KINDS)}, not '{k}'")
+                sys.exit(f"[builderbot] ERROR: aerie tidy --keep takes one of {', '.join(KINDS)}, not '{k}'")
             keep.add(k)
         elif a == "--dry":
             dry = True
@@ -397,7 +397,7 @@ def main(argv):
             print((__doc__ or "").strip())
             return 0
         else:
-            sys.exit(f"[builderbot] ERROR: bb tidy [--keep {'|'.join(KINDS)}]... [--dry]: not '{a}'")
+            sys.exit(f"[builderbot] ERROR: aerie tidy [--keep {'|'.join(KINDS)}]... [--dry]: not '{a}'")
     card0 = card_used()
     procs = [p for p in processes() if p[2] not in keep]
     files = [] if "tmp" in keep else tmp_entries()
@@ -413,7 +413,7 @@ def main(argv):
         print(f"kept: {', '.join(sorted(keep)) or 'nothing'}")
         return 0
     if any(k == "emulator" for _, _, k in procs):
-        subprocess.run(["bb", "emu", "stop"], check=False)
+        subprocess.run(["aerie", "emu", "stop"], check=False)
     for pid, _, _ in procs:
         with contextlib.suppress(OSError):
             os.kill(pid, signal.SIGTERM)

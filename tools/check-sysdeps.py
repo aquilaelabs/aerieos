@@ -19,7 +19,7 @@ when any of them is in the index. The release column says which one it is.
     tools/check-sysdeps.py --fresh      fetch the indexes again
     tools/check-sysdeps.py --controller the controller's own list (config/controller-packages.tsv)
 
-Network, so not part of bb lint or CI: run it after changing a `system` list
+Network, so not part of aerie lint or CI: run it after changing a `system` list
 and before a release. Exits 1 when a name is missing somewhere it is listed.
 """
 import gzip

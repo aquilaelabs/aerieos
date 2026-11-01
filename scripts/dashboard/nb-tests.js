@@ -11,7 +11,7 @@ function nbTestsView({$, nb, project}){
   // is nothing to stage and nothing a Save could mean.
   //
   // The timings are not written from this page at all. They are parsed out of
-  // a run somebody ingested (`bb tests ingest`) because a duration this
+  // a run somebody ingested (`aerie tests ingest`) because a duration this
   // page produced would be a duration measured on a box that was busy drawing
   // this page.
   nb.tests = null;
@@ -20,7 +20,7 @@ function nbTestsView({$, nb, project}){
   nb.tstSuite = ""; nb.tstFlagged = false, nb.tstUndoc = false;
 
   // The run's output, in the project's shell: opened if none is, focused if
-  // one is, and `bb tests log -f` typed into it, which follows a run still
+  // one is, and `aerie tests log -f` typed into it, which follows a run still
   // going. Output belongs in a terminal, where it scrolls and pages and can
   // be left running; a box on the Docker row used to carry a tail of it and
   // redraw for every line.
@@ -33,7 +33,7 @@ function nbTestsView({$, nb, project}){
     const t = tabOf(panes[active]);
     if (!t || t.kind !== "term"){
       unbusy(btn, "Open the run's output");
-      return notify("no shell tab opened; open one and run bb tests log -f", true);
+      return notify("no shell tab opened; open one and run aerie tests log -f", true);
     }
     // Sent, and sent again while the shell is still coming up. The server
     // asks tmux itself whether the session is there, so this does not wait
@@ -140,7 +140,7 @@ function nbTestsView({$, nb, project}){
         drafts.set(t.key, {protects: p.value, notes: n.value, accept, why});
     });
     // A run going right now is said first, before the last run's numbers
-    // (R99): bb test tells the server at its start and end, and the app
+    // (R99): aerie test tells the server at its start and end, and the app
     // already reads the same fact to time its note.
     const going = j.running
       ? `<b>tests running</b>, started ${esc(ago(j.running.since))}${j.running.by ? " by " + esc(j.running.by) : ""}${
@@ -155,7 +155,7 @@ function nbTestsView({$, nb, project}){
       // What the view is for, as its empty state, in one sentence as every
       // view's is (the a-notebook/views rule): a command box the page's
       // width read as a field to type in.
-      $("tstStats").innerHTML = `<div class="field"><div class="hint nbempty">Each test run a session records with <code>bb tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`;
+      $("tstStats").innerHTML = `<div class="field"><div class="hint nbempty">Each test run a session records with <code>aerie tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`;
       $("tstList").innerHTML = ""; $("tstBar").hidden = true;
       $("tstFolds").innerHTML = "";
       return;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The system pool of a BuilderBot OS stick (R161 step 10, the operator,
+# The system pool of a AerieOS stick (R161 step 10, the operator,
 # 29 Oct: the stick read once and written rarely, as Unraid's is): what
 # writes all day, docker's and containerd's data, libvirt's, the toolchain
 # store and the projects, lives on a pool, bound over its usual place at

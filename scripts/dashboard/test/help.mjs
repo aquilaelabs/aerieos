@@ -1,4 +1,4 @@
-// Help on the rail (R258, the operator 16 Oct): BuilderBot's own docs read in
+// Help on the rail (R258, the operator 16 Oct): AerieOS's own docs read in
 // the dashboard. The page lists them in docs/README.md's groups beside the
 // article, opens a long one on its contents box, follows a link between docs
 // in place with an address per doc, and searches them all as the bar's field

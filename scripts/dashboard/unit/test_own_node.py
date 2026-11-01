@@ -1,5 +1,5 @@
 """The controller's own machine as a node of itself (R90 step 6): minted from
-a shell on a controller installed bare metal (bb nodes enroll-token --own),
+a shell on a controller installed bare metal (aerie nodes enroll-token --own),
 an ordinary agent row that builds and runs sessions and runs no containers,
 with each session in a network of its own from the first hello; there is
 one such row, its session network cannot be switched off, and docker-host
@@ -83,7 +83,7 @@ class OwnRow(unittest.TestCase):
 
 class TheImageUpdate(unittest.TestCase):
     """os-update (R160 step 4) is for a machine whose census says it runs
-    BuilderBot OS; a bare-metal install on another system is told so."""
+    AerieOS; a bare-metal install on another system is told so."""
     def setUp(self):
         self.state = tempfile.mkdtemp()
         sys.path.insert(0, DASH)
@@ -95,7 +95,7 @@ class TheImageUpdate(unittest.TestCase):
         mint(self.state, "nas", "--own")
         n = next(x for x in self.nodes.node_list() if x["name"] == "nas")
         r = self.nodes.node_os_update("user:t", n["id"], "v0.9.1")
-        self.assertIn("runs BuilderBot OS", r.get("error", ""))
+        self.assertIn("runs AerieOS", r.get("error", ""))
         r = self.nodes.node_os_update("user:t", "n_nothere", "v0.9.1")
         self.assertEqual(r.get("error"), "no such node")
 
@@ -133,7 +133,7 @@ class TheNameAndTime(unittest.TestCase):
 
 
 class TheDoctorSaysTheWall(unittest.TestCase):
-    """bb doctor (and so the Doctor card) on a controller whose own machine is
+    """aerie doctor (and so the Doctor card) on a controller whose own machine is
     a node: whether the wall holds there, from that node's bb-session check,
     in red when it does not (R90 step 8)."""
 

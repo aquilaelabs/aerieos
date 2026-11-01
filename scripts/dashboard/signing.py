@@ -23,7 +23,7 @@ commit holds no key and no password.
 Nothing here runs a jdk or build-tools (the operator, 22 Oct: the
 controller runs nothing). What needs keytool or apksigner, an upload checked,
 a key made, a backup wrapped, a rotation's proof and a release's APK signed,
-is a sign-key job on the project's node (_on_node), as bb sign is a sign job
+is a sign-key job on the project's node (_on_node), as aerie sign is a sign job
 there: what it needs is handed over the agent's channel for that job alone
 (hand_over), what it made comes back the same way (take_result), and this
 waits for it. An upload is checked before it is kept: a wrong password or
@@ -393,7 +393,7 @@ def key_for(project, package, route=""):
     else `default`, else, when no key is called that, the project's only key
     holding the route. A project whose one key had another name had every
     unmapped build approved and then failed for want of `default`
-    (BuilderBot's own app, 5 Oct, B509)."""
+    (AerieOS's own app, 5 Oct, B509)."""
     mapped = mapping(project).get(package or "")
     if mapped:
         return mapped
@@ -798,7 +798,7 @@ def import_backup(project, route, blob_b64, key="", password="", alias="", filen
 
 # ---- the backup password (the operator, 1 Oct) ----------------------------
 # A project's owner may put a password on its keys' backups, which every
-# download then needs, BuilderBot's owner's included: the dashboard's own
+# download then needs, AerieOS's owner's included: the dashboard's own
 # accounts stop being enough to walk off with a key. Kept as a PBKDF2 hash
 # (users.hash_password), never readable back; changed or removed only with
 # the current one; five wrong in a row hold the downloads for fifteen
@@ -1166,7 +1166,7 @@ def refusal(project, rel, route, key=""):
     if not rel.lower().endswith((".apk", ".aab")):
         return {"error": "an Android build is an .apk or an .aab"}, 400
     if file_path(project, rel) is None:
-        return {"error": f"no {rel} in {project}'s dist/: bb build puts a build there"}, 404
+        return {"error": f"no {rel} in {project}'s dist/: aerie build puts a build there"}, 404
     if not (node_of(project) or ""):
         return {"error": f"{project} has no node to sign on: its settings choose one"}, 400
     # A node whose agent is behind takes nothing but its own update, so the

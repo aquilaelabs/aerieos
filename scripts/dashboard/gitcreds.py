@@ -13,10 +13,10 @@ A token a person gives a project is kept in their own key store
 (accountkeys.py, sealed under their key; the operator, 27 Oct), and the
 project's file then says `account:UID:ID`, nothing secret, one line per
 person who gave one (R159: every git action is a person's, with their own
-token). A person's own git work (their session's bb git, their presses in
+token). A person's own git work (their session's aerie git, their presses in
 the Git view, the release they cut, the wiki they sync) is handed their own
 token, while they hold a live sign-in anywhere (logins.live); signed out
-everywhere, their sessions' bb git waits for them. Work that is nobody's
+everywhere, their sessions' aerie git waits for them. Work that is nobody's
 in the moment (watching CI) takes the token of any giver signed in now and
 pauses while none is. A project keeps no token of its own; a line kept as
 the project's from before (an install with no key to seal a store with)
@@ -210,7 +210,7 @@ def usable(project, uid):
             return {"by": uid, "mine": True, "live": True, "given": True, "why": ""}
         return {"by": uid, "mine": True, "live": False, "given": True,
                 "why": "your token for this project is used only while you are signed in, and you are "
-                       "signed out everywhere: bb git waits for you to sign in to the dashboard"}
+                       "signed out everywhere: aerie git waits for you to sign in to the dashboard"}
     other = next((u for u, _ in g if _live(u) and not _locked(u)), "")
     if other:
         return {"by": other, "mine": False, "live": True, "given": False, "why": ""}
@@ -308,7 +308,7 @@ def remap(uid, olds, new):
 def adopt(owner_of):
     """Each token kept as a project's own (from before tokens were a
     person's) moved into its project owner's store, the project linked to
-    it: BuilderBot's owner where a project has none (owner_of says). Done
+    it: AerieOS's owner where a project has none (owner_of says). Done
     once a key can seal it; returns how many moved."""
     if not (seal and sealing and sealing()):
         return 0
@@ -427,10 +427,10 @@ def helpers(project, uid=None, why="git"):
 
 
 def git_c(project, uid=None, why="git"):
-    """git's -c arguments that hand a command BuilderBot's credential for this
+    """git's -c arguments that hand a command AerieOS's credential for this
     project, wherever it is kept (the account's own store, the project's),
     whatever the tree's own config names: every git that reaches a remote
-    for BuilderBot goes through these or through helpers() written into a
+    for AerieOS goes through these or through helpers() written into a
     config of its own (the operator, 27 Oct). [] where there is none."""
     hs = helpers(project, uid, why)
     return ["-c", "credential.helper=", *[x for h in hs for x in ("-c", f"credential.helper={h}")]] if hs else []

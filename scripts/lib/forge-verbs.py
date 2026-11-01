@@ -1,8 +1,8 @@
-"""Behind `bb forge` (R188): the project's git host worked through the
+"""Behind `aerie forge` (R188): the project's git host worked through the
 controller, which holds the project's token and runs each verb with it
 (dashboard/forgeaccess.py); the token never reaches here.
 
-Arguments: the project, then the words after `bb forge`: a verb (whoami,
+Arguments: the project, then the words after `aerie forge`: a verb (whoami,
 measure, or a group and an action: pr list, run log ...), its positional
 arguments, and its flags (--title "...", --draft, -f NAME=VALUE ...).
 BB_FORGE_AUTH is the session's credential.
@@ -30,7 +30,7 @@ if not words or words[0] in ("-h", "--help", "help"):
 verb = words.pop(0)
 if verb in GROUPS:
     if not words:
-        fail(f"bb forge {verb} needs an action: list, view ...")
+        fail(f"aerie forge {verb} needs an action: list, view ...")
     verb = f"{verb} {words.pop(0)}"
 pos, flags = [], {}
 while words:

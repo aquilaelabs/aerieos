@@ -41,7 +41,7 @@ const RAIL = [
   // address and grant as before, kept off its sub-nav (PRESSED).
   {key: "containers", label: "Containers", icon: "docker", tools: [["docker", "Containers"], ["vms", "VMs"], ["nginx", "nginx"], ["scanners", "Scanners"]]},
   // The controller, a group of its own (the operator, 22 Oct): how this
-  // BuilderBot behaves, with room for the pages a bare-metal install and
+  // AerieOS behaves, with room for the pages a bare-metal install and
   // the USB edition add beside Settings (R90, R56). After Containers, so a
   // phone's bar keeps its four.
   {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This machine"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
