@@ -3399,9 +3399,12 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // Its facts a grid (R218 step 26): the account jobs run as is one.
     const runsAs = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .ndfacts .fact`,
       fs => fs.find(f => f.querySelector('dt').textContent === 'Jobs run as')?.querySelector('dd').textContent || '');
-    ok(/agentbox/.test(row) && /live/.test(row) && /cpu/.test(row) && /data/.test(row)
-       && runsAs === (process.env.USER || 'builder'),
-       `the row shows the agent live, its numbers and the account jobs run as (${row.slice(0, 160)}…)`);
+    // The node's name is the Machines header's, in its picker (R177), not
+    // the row's.
+    const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
+    const missing = ['live', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker']);
+    ok(!missing.length && runsAs === (process.env.USER || 'builder'),
+       `the node named in the header's picker, its row the agent live, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
     // Each session kept to its own project's network (R79): a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
     // apply-not-onchange: it wrote itself on the click at first, the
