@@ -114,6 +114,7 @@ let pjQuery = "";
 // The group chip in force, "" for All and "none" for the projects in no
 // group: a view for the page's life, as the Containers page's chips are.
 let pjChip = "";
+let pjChipMove = false;          // a chip's redraw, whose cards chipMove moves
 function projectMatches(p, q){
   if (!q) return true;
   const hay = [p, ...(p.rows || [])].flatMap(x => [x.name, x.label, x.git, x.node_name, x.session_at])
@@ -587,8 +588,11 @@ function renderProjectsInto(i){
   const cb = el.querySelector("#pjChips");
   if (paint(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
-      chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid > :not(.pgrid)",
-               () => { pjChip = c.dataset.pjchip; renderProjectsInto(i); }));
+      // The cards and the groups' headings, never a group's box itself: a
+      // card in a group that moved slid twice as far, and a group left out
+      // was copied whole over the grid.
+      chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid .pjgname",
+               () => { pjChip = c.dataset.pjchip; pjChipMove = true; renderProjectsInto(i); pjChipMove = false; }));
   const inChip = p => !pjChip || (pjChip === "none" ? !p.group : p.group === pjChip);
   const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;
@@ -609,7 +613,9 @@ function renderProjectsInto(i){
   const was = [...grid.querySelectorAll(".pcard[data-pkey]")].map(c => c.dataset.pkey);
   const now = [...String(html).matchAll(/<div class="pcard [^"]*" data-pkey="([^"]*)"/g)].map(m => m[1]);
   const moved = was.length > 0 && was.join("\n") !== now.join("\n");
-  const play = moved ? flip(() => grid.querySelectorAll(".pcard[data-pkey]"), el => el.dataset.pkey, 360) : null;
+  // A chip's press moves the cards itself (chipMove): the grid's own slide
+  // on top of it played every card twice.
+  const play = moved && !pjChipMove ? flip(() => grid.querySelectorAll(".pcard[data-pkey]"), el => el.dataset.pkey, 360) : null;
   // The card a press armed, faded through once its markup has moved, and
   // only where it stays: a card that moves slides rather than fading.
   const fc = pjFade && ps.find(c => c.key === pjFade.key);

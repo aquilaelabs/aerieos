@@ -393,10 +393,20 @@ function chipMove(scope, items, swap){
   }
   const out = swap();
   const host = scope();
+  // The list is not a page arriving: paint's fade on what it redrew went
+  // under the move, the whole list blinking while its cards slid.
+  if (host){
+    host.classList.remove("justpainted");
+    host.querySelectorAll(".justpainted").forEach(e => e.classList.remove("justpainted"));
+  }
   const kept = new Set();
   let late = 0;
-  for (const el of list()){
-    const k = moveKey(el), was = before.get(k), r = el.getBoundingClientRect();
+  // Every place read before anything is started or added, so the page is
+  // laid out once (a read after each write laid out a big page per card,
+  // and the screen stood still while it did).
+  const now = list().map(el => [el, moveKey(el), el.getBoundingClientRect()]);
+  for (const [el, k, r] of now){
+    const was = before.get(k);
     if (was && !kept.has(k)){
       kept.add(k);
       const dx = was.r.left - r.left, dy = was.r.top - r.top;
@@ -408,6 +418,7 @@ function chipMove(scope, items, swap){
                  {duration: 240, delay: 110 + Math.min(late++, 8) * 18, fill: "backwards", easing: MOVE_EASE});
     }
   }
+  const ghosts = [];
   if (host) for (const [k, was] of before){
     if (kept.has(k) || !onScreen(was.r)) continue;
     const g = was.el.cloneNode(true);
@@ -418,15 +429,19 @@ function chipMove(scope, items, swap){
     g.setAttribute("aria-hidden", "true");
     Object.assign(g.style, {position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
                             width: `${was.r.width}px`, height: `${was.r.height}px`, pointerEvents: "none", zIndex: "1"});
-    host.appendChild(g);
-    const at = g.getBoundingClientRect();
-    g.style.left = `${(was.r.left - at.left).toFixed(1)}px`;
-    g.style.top = `${(was.r.top - at.top).toFixed(1)}px`;
+    ghosts.push([g, was]);
+  }
+  // All laid in, then all measured, then all put in place: one layout.
+  ghosts.forEach(([g]) => host.appendChild(g));
+  const at = ghosts.map(([g]) => g.getBoundingClientRect());
+  ghosts.forEach(([g, was], n) => {
+    g.style.left = `${(was.r.left - at[n].left).toFixed(1)}px`;
+    g.style.top = `${(was.r.top - at[n].top).toFixed(1)}px`;
     const gone = () => g.remove();
     g.animate([{opacity: 1, transform: "none"}, {opacity: 0, transform: "scale(.96)"}],
               {duration: 180, easing: "ease-in", fill: "forwards"}).finished.then(gone, gone);
     setTimeout(gone, 600);
-  }
+  });
   return out;
 }
 
