@@ -41,7 +41,7 @@ VM_OPS = {"start": ["start"], "shutdown": ["shutdown"], "off": ["destroy"],
 DATA_RE = re.compile(r"disk([1-9][0-9]?)")
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 # Names a pool may not take: the merged trees under /mnt, and BuilderBot's.
-NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "cache-mover"}
+NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "other", "cache-mover"}
 # What a read-only mount adds so the filesystem writes nothing at all.
 NO_REPLAY = {"xfs": "norecovery", "btrfs": "rescue=nologreplay"}
 # What blkid calls each filesystem.
@@ -123,6 +123,14 @@ def plan(want, disks, blk=blkid):
     say = out["said"].append
     seen = set()
 
+    def free(where, what):
+        # Something of this machine's at the old path already (a pool of its
+        # own by the same name): the old system's is not laid over it.
+        if os.path.ismount(where):
+            no(f"{what}: {where} has something mounted on it already on this machine")
+            return False
+        return True
+
     def usable(d, what):
         if d is None:
             no(f"{what} is not on this machine (no disk with that serial)")
@@ -159,8 +167,10 @@ def plan(want, disks, blk=blkid):
         if not part:
             no(f"{what} is {d['name']}, and nothing on it is the {fs} the old system named: it is left alone")
             continue
-        data.append(slot)
         where = f"{mnt()}/{slot}"
+        if not free(where, what):
+            continue
+        data.append(slot)
         if fs == "zfs":
             pool = row.get("LABEL") or slot
             out["zfs"].append({"pool": pool, "where": where, "readonly": not writable, "slot": slot})
@@ -194,6 +204,8 @@ def plan(want, disks, blk=blkid):
             no(f"{what}: its filesystem is {fs or 'not said'}; XFS, btrfs and ZFS are taken")
             continue
         where = f"{mnt()}/{name}"
+        if not free(where, what):
+            continue
         if fs == "zfs":
             pools.append(name)
             out["zfs"].append({"pool": name, "where": where, "readonly": False, "slot": name})

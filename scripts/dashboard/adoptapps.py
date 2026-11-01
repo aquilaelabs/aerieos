@@ -61,7 +61,7 @@ def compose_for(app, read, pools=(), writable=False, shares=None):
         host, _, rest = str(v).partition(":")
         mode = rest.rsplit(":", 1)[1] if rest.count(":") else "rw"
         if host.startswith(NOT_HELD):
-            notes.append(f"{host} is on a disk or share the old system mounted on its own, not one adopted here: mount it at that path from Storage, or change the path")
+            notes.append(f"{host} is on a disk or share the old system mounted on its own, not one adopted here: mount it from Storage's other disks and shares (under /mnt/other) and point the container there")
         elif host.startswith("/mnt/") and not HELD.match(host):
             notes.append(f"{host} is not under a path the adopted disks hold")
         elif m := HELD.match(host):

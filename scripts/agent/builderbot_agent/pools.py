@@ -21,6 +21,11 @@ from .base import log
 from .disks import disks_now, moved
 
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}")
+# A pool mounts at /mnt/NAME, so a name is not one of the folders there that
+# mean something else: the array's and the other mounts' (here), and the
+# merged folders and per-disk paths of disks adopted from another system
+# (adopt.py), whose containers and VMs look for them by those names.
+POOL_RESERVED = re.compile(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)")
 LAYOUTS = {"single": 1, "mirror": 2, "raidz1": 3, "raidz2": 4}
 ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy")
 MOUNT_ROOT = "/mnt"
@@ -268,6 +273,9 @@ class PoolsMixin:
         if not POOL_RE.fullmatch(name):
             say(f"refused: {name or 'no name'} is not a pool name (a letter, then letters, digits, hyphens and underscores, 31 at most)\n")
             return "failed", 64
+        if action == "create" and (POOL_RESERVED.fullmatch(name) or os.path.ismount(f"{MOUNT_ROOT}/{name}")):
+            say(f"refused: {MOUNT_ROOT}/{name} is a folder that means something else here, or something is mounted there already: pick another name\n")
+            return "failed", 66
         have = {p["name"]: p for p in pools_now()}
         disks = {d["name"]: d for d in disks_now(smart=False)}
         want = [str(x) for x in (cfg.get("disks") or []) if isinstance(x, str)]

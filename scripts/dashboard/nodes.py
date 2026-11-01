@@ -3659,6 +3659,11 @@ def node_storage_pool(principal, node_id, req):
         return {"error": f"a pool action is one of {', '.join(POOL_ACTIONS)}"}
     if not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", name):
         return {"error": "a pool's name is a letter, then letters, digits, hyphens and underscores, 31 at most"}
+    # /mnt/NAME is where it mounts: not the array's folders, the other
+    # mounts', or what disks adopted from another system are found under.
+    held = {m.get("where", "").rsplit("/", 1)[-1] for m in ((rep.get("adopted") or {}).get("mounts") or [])}
+    if action == "create" and (re.fullmatch(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)", name) or name in held):
+        return {"error": f"/mnt/{name} means something else on this machine (the array's folders, the other mounts', or adopted disks): pick another name"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
     known = {d["name"]: d for d in rep.get("disks") or [] if isinstance(d, dict)}
