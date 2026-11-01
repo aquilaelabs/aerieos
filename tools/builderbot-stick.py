@@ -399,6 +399,29 @@ def patched(src, block, boot=None, mirror=None):
 
 
 # ---- the write ----------------------------------------------------------------
+def clean_disk(n, tries=4):
+    """diskpart's clean on disk n: its partition table wiped, so Windows
+    lets go of every volume on it. It can be refused while Windows is still
+    looking at the disk, so it is tried again a few times."""
+    import tempfile
+    fd, script = tempfile.mkstemp(suffix=".txt")
+    with os.fdopen(fd, "w") as f:
+        f.write(f"select disk {int(n)}\nclean\n")
+    try:
+        out = ""
+        for i in range(tries):
+            r = subprocess.run(["diskpart", "/s", script], capture_output=True, text=True, check=False)
+            out = (r.stdout + r.stderr).strip()
+            if r.returncode == 0:
+                say("the stick's old partitions are cleared")
+                return
+            time.sleep(1 + i)
+        die(f"Windows would not clear the stick's partitions (diskpart: {out.splitlines()[-1] if out else 'no answer'}): "
+            "close anything showing it, unplug it and plug it in, and write again; nothing written")
+    finally:
+        os.unlink(script)
+
+
 class WinDisk:
     """A disk opened whole on Windows, written and read with Windows' own
     calls (WriteFile, ReadFile, FlushFileBuffers): the C runtime's file on
@@ -509,10 +532,15 @@ def open_disk(dev):
         if not m:
             die(f"{dev} is not a disk (\\\\.\\PhysicalDriveN, or N)")
         n = int(m.group(1))
-        ps = f"Get-Partition -DiskNumber {n} -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter"
-        letters = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout.split()
         if not is_admin():
             die("writing a whole disk on Windows needs Administrator: start this again as Administrator; nothing written")
+        # Its partitions taken away first (diskpart's clean): Windows keeps
+        # a volume mounted for each one it knows, with a drive letter or
+        # not (a stick written before carries a boot partition and slots
+        # with none), and refuses a raw write over a mounted volume.
+        clean_disk(n)
+        ps = f"Get-Partition -DiskNumber {n} -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter"
+        letters = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout.split()
         from ctypes import wintypes
         k32 = ctypes.windll.kernel32
         k32.CreateFileW.restype = wintypes.HANDLE

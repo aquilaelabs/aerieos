@@ -101,6 +101,24 @@ class Stick(unittest.TestCase):
                 self.assertEqual(d.read(4096), b"x" * 4096)
         self.assertEqual(closed, [7, 8, 9], "the disk and its volumes let go when it closes")
 
+    def test_a_disk_on_windows_is_cleared_before_it_is_written(self):
+        answers = [1, 0]
+        scripts = []
+
+        def run(cmd, **_kw):
+            scripts.append(open(cmd[-1]).read())
+            return subprocess.CompletedProcess(cmd, answers.pop(0), "", "Virtual Disk Service error: access is denied")
+        said = []
+        with mock.patch.object(self.m.subprocess, "run", run), mock.patch.object(self.m.time, "sleep"), \
+                mock.patch.object(self.m, "say", said.append):
+            self.m.clean_disk(5)
+            self.assertEqual(scripts[0], "select disk 5\nclean\n")
+            self.assertEqual(len(scripts), 2, "tried again once it was refused")
+            answers.extend([1] * 4)
+            with mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
+                self.m.clean_disk(5)
+            self.assertIn("access is denied", die.call_args[0][0])
+
     def test_the_write_is_whole_sectors_as_windows_asks(self):
         pieces = [b"a" * 1000, b"b" * (3 << 20), b"c" * 70001, b"d" * 5]
         out = list(self.m.sectors(iter(pieces)))
