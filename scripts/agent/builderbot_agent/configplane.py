@@ -113,6 +113,9 @@ class ConfigPlaneMixin:
             return self._apply_storage_snapshot(job, cfg)
         if what == "storage-array":
             return self._apply_storage_array(job, cfg)
+        if what == "console":
+            # A way in at the console of BuilderBot OS (console.py, R194).
+            return self._apply_console(job, cfg)
         if what == "storage-adopt":
             # Another NAS's array and pools taken as they are (adopt.py).
             return self._apply_storage_adopt(job, cfg)

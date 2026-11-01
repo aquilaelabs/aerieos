@@ -1552,6 +1552,9 @@ def _census(c):
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16)}
+    # ...and whether its console takes a password (R194, BuilderBot OS).
+    if isinstance(c.get("console"), dict) and c["console"]:
+        out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
     # ...and what it adopted of another NAS (R163 step 8): each mount, its
     # filesystem, read-only or not and mounted now, the merged trees, and
     # the parity disk left alone.
@@ -3380,6 +3383,41 @@ def node_storage_array(principal, node_id, req):
                 {"apply": "storage-array", "config": cfg, "timeout": 900 if action in ("check", "destroy") else ARRAY_LONG})
     if r.get("ok"):
         audit(principal, "storage-array", node_id, {"job": r["job"], **cfg})
+    return r
+
+
+def node_console(principal, node_id, password, clear=False):
+    """A console password for BuilderBot OS's screen (R194): hashed here
+    (SHA-512 crypt, by openssl, so neither the job nor its record holds the
+    password itself), sent to the machine's agent, which makes the admin
+    account from it at every boot. clear takes it away."""
+    import subprocess
+    n = node(node_id)
+    if not n or not own_machine(n):
+        return {"error": "a console password is the controller's own machine's"}
+    rep = n.get("reported") or {}
+    if not (rep.get("console") or {}).get("os"):
+        return {"error": "a console password is BuilderBot OS's; on a Linux of your own, log in with its own accounts"}
+    cfg = {"clear": True} if clear else {}
+    if not clear:
+        pw = str(password or "")
+        if len(pw) < 10 or len(pw) > 200 or "\n" in pw:
+            return {"error": "a console password is ten characters at least"}
+        try:
+            r = subprocess.run(["openssl", "passwd", "-6", "-stdin"], input=pw + "\n", capture_output=True, text=True, timeout=20, check=False)
+        except (OSError, subprocess.SubprocessError) as e:
+            return {"error": f"the password could not be hashed here: {e}"}
+        h = r.stdout.strip()
+        if r.returncode != 0 or not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", h):
+            return {"error": "the password could not be hashed here (openssl passwd -6)"}
+        cfg["hash"] = h
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "console", "config": cfg, "timeout": 60})
+    if r.get("ok"):
+        audit(principal, "console-password", node_id, {"job": r["job"], "cleared": bool(clear)})
     return r
 
 
@@ -7042,6 +7080,7 @@ def verb(principal, req):
              "storage-snapshot": lambda: node_storage_snapshot(principal, nid, req),
              "storage-array": lambda: node_storage_array(principal, nid, req),
              "storage-adopt": lambda: node_storage_adopt(principal, nid, req),
+             "console": lambda: node_console(principal, nid, req.get("password"), req.get("clear") is True),
              "storage-backup": lambda: node_storage_backup(principal, nid, field(req, "name")),
              "storage-key": lambda: node_storage_key(principal, nid, req),
              "host-update": lambda: node_host_update(principal, nid, req.get("reboot") is True),

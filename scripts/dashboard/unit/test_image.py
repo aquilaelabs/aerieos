@@ -323,7 +323,10 @@ class Workflow(unittest.TestCase):
         self.assertIn("ExecStart=/usr/lib/builderbot-os/health", unit)
         self.assertIn('bash "$SLOT" good', read(EXTRA, "usr", "lib", "builderbot-os", "health"))
         # B471: a slot that panics or never gets healthy comes back by itself.
-        self.assertEqual(g.count("panic=15 console="), 3)
+        self.assertEqual(g.count("panic=15 console="), 4)
+        # R194: Rescue, a root shell at the screen with nothing started.
+        self.assertIn('menuentry "Rescue', g)
+        self.assertIn("systemd.unit=rescue.target systemd.setenv=SYSTEMD_SULOGIN_FORCE=1", g)
         self.assertIn('set fallback="slot-${bb_prev}"', g)
         health = read(EXTRA, "usr", "lib", "builderbot-os", "health")
         self.assertIn("systemctl reboot", health)

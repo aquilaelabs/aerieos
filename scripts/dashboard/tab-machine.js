@@ -67,6 +67,7 @@ function renderMachineInto(i){
   d.list.innerHTML = machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
     + stickSection(n)
+    + consoleSection(n)
     + firstbootSection()
     + adoptSection(n)
     + adoptAppsSection(n)
@@ -139,6 +140,33 @@ function wireStick(root){
     notify(j.error || "moving to the pool: This machine says when it is done", !!j.error);
     await loadNodes();
   });
+}
+
+// A way in at the screen (R194): BuilderBot OS's console takes a password
+// set here, logging in as admin with sudo for root; the boot menu's Rescue
+// entry is the way in when nothing else answers. Only on BuilderBot OS.
+function consoleSection(n){
+  const c = n.reported?.console;
+  if (!c?.os) return "";
+  return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
+      <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with the console password; <code>sudo</code> gives root. It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.</div>
+      <div class="fx"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
+        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>
+      <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);
+}
+
+function wireConsole(root){
+  root.querySelectorAll("[data-console]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const clear = b.dataset.console === "clear", n = ownMachine();
+    const pw = $("conPw")?.value || "", pw2 = $("conPw2")?.value || "";
+    if (!clear && pw !== pw2) return notify("the two passwords differ", true);
+    if (clear && !await askYes("Take the console password away?\n\nNobody can log in at the screen as admin until one is set again; the boot menu's Rescue entry still opens a root shell there.",
+        {title: "Take it away?", verb: "Take it away", danger: true})) return;
+    busy(b, clear ? "Taking it away" : "Setting");
+    const j = await (await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", ...(clear ? {clear: true} : {password: pw})})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || (clear ? "taking the console password away" : "setting it: log in at the screen as admin"), !!j.error);
+    await loadNodes();
+  }));
 }
 
 // What a stick's prepared configuration did at the first boot (R161 step 8,
@@ -336,4 +364,5 @@ function wireHeld(root){
   wireStick(root);
   wireAdopt(root);
   wireAdoptApps(root);
+  wireConsole(root);
 }

@@ -34,6 +34,7 @@ from .shares import SharesMixin
 from .pools import PoolsMixin
 from .array import ArrayMixin
 from .adopt import AdoptMixin
+from .console import ConsoleMixin, apply as console_apply
 from .power import PowerMixin
 from .extmounts import ExtMountsMixin
 from .backups import BackupsMixin
@@ -77,7 +78,7 @@ def follow(state, url="", expect=""):
     return True, ""
 
 
-class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
+class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, ConsoleMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
             TokensMixin, ScanMixin):
     def __init__(self, state):
         self.state = state
@@ -114,6 +115,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.sessnet = SessionNet(self)    # each session kept to its own project's network (R79)
         self.sesswatch = SessionWatch(self)  # its sessions reported as they change
         self.ftp = FtpServers(self)        # a project's file access over FTP (R151)
+        # The console's admin account made again from its kept hash: the
+        # OS's root forgets it at every boot (R194).
+        try:
+            console_apply()
+        except (OSError, subprocess.SubprocessError) as e:
+            log(f"console: the admin account was not made: {e}")
         self.screen = ScreenRelay(self)    # its VMs' screens, for the dock (R99)
         self.wssync = WorkspaceSync(self)  # its projects as a synced copy, where it holds them so (R162)
         self.claudesync = ClaudeMirror(self, self.wssync)  # ...and its sessions' conversations with them (B613)

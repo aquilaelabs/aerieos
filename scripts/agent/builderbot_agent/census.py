@@ -50,6 +50,7 @@ from .shares import shares_now
 from .pools import pools_now, snapshots_now
 from .array import array_now
 from .adopt import adopted_now, apps_now
+from .console import console_now
 from .power import host_updates_now, ups_now
 from .extmounts import extmounts_now
 from .backups import backups_now
@@ -384,6 +385,7 @@ def census(state):
         # ...and its array (R162 step 2): the disks by slot, their room, and
         # when SnapRAID last synced, scrubbed and checked it.
         "array": array_now(),
+        "console": console_now(),
         "adopted": {**adopted_now(), **({"apps": apps_now()} if adopted_now() else {})},
         # ...and its other disks and shares (R162 step 4), as the record the hello left says.
         "ext_mounts": extmounts_now(state),

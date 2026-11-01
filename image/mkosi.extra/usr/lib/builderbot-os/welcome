@@ -17,6 +17,13 @@ mkdir -p "$(dirname "$OUT")"
     printf '\n'
     sed 's/\\/\\\\/g' "$LIB/logo"
     printf '\n        BuilderBot OS%s, slot %s\n' "${ver:+ $ver}" "$("$LIB/slot" current 2>/dev/null || echo "?")"
-    printf '        Open http://\\4:%s/ in a browser on this network.\n\n' "${port:-7680}"
+    printf '        Open http://\\4:%s/ in a browser on this network.\n' "${port:-7680}"
+    # The way in at this screen (R194): admin, once a console password is
+    # set on This machine; until then, where to set one.
+    if [ -s "${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}" ]; then
+        printf '        Log in here as admin with the console password.\n\n'
+    else
+        printf '        To log in here, set a console password on This machine.\n\n'
+    fi
 } > "$OUT.new"
 mv -f "$OUT.new" "$OUT"

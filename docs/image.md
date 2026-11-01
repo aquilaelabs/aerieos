@@ -201,6 +201,17 @@ dashboard's port), which the console fills in and redraws as the network
 comes up. The installer opens on the same logo. Both are plain characters,
 so a serial console or a server's remote screen draws them too.
 
+To log in at the screen (a monitor or a KVM), set a console password on
+This machine's Console section: it logs in as `admin`, with `sudo` for
+root, and it is separate from the dashboard's password. The image's root
+forgets everything at each boot, so the password's hash is kept on the
+data partition and the account is made from it at every start; until one
+is set, the screen says where to set it. Root itself has no password. When
+nothing else answers, the boot menu's **Rescue** entry, beside Safe mode,
+starts nothing and opens a root shell at the screen: whoever is at the
+keyboard can already take the disks out, so it opens nothing they do not
+have, and it is never the default.
+
 ## Installing it on a machine
 
 `builderbot-os-VERSION.iso` boots the same root live (UEFI or BIOS) with
