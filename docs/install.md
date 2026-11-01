@@ -216,20 +216,18 @@ published, so an install on it takes builds that may not come up
 
 **What is supported:**
 
-- From any release to any later release **in the same line** (0.5.0 to
-  0.5.3, say), in one step.
-- To a **new line** (0.6.0) **from the last release of the line before**
-  (the newest 0.5.x). An older install goes there first, then on.
-- **0.9 upgrades from any 0.6.x, 0.7.x or 0.8.x** in one step. A 0.5.x or
-  older install goes through the newest 0.6.x first.
+- From any release to any later release, in one step, from 0.9 on.
+- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from BuilderBot
+  0.8 or earlier: install fresh, with a new `/config`, and add your projects
+  again from their repositories.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
   below, with the older image.
 
 **What the controller does for you.** `/config` carries the version of its
 state. On start, a controller moves older state forward, one numbered step
 at a time, after copying `/config` to `/config/backups/before-VERSION` (the
-last three are kept). It refuses to start, saying which release to go
-through, on state older than it can move forward, and it refuses state from
+last three are kept). It refuses to start on state older than it can move
+forward, and it refuses state from
 a newer release rather than reading what it does not understand.
 
 **Nodes and apps follow.** After the controller, update each node's agent

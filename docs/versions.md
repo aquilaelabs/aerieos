@@ -78,11 +78,10 @@ published.
 
 Each release says how far back it reaches, in two numbers.
 
-- **The state floor** is the oldest `/config` it moves forward
-  (`SUPPORTED_FROM` in `scripts/dashboard/stateversion.py`). 0.9 reads state 2,
-  what 0.6.0 shipped, so any 0.6.x, 0.7.x or 0.8.x install upgrades in one
-  step. An older `/config` is refused at start with the release to go through
-  first (`THROUGH`), and the migrations under the floor are gone from the tree.
+- **The state floor** is the oldest `/config` it reads (`SUPPORTED_FROM` in
+  `scripts/dashboard/stateversion.py`). AerieOS starts at 0.9, and nothing
+  upgrades from a build before it: an older `/config` is refused at start, and
+  the way on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
   from another window takes nothing but its own update, and its projects'
   sessions wait until it has it. The controller keeps what the previous

@@ -48,18 +48,11 @@ FILE = "state.json"
 BACKUPS = "backups"
 KEEP = 3
 
-# The oldest state this build migrates from: state 2, what 0.6.0 shipped,
-# so any 0.6.x, 0.7.x or 0.8.x install upgrades in one step (the operator,
-# 28 Oct: 0.9 is a clean break with upgrade paths from 0.6, 0.7 and 0.8).
-# The migrations below it are gone from the tree (aerie lint allows that for a
-# number under this floor alone). A release that drops a state from here
-# names the release that still reads it in THROUGH.
-SUPPORTED_FROM = 2
-
-# state -> the release line to go through for a state this build no longer
-# migrates from: its newest release carries it to one this build reads.
-# State 0 is a /config from before the stamp (before 0.5.0), state 1 a 0.5.x.
-THROUGH = {0: "0.6", 1: "0.6"}
+# The oldest state this build reads: AerieOS starts here, and nothing upgrades
+# from the releases before it (the operator, 1 Nov: 0.6, 0.7 and 0.8 have no
+# path, and the migrations below this number are gone from the tree). A move
+# from a controller already at this state still lands.
+SUPPORTED_FROM = 19
 
 # What the copy before a migration leaves out: what grows and is not state
 # (each kind paths.py lets the Settings page move: logs, the trees jobs ran
@@ -167,11 +160,10 @@ def refusal(state, version=None):
                 f"AerieOS {by or 'a newer build'}, and this build reads state {cur} and older. "
                 f"Downgrades are not supported: start {by or 'the newer build'} again, or {where}.")
     if n < SUPPORTED_FROM:
-        via = THROUGH.get(n, "an older release")
         return (f"AerieOS {version} will not start: this /config is at state {n}"
-                f"{f', written by AerieOS {by}' if by else ''}, and this build upgrades from state "
-                f"{SUPPORTED_FROM} on. Start the newest {via} release on it first, then this one "
-                f"(docs/install.md#upgrading).")
+                f"{f', written by {by}' if by else ''}, and this build reads state "
+                f"{SUPPORTED_FROM} on. Nothing upgrades from a build before it: install fresh, "
+                f"with a new /config (docs/install.md#upgrading).")
     return ""
 
 
