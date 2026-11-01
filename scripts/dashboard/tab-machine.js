@@ -189,7 +189,7 @@ function wireStick(root){
     if (!release && !path) return notify("name the folder the projects are in first", true);
     if (!await askYes(release
         ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are."
-        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to BuilderBot's own account, so git and the controller can write them: their owner changes, nothing in them does. What the projects folder held before stays underneath, unseen.`,
+        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to BuilderBot's own account, so git and the controller can write them, and the folder is closed to other accounts: their owner changes, nothing in them does, and a share of this folder stops serving other people. What the projects folder held before stays underneath, unseen.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
     busy(pb, release ? "Letting go" : "Taking it");
     const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));

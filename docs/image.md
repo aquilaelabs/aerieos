@@ -88,9 +88,11 @@ projects folder: a share of the disks the machine adopted, a pool or the
 array, never the stick, and never a disk adopted read only. It is bound
 over the projects folder at every boot in place of the system pool's, with
 no pool needed, and the controller restarts on it. Its files are handed to
-the controller's own account, as a projects folder it made is: their owner
-changes and nothing in them does, since git refuses a tree another account
-owns and the controller could not write it. The job says which of the
+the controller's own account and the folder closed to other accounts, as a
+projects folder it made is: their owner changes and nothing in them does, since
+git refuses a tree another account owns, the controller could not write it, and
+sessions on this machine are refused while anybody can walk into the projects.
+A share of that folder stops serving other people. The job says which of the
 controller's projects the folder holds and which it does not, and what the
 projects folder held before stays underneath, unseen, until **Let it go**
 binds the pool's again.

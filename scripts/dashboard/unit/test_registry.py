@@ -38,6 +38,20 @@ class Registry(unittest.TestCase):
         self.assertTrue(registry.is_project("alpha"))
         self.assertEqual(registry.new_dir("byhand"), "byhand-2", "...and its name is not handed out")
 
+    def test_an_empty_workspace_is_a_disk_not_there_not_every_project_gone(self):
+        # B595: a purge has no way back, and the disk may only be late.
+        (self.ws / "beta").mkdir()
+        registry.sync()
+        shutil.rmtree(self.ws)
+        self.ws.mkdir()
+        ps = registry.sync()["projects"]
+        self.assertEqual((ps["alpha"]["state"], ps["beta"]["state"]), ("live", "live"), "nothing there at all: nothing changes")
+        (self.ws / "alpha").mkdir()
+        (self.ws / "beta").mkdir()
+        self.assertEqual(registry.sync()["projects"]["alpha"]["state"], "live")
+        shutil.rmtree(self.ws / "beta")
+        self.assertEqual(registry.sync()["projects"]["beta"]["state"], "purged", "one gone while others are there is one gone")
+
     def test_a_directory_is_never_handed_out_twice(self):
         registry.sync()
         self.assertEqual(registry.new_dir("alpha"), "alpha-2")

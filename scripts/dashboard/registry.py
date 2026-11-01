@@ -135,9 +135,16 @@ def sync():
                 if r.get("state") == "live":
                     r["name"] = unique_name(r["name"], but=name)
                 changed = True
+        # Not a folder of the projects there, and records say there were: the
+        # disk is not (not mounted yet, a stick's hold, a move landed before
+        # its folder was named), not every project gone at once. A purge has
+        # no way back and takes the owners with it (B595).
+        absent = not live and not gone
         for name, r in ps.items():
             st = r.get("state")
             if st == "live" and name not in live:
+                if absent:
+                    continue
                 r["state"] = "trashed" if name in gone else "purged"
                 changed = True
             elif st == "trashed" and name in live and name not in gone:
