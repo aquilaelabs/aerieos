@@ -42,7 +42,7 @@ const scrub = page => page.evaluate(() => {
   const ip = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, seen = new Map();
   const fake = a => a.startsWith('192.0.2.') || a === '127.0.0.1' ? a
     : (seen.has(a) || seen.set(a, `192.0.2.${10 + seen.size}`), seen.get(a));
-  const clean = s => s.replace(mail, 'you@example.com').replace(ip, fake);
+  const clean = s => s.replace(mail, 'you@example.com').replace(ip, fake).replace(/bb-dev-sandbox/g, 'workshop-1');
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()){ const c = clean(n.nodeValue); if (c !== n.nodeValue) n.nodeValue = c; }
   document.querySelectorAll('[title]').forEach(e => { e.title = clean(e.title); });
