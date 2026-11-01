@@ -123,7 +123,7 @@ what runs in every session of it.
 
 ## The vetted catalog
 
-The public catalog (the `builderbot-catalog` repository, R169) is an index
+The public catalog (the `aerieos-catalog` repository, R169) is an index
 of packs reviewed by AerieOS's maintainers, each entry pinning a pack's
 repository to an exact commit and the sha256 of its archive at that
 commit, never a branch or latest. The index is signed with the

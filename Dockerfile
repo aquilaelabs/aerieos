@@ -21,7 +21,7 @@ FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.title="AerieOS" \
       org.opencontainers.image.description="Claude Code workstation and build-node controller" \
-      org.opencontainers.image.source="https://github.com/aquilaelabs/builderbot" \
+      org.opencontainers.image.source="https://github.com/aquilaelabs/aerieos" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -325,13 +325,11 @@ COPY config/icon.png /opt/builderbot/icon.png
 RUN set -eux; \
     chmod -R +x /opt/builderbot/scripts; \
     ln -sf /opt/builderbot/scripts/aerie /usr/local/bin/aerie; \
-    ln -sf /opt/builderbot/scripts/bb /usr/local/bin/bb; \
     # /opt/builderbot/bin sits first on PATH and holds privilege-dropping
     # wrappers, so `docker exec -it builderbot bb` runs as `builder`
     # (correct HOME, correct file ownership) instead of as root.
     mkdir -p /opt/builderbot/bin; \
     ln -sf /opt/builderbot/scripts/as-builder /opt/builderbot/bin/aerie; \
-    ln -sf /opt/builderbot/scripts/as-builder /opt/builderbot/bin/bb; \
     chown -R builder:builder /opt/builderbot/skel
 
 # Baked in so `docker exec` sessions also see it: when the entrypoint has

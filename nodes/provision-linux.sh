@@ -12,7 +12,7 @@
 #
 # Run it inside the VM, once:
 #
-#   curl -fsSLO https://raw.githubusercontent.com/aquilaelabs/builderbot/main/nodes/provision-linux.sh
+#   curl -fsSLO https://raw.githubusercontent.com/aquilaelabs/aerieos/main/nodes/provision-linux.sh
 #   sudo bash provision-linux.sh --key "ssh-ed25519 AAAA..."
 #
 # With --controller URL --token bbe_… (the Nodes tab mints the token) it also
@@ -1822,7 +1822,7 @@ print(json.load(open(sys.argv[1])).get("user") or "")' "$NODE_JSON" 2>/dev/null)
     # The newest bundle the agent has unpacked. It appears the first time a
     # toolchain job runs here, so before that there is honestly nothing to run.
     newest="$(ls -1dt "$store"/.bb/*/scripts/aerie 2>/dev/null | head -1 || true)"
-    [ -n "$newest" ] || die "no bb on this machine yet: the controller unpacks one into
+    [ -n "$newest" ] || die "no aerie on this machine yet: the controller unpacks one into
    ${store}/.bb the first time a toolchain job runs on this node. Install
    something from the dashboard's Library and it will be here."
     bb="$newest"

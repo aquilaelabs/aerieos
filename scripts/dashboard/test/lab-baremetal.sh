@@ -42,7 +42,7 @@ outside() {
 start_install() {
     set -e
     mkdir -p /root/bb && cd /root/bb
-    curl -fsSL "https://github.com/aquilaelabs/builderbot/archive/$1.tar.gz" | tar -xz --strip-components=1
+    curl -fsSL "https://github.com/aquilaelabs/aerieos/archive/$1.tar.gz" | tar -xz --strip-components=1
     bash nodes/install-controller.sh --check > /root/check.log 2>&1; echo $? > /root/check.rc
     setsid bash -c 'bash nodes/install-controller.sh --install > /root/install.log 2>&1; echo $? > /root/install.rc' \
         < /dev/null > /dev/null 2>&1 &
@@ -81,7 +81,7 @@ inside() {
 start_update() {
     set -e
     rm -rf /root/bb-next && mkdir -p /root/bb-next && cd /root/bb-next
-    curl -fsSL "https://github.com/aquilaelabs/builderbot/archive/$1.tar.gz" | tar -xz --strip-components=1
+    curl -fsSL "https://github.com/aquilaelabs/aerieos/archive/$1.tar.gz" | tar -xz --strip-components=1
     setsid bash -c 'bash /opt/builderbot/nodes/install-controller.sh --update --from /root/bb-next > /root/update.log 2>&1; echo $? > /root/update.rc' \
         < /dev/null > /dev/null 2>&1 &
     echo started

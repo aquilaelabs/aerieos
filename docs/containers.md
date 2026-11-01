@@ -477,7 +477,7 @@ owner is for the day a deployment of AerieOS's sits on a bridge.
 
 Every other container's registry images keep up to date the same way (R195,
 the operator, 11 Oct). A service that runs an image by tag, with no `build:`
-(mariadb, a linuxserver image, ghcr.io/aquilaelabs/builderbot:latest), is
+(mariadb, a linuxserver image, ghcr.io/aquilaelabs/aerieos:latest), is
 compared once a week, and on Check for updates on the Containers page: the digest
 its node pulled (`docker inspect`'s RepoDigests) against what the
 registry serves for that tag now, over the registry's v2 API with an

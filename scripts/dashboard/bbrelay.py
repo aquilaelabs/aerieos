@@ -349,10 +349,10 @@ def run(me, req, project):
     # together, each slowing the rest (68s for what took 8). The rest wait
     # their turn in this thread; a wait that long says the box is busy.
     if not _SLOTS.acquire(timeout=120):
-        return {"error": "the controller is busy with other sessions' bb; try again",
+        return {"error": "the controller is busy with other sessions' aerie; try again",
                 "code": 75, "out": "", "err": ""}, 503
     try:
-        r = subprocess.run(["bash", str(HERE.parent / "bb"), *argv], cwd=str(cwd),
+        r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
                            env=env, capture_output=True, text=True, timeout=180)
     except subprocess.TimeoutExpired:
         return {"error": f"bb {argv[0]} took longer than three minutes",

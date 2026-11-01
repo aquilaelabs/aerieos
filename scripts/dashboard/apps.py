@@ -33,7 +33,7 @@ from pathlib import Path
 
 # The releases are AerieOS's own on GitHub; a test points this at a file.
 RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
-                or "https://api.github.com/repos/aquilaelabs/builderbot/releases")
+                or "https://api.github.com/repos/aquilaelabs/aerieos/releases")
 BOOT_DELAY = float(os.environ.get("BB_APPS_BOOT_DELAY") or 30)
 EVERY = 24 * 3600
 TIMEOUT = 60

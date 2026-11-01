@@ -89,7 +89,7 @@ def _unwrap(words):
         if _ASSIGN.match(w) or w in KEYWORDS:
             i += 1
             continue
-        if w in ("aerie", "bb") and words[i + 1:i + 2] == ["run"]:
+        if w == "aerie" and words[i + 1:i + 2] == ["run"]:
             # `aerie run [--node N] -- CMD`: the command is after the `--`.
             try:
                 i = words.index("--", i) + 1

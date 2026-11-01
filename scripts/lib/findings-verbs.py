@@ -110,7 +110,7 @@ def sample():
            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
            "runs": [{"tool": {"driver": {
                "name": "builderbot-sample",
-               "informationUri": "https://github.com/aquilaelabs/builderbot",
+               "informationUri": "https://github.com/aquilaelabs/aerieos",
                "rules": [{"id": r, "shortDescription": {"text": t}} for r, _, t in RULES]}},
                "results": results}]}
     # Relayed, it runs on the controller: a path is the project's own, or

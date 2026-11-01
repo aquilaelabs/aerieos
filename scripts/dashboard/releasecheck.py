@@ -19,7 +19,7 @@ import time
 import urllib.request
 
 RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
-                or "https://api.github.com/repos/aquilaelabs/builderbot/releases")
+                or "https://api.github.com/repos/aquilaelabs/aerieos/releases")
 BOOT_DELAY = float(os.environ.get("BB_RELEASE_BOOT_DELAY") or 120)
 EVERY = 24 * 3600
 TIMEOUT = 30

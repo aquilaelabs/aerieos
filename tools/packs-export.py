@@ -102,7 +102,7 @@ def catalog_index(root):
         print("  [FAIL] packs/ in the catalog is not committed: commit the folders first, then --index pins that commit")
         return 1
     url = subprocess.run(["git", "-C", root, "remote", "get-url", "origin"], capture_output=True, text=True, check=False).stdout.strip() \
-        or "https://github.com/aquilaelabs/builderbot-catalog"
+        or "https://github.com/aquilaelabs/aerieos-catalog"
     url = url.removesuffix(".git")
     idx_path = os.path.join(root, "index.json")
     try:

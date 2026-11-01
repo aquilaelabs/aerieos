@@ -58,7 +58,7 @@ WALL_FILE="$P/etc/bb-session.wall"
 SUDOERS="$P/etc/sudoers.d/builderbot-controller"
 BB_BIN="$P/usr/local/bin/aerie"
 SERVICE=builderbot-controller
-REPO=aquilaelabs/builderbot
+REPO=aquilaelabs/aerieos
 # How many releases are kept beside the one in use: the one before is what
 # an update that does not come up goes back to by itself.
 KEEP_RELEASES=3
@@ -106,7 +106,7 @@ Actions:
                  release that does not answer goes back to it by itself,
                  the state copy it took first put back. There is no going
                  back by hand: a release moves forward only.
-  --remove       stop the controller and take its release, service, bb and
+  --remove       stop the controller and take its release, service, aerie and
                  wall away, and this machine's node with them. The state,
                  the env file, the secrets, the account and the projects
                  stay; --purge takes all but the projects too. Says what
@@ -524,7 +524,7 @@ exec /opt/builderbot/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
     # The old name, while anything still calls it.
-    ln -sf "$(basename "$BB_BIN")" "$(dirname "$BB_BIN")/bb"
+    rm -f "$(dirname "$BB_BIN")/bb"   # the command's old name, on a machine that had it
 }
 
 # sudoers: the two root helpers the account may run, the image's rule.
@@ -643,7 +643,7 @@ cmd_install() {
 The controller is at http://${stamp}:${PORT}. Open it and make the owner
 account: until somebody does, it serves that page and nothing else.
 
-  sudo aerie status                  what it is running, as the container's bb says it
+  sudo aerie status                  what it is running, as the container's aerie says it
   sudo systemctl status ${SERVICE}
   ${ENV_FILE}   its settings
 

@@ -24,7 +24,7 @@ catchup` says what the box has run and what changed since.
 ## Build
 
 The image, and nothing else: `.github/workflows/build-image.yml` builds and
-pushes `ghcr.io/aquilaelabs/builderbot` on a push to `main` that touches the
+pushes `ghcr.io/aquilaelabs/aerieos` on a push to `main` that touches the
 image's inputs (Dockerfile, `scripts/`, `config/`), plus a weekly uncached
 rebuild; a manual dispatch is cached unless its `no_cache` box is ticked. It
 runs on a hosted, pinned `ubuntu-24.04`, and a pull request does not build

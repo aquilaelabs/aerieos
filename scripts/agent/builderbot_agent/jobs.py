@@ -412,7 +412,7 @@ class Job(threading.Thread):
         env.setdefault("BB_CONTROLLER", str(self.agent.state.get("controller") or ""))
         env.setdefault("BUILDERBOT_ROLE", "node")
         env.setdefault("BB_NODE", str(self.agent.state.get("name") or ""))
-        argv = ["bash", os.path.join(into, "scripts", "bb"), "login", "--flow"] + (["--agent", agent] if agent else [])
+        argv = ["bash", os.path.join(into, "scripts", "aerie"), "login", "--flow"] + (["--agent", agent] if agent else [])
         # Where sign-ins are sealed (R126), the folder its opened copy lives
         # in is there before the login writes through the home's link to it;
         # the token pass then seals what the login wrote.
@@ -529,7 +529,7 @@ class Job(threading.Thread):
         env.setdefault("BB_NODE", str(self.agent.state.get("name") or ""))
         self.say(f"signing out of {agent or 'Claude'} on this machine\n")
         try:
-            p = subprocess.run(["bash", os.path.join(into, "scripts", "bb"), "login", "--out"] + (["--agent", agent] if agent else []),
+            p = subprocess.run(["bash", os.path.join(into, "scripts", "aerie"), "login", "--out"] + (["--agent", agent] if agent else []),
                                env=env, cwd="/tmp", capture_output=True, text=True,
                                timeout=int(spec.get("timeout") or 120), check=False, **who)
         except (OSError, subprocess.SubprocessError) as e:
@@ -575,7 +575,7 @@ class Job(threading.Thread):
             into = self.agent.bundle(self, who)
             if not into:
                 return "failed", 69
-            argv = ["bash", os.path.join(into, "scripts", "bb")] + bbv
+            argv = ["bash", os.path.join(into, "scripts", "aerie")] + bbv
             project = re.sub(r"[^A-Za-z0-9._-]", "_", str(spec.get("project") or "project"))
             cwd = os.path.join(stores.get("data") or "/tmp", "emu", project)
             self.agent.own_dir(cwd, who)

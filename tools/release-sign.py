@@ -26,7 +26,7 @@ import tempfile
 import urllib.request
 from typing import NoReturn
 
-REPO = "aquilaelabs/builderbot"
+REPO = "aquilaelabs/aerieos"
 API = f"https://api.github.com/repos/{REPO}"
 NS = "builderbot-release"
 DEFAULT_KEY = os.path.join(os.path.expanduser("~"), ".builderbot-release", "key")

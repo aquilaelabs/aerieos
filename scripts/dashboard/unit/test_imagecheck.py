@@ -75,8 +75,8 @@ class ImageCheck(unittest.TestCase):
     def test_a_reference_is_read_as_a_registry_would(self):
         self.assertEqual(imagecheck.parse_ref("mariadb:11"), ("registry-1.docker.io", "library/mariadb", "11"))
         self.assertEqual(imagecheck.parse_ref("linuxserver/radarr"), ("registry-1.docker.io", "linuxserver/radarr", "latest"))
-        self.assertEqual(imagecheck.parse_ref("ghcr.io/aquilaelabs/builderbot:latest"),
-                         ("ghcr.io", "aquilaelabs/builderbot", "latest"))
+        self.assertEqual(imagecheck.parse_ref("ghcr.io/aquilaelabs/aerieos:latest"),
+                         ("ghcr.io", "aquilaelabs/aerieos", "latest"))
         self.assertEqual(imagecheck.parse_ref("localhost:5000/app:1"), ("localhost:5000", "app", "1"))
         self.assertIsNone(imagecheck.parse_ref("nginx:1.29-alpine@sha256:" + "c" * 64), "pinned by digest: not asked")
 

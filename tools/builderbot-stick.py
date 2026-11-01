@@ -44,8 +44,8 @@ import time
 import urllib.error
 import urllib.request
 
-RELEASES = "https://github.com/aquilaelabs/builderbot/releases"
-API = "https://api.github.com/repos/aquilaelabs/builderbot/releases"
+RELEASES = "https://github.com/aquilaelabs/aerieos/releases"
+API = "https://api.github.com/repos/aquilaelabs/aerieos/releases"
 CHUNK = 4 << 20
 GB = 1e9
 # The stick's builderbot.env (image/lay-disk): 4 KiB behind this line.
@@ -196,7 +196,7 @@ def release_image(tag, channel="normal"):
     return name
 
 
-ATTEST = "https://api.github.com/repos/aquilaelabs/builderbot/attestations/sha256:{digest}"
+ATTEST = "https://api.github.com/repos/aquilaelabs/aerieos/attestations/sha256:{digest}"
 
 
 def attested(path):
@@ -227,7 +227,7 @@ def attested(path):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
         f.write("\n".join(lines) + "\n")
     try:
-        r = subprocess.run([gh, "attestation", "verify", path, "--bundle", f.name, "--repo", "aquilaelabs/builderbot"],
+        r = subprocess.run([gh, "attestation", "verify", path, "--bundle", f.name, "--repo", "aquilaelabs/aerieos"],
                            capture_output=True, text=True, check=False)
     finally:
         os.unlink(f.name)

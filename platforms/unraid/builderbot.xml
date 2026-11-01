@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>Aerie-Workshop</Name>
-  <Repository>ghcr.io/aquilaelabs/builderbot:latest</Repository>
+  <Repository>ghcr.io/aquilaelabs/aerieos:latest</Repository>
   <Registry>https://ghcr.io</Registry>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/aquilaelabs/builderbot/issues</Support>
-  <Project>https://github.com/aquilaelabs/builderbot</Project>
+  <Support>https://github.com/aquilaelabs/aerieos/issues</Support>
+  <Project>https://github.com/aquilaelabs/aerieos</Project>
   <Overview>
 An AI workshop for coding agents (Claude Code, ChatGPT's Codex CLI and GitHub's Copilot CLI) and the controller for your build nodes: the machines where builds, tests, CI and the Android emulator run.
 
@@ -27,7 +27,7 @@ NOTES
        returns early on an empty URL and never consults the cache, so an
        empty <Icon/> shows the question-mark placeholder however many PNGs
        are sitting on disk. -->
-  <Icon>https://raw.githubusercontent.com/aquilaelabs/builderbot/main/config/icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/aquilaelabs/aerieos/main/config/icon.png</Icon>
   <ExtraParams>--hostname=builderbot --log-opt max-size=20m --log-opt max-file=3 --ulimit memlock=-1:-1 --ulimit core=0:0</ExtraParams>
   <PostArgs/>
   <DonateText/>

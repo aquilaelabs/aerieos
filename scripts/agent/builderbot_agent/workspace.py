@@ -184,7 +184,10 @@ class WorkspaceMixin:
                     tar.extractall(into, filter="data")
                 else:
                     tar.extractall(into)
-            os.chmod(os.path.join(into, "scripts", "bb"), 0o755)
+            os.chmod(os.path.join(into, "scripts", "aerie"), 0o755)
+            # The old name is in the bundle only for an agent not yet updated.
+            with contextlib.suppress(OSError):
+                os.unlink(os.path.join(into, "scripts", "bb"))
             for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
                 with contextlib.suppress(OSError):
                     os.chmod(os.path.join(into, "scripts", "dashboard", x), 0o755)

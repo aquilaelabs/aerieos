@@ -235,12 +235,12 @@ ALWAYS = [
      # job, and a build can be longer than either (the operator, 16 Oct:
      # messages queued behind them, on every project as on this one).
      # The command by either name: bb still forwards to aerie.
-     "refuse": [f"{cli} {verb}" for cli in ("aerie", "bb")
+     "refuse": [f"{cli} {verb}" for cli in ("aerie",)
                 for verb in ("build", "test", "tests run", "tests preflight", "tests lab", "tests coverage",
                              "tests probe", "devapp rebuild", "dashboard test")]
                + ["*/dashboard/test/run.sh"]
                # the plan only: nothing runs (B698), and a verb's usage, which runs nothing either (B278).
-               + [f"!{cli} {tail}" for cli in ("aerie", "bb")
+               + [f"!{cli} {tail}" for cli in ("aerie",)
                   for tail in ("tests preflight* --dry*", "* --help*", "* -h", "*help")],
      "foreground": True},
     # ...and the wait for one is not a foreground loop either (the operator,

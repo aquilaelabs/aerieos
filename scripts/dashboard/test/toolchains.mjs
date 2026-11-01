@@ -790,7 +790,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     ok(served.src.includes(iconAt.slice(0, 12)) && served.w > 0 && served.type === 'image/svg+xml' && /sandbox/.test(served.csp)
        && /default-src 'none'/.test(served.csp) && served.sniff === 'nosniff' && !served.ran,
        `its card draws the icon from the pack's own address at its pin, served as an image with no script run (${JSON.stringify(served)})`);
-    await api('/api/settings', { set: { catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/' } });
+    await api('/api/settings', { set: { catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/' } });
     rmSync(`${DIR}/state/catalog-index.json`, { force: true });
   }
   const bad = await api('/api/toolpacks', { action: 'preview', url: `file://${DIR}/nowhere` });

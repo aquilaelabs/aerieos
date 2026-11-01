@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
-# The command's old name, kept while sessions and nodes on an older build still
-# call it; deprecated, gone in a later release (CHANGELOG, Upgrading).
+# Not a command any more: no PATH carries it. A node's agent from an earlier 0.9
+# build calls this name in the bundle until it has updated itself, and an updated
+# agent deletes it on unpack. It goes when the agent's window moves.
 exec "$(dirname "$(readlink -f "$0")")/aerie" "$@"

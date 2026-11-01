@@ -72,7 +72,7 @@ class Install(unittest.TestCase):
         self.env["SDK_ROOT"] = self.store
 
     def bb(self, *a):
-        return subprocess.run(["bash", os.path.join(self.b, "scripts", "bb"), *a], capture_output=True, text=True,
+        return subprocess.run(["bash", os.path.join(self.b, "scripts", "aerie"), *a], capture_output=True, text=True,
                               env=self.env, timeout=120, check=False)
 
     def test_installs_at_the_approved_commit_and_joins_the_environment(self):
@@ -167,7 +167,7 @@ class MadeHere(unittest.TestCase):
         env["SDK_ROOT"] = store
 
         def bb(*a):
-            return subprocess.run(["bash", os.path.join(b, "scripts", "bb"), *a], capture_output=True, text=True,
+            return subprocess.run(["bash", os.path.join(b, "scripts", "aerie"), *a], capture_output=True, text=True,
                                   env=env, timeout=120, check=False)
         r = bb("toolchains", "install", "hexkit")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

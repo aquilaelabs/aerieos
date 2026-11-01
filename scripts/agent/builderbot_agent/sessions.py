@@ -156,7 +156,7 @@ class SessionsMixin:
         # returned, so no idle session's token was ever refreshed and each
         # ran out twelve hours after its last call (B335).
         store = tc_root(self.state)
-        bb = os.path.join(store, ".bb", "current", "scripts", "bb") if store else ""
+        bb = os.path.join(store, ".bb", "current", "scripts", "aerie") if store else ""
         if not bb or not os.access(bb, os.X_OK):
             self.keep_said("bundle", f"no bundle bb at {bb or '(no toolchain store)'}, so no idle "
                                      "session's token is refreshed")
@@ -185,7 +185,7 @@ class SessionsMixin:
                 with contextlib.suppress(RuntimeError):
                     w, base, root_bb = dropper(env, uid)
                     if root_bb:
-                        run_bb, run_who = os.path.join(root_bb, "scripts", "bb"), w
+                        run_bb, run_who = os.path.join(root_bb, "scripts", "aerie"), w
                         env["BUILDER_HOME"] = base
             try:
                 p = subprocess.run([run_bb, "token", "keep"],
@@ -432,7 +432,7 @@ class SessionsMixin:
         refreshed"), and only the next job or session start fetched it.
         Once a minute at most while it is missing."""
         store = tc_root(self.state)
-        bb = os.path.join(store, ".bb", "current", "scripts", "bb") if store else ""
+        bb = os.path.join(store, ".bb", "current", "scripts", "aerie") if store else ""
         if not store or os.access(bb, os.X_OK):
             return
         # There and unable to run: a store mounted noexec. Fetching again
@@ -561,7 +561,7 @@ class SessionsMixin:
             return None
         self._logins_at = now
         store = tc_root(self.state)
-        bb = os.path.join(store, ".bb", "current", "scripts", "bb") if store else ""
+        bb = os.path.join(store, ".bb", "current", "scripts", "aerie") if store else ""
         if not (bb and os.path.isfile(bb)):
             return None
         env = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),

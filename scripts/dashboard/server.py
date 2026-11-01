@@ -3214,7 +3214,7 @@ PHONE_WAIT_S = 45
 
 
 # AerieOS's own repository, as a project's origin names it over https or ssh.
-SELF_REPO = re.compile(r"github\.com[:/]aquilaelabs/builderbot(?:\.git)?/?$", re.I)
+SELF_REPO = re.compile(r"github\.com[:/]aquilaelabs/(?:aerieos|builderbot)(?:\.git)?/?$", re.I)
 
 
 def self_dist():

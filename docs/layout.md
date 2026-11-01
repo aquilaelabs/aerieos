@@ -39,19 +39,19 @@ scripts/
   deploy-key                     root-only deploy key helper: make, keep, forget, load (the other)
   healthcheck.sh                 docker healthcheck
   aerie                          in-container helper CLI
-  bb                             the same command under its old name, forwarding to aerie
+  bb                             what an older agent calls in the bundle until it updates; no PATH carries it
   as-builder                     privilege-dropping wrapper for docker exec
   lib/common.sh                  shared shell helpers
   lib/host-env.sh                the image's ENV, the release's stamp and the env file, for a bare-metal install's service and its bb (R90)
   lib/boot.sh                    the boot's steps both installs take: secrets shield, ssh-agent, home seed, hooks, state gate (R90)
   lib/controller-packages.sh     the controller's package list read one way, for the Dockerfile and a bare-metal install (R90)
-  lib/relay-verbs                the aerie verbs a node relays to the controller (bb and bbrelay.py both read it)
+  lib/relay-verbs                the aerie verbs a node relays to the controller (aerie and bbrelay.py both read it)
   lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by bb
   lib/preflight.sh               `aerie tests preflight`, sourced by bb
   lib/bbapi.py                   the controller's API from bb: one client, the loopback or BB_CONTROLLER, pinned https
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
   lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
-  lib/syncwait.py                a session's bb on a synced node waits for its copy to be in step with the controller's (R163)
+  lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
@@ -278,7 +278,7 @@ scripts/
     findings.py                  the scanner's reports read and attributed, and what they used to say
     gitrelay.py                  a node session's push, fetch and pull, done in a repository of the controller's own
     pushscan.py                  what a push would send, read for secrets and private things before it goes, and the lines a person okayed (R219)
-    bbrelay.py                   a bb verb from a node's session, run here: which verbs travel, and what a session may push
+    bbrelay.py                   an aerie verb from a node's session, run here: which verbs travel, and what a session may push
     hooks.py                     what a node session's hooks post: overlap notes, the chat feed, the catch-up, the turn queue
     macros.py                    what the page may type into a terminal: the command and key tables, the pins, custom lists
     profiletab.py                an account's own settings, the Profile page

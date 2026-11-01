@@ -32,7 +32,7 @@ those rows. Nothing else.
 | Run a self-hosted runner for **one repo** | ● | | |
 | Run a self-hosted runner for the **whole org** | ● | | |
 
-Pulling the image needs none of them: `ghcr.io/aquilaelabs/builderbot` is
+Pulling the image needs none of them: `ghcr.io/aquilaelabs/aerieos` is
 public.
 
 ### What each one is, exactly
@@ -76,7 +76,7 @@ never in this container: it has no Docker socket (see the notes at the end).
 
 ## Shared step 2: the appdata directories
 
-The image is `ghcr.io/aquilaelabs/builderbot`, public, published on every
+The image is `ghcr.io/aquilaelabs/aerieos`, public, published on every
 push to `main` and every release (plus a weekly freshness rebuild); pulling
 it needs no login.
 
@@ -104,7 +104,7 @@ Get the template onto the flash drive, from the Unraid terminal:
 
 ```bash
 curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-builderbot.xml \
-  https://raw.githubusercontent.com/aquilaelabs/builderbot/main/platforms/unraid/builderbot.xml
+  https://raw.githubusercontent.com/aquilaelabs/aerieos/main/platforms/unraid/builderbot.xml
 ```
 
 **Or copy it over.** The flash drive is an SMB share: open
@@ -346,7 +346,7 @@ metadata before it reached any code.
    STACK=/boot/config/plugins/compose.manager/projects/builderbot
    mkdir -p "$STACK"
    cd /mnt/user/appdata
-   git clone https://github.com/aquilaelabs/builderbot.git
+   git clone https://github.com/aquilaelabs/aerieos.git
    cp builderbot/docker-compose.yml "$STACK"/
    cp builderbot/.env.example "$STACK"/.env
    nano "$STACK"/.env && chmod 600 "$STACK"/.env

@@ -4,7 +4,7 @@ The Unraid-specific detail for every step lives in
 **[unraid.md](unraid.md)**; this is the complete checklist with the
 decisions you need to make.
 
-The image, `ghcr.io/aquilaelabs/builderbot`, is public: pulling it needs no
+The image, `ghcr.io/aquilaelabs/aerieos`, is public: pulling it needs no
 login.
 
 AerieOS comes in four editions, one controller in four shapes. This
@@ -207,7 +207,7 @@ back, see [Upgrading](#upgrading). Compose: `docker compose pull && docker compo
 ## Upgrading
 
 **Pin a release, not `:latest`.** `:latest` moves to each stable release as it
-is published. Each release publishes its own image, `ghcr.io/aquilaelabs/builderbot:0.6.0`,
+is published. Each release publishes its own image, `ghcr.io/aquilaelabs/aerieos:0.6.0`,
 and `:0.6` for the newest release of that line; pin one of those in your
 compose file or template, and move it on when you choose to upgrade.
 `:dev` follows the dev channel instead: every dev build and release as it is
@@ -264,7 +264,7 @@ beside the system's 3.9.
 **Install**, from a checkout or an unpacked release, as root:
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 sudo bash nodes/install-controller.sh --check        # changes nothing
 sudo bash nodes/install-controller.sh --install
 ```
@@ -346,7 +346,7 @@ what it is, how each is installed and how it is built.
 ## Building locally instead of pulling
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 cp .env.example .env && nano .env
 docker compose build && docker compose up -d
 ```

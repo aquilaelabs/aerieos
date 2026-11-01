@@ -11,11 +11,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/build-image.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/build-image.yml/badge.svg" alt="build image"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/lint.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/lint.yml/badge.svg" alt="lint"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/dashboard.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/dashboard.yml/badge.svg" alt="dashboard tests"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/build-image.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/build-image.yml/badge.svg" alt="build image"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml/badge.svg" alt="lint"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml/badge.svg" alt="dashboard tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/pkgs/container/builderbot"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/pkgs/container/builderbot"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
 </p>
 
 > [!WARNING]
@@ -196,7 +196,7 @@ match:
 ```yaml
 services:
   builderbot:
-    image: ghcr.io/aquilaelabs/builderbot:0.9   # a release line; see Upgrading in docs/install.md
+    image: ghcr.io/aquilaelabs/aerieos:0.9   # a release line; see Upgrading in docs/install.md
     container_name: Aerie-Workshop
     hostname: builderbot
     restart: unless-stopped
@@ -237,7 +237,7 @@ On a NAS, the app template does the same from its own page: the
 On a Linux machine that is only AerieOS, as root:
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 sudo bash nodes/install-controller.sh --check        # changes nothing
 sudo bash nodes/install-controller.sh --install
 ```

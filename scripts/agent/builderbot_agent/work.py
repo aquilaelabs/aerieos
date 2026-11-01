@@ -450,7 +450,7 @@ class WorkMixin:
             # of this job's log (R67).
             job.step("checking")
             job.say(f"== aerie toolchains check {' '.join(names)}\n")
-            return job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
+            return job.exec({"argv": ["bash", os.path.join(into, "scripts", "aerie"),
                                        "toolchains", "check", *names],
                               "cwd": store, "timeout": spec.get("timeout") or 900,
                               "env": sdk_env(self.state)})
@@ -486,7 +486,7 @@ class WorkMixin:
             # ends this name there, with the old one still installed.
             for verb in tc_verbs(store, name, cat.get(name), action):
                 job.say(f"== aerie toolchains {verb} {name}\n")
-                st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
+                st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "aerie"),
                                                 "toolchains", verb, name],
                                        "cwd": store, "timeout": spec.get("step_timeout") or spec.get("timeout") or 3600,
                                        "env": sdk_env(self.state)})
@@ -834,7 +834,7 @@ class WorkMixin:
         for iid in ids:
             job.step(iid)
             job.say(f"== aerie emu image {action} {iid}\n")
-            st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "bb"),
+            st_, code = job.exec({"argv": ["bash", os.path.join(into, "scripts", "aerie"),
                                             "emu", "image", action, iid],
                                    "cwd": store, "timeout": spec.get("step_timeout") or spec.get("timeout") or 3600,
                                    "env": sdk_env(self.state)})

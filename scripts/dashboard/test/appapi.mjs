@@ -46,7 +46,7 @@ ok(typeof meta.body.built === 'string',
   mkdirSync(d, { recursive: true });
   mkdirSync(`${self}/.git`, { recursive: true });
   writeFileSync(`${self}/.git/config`,
-    '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/aquilaelabs/builderbot.git\n'
+    '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/aquilaelabs/aerieos.git\n'
     + '\tfetch = +refs/heads/*:refs/remotes/origin/*\n');
   const signed = 'builderbot-app-0.7.0-dev.2284-d51d651-signed.apk';
   writeFileSync(`${d}/${signed}`, 'signed');

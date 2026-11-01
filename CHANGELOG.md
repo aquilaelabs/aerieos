@@ -22,7 +22,7 @@
 
 ### Changed
 
-- The default theme is blue and copper: navy surfaces, a cerulean accent and warm copper on what is pressed and followed, and the mark with them; a check that passed stays green
+- The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
 - The command is aerie, in every shell and session
 - The container edition is called Aerie Workshop: it is the AI workshop alone, and the storage comes with AerieOS on a machine of its own
@@ -65,7 +65,8 @@
 
 ### Upgrading
 
-- The command is now aerie. bb still works and forwards to it, deprecated, and goes in a later release; change any script of your own that calls it. Folders, services, the image and the repository keep their names, so nothing on an install moves
+- The command is now aerie, and bb is gone: change any script of your own that calls it
+- The image is now ghcr.io/aquilaelabs/aerieos, and the old name gets no more builds: point your compose file, template or `docker pull` at the new one. The repositories moved to github.com/aquilaelabs/aerieos and aerieos-catalog, and old links still reach them. Folders, services and data keep their names, so nothing on an install moves
 - A container following :latest now moves only when a stable release is published; to follow every change on main as before, point it at :main (c4879b7)
 
 ## 0.9.0: 2026-10-30

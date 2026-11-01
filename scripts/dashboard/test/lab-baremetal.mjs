@@ -15,7 +15,7 @@
 //   BB_LAB_KEY         an ssh public key for each VM's own account
 //   BB_LAB_SSH         the private half's path ON THE VM HOST, readable by its
 //                      job account: the walk reaches a VM through jobs there
-//   BB_LAB_REF         the ref of github.com/aquilaelabs/builderbot to install
+//   BB_LAB_REF         the ref of github.com/aquilaelabs/aerieos to install
 //   BB_LAB_REF_NEXT    a newer ref to update to (R90 step 5), optional
 //                      (the branch under test, pushed)
 //   BB_LAB_PROJECT     a project there to make the VMs in (hello)

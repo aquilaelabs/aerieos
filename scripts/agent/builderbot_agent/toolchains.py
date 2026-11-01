@@ -557,7 +557,7 @@ def sdk_versions(state):
     env = dict(os.environ)
     env.update(sdk_env(state))
     for c in cands[:3]:
-        bb = os.path.join(c, "scripts", "bb")
+        bb = os.path.join(c, "scripts", "aerie")
         if not os.path.isfile(bb):
             continue
         try:

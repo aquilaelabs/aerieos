@@ -550,8 +550,8 @@ const SETTING_GROUPS = [
   // The vetted catalog (R169): where its signed index is read, and a mirror
   // of it imported for a controller that cannot reach it (step 6).
   {key: "catalog", title: "Vetted catalog", intro: catalogIntro, status: catalogStatus,
-   heading: s => `${/aquilaelabs\/builderbot-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
-   fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/",
+   heading: s => `${/aquilaelabs\/(aerieos|builderbot)-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
+   fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/",
      hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"}]},
   {key: "apps", title: "Apps", off: "apps", intro: appsIntro, status: appsStatus,
    heading: s => `${["apps_android", ...(s?.settings?.offer_unvetted?.value ? ["apps_vscode", "apps_companion"] : [])]

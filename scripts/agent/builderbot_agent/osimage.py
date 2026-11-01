@@ -28,8 +28,8 @@ ESP = "/boot/efi"
 SLOT_DEV = {"a": "/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0a",
             "b": "/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0b"}
 SLOT_MIB = 4096
-RELEASE_URL = "https://github.com/aquilaelabs/builderbot/releases/download"
-REPO = "aquilaelabs/builderbot"
+RELEASE_URL = "https://github.com/aquilaelabs/aerieos/releases/download"
+REPO = "aquilaelabs/aerieos"
 # A build's attestation, read from GitHub's public API with no token, and
 # verified by gh with --bundle, which asks for no sign-in: a machine has
 # none. An update from a folder takes the bundle the release carries

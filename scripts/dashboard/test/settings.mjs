@@ -126,8 +126,8 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   const good = await set({catalog_url: 'https://example.com/catalog/'});
   const bad = await set({catalog_url: 'ftp://example.com/catalog/'});
   const mail = await set({smtp_port: '587', smtp_from: 'AerieOS <bb@example.com>', tls_email: 'me@example.com'});
-  await set({catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/', smtp_port: '', smtp_from: '', tls_email: ''});
-  ok(/builderbot-catalog/.test(drawn.url) && /No mirror imported/.test(drawn.said) && good.ok && /an address like/.test(bad.error || '') && mail.ok,
+  await set({catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/', smtp_port: '', smtp_from: '', tls_email: ''});
+  ok(/aerieos-catalog/.test(drawn.url) && /No mirror imported/.test(drawn.said) && good.ok && /an address like/.test(bad.error || '') && mail.ok,
      `Vetted catalog draws the catalog's address and says no mirror is held; an address saves, a port, a From line and an email too, and ftp is refused (${drawn.url}; ${bad.error}; ${mail.error || 'mail saved'})`);
   const dir = `${DIR}/mirror-src/catalog-mirror`;
   mkdirSync(`${dir}/repos`, { recursive: true });
