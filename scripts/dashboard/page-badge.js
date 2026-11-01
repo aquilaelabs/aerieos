@@ -27,7 +27,7 @@ function setBadge(n){
   badgeOn = n;
   document.title = n ? `(${n}) ${BASE_TITLE}` : BASE_TITLE;
   if (!ICON) return;
-  // The same robot with a dot in the corner, drawn into the icon that is
+  // The same mark with a dot in the corner, drawn into the icon that is
   // already there rather than swapped for a second asset: one icon to keep
   // in step instead of two that can drift.
   ICON.setAttribute("href", n

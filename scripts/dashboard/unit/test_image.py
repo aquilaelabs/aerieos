@@ -580,7 +580,7 @@ class Workflow(unittest.TestCase):
             r = sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file})
             self.assertEqual(r.returncode, 0, r.stderr)
             issue = open(os.path.join(out, "10-builderbot.issue")).read()
-            self.assertIn("B U I L D E R B O T", issue)
+            self.assertIn("A E R I E O S", issue)
             self.assertIn("BuilderBot OS 0.9.0, slot a", issue)
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
             os.unlink(env_file)
