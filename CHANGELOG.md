@@ -4,6 +4,7 @@
 
 ### Added
 
+- An installed BuilderBot takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
 - The image is tagged :dev at every release and dev build, so an install can follow the dev channel by its compose file or template (1b8ce1d)
 - bb version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
 - bb version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
@@ -11,6 +12,7 @@
 
 ### Changed
 
+- Any install picks its update channel, Releases or Dev builds, under Controller settings' Updates, and keeps it; the dev channel was offered only to a controller started for development (4c96252)
 - A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
 - On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
 - The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)
@@ -22,6 +24,7 @@
 
 ### Fixed
 
+- The VMs page lists a VM BuilderBot did not make whose name has a space in it, where it was missing (7f8d87a)
 - A project's FTP access keeps working after its node's agent updates itself, where the old server held the port and refused every login while the new one could not start (Address already in use). A node already in that state mends itself once its agent is updated: the agent ends the old server it finds on the port and starts its own
 - The Windows companion's .exe starts again, where it stopped at once with No module named bbcompanion.__main__ because its build left the app's own package out
 - A node no longer goes quiet for good after its agent's token changes: two of its calls carrying a new token at the same moment left it with a token that expired three minutes on, and its agent was turned away until the node was enrolled again. A node shut out that way comes back by itself at its next call (6058f86)

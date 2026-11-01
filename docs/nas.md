@@ -73,6 +73,22 @@ the bell, and a dead SSD is restored from last night's.
 - **Health**: disks by model, size, serial, SMART health and temperature;
   SMART tests and their results on the bell; room checks over pools as over
   a node's stores.
+- **Moving a NAS you have**: disks another system made are taken as they
+  are, never formatted or partitioned. Each data disk is found by its model
+  and serial and mounted with the filesystem it holds (XFS, btrfs or ZFS) at
+  the path it had, read-only unless Writable is picked; a parity disk is
+  never mounted or written; its pools are mounted writable; and the merged
+  folders it served (`/mnt/user`, `/mnt/user0`) are made again, so what
+  pointed at them finds its files. A read-only disk is mounted with its
+  journal left unreplayed (XFS `norecovery`, btrfs `rescue=nologreplay`),
+  so it writes nothing at all and the old parity stays good; Writable says
+  that going back then takes a parity sync. Its shares are served from the
+  merged folder as their security said, its Docker and libvirt image files
+  are read read-only for what ran, and its containers are made again on the
+  Containers page with the exact image each ran and started with the
+  machine where they were; its VMs are defined on this machine's QEMU and
+  firmware with their disks where they are. Everything is said on This
+  machine before it happens, and Release undoes the mounts.
 
 ## What BuilderBot does not build
 
