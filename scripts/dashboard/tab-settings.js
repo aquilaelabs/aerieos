@@ -231,12 +231,11 @@ function updatesSection(){
       <div class="actbar"><span class="sp"></span>
         ${h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : ""}
         <button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button></div>`;
-  // The release channel (R179): drawn only where dev may be picked (debug
-  // mode with the dev switch on); everybody else is on the normal channel
-  // and sees no pulldown.
+  // The release channel: releases, or the dev builds as well, on any install
+  // (R193, the operator, 1 Nov).
   const channel = r.dev_ok ? `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}` : ""}. A dev build is not a release: it may not come up, and the slot's fallback is what brings the machine back.` : "Releases alone. The dev channel is here because this controller runs in debug mode with the dev switch on."}</div></div>` : "";
+      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}` : ""}. A dev build is not a release: it may not come up, and on BuilderBot OS the other slot's fallback is what brings the machine back.` : "Releases alone. Dev builds are every build as it is cut, ahead of the next release, and less tried."}</div></div>` : "";
   return `<div class="row stack2" data-group="Updates"><div class="grow">
       <div class="sub">This install runs ${runs}; the newest ${r.channel === "dev" ? "on the dev channel" : "release"} is ${(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) ? esc(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) : "not known yet"} (${when}${r.error ? `; ${esc(r.error)}` : ""}).</div>
       <div class="sub dim">${how}</div>

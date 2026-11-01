@@ -36,10 +36,9 @@ and never a pre-release. A *dev* channel takes the pre-releases CI
 publishes from a dev build: a tag `vX.Y.Z-dev.N` built by the same workflow
 as a release, marked a pre-release and never the latest, with the same
 files (the controller bundle, the OS image, the stick disk, the APK). The
-channel is picked under Controller settings, Updates, and the dev channel
-is offered only on a controller started for development with its dev
-switch on; every other install sees the normal channel alone and the
-pre-releases never, and an ordinary start puts the channel back to normal. On
+channel is picked under Controller settings, Updates, on any install:
+Releases, the default, or Dev builds, and the pick is kept across restarts.
+A stick written for the dev channel follows it from its first start. On
 the dev channel Check now, Update and the update window take the newest
 of the releases and the dev builds by rank (a release stands above every
 dev build heading for it, a dev build by its ordinal), so a dev build

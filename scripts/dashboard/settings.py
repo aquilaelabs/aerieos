@@ -152,8 +152,10 @@ KEYS = {
 # project's Debug grants) is put back off, so setting it to 1 again starts
 # from nothing granted.
 DEBUG_KEYS = ("debug_mode", "offer_unvetted")
-# ...and what only those allow, put back at a start without them.
-DEBUG_ONLY = ("release_channel",)
+# ...and what only those allow, put back at a start without them. The
+# release channel is no longer one of them (R193, the operator, 1 Nov: any
+# install follows stable or dev as its owner picks).
+DEBUG_ONLY = ()
 
 
 def debug_available():
@@ -161,9 +163,10 @@ def debug_available():
 
 
 def dev_channel_ok():
-    """Whether the dev release channel may be picked here (R179): debug mode
-    on and the dev switch on."""
-    return debug_available() and _parse("offer_unvetted", load().get("offer_unvetted")) is True
+    """Whether the dev release channel may be picked here: on every install
+    (R193, the operator, 1 Nov), where R179 kept it to debug mode with the
+    dev switch on."""
+    return True
 
 
 def reset_debug():
@@ -181,18 +184,17 @@ def reset_debug():
 
 def boot_channel():
     """The release channel a boot asked for (BB_RELEASE_CHANNEL, from a
-    stick's builderbot.env, R161 step 12), taken at start on a controller in
-    debug mode: dev turns the dev switch on and picks the dev channel, so a
-    stick made for it follows the pre-releases from its first start. Nothing
-    without DEBUG_MODE=1, and nothing for any other word. Whether it moved
+    stick's builderbot.env, R161 step 12), taken at start: dev picks the dev
+    channel, so a stick made for it follows the pre-releases from its first
+    start (any install, R193). Nothing for any other word. Whether it moved
     anything."""
-    if not debug_available() or os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
+    if os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
         return False
     with _lock:
         d = load()
-        if d.get("offer_unvetted") is True and d.get("release_channel") == "dev":
+        if d.get("release_channel") == "dev":
             return False
-        d.update(offer_unvetted=True, release_channel="dev")
+        d.update(release_channel="dev")
         write_json(FILE, d)
     return True
 
