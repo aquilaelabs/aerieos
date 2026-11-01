@@ -340,6 +340,7 @@ await firstRun(false);
         adopt: { want: { data: [{ slot: 'disk1', id: 'WDC_X_SER111', fs: 'xfs' }, { slot: 'disk2', id: 'WDC_Y_GONE22', fs: 'btrfs' }],
                          parity: [{ slot: 'parity', id: 'ST_P_SERPPP' }], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u-1' }] },
                  skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
+      window.__fbPlan = state.firstboot;
       nodesRev++; drawPanes();
       const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
@@ -355,8 +356,10 @@ await firstRun(false);
       n.reported = { ...n.reported, adopted: { from: 'adopted', writable: false, at: 1, parity: ['sdc'],
         mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: false }],
         merged: { '/mnt/user': true } } };
-      state.firstboot.shares = { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
-                                 notes: [{ name: 'docs', said: 'secure: its writers by name' }] };
+      // The page's poll may have put the server's first boot (none) back
+      // since the step above: the plan is set again with its shares.
+      state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
+                                 notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
       nodesRev++; drawPanes();
       const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
       return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
