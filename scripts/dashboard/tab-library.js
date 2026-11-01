@@ -178,13 +178,13 @@ function libActs(r, may){
   // something is behind it, set on the Installed page.
   if (r.kind === "service") return !may.configure || r.installed ? "" : `<button type="button" class="primary" data-libact="install" data-libkind="service" data-libname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}: set on the Installed page"` : ""}>Install</button>`;
   if (!may.install || !n) return "";
-  if (r.kind === "pack" && !r.installed && r.catalog) return a("add", "Install", "", libHold);
+  if (r.kind === "pack" && !r.installed && r.catalog) return a("add", "Install", "primary", libHold);
   if (r.machine && !r.machine.managed) return "";
   // The container toolkit installed but unknown to Docker is put right by
   // installing it again, which its line on the Installed page says.
   const again = r.machine?.state === "unconfigured";
-  const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "", libHold)
-    : r.installed ? "" : a("install", "Install", "", libHold);
+  const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
+    : r.installed ? "" : a("install", "Install", "primary", libHold);
   const edit = r.kind === "pack" && r.pack ? a("edit", "Edit") : "";
   // The catalog pins a newer commit of a pack kept from it (R169 step 4):
   // the dialog on that pin, its changes marked, before anything is kept.
