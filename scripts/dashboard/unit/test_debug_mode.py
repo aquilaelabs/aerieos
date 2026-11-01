@@ -62,29 +62,31 @@ class DebugMode(unittest.TestCase):
 
 
 
-    def test_a_boot_that_asks_for_the_dev_channel_gets_it(self):
+    def test_a_boot_that_asks_for_the_dev_channel_gets_it_in_debug_mode_alone(self):
         # R161 step 12: a stick's builderbot.env says BB_RELEASE_CHANNEL=dev.
         was = os.environ.get("BB_RELEASE_CHANNEL")
         self.addCleanup(lambda: os.environ.pop("BB_RELEASE_CHANNEL", None) if was is None else os.environ.__setitem__("BB_RELEASE_CHANNEL", was))
         os.environ["BB_RELEASE_CHANNEL"] = "dev"
         os.environ.pop("DEBUG_MODE", None)
-        self.assertTrue(settings.boot_channel(), "any install takes the channel its stick asked for (R193)")
+        self.assertFalse(settings.boot_channel(), "nothing without DEBUG_MODE=1")
+        os.environ["DEBUG_MODE"] = "1"
+        self.assertTrue(settings.boot_channel())
         self.assertEqual(settings.get("release_channel"), "dev")
         self.assertFalse(settings.boot_channel(), "the next start finds it so and writes nothing")
-        os.environ["BB_RELEASE_CHANNEL"] = "nightly"
-        settings.set_many({"release_channel": "normal"})
-        self.assertFalse(settings.boot_channel(), "no other word")
-        self.assertEqual(settings.get("release_channel"), "normal")
 
-    def test_any_install_picks_dev_or_releases_and_keeps_it(self):
-        # R193 (the operator, 1 Nov), where R179 kept dev to debug mode.
+    def test_the_dev_channel_is_debug_modes_alone(self):
+        # R193 (the operator, 1 Nov): refused without debug mode, offered in
+        # it with no dev switch, and a start without it puts it back.
         os.environ.pop("DEBUG_MODE", None)
+        self.assertFalse(settings.dev_channel_ok())
+        self.assertIn("debug mode", settings.set_many({"release_channel": "dev"}).get("error", ""))
+        self.assertTrue(settings.set_many({"release_channel": "normal"}).get("ok"), "normal may always be picked")
+        os.environ["DEBUG_MODE"] = "1"
         self.assertTrue(settings.dev_channel_ok())
         self.assertTrue(settings.set_many({"release_channel": "dev"}).get("ok"))
-        self.assertEqual(settings.get("release_channel"), "dev")
-        settings.reset_debug()
-        self.assertEqual(settings.get("release_channel"), "dev", "a start without debug mode leaves the channel picked")
-        self.assertTrue(settings.set_many({"release_channel": "normal"}).get("ok"))
+        os.environ.pop("DEBUG_MODE")
+        self.assertTrue(settings.reset_debug())
+        self.assertEqual(settings.get("release_channel"), "normal", "a start without debug mode puts the channel back")
 
 
 if __name__ == "__main__":

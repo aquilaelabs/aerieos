@@ -152,10 +152,10 @@ KEYS = {
 # project's Debug grants) is put back off, so setting it to 1 again starts
 # from nothing granted.
 DEBUG_KEYS = ("debug_mode", "offer_unvetted")
-# ...and what only those allow, put back at a start without them. The
-# release channel is no longer one of them (R193, the operator, 1 Nov: any
-# install follows stable or dev as its owner picks).
-DEBUG_ONLY = ()
+# ...and what only those allow, put back at a start without them: the dev
+# release channel (R193, the operator, 1 Nov: dev updates for a controller
+# in debug mode alone).
+DEBUG_ONLY = ("release_channel",)
 
 
 def debug_available():
@@ -163,10 +163,10 @@ def debug_available():
 
 
 def dev_channel_ok():
-    """Whether the dev release channel may be picked here: on every install
-    (R193, the operator, 1 Nov), where R179 kept it to debug mode with the
-    dev switch on."""
-    return True
+    """Whether the dev release channel may be picked here: on a controller
+    in debug mode (R193, the operator, 1 Nov; R179 also asked for the dev
+    switch)."""
+    return debug_available()
 
 
 def reset_debug():
@@ -184,11 +184,11 @@ def reset_debug():
 
 def boot_channel():
     """The release channel a boot asked for (BB_RELEASE_CHANNEL, from a
-    stick's builderbot.env, R161 step 12), taken at start: dev picks the dev
-    channel, so a stick made for it follows the pre-releases from its first
-    start (any install, R193). Nothing for any other word. Whether it moved
-    anything."""
-    if os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
+    stick's builderbot.env, R161 step 12), taken at start on a controller in
+    debug mode: dev picks the dev channel, so a stick made for it follows the
+    pre-releases from its first start. Nothing without debug mode, and
+    nothing for any other word. Whether it moved anything."""
+    if not debug_available() or os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
         return False
     with _lock:
         d = load()
@@ -379,7 +379,7 @@ def set_many(changes):
         if key == "debug_mode":
             return {"error": "debug mode is on while the controller is started with DEBUG_MODE=1, and off otherwise"}
         if key == "release_channel" and _parse(key, raw) == "dev" and not dev_channel_ok():
-            return {"error": "the dev channel is offered only on a controller in debug mode with the dev switch on"}
+            return {"error": "the dev channel is offered only on a controller in debug mode"}
         v = _parse(key, raw)
         if v is None:
             kind = KEYS[key]["kind"]
