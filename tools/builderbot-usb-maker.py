@@ -17,13 +17,16 @@ with a box to tick before Write; then the progress and the read back.
 Another tool can open the same window with pages of its own before these,
 and a prepared configuration for the stick's first boot (Maker(extra=...)).
 """
+import datetime
 import importlib.util
 import os
+import platform
 import queue
 import re
 import subprocess
 import sys
 import threading
+import traceback
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -253,15 +256,30 @@ class Maker(tk.Tk):
 
     # ---- the work, on its own thread; the window hears it through the queue ----
     def work(self):
-        stick.say = lambda s: self.q.put(("say", str(s)))
+        work_dir = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BuilderBot USB Maker")
+        os.makedirs(work_dir, exist_ok=True)
+        self.log_path = os.path.join(work_dir, "usb-maker.log")
+        logf = open(self.log_path, "a", encoding="utf-8")
+
+        def note(s):
+            logf.write(f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}  {s}\n")
+            logf.flush()
+
+        def say(s):
+            note(s)
+            self.q.put(("say", str(s)))
+        stick.say = say
 
         def die(s):
             raise Stopped(str(s))
         stick.die = die
         cfg = None
+        d = self.choice["disk"] or {}
+        note(f"---- {self.title()}: {sys.executable} {platform.python_version()} on {platform.platform()}, "
+             f"administrator {stick.is_admin()}")
+        note(f"the image: {self.choice['source'].get()} {self.choice['tag'].get() or self.choice['file'].get()}; "
+             f"the stick: {d.get('id')} ({stick.named(d) if d else 'none'})")
         try:
-            work_dir = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BuilderBot USB Maker")
-            os.makedirs(work_dir, exist_ok=True)
             os.chdir(work_dir)
             if not stick.is_admin():
                 raise Stopped("writing a stick needs Administrator: close this window and start it again, "
@@ -286,11 +304,15 @@ class Maker(tk.Tk):
             stick.write_image(image, d["id"], verify_after=True, sets=[f"{k}={v}" for k, v in lines.items()], config=cfg)
             self.q.put(("done", self.extra.get("done") or "Done. Boot the machine from the stick: it comes up as its own controller, "
                         "and its first page, at http://ITS-ADDRESS:7680 on your network, makes the owner."))
+            note("done")
         except Stopped as e:
-            self.q.put(("stopped", str(e)))
-        except Exception as e:      # noqa: BLE001 (said in the window, never a traceback)
-            self.q.put(("stopped", f"{type(e).__name__}: {e}"))
+            note(f"stopped: {e}")
+            self.q.put(("stopped", f"{e}\n\nThe log: {self.log_path}"))
+        except Exception as e:      # noqa: BLE001 (said in the window; the traceback goes to the log)
+            note("failed:\n" + traceback.format_exc())
+            self.q.put(("stopped", f"{type(e).__name__}: {e}\n\nThe log, with the whole error: {self.log_path}"))
         finally:
+            logf.close()
             if cfg and os.path.isfile(cfg):
                 os.unlink(cfg)
 
