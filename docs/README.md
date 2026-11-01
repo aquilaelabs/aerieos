@@ -1,9 +1,9 @@
 # AerieOS documentation
 
-AerieOS is a self-hosted AI workshop and NAS: coding agents (Claude Code,
-ChatGPT's Codex CLI, GitHub's Copilot CLI, xAI's Grok Build, and any model
-through OpenCode) working on your projects, and your disks, shares, apps and
-VMs. The **controller** serves this dashboard and keeps every project's plan, bugs
+AerieOS is your own server, for your files, your apps and your code: your disks,
+shares, apps, VMs and projects, with coding agents (Claude Code, ChatGPT's Codex
+CLI, GitHub's Copilot CLI, xAI's Grok Build, and any model through OpenCode) when
+you want them. The **controller** serves this dashboard and keeps every project's plan, bugs
 and rules; the machines it enrolls, the **nodes**, do the work: the agents'
 sessions, builds, tests, CI, Android emulators, containers and VMs. On a
 machine of its own it runs the storage too. These
