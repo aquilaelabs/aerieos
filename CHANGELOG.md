@@ -13,6 +13,9 @@
 - bb version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
 - A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
 - A release can be signed with an offline release key (tools/release-sign.py): BuilderBot OS's updater, the stick maker and the installer refuse a release the install's own config/release-signers does not verify, so a change to the repository or its CI cannot hand an install an update (7f98d53)
+- On a USB stick, This machine can name a folder already on the machine's disks as the projects folder, so a controller moved there works on its projects where they are, with nothing copied (7c24926)
+- On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
+- A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
 
 ### Changed
 

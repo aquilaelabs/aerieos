@@ -359,9 +359,11 @@ container to a machine of its own, and back.
 1. On the old controller, Controller settings, **Move this controller**:
    name the new home's address (where its page will be reached), tick what
    the bundle carries beyond the state and the deploy key (each store kept
-   outside the state, with its size; the repositories, when the two homes
-   do not mount the same share; the install key, when the new home should
-   not ask for it), and press **Prepare to move**. That arms the move: it
+   outside the state, with its size; the repositories, unless the new home
+   reaches the same folder, a share both mount or the disks the new machine
+   adopts, where This machine names it as the projects folder (see
+   [image.md](image.md)); the install key, when the new home should not ask
+   for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
    every node hears the new address and a challenge of its own, which it
    keeps. The move stays armed until it lands or you press **Forget it**,
@@ -371,7 +373,11 @@ container to a machine of its own, and back.
    the first-run card press **Moving a controller here?** and give the
    token with the old controller's address, while it still runs: the new
    home pulls the bundle from it, packed at that moment, under a proof
-   derived from the token. An old home that is already off is moved from
+   derived from the token. A BuilderBot OS stick takes the move later
+   instead, once its disks hold the projects: make a setup account, set
+   the disks up on This machine, and land it from Controller settings,
+   **Move a controller here**, with the same token and address or bundle
+   (see [image.md](image.md)). An old home that is already off is moved from
    a bundle instead: **Download the bundle** on the old controller (packed
    fresh each time it is pressed, with what was ticked) and give the file
    with the token. Either way the bundle is held to the version gate (a

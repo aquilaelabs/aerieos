@@ -1630,7 +1630,11 @@ def _census(c):
         out["os_stick"] = {"stick": True, "pool": str(s.get("pool") or "")[:200] if str(s.get("pool") or "").startswith("/") else "",
                            "ready": s.get("ready") is True,
                            "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects")],
-                           "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb"))}
+                           "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb")),
+                           # A folder of the machine's own as the projects folder (R163).
+                           "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
+                           "projects_bound": s.get("projects_bound") is True,
+                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else ""}
     # The domains its libvirt has that BuilderBot did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
@@ -3987,6 +3991,95 @@ def node_os_update(principal, node_id, release="", from_dir=""):
                 {"apply": "os-update", "config": ({"release": tag} if tag else {"from": src}), "timeout": 3600})
     if r.get("ok"):
         audit(principal, "os-update", node_id, {"job": r["job"], "release": tag, "from": src})
+    return r
+
+
+def on_stick():
+    """Whether this controller's own machine runs BuilderBot OS from a stick."""
+    return any(own_machine(n) and ((n.get("reported") or {}).get("os_stick") or {}).get("stick") for n in node_list())
+
+
+def workspace_held():
+    """Why no project may be made, cloned or moved in here now, or "": on a
+    stick the projects are never written to the stick (the operator, 1 Nov),
+    so until a system pool or a folder on the machine's disks holds them,
+    they are held (system-pool's hold)."""
+    for n in node_list():
+        if not own_machine(n):
+            continue
+        s = (n.get("reported") or {}).get("os_stick") or {}
+        if not s.get("stick"):
+            return ""
+        if s.get("projects_home") == "held":
+            return ("this machine runs from a stick, and the projects are never kept on it: on This machine, create or adopt "
+                    "a pool and name it the system pool, or name the folder on its disks the projects are in")
+        if s.get("projects_home") == "folder" and not s.get("projects_bound"):
+            return f"the projects folder {s.get('projects') or ''} is waiting for its disks to mount"
+        return ""
+    return ""
+
+
+def projects_folder_places(n):
+    """The places a stick's projects folder may be named in: the adopted
+    disks' merged views and mounts (writable ones alone), its pools and its
+    array, by mount point; each with whether it is writable."""
+    rep = n.get("reported") or {}
+    out = {}
+    ad = rep.get("adopted") or {}
+    for where, up in (ad.get("merged") or {}).items():
+        if up and str(where).startswith("/"):
+            out[str(where)] = bool(ad.get("writable"))
+    for m in ad.get("mounts") or []:
+        if m.get("mounted") and str(m.get("where") or "").startswith("/"):
+            out[str(m["where"])] = not m.get("ro")
+    for p in rep.get("pools") or []:
+        if isinstance(p, dict) and str(p.get("mount") or "").startswith("/"):
+            out[str(p["mount"])] = True
+    if str((rep.get("array") or {}).get("mount") or "").startswith("/"):
+        out[rep["array"]["mount"]] = True
+    return out
+
+
+def node_projects_folder(principal, node_id, path="", release=False):
+    """A folder already on a stick machine's disks named as its projects
+    folder (R163, the operator, 1 Nov): a controller moved here without its
+    repositories finds them where the disks held them, nothing copied. The
+    folder must lie inside an adopted share, a pool or the array, writable;
+    the job says which of the controller's projects it holds, hands its files
+    to the controller's account and restarts the controller on it. `release`
+    lets it go. A system job on the own machine's node."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    rep = n.get("reported") or {}
+    if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
+        return {"error": "a projects folder of the machine's own is a stick's: this machine does not run BuilderBot OS from a stick"}
+    if n.get("kind") != "agent" or not rep.get("administers"):
+        return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot name a folder"}
+    cfg = {"release": True}
+    if not release:
+        path = os.path.normpath(str(path or "").strip()) if str(path or "").strip() else ""
+        if not path.startswith("/") or "\n" in path:
+            return {"error": "name the folder by its path, as /mnt/user/projects"}
+        places = projects_folder_places(n)
+        inside = [p for p in places if path != p and path.startswith(p.rstrip("/") + "/")]
+        if not inside:
+            return {"error": "name a folder inside the disks this machine adopted, a pool or the array (a share, as /mnt/user/projects)"}
+        if not any(places[p] for p in inside):
+            return {"error": "those disks were adopted read only, so the projects could not be written there: adopt them writable first"}
+        cfg = {"path": path, "names": sorted(str(x) for x in (project_names() or []))[:500]}
+    elif not (rep.get("os_stick") or {}).get("projects"):
+        return {"error": "no folder of the machine's own is the projects folder"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "projects-folder", "config": cfg, "timeout": 6 * 3600})
+    if r.get("ok"):
+        audit(principal, "projects-folder", node_id, {"job": r["job"], **({"path": cfg["path"]} if "path" in cfg else {"release": True})})
     return r
 
 
@@ -6776,7 +6869,8 @@ no_node_advice = None    # a project with no node -> what it can still do
 turns_of = None          # a node row -> its sessions' turns: working, waiting, the limit
 working_on = None        # a node id -> how many of its sessions are mid-turn (R120 step 7)
 _VERB_PARTS = ("vmtemplate", "forges", "devapp", "runner_store",
-               "workspace", "project_prefs", "may_push", "no_node_advice", "turns_of", "working_on")
+               "workspace", "project_prefs", "may_push", "no_node_advice", "turns_of", "working_on", "project_names")
+project_names = list   # the projects the controller knows, by name (prefs.all_projects)
 
 
 def configure_verbs(**parts):
@@ -7074,6 +7168,7 @@ def verb(principal, req):
              "controller-update": lambda: node_controller_update(principal, nid, field(req, "release")),
              "os-update": lambda: node_os_update(principal, nid, field(req, "release"), field(req, "from")),
              "system-pool": lambda: node_system_pool(principal, nid, field(req, "path")),
+             "projects-folder": lambda: node_projects_folder(principal, nid, field(req, "path"), req.get("release") is True),
              "machine": lambda: node_machine(principal, nid, field(req, "hostname"), field(req, "timezone"), req.get("spindown")),
              "storage-share": lambda: node_storage_share(principal, nid, req),
              "storage-pool": lambda: node_storage_pool(principal, nid, req),

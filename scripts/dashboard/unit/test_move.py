@@ -109,6 +109,16 @@ class Move(unittest.TestCase):
         with self.assertRaises(ValueError):
             move.split_form(src, "application/x-www-form-urlencoded", "bundle", dest)
 
+    def test_a_landing_without_room_is_refused_before_it_takes_the_bundle(self):
+        # B588: a stick before a system pool lands on its own partition.
+        from unittest import mock
+        with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=2 << 30)):
+            why = move.room_for(5 << 30, self.tmp)
+        self.assertIn("without the repositories", why)
+        self.assertIn("projects folder on This machine", why)
+        with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=20 << 30)):
+            self.assertEqual(move.room_for(5 << 30, self.tmp), "")
+
     def test_a_bundle_of_the_format_before_still_lands(self):
         r = move.prepare("user:ann", "https://new.example")
         token = r["token"]

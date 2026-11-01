@@ -233,6 +233,12 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
   <button type="submit">Restore it</button>
   <p class="note"><a href="/">Not restoring one: make the first account instead</a>.</p>"""
 
+# On a stick the first run's move door is shut (the operator, 1 Nov): the
+# bundle never lands on the stick, so the disks come first.
+STICK_MOVE_FIRST = ("This machine runs from a stick, and a move never lands on the stick: make a setup account, "
+                    "then on This machine create or adopt the disks and name the system pool or the folder the projects are in, "
+                    "and land the move from Controller settings, Move a controller here. The setup account goes when the move lands.")
+
 MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move token once.
     Give the token here with its bundle, or with the old controller's address while it still
     runs (the bundle is pulled from it, packed at that moment), and this install becomes that
@@ -4821,7 +4827,8 @@ nodes.configure_verbs(vmtemplate=vmtemplate, forges=forges, devapp=devapp,
                       runner_store=runners, workspace=workspace,
                       project_prefs=prefs.get, may_push=projects.may_push,
                       no_node_advice=no_node_advice, turns_of=node_turns,
-                      working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"])
+                      working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"],
+                      project_names=lambda: sorted(prefs.all_projects()))
 
 version.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
                   roadmap_mod=roadmap, bugs_mod=bugs, changelog_mod=changelog,
@@ -4915,6 +4922,7 @@ devapp.reaches_of = prefs.reaches_on
 # ...and what the create dialog's follow-ups and the sidebar's pins need.
 projects.lock = _state_lock
 projects.take_on = users.take_on
+projects.held = nodes.workspace_held
 projects.set_prefs = lambda name, **kw: prefs.set_prefs(name, workspace=WORKSPACE, **kw)
 projects.brief_writer = brief.write
 # A create that never took, and a project deleted for good, leave no owner,
@@ -8700,6 +8708,9 @@ class Handler(BaseHTTPRequestHandler):
         # ...and an installer's ISO for a VM host (R99), streamed the same way.
         if self.path.split("?")[0] == "/api/vms-iso-upload":
             return self._vms_iso_upload()
+        # ...and a move landed from Controller settings, its bundle streamed.
+        if self.path.split("?")[0] == "/api/move-land":
+            return self._move_land()
         req = self._read_json()
         if req is None:
             return None
@@ -12652,6 +12663,10 @@ class Handler(BaseHTTPRequestHandler):
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
             move.ask_new()
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
+        # Whether a move may land here (_move_land): a fresh controller's,
+        # and on a stick only once the projects have a place on the disks.
+        fresh = len(users.all_users()) <= 1 and not any(not nodes.own_machine(n) for n in nodes.node_list())
+        out["land"] = {"fresh": fresh, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
         if q.get("pieces", [""])[0] == "1":
             out["pieces"] = move.pieces()
         return self._json(out)
@@ -12871,11 +12886,15 @@ class Handler(BaseHTTPRequestHandler):
     def _move_page(self, error=""):
         """GET /login/move: the first run's other way in (R90 step 12): a
         controller's bundle and its token, before anybody owns this one."""
+        # On a stick the form is not offered: the disks come first, under a
+        # setup account (STICK_MOVE_FIRST).
+        fields = (f'  <p class="note">{html_escape(STICK_MOVE_FIRST)}</p>\n  <p class="note"><a href="/">Make the setup account</a>.</p>'
+                  if nodes.on_stick() else MOVE_FIELDS)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "move a controller here")
                 .replace("<!--SAID-->", "Moving a controller here?")
                 .replace("<!--ACTION-->", "/setup/move")
-                .replace("<!--FIELDS-->", MOVE_FIELDS)
+                .replace("<!--FIELDS-->", fields)
                 .replace("<!--ERR-->", f'<p class="err">{html_escape(error)}</p>' if error else "")
                 .replace("<!--NAME-->", "").replace("<!--NEXT-->", "/")
                 .replace("<form ", '<form enctype="multipart/form-data" ', 1)
@@ -12890,50 +12909,16 @@ class Handler(BaseHTTPRequestHandler):
     def _setup_move_post(self):
         """POST /setup/move: the bundle and the token, taken before an owner
         exists (closed the moment there is one), held to the version gate,
-        restored, and the dashboard re-executed on the restored state."""
+        restored, and the dashboard re-executed on the restored state. Not on
+        a stick (the operator, 1 Nov): there the machine's disks are set up
+        first, under an account, and the move lands from Controller settings."""
         if users.all_users():
             return self._login_page("This controller already has an account; a move lands only on a fresh install.")
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
-        if not 0 < n <= 16 << 30:
-            return self._move_page("the upload is empty or past 16 GB")
-        spool = Path(STATE).parent / f".move-upload-{os.getpid()}"
-        file_part = spool.with_name(spool.name + ".file")
-        try:
-            with open(spool, "wb") as f:
-                left = n
-                while left > 0:
-                    chunk = self.rfile.read(min(1 << 20, left))
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    left -= len(chunk)
-            # The form read a megabyte at a time, its file part to a file of
-            # its own (B558: never whole in memory).
-            fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
-            token, frm = fields.get("token", ""), fields.get("from", "")
-            if not token or not (bundle or frm):
-                return self._move_page("the move token is needed, with the bundle file or the old controller's address")
-            if bundle:
-                os.replace(file_part, spool)
-            else:
-                # The pull (R175 step 5): the bundle fetched from the old
-                # controller under a proof the token derives.
-                why = move.fetch_bundle(frm, token, str(spool))
-                if why:
-                    return self._move_page(why)
-            r = move.restore(str(spool), token)
-        except (OSError, ValueError) as e:
-            return self._move_page(f"the move did not land: {e}")
-        finally:
-            with contextlib.suppress(OSError):
-                file_part.unlink()
-            with contextlib.suppress(OSError):
-                spool.unlink()
-        if r.get("error"):
-            return self._move_page(r["error"])
+        if nodes.on_stick():
+            return self._move_page(STICK_MOVE_FIRST)
+        r, why = self._receive_move(Path(STATE).parent)
+        if why:
+            return self._move_page(why)
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "moved")
@@ -12950,6 +12935,85 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
+
+    def _move_land(self):
+        """POST /api/move-land: a move landed from Controller settings by the
+        owner of a fresh controller, the form as the first run's (the token
+        with the bundle file or the old controller's address). Its state
+        replaces this one's, the setup account's with it, which is set aside
+        as a reset's is. On a stick (the operator, 1 Nov) only once the
+        projects have a place on the machine's disks, and spooled and
+        unpacked there, never on the stick."""
+        me = self._who() or {}
+        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+            return self._json({"error": "moving a controller here is its owner's"}, 403)
+        if len(users.all_users()) > 1 or any(not nodes.own_machine(n) for n in nodes.node_list()):
+            return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
+        where = Path(STATE).parent
+        if nodes.on_stick():
+            held = nodes.workspace_held()
+            if held:
+                return self._json({"error": held}, 409)
+            where = Path(WORKSPACE)
+        r, why = self._receive_move(where, work_root=where if where != Path(STATE).parent else None)
+        if why:
+            return self._json({"error": why}, 400)
+        print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
+        self._json({"ok": True, "nodes": len(r.get("nodes") or []), "from": r.get("from") or ""})
+        threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
+        return None
+
+    def _receive_move(self, where, work_root=None):
+        """The move's form taken into a spool under `where` a megabyte at a
+        time, the bundle from it or pulled from the old controller, and
+        restored: (result, "") or (None, why)."""
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            n = -1
+        if not 0 < n <= 16 << 30:
+            return None, "the upload is empty or past 16 GB"
+        spool = Path(where) / f".move-upload-{os.getpid()}"
+        # Room for it and what it unpacks to, said before a byte is taken
+        # (B588).
+        no_room = move.room_for(n, spool.parent)
+        if no_room:
+            return None, no_room
+        file_part = spool.with_name(spool.name + ".file")
+        try:
+            with open(spool, "wb") as f:
+                left = n
+                while left > 0:
+                    chunk = self.rfile.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    left -= len(chunk)
+            # The form read a megabyte at a time, its file part to a file of
+            # its own (B558: never whole in memory).
+            fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
+            token, frm = fields.get("token", ""), fields.get("from", "")
+            if not token or not (bundle or frm):
+                return None, "the move token is needed, with the bundle file or the old controller's address"
+            if bundle:
+                os.replace(file_part, spool)
+            else:
+                # The pull (R175 step 5): the bundle fetched from the old
+                # controller under a proof the token derives.
+                why = move.fetch_bundle(frm, token, str(spool))
+                if why:
+                    return None, why
+            r = move.restore(str(spool), token, work_root=work_root)
+        except (OSError, ValueError) as e:
+            return None, f"the move did not land: {e}"
+        finally:
+            with contextlib.suppress(OSError):
+                file_part.unlink()
+            with contextlib.suppress(OSError):
+                spool.unlink()
+        if r.get("error"):
+            return None, r["error"]
+        return r, ""
 
     def _get_reset(self):
         """GET /api/reset: how a Reset that un-enrolls its nodes first is

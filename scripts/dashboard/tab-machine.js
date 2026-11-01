@@ -115,6 +115,8 @@ function stickSection(n){
     ["Runs from", "memory: the stick is read at boot"],
     ["On the stick", (s.on_stick || []).length ? `the configuration, and ${s.on_stick.map(k => STICK_WORDS[k] || k).join(", ")}` : "the configuration alone"],
     ["Docker and the VMs", s.ready ? `on ${s.pool}` : s.pool ? `waiting for ${s.pool} to mount` : "waiting for a system pool", {cls: s.ready ? "ok" : "warn"}],
+    ["The projects", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "on the stick",
+     {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
   ];
   const why = !mounts.length ? "No pool or array here yet: make one on the Storage page, then pick it here."
@@ -124,10 +126,45 @@ function stickSection(n){
       <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
       ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
   return docSection("nodes", "stick", "The stick", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, and the logs and the journal are kept in memory.</div></div>`,
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, and the logs and the journal are kept in memory.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
+
+// A projects folder of the machine's own (R163, the operator, 1 Nov): a
+// controller moved here without its repositories takes the folder its
+// projects already sit in on the adopted disks, nothing copied. Offered
+// where those disks are: the plan's shares, then the merged views.
+function projectsFolderField(n, s, admin){
+  if (!admin) return "";
+  const ad = n.reported?.adopted || {};
+  const roots = Object.keys(ad.merged || {}).filter(k => ad.merged[k]);
+  const pools = [...(n.reported?.pools || []).map(p => p.mount), n.reported?.array?.mount].filter(Boolean);
+  if (!roots.length && !pools.length) return "";
+  const shares = (state.firstboot?.shares?.rows || []).map(r => r.path).filter(p => typeof p === "string" && p.startsWith("/"));
+  const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
+  const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
+  const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
+  return `<div class="field"><div class="fx"><label class="pick grow"><span class="pickw">Projects folder</span><input id="projFolder" list="projFolderOffer" spellcheck="false"
+      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}" aria-label="the projects folder"${why ? " disabled" : ""}></label>
+      <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
+    <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
+      <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
+    ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
+    <div class="hint">Where the projects already are on these disks, as another system kept them (its share for the projects): the controller works in that folder in place, nothing copied, so a move here can leave its repositories out. Its files become BuilderBot's own; nothing in them changes.</div></div>`;
+}
 function wireStick(root){
+  root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {
+    const release = pb.dataset.projfolder === "release", path = (root.querySelector("#projFolder")?.value || "").trim();
+    if (!release && !path) return notify("name the folder the projects are in first", true);
+    if (!await askYes(release
+        ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are."
+        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to BuilderBot's own account, so git and the controller can write them: their owner changes, nothing in them does. What the projects folder held before stays underneath, unseen.`,
+        {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
+    busy(pb, release ? "Letting go" : "Taking it");
+    const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || "taking the folder: the job says which projects it found, and the controller restarts on it", !!j.error);
+    await loadNodes();
+  }));
   const b = root.querySelector("[data-stickpool]"), sel = root.querySelector("#stickPool");
   if (!b || !sel) return;
   b.onclick = () => pressing(b, async () => {

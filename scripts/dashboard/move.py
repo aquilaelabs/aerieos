@@ -271,7 +271,7 @@ def pieces():
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
         out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True))
-    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when both homes mount the same share", WORKSPACE, False))
+    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the projects folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     return out
 
@@ -788,6 +788,23 @@ def serve_fetch(q):
     return str(STATE / "move" / r["bundle"]), "", 200
 
 
+def room_for(size, where):
+    """"" when `where` has room for a bundle of `size` bytes and what it
+    unpacks to (twice it, and a little), or why not (B588: a stick before a
+    system pool lands on its own small partition)."""
+    try:
+        free = shutil.disk_usage(str(where)).free
+    except OSError:
+        return ""
+    need = 2 * int(size or 0) + (256 << 20)
+    if free >= need:
+        return ""
+    gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
+    return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
+            "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
+            "the folder they are in as the projects folder on This machine")
+
+
 def fetch_bundle(old_url, token, dest):
     """The new install pulling the bundle from the old controller into
     `dest`, under the proof the token derives. "" or why."""
@@ -799,8 +816,12 @@ def fetch_bundle(old_url, token, dest):
     q = urllib.parse.urlencode({"hash": token_hash(token), "nonce": nonce, "proof": fetch_proof(key, nonce)})
     req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "BuilderBot"})
     try:
-        with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r, open(dest, "wb") as f:
-            shutil.copyfileobj(r, f)
+        with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r:
+            why = room_for(int(r.headers.get("Content-Length") or 0), Path(dest).parent)
+            if why:
+                return why
+            with open(dest, "wb") as f:
+                shutil.copyfileobj(r, f, 1 << 20)
     except urllib.error.HTTPError as e:
         try:
             why = json.loads(e.read()).get("error") or f"answered {e.code}"
@@ -866,7 +887,8 @@ def read_manifest(path):
         return None, f"could not read the bundle: {e}"
 
 
-def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None):
+def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
+            work_root=None):
     """The bundle unsealed under the token and put in place of the state here
     (the state as it is moved aside, as a reset does), its stores where the
     records name them, the repositories into the workspace, the secrets into
@@ -910,7 +932,9 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         except ValueError:
             fh.close()
             return {"error": wrong}
-    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(state_dir.parent)))
+    # Unpacked beside the state, or where the caller says (`work_root`: on a
+    # stick, the projects folder on the machine's disks, never the stick).
+    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir.parent)))
     counts = {}
     try:
         try:

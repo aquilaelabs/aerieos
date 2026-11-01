@@ -1253,6 +1253,9 @@ def _claim(name, shown, into=""):
         repos.add(into, name)
 
 
+# Why no project may be made here now (nodes.workspace_held), or "".
+held = lambda: ""  # noqa: E731
+
 def create(req, env=None):
     """Create a project under /workspace, as a (payload, status) pair.
     `env` is the account's git identity, for the commits a starting version
@@ -1270,6 +1273,11 @@ def create(req, env=None):
     mode = _field(req, "mode")
     if mode not in ("init", "clone"):
         return {"error": "unknown mode"}, 400
+    # Never on a stick (the operator, 1 Nov): held until the projects have
+    # a place on the machine's disks (nodes.workspace_held).
+    why = held()
+    if why:
+        return {"error": why}, 409
     url = _field(req, "url").strip()
     about, key_url = "", ""
     if mode == "clone":

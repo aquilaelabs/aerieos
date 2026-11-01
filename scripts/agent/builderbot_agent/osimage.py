@@ -220,7 +220,9 @@ def stick_status():
     return {"stick": True, "pool": str(d.get("pool") or "")[:200], "ready": d.get("ready") is True,
             "on_stick": [str(x)[:20] for x in (d.get("on_stick") or [])][:8],
             "written_kb": d.get("written_kb") if isinstance(d.get("written_kb"), int) else None,
-            "boot_written_kb": d.get("boot_written_kb") if isinstance(d.get("boot_written_kb"), int) else None}
+            "boot_written_kb": d.get("boot_written_kb") if isinstance(d.get("boot_written_kb"), int) else None,
+            "projects": str(d.get("projects") or "")[:300], "projects_bound": d.get("projects_bound") is True,
+            "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else ""}
 
 
 class OsImageMixin:
@@ -322,6 +324,28 @@ class OsImageMixin:
             return "failed", 64
         rc = self._sh(job, ["bash", tool, "set", path], timeout=6 * 3600)
         self.hello_again("the system pool was set")
+        return ("succeeded", 0) if rc == 0 else ("failed", rc)
+
+    def _apply_projects_folder(self, job, cfg):
+        """A folder already on the machine's disks taken as the projects
+        folder (R163, the operator, 1 Nov: a moved controller adopts the
+        projects where they are), or let go (`release`): the tool checks it,
+        says which of `names` it holds, hands it to the controller's account,
+        binds it and restarts the controller on it; then a hello."""
+        tool = _env("BB_OS_POOL", POOL_TOOL)
+        if not os.path.isfile(tool):
+            job.say("refused: this machine does not run BuilderBot OS, so it has no stick\n")
+            return "failed", 77
+        if cfg.get("release"):
+            rc = self._sh(job, ["bash", tool, "projects", "--release"], timeout=600)
+        else:
+            path = str(cfg.get("path") or "")
+            if not path.startswith("/") or ".." in path.split("/"):
+                job.say("refused: a projects folder is named by its path\n")
+                return "failed", 64
+            names = [str(n) for n in (cfg.get("names") or []) if isinstance(n, str) and n and "/" not in n and not n.startswith(".")][:500]
+            rc = self._sh(job, ["bash", tool, "projects", path, *names], timeout=6 * 3600)
+        self.hello_again("the projects folder changed")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _apply_os_update(self, job, cfg):

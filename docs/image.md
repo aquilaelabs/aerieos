@@ -75,10 +75,35 @@ containers, the VMs, the toolchains and the projects, lives on a **system
 pool**: picked under This machine's **The stick** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
-picked, docker and the VMs wait, and sessions still run, their projects on the stick. **The stick**
+picked, docker and the VMs wait, and the projects are held: the projects
+folder is an empty read-only mount of its own, no project is made, cloned
+or moved in, and they are never written to the stick. **The stick**
 also says what still lives on the stick and how much has been written to it,
 in its life and since this boot. An installed disk has none of this: its
 data partition is the machine's disk.
+
+**The projects where they already are.** Under **The stick**, the
+**Projects folder** names a folder already on the machine's disks as the
+projects folder: a share of the disks the machine adopted, a pool or the
+array, never the stick, and never a disk adopted read only. It is bound
+over the projects folder at every boot in place of the system pool's, with
+no pool needed, and the controller restarts on it. Its files are handed to
+the controller's own account, as a projects folder it made is: their owner
+changes and nothing in them does, since git refuses a tree another account
+owns and the controller could not write it. The job says which of the
+controller's projects the folder holds and which it does not, and what the
+projects folder held before stays underneath, unseen, until **Let it go**
+binds the pool's again.
+
+**A move onto a stick lands last.** The first page's **Moving a controller
+here?** does not take a bundle on a stick, since it would land on the stick.
+Make a setup account instead, create or adopt the disks on This machine,
+name the system pool or the projects folder, and land the move from
+Controller settings, **Move a controller here** (the token with the old
+controller's address, or the bundle). It is spooled and unpacked in the
+projects folder on the disks, and its state takes the setup account's place.
+A controller whose projects already sit on these disks needs no repositories
+in its bundle: name their folder first, and they are found where they are.
 
 **The data partition takes the stick's room.** The image's data partition
 is 2 GB; at each boot it is grown to the end of the stick (the filesystem

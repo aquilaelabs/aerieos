@@ -317,7 +317,19 @@ function moveSection(){
   const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle.</div></div>` : "";
   const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
+  // A move landed here instead (the operator, 1 Nov): on a fresh controller,
+  // by its owner, from Controller settings, which on a stick is the only way
+  // in, once its disks hold the projects.
+  const ld = m.land || {};
+  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
+      <div class="sub">Moving a controller here instead: give its move token with its address (it hands the bundle over) or the bundle downloaded from it. Its state takes this one's place, this setup account's with it, and you sign in with an account it had.${ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}</div>
+      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
+      <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
+        <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
+      <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
+      ${land}
       ${arrived}
       <div class="sub">To another container, to a machine of its own, or back: Prepare to move arms the move and shows a move token once; from then on every node hears where the controller is going, and follows by itself once the new home answers, however long that takes. The bundle (the state, the stores ticked, the deploy key, the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.</div>
       ${m.prepared ? `<div class="sub">Armed ${esc(ago(m.made_at))} for ${esc(m.to || "an address not named yet")}: ${m.heard} of ${m.nodes} node${m.nodes === 1 ? "" : "s"} ${m.heard === 1 ? "has" : "have"} heard it${m.packed_at ? `; last packed ${esc(ago(m.packed_at))}, ${esc(sizeMb)}` : ""}${stores.length ? `, with ${esc(stores.join(", "))}` : ""}${m.repos ? ", the repositories in it" : ""}${m.carries_key ? ", the install key in it" : ""}.${
@@ -331,6 +343,21 @@ function moveSection(){
     </div></div>`;
 }
 function wireMove(root){
+  root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const tok = ($("landTok")?.value || "").trim(), from = ($("landFrom")?.value || "").trim(), file = $("landFile")?.files?.[0];
+    if (!tok || !(file || from)) return notify("the move token is needed, with the old controller's address or the bundle", true);
+    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
+        {title: "Land the move?", verb: "Land it", danger: true})) return;
+    busy(b, "Landing");
+    const fd = new FormData();
+    fd.append("token", tok);
+    fd.append("from", file ? "" : from);
+    if (file) fd.append("bundle", file, file.name);
+    const j = await (await fetch("/api/move-land", {method: "POST", body: fd})).json().catch(() => ({error: "no answer"}));
+    if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
+    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had`);
+    setTimeout(() => location.assign("/"), 6000);
+  }));
   root.querySelectorAll("[data-moveprep]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Preparing");
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
