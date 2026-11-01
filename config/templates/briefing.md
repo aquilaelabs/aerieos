@@ -611,6 +611,10 @@ FILE` names another (`site/compose.yml`,
 tab. What stands in front of a container (a hostname, TLS, a reverse proxy)
 is the nginx page, a person's, one per node: say in your reply which hostname
 should reach which port rather than writing a proxy container of your own.
+That holds for the project's own container too: a site serves plain HTTP on
+a port of its own with the smallest server it needs (a static site's files
+behind a few-megabyte static server), never nginx, TLS or a hostname of its
+own, unless the person has said they run their own proxy.
 
 The project's own container is the one built from its tree: its Rebuild and
 its Branch build what the tree holds. Anything you bring up beside it (a

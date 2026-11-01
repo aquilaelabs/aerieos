@@ -383,6 +383,13 @@ what it is (docs/nodes.md §7).
 
 ## nginx
 
+Each node's nginx is what stands in front of its containers, unless you
+choose to run your own proxy: a container, a site included, serves plain
+HTTP on a port of its own with the smallest server it needs, and its
+hostname and certificate are a route on the nginx page. A static site needs
+no nginx of its own; a few-megabyte static server behind the node's nginx
+is the whole of it.
+
 The nginx page keeps one list of public **Hostnames**, shared by every node's
 nginx (the operator, 12 Oct): a name is added once and shows where it is
 routed, and is deleted only when nothing routes it, the refusal saying
