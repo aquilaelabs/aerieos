@@ -1428,7 +1428,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     if (asked.id) await napi('/api/phone', { action: 'deny', id: asked.id });
     ok(/shed is not gamma's/.test(notMine.error || '') && asked.ok && asked.node === 'shed',
        `aerie root run --node shed is refused until gamma hosts containers there, then asked for shed (${notMine.error} / ${JSON.stringify(asked)})`);
-    ok(await page.$eval(`${ROW} [data-k="rootasks"]`, c => c.checked && /bb root run --node shed/.test(c.closest('label').textContent)),
+    ok(await page.$eval(`${ROW} [data-k="rootasks"]`, c => c.checked && /aerie root run --node shed/.test(c.closest('label').textContent)),
        'the hosting-only row carries the root-asks switch, on, naming the verb');
     await page.click(`${ROW} [data-k="rootasks"]`);
     await page.click(`${ROW} [data-nd="sess-save"]`);
@@ -3315,7 +3315,7 @@ ok(page.errors.length === 0,
     const withCard = (await napi('/api/preamble?project=gamma')).text || '';
     await napi('/api/prefs', { project: 'gamma', node: prevNode });
     const gpuTopic = (await napi('/api/preamble?project=gamma&topic=gpu')).text || '';
-    ok(!/- gpu: /.test(without) && /- gpu: the card/.test(withCard) && /bb gpu run \[--mem MB\] -- CMD/.test(gpuTopic),
+    ok(!/- gpu: /.test(without) && /- gpu: the card/.test(withCard) && /aerie gpu run \[--mem MB\] -- CMD/.test(gpuTopic),
        'the briefing names its GPU topic for a project whose node has a card, and for no other; the topic answers either way');
   }
   // The sound a node has (R107): the census's cards and server, cleaned on
@@ -3356,7 +3356,7 @@ ok(page.errors.length === 0,
        `the row says a node has no internet, and nothing when it has or has not said (${net.join(' | ')})`);
     const nx = await page.evaluate(() => nodeInternet({ kind: 'agent', reported: { internet: true, store_noexec: true } })
       .replace(/<[^>]+>/g, '').trim());
-    ok(/^the toolchain store is mounted noexec: bb and every terminal here cannot run/.test(nx),
+    ok(/^the toolchain store is mounted noexec: aerie and every terminal here cannot run/.test(nx),
        `...and a store mounted noexec, which stops every terminal there (${nx})`);
     // A toolchain store the node cannot write (R85): the Library says so
     // over its cards, before a job fails on it.

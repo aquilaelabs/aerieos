@@ -191,7 +191,7 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
   // The extension: its headers on every call, and the same refusal.
   const pkg = JSON.parse(readFileSync(`${REPO}/apps/vscode/package.json`, 'utf8'));
   const h = ed.headers();
-  ok(h['X-BB-Api'] === String(client.API) && h['X-BB-App'] === `vscode/${pkg.version}` && pkg.builderbotApi === client.API,
+  ok(h['X-BB-Api'] === String(client.API) && h['X-BB-App'] === `vscode/${pkg.version}` && pkg.aerieosApi === client.API,
      `the extension says its Files API and its release on every call (${h['X-BB-Api']} ${h['X-BB-App']})`);
   const r = await fetch(`${base}/api/v1/files`, { method: 'POST', body: JSON.stringify({ action: 'projects' }),
     headers: { Cookie: `bb_session=${cookie}`, 'Content-Type': 'application/json', 'X-BB-Api': '0', 'X-BB-App': 'vscode/0.0.1' } });

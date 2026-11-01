@@ -192,7 +192,7 @@ function nodeInternet(n){
   // A store mounted noexec: nothing in it runs, the bb bundle and every
   // terminal from it included, which closed at once with nothing saying why.
   const noexec = n.reported?.store_noexec === true
-    ? `<div class="actbar ndnoexec"><span class="state bad">the toolchain store is mounted noexec: bb and every terminal here cannot run until it is remounted with exec</span></div>` : "";
+    ? `<div class="actbar ndnoexec"><span class="state bad">the toolchain store is mounted noexec: aerie and every terminal here cannot run until it is remounted with exec</span></div>` : "";
   if (n.reported?.internet !== false) return noexec;
   return noexec + `<div class="actbar ndnet"><span class="state warn">no internet: toolchains, images and updates cannot download here</span></div>`;
 }
@@ -2167,7 +2167,7 @@ function ndDialogs(){
         <div class="hint" id="ndEnSysWhy" hidden></div>
         <label class="ndcap"><input type="checkbox" id="ndEnSess" checked> Sessions run on it</label>
         <label class="ndcap"><input type="checkbox" id="ndEnHost"> Hosting only: it runs containers sent to it, and nothing of it comes back</label>
-        <div class="hint" id="ndEnHostHint" hidden>No project's code, no sessions and no bb go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div>
+        <div class="hint" id="ndEnHostHint" hidden>No project's code, no sessions and no aerie go to it; its agent may ask the controller for its own jobs and nothing else. For a public box such as a cloud VPS.</div>
         <label class="ndcap" id="ndEnFwRow" hidden><input type="checkbox" id="ndEnFw" checked> Take in only 80 and 443</label>
         <div class="hint" id="ndEnFwHint" hidden>A firewall on the machine drops everything else coming in, a port a container publishes included, so nginx is the way to a container. Port 22 stays open unless the SSH door closes it. Going out is left alone.</div>
         <div class="setrow col ctlrow">${lbl("ndEnDoor", "SSH door",

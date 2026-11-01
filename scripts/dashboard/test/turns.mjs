@@ -126,7 +126,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   writeFileSync(f, JSON.stringify(d));
   const moved = await sess({ node: 'nodeA' });
   ok(/The controller moved to 0\.4\.0-dev\.390\+abc1234 since this session began \(it was on 0\.3\.9-dev\.1\+oldrev1\)/.test(moved.line || '')
-     && /bb catchup/.test(moved.line) && /bb preamble/.test(moved.line),
+     && /aerie catchup/.test(moved.line) && /aerie preamble/.test(moved.line),
      `...and once the build has moved, the next prompt says so, naming both builds and where to read (${(moved.line || '').slice(0, 80)})`);
   const again = await sess({ node: 'nodeA' });
   ok(!/controller moved/.test(again.line || ''), '...once: the prompt after it says nothing more');
@@ -217,7 +217,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await asOwner({ node: 'nodeA' });
   const r2 = await rep('the second report');
   const told = await asOwner({ node: 'nodeA' });
-  ok(new RegExp(`report #${r2.id} from the dashboard`).test(told.line || '') && /bb diag reports/.test(told.line || ''),
+  ok(new RegExp(`report #${r2.id} from the dashboard`).test(told.line || '') && /aerie diag reports/.test(told.line || ''),
      `with the rule and the grant, a new report is named on the next prompt (${(told.line || 'no line').slice(0, 100)})`);
   const once = await asOwner({ node: 'nodeA' });
   ok(!/diagnostics/.test(once.line || ''), `...once (${(once.line || 'no line').slice(0, 60)})`);

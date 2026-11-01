@@ -656,7 +656,7 @@ def wj(p, d):
 u.configure(state="${DIR}/state", write_json=wj)
 print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const asSession = await act('fetch', {}, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
-  ok(asSession.status === 403 && /bb git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
+  ok(asSession.status === 403 && /aerie git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
   // Its owner's lock leaves its owner working (R119); an administrator's
   // holds the owner too, written as one here since this account owns beta.
   await page.evaluate(() => fetch('/api/lock', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -891,7 +891,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   execFileSync('git', ['-C', B, 'tag', 'v9.9.9-b397']);
   const tag = await relay(['git', 'push', 'origin', 'v9.9.9-b397']);
   execFileSync('git', ['-C', B, 'tag', '-d', 'v9.9.9-b397']);
-  ok(tag.status === 403 && /v9\.9\.9-b397 is a tag/.test(tag.error || '') && /bb version release/.test(tag.error || ''),
+  ok(tag.status === 403 && /v9\.9\.9-b397 is a tag/.test(tag.error || '') && /aerie version release/.test(tag.error || ''),
      `pushing a tag the tree holds is refused as the release's, naming aerie version release (${(tag.error || '').slice(0, 80)})`);
   const gone = await relay(['git', 'push', 'origin', '--delete', 'topic']);
   ok(gone.status === 403 && /does not take work away/.test(gone.error || '')

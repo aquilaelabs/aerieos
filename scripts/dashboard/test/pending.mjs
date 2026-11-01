@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BB = join(HERE, '..', '..', 'bb');
+const BB = join(HERE, '..', '..', 'aerie');
 const ENV = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
               DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`,
               BB_PROJECT: 'alpha', BB_ROADMAP_PROJECT: 'alpha', BB_BUG_PROJECT: 'alpha' };

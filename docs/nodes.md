@@ -2012,7 +2012,7 @@ node setting decides where its jobs land by label**: the workflow's
 job, not this controller. The controller's own runner was retired on 5 Sep,
 by the phase's own rule: only after a node runner had taken a real job (3 Sep,
 the smoke test on bb-sandbox) and every workflow in this repo had moved there.
-`runner.sh`, its supervision, `bb runner`, the image's install step and the
+`runner.sh`, its supervision, `aerie runner`, the image's install step and the
 five `RUNNER_*` settings all went in one change; the Runner card is a view of
 the nodes' runners now.
 

@@ -122,7 +122,7 @@ def rows():
 
 def builderbot_tree(root):
     """Whether a project's tree is AerieOS's own source (B743): there, a
-    bug that names AerieOS or bb is this tracker's, since its readers are
+    bug that names AerieOS or aerie is this tracker's, since its readers are
     AerieOS's maintainers, and sending it to aerie report sent it to them by
     the long way round."""
     return all(os.path.isfile(os.path.join(root, f)) for f in
@@ -304,10 +304,10 @@ elif op == "add":
     import prefs
     if not here and prefs.get(proj).get("report") != "deny" \
             and not builderbot_tree(os.path.join(os.environ.get("BB_WORKSPACE", "/workspace"), proj)) \
-            and re.search(r"\bbuilder ?bot\b|\bbb\b", said, re.I):
+            and re.search(r"\bbuilder ?bot\b|\baerie(?: ?os)?\b|\bbb\b", said, re.I):
         print("[builderbot] not filed yet. Send it with aerie report \"what happened\" [--area A] "
               f"[--repro \"...\"] if it is a problem with AerieOS itself, or add --here if it is "
-              f"{proj}'s own bug. It names AerieOS or bb, and AerieOS's problems go to its "
+              f"{proj}'s own bug. It names AerieOS or aerie, and AerieOS's problems go to its "
               f"maintainers, not into {proj}'s tracker, while {proj}'s setting Agents may: Report "
               "AerieOS bugs is on (off makes aerie bug add file here)",
               file=sys.stderr)

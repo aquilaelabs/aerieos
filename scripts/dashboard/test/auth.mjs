@@ -58,7 +58,7 @@ r = await bare('/login');
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
   // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
   // picked is worn there (the operator, 17 Oct).
-  ok(html.includes('--bg:#1a1f26') && !html.includes('bb.theme'),
+  ok(html.includes('--bg:#0b1322') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
 }
 
@@ -1456,7 +1456,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
       const plr = await bare('/api/signing', { method: 'POST', headers: plainAuth,
                                               body: JSON.stringify({ project: 'alpha', action: 'list' }) });
       const pl = await plr.json().catch(() => ({}));
-      ok(sl.status === 403 && /bb sign/.test(sl.error || '') && sb.status === 403
+      ok(sl.status === 403 && /aerie sign/.test(sl.error || '') && sb.status === 403
          && plr.status === 200 && pl.keys && typeof pl.map === 'object' && !JSON.stringify(pl).includes('pass'),
          `a session reaches no signing key, not even the list or a backup, and a person reads only which exist (${sl.status}/${sb.status}/${plr.status})`);
     }
@@ -1483,7 +1483,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
       const ownerAsks = await (await bare('/api/phone', { headers: ownerAuth })).json();
       const ask = (ownerAsks.asks || []).find(a => a.id === asked.body.id);
       ok(/no node to sign on/.test(noNode.body.error || '') && !setNode.error
-         && /no Play upload key/.test(noKey.body.error || '') && /bb build/.test(noFile.body.error || '')
+         && /no Play upload key/.test(noKey.body.error || '') && /aerie build/.test(noFile.body.error || '')
          && asked.status === 200 && asked.body.id && ask && ask.kind === 'sign'
          && ask.cmd.join(' ') === 'sign alpha-release.apk --for sideload',
          `a session's aerie sign waits on the project's owner, and what it could not sign is refused before anybody is asked (${asked.body.to || JSON.stringify(asked.body)}; ${JSON.stringify(setNode).slice(0, 80)})`);
@@ -1792,7 +1792,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
     ok(lockBeta.status === 400 && /not a project/.test(lockBeta.error),
        `...nor lock a project it was not given, which it is not told exists (${lockBeta.status})`);
     const vs = await act(sessAuth, '/api/version', { project: 'alpha', action: 'policy', policy: 'any' });
-    ok(vs.status === 403 && /bb version bump/.test(vs.error),
+    ok(vs.status === 403 && /aerie version bump/.test(vs.error),
        `a session's token cannot use the version panel, where it could loosen its own policy (${vs.status})`);
     await bare('/api/profile', { method: 'POST', headers: { ...noauthor, 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'save', profile: { full_name: 'No Author', email: 'na@example.invalid' } }) });

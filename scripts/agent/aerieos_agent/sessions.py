@@ -158,7 +158,7 @@ class SessionsMixin:
         store = tc_root(self.state)
         bb = os.path.join(store, ".bb", "current", "scripts", "aerie") if store else ""
         if not bb or not os.access(bb, os.X_OK):
-            self.keep_said("bundle", f"no bundle bb at {bb or '(no toolchain store)'}, so no idle "
+            self.keep_said("bundle", f"no bundle aerie at {bb or '(no toolchain store)'}, so no idle "
                                      "session's token is refreshed")
             return
         env0 = dict(os.environ)
@@ -346,7 +346,7 @@ class SessionsMixin:
         self.session_up = True
         SESSION.update(up=True, user=user, home=env["HOME"], bind=bind, bundle=self.session_bundle, why="",
                        term=True, screen=SCREEN_PORT)
-        log(f"sessions: terminals open as {user}, bb {self.session_bundle[7:19]}")
+        log(f"sessions: terminals open as {user}, aerie {self.session_bundle[7:19]}")
         self.ctr_start(bbtty)
 
     def ctr_start(self, bbtty):
@@ -441,7 +441,7 @@ class SessionsMixin:
         # the census carries it to the node's page.
         if os.path.exists(bb) and noexec(store):
             if not getattr(self, "_noexec_said", False):
-                log(f"sessions: the toolchain store {store} is mounted noexec, so bb and every terminal "
+                log(f"sessions: the toolchain store {store} is mounted noexec, so aerie and every terminal "
                     "cannot run from it; remount it with exec")
                 self._noexec_said = True
             return

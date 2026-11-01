@@ -151,7 +151,7 @@ ok(!st.snap && !st.sess, '...nor drawn');
   const { writeFileSync, mkdirSync } = await import('node:fs');
   writeFileSync(`${DIR}/ws/alpha/.bb-test-run.log`,
     '[dashboard-test] == shape.mjs ==\nPASS  [+0.1s] a row a reader opens\n1 passed, 0 failed in 0.1s\n');
-  execFileSync(join(HERE, '..', 'bb'), ['tests', 'ingest', '.bb-test-run.log'],
+  execFileSync(join(HERE, '..', 'aerie'), ['tests', 'ingest', '.bb-test-run.log'],
     { cwd: `${DIR}/ws/alpha`, env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
       DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
   mkdirSync(`${DIR}/ws/alpha/dist`, { recursive: true });

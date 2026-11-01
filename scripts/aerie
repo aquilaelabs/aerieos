@@ -25,7 +25,7 @@ export BB_LIB
 # The reference's entries for one verb: each line that starts `bb VERB `,
 # with the indented lines that continue it. Fails when there are none.
 verb_help() {
-    usage | awk -v v="$1" '/^bb / { on = ($2 == v) } on { print; n++ } END { exit n ? 0 : 1 }'
+    usage | awk -v v="$1" '/^aerie / { on = ($2 == v) } on { print; n++ } END { exit n ? 0 : 1 }'
 }
 
 usage() {
@@ -33,10 +33,10 @@ usage() {
     # from this by tools/bb-ref.sh, and aerie lint fails when the two differ
     # (R91 step 5). Column 0 for a verb, 19 in for a line that continues it.
     cat <<'EOF'
-bb: AerieOS helper
+aerie: AerieOS helper
 
-bb -p NAME VERB    any verb, about another project this one reads (its
-                   settings name them): bb -p NAME roadmap, bb -p NAME map find X;
+aerie -p NAME VERB    any verb, about another project this one reads (its
+                   settings name them): aerie -p NAME roadmap, aerie -p NAME map find X;
                    NAME is its shown name, its folder or its id (P3)
 aerie status          tool versions, runner registration, the projects here
 aerie version         this project's version, and who is allowed to move it
@@ -492,7 +492,7 @@ aerie wiki rm NAME [--why "..."]   take a page out, under the same setting
 aerie wiki mv OLD NEW   rename one; aerie wiki history: the last changes
 aerie transcripts     your own conversations on this project, from every coding agent
                    you use, each marked with its agent, newest first, as the
-                   Profile page lists them (bb -p NAME for one it reads)
+                   Profile page lists them (aerie -p NAME for one it reads)
 aerie transcripts show ID [--tz ZONE] [--all]   one of them as text: what was said,
                    every command it ran and what it answered; the newest
                    16 MB of a longer one, the whole of it with --all
@@ -500,7 +500,7 @@ aerie transcripts fetch ID [--into DIR]   the file itself into this machine's fo
                    for it: how a node holding its projects as a synced copy
                    resumes a conversation it does not have (bb-tty runs it)
 aerie memory          your memories on this repository, kept for every coding agent:
-                   the index, newest first (bb -p REPO for another repository
+                   the index, newest first (aerie -p REPO for another repository
                    of the project, which keeps them when it moves)
 aerie memory show NAME   one of them whole
 aerie memory add NAME --type user|feedback|project|reference --about "one line" "what to remember"
@@ -2545,7 +2545,7 @@ cmd_design() {
 }
 
 # `aerie transcripts`: this account's own conversations with Claude on the
-# project, as the Profile tab lists them; `bb -p NAME transcripts` for a
+# project, as the Profile tab lists them; `aerie -p NAME transcripts` for a
 # project this one reads (the operator, 29 Sep). Only the account's own:
 # the controller looks under its transcripts and nowhere else.
 cmd_wiki() {
@@ -2570,7 +2570,7 @@ cmd_memory() {
     local verb="${1:-list}" auth proj
     local use='aerie memory [list | show NAME | add NAME --type user|feedback|project|reference --about "one line" "what to remember" | forget NAME]'
     case "$verb" in list|show|add|forget) ;; -h|--help)
-        echo "$use: your memories on this repository, kept for every coding agent; bb -p REPO memory for another repository of the project"; return 0 ;;
+        echo "$use: your memories on this repository, kept for every coding agent; aerie -p REPO memory for another repository of the project"; return 0 ;;
         *) die "$use" ;; esac
     proj="$(bb_project)" || die "not inside a project under ${WORKSPACE}; cd into one first"
     auth="$(bb_auth_or_die)"
@@ -2628,7 +2628,7 @@ cmd_rules() {
     # change only its own; see rules.py for the ownership and the log.
     # Its help, as every verb's -h is (B411): the lines aerie help carries for it.
     case "${1:-}" in
-        -h|--help) usage | sed -n '/^aerie rules /,/^bb [^r]/p' | sed '$d'; return 0 ;;
+        -h|--help) usage | sed -n '/^aerie rules /,/^aerie [^r]/p' | sed '$d'; return 0 ;;
     esac
     local proj="${BB_PROJECT:-}"
     if [ -z "$proj" ]; then
@@ -3497,7 +3497,7 @@ EOT
             done
             [ "$verb" = logs ] && verb=log
             # The project too (B675): a read project's container is
-            # answered only when its project is named, so `bb -p X devapp
+            # answered only when its project is named, so `aerie -p X devapp
             # log NAME` fell to this session's own and was refused.
             BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_VERB="$verb" BB_DEV_NAME="$name" BB_DEV_WHY="$why" \
                 python3 "$BB_LIB/devapp-verbs.py" ctl
@@ -3564,7 +3564,7 @@ bb_token_exp() {
 }
 
 # The project a session token was minted for: its first field. The kept
-# copy is filed under it, and `bb -p NAME` repoints BB_PROJECT at the
+# copy is filed under it, and `aerie -p NAME` repoints BB_PROJECT at the
 # project being READ, so a lookup by BB_PROJECT under -p found no kept
 # copy and sent the environment's, long dead (B497). bbapi.keep_token
 # reads the token the same way, for the same reason.
@@ -3636,7 +3636,7 @@ cmd_token() {
     home="$(user_home "${BB_ACCOUNT_UID:-}")"
     [ -n "$home" ] || die "no home for account ${BB_ACCOUNT_UID:-(none)} on this machine"
     py="$(dirname "$(readlink -f "$0")")/lib/bbapi.py"
-    [ -f "$py" ] || die "bbapi.py is missing beside bb"
+    [ -f "$py" ] || die "bbapi.py is missing beside aerie"
     HOME="$home" python3 "$BB_LIB/token-verbs.py" keep
 }
 
@@ -3681,7 +3681,7 @@ bb_auth_or_die() {
     # tab mints a fresh one, which bb-tty writes where bb_token_now reads it.
     if [ -n "${BB_TOKEN:-}" ] && bb_token_dead "$(bb_token_now)"; then
         local e; e="$(bb_token_exp "$BB_TOKEN")"
-        die "this session's token expired$([ -n "$e" ] && date -d "@$e" '+ %d %b at %H:%M' 2>/dev/null). A token lasts 12 hours and is renewed by every answer the controller gives, and the node's agent renews an idle one; a session left idle before that fix ran out. Ask the person to reopen this session's tab on the dashboard: that mints a fresh token and leaves it where bb looks, and the next command works."
+        die "this session's token expired$([ -n "$e" ] && date -d "@$e" '+ %d %b at %H:%M' 2>/dev/null). A token lasts 12 hours and is renewed by every answer the controller gives, and the node's agent renews an idle one; a session left idle before that fix ran out. Ask the person to reopen this session's tab on the dashboard: that mints a fresh token and leaves it where aerie looks, and the next command works."
     fi
     if [ -z "$h" ]; then
         # Which of the two is actually wrong. Everything that reaches a node
@@ -3739,7 +3739,7 @@ bb_controller_stamp() {
 BB_RELAY_VERBS=" $(tr -s '[:space:]' ' ' < "$(dirname "$(readlink -f "$0")")/lib/relay-verbs") "
 
 # bb_project: the project a verb acts on: BB_PROJECT, which is the session's
-# own or what `bb -p NAME` named, else the working directory's when it is
+# own or what `aerie -p NAME` named, else the working directory's when it is
 # inside a project. The switch and not the directory, because a checkout of
 # AerieOS itself sits under /workspace on the controller and the harness
 # runs bb from it with the project in the environment.
@@ -3927,7 +3927,7 @@ cmd_settings() {
         # scripted setup: an administrator's, as on the Settings page.
         [ -z "${BB_TOKEN:-}${BB_ACCOUNT_UID:-}" ] && ! on_node \
             || die "aerie settings node is run in a shell on the controller, not from a session: a project's node is its Settings page's"
-        [ -n "$proj" ] || die "not inside a project under ${WORKSPACE}; cd into one first, or bb -p NAME settings node NODE"
+        [ -n "$proj" ] || die "not inside a project under ${WORKSPACE}; cd into one first, or aerie -p NAME settings node NODE"
         [ -n "${2:-}" ] || die "aerie settings node NODE: which node? aerie nodes lists them"
         BB_SET_VALUE="$2" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
             python3 "$BB_LIB/settings-verbs.py" node "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
@@ -4760,7 +4760,7 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         if grep -qF '"shipped": shipped' "$BB_LIB/lint-checks.py"; then
             python3 "$BB_LIB/lint-checks.py" shipped || rc=1
         else
-            echo "  [skip] this bb's lint-checks.py predates the check: bash scripts/aerie lint runs the tree's"
+            echo "  [skip] this aerie's lint-checks.py predates the check: bash scripts/aerie lint runs the tree's"
             skipped=1
         fi
     fi
@@ -6230,13 +6230,13 @@ cmd_changelog() {
 # On a node, the verbs whose state is the controller's go there whole (see
 # bb_relay); BB_RELAYED marks the controller's own run so a relayed verb that
 # calls bb again cannot bounce.
-# `bb -p NAME VERB`: the verb about another project, one this project reads
+# `aerie -p NAME VERB`: the verb about another project, one this project reads
 # (prefs.reads, read-only from here). It moves every project the verbs read,
 # and the tree aerie map reads, before the relay decides where the words go:
 # the controller's door is what refuses a project this one does not read.
 if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
-    [ -n "${2:-}" ] || die "bb -p NAME VERB: which project?"
-    case "$2" in */*|.*) die "bb -p: '$2' is not a project name" ;; esac
+    [ -n "${2:-}" ] || die "aerie -p NAME VERB: which project?"
+    case "$2" in */*|.*) die "aerie -p: '$2' is not a project name" ;; esac
     p_dir="$2" p_name="$2"
     # The name the dashboard shows is taken for its directory (B1), here as
     # well as at the relay, since aerie map and aerie transcripts read the tree
@@ -6246,19 +6246,19 @@ if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
         [ -n "$p_res" ] && [ -d "$WORKSPACE/$p_res" ] && p_dir="$p_res"
     fi
     export BB_PROJECT="$p_dir" BB_ROADMAP_PROJECT="$p_dir" BB_BUG_PROJECT="$p_dir" BB_VERSION_PROJECT="$p_dir"
-    # ...and the verbs that read logs (B675): `bb -p X tests log` and
-    # `bb -p X ci-log` answered for this session's own project.
+    # ...and the verbs that read logs (B675): `aerie -p X tests log` and
+    # `aerie -p X ci-log` answered for this session's own project.
     export BB_TESTS_PROJECT="$p_dir" BB_CILOG_PROJECT="$p_dir"
     export BB_TREE="$WORKSPACE/$p_dir"
     shift 2
     # Said rather than answered for this project or for nothing
-    # (MediaReducer, 7 Oct): `bb -p X status` printed this session's own
-    # status, and `bb -p X map find` said "nothing defines" a function X
+    # (MediaReducer, 7 Oct): `aerie -p X status` printed this session's own
+    # status, and `aerie -p X map find` said "nothing defines" a function X
     # has, because X was added to the reads after the session started and
     # its tree was not in view.
     case "${1:-}" in
         status|node|gpu|toolchains|emu|phone|tidy|doctor|lint|drift|build|test|run)
-            die "bb -p: bb ${1} answers for this machine and this project, not for $p_name" ;;
+            die "aerie -p: aerie ${1} answers for this machine and this project, not for $p_name" ;;
         map)
             # By the name it was asked by, never its directory (B58).
             [ -d "$BB_TREE" ] || die "$p_name's tree is not in this session's view: a project added to the reads comes into a session's view when it starts, so start a new one (its notebook answers already)" ;;

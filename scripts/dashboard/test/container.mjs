@@ -195,7 +195,7 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
   const asks = (await api('/api/phone')).body.asks || [];
   ok(r.status === 400 && /builds app from a relative path/.test(r.body.error || '')
      && /own data directory, which is empty/.test(r.body.error || '')
-     && /bb devapp new/.test(r.body.error || '') && /docker-compose\.yml or compose\.yml/.test(r.body.error || '')
+     && /aerie devapp new/.test(r.body.error || '') && /docker-compose\.yml or compose\.yml/.test(r.body.error || '')
      && !asks.some(a => a.kind === 'container' && a.name === 'd2-armor-web'),
      `an ask whose compose builds from a relative path is refused before the bell, naming aerie devapp new (${
         r.status}: ${(r.body.error || '').slice(0, 90)})`);

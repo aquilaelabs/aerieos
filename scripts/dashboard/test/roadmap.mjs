@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 // The checkout's bb, not the stub on the harness PATH: `aerie roadmap` is the half
 // of this a session uses, and it is the real implementation under test.
-const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bb');
+const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'aerie');
 const FILE = `${DIR}/state/roadmap.json`;
 const read = () => existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : { projects: {} };
 
@@ -336,7 +336,7 @@ ok((await open()).some(i => i.can),
 const prompt = execFileSync(BB, ['roadmap', '--prompt'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
-ok(/\d+ open items?/.test(prompt) && /bb roadmap show R4/.test(prompt) && !prompt.includes('make the picker wrap properly'),
+ok(/\d+ open items?/.test(prompt) && /aerie roadmap show R4/.test(prompt) && !prompt.includes('make the picker wrap properly'),
    'the block a session is started with counts the open items and says how to read one, and carries no list');
 
 // ---- an order that matters ---------------------------------------------

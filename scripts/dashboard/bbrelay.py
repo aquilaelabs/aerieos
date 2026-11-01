@@ -110,9 +110,9 @@ def _not_a_read(argv):
     if verb in READ_FORMS and first in forms:
         return ""
     if verb in READ_FORMS:
-        return (f"bb {verb} {first} would change it, and a session on the project "
+        return (f"aerie {verb} {first} would change it, and a session on the project "
                 f"that reads it only reads")
-    return f"bb {verb} acts on the project's own machines, and reading it does not"
+    return f"aerie {verb} acts on the project's own machines, and reading it does not"
 
 
 def admit(me, req):
@@ -122,10 +122,10 @@ def admit(me, req):
     author, a name that is not a project."""
     argv = _argv(req)
     if len(argv) > MAX_WORDS:
-        return None, ({"error": f"bb {argv[0]} sent {len(argv)} words, and a relayed command "
+        return None, ({"error": f"aerie {argv[0]} sent {len(argv)} words, and a relayed command "
                                 f"carries {MAX_WORDS} at most: split it into several"}, 400)
     if not argv or argv[0] not in VERBS:
-        return None, ({"error": f"bb {argv[0] if argv else ''} is not relayed: "
+        return None, ({"error": f"aerie {argv[0] if argv else ''} is not relayed: "
                        "it answers for the machine the session is on"}, 400)
     # A rule's check is a command, and a session may write its own rule's
     # check, so it runs on the machine the session is on and never here
@@ -138,7 +138,7 @@ def admit(me, req):
     # well, whatever the verb does, so nothing a session sends sets a
     # project's node or mints a node's token.
     if me.get("session") and (argv[:2] in (["nodes", "enroll-token"], ["settings", "node"])):
-        return None, ({"error": f"bb {' '.join(argv[:2])} is an administrator's, from a shell on the "
+        return None, ({"error": f"aerie {' '.join(argv[:2])} is an administrator's, from a shell on the "
                                 "controller, never a session's"}, 403)
     # `aerie findings --all` means every project in the scanner's report, and
     # the report covers the whole share. The rest of this door keeps a
@@ -355,7 +355,7 @@ def run(me, req, project):
         r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
                            env=env, capture_output=True, text=True, timeout=180)
     except subprocess.TimeoutExpired:
-        return {"error": f"bb {argv[0]} took longer than three minutes",
+        return {"error": f"aerie {argv[0]} took longer than three minutes",
                 "code": 124, "out": "", "err": ""}, 504
     except OSError as e:
         return {"error": str(e), "code": 1, "out": "", "err": ""}, 500

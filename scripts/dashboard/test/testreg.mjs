@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bb');
+const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'aerie');
 const FILE = `${DIR}/state/tests.json`;
 const read = () => existsSync(FILE)
   ? JSON.parse(readFileSync(FILE, 'utf8')).projects.alpha || {} : {};

@@ -3738,7 +3738,7 @@ def session_seen_note(project, uid, node, who=None, begin=False):
         if new_stale:
             said.append(f"This project's {', '.join(stale)} changed since this session started, and "
                         "a session takes those when it starts: end it and start a new one to have "
-                        "them (a project added to Reads answers bb -p already; its tree is mounted "
+                        "them (a project added to Reads answers aerie -p already; its tree is mounted "
                         "by the new session).")
         fresh = [r for r in watched or [] if int(r.get("id") or 0) > was_diag]
         if fresh:
@@ -6293,7 +6293,7 @@ class Handler(BaseHTTPRequestHandler):
             if getattr(self, "_basic_2fa", False):
                 self._basic_2fa = False
                 return self._json({"error": "this account has two-factor sign-in, so its password alone opens "
-                                            "nothing: use bb from a dashboard terminal, which carries its own token"}, 401)
+                                            "nothing: use aerie from a dashboard terminal, which carries its own token"}, 401)
             return self._json({"error": "not signed in"}, 401)
         nxt = urllib.parse.quote(self.path, safe="/?=&")
         self.send_response(302)

@@ -219,7 +219,7 @@ ALWAYS = [
                 "pgrep -f", "pgrep --full", "pgrep -* -f", "pgrep -*f"]},
     {"name": "emulator-through-bb",
      "text": "The emulator is started with `aerie emu start` and stopped with `aerie emu stop`, never the"
-             " emulator binary: bb picks the GPU, waits for the boot, keeps the log and saves its"
+             " emulator binary: aerie picks the GPU, waits for the boot, keeps the log and saves its"
              " state on stop.",
      "refuse": ["emulator -avd", "emulator @*"]},
     # Only a call that is not in the background (`foreground`): a run started
@@ -234,7 +234,6 @@ ALWAYS = [
      # A probe is a run against the kept fixture, a rebuild is minutes of a
      # job, and a build can be longer than either (the operator, 16 Oct:
      # messages queued behind them, on every project as on this one).
-     # The command by either name: bb still forwards to aerie.
      "refuse": [f"{cli} {verb}" for cli in ("aerie",)
                 for verb in ("build", "test", "tests run", "tests preflight", "tests lab", "tests coverage",
                              "tests probe", "devapp rebuild", "dashboard test")]

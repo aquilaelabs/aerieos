@@ -217,7 +217,7 @@ ok(page.errors.length === 0,
   const root = join(import.meta.dirname, '..', '..', '..');
   const run = (env) => {
     try {
-      return execFileSync('bash', [join(root, 'scripts', 'bb'), 'status'],
+      return execFileSync('bash', [join(root, 'scripts', 'aerie'), 'status'],
         { encoding: 'utf8', cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) { return `${e.stdout || ''}${e.stderr || ''}` || `THREW ${e}`; }
   };

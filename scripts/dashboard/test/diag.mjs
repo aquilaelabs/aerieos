@@ -54,7 +54,7 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
 // aerie diag, the way a person reads it: the verb against this server.
 {
   const out = (() => { try {
-    return execFileSync('bash', [join(HERE, '..', 'bb'), 'diag', 'controller', 'nodes', 'jobs'],
+    return execFileSync('bash', [join(HERE, '..', 'aerie'), 'diag', 'controller', 'nodes', 'jobs'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_CONTROLLER: base,
                DASHBOARD_AUTH: 'test:test' } });

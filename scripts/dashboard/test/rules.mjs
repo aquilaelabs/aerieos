@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BB = join(HERE, '..', '..', 'bb');
+const BB = join(HERE, '..', '..', 'aerie');
 const FILE = `${DIR}/state/rules.json`;
 const ENV = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
               DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`,
@@ -199,7 +199,7 @@ ok(/No em dashes\./.test(block),
 ok(!/add, do not change/.test(block),
    `...and the conditional one is NOT, which is the whole reason it is a kind (${
      JSON.stringify(block)})`);
-ok(/agent-compat/.test(block) && /bb rules show/.test(block),
+ok(/agent-compat/.test(block) && /aerie rules show/.test(block),
    '...but it is named there, so a trigger that misses leaves a rule the session knows of');
 ok(/cannot change them/.test(block),
    '...and the block says whose they are');
@@ -234,7 +234,7 @@ ok(read().find(r => r.name === 'design')?.doc === 'docs/design.md'
    && read().find(r => r.name === 'design')?.check === 'test -d .git',
    '...stored on it');
 ok(/defined in full in docs\/design\.md/.test(bb('--prompt'))
-   && /bb rules check design/.test(bb('--prompt')),
+   && /aerie rules check design/.test(bb('--prompt')),
    'the block a session is handed says where it is defined and how it is checked');
 ok(/PASS  design/.test(bb('check', 'design')),
    'aerie rules check NAME runs the check in the project tree and reports it');
@@ -311,7 +311,7 @@ ok(/^aerie rules show NAME/m.test(execFileSync(BB, ['rules', '-h'], { env: ENV }
   const help = v => { try { return [0, execFileSync(BB, [v, '-h'], { env: ENV, stdio: 'pipe' }).toString()]; }
                       catch (e) { return [e.status, String(e.stdout) + String(e.stderr)]; } };
   const said = ['devapp', 'container', 'capture', 'jobs'].map(v => [v, ...help(v)]);
-  ok(said.every(([v, st, out]) => st === 0 && new RegExp(`^bb ${v}\\b`).test(out) && !/ERROR/.test(out)),
+  ok(said.every(([v, st, out]) => st === 0 && new RegExp(`^aerie ${v}\\b`).test(out) && !/ERROR/.test(out)),
      `bb VERB -h prints that verb's entries from the reference and exits 0 (${said.map(([v, st]) => v + ':' + st).join(' ')})`);
 }
 ok(/No em dashes/.test(bb('list')) && /agent-compat/.test(bb('list')),

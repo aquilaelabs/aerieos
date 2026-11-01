@@ -185,7 +185,7 @@ const toLibrary = async () => {
   });
   if (tc){
     await toEntry(tc);
-    ok(await page.$eval(`${ENTRY(tc)} .ldetail`, d => /bb tool|Licensed|accept/.test(d.textContent)),
+    ok(await page.$eval(`${ENTRY(tc)} .ldetail`, d => /aerie tool|Licensed|accept/.test(d.textContent)),
        `a toolchain's page says what it adds to a session and its terms (${tc})`);
   }
   if (await page.evaluate(() => lib.rows.some(r => r.kind === 'agent' && r.name === 'claude-code'))){

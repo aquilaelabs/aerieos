@@ -91,7 +91,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
 // duplicate label, since a bash case takes the first match and hides a
 // second in silence.
 {
-  const bb = readFileSync(`${import.meta.dirname}/../../bb`, 'utf8');
+  const bb = readFileSync(`${import.meta.dirname}/../../aerie`, 'utf8');
   const labels = [...bb.matchAll(/^    ([a-z][a-z0-9|-]*)\)\s+(?:shift; )?cmd_/gm)]
     .flatMap(m => m[1].split('|'));
   const dup = labels.filter((l, i) => labels.indexOf(l) !== i);
@@ -677,8 +677,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.click('#tpmodal [data-tplook]');
   await page.waitForSelector('#tpmodal .tpseen', { timeout: 20000 });
   const seen = await page.$eval('#tpmodal .tpseen', e => e.textContent.replace(/\s+/g, ' '));
-  ok(/Hex kit hexkit at [0-9a-f]{12}/.test(seen) && /bb tool hexkit dump FILE runs \{dir\}\/bin\/hexkit dump \{args\}/.test(seen)
-     && /bb help tool-hexkit/.test(seen),
+  ok(/Hex kit hexkit at [0-9a-f]{12}/.test(seen) && /aerie tool hexkit dump FILE runs \{dir\}\/bin\/hexkit dump \{args\}/.test(seen)
+     && /aerie help tool-hexkit/.test(seen),
      `Add your own's Look shows the pack at its commit, each verb's words and its guidance before Add (${seen.slice(0, 160)})`);
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(() => (toolchains?.items || []).some(i => i.name === 'hexkit' && i.pack), null, { timeout: 20000 });
@@ -862,7 +862,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.waitForSelector('#tpmodal .tpseen', { timeout: 20000 });
   const pseen = await page.$eval('#tpmodal .tpseen', e => e.textContent.replace(/\s+/g, ' '));
   ok(/Wordy wordy as given here, 1 file/.test(pseen) && /Installs by copying these files to the node/.test(pseen)
-     && /bb tool wordy count FILE runs \{dir\}\/bin\/wordy \{args\}/.test(pseen),
+     && /aerie tool wordy count FILE runs \{dir\}\/bin\/wordy \{args\}/.test(pseen),
      `a pasted bbtool.json is looked at like a repository's: what it installs and what each verb runs (${pseen.slice(0, 160)})`);
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(() => (toolchains?.items || []).find(i => i.name === 'wordy')?.pack?.here, null, { timeout: 20000 });
@@ -903,7 +903,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.click('#tpmodal [data-tplook]');
   await page.waitForSelector('#tpmodal .tpseen', { timeout: 20000 });
   const useen = await page.$eval('#tpmodal .tpseen', e => e.textContent.replace(/\s+/g, ' '));
-  ok(/as given here, 3 files/.test(useen) && /bb help tool-stamp/.test(useen),
+  ok(/as given here, 3 files/.test(useen) && /aerie help tool-stamp/.test(useen),
      `an uploaded archive of the pack's files is looked at the same way, its guidance with it (${useen.slice(0, 160)})`);
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(() => (toolchains?.items || []).find(i => i.name === 'stamp')?.pack?.here, null, { timeout: 20000 });

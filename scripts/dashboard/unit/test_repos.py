@@ -279,7 +279,7 @@ class Briefing(unittest.TestCase):
         self.assertIn("### server", claude)
         self.assertIn("Fact of server", claude)
         self.assertNotIn("Fact of app", claude, "Claude Code loads its own repository's index")
-        self.assertIn("bb -p REPO memory add", claude)
+        self.assertIn("aerie -p REPO memory add", claude)
         other = preamble.memory_part("app", "u_1", "codex")[0]
         self.assertIn("Fact of app", other)
         self.assertIn("Fact of server", other)

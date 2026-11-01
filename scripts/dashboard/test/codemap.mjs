@@ -62,7 +62,7 @@ ok(/server\.py:\d+  from Handler\._nodes_for\b/.test(py), 'a python method is at
 
 // Shell: bb's own functions.
 const sh = map('who-calls', 'gfx_tool');
-ok(/^scripts\/bb:\d+  from tool_graphics/m.test(sh), "bb's shell functions are in the map too");
+ok(/^scripts\/aerie:\d+  from tool_graphics/m.test(sh), "bb's shell functions are in the map too");
 
 // What a function draws, and which suites name it.
 const draws = map('draws', '.dmtab');
@@ -86,7 +86,7 @@ const pyS = map('suites', 'scripts/dashboard/roadmap.py');
 ok(/^scripts\/dashboard\/test\/roadmap\.mjs  \(\d+: .*\/api\/roadmap/m.test(pyS),
    'a python module finds the suites that ask the paths its handlers answer');
 ok(!/auth\.mjs  \(\d+: \/api\/bugs/.test(pyS), '...and not every suite that asks any path');
-ok(/^scripts\/dashboard\/test\/agent\.mjs  \(\d+: .*scripts\/bb/m.test(map('suites', 'scripts/aerie')),
+ok(/^scripts\/dashboard\/test\/agent\.mjs  \(\d+: .*scripts\/aerie/m.test(map('suites', 'scripts/aerie')),
    'a file a suite names outright, such as bb itself, reaches that suite');
 const names = map('suites', 'scripts/dashboard/toolchains.py', '--names').split('\n');
 ok(names.includes('toolchains') && !names.some(n => n.startsWith('lab-')),

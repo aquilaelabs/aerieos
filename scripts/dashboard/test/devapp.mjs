@@ -4621,7 +4621,7 @@ print(json.dumps(out))
   writeFileSync(`${DIR}/ws/alpha/docker-compose.yml`, 'services:\n  app:\n    image: alpha-dev\n');
   const nowhere = await api('/api/devapp', { project: 'ep.silon', action: 'move', instance: 'loose', to: 'no-such' });
   ok(nowhere.status === 400 && /no project called no-such/.test(nowhere.error || ''), `a move names a project there is (${nowhere.error})`);
-  const moveTok = execFileSync('bash', [fileURLToPath(new globalThis.URL('../../bb', import.meta.url)), 'users', 'token', 'ep.silon', 'test'],
+  const moveTok = execFileSync('bash', [fileURLToPath(new globalThis.URL('../../aerie', import.meta.url)), 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const bySess = await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + moveTok },
@@ -5248,7 +5248,7 @@ try:
 except SystemExit:
     pass`], { encoding: 'utf8' }).stdout || '';
   const withFile = said(true), without = said(false);
-  ok(/bb devapp new builds its dev instance/.test(withFile) && !/Containers page/.test(withFile)
+  ok(/aerie devapp new builds its dev instance/.test(withFile) && !/Containers page/.test(withFile)
      && /compose file at its root/.test(without),
      `aerie devapp ls with nothing yet points at aerie devapp new, and says a compose file is what it needs where there is none (${withFile.trim().slice(0, 70)})`);
 }

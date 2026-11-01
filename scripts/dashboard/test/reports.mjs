@@ -92,7 +92,7 @@ const byRepro = bb(['bug', 'add', 'the dashboard repaints after it loads', '--re
 ok(byRepro.status === 0 && /filed B\d+/.test(byRepro.stdout) && bugsNow() === had + 1,
    `...and a repro that uses bb does not make it AerieOS's (${(byRepro.stdout + byRepro.stderr).trim().slice(0, 80)})`);
 const helped = bb(['bug', 'add', '-h'], { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
-ok(helped.status === 0 && /bb bug/.test(helped.stdout) && bugsNow() === had + 1,
+ok(helped.status === 0 && /aerie bug/.test(helped.stdout) && bugsNow() === had + 1,
    '...and aerie bug add -h prints the help rather than filing a bug called -h');
 const mine2 = bb(['bug', 'add', 'aerie build fails because this project pins an old compiler', '--here'],
                  { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });

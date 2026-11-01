@@ -301,7 +301,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
 // ---- the briefing names them ------------------------------------------------------------
 const pre = await api('/api/preamble?project=alpha');
 const whereTopic = (await api('/api/preamble?project=alpha&topic=where')).text || '';
-ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `bb -p NAME` in front/.test(pre.text)
+ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `aerie -p NAME` in front/.test(pre.text)
    && /its containers answer from here on this project's nodes/.test(pre.text) && /Nothing there is yours to change/.test(pre.text) && /beyond the ones it reads/.test(whereTopic),
    'the block says which projects the session reads and that nothing there is its to change; the where topic, to look for context nowhere else');
 await api('/api/prefs', { project: 'alpha', reads: [] });

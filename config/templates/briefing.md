@@ -113,7 +113,7 @@ names every place it lands), `aerie map who-calls KEY` where the code reads
 it, and a Markdown file's headings (`aerie map sections docs/install.md`);
 `--format json|yaml|markdown` on find, who-calls and defs prints the
 entries as records. The map is an index over this tree (python, the
-dashboard's scripts, bb's shell, the suites), rebuilt by itself when a
+dashboard's scripts, aerie's shell, the suites), rebuilt by itself when a
 source is newer. It is rough by
 design: braces, not scope, and an anonymous callback is attributed to the
 nearest named function around it. When you grep because the map answered
@@ -322,7 +322,7 @@ change you commit reaches the editor there in seconds.
 <!-- BUILDERBOT:TOPIC notebook: the record's verbs in full, aerie design, the wiki, aerie transcripts, aerie memory, aerie rules, aerie report -->
 
 `aerie roadmap`, `aerie bug`, `aerie rules`, `aerie tests`, `aerie changelog`, `aerie design`,
-`aerie wiki`, and `bb <verb> -h` for the rest of any of them. `aerie design` is
+`aerie wiki`, and `aerie <verb> -h` for the rest of any of them. `aerie design` is
 what the project looks like as the operator laid it out on the notebook's
 Design view: `aerie design show NAME` for one page, theme or rule
 (`nostromo/hull` for a theme's or a page's own), and `aerie design file` prints
@@ -336,7 +336,7 @@ its answer included. `aerie memory` is this account's memories on a repository,
 the same for every coding agent and where Claude Code keeps its own: `aerie
 memory show NAME` reads one, `aerie memory add NAME --type T --about "..." "..."`
 saves one with its index line, `aerie memory forget NAME` takes one out, and
-`bb -p REPO memory` answers for another repository of the project, so a
+`aerie -p REPO memory` answers for another repository of the project, so a
 fact stays with the repository it is about when that repository moves.
 
 The project's wiki is the notebook's Wiki view, for the people who use or

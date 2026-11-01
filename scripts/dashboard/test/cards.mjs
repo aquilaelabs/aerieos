@@ -206,7 +206,7 @@ await ready(page);
   }));
   ok(probLines.length === 2 && probLines.every(l => l.same),
      `↻ runs it again, and a FAIL turns the dot red with each problem in its level's color (${JSON.stringify(probLines.map(l => l.same))})`);
-  ok(probLines.some(l => /runner offline/.test(l.text) && /bb logs --runner/.test(l.why)),
+  ok(probLines.some(l => /runner offline/.test(l.text) && /aerie logs --runner/.test(l.why)),
      '...and carries the rest of what the check said under it');
   ok(await page.$eval('#docPanel', p => !p.hidden), '...with the panel still open after ↻ redrew it');
   await page.keyboard.press('Escape');

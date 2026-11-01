@@ -97,7 +97,7 @@ if (queued.job){
   });
   ok(fin && fin.state === 'succeeded',
      `...and the agent there ran it (${fin ? fin.state : 'never finished'})`);
-  ok(fin && /bb toolchains check/.test(fin.log || ''),
+  ok(fin && /aerie toolchains check/.test(fin.log || ''),
      '...through the bundle this controller ships, not a copy on the machine');
   const view = await api(`/api/toolchains?node=${node.id}`);
   const row = (view.items || []).find(i => i.name === 'zig');

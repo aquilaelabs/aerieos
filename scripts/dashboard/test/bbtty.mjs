@@ -46,7 +46,7 @@ const boot = status.boot;
 // being asserted) and to record what it was handed.
 const bin = mkdtempSync(join(tmpdir(), 'bbtty-'));
 const argvOut = join(bin, 'argv');
-writeFileSync(join(bin, 'bb'), `#!/usr/bin/env bash
+writeFileSync(join(bin, 'aerie'), `#!/usr/bin/env bash
 # A roadmap of whatever size the case asks for, in items rather than one long
 # line, so the trim has real line boundaries to land on.
 case "\${1:-}" in
@@ -104,7 +104,7 @@ printf '%s\\0' "$@" > "${argvOut}"
 # Held open for a pane; a launcher run on its own has its argv and goes.
 [ -n "\${FAKE_CLAUDE_QUICK:-}" ] || sleep 60
 `);
-chmodSync(join(bin, 'bb'), 0o755);
+chmodSync(join(bin, 'aerie'), 0o755);
 chmodSync(join(bin, 'claude'), 0o755);
 
 // One connection, the way a terminal makes one. bb-tty ends by exec'ing `tmux
@@ -176,7 +176,7 @@ ok(genv('GIT_AUTHOR_NAME') === 'GIT_AUTHOR_NAME=Pat Tester'
 // reason nor the way out, so the session carries one that does (R69 step 4).
 ok(genv('GIT_CONFIG_KEY_0') === 'GIT_CONFIG_KEY_0=credential.helper'
    && /no git credential is on this machine/.test(genv('GIT_CONFIG_VALUE_0'))
-   && /bb git push/.test(genv('GIT_CONFIG_VALUE_0'))
+   && /aerie git push/.test(genv('GIT_CONFIG_VALUE_0'))
    && genv('GIT_TERMINAL_PROMPT') === 'GIT_TERMINAL_PROMPT=0',
    `...and a credential helper that names aerie git rather than asking for a username (${
      (genv('GIT_CONFIG_VALUE_0') || 'unset').slice(0, 60)})`);
@@ -216,7 +216,7 @@ ok(launcher().includes(tokWritten),
 {
   // What bb does with it: a BB_TOKEN that has expired falls through to this
   // file, and a live one is left alone.
-  const BBBIN = new globalThis.URL('../../bb', import.meta.url).pathname;
+  const BBBIN = new globalThis.URL('../../aerie', import.meta.url).pathname;
   const dead = 'bbs_' + Buffer.from('alpha|1000000000|u_0badf00d|deadbeef')
     .toString('base64url').replace(/=+$/, '');
   const ask = (env) => execFileSync('bash', ['-c',
@@ -1111,7 +1111,7 @@ print(uid)`);
        `the tmux server's environment is brought up to date before each session, the token excepted (${genv('BB_TOKEN') || 'no BB_TOKEN'})`);
     const launcher = readFileSync(join(HOMEDIR, 'users', ownerUid, '.cache', 'builderbot',
                                        'u', ownerUid, 'project', proj, 'claude-run.sh'), 'utf8');
-    ok(/bb settings --json/.test(launcher) && launcher.includes(`BB_TOKEN=${ownerTok}`),
+    ok(/aerie settings --json/.test(launcher) && launcher.includes(`BB_TOKEN=${ownerTok}`),
        'the launcher asks aerie settings for the model when the prefs file is not here, and carries the token');
 
     // ---- a session's view (R35) ----------------------------------------------

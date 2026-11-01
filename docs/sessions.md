@@ -305,7 +305,7 @@ session, since it has no address of its own to allow.
 **Reads.** In What sessions reach, a project's settings name the other projects a
 session on it may read: their trees, bound read-only at `/workspace/NAME`
 into the session's view on a node, and their notebooks, which `aerie roadmap`,
-`aerie bug`, `aerie rules`, `aerie design` and the rest answer for with `bb -p NAME`
+`aerie bug`, `aerie rules`, `aerie design` and the rest answer for with `aerie -p NAME`
 in front. Their running containers answer the session too, on its own
 project's nodes, so a page of theirs can be opened and photographed with
 `aerie capture`; a read project's node the reading project is not on stays

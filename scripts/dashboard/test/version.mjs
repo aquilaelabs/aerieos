@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 // The checkout's bb, not the image's: the running image predates this
 // subcommand, which is exactly the case this repo's own CLAUDE.md warns about.
-const BB = fileURLToPath(new URL('../../bb', import.meta.url));
+const BB = fileURLToPath(new URL('../../aerie', import.meta.url));
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const WS = `${DIR}/ws`;
 const PROJ = 'versioned';
@@ -904,7 +904,7 @@ setPolicyFor('askme', 'locked');
 const lockedAsk = JSON.parse(askText('askme', ['claude-askme']));
 ok(/what version should askme start at/.test(lockedAsk.text),
    'the ask names the thing it is asking about');
-ok(/bb version policy/.test(lockedAsk.text),
+ok(/aerie version policy/.test(lockedAsk.text),
    '...and points at the verb that answers, rather than restating the protocol');
 ok(/propose a number you derived here and ask; do not apply one/.test(lockedAsk.text),
    '...saying plainly that this is a proposal, not an instruction');
@@ -1376,7 +1376,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stok}` },
     body: JSON.stringify({ project: 'beta', groups: [] }) });
   const refused = await res.json();
-  ok(res.status === 403 && /bb changelog add/.test(refused.error || '')
+  ok(res.status === 403 && /aerie changelog add/.test(refused.error || '')
      && /merge/.test(refused.error || ''),
      `a session is refused the whole section, and told the verbs it does have (${
        (refused.error || '').slice(0, 64)})`);

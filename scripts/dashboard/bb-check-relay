@@ -191,7 +191,7 @@ def main():
                 return                       # this exact tree already passed
     except OSError:
         pass
-    bb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bb")
+    bb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "aerie")
     if cuts(cwd, bb):
         reason = detached(project, cwd, bb, stamp)
     else:

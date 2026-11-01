@@ -1969,7 +1969,7 @@ await page.setViewportSize({ width: 393, height: 851 });
     '[dashboard-test] == shape.mjs ==\nPASS  [+0.1s] a row long enough to wrap on a phone, which most of them are\n'
     + 'PASS  [+0.1s] ...and a continuation of it, whose follows line is drawn under the name\n'
     + '2 passed, 0 failed in 0.2s\n');
-  execFileSync(join(HERE, '..', '..', 'bb'), ['tests', 'ingest', '.bb-test-run.log'],
+  execFileSync(join(HERE, '..', '..', 'aerie'), ['tests', 'ingest', '.bb-test-run.log'],
     { cwd: `${DIR}/ws/alpha`, env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
       DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
 }

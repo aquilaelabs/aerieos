@@ -122,7 +122,7 @@ def map_first(req, patterns, also=""):
             json.dump({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": also}}, sys.stdout)
         return
     import subprocess
-    bb = os.path.join(HERE, "..", "bb")
+    bb = os.path.join(HERE, "..", "aerie")
     said = []
     for n in names:
         try:

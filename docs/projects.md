@@ -225,7 +225,7 @@ Each project also has an id, P and a number (P3), shown first on its card's
 and its page's facts line: it never changes and is never given to another
 project, so it names the project for good. A Claude session is named after
 the project with its id, "builderbot (P3)", which is how the Claude app lists
-it, and `bb -p P3` names it as `bb -p builderbot` does.
+it, and `aerie -p P3` names it as `aerie -p builderbot` does.
 Only AerieOS makes a project (create, clone, or start from an imported
 archive): a folder made by hand on the share is not listed, and the folders
 already there when this arrived were recorded once, as they were.

@@ -73,7 +73,7 @@ ok(typeof meta.body.built === 'string',
   const ENV = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
                 WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ROADMAP_PROJECT: 'alpha', BB_BUG_PROJECT: 'alpha',
                 BB_TESTS_PROJECT: 'alpha' };
-  const bb = (...a) => execFileSync(join(REPO, 'scripts', 'bb'), a, { env: ENV, encoding: 'utf8' });
+  const bb = (...a) => execFileSync(join(REPO, 'scripts', 'aerie'), a, { env: ENV, encoding: 'utf8' });
   const post = async (p, b) => (await fetch(base + p, { method: 'POST', headers: H, body: JSON.stringify(b) })).json();
   bb('roadmap', 'add', 'a row the contract types', '--step', 'and a step');
   bb('bug', 'add', 'a row the contract types', '--area', 'contract');

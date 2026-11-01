@@ -140,8 +140,8 @@ release.
 Bare `aerie` prints this list; `aerie status` is the tool-version wall.
 
 ```
-bb -p NAME VERB    any verb, about another project this one reads (its
-                   settings name them): bb -p NAME roadmap, bb -p NAME map find X;
+aerie -p NAME VERB    any verb, about another project this one reads (its
+                   settings name them): aerie -p NAME roadmap, aerie -p NAME map find X;
                    NAME is its shown name, its folder or its id (P3)
 aerie status          tool versions, runner registration, the projects here
 aerie version         this project's version, and who is allowed to move it
@@ -597,7 +597,7 @@ aerie wiki rm NAME [--why "..."]   take a page out, under the same setting
 aerie wiki mv OLD NEW   rename one; aerie wiki history: the last changes
 aerie transcripts     your own conversations on this project, from every coding agent
                    you use, each marked with its agent, newest first, as the
-                   Profile page lists them (bb -p NAME for one it reads)
+                   Profile page lists them (aerie -p NAME for one it reads)
 aerie transcripts show ID [--tz ZONE] [--all]   one of them as text: what was said,
                    every command it ran and what it answered; the newest
                    16 MB of a longer one, the whole of it with --all
@@ -605,7 +605,7 @@ aerie transcripts fetch ID [--into DIR]   the file itself into this machine's fo
                    for it: how a node holding its projects as a synced copy
                    resumes a conversation it does not have (bb-tty runs it)
 aerie memory          your memories on this repository, kept for every coding agent:
-                   the index, newest first (bb -p REPO for another repository
+                   the index, newest first (aerie -p REPO for another repository
                    of the project, which keeps them when it moves)
 aerie memory show NAME   one of them whole
 aerie memory add NAME --type user|feedback|project|reference --about "one line" "what to remember"

@@ -674,7 +674,7 @@ m.log = lambda *a, **k: None
 store = tempfile.mkdtemp()
 os.makedirs(os.path.join(store, '.bb', 'current', 'scripts'))
 seen = os.path.join(store, 'seen')
-bb = os.path.join(store, '.bb', 'current', 'scripts', 'bb')
+bb = os.path.join(store, '.bb', 'current', 'scripts', 'aerie')
 with open(bb, 'w') as f:
     f.write('#!/bin/sh\\nprintf "%s %s %s %s\\\\n" "$1 $2" "$BB_PROJECT" "$BB_ACCOUNT_UID" "$BB_TOKEN" >> ' + seen + '\\n')
 os.chmod(bb, 0o755)
@@ -702,7 +702,7 @@ logged = []
 m.log = lambda msg, *a, **k: logged.append(msg)
 store = tempfile.mkdtemp()
 os.makedirs(os.path.join(store, '.bb', 'current', 'scripts'))
-bb = os.path.join(store, '.bb', 'current', 'scripts', 'bb')
+bb = os.path.join(store, '.bb', 'current', 'scripts', 'aerie')
 with open(bb, 'w') as f:
     f.write('#!/bin/sh\\necho "[builderbot] ERROR: the session token was not kept under /nowhere: PermissionError" >&2\\nexit 1\\n')
 os.chmod(bb, 0o755)
@@ -2478,7 +2478,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     let failed = '';
     try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
     catch (e) { failed = String(e.stderr) + String(e.stdout); }
-    ok(/no test command is set/.test(failed) && /bb settings set test/.test(failed),
+    ok(/no test command is set/.test(failed) && /aerie settings set test/.test(failed),
        'aerie test with nothing set refuses, and names the verb that fills the field in');
     // Nothing runs that nobody wrote down: a tree with a go.mod is not a
     // test command, and aerie test says so rather than guessing one. The session
@@ -2720,7 +2720,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     }, 60000);
     ok(dfin && dfin.state === 'failed' && dfin.exit_code === 77
        && /does not administer the machine, so its owner installs these: playwright: /.test(dfin.log)
-       && /libnss3/.test(dfin.log) && !/bb toolchains install/.test(dfin.log),
+       && /libnss3/.test(dfin.log) && !/aerie toolchains install/.test(dfin.log),
        `...and refused on the node with the names, without reinstalling the recipe (${dfin?.state} ${dfin?.exit_code}: ${(dfin?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
     ok(sfin && sfin.state === 'failed' && /npm: stub/.test(sfin.log)
        && !existsSync(`${PK}/playwright/node_modules`),
@@ -2946,7 +2946,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       // ...with no token of the harness's own session leaking in (B412).
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...process.env, DASHBOARD_AUTH: 'test:test', BB_TOKEN: '',
         DASHBOARD_PORT: new globalThis.URL(URL).port, DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha' } });
-    ok(/bb emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
+    ok(/aerie emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
        `aerie emu from a shell goes to the project's node and streams the answer back (${cli.replace(/\s+/g, ' ').slice(0, 120)})`);
   }
 

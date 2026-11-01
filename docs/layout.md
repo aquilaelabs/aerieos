@@ -354,7 +354,7 @@ apps/                            the companions a person installs (R98 step 1): 
                                  Windows companion, each released by its own workflow and offered as a card in the Library
   android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin
   vscode/                          AerieOS for VS Code (R159): plain JavaScript, no build step and no dependencies
-    package.json                   the extension's manifest: its commands, its settings, and builderbotApi, the Files API it speaks
+    package.json                   the extension's manifest: its commands, its settings, and aerieosApi, the Files API it speaks
     extension.js                   the builderbot: file system, the sign-in, open project, search and the session's terminal
     lib/client.js                  the controller as the extension speaks to it: sign-in through /login, the Files API, /term
     lib/ws.js                      a websocket client in Node's own modules, for the terminal

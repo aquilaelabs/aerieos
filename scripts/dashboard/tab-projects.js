@@ -140,7 +140,7 @@ function lockMark(p){
 // branch, that it may push, and the node it runs on.
 function projFacts(p){
   const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this project's id, which never changes: bb -p ${projId(p)} names it">${projId(p)}</span>` : "",
+  return [p.pid ? `<span class="pid" title="this project's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
           p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
           esc(node)].filter(Boolean).join(" · ");
 }

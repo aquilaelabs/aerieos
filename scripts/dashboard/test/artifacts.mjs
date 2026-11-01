@@ -267,7 +267,7 @@ ok(acts.every(a => a.dl), '...and everything can be downloaded');
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
     body: JSON.stringify({ project: 'alpha', action: 'forget-capture', name: 'walk' }) });
   const asSession = { status: r.status, j: await r.json().catch(() => ({})) };
-  ok(asSession.status === 403 && /bb capture prune/.test(asSession.j.error || '') && existsSync(`${DIR}/ws/alpha/dist/reel/walk`),
+  ok(asSession.status === 403 && /aerie capture prune/.test(asSession.j.error || '') && existsSync(`${DIR}/ws/alpha/dist/reel/walk`),
      `a session is told to use aerie capture prune instead (${asSession.status} ${asSession.j.error})`);
   await pref({ project: 'alpha', capture_days: 7 });
 }

@@ -288,7 +288,7 @@ _sdk_root_cache = []
 # the bb beside it does not have would be a button that cannot work.
 # BB_BIN exists for the test harness, which points it at a stub: the suite
 # must be able to drive install and remove without downloading gigabytes.
-BB = os.environ.get("BB_BIN") or str(HERE.parent / "bb")
+BB = os.environ.get("BB_BIN") or str(HERE.parent / "aerie")
 
 
 def sdk_root_path():

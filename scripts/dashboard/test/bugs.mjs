@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bb');
+const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'aerie');
 const bbBug = (...a) => execFileSync(BB, ['bug', ...a],
   { env: { ...process.env, BB_BUG_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
@@ -109,7 +109,7 @@ ok(/file list is built from names/.test(read()[1].notes || ''),
 const prompt = bbBug('--prompt');
 ok(/bug tracker with 2 open \(1 high, 1 low\)/.test(prompt) && !/the picker loses/.test(prompt),
    'the prompt block counts the open bugs by severity and carries no list (R202)');
-ok(/bb bug show B7/.test(prompt) && /bb bug add/.test(prompt),
+ok(/aerie bug show B7/.test(prompt) && /aerie bug add/.test(prompt),
    '...and tells a session how to read one and how to file one');
 
 // ---- the GUI sees what the CLI wrote ---------------------------------------

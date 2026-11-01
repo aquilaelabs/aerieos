@@ -315,12 +315,12 @@ const gitc = k => { try { return execFileSync('git', ['-C', `${DIR}/ws/alpha`, '
 ok(gitc('user.name') === 'dashboard test' && gitc('user.email') === 'test@example.invalid',
    '...without writing anything into the repository\'s own config, which keeps the fixture\'s');
 const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
-const st = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'],
+const st = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'],
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner } }));
 ok(st.git_name === 'T. Person' && st.git_email === 'tp@users.noreply.invalid',
    '...and aerie settings --json carries it for the seat asking, which is how bb-tty puts it in a session');
-const bare = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'],
+const bare = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'],
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: '', BB_ACCOUNT_UID: owner }, cwd: '/' }));
 ok(bare.git_name === 'T. Person', '...for a shell with no project too');
@@ -330,8 +330,8 @@ ok(bare.git_name === 'T. Person', '...for a shell with no project too');
   const envs = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner };
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: ['beta'] }) })).json()));
-  const text = execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings'], { encoding: 'utf8', env: envs });
-  const asJson = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'], { encoding: 'utf8', env: envs }));
+  const text = execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings'], { encoding: 'utf8', env: envs });
+  const asJson = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'], { encoding: 'utf8', env: envs }));
   ok(/^  reads\s+beta$/m.test(text) && asJson.reads.join() === 'beta',
      `aerie settings names the projects this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -351,12 +351,12 @@ await page.fill('#rnGitEmail', 'alter@example.invalid');
 await saveDialog(page);
 ok(gitc('user.name') === 'dashboard test' && gitc('user.email') === 'test@example.invalid',
    '...and saving it still writes nothing into the repository, which is what the old one got wrong');
-const over = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'],
+const over = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'],
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner } }));
 ok(over.git_name === 'Alter Ego' && over.git_email === 'alter@example.invalid',
    `...and a session here is handed it instead of the Profile's (${over.git_name} <${over.git_email}>)`);
-const elsewhere = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'bb'), 'settings', '--json'],
+const elsewhere = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'],
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'beta', BB_ACCOUNT_UID: owner } }));
 ok(elsewhere.git_name === 'T. Person',

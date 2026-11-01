@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const BB = join(HERE, '..', 'bb');
+const BB = join(HERE, '..', 'aerie');
 const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
                 'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {

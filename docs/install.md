@@ -277,8 +277,8 @@ itself. Open `http://ADDRESS:7680` and make the owner account, as on a
 container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
 it to answer rather than for a node you enroll; Enroll another machine is
-there for more, and none is needed. `sudo bb ...` is the container's `docker exec -it
-AerieOS bb ...`.
+there for more, and none is needed. `sudo aerie ...` is the container's `docker exec -it
+AerieOS aerie ...`.
 
 Options worth knowing: `--workspace PATH` (the projects folder, by default
 `/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),

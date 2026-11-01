@@ -195,17 +195,17 @@ def identity_line(project):
         where = ", ".join(f"{lab} at /workspace/{d}" for d, lab in members)
         return (f"This project is shown as {name}; its id is {pid}, which never changes. Call it {name} when "
                 f"you speak of it. Its repositories are {where}: each is this project's own to work in, "
-                f"commit to and push, the session starts in /workspace/{project}, and `bb -p` takes a "
+                f"commit to and push, the session starts in /workspace/{project}, and `aerie -p` takes a "
                 f"repository's directory to answer for that one.")
     lab = label_of(project) if label_of else project
     pid = id_of(project) if id_of else ""
     if got:
         lab, pid = got[0] or lab, got[1] or pid
-    said = f"This project's id is {pid}, which never changes; `bb -p {pid}` names it." if pid else ""
+    said = f"This project's id is {pid}, which never changes; `aerie -p {pid}` names it." if pid else ""
     if not lab or lab == project:
         return said
     return (f"This project is shown as {lab}; its directory is /workspace/{project}, which every "
-            f"path and `bb -p` use. Call it {lab} when you speak of it."
+            f"path and `aerie -p` use. Call it {lab} when you speak of it."
             + (f" Its id is {pid}, which never changes." if pid else ""))
 
 
@@ -268,11 +268,11 @@ def reads_line(project):
         return ""
     names = ", ".join(_shown(r) for r in reads)
     return (f"This project reads {names}: each is at /workspace/NAME, read-only, and "
-            f"`bb -p NAME` in front of `aerie roadmap`, `aerie bug`, `aerie rules`, `aerie design`, "
+            f"`aerie -p NAME` in front of `aerie roadmap`, `aerie bug`, `aerie rules`, `aerie design`, "
             f"`aerie tests` or `aerie map` makes the verb answer for it, so its notebook and its code "
             f"are yours to read, and its containers answer from here on this project's nodes, so "
-            f"`bb -p NAME devapp` says where its page is and `aerie capture shot` photographs it; "
-            f"`bb -p NAME transcripts` lists this account's own conversations there, every agent's, "
+            f"`aerie -p NAME devapp` says where its page is and `aerie capture shot` photographs it; "
+            f"`aerie -p NAME transcripts` lists this account's own conversations there, every agent's, "
             f"and `show ID` prints one, and their files are under ~/.claude/projects read-only. "
             f"Nothing there is yours to change: a write to its tree fails, a write to its notebook is "
             f"refused, and its containers are not yours to start or stop; a session on that project is "
@@ -571,12 +571,12 @@ def memory_part(project, uid="", agent=""):
             "What you remember is each repository's, kept for your account across sessions and coding agents: "
             "`aerie memory` lists a repository's, `aerie memory show NAME` reads one whole, and "
             "`aerie memory add NAME --type user|feedback|project|reference --about \"one line\" \"...\"` saves one, "
-            + ("with `bb -p REPO` on the repository it is about, so it stays with that repository if it moves to another "
+            + ("with `aerie -p REPO` on the repository it is about, so it stays with that repository if it moves to another "
                f"project; one about the project as a whole goes on {first}."
                if many else "so a session of any agent here starts knowing it.")]
     if claude:
         head += ["", "Claude Code's own memory here is this repository's index and folder; a fact about another "
-                    "repository of the project is saved with `bb -p REPO memory add`, not there."]
+                    "repository of the project is saved with `aerie -p REPO memory add`, not there."]
     return "\n".join(head + out).strip(), "; ".join(left)
 
 
@@ -644,8 +644,8 @@ def repos_part(project):
              "",
              f"This session is {name} ({pid}), a project of {len(members)} repositories, and works in every one: "
              f"each is its own repository with its own notebook, git host, CI and releases. Each tree below is "
-             f"yours to write (a worktree of it on this session's branch, where you have one); bb answers for "
-             f"the repository whose tree you run it in, and `bb -p NAME` for another.",
+             f"yours to write (a worktree of it on this session's branch, where you have one); aerie answers for "
+             f"the repository whose tree you run it in, and `aerie -p NAME` for another.",
              ""]
     for d, label in members:
         lines.append(f"- {label}: {ws}/{d}{' (this briefing is its own, above)' if d == project else ''}")
@@ -749,7 +749,7 @@ def for_agent(agent_id, text):
         return text
     return (f"This session runs {a.product}, AerieOS's {a.name} agent. Everything below holds for it "
             "as for a Claude session: where this briefing says Claude, read the session you are; "
-            "the house rules, the project's Agents may settings and bb apply to you alike.\n\n" + text)
+            "the house rules, the project's Agents may settings and aerie apply to you alike.\n\n" + text)
 
 
 def block(project, reply="", asks="", uid="", agent=""):

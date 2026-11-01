@@ -160,7 +160,7 @@ class WorkspaceMixin:
         tar_path = os.path.join(TOOLS_DIR if root else bbdir, "bundle.tar")
         st, digest = self.ctl.fetch("download?what=bundle", tar_path)
         if st != 200:
-            say(f"could not fetch bb from the controller ({st})\n")
+            say(f"could not fetch aerie from the controller ({st})\n")
             return ""
         hexd = digest.split(":", 1)[-1]
         # The bytes are what the header says they are, or nothing here runs
@@ -191,7 +191,7 @@ class WorkspaceMixin:
             for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
                 with contextlib.suppress(OSError):
                     os.chmod(os.path.join(into, "scripts", "dashboard", x), 0o755)
-            say(f"bb {hexd[:12]} unpacked into {into}\n")
+            say(f"aerie {hexd[:12]} unpacked into {into}\n")
         with contextlib.suppress(OSError):
             tmp = os.path.join(bbdir, ".current.new")
             if os.path.lexists(tmp):
