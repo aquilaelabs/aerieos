@@ -61,6 +61,16 @@ class Stick(unittest.TestCase):
             self.m.pick("/dev/sdz")
         self.assertEqual(self.m.pick("/dev/sdb")["model"], "Ultra Fit")
 
+    def test_the_write_is_whole_sectors_as_windows_asks(self):
+        pieces = [b"a" * 1000, b"b" * (3 << 20), b"c" * 70001, b"d" * 5]
+        out = list(self.m.sectors(iter(pieces)))
+        self.assertTrue(all(len(p) % (1 << 20) == 0 for p in out[:-1]), [len(p) for p in out])
+        self.assertEqual(len(out[-1]) % self.m.SECTOR, 0)
+        joined = b"".join(out)
+        whole = b"".join(pieces)
+        self.assertEqual(joined[:len(whole)], whole)
+        self.assertEqual(joined[len(whole):], bytes(len(joined) - len(whole)))
+
     def test_a_disk_on_windows_is_named_with_its_drive_letters(self):
         disks = '[{"Number":0,"Size":512110190592,"FriendlyName":"Samsung SSD","BusType":"NVMe","IsSystem":true,"IsBoot":true},' \
                 '{"Number":2,"Size":31457280000,"FriendlyName":"SanDisk Ultra","BusType":"USB","IsSystem":false,"IsBoot":false}]'
@@ -215,12 +225,14 @@ class Stick(unittest.TestCase):
                 mock.patch.object(self.m, "open_disk", side_effect=lambda d: open(d, "r+b", buffering=0)):
             self.m.write_image(img, dev, sets=["TZ=UTC"], config=cfg)
         got = open(dev, "rb").read()
-        self.assertEqual(len(got), len(raw))
+        whole = len(raw) + (-len(raw) % self.m.SECTOR)    # the write ends on a whole sector
+        self.assertEqual(len(got), whole)
+        self.assertEqual(got[len(raw):], bytes(whole - len(raw)))
         self.assertIn(b"\nTZ=UTC\n", got[a:a + self.m.ENV_SIZE])
         lines = got[b:b + self.m.BOOT_SIZE].decode().split("\n", 1)
         self.assertEqual(lines[0], "BB-FIRSTBOOT-1")
         self.assertEqual(json.loads(lines[1])["machine"]["hostname"], "tower")
-        self.assertEqual(got[b + self.m.BOOT_SIZE:], raw[b + self.m.BOOT_SIZE:])
+        self.assertEqual(got[b + self.m.BOOT_SIZE:len(raw)], raw[b + self.m.BOOT_SIZE:])
         json.dump({"machine": {}}, open(cfg, "w"))
         with self.assertRaises(SystemExit):
             self.m.boot_block(cfg)
@@ -251,12 +263,14 @@ class Stick(unittest.TestCase):
                 mock.patch.object(self.m, "open_disk", side_effect=lambda d: open(d, "r+b", buffering=0)):
             self.m.write_image(img, dev, mirror=arc)
         got = open(dev, "rb").read()
-        self.assertEqual(len(got), len(raw))
+        whole = len(raw) + (-len(raw) % self.m.SECTOR)    # the write ends on a whole sector
+        self.assertEqual(len(got), whole)
+        self.assertEqual(got[len(raw):], bytes(whole - len(raw)))
         head = got[a:a + len(self.m.MIRROR_MARK) + 13]
         n = int(head[len(self.m.MIRROR_MARK):-1])
         self.assertEqual(n, os.path.getsize(arc))
         self.assertEqual(got[a + len(head):a + len(head) + n], open(arc, "rb").read())
-        self.assertEqual(got[a + size:], raw[a + size:])
+        self.assertEqual(got[a + size:len(raw)], raw[a + size:])
         open(os.path.join(self.d, "not.tar.gz"), "wb").write(b"nope")
         with self.assertRaises(SystemExit):
             self.m.mirror_block(os.path.join(self.d, "not.tar.gz"))

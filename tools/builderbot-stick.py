@@ -399,6 +399,26 @@ def patched(src, block, boot=None, mirror=None):
 
 
 # ---- the write ----------------------------------------------------------------
+SECTOR = 4096
+
+
+def sectors(chunks, size=1 << 20):
+    """The bytes regrouped into pieces of whole MiB, the last padded with
+    zeros to a whole 4 KiB: Windows takes a write to a disk opened whole only
+    in whole sectors (EINVAL otherwise), where patched() holds back an odd
+    number of bytes from each chunk."""
+    buf = bytearray()
+    for c in chunks:
+        buf += c
+        if len(buf) >= size:
+            n = len(buf) - len(buf) % size
+            yield bytes(buf[:n])
+            del buf[:n]
+    if buf:
+        buf += bytes(-len(buf) % SECTOR)
+        yield bytes(buf)
+
+
 def is_admin():
     """Whether this runs with the right to write a whole disk: Administrator
     on Windows, root elsewhere."""
@@ -503,7 +523,7 @@ def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None
     h = hashlib.sha256()
     written = 0
     with lzma.open(image, "rb") as src, open_disk(dev) as dst:
-        for chunk in patched(src, block, boot, held):
+        for chunk in sectors(patched(src, block, boot, held)):
             dst.write(chunk)
             h.update(chunk)
             written += len(chunk)
@@ -591,8 +611,8 @@ def cmd_verify(a):
     h = hashlib.sha256()
     n = 0
     with lzma.open(a.image, "rb") as src:
-        for chunk in patched(src, env_block(a.set) if a.set else None, boot_block(a.config) if a.config else None,
-                             mirror_block(a.mirror) if a.mirror else None):
+        for chunk in sectors(patched(src, env_block(a.set) if a.set else None, boot_block(a.config) if a.config else None,
+                                     mirror_block(a.mirror) if a.mirror else None)):
             h.update(chunk)
             n += len(chunk)
     verify(d["id"], n, h.hexdigest())
