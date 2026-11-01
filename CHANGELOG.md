@@ -4,6 +4,8 @@
 
 ### Added
 
+- BuilderBot OS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
+- A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
 - An installed BuilderBot takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
 - The image is tagged :dev at every release and dev build, so an install can follow the dev channel by its compose file or template (1b8ce1d)
 - bb version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
