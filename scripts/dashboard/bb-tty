@@ -1388,7 +1388,10 @@ start() {
         GRADLE_USER_HOME="$HOME/.cache/builderbot/u/$account/project/$BB_PROJECT/gradle-home"
     fi
     gradle_local_build
-    for v in HOME BB_TOKEN BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_LOCAL_BUILD BB_WORKS BB_WORK_DIRS \
+    # BB_TREE_OWNER with them: kept out of the server's environment below as
+    # one account's, it reached no pane at all on a node (B430), so bb never
+    # knew the owner there.
+    for v in HOME BB_TOKEN BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_LOCAL_BUILD BB_WORKS BB_WORK_DIRS \
              GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL CARGO_HOME \
              GRADLE_USER_HOME ANDROID_USER_HOME XDG_DATA_HOME \
              GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1 \
