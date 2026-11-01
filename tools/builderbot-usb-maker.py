@@ -32,9 +32,10 @@ TITLE = "BuilderBot USB Maker"
 
 
 def load(name, file):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, file))
-    if spec is None or spec.loader is None:
-        raise SystemExit(f"{file} is not beside this tool")
+    path = os.path.join(HERE, file)
+    spec = importlib.util.spec_from_file_location(name, path)
+    if not os.path.isfile(path) or spec is None or spec.loader is None:
+        raise SystemExit(f"{file} is not beside this tool in {HERE}: run it with builderbot-stick.py in the same folder")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
