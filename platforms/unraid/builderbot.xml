@@ -9,7 +9,7 @@
   <Support>https://github.com/aquilaelabs/builderbot/issues</Support>
   <Project>https://github.com/aquilaelabs/builderbot</Project>
   <Overview>
-A workshop for coding agents (Claude Code, ChatGPT's Codex CLI and GitHub's Copilot CLI) and the controller for your build nodes: the machines where builds, tests, CI and the Android emulator run.
+An AI workshop for coding agents (Claude Code, ChatGPT's Codex CLI and GitHub's Copilot CLI) and the controller for your build nodes: the machines where builds, tests, CI and the Android emulator run.
 
 Open the dashboard on its port; an agent's session runs on a node from there.
 Helper CLI inside:       docker exec -it AerieOS aerie status

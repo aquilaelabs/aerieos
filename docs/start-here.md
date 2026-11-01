@@ -7,7 +7,7 @@ it in Help.
 
 ## What it is
 
-A workstation for coding agents you reach in a browser. Each project on the
+An AI workshop and a NAS you reach in a browser. Each project on the
 Projects page holds git repositories on a shared disk. A **session** is a coding
 agent working in them (Claude, through Claude Code; ChatGPT, through Codex
 CLI; Copilot, through Copilot CLI; Grok, through Grok Build; or any model,

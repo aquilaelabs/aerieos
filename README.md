@@ -5,9 +5,9 @@
 <h1 align="center">AerieOS</h1>
 
 <p align="center">
-  A self-hosted workshop for coding agents (Claude Code, ChatGPT's Codex CLI,
-  GitHub's Copilot CLI and xAI's Grok Build): your projects, the machines that build them, and
-  the sessions working on them, in one dashboard.
+  A self-hosted AI workshop and NAS: coding agents (Claude Code, ChatGPT's Codex CLI,
+  GitHub's Copilot CLI and xAI's Grok Build) working on your projects, and your disks, shares,
+  apps and VMs, in one dashboard on machines you own.
 </p>
 
 <p align="center">
@@ -42,6 +42,12 @@ Each project holds git repositories on a shared disk. Open it from the
 browser, on a desktop or a phone, and a session of Claude, ChatGPT, Copilot
 or Grok starts on its node already briefed with the project's house rules,
 roadmap and open bugs. Close the tab and the session keeps going.
+
+On a machine of its own it is a NAS as well: the disks as pools or an array
+with parity, SMB and NFS shares, snapshots and backups, media and photo apps
+from the Library, and VMs. The agents work beside it under the same dials, so
+a session can write a service's compose file or read why a container stopped,
+and nothing touches a disk without you.
 
 ## The editions
 
