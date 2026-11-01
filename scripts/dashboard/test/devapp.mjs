@@ -4497,7 +4497,10 @@ ok(await page.$('#devSend'),
   const bad = await asSession({ project: 'ep.silon', action: 'test', args: ['$(rm -rf /)'] });
   ok(bad.status === 400 && /argument the test command cannot take/.test(bad.error || ''),
      'an argument that is not a plain word is refused before anything runs');
-  await api({ project: 'ep.silon', instance: 'main', action: 'down' });
+  // The down is a job: waited for, or the session's ask can land while the
+  // instance still runs and is taken (B587).
+  const downJob = await api({ project: 'ep.silon', instance: 'main', action: 'down' });
+  if (downJob.job) await finished(downJob.job);
   await refreshUntil(page, () => true, { timeout: 5000 });
   const down = await asSession({ project: 'ep.silon', action: 'test' });
   ok(down.status === 400 && /is not running: Up on the Containers page/.test(down.error || ''),
