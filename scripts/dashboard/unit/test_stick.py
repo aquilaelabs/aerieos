@@ -61,6 +61,46 @@ class Stick(unittest.TestCase):
             self.m.pick("/dev/sdz")
         self.assertEqual(self.m.pick("/dev/sdb")["model"], "Ultra Fit")
 
+    def test_a_disk_on_windows_is_written_and_read_with_windows_own_calls(self):
+        import ctypes
+        disk = bytearray(8192)
+        at = [0]
+        closed = []
+
+        class Fn:
+            def __init__(self, f):
+                self.f, self.argtypes = f, None
+
+            def __call__(self, *a):
+                return self.f(*a)
+
+        def write(h, b, n, done, _o):
+            disk[at[0]:at[0] + n] = b[:n]
+            at[0] += n
+            done._obj.value = n
+            return 1
+
+        def read(h, buf, n, done, _o):
+            got = bytes(disk[at[0]:at[0] + n])
+            ctypes.memmove(buf, got, len(got))
+            at[0] += len(got)
+            done._obj.value = len(got)
+            return 1
+
+        def seek(h, pos, _new, _how):
+            at[0] = pos
+            return 1
+        k = type("K", (), {})()
+        k.WriteFile, k.ReadFile, k.SetFilePointerEx = Fn(write), Fn(read), Fn(seek)
+        k.FlushFileBuffers, k.CloseHandle = Fn(lambda h: 1), Fn(closed.append)
+        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k):
+            with self.m.WinDisk(7, [8, 9]) as d:
+                d.write(b"x" * 4096)
+                d.sync()
+                d.seek(0)
+                self.assertEqual(d.read(4096), b"x" * 4096)
+        self.assertEqual(closed, [7, 8, 9], "the disk and its volumes let go when it closes")
+
     def test_the_write_is_whole_sectors_as_windows_asks(self):
         pieces = [b"a" * 1000, b"b" * (3 << 20), b"c" * 70001, b"d" * 5]
         out = list(self.m.sectors(iter(pieces)))

@@ -399,6 +399,63 @@ def patched(src, block, boot=None, mirror=None):
 
 
 # ---- the write ----------------------------------------------------------------
+class WinDisk:
+    """A disk opened whole on Windows, written and read with Windows' own
+    calls (WriteFile, ReadFile, FlushFileBuffers): the C runtime's file on
+    such a handle refused to write (EBADF). The volume handles are held with
+    it, and every lock goes when it is closed."""
+
+    def __init__(self, h, held=()):
+        from ctypes import wintypes
+        self.k = k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_char_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k.SetFilePointerEx.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
+        k.FlushFileBuffers.argtypes = [wintypes.HANDLE]
+        k.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.dword = wintypes.DWORD
+        self.h, self.held = h, list(held)
+
+    def _fail(self, what):
+        e = ctypes.get_last_error()
+        raise OSError(e, f"{what} the stick: {ctypes.FormatError(e).strip()} (Windows error {e})")
+
+    def write(self, b):
+        n = self.dword(0)
+        if not self.k.WriteFile(self.h, bytes(b), len(b), ctypes.byref(n), None) or n.value != len(b):
+            self._fail("could not write to")
+        return n.value
+
+    def read(self, size):
+        buf = ctypes.create_string_buffer(size)
+        n = self.dword(0)
+        if not self.k.ReadFile(self.h, buf, size, ctypes.byref(n), None):
+            self._fail("could not read")
+        return buf.raw[:n.value]
+
+    def seek(self, pos):
+        if not self.k.SetFilePointerEx(self.h, pos, None, 0):
+            self._fail("could not seek on")
+
+    def flush(self):
+        pass
+
+    def sync(self):
+        if not self.k.FlushFileBuffers(self.h):
+            self._fail("could not flush")
+
+    def close(self):
+        for h in [self.h, *self.held]:
+            self.k.CloseHandle(h)
+        self.held = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
 SECTOR = 4096
 
 
@@ -505,10 +562,7 @@ def open_disk(dev):
         else:
             k32.CloseHandle(h)
             let_go("the stick is in use (a window or a program has it open): close it and write again; nothing written")
-        import msvcrt
-        f = os.fdopen(msvcrt.open_osfhandle(h, os.O_RDWR | getattr(os, "O_BINARY", 0)), "r+b", buffering=0)
-        f.bb_handles = handles  # kept open until the write ends, so the lock holds
-        return f
+        return WinDisk(h, handles)
     if platform.system() == "Darwin":
         subprocess.run(["diskutil", "unmountDisk", dev], capture_output=True, check=False)
         rdev = dev.replace("/dev/disk", "/dev/rdisk")
@@ -548,7 +602,10 @@ def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None
         dst.flush()
         # A stick that cannot flush did not take the image: said, never
         # passed over (B474).
-        os.fsync(dst.fileno())
+        if hasattr(dst, "sync"):
+            dst.sync()
+        else:
+            os.fsync(dst.fileno())
         say(f"written: {written / GB:.1f} GB")
         # Read back through the same handle while it is still held, so
         # nothing (Windows mounting what was written) comes between.
@@ -597,7 +654,7 @@ def verify(dev, length, want, f=None, parts=None):
         f = open(rdev, "rb", buffering=0)
     try:
         # Read from the stick, not from what Linux still holds of the write.
-        if hasattr(os, "posix_fadvise"):
+        if hasattr(os, "posix_fadvise") and hasattr(f, "fileno"):
             os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
         while left > 0:
             chunk = f.read(min(CHUNK, left))
