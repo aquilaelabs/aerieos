@@ -432,12 +432,15 @@ jobs:
           # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
           # @TAG@, @VER@ and @REPO@ filled in, so the release is published with
           # them rather than edited after. Otherwise they are the changelog's
-          # own section: Unreleased for a dev build, the version's for a release.
+          # own: the version's section for a release, and for a dev build only
+          # what Unreleased gained since the tag before (tools/release-notes.py).
           ver="${TAG#v}"; base="${ver%%-dev.*}"
           notes="docs/release-notes/$base.md"; case "$TAG" in *-dev.*) notes="docs/release-notes/$base-dev.md";; esac
-          head="## $base:"; case "$TAG" in *-dev.*) head="## Unreleased";; esac
+          head="## $base:"
           if [ -f "$notes" ]; then
             sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" "$notes" > notes.md
+          elif [ "$ver" != "$base" ]; then
+            python3 tools/release-notes.py "$TAG" > notes.md
           else
             awk -v h="$head" 'index($0, h) == 1 {on = 1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
             grep -q '[^[:space:]]' notes.md || echo "BuilderBot $ver: see CHANGELOG.md." > notes.md

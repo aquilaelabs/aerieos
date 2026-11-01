@@ -64,6 +64,9 @@ image tags people follow are not. A tag pushes the image under its exact
 version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
 and for a stable release `:latest` and `:0.9` too.
 
+A dev build's notes are what the changelog's Unreleased section gained since
+the last published release before it; a stable release's are its version's whole section.
+
 A controller started for development, on the dev channel and holding a
 token for BuilderBot's repository, sees the drafts as well. Updating
 BuilderBot OS to one fetches the draft's files with that token and takes the
