@@ -489,10 +489,24 @@ def open_disk(dev):
             else:
                 let_go(f"{letter}: on the stick is in use (a window or a program has it open): close it and write again; nothing written")
             k32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
-        try:
-            f = open(f"\\\\.\\PhysicalDrive{n}", "r+b", buffering=0)
-        except OSError as e:
-            let_go(f"Windows would not open the stick for writing ({e.strerror}): close anything showing it, unplug it and plug it in, and write again; nothing written")
+        # The disk itself opened and locked too: the write lays down a new
+        # partition table, and Windows would mount the partitions it finds
+        # and write to them (a FAT's dirty flag) while the write and the
+        # read back go on; locked, nothing is mounted until it is let go.
+        h = k32.CreateFileW(f"\\\\.\\PhysicalDrive{n}", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
+        if not h or h == bad:
+            let_go(f"Windows would not open the stick for writing (error {ctypes.GetLastError()}): close anything showing it, "
+                   "unplug it and plug it in, and write again; nothing written")
+        out = wintypes.DWORD(0)
+        for _ in range(40):
+            if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
+                break
+            time.sleep(0.25)
+        else:
+            k32.CloseHandle(h)
+            let_go("the stick is in use (a window or a program has it open): close it and write again; nothing written")
+        import msvcrt
+        f = os.fdopen(msvcrt.open_osfhandle(h, os.O_RDWR | getattr(os, "O_BINARY", 0)), "r+b", buffering=0)
         f.bb_handles = handles  # kept open until the write ends, so the lock holds
         return f
     if platform.system() == "Darwin":
@@ -521,11 +535,13 @@ def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None
     boot = boot_block(config) if config else None
     held = mirror_block(mirror) if mirror else None
     h = hashlib.sha256()
+    parts = Parts()
     written = 0
     with lzma.open(image, "rb") as src, open_disk(dev) as dst:
         for chunk in sectors(patched(src, block, boot, held)):
             dst.write(chunk)
             h.update(chunk)
+            parts.update(chunk)
             written += len(chunk)
             if written % (512 << 20) < CHUNK:
                 say(f"  {written / GB:.1f} GB written")
@@ -533,19 +549,53 @@ def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None
         # A stick that cannot flush did not take the image: said, never
         # passed over (B474).
         os.fsync(dst.fileno())
-    say(f"written: {written / GB:.1f} GB")
-    if verify_after:
-        verify(dev, written, h.hexdigest())
+        say(f"written: {written / GB:.1f} GB")
+        # Read back through the same handle while it is still held, so
+        # nothing (Windows mounting what was written) comes between.
+        if verify_after:
+            dst.seek(0)
+            verify(dev, written, h.hexdigest(), f=dst, parts=parts.done())
 
 
-def verify(dev, length, want):
+class Parts:
+    """A sha256 per PART of what was written, so a read back that differs
+    says where: near the start is the system touching the boot partition,
+    anywhere else the stick or the port."""
+    PART = 64 << 20
+
+    def __init__(self):
+        self.out, self.h, self.n = [], hashlib.sha256(), 0
+
+    def update(self, b):
+        mv = memoryview(b)
+        while len(mv):
+            take = min(len(mv), self.PART - self.n)
+            self.h.update(mv[:take])
+            self.n += take
+            mv = mv[take:]
+            if self.n == self.PART:
+                self.out.append(self.h.hexdigest())
+                self.h, self.n = hashlib.sha256(), 0
+
+    def done(self):
+        if self.n:
+            self.out.append(self.h.hexdigest())
+            self.h, self.n = hashlib.sha256(), 0
+        return self.out
+
+
+def verify(dev, length, want, f=None, parts=None):
     say("reading the stick back")
     h = hashlib.sha256()
+    got = Parts()
     left = length
     rdev = dev.replace("/dev/disk", "/dev/rdisk") if platform.system() == "Darwin" else dev
     if platform.system() == "Windows" and re.fullmatch(r"\d+", dev):
         rdev = f"\\\\.\\PhysicalDrive{dev}"
-    with open(rdev, "rb", buffering=0) as f:
+    own = f is None
+    if own:
+        f = open(rdev, "rb", buffering=0)
+    try:
         # Read from the stick, not from what Linux still holds of the write.
         if hasattr(os, "posix_fadvise"):
             os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
@@ -554,9 +604,20 @@ def verify(dev, length, want):
             if not chunk:
                 break
             h.update(chunk)
+            got.update(chunk)
             left -= len(chunk)
+    finally:
+        if own:
+            f.close()
     if h.hexdigest() != want:
-        die("the stick does not read back as what was written: try another stick, or another port")
+        where = ""
+        if parts:
+            mine = got.done()
+            bad = [i for i, d in enumerate(parts) if i >= len(mine) or mine[i] != d]
+            if bad:
+                where = (f" (it differs in {len(bad)} of {len(parts)} pieces of 64 MiB, the first at "
+                         f"{bad[0] * Parts.PART / GB:.2f} GB)")
+        die(f"the stick does not read back as what was written{where}: try another stick, or another port")
     say("the stick reads back as written")
 
 
