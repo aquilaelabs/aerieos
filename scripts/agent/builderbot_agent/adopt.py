@@ -37,6 +37,8 @@ DATA_RE = re.compile(r"disk([1-9][0-9]?)")
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 # Names a pool may not take: the merged trees under /mnt, and BuilderBot's.
 NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array", "parity", "cache-mover"}
+# What a read-only mount adds so the filesystem writes nothing at all.
+NO_REPLAY = {"xfs": "norecovery", "btrfs": "rescue=nologreplay"}
 # What blkid calls each filesystem.
 BLK = {"xfs": "xfs", "btrfs": "btrfs", "zfs": "zfs_member"}
 
@@ -82,6 +84,12 @@ def holding(d, fs, blk):
         if row.get("TYPE") == BLK.get(fs):
             return name, row
     return None, {}
+
+
+def mnt():
+    """Where the old paths go: /mnt, or under BB_ADOPT_ROOT for a proof
+    that must not touch the machine's own."""
+    return _env("BB_ADOPT_ROOT", "") + "/mnt"
 
 
 def plan(want, disks, blk=blkid):
@@ -138,7 +146,7 @@ def plan(want, disks, blk=blkid):
             no(f"{what} is {d['name']}, and nothing on it is the {fs} the old system named: it is left alone")
             continue
         data.append(slot)
-        where = f"/mnt/{slot}"
+        where = f"{mnt()}/{slot}"
         if fs == "zfs":
             pool = row.get("LABEL") or slot
             out["zfs"].append({"pool": pool, "where": where, "readonly": not writable, "slot": slot})
@@ -171,7 +179,7 @@ def plan(want, disks, blk=blkid):
         if fs not in FS:
             no(f"{what}: its filesystem is {fs or 'not said'}; XFS, btrfs and ZFS are taken")
             continue
-        where = f"/mnt/{name}"
+        where = f"{mnt()}/{name}"
         if fs == "zfs":
             pools.append(name)
             out["zfs"].append({"pool": name, "where": where, "readonly": False, "slot": name})
@@ -198,16 +206,16 @@ def plan(want, disks, blk=blkid):
         out["mounts"].append({"what": f"UUID={uuid}", "where": where, "fs": fs, "ro": False, "dev": part})
         say(f"{name}: {fs} on {part} at {where}, writable")
 
-    disks_ = [f"/mnt/{s}" for s in sorted(data, key=lambda s: int(s[4:]))]
+    disks_ = [f"{mnt()}/{s}" for s in sorted(data, key=lambda s: int(s[4:]))]
     tag = "RO" if not writable else "RW"
     if disks_ or pools:
-        out["merged"]["/mnt/user"] = [f"/mnt/{p}=RW" for p in pools] + [f"{p}={tag}" for p in disks_]
+        out["merged"][f"{mnt()}/user"] = [f"{mnt()}/{p}=RW" for p in pools] + [f"{p}={tag}" for p in disks_]
         parts = ([f"the pools ({', '.join(pools)})"] if pools else []) \
             + ([f"the data disks{' (read-only: new files land on a pool)' if not writable else ''}"] if disks_ else [])
-        say("/mnt/user: " + " and ".join(parts) + " merged, as the old system's was")
+        say(f"{mnt()}/user: " + " and ".join(parts) + " merged, as the old system's was")
     if disks_:
-        out["merged"]["/mnt/user0"] = [f"{p}={tag}" for p in disks_]
-        say("/mnt/user0: the data disks alone, as the old system's was")
+        out["merged"][f"{mnt()}/user0"] = [f"{p}={tag}" for p in disks_]
+        say(f"{mnt()}/user0: the data disks alone, as the old system's was")
     if not writable and disks_:
         say("The old system's parity stays good: nothing on a data disk is written while they are read-only")
     elif disks_:
@@ -222,13 +230,19 @@ def render_fstab(p):
     merged trees, which wait for their branches."""
     lines = []
     for m in p.get("mounts") or []:
-        opts = ("ro," if m.get("ro") else "") + "defaults,nofail,noatime"
+        # Read-only is not enough on its own: XFS replays its log and btrfs
+        # its log tree even on a read-only mount, which writes the disk
+        # behind the old parity's back (the proof of 1 Nov caught an XFS
+        # image changed by a plain ro mount). These write nothing; a disk
+        # whose journal needs replaying then refuses to mount and says so.
+        opts = (f"ro,{NO_REPLAY.get(m['fs'], '')}," if m.get("ro") else "") + "defaults,nofail,noatime"
+        opts = opts.replace(",,", ",")
         lines.append(f"{m['what']} {m['where']} {m['fs']} {opts} 0 0 {MARK}\n")
     for where, branches in (p.get("merged") or {}).items():
-        create = "ff" if where == "/mnt/user" else "mfs"
+        create = "ff" if where.endswith("/user") else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={b.split('=')[0]}" for b in branches)
         lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,"
-                     f"dropcacheonclose=true,category.create={create},moveonenospc=true,minfreespace=10G,fsname=adopted{where[5:]},{req} 0 0 {MARK}\n")
+                     f"dropcacheonclose=true,category.create={create},moveonenospc=true,minfreespace=10G,fsname=adopted-{os.path.basename(where)},{req} 0 0 {MARK}\n")
     return "".join(lines)
 
 
@@ -303,10 +317,10 @@ class AdoptMixin:
                 self._zfs_import(None, z)
         for m in p.get("mounts") or []:
             if not os.path.ismount(m["where"]) and os.path.isdir(m["where"]):
-                subprocess.run(["mount", m["where"]], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
         for where in p.get("merged") or {}:
             if not os.path.ismount(where) and os.path.isdir(where):
-                subprocess.run(["mount", where], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
 
     def _zfs_import(self, job, z):
         """Import one pool as it is: no -f, never upgraded; read-only where
@@ -381,10 +395,13 @@ class AdoptMixin:
                 say(f"{z['pool']} was not imported (above): a pool the old system did not export says it was in use on another system, "
                     "and it is not forced\n")
         for m in p["mounts"]:
-            if self._sh(job, ["mount", m["where"]], timeout=60) != 0:
+            if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
                 failed.append(m["where"])
+                if m.get("ro"):
+                    say(f"{m['where']} would not mount without its journal replayed, which writes the disk: mount it once on the "
+                        "old system and shut that down cleanly, or adopt writable\n")
         for where in p["merged"]:
-            if self._sh(job, ["mount", where], timeout=60) != 0:
+            if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
                 failed.append(where)
         if failed:
             say(f"adopted, but not mounted yet: {', '.join(failed)}; tried again every minute, and Release undoes all of it\n")
