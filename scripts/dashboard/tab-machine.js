@@ -111,8 +111,8 @@ function olderVersionsSection(n){
       ${admin && k.booted !== v.version ? `<div class="acts"><button type="button" data-oskeptdo="next"${dead ? " disabled" : ""}>Boot this next</button><button type="button" class="danger" data-oskeptdo="remove"${dead ? " disabled" : ""}>Remove</button></div>` : ""}</div>`).join("");
   return docSection("nodes", "older", "Older versions", k.booted ? `visiting ${k.booted}` : String(k.versions.length), `<div class="field">
       ${k.booted ? `<div class="hint warn">This boot is a visit to ${esc(k.booted)}. Restart to go back to the version it came from; updates wait until then.</div>` : ""}
-      ${rows}${busy ? `<div class="sub dim">Working on it now.</div>` : !n.live ? `<div class="sub dim">Its agent is not dialing in.</div>` : ""}
-      <div class="hint">Each version an update replaced, also under Older versions on the boot menu. A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. Your projects, shares and VMs are not part of it. How many are kept is under Update window.</div></div>`);
+      ${rows}${busy ? `<div class="sub dim">Working on it now.</div>` : !n.live ? `<div class="sub dim">Its agent is not dialing in.</div>` : ""}</div>
+      <div class="field"><div class="hint">Each version an update replaced, also under Older versions on the boot menu. A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. Your projects, shares and VMs are not part of it. How many are kept is under Update window.</div></div>`);
 }
 function wireOlderVersions(root){
   root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -175,8 +175,8 @@ function projectsFolderField(n, s, admin){
   const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
   const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
   const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
-  return `<div class="field"><div class="fx"><label class="pick grow"><span class="pickw">Projects folder</span><input id="projFolder" list="projFolderOffer" spellcheck="false"
-      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}" aria-label="the projects folder"${why ? " disabled" : ""}></label>
+  return `<div class="field"><div class="setrow col ctlrow"><label for="projFolder">Projects folder</label><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
+      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}>
       <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
       <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>

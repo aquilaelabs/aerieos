@@ -1618,8 +1618,38 @@ ok((await page.errors).every(e => /400/.test(e)),
   const LNB = nb('landproj');
   await takeOn('landproj');            // made by hand here, so the owner takes it on (R135)
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'landproj'), { timeout: 20000 });
+  // Drafts (the operator, 1 Nov): a project on no forge has none and says
+  // nothing; one with drafts shows each one's notes, and Publish waits for a
+  // release that is whole.
+  const asked = [];
+  await page.route('**/api/version', async r => {
+    let body = {};
+    try { body = r.request().postDataJSON() || {}; } catch {}
+    if (body.action === 'release-drafts') return r.fulfill({ json: { forge: 'GitHub', drafts: [
+      { tag: 'v9.9.9-dev.1', prerelease: true, url: 'https://example.invalid/1', missing: ['the.iso'], notes: 'not whole' },
+      { tag: 'v9.9.9', prerelease: false, url: 'https://example.invalid/2', missing: [], notes: 'whole' }] } });
+    if (body.action === 'release-publish' || body.action === 'release-draft-notes'){
+      asked.push(body);
+      return r.fulfill({ json: { ok: true, tag: body.tag } });
+    }
+    return r.continue();
+  });
   await page.evaluate(() => openNotebook('landproj', 'artifacts'));
   await page.waitForSelector(`${LNB} #verBox [data-verbump="minor"]`, { timeout: 20000 });
+  await page.waitForSelector(`${LNB} #verDrafts [data-draft="v9.9.9"]`, { timeout: 20000 });
+  const draftRow = t => page.locator(`${LNB} #verDrafts [data-draft="${t}"]`);
+  const drafted = { notes: await draftRow('v9.9.9').locator('textarea').inputValue(),
+                    shut: await draftRow('v9.9.9-dev.1').locator('[data-draftpub]').isDisabled(),
+                    open: await draftRow('v9.9.9').locator('[data-draftpub]').isDisabled(),
+                    said: await draftRow('v9.9.9-dev.1').textContent() };
+  ok(drafted.notes === 'whole' && drafted.shut && !drafted.open && /Not whole yet: the\.iso/.test(drafted.said),
+     `a draft shows its notes to correct, and Publish waits until it is whole (${JSON.stringify(drafted).slice(0, 120)})`);
+  await page.fill(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, 'corrected');
+  await page.click(`${LNB} #verDrafts [data-draft="v9.9.9"] [data-draftpub]`);
+  await page.waitForTimeout(1500);
+  ok(asked.some(a => a.action === 'release-publish' && a.tag === 'v9.9.9' && a.notes === 'corrected'),
+     `Publish sends the notes as they stand in the box (${JSON.stringify(asked).slice(0, 120)})`);
+  await page.unroute('**/api/version');
   const marks = () => page.$$eval(`${LNB} #verBox .vermark`, ms => ms.map(m =>
     ({ text: m.textContent.replace(/\s+/g, ' ').trim(), bad: m.classList.contains('bad') })));
   ok(!(await marks()).some(m => /builds come from/i.test(m.text)),

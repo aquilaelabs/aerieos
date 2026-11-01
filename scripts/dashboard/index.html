@@ -2610,6 +2610,12 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* The Design view's new page is three pickers and Add page on one row,
    sharing it, where each picker took the row and they stacked. */
 .addbar[data-add="design"]>select{flex:1 1 8rem;width:auto;min-width:0}
+/* A button that adds beside the words saying what it adds, never on a line of
+   its own under them; under them only where the row is too narrow for both. */
+.addline{display:flex;flex-wrap:wrap;gap:var(--field-gap);align-items:center;justify-content:space-between}
+.addline>:first-child{flex:1 1 16rem;min-width:0;margin:0}
+.addline>.addbar{flex:0 0 auto;max-width:none;margin:0}
+@media (min-width:600px){ .addbar[data-add="design"]{flex-wrap:nowrap;max-width:none} }
 /* Several pickers before the button (the Design view's platform, template
    and copy) wrap on a phone rather than each shrinking past its words. */
 .addbar{flex-wrap:wrap}

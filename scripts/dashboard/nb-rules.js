@@ -107,9 +107,9 @@ function nbRulesView({$, nb, project}){
         </details>`;
     };
     const adding = ed && ed.i === -1 ? row(ed.r, -1) : "";
-    return `<div class="sub dim ggroup">Global rules: every project's sessions are handed these. Switch one off for this project here${
+    return `<div class="addline"><div class="sub dim ggroup">Global rules: every project's sessions are handed these. Switch one off for this project here${
         may ? "; as an administrator you also change them for every project" : ""}.</div>${
-      may && !(ed && ed.i === -1) ? `<div class="addbar ctlrow" data-add="global"><button type="button" id="grAddHere">Add a global rule</button></div>` : ""}
+      may && !(ed && ed.i === -1) ? `<div class="addbar ctlrow" data-add="global"><button type="button" id="grAddHere">Add a global rule</button></div>` : ""}</div>
       <div class="field" id="rlGlobal">${adding}${gs.map(row).join("")}</div>`;
   }
 
@@ -170,8 +170,8 @@ function nbRulesView({$, nb, project}){
     // rule, and no Edit or Remove on a row.
     const ro = projWriteWhy(project);
     const body = `
-      <div class="hint">How you want this project worked on. A session reads these at the start and cannot change yours.</div>
-      ${ro ? "" : `<div class="addbar ctlrow" data-add="rule"><button type="button" id="rlAdd">Add a rule</button></div>`}
+      <div class="addline"><div class="hint">How you want this project worked on. A session reads these at the start and cannot change yours.</div>
+      ${ro ? "" : `<div class="addbar ctlrow" data-add="rule"><button type="button" id="rlAdd">Add a rule</button></div>`}</div>
       <div class="field" id="rlList">${rows.map((r, i) => `
         <details class="bug chev rulerow${nb.ruleEditing.has(i) ? " editing" : ""}" data-i="${i}"${
             nb.ruleEditing.has(i) || nb.ruleOpen.has(i) ? " open" : ""}>
