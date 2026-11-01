@@ -122,6 +122,53 @@ def adopt_want(cfg):
     return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
 
 
+def share_requests(cfg):
+    """The plan's shares as storage-share's set-many takes them (R163 step
+    9), each served from the merged tree where its files were: SMB as its
+    security said (public: everybody as a guest; secure: its writers by name,
+    the guests' reading not carried and said so, or everybody as a read-only
+    guest where it names no writer; private: the people on its lists by
+    name), NFS to the hosts its export named, a Time Machine share kept one.
+    What cannot be carried is said beside each. ([rows], [notes])."""
+    rows, notes = [], []
+    for s in (cfg or {}).get("shares") or []:
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        name = str(s["name"])
+        sec = str(s.get("security") or "public")
+        people = [p for p in [*(s.get("read") or []), *(s.get("write") or [])] if isinstance(p, str) and p]
+        smb = {"on": s.get("smb") is True, "guest": False, "ro": False, "tm": s.get("time_machine") is True, "users": []}
+        if smb["on"]:
+            if sec == "public":
+                smb["guest"] = True
+            elif sec == "secure":
+                writers = [p for p in s.get("write") or [] if isinstance(p, str) and p]
+                if writers:
+                    smb["users"] = writers
+                    notes.append({"name": name, "said": "secure: its writers by name; everybody else's guest reading is not carried"})
+                else:
+                    smb.update(guest=True, ro=True)
+            else:
+                smb["users"] = sorted(set(people))
+                if not people:
+                    notes.append({"name": name, "said": "private with nobody on its lists: not served over SMB"})
+                    smb["on"] = False
+        clients, ro = [], False
+        for rule in str(s.get("nfs_clients") or "").split():
+            host = rule.split("(", 1)[0]
+            if host:
+                clients.append(host)
+                ro = ro or "(ro" in rule or ",ro" in rule
+        nfs = {"on": s.get("nfs") is True, "ro": ro, "clients": clients or (["*"] if s.get("nfs") and s.get("nfs_security") == "public" else [])}
+        if nfs["on"] and not nfs["clients"]:
+            notes.append({"name": name, "said": "NFS with no host named: not exported"})
+            nfs["on"] = False
+        if not smb["on"] and not nfs["on"]:
+            continue
+        rows.append({"name": name, "path": f"/mnt/user/{name}", "smb": smb, "nfs": nfs})
+    return rows, notes
+
+
 def view():
     """This machine's section: what the stick's prepared configuration did,
     and what its plan names to adopt; None when this install had none."""
@@ -129,4 +176,6 @@ def view():
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(d.get("config"))}
+    rows, notes = share_requests(d.get("config"))
+    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(d.get("config")),
+            "shares": {"rows": rows, "notes": notes} if rows or notes else None}

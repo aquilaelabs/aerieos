@@ -355,11 +355,19 @@ await firstRun(false);
       n.reported = { ...n.reported, adopted: { from: 'adopted', writable: false, at: 1, parity: ['sdc'],
         mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: false }],
         merged: { '/mnt/user': true } } };
+      state.firstboot.shares = { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
+                                 notes: [{ name: 'docs', said: 'secure: its writers by name' }] };
       nodesRev++; drawPanes();
       const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
       return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
-               release: !!sect?.querySelector('[data-adopt="release"]') };
+               release: !!sect?.querySelector('[data-adopt="release"]'), serve: !!sect?.querySelector('[data-adoptshares]') };
     });
+    ok(done.serve && /1 share \(media\) can be served from \/mnt\/user/.test(done.text) && /docs: secure/.test(done.text),
+       `...with the stick's shares to serve from /mnt/user and what of theirs is not carried (${done.text.slice(-160)})`);
+    const many = await bmApi('/api/v1/nodes', { action: 'storage-share', id: (await page.evaluate(() => ownMachine()?.id)), share: 'set-many',
+      shares: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true } }] });
+    ok(/no share to serve: media: no Samba/.test(many.error || '') && !many.job,
+       `serving the shares where no Samba is installed says so for each, with no job (${many.error})`);
     ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
        `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
     // The verb checks before any job: a filesystem it does not take, and a

@@ -194,6 +194,18 @@ class SharesMixin:
         if os.geteuid() != 0:
             say("refused: shares are written as root, and this agent is not root\n")
             return "failed", 77
+        # Many at once (R163 step 9, an adopted system's shares): each the
+        # same set as one alone, in turn, each said; one refused leaves the
+        # others served.
+        if cfg.get("share") == "set-many":
+            rows = [x for x in (cfg.get("shares") or []) if isinstance(x, dict)][:64]
+            bad = []
+            for x in rows:
+                st, _rc = self._apply_storage_share(job, {**x, "share": "set"})
+                if st != "succeeded":
+                    bad.append(str(x.get("name") or "?"))
+            say(f"{len(rows) - len(bad)} of {len(rows)} shares served" + (f"; not {', '.join(bad)} (above)" if bad else "") + "\n")
+            return ("succeeded", 0) if not bad else ("failed", 1)
         action = str(cfg.get("share") or "")
         name = str(cfg.get("name") or "").strip()
         if action not in ("set", "remove"):

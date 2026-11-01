@@ -173,7 +173,9 @@ function adoptSection(n){
       `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.writable
         ? "Writable: going back to the old system takes a parity sync, which leaves its array unprotected until it ends."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
-        <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button></div></div>`);
+        ${adoptSharesLine()}
+        <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button>${
+          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>`);
   }
   const a = state?.firstboot?.adopt;
   if (!a) return "";
@@ -197,7 +199,24 @@ function adoptSection(n){
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, {open: true});
 }
 
+// The plan's shares, served from the merged tree once the disks are here:
+// how many, and what of theirs cannot be carried.
+function adoptSharesLine(){
+  const s = state?.firstboot?.shares;
+  if (!s || !(s.rows || []).length) return "";
+  return `<div class="hint">The stick's ${s.rows.length} share${s.rows.length === 1 ? "" : "s"} (${s.rows.map(r => esc(r.name)).join(", ")}) can be served from /mnt/user as they were.${
+    (s.notes || []).map(x => ` ${esc(x.name)}: ${esc(x.said)}.`).join("")}</div>`;
+}
+
 function wireAdopt(root){
+  root.querySelectorAll("[data-adoptshares]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const n = ownMachine(), rows = state?.firstboot?.shares?.rows || [];
+    if (!n || !rows.length) return;
+    busy(b, "Serving");
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || `serving ${rows.length - (j.skipped || []).length} shares${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
+    await loadNodes();
+  }));
   root.querySelectorAll('input[name="adoptMode"]').forEach(r => r.onchange = () => { adoptWritable = r.value === "rw"; });
   root.querySelectorAll("[data-adopt]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.adopt, n = ownMachine();

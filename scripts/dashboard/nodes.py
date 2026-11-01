@@ -3489,43 +3489,26 @@ def node_storage_share(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot serve a share"}
     sh = (rep.get("features") or {}).get("shares") or {}
     action = str(req.get("share") or "")
-    name = str(req.get("name") or "").strip()
-    if action not in ("set", "remove"):
-        return {"error": "a share action is set or remove"}
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", name):
-        return {"error": "a share's name is letters, digits, dots, hyphens and underscores, 63 at most"}
-    cfg = {"share": action, "name": name}
-    if action == "set":
-        path = str(req.get("path") or "").strip()
-        smb = req.get("smb") if isinstance(req.get("smb"), dict) else {}
-        nfs = req.get("nfs") if isinstance(req.get("nfs"), dict) else {}
-        if not (path.startswith(("/mnt/", "/srv/")) and ".." not in path.split("/") and len(path) <= 200):
-            return {"error": "a share's path is a folder under /mnt or /srv"}
-        if not smb.get("on") and not nfs.get("on"):
-            return {"error": "a share is served over SMB, NFS or both"}
-        if smb.get("on") and not sh.get("smb"):
-            return {"error": "no Samba on the machine yet: install Shares on its Features section first"}
-        if nfs.get("on") and not sh.get("nfs"):
-            return {"error": "no NFS server on the machine yet: install Shares on its Features section first"}
-        users = [str(u).strip() for u in (smb.get("users") or []) if isinstance(u, str) and str(u).strip()]
-        # An account's name or role:NAME to the Unix users Samba is told (R164 step 1).
-        if smb_resolve and users:
-            users, why = smb_resolve(users)
+    # Many at once (R163 step 9): an adopted system's shares, each checked
+    # as one alone is; one that does not pass is left out with why.
+    if action == "set-many":
+        rows, skipped = [], []
+        for x in (req.get("shares") or [])[:64]:
+            if not isinstance(x, dict):
+                continue
+            one, why = _share_cfg(sh, {**x, "share": "set"})
             if why:
-                return {"error": why}
-        clients = [str(c).strip() for c in (nfs.get("clients") or []) if isinstance(c, str) and str(c).strip()]
-        if smb.get("on") and not smb.get("guest") and not users:
-            return {"error": "an SMB share takes the users who may reach it, or everybody as a guest"}
-        if nfs.get("on") and not clients:
-            return {"error": "an NFS share takes the clients it is exported to (an address, a network, a name, or *)"}
-        for u in users:
-            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", u):
-                return {"error": f"{u!r} is not a user name"}
-        for c in clients:
-            if not re.fullmatch(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}", c):
-                return {"error": f"{c!r} is not a client (an address, a network like 192.168.1.0/24, a name, or *)"}
-        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
-                   nfs={"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]})
+                skipped.append({"name": str(x.get("name") or "")[:63], "why": why})
+            else:
+                rows.append({k: v for k, v in one.items() if k != "share"})
+        if not rows:
+            return {"error": "no share to serve" + (f": {skipped[0]['name']}: {skipped[0]['why']}" if skipped else "")}
+        cfg = {"share": "set-many", "shares": rows}
+    else:
+        cfg, why = _share_cfg(sh, req)
+        if why:
+            return {"error": why}
+        skipped = []
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -3533,10 +3516,56 @@ def node_storage_share(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120})
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120 * max(1, len(cfg.get("shares") or []))})
     if r.get("ok"):
-        audit(principal, "storage-share", node_id, {"job": r["job"], **cfg})
+        audit(principal, "storage-share", node_id, {"job": r["job"], **({"share": "set-many", "names": [x["name"] for x in cfg["shares"]]} if action == "set-many" else cfg)})
+        if skipped:
+            r["skipped"] = skipped
     return r
+
+
+def _share_cfg(sh, req):
+    """One share's request checked, as the job takes it: (cfg, "") or
+    (None, why). `sh` is the shares feature's daemons on the machine."""
+    action = str(req.get("share") or "")
+    name = str(req.get("name") or "").strip()
+    if action not in ("set", "remove"):
+        return None, "a share action is set or remove"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", name):
+        return None, "a share's name is letters, digits, dots, hyphens and underscores, 63 at most"
+    cfg = {"share": action, "name": name}
+    if action == "set":
+        path = str(req.get("path") or "").strip()
+        smb = req.get("smb") if isinstance(req.get("smb"), dict) else {}
+        nfs = req.get("nfs") if isinstance(req.get("nfs"), dict) else {}
+        if not (path.startswith(("/mnt/", "/srv/")) and ".." not in path.split("/") and len(path) <= 200):
+            return None, "a share's path is a folder under /mnt or /srv"
+        if not smb.get("on") and not nfs.get("on"):
+            return None, "a share is served over SMB, NFS or both"
+        if smb.get("on") and not sh.get("smb"):
+            return None, "no Samba on the machine yet: install Shares on its Features section first"
+        if nfs.get("on") and not sh.get("nfs"):
+            return None, "no NFS server on the machine yet: install Shares on its Features section first"
+        users = [str(u).strip() for u in (smb.get("users") or []) if isinstance(u, str) and str(u).strip()]
+        # An account's name or role:NAME to the Unix users Samba is told (R164 step 1).
+        if smb_resolve and users:
+            users, why = smb_resolve(users)
+            if why:
+                return None, why
+        clients = [str(c).strip() for c in (nfs.get("clients") or []) if isinstance(c, str) and str(c).strip()]
+        if smb.get("on") and not smb.get("guest") and not users:
+            return None, "an SMB share takes the users who may reach it, or everybody as a guest"
+        if nfs.get("on") and not clients:
+            return None, "an NFS share takes the clients it is exported to (an address, a network, a name, or *)"
+        for u in users:
+            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", u):
+                return None, f"{u!r} is not a user name"
+        for c in clients:
+            if not re.fullmatch(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}", c):
+                return None, f"{c!r} is not a client (an address, a network like 192.168.1.0/24, a name, or *)"
+        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
+                   nfs={"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]})
+    return cfg, ""
 
 
 def smb_shares_for(uid):

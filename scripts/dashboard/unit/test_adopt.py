@@ -185,3 +185,33 @@ class FromTheStick(unittest.TestCase):
     def test_a_plan_with_no_disk_or_pool_offers_nothing(self):
         self.assertIsNone(self.want({}))
         self.assertIsNone(self.want({"array": {"disks": []}}))
+
+
+class SharesFromTheStick(unittest.TestCase):
+    """The plan's shares as storage-share's set-many takes them
+    (firstboot.share_requests, R163 step 9)."""
+
+    def setUp(self):
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+        import firstboot
+        self.req = firstboot.share_requests
+
+    def test_each_security_carried_as_it_can_be(self):
+        rows, notes = self.req({"shares": [
+            {"name": "media", "smb": True, "security": "public"},
+            {"name": "docs", "smb": True, "security": "secure", "write": ["ann"]},
+            {"name": "isos", "smb": True, "security": "secure"},
+            {"name": "home", "smb": True, "security": "private", "read": ["bob"], "write": ["ann"], "time_machine": True},
+            {"name": "backup", "nfs": True, "nfs_clients": "192.168.1.0/24(rw) 10.0.0.5(ro)"},
+            {"name": "lonely", "smb": True, "security": "private"}]})
+        by = {r["name"]: r for r in rows}
+        self.assertEqual(by["media"]["path"], "/mnt/user/media")
+        self.assertTrue(by["media"]["smb"]["guest"])
+        self.assertEqual(by["docs"]["smb"]["users"], ["ann"])
+        self.assertTrue(by["isos"]["smb"]["guest"] and by["isos"]["smb"]["ro"])
+        self.assertEqual(by["home"]["smb"]["users"], ["ann", "bob"])
+        self.assertTrue(by["home"]["smb"]["tm"])
+        self.assertEqual(by["backup"]["nfs"]["clients"], ["192.168.1.0/24", "10.0.0.5"])
+        self.assertNotIn("lonely", by)
+        self.assertEqual({n["name"] for n in notes}, {"docs", "lonely"})
