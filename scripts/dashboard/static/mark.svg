@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256">
-  <!-- AerieOS's mark, the large one: a raptor with its wings swept back, which is also the letter A. Fixed greens rather
+  <!-- AerieOS's mark, the large one: a raptor with its wings swept back, which is also the letter A. Fixed colors rather
        than currentColor, because a browser tab has no text color to inherit. The favicon assets are
        generated from this file with the graphics tool's favicon verb. -->
   <path d="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z" fill="#2fc6ff"/>

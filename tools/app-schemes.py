@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+# A scheme that fills what is pressed apart from its second color (index.html's --lit).
+LIT = {"Default": (", lit = 0xFFFF8F4A", ", lit = 0xFFB8470F")}
 KEYS = ["bg", "panel", "ink", "dim", "line", "accent", "warn", "bad", "note"]
 THEME_KT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "apps", "android", "app", "src", "main",
                         "java", "dev", "builderbot", "app", "ui", "Theme.kt")
@@ -20,9 +22,6 @@ THEME_KT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "apps"
 
 def half(cols, name, which):
     got = {c["name"]: c["hex"] for c in cols or []}
-    # The app has one second color, for both; the default scheme's filled one reads there.
-    if name == "Default":
-        got["note"] = {"dark": "#ff8f4a", "light": "#b8470f"}[which]
     missing = [k for k in KEYS if k not in got]
     if missing:
         sys.exit(f"app-schemes: {name}'s {which} half has no {', '.join(missing)}")
@@ -34,8 +33,8 @@ def main():
     rows = []
     for t in record["language"]["themes"]:
         rows.append(f'        Scheme("{t["name"]}",\n'
-                    f'            Half({half(t.get("colors"), t["name"], "dark")}),\n'
-                    f'            Half({half(t.get("light"), t["name"], "light")}, light = true)),')
+                    f'            Half({half(t.get("colors"), t["name"], "dark")}{LIT.get(t["name"], ("", ""))[0]}),\n'
+                    f'            Half({half(t.get("light"), t["name"], "light")}, light = true{LIT.get(t["name"], ("", ""))[1]})),')
     with open(THEME_KT) as f:
         src = f.read()
     start = src.index("    val all = listOf(\n") + len("    val all = listOf(\n")

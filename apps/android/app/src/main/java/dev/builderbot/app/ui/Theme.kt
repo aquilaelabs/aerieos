@@ -23,7 +23,8 @@ import androidx.compose.ui.graphics.lerp
 // the light half darkens the panel less and tints it with the second color,
 // the ink on it, as the stylesheet's light half does (R216).
 class Half(bg: Long, panel: Long, ink: Long, dim: Long, line: Long,
-           accent: Long, warn: Long, bad: Long, note: Long, val light: Boolean = false) {
+           accent: Long, warn: Long, bad: Long, note: Long, val light: Boolean = false,
+           lit: Long = note) {
     val bg = Color(bg)
     val panel = Color(panel)
     val ink = Color(ink)
@@ -34,7 +35,9 @@ class Half(bg: Long, panel: Long, ink: Long, dim: Long, line: Long,
     val bad = Color(bad)
     val note = Color(note)
     val sunk = lerp(this.panel, Color.Black, if (light) .05f else .12f)
-    val accentDeep = if (light) lerp(this.panel, this.note, .16f) else deep(this.note)
+    val lit = Color(lit)     // what fills a pressed thing: the second color, but for Default's copper
+    val accentDeep = if (light) lerp(this.panel, this.lit, .16f) else deep(this.lit)
+    val pass = if (light) Color(0xFF1A7F37) else Color(0xFF3FB950)
 }
 
 class Scheme(val name: String, val dark: Half, val light: Half)
@@ -49,8 +52,8 @@ private fun deep(c: Color): Color {
 object Schemes {
     val all = listOf(
         Scheme("Default",
-            Half(0xFF0B1322, 0xFF121C30, 0xFFEAF1FC, 0xFFA9B7CE, 0xFF3E5378, 0xFF2FC6FF, 0xFFD29922, 0xFFF07178, 0xFFFF8F4A),
-            Half(0xFFEEF3FB, 0xFFFBFDFF, 0xFF1D2633, 0xFF566275, 0xFFC4D2E6, 0xFF0059C7, 0xFF996200, 0xFFC3131B, 0xFFB8470F, light = true)),
+            Half(0xFF0B1322, 0xFF121C30, 0xFFEAF1FC, 0xFFA9B7CE, 0xFF3E5378, 0xFF2FC6FF, 0xFFD29922, 0xFFF07178, 0xFF8CC8FF, lit = 0xFFFF8F4A),
+            Half(0xFFEEF3FB, 0xFFFBFDFF, 0xFF1D2633, 0xFF566275, 0xFFC4D2E6, 0xFF0059C7, 0xFF996200, 0xFFC3131B, 0xFF0A5FB0, light = true, lit = 0xFFB8470F)),
         Scheme("Abyss",
             Half(0xFF111D20, 0xFF18262A, 0xFFDCECEE, 0xFF93A9AC, 0xFF3E5E66, 0xFF2FB8C6, 0xFFD7AB4C, 0xFFEF6A63, 0xFFE391D9),
             Half(0xFFEFF5F6, 0xFFFBFEFF, 0xFF212829, 0xFF5A6667, 0xFFC3D5D9, 0xFF007480, 0xFF906700, 0xFFB53433, 0xFFBB30AA, light = true)),
@@ -118,7 +121,7 @@ val AccentDeep: Color get() = Schemes.half.accentDeep    // what a filled accent
 val Warn: Color get() = Schemes.half.warn
 val Bad: Color get() = Schemes.half.bad
 val Note: Color get() = Schemes.half.note
-val Ok: Color get() = Accent
+val Ok: Color get() = Schemes.half.pass   // one green in every scheme, as the dashboard's --pass
 
 // The badge palette, the same on every scheme (the design's rule badges).
 val Purple = Color(0xFFB79AE0)

@@ -265,7 +265,7 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
                 Mark(26.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    // Several BuilderBots (R132): the one in front by name,
+                    // Several controllers (R132): the one in front by name,
                     // and a tap on it lists the others.
                     if (pairings.size > 1 && here != null) {
                         Row(Modifier.clickable { pick = true }, verticalAlignment = Alignment.CenterVertically) {
@@ -957,9 +957,9 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
         Text("app ${BuildConfig.VERSION_NAME} api ${BuildConfig.TARGET_API}" +
             (if (m != null) "\ndashboard ${m.str("version").ifBlank { "unstamped" }} api ${m.int("api")}" else ""),
             color = Dim, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-        // The BuilderBots this app is paired with (R132): the one in front
+        // The controllers this app is paired with (R132): the one in front
         // marked, a tap on another switches, and Forget takes one off.
-        SectionHead("BuilderBots", inset = false)
+        SectionHead("Controllers", inset = false)
         val here = store.pairing
         for (p in store.pairings) {
             Row(Modifier.fillMaxWidth().clickable { if (p.id != here?.id) onSwitch(p.id) }.padding(vertical = 6.dp),
