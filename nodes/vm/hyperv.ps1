@@ -1,4 +1,4 @@
-# A AerieOS node on Hyper-V. Run in an elevated PowerShell on the host.
+# An AerieOS node on Hyper-V. Run in an elevated PowerShell on the host.
 #
 # Rendered by the dashboard's Create sandbox VM (vmtemplate.py). Generation 2
 # is UEFI, and its Secure Boot template rejects most Linux installers unless

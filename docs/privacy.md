@@ -68,6 +68,6 @@ projects share and each node's store.
 The data above is yours as the operator: you decide who has an account,
 which projects they see and what an agent may do, and any duty to tell the
 people you give accounts to how their data is handled is yours. This page is
-meant as the basis for that notice. A AerieOS that is reachable from the
+meant as the basis for that notice. An AerieOS that is reachable from the
 internet holds the same data, so it also needs the care any service holding
 accounts and source code does: HTTPS, strong passwords and timely updates.

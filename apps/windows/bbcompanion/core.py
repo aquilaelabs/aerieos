@@ -1,5 +1,5 @@
 """The companion app's sync (R270 step 3): a folder on this machine kept in
-step with a AerieOS project, both ways, by the node agent's own sync
+step with an AerieOS project, both ways, by the node agent's own sync
 (builderbot_agent.wssync), shared rather than copied, spoken through the
 device door (/api/v1/device/) with the person's device token.
 

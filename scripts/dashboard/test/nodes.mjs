@@ -494,7 +494,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
   // Both are the thing under test (a reason on screen instead of a spinner),
   // and listing only three made the fourth read as a failure in a full run
   // while the file passed alone.
-  ok(/not a AerieOS sandbox|does not answer|will not say what it is/.test(emptyWhy),
+  ok(/not an AerieOS sandbox|does not answer|will not say what it is/.test(emptyWhy),
      `an unreachable node shows its reason, not a spinner (${emptyWhy.slice(0, 50)})`);
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   ok(await page.$eval('.pane .bar #ndPick', s => !s.disabled),
@@ -3579,7 +3579,7 @@ ok(page.errors.length === 0,
     await hello(shed, { sandbox: true, gpu_card: card });
   }
   const no = await napi('/api/v1/nodes', { action: 'uninstall', id: plain.id });
-  ok(/only a node provisioned as a AerieOS sandbox/.test(no.error || '') && /sudo bb-sandbox uninstall/.test(no.error || ''),
+  ok(/only a node provisioned as an AerieOS sandbox/.test(no.error || '') && /sudo bb-sandbox uninstall/.test(no.error || ''),
      `a node that is not a sandbox is refused, and told the command to run on the machine (${no.error})`);
   const r = await napi('/api/v1/nodes', { action: 'uninstall', id: shed.id, stores: true, doors: true, configured: 'yes' });
   ok(r.ok && /^j_/.test(r.job || ''), `a sandbox node queues the uninstall as a system job (${r.error || r.job})`);

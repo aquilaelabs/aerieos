@@ -603,7 +603,7 @@ checks() {
 
 cmd_check() {
     checks
-    printf '\n   %s can take a AerieOS controller.\n' "${PRETTY_NAME:-$ID}"
+    printf '\n   %s can take an AerieOS controller.\n' "${PRETTY_NAME:-$ID}"
 }
 
 cmd_install() {
@@ -789,7 +789,7 @@ fetch_tree() {
     tar -xzf "$d/release.tar.gz" -C "$d"
     local top
     top="$(find "$d" -mindepth 1 -maxdepth 1 -type d | head -1)"
-    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not a AerieOS tree that installs bare metal"
+    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not an AerieOS tree that installs bare metal"
     # The commit, from the header git writes on every archive.
     python3 -c 'import sys, tarfile; print(tarfile.open(sys.argv[1]).pax_headers.get("comment", ""))' \
         "$d/release.tar.gz" > "$top/.release-rev" 2>/dev/null || true
@@ -819,7 +819,7 @@ cmd_update() {
     # The new release's own installer lays the new release out, the way the
     # new image's own entrypoint is what starts it.
     if [ "${BB_UPDATE_HANDOFF:-}" != 1 ] && [ "$(cd "$t/nodes" && pwd)" != "$HERE" ]; then
-        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not a AerieOS tree that installs bare metal"
+        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not an AerieOS tree that installs bare metal"
         if [ "$DEV" = 1 ]; then
             BB_UPDATE_HANDOFF=1 exec bash "$t/nodes/install-controller.sh" --update --from "$t" --dev
         fi
@@ -1036,7 +1036,7 @@ wall_cover() {
 wall_write() {
     say "the wall: what a session on this machine never reaches"
     {
-        printf '# Written by AerieOS'"'"'s install-controller.sh (R90): this machine is a AerieOS\n'
+        printf '# Written by AerieOS'"'"'s install-controller.sh (R90): this machine is an AerieOS\n'
         printf '# controller, and a session on its node is kept out of what follows. bb-session\n'
         printf '# covers every folder in COVER in a session'"'"'s view and starts none unless the\n'
         printf '# session and job accounts reach none of it.\n'

@@ -336,7 +336,7 @@ class RunnersMixin:
         the foreground under this agent, which supervises it the way it
         does GitHub's runner on a node without systemd. Every label is
         `name:host`, so a job lands on this machine's own toolchain rather
-        than in a container, which is what a AerieOS node is for."""
+        than in a container, which is what an AerieOS node is for."""
         exe = os.path.join(d, "act_runner")
         if not want:
             if not installed:

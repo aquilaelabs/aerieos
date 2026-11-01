@@ -1144,7 +1144,7 @@ function projectActions(p){
           p.linked ? `${esc(p.forge_name || "Remote")} settings` : "Link to a git host"}</button>` : "",
     p.phone?.mine ? `<button type="button" data-ph="${esc(name)}"${phoneWhy(p) ? " disabled" : ""}>${
         p.phone?.lease?.project === name ? "Take your phone back" : "Lend your phone"}</button>` : "",
-    p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report a AerieOS bug</button>`,
+    p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report an AerieOS bug</button>`,
     // Archive is out of sight only (R119, the operator, 23 Oct): its card
     // folds away at the foot of the Projects page and leaves Home, and the
     // project works on. Its owner's or an administrator's.

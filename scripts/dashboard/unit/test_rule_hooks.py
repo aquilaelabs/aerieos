@@ -159,7 +159,7 @@ class Store(unittest.TestCase):
 
     def test_a_test_run_is_refused_only_in_the_foreground(self):
         for line in ("aerie tests run", "bash scripts/aerie tests preflight --base HEAD",
-                     "cd /workspace/AerieOS && timeout 900 bash scripts/aerie dashboard test cards 2>&1 | tail",
+                     "cd /workspace/builderbot && timeout 900 bash scripts/aerie dashboard test cards 2>&1 | tail",
                      "bash scripts/dashboard/test/run.sh cards",
                      "bash scripts/aerie tests probe /tmp/x.mjs", "aerie devapp rebuild --instance web-dev",
                      "aerie build", "cd app && aerie build -- ./gradlew assembleDebug"):

@@ -703,7 +703,7 @@ ns = importlib.util.module_from_spec(spec); spec.loader.exec_module(ns)
 mi = """
 26 25 0:24 /development/projects /workspace rw - fuse.shfs x rw
 27 25 0:24 /development/SDK /sdk rw - fuse.shfs x rw
-28 25 0:25 /appdata/AerieOS /config rw - xfs x rw
+28 25 0:25 /appdata/BuilderBot /config rw - xfs x rw
 29 25 0:26 / /reports ro - xfs x ro
 """
 print(json.dumps(sorted(ns.siblings_of(mi, '/workspace'))))

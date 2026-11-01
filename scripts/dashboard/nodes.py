@@ -972,7 +972,7 @@ def authenticate(bearer):
     kind = next((k for k, p in TOKEN_PREFIX.items() if bearer.startswith(p)),
                 None)
     if not kind:
-        return {"error": "not a AerieOS token"}
+        return {"error": "not an AerieOS token"}
     secret = bearer[len(TOKEN_PREFIX[kind]):]
     rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = ?",
                  (_hash(secret), kind))
@@ -3149,7 +3149,7 @@ def node_uninstall(principal, node_id, rings=None):
     if n.get("kind") != "agent":
         return {"error": "only an agent node can be uninstalled from here"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a AerieOS sandbox can be uninstalled "
+        return {"error": "only a node provisioned as an AerieOS sandbox can be uninstalled "
                          "from here: on the machine, sudo bb-sandbox uninstall"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
@@ -4295,7 +4295,7 @@ def node_gpu_display(principal, node_id):
     if n.get("kind") != "agent":
         return {"error": "only an agent node has a GPU display to set up"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a AerieOS sandbox is set up from here: "
+        return {"error": "only a node provisioned as an AerieOS sandbox is set up from here: "
                          "on the machine, sudo bb-sandbox gpu"}
     # The display runs on the driver and does not install it (R102): the
     # driver's card in the Library is the one place it is installed.
@@ -4326,7 +4326,7 @@ def node_gpu_display_off(principal, node_id):
     if not n:
         return {"error": "no such node"}
     if n.get("kind") != "agent" or not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a AerieOS sandbox is changed from here: "
+        return {"error": "only a node provisioned as an AerieOS sandbox is changed from here: "
                          "on the machine, sudo bb-sandbox gpu-off"}
     why = node_locked(n)
     if why:
@@ -4443,7 +4443,7 @@ def node_apply(principal, node_id, what):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a AerieOS sandbox "
+        return {"error": "this node was not provisioned as an AerieOS sandbox "
                          "(no bb-sandbox on it), so system jobs are not offered to it"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; system jobs go to an online node"}
@@ -5668,7 +5668,7 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a AerieOS sandbox, so root "
+        return {"error": "this node was not provisioned as an AerieOS sandbox, so root "
                          "there is its owner's"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; a root command goes to an online node"}

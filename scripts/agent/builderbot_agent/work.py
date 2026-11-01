@@ -517,7 +517,7 @@ class WorkMixin:
                 # The stamp, as every job that changes the machine itself
                 # asks; bb-sandbox refuses by itself where it is not root.
                 job.say(f"refused: {mine} is this machine's own, and this node was not "
-                        f"provisioned as a AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
+                        f"provisioned as an AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
                 bad += 1
             else:
                 self.refresh_sandbox_tool(job)

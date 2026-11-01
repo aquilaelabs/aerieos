@@ -1,5 +1,5 @@
 """The AerieOS companion app (R270): a folder on this machine kept in step
-with a AerieOS project, as a node's synced copy is.
+with an AerieOS project, as a node's synced copy is.
 
     python -m bbcompanion                      the window (sign in, pick projects, watch them)
     python -m bbcompanion signin URL USER      sign this machine in (asks the password once)

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Enroll a Mac as a AerieOS node, a GUEST node (roadmap R23): one
+# Enroll a Mac as an AerieOS node, a GUEST node (roadmap R23): one
 # directory and one launchd agent, and nothing outside them. The Mac stays
 # its owner's machine: no accounts made, no daemon, no root, nothing in
 # /etc, and --remove takes exactly what this put there back out again.

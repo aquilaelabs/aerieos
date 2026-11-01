@@ -1854,7 +1854,7 @@ def schedule_queue(s, argv, by):
                            "timeout": schedules.SYSTEM_TIMEOUT.get(s["system"]["apply"], 900)})
     elif s.get("as") == "root":
         if not (n.get("reported") or {}).get("sandbox"):
-            return {"error": f"{n['name']} was not provisioned as a AerieOS sandbox, so root there is its owner's: "
+            return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so root there is its owner's: "
                              "run it as the jobs account, or on a sandbox node"}
         if nodes.system_job_for(nid):
             return {"error": f"a system job is already running on {n['name']}; one at a time"}
@@ -11715,7 +11715,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _get_library(self):
-        """GET /api/library?node=ID (R170): everything a AerieOS installs
+        """GET /api/library?node=ID (R170): everything an AerieOS installs
         or runs as one list for one node (library.rows): the toolchains and
         packs with what the node's store holds, the coding agents, the apps
         a NAS runs, the vetted catalog's offers and the companions a person

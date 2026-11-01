@@ -78,7 +78,7 @@ class ConfigPlaneMixin:
         # nor any reason to be refused either of those.
         if what in ("storage", "network", "root", "gpu", "gpu-off", "feature") and not os.access(SANDBOX_BIN, os.X_OK):
             job.say(f"refused: {what} edits this machine's own configuration, and this node "
-                    f"was not provisioned as a AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
+                    f"was not provisioned as an AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
             return "failed", 77
         cfg = spec.get("config") if isinstance(spec.get("config"), dict) else {}
         if what == "root":

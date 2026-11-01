@@ -164,7 +164,7 @@ function instAboutLines(r){
   const lines = [];
   if (r.machine){
     lines.push(r.name === TC_DRIVER ? tcDriverLine(r.machine) : tcToolkitLine(r.machine));
-    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not a AerieOS sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
+    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not an AerieOS sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
     if (r.machine.settling) lines.push(`<span class="sub">The node is reporting what the last job left<span class="dots"></span></span>`);
     return lines.filter(Boolean).join("");
   }

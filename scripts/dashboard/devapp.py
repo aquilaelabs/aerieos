@@ -932,7 +932,7 @@ def _available_agent(n):
                        "docker group"} | source()
     if not rep.get("sandbox"):
         return {"on": False,
-                "why": f"{n['name']} is not a AerieOS sandbox: it does "
+                "why": f"{n['name']} is not an AerieOS sandbox: it does "
                        "not report the provisioner's stamp, and a container "
                        "here runs as root on that machine. Run "
                        "nodes/provision-linux.sh on it (again is fine, it "
@@ -1001,7 +1001,7 @@ def available():
                        + info["error"]} | source()
     if not is_sandbox(info["labels"]):
         return {"on": False,
-                "why": "this daemon is not a AerieOS sandbox: it carries no "
+                "why": "this daemon is not an AerieOS sandbox: it carries no "
                        f"{SANDBOX_LABEL} label. Run nodes/provision-linux.sh on the VM "
                        "(again is fine, it only adds what is missing); see "
                        "docs/sandbox-vm.md"} | source()

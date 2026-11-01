@@ -902,7 +902,7 @@ def read_manifest(path):
         with open(path, "rb") as f:
             head = f.readline()
             if head not in (HEADER, BACKUP_HEADER):
-                return None, "not a AerieOS move bundle or backup"
+                return None, "not an AerieOS move bundle or backup"
             line = f.readline()
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:

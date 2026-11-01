@@ -221,7 +221,7 @@ const TABKINDS = {
   notebook:     { multi: true, label: t => "Notebook: " + projLabel(t.arg),
               icon: TOOL_ICONS.notebook,
               render: (i, t) => renderNotebookInto(i, t.arg), live: "always" },
-  // The Library (R170): one list of everything a AerieOS installs or
+  // The Library (R170): one list of everything an AerieOS installs or
   // runs, for one node; its own read, the node list, and the sign-in,
   // which rides the status poll (an agent's row carries it).
   library:  { multi: false, label: () => "Library",

@@ -9,10 +9,10 @@ open a pull request, and let the image follow.
 
 ## Getting a checkout
 
-Clone the repository and open it as a project on a AerieOS, which is what
+Clone the repository and open it as a project on an AerieOS, which is what
 its own sessions do: the tree lives on the projects share, the notebook
 (roadmap, bugs, rules, tests) is the controller's, and `aerie` is on the PATH.
-Outside a AerieOS the linters and the dashboard's suite still run; the
+Outside an AerieOS the linters and the dashboard's suite still run; the
 notebook verbs do not, since they relay to a controller.
 
 ## Seeing a change

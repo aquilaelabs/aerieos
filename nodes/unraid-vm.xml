@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!--
-  A AerieOS node as an Unraid VM: the Docker sandbox, and since the
+  An AerieOS node as an Unraid VM: the Docker sandbox, and since the
   controller stopped building anything itself, the machine a project's
   builds, tests, CI runner, Android emulator and Claude sessions all run on.
 

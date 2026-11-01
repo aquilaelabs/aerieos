@@ -2853,9 +2853,9 @@ ok(true, '...and a daemon coming back needs no un-gating: the next draw is clean
   // note one call found was gone by the next (B161).
   const note = await page.waitForFunction(() => {
     const t = document.querySelector('.dmtab .dmnote')?.textContent || '';
-    return /not a AerieOS sandbox/.test(t) && t;
+    return /not an AerieOS sandbox/.test(t) && t;
   }, null, { timeout: 15000 }).then(h => h.jsonValue(), () => '');
-  ok(/not a AerieOS sandbox/.test(note),
+  ok(/not an AerieOS sandbox/.test(note),
      'a daemon with no provisioner stamp is refused, and named as the reason');
   // The provisioner's own name, which is provision-linux.sh since there is a
   // macos one beside it. `provision\.sh` matched the name it had before that

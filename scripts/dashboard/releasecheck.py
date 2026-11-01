@@ -209,7 +209,7 @@ def is_draft(tag):
     return bool(_token()) and str(tag) in _drafts
 
 
-# What a AerieOS update takes from a release's folder (osimage).
+# What an AerieOS update takes from a release's folder (osimage).
 def _os_files(tag):
     ver = str(tag).lstrip("v")
     return {f"builderbot-os-{ver}.iso", f"builderbot-os-{ver}.iso.sha256", f"builderbot-os-{ver}.attestation.jsonl",

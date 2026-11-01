@@ -125,7 +125,7 @@ function schedAs(s){
   const as = schedDraft.as ?? s?.as ?? "job";
   if (n?.sandbox) return `${lbl("schAs", "Runs as", "root is offered only on a node AerieOS set up as a sandbox; anywhere else a schedule runs as the jobs account")}
     <select id="schAs" data-schedf="as">${optionList([["job", "the node's jobs account"], ["root", "root"]], as)}</select>`;
-  return s?.as === "root" && n ? `<div class="hint warn">Saved to run as root, which ${esc(n.name)} does not allow: it is not a AerieOS sandbox. Saved again, it runs as the jobs account.</div>` : "";
+  return s?.as === "root" && n ? `<div class="hint warn">Saved to run as root, which ${esc(n.name)} does not allow: it is not an AerieOS sandbox. Saved again, it runs as the jobs account.</div>` : "";
 }
 
 // Open the dialog on a schedule, or on a new one.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign a AerieOS release (R199), on the release key holder's own machine:
+"""Sign an AerieOS release (R199), on the release key holder's own machine:
 never in the repository, CI or a controller, so whoever changes those can
 build and attest a release but not sign one, and every install refuses an
 update its release key did not sign.

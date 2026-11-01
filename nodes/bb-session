@@ -297,7 +297,7 @@ def wall_conf():
         st = os.stat(path)
     except OSError:
         if any(m and os.path.lexists(m) for m in marks):
-            raise Refused(f"bb-session: this machine carries a AerieOS controller and no wall ({path}): "
+            raise Refused(f"bb-session: this machine carries an AerieOS controller and no wall ({path}): "
                           "run nodes/install-controller.sh --install again to write it") from None
         return ""
     if path == WALL and (st.st_uid != 0 or st.st_mode & 0o022):

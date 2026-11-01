@@ -139,7 +139,7 @@ class SlotTool(unittest.TestCase):
     def test_a_boot_that_names_no_slot_is_said(self):
         r = self.run_tool("current", cmdline="root=/dev/sda1 ro")
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("not a AerieOS boot", r.stderr)
+        self.assertIn("not an AerieOS boot", r.stderr)
 
     def test_next_is_slot_a_until_grub_says_otherwise_and_cannot_be_set_without_the_esp(self):
         self.assertEqual(self.run_tool("next").stdout.strip(), "a")

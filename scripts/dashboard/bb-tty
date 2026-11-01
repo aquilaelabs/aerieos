@@ -1104,7 +1104,7 @@ async function keep(id){
 export const AerieOS = async ({ directory }) => ({
   "tool.execute.before": async (input, output) => {
     const r = await hook("pre", {tool: input.tool, args: output.args, cwd: directory, session_id: input.sessionID || ""});
-    if (r.code === 2) throw new Error((r.err || "").trim() || "refused by a AerieOS guard");
+    if (r.code === 2) throw new Error((r.err || "").trim() || "refused by an AerieOS guard");
   },
   "chat.message": async (input, output) => {
     const text = (output?.message?.parts || output?.parts || []).map(p => p.text || "").join("\n");

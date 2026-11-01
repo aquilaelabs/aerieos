@@ -1,4 +1,4 @@
-A session runs on a AerieOS node: the machine where builds, tests, CI
+A session runs on an AerieOS node: the machine where builds, tests, CI
 and the emulator run, and where you most likely are; `aerie status` says under
 "where" whether this machine is a node, and which, or the controller. The
 controller keeps the dashboard, the notebook and the record; everything you

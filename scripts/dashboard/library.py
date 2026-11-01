@@ -1,4 +1,4 @@
-"""The Library (R170): everything a AerieOS installs or runs, as one
+"""The Library (R170): everything an AerieOS installs or runs, as one
 list of one shape, for one node. The toolchains the catalog offers with
 what the node's store holds (toolchains.payload_for_node), the coding
 agents with their version against the latest (agentcode.rows), the tool

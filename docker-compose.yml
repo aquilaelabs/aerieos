@@ -1,4 +1,5 @@
-# AerieOS: Claude Code workstation + GitHub Actions runner for a NAS.
+# Aerie Workshop, the container edition of AerieOS: a workshop for coding
+# agents, and a GitHub Actions runner, beside what the host already runs.
 #
 #   docker compose up -d
 #   docker exec -it builderbot claude
@@ -34,7 +35,7 @@ services:
       core: 0
     # Same name the Unraid template uses, so every `docker exec -it
     # AerieOS ...` command in the docs works under either install method.
-    container_name: AerieOS
+    container_name: Aerie-Workshop
     hostname: builderbot
     # What the container prints, kept by Docker on the host: bounded, since
     # the json-file driver keeps all of it by default. The same output is in
@@ -103,9 +104,9 @@ services:
       # --- persistent container state --------------------------------------
       # Each account's home on the controller, and its state: accounts,
       # settings, notebooks, logs.
-      - ${APPDATA_PATH:-/mnt/user/appdata/AerieOS}/home:/home/builder
+      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/home:/home/builder
       # Drop your own *.sh startup hooks in here.
-      - ${APPDATA_PATH:-/mnt/user/appdata/AerieOS}/config:/config
+      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/config:/config
       # The runners' registration tokens, root-only (0700) by design so a
       # session can never read one. A named volume rather than a directory
       # under /config: on an appdata path that is a squashed NFS share
@@ -143,7 +144,7 @@ services:
       # is mounted read-write. Secrets provided here are shielded from Claude
       # sessions (keys are served via a root-owned ssh-agent); keys in
       # home/.ssh are not.
-      # - /mnt/user/appdata/AerieOS/secrets:/secrets
+      # - /mnt/user/appdata/BuilderBot/secrets:/secrets
 
       # --- host Docker access (OFF by default) ------------------------------
 

@@ -1,6 +1,6 @@
 # AerieOS for VS Code
 
-Open a AerieOS project in VS Code without mounting a share, see what a
+Open an AerieOS project in VS Code without mounting a share, see what a
 coding agent's session (Claude, ChatGPT or Copilot) changes as it saves, and
 work in that session's terminal from a VS Code panel. You use it as your own AerieOS account. The controller
 decides what the account may do on every request, so the extension can do

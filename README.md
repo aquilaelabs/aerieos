@@ -56,12 +56,12 @@ machine does.
 
 | Edition | Runs on | What it is for | How it installs | State |
 | --- | --- | --- | --- | --- |
-| **Container** | Any host with Docker: a NAS, a home server, a VPS | The dashboard beside everything else the host runs; nodes elsewhere | `docker compose up` with the compose file below, or the app template on a NAS | Released |
+| **Aerie Workshop** | A container on any host with Docker: a NAS, a home server, a VPS | The AI workshop alone: the dashboard beside everything else the host runs, nodes elsewhere, and no storage of its own | `docker compose up` with the compose file below, or the app template on a NAS | Released |
 | **Bare-metal install** | A Linux machine of its own (every system a node runs on) | One box that is the controller and its own node: the dashboard, the builds, the sessions and the storage on one machine | `nodes/install-controller.sh --install` on the machine, updates from the page | Released |
 | **AerieOS** | A machine or a VM installed from the ISO | The bare-metal install as an appliance: a read-only root in two slots, an update that falls back by itself, the disks as pools, an array and shares | Boot the ISO and pick a disk | Experimental: it boots and updates in the lab and on one machine, and it is the edition most likely to break |
 | **USB edition** | A stick in any x86-64 machine | AerieOS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/builderbot-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
 
-The container and bare-metal editions are what AerieOS has shipped as
+Aerie Workshop and the bare-metal install are what AerieOS has shipped as
 since 0.6. The OS and USB editions are new in 0.9: try them on a machine or
 a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
 
@@ -180,7 +180,7 @@ a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   themselves, on the node, from the Installed page.
 - **Repositories made for trying it** (see the warning above).
 
-### The container edition
+### Aerie Workshop, the container edition
 
 Make the folders it keeps its state in, owned by the user the container
 should run as (`id -u` and `id -g` give yours):
@@ -197,7 +197,7 @@ match:
 services:
   builderbot:
     image: ghcr.io/aquilaelabs/builderbot:0.9   # a release line; see Upgrading in docs/install.md
-    container_name: AerieOS
+    container_name: Aerie-Workshop
     hostname: builderbot
     restart: unless-stopped
     stdin_open: true
@@ -269,7 +269,7 @@ account, so do this before anyone else can reach it. Then:
 
 1. **Your profile** (the gear, then Profile): your name, email and git
    identity, which your commits carry.
-2. **Enroll a node** (the container edition): Machines, then **Enroll
+2. **Enroll a node** (Aerie Workshop): Machines, then **Enroll
    node**. It gives you one command to run on the node machine, which sets
    it up and connects it. An installed edition is its own node already.
 3. **Install an agent on the node**: Build, then the Library, with that node

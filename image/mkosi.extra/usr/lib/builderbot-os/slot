@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The two root slots of a AerieOS disk (R160 step 1), read and set:
+# The two root slots of an AerieOS disk (R160 step 1), read and set:
 #
 #   slot current         the slot this boot came from (a or b), from the kernel's command line
 #   slot other           the one an update writes
@@ -30,7 +30,7 @@ current() {
     for w in $line; do
         case "$w" in bbslot=a|bbslot=b) printf '%s\n' "${w#bbslot=}"; return 0 ;; esac
     done
-    echo "slot: this boot named no slot (bbslot= is not on the kernel's command line), so it is not a AerieOS boot" >&2
+    echo "slot: this boot named no slot (bbslot= is not on the kernel's command line), so it is not an AerieOS boot" >&2
     return 1
 }
 other() { [ "$(current)" = a ] && echo b || echo a; }

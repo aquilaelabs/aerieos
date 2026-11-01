@@ -1,6 +1,6 @@
 # AerieOS companion for Windows
 
-A folder on your Windows machine kept in step with a AerieOS project,
+A folder on your Windows machine kept in step with an AerieOS project,
 both ways, the way a node's copy of a project is kept (R270). Open it in a
 tool that only runs on Windows (GameMaker, Unity, Unreal, Visual Studio)
 while Claude works on the same project from its session on a node: a change

@@ -8,10 +8,10 @@ The image, `ghcr.io/aquilaelabs/builderbot`, is public: pulling it needs no
 login.
 
 AerieOS comes in four editions, one controller in four shapes. This
-checklist is the **container** edition, on any host with Docker. The
-**bare-metal install** puts the same controller on a Linux machine of its
-own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS
-OS** is that install as an appliance, from an ISO or a VM image, and the
+checklist is **Aerie Workshop**, the container edition, on any host with
+Docker. The **bare-metal install** puts the same controller on a Linux machine
+of its own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS**
+is that install as an appliance, from an ISO or a VM image, and the
 **USB edition** runs it from a stick ([image.md](image.md)); those two are
 new in 0.9 and experimental. A controller moves between any of them
 ([Moving a controller](#moving-a-controller)).
@@ -28,8 +28,8 @@ there before going on.
 ### 1. Create the state directories
 
 ```bash
-mkdir -p /mnt/user/appdata/AerieOS/{home,config/startup.d}
-chown -R 99:100 /mnt/user/appdata/AerieOS
+mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
+chown -R 99:100 /mnt/user/appdata/BuilderBot
 ```
 
 | Dir | Holds |
@@ -45,18 +45,18 @@ Keep `home/` on a cache/SSD-backed share: it does heavy small-file IO.
 Root-owned, so its contents are **never readable by sessions**:
 
 ```bash
-mkdir -p /mnt/user/appdata/AerieOS/secrets/ssh
+mkdir -p /mnt/user/appdata/BuilderBot/secrets/ssh
 
-cp /path/to/git-key /mnt/user/appdata/AerieOS/secrets/ssh/id_ed25519
+cp /path/to/git-key /mnt/user/appdata/BuilderBot/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
 # is loaded the same way. The install key is made here by the first start.
-cat > /mnt/user/appdata/AerieOS/secrets/builderbot.env <<'EOF'
+cat > /mnt/user/appdata/BuilderBot/secrets/builderbot.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF
 
-chown -R root:root /mnt/user/appdata/AerieOS/secrets
-chmod -R go-rwx    /mnt/user/appdata/AerieOS/secrets
+chown -R root:root /mnt/user/appdata/BuilderBot/secrets
+chmod -R go-rwx    /mnt/user/appdata/BuilderBot/secrets
 ```
 
 The install key seals the settings' tokens, the signing keys and the git
@@ -93,7 +93,7 @@ Required / usually touched:
 | Field | Set it to |
 |---|---|
 | Projects folder | One mapping for all of them: `/mnt/user/projects` → `/workspace`. Every folder inside it is a project |
-| State paths | Pre-wired to `/mnt/user/appdata/AerieOS/{home,config}` |
+| State paths | Pre-wired to `/mnt/user/appdata/BuilderBot/{home,config}` |
 | **Secrets directory** | The folder from step 2 (or leave empty if unshielded) |
 
 Everything else has sane defaults: full reference in [reference.md](reference.md#configuration-reference).
@@ -114,8 +114,8 @@ Everything else has sane defaults: full reference in [reference.md](reference.md
 ### 6. First boot
 
 ```bash
-docker logs -f AerieOS          # banner → hooks → ready
-docker exec -it AerieOS aerie doctor
+docker logs -f Aerie-Workshop          # banner → hooks → ready
+docker exec -it Aerie-Workshop aerie doctor
 ```
 
 Then open the dashboard. The first page makes the owner account; the setup
@@ -176,8 +176,8 @@ project's card or page, and runs on that project's node. There is no
 `claude`, `codex` or `copilot` in this container to exec into.
 
 ```bash
-docker exec -it AerieOS aerie shell                        # shell as builder
-docker exec -it AerieOS aerie status                       # what this box is
+docker exec -it Aerie-Workshop aerie shell                        # shell as builder
+docker exec -it Aerie-Workshop aerie status                       # what this box is
 ```
 
 **Adding a project**: **New project** on the Projects page makes one, as a
@@ -374,7 +374,7 @@ container to a machine of its own, and back.
    the first-run card press **Moving a controller here?** and give the
    token with the old controller's address, while it still runs: the new
    home pulls the bundle from it, packed at that moment, under a proof
-   derived from the token. A AerieOS stick takes the move later
+   derived from the token. An AerieOS stick takes the move later
    instead, once its disks hold the projects: make a setup account, set
    the disks up on This machine, and land it from Controller settings,
    **Move a controller here**, with the same token and address or bundle

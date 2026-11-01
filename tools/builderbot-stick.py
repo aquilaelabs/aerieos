@@ -173,7 +173,7 @@ def release_image(tag, channel="normal"):
         # AerieOS, or one whose image build failed, has none.
         withimg = [x for x in live if any(str(a.get("name", "")).endswith(".stick.raw.xz") for a in x.get("assets") or [])]
         if not withimg:
-            die(("no dev build" if dev else "no release") + " carries a AerieOS stick image yet"
+            die(("no dev build" if dev else "no release") + " carries an AerieOS stick image yet"
                 + ("" if dev else ": the dev builds do, so pick the newest dev build"))
         if live and withimg[0] is not live[0]:
             say(f"{live[0]['tag_name']} carries no stick image, so {withimg[0]['tag_name']}'s is written")

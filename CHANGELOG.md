@@ -25,6 +25,7 @@
 - The default theme is blue and copper: navy surfaces, a cerulean accent and warm copper on what is pressed and followed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
 - The command is aerie, in every shell and session
+- The container edition is called Aerie Workshop: it is the AI workshop alone, and the storage comes with AerieOS on a machine of its own
 - A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
 - On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
 - The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)

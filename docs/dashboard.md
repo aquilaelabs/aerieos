@@ -490,7 +490,7 @@ looks after this AerieOS reads it (`aerie diag reports`). It is a log, not a
 conversation: nothing goes back to whoever sent it, and **Clear reports**
 empties it. A session sends one with `aerie report "what happened"`, under the
 project's **Agents may: Report AerieOS bugs**. A person sends one from a
-project's menu: **Report a AerieOS bug** opens **Report a bug**, with a category to
+project's menu: **Report an AerieOS bug** opens **Report a bug**, with a category to
 pick, what happened and how to make it happen, and **Send** puts it in the
 diagnostics under that project with its node and the build it was seen on,
 marked as from the dashboard. A person's report is heard whatever that

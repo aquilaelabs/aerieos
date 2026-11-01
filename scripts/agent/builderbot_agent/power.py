@@ -60,8 +60,8 @@ def ups_now():
 def host_updates_now(state):
     """{pending, security, reboot, checked} for a bare-metal install on a
     Debian-family system, counted once an hour as root (apt-get update,
-    then a simulated upgrade), kept in node.json between; {} on AerieOS
-    OS, without apt, or as anybody but root. `reboot` is the flag a kernel
+    then a simulated upgrade), kept in node.json between; {} on AerieOS,
+    without apt, or as anybody but root. `reboot` is the flag a kernel
     or libc update leaves."""
     apt = shutil.which("apt-get")
     if not apt or os.geteuid() != 0 or os_release():

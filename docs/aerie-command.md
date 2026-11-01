@@ -147,5 +147,5 @@ the run, so a busy run's seconds are not read as a quiet one's.
 ## As builder, not root
 
 `aerie` re-execs as `builder` automatically: `docker exec` lands as root, which
-would break file ownership. A bare `docker exec -it AerieOS bash` is still
+would break file ownership. A bare `docker exec -it Aerie-Workshop bash` is still
 root; use `aerie shell` for the normal user.

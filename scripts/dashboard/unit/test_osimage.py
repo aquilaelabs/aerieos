@@ -49,7 +49,7 @@ IN_ISO = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz"
 
 
 class World:
-    """A AerieOS machine in a folder: the release file, a slot tool that
+    """An AerieOS machine in a folder: the release file, a slot tool that
     keeps the next slot in a file, two slot partitions as files, an ESP, and
     a release's files served by file://."""
     def __init__(self, slot="a", version="0.9.0"):

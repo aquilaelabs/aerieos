@@ -83,8 +83,8 @@ it needs no login.
 In the Unraid terminal:
 
 ```bash
-mkdir -p /mnt/user/appdata/AerieOS/{home,config/startup.d}
-chown -R 99:100 /mnt/user/appdata/AerieOS
+mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
+chown -R 99:100 /mnt/user/appdata/BuilderBot
 
 # The controller's toolchain store: the browsers `aerie capture shot` uses. A node
 # keeps its own toolchains, in a directory of its own on the store its Nodes
@@ -189,7 +189,7 @@ container icon and only downloads when **both** are missing
 
 So keep the disk copy warm and the download never happens. Container settings →
 **Unraid icon cache** → `/var/lib/docker/unraid/images`, apply, and the
-container writes `AerieOS-icon.png` there on every start, including right
+container writes `Aerie-Workshop-icon.png` there on every start, including right
 after an image update, which is when Unraid clears the cache and re-downloads.
 
 Two things that will silently defeat it:
@@ -206,8 +206,8 @@ The one-time equivalent, if you would rather not add a mapping: just redo it
 if you ever recreate `docker.img`:
 
 ```bash
-docker cp AerieOS:/opt/builderbot/icon.png \
-  /var/lib/docker/unraid/images/AerieOS-icon.png
+docker cp Aerie-Workshop:/opt/builderbot/icon.png \
+  /var/lib/docker/unraid/images/Aerie-Workshop-icon.png
 ```
 
 ### Android emulator (on a node)
@@ -371,19 +371,19 @@ root-only folder:
 
 1. Create it on the host and drop your secrets in:
    ```bash
-   mkdir -p /mnt/user/appdata/AerieOS/secrets/ssh
+   mkdir -p /mnt/user/appdata/BuilderBot/secrets/ssh
 
    # any publishing token a session should use but never read (optional);
    # the install key is made here by the first start, saved from Controller, Keys
-   cat > /mnt/user/appdata/AerieOS/secrets/builderbot.env <<'EOF'
+   cat > /mnt/user/appdata/BuilderBot/secrets/builderbot.env <<'EOF'
    NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
    EOF
 
    # any git ssh keys (no passphrase; filename doesn't matter)
-   cp /path/to/id_ed25519 /mnt/user/appdata/AerieOS/secrets/ssh/
+   cp /path/to/id_ed25519 /mnt/user/appdata/BuilderBot/secrets/ssh/
 
-   chown -R root:root /mnt/user/appdata/AerieOS/secrets
-   chmod -R go-rwx   /mnt/user/appdata/AerieOS/secrets
+   chown -R root:root /mnt/user/appdata/BuilderBot/secrets
+   chmod -R go-rwx   /mnt/user/appdata/BuilderBot/secrets
    ```
 2. Set the template's **Secrets directory** field (or uncomment the
    `/secrets` volume in compose) to that folder, read-write, so the first
@@ -547,7 +547,7 @@ not host-root.
 
 | Log | Where | Survives image updates? |
 |---|---|---|
-| Startup + supervisor | `/mnt/user/appdata/AerieOS/config/logs/builderbot.log` (also `docker logs AerieOS` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
+| Startup + supervisor | `/mnt/user/appdata/BuilderBot/config/logs/builderbot.log` (also `docker logs Aerie-Workshop` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
 | ...or your own location | Map the optional **Logs directory** path (template, advanced view) / the `/logs` volume (compose) to any share, e.g. on the array, and the log moves there automatically | ✅ |
 | CI job output | GitHub → repo → *Actions* → the run | ✅ (kept by GitHub) |
 | A node's own logs (its agent and its terminals, CI runner, its nginx, the system journal, the kernel ring, the previous boot) | on the node: `aerie logs --node NAME` from a session granted it, or the machine's journal | ✅ |

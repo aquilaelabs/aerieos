@@ -82,7 +82,7 @@ def _env(name, default):
 
 
 def os_release():
-    """{version, snapshot, built, slot, next} on a AerieOS disk, {}
+    """{version, snapshot, built, slot, next} on an AerieOS disk, {}
     anywhere else: the release file the image carries, and the slot tool's
     reading of this boot and the next."""
     path = _env("BB_OS_RELEASE", RELEASE_FILE)

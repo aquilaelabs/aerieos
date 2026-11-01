@@ -165,7 +165,7 @@ fun LoginScreen(store: Store, adding: Boolean = false, onDone: (admin: Boolean) 
                 try {
                     val api = Api(server, user, password)
                     val st = api.status()
-                    if (st.str("me").isBlank()) throw Exception("that address answers, but not as a AerieOS")
+                    if (st.str("me").isBlank()) throw Exception("that address answers, but not as an AerieOS")
                     store.add(name, server, user, password)
                     onDone(st.obj("can").optBoolean("admin", false))
                 } catch (e: Exception) {

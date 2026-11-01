@@ -1,6 +1,6 @@
 [Unit]
 Description=AerieOS: the slot marked good once the dashboard and the agent are up
-# Only on a AerieOS boot (bbslot= on the kernel's command line); the
+# Only on an AerieOS boot (bbslot= on the kernel's command line); the
 # controller's own first boot runs first where there is one.
 ConditionKernelCommandLine=bbslot
 After=network-online.target builderbot-controller.service builderbot-os-firstboot.service

@@ -1,4 +1,4 @@
-# Who may sign a AerieOS release (R199): ssh-keygen's allowed signers
+# Who may sign an AerieOS release (R199): ssh-keygen's allowed signers
 # format, one line a key:
 #   builderbot-release namespaces="builderbot-release" ssh-ed25519 AAAA... COMMENT
 # Every update an install takes (the controller's bundle, AerieOS's

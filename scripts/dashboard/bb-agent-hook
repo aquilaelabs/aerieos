@@ -476,7 +476,7 @@ def main(argv):
         if out.strip():
             said.append(out.strip())
         if code == 2:
-            reason = err.strip() or "refused by a AerieOS guard"
+            reason = err.strip() or "refused by an AerieOS guard"
             if proto == "copilot" and event == "pre":
                 print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": reason}))
                 return 0

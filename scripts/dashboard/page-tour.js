@@ -59,7 +59,7 @@ const TOUR_STEPS = {
     {say: "Its sections are its kind's: an agent's facts, your sign-in and what you added to it; a toolchain's path and system packages; a pack's or a service's Configure, saved with Save."},
   ],
   library: [
-    {say: "The Library is everything a AerieOS installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs you add, the apps a NAS runs, and the apps for your own machines."},
+    {say: "The Library is everything an AerieOS installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs you add, the apps a NAS runs, and the apps for your own machines."},
     {at: TOUR_MHEAD, say: "Pick the node here; it holds across the Library, the Emulator, the Phone and the CI runner. Check for updates reads what is newer; Add your own brings in a tool pack or an app of yours, looked at before it is kept."},
     {at: `${TOUR_PANE} .lcard`, say: "Each card says its tier, what is installed and whether a newer one is out, with Install or Update on it; Details opens its own page with the whole description."},
   ],

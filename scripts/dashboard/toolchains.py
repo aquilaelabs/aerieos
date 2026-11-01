@@ -1999,7 +1999,7 @@ def _machine_name(n, action, name, also):
     if row["state"] == "nocard" and action != "remove":
         return "", f"{n['name']} has no NVIDIA card now: its toolkit can only be removed"
     if not row["managed"]:
-        return "", (f"{n['name']} is its owner's machine, not a AerieOS sandbox: the container toolkit "
+        return "", (f"{n['name']} is its owner's machine, not an AerieOS sandbox: the container toolkit "
                     "is installed or removed there, the way NVIDIA's guide does it")
     if (n.get("config") or {}).get("lock"):
         return "", f"{n['name']} is locked to its console: nothing on it is installed from here"
@@ -2020,7 +2020,7 @@ def _driver_name(n, action, pkg):
     if row["state"] == "nocard" and action != "remove":
         return "", f"{n['name']} has no NVIDIA card now: its driver can only be removed"
     if not row["managed"]:
-        return "", (f"{n['name']} is its owner's machine, not a AerieOS sandbox: its driver is "
+        return "", (f"{n['name']} is its owner's machine, not an AerieOS sandbox: its driver is "
                     "installed or removed there, the way its distribution does it")
     if (n.get("config") or {}).get("lock"):
         return "", f"{n['name']} is locked to its console: nothing on it is installed from here"
@@ -2054,7 +2054,7 @@ def node_job(principal, nid, action, names, driver=""):
     if action not in ("install", "remove", "sysdeps", "check"):
         return {"error": f"a node takes install, remove, sysdeps or check, not {action!r}"}
     if action == "sysdeps" and not (n.get("reported") or {}).get("sandbox"):
-        return {"error": f"{n['name']} was not provisioned as a AerieOS sandbox, so its "
+        return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so its "
                          "system packages are its owner's to install; the row names them"}
     # The driver leaves the list for the store's checks and joins it again
     # at the end, since it is the machine's and ends at a restart.

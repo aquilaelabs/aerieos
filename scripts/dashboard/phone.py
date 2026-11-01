@@ -996,7 +996,7 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
         return {"error": f"{project or 'this project'} has no node, so there is no machine "
                          "to run anything on as root: root is asked for on the project's node"}
     if not sandbox:
-        return {"error": f"{node_name or nid} was not provisioned as a AerieOS sandbox, so "
+        return {"error": f"{node_name or nid} was not provisioned as an AerieOS sandbox, so "
                          "root there is its owner's and not something this can ask for"}
     if locked:
         # Said now rather than after somebody pressed Allow: the lock is the

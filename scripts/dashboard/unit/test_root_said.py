@@ -20,7 +20,7 @@ class RootSaid(unittest.TestCase):
         self.assertEqual(phone.root_said(HEAD), HEAD)
 
     def test_a_refusal_without_it_is_left_whole(self):
-        log = "system: root\nrefused: this node was not provisioned as a AerieOS sandbox\n"
+        log = "system: root\nrefused: this node was not provisioned as an AerieOS sandbox\n"
         self.assertEqual(phone.root_said(log), log)
 
 

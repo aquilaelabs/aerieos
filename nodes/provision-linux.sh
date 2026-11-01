@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Turn a fresh Linux machine into a AerieOS node: the Debian, RHEL, Arch and
+# Turn a fresh Linux machine into an AerieOS node: the Debian, RHEL, Arch and
 # SUSE families, Alpine, Void and Gentoo; see "the machine's own tools" below.
 #
 # The sandbox exists so that a Claude session can build, run and destroy
@@ -3143,7 +3143,7 @@ grub_regen() {
 # storage (ZFS, mergerfs, SnapRAID and SMART for the Storage page's pools and
 # array) and shares (Samba and NFS), each installed with exactly its
 # packages and removed with them, their services the machine's own, run by
-# the root agent and never by the controller's account. On a AerieOS
+# the root agent and never by the controller's account. On an AerieOS
 # disk the packages are the image's (pkg says so when one is missing).
 storage_pkgs() {
     case "$1" in

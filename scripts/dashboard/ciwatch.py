@@ -61,7 +61,7 @@ def _file(project):
 
 def read(project):
     """What the last look found, or {} before the first, or when it was
-    made by a AerieOS that judged differently (FORMAT)."""
+    made by an AerieOS that judged differently (FORMAT)."""
     try:
         rec = json.loads(_file(project).read_text())
     except (OSError, ValueError):

@@ -1,7 +1,7 @@
 {
   "name": "builderbot",
   "displayName": "AerieOS",
-  "description": "Open a AerieOS project's files with no share mounted, see a coding agent session's changes as it saves them, and work in any agent's session terminal, as your own AerieOS account.",
+  "description": "Open an AerieOS project's files with no share mounted, see a coding agent session's changes as it saves them, and work in any agent's session terminal, as your own AerieOS account.",
   "version": "0.2.0",
   "publisher": "builderbot",
   "license": "Apache-2.0",

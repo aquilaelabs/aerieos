@@ -1,7 +1,7 @@
 [Unit]
 Description=AerieOS: the configuration put back for the slot a failed update fell back to
 # Before the controller, whose state gate would refuse a configuration the
-# newer slot moved on (B472); only on a AerieOS boot.
+# newer slot moved on (B472); only on an AerieOS boot.
 ConditionKernelCommandLine=bbslot
 DefaultDependencies=yes
 After=local-fs.target

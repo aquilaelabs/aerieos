@@ -1,5 +1,5 @@
 #!/bin/sh
-# In place of apt and apt-get on a AerieOS disk: its packages are the
+# In place of apt and apt-get on an AerieOS disk: its packages are the
 # image's, pinned to a Debian snapshot when it was built, and the root they
 # are in is read-only under a tmpfs, so a package installed here would be
 # gone at the next boot without a word. An update brings the next image

@@ -4005,7 +4005,7 @@ cmd_users() {
             # for an owner who lost their app, their passkeys and their
             # recovery codes. A shell on the controller only, as enroll-token.
             [ -z "${BB_TOKEN:-}${BB_ACCOUNT_UID:-}" ] && ! on_node \
-                || die "aerie users reset-2fa is run in a shell on the controller (docker exec AerieOS aerie users reset-2fa NAME), not from a session"
+                || die "aerie users reset-2fa is run in a shell on the controller (docker exec Aerie-Workshop aerie users reset-2fa NAME), not from a session"
             [ -n "${1:-}" ] || die "which account? aerie users reset-2fa NAME"
             DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/users-verbs.py" reset-2fa "$py" "$1"
             return ;;
@@ -4037,7 +4037,7 @@ cmd_nodes() {
             # session's bb answers for the machine it is on, and minting a
             # node is nothing a session decides (R84).
             [ -z "${BB_TOKEN:-}${BB_ACCOUNT_UID:-}" ] && ! on_node \
-                || die "aerie nodes enroll-token is run in a shell on the controller (docker exec AerieOS aerie nodes enroll-token NAME), not from a session"
+                || die "aerie nodes enroll-token is run in a shell on the controller (docker exec Aerie-Workshop aerie nodes enroll-token NAME), not from a session"
             shift
             DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nodes-verbs.py" enroll-token "$py" "$@" ;;
         -h|--help) echo "aerie nodes            the enrolled machines, each with the agent it runs"
@@ -5253,7 +5253,7 @@ const [exe, auth, w, h, scale, wait, full, mode, dest, trust, resize, settle, dr
   // the terminal is a websocket on the dashboard's own origin now, so a
   // shot of a page with a terminal in it came out with the terminal
   // refused. A cookie goes on the handshake like any other request.
-  // Best-effort: a page that is not a AerieOS dashboard has no /login,
+  // Best-effort: a page that is not an AerieOS dashboard has no /login,
   // and the header above is still what answers for it.
   if (username) {
     for (const origin of mine) {

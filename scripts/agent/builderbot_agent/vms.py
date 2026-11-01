@@ -516,7 +516,7 @@ class VmsMixin:
             job.say(f"refused: {action or 'no action'} is not a VM action (one of {', '.join(ACTIONS)})\n")
             return "failed", 64
         if not DOMAIN_RE.fullmatch(name) and not action.startswith("iso-") and action != "vbios":
-            job.say(f"refused: {name or 'no name'} is not a AerieOS VM's name\n")
+            job.say(f"refused: {name or 'no name'} is not an AerieOS VM's name\n")
             return "failed", 64
         if not shutil.which("virsh") or not os.path.isdir(VM_DIR):
             job.say("refused: this node's VM host feature is not installed (its Features section installs it)\n")
