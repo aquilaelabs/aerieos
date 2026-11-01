@@ -108,6 +108,15 @@ here yet.
 
 ## The stick maker
 
+On Windows, **BuilderBot USB Maker** (`builderbot-usb-maker-VERSION.exe`,
+attached to every release) does it in a window: which release (the newest,
+the newest dev build, one by name, or an image file you have), which stick
+(the removable disks alone), a few settings for the first boot (the dev
+channel, a name, a time zone, a fixed address), and a last page naming the
+stick by model and size, with a box to tick, before it is erased; then the
+progress and the read back. It asks for Administrator once at start, since
+writing a disk needs it, and every step in it is the stick maker's own.
+
 `tools/builderbot-stick.py` writes a release's stick image onto a USB
 stick on Windows, a Mac or Linux with nothing but Python's own library: `list`
 names the removable disks here (the system disk marked, and never written),

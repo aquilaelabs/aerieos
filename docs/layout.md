@@ -391,6 +391,7 @@ config/templates/                briefing.md, assembled per session by preamble.
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
 tools/bb-ref.sh                  writes the bb block of docs/reference.md from bb help; bb lint holds the two equal
 tools/builderbot-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
+tools/builderbot-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step builderbot-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; bb lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; bb lint holds the two equal
 tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; bb lint's --check holds them to it (R169 step 1)

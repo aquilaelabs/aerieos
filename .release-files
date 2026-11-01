@@ -7,6 +7,8 @@ builderbot-controller-@VER@.tar.gz
 builderbot-controller-@VER@.tar.gz.sha256
 builderbot-companion-@VER@.exe
 builderbot-companion-@VER@.exe.sha256
+builderbot-usb-maker-@VER@.exe
+builderbot-usb-maker-@VER@.exe.sha256
 builderbot-companion-@VER@.pyz
 builderbot-companion-@VER@.pyz.sha256
 builderbot-vscode-@VER@.vsix
