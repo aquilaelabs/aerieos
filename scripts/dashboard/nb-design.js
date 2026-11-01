@@ -482,7 +482,7 @@ function nbDesignView({$, nb, project, root}){
   // (presets.roles), falling back to the dashboard's own scheme: the board
   // is painted in the language, and a theme with a "page" and a "surface"
   // is still a page and a surface.
-  const FALLBACK = {bg: "#1a1f26", panel: "#212730", ink: "#e6edf3", line: "#4d5c6f", accent: "#3fb950"};
+  const FALLBACK = {bg: "#10192b", panel: "#172339", ink: "#e7eefa", line: "#44597c", accent: "#35b6ff"};
   function paint(role){
     const t = (nb.dsLang.themes || [])[0];
     const names = presets().roles?.[role] || [role];

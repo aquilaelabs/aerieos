@@ -347,7 +347,7 @@ LOGIN_HTML = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#1a1f26">
+<meta name="theme-color" content="#10192b">
 <title>AerieOS: <!--TITLE--></title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -358,11 +358,11 @@ LOGIN_HTML = """<!doctype html>
      dashboard derives them (index.html :root): the lit fill from the second
      color, the sunk field from the panel. */
   :root{
-    --bg:#1a1f26; --panel:#212730; --line:#4d5c6f; --ink:#e6edf3;
-    --dim:#9fa9b4; --accent:#3fb950; --bad:#f8524a; --note:#58a6ff;
-    --deep:#1a4f8f; --deep:color-mix(in srgb, var(--note), #000000 40%);
-    --deep-edge:#1f6feb; --deep-edge:color-mix(in srgb, var(--note), #000000 14%);
-    --sunk:#1d2229; --sunk:color-mix(in srgb, var(--panel), #000000 12%);
+    --bg:#10192b; --panel:#172339; --line:#44597c; --ink:#e7eefa;
+    --dim:#a6b4cb; --accent:#35b6ff; --bad:#f8524a; --note:#9aa5ff;
+    --deep:#5c6399; --deep:color-mix(in srgb, var(--note), #000000 40%);
+    --deep-edge:#848edb; --deep-edge:color-mix(in srgb, var(--note), #000000 14%);
+    --sunk:#141f32; --sunk:color-mix(in srgb, var(--panel), #000000 12%);
     --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --r:6px;
   }

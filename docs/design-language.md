@@ -12,29 +12,29 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 
 | token | value | for |
 |---|---|---|
-| `--bg` | `#1a1f26` | the page |
-| `--panel` | `#212730` | a raised box: a card, a pane, a modal |
-| `--ink` | `#e6edf3` | the text, and text on a filled accent |
-| `--dim` | `#9fa9b4` | secondary text and field labels |
-| `--line` | `#4d5c6f` | hairlines and borders, 1px |
-| `--accent` | `#3fb950` | the one color that means this is the one: the active tab, the primary button, a link |
+| `--bg` | `#10192b` | the page |
+| `--panel` | `#172339` | a raised box: a card, a pane, a modal |
+| `--ink` | `#e7eefa` | the text, and text on a filled accent |
+| `--dim` | `#a6b4cb` | secondary text and field labels |
+| `--line` | `#44597c` | hairlines and borders, 1px |
+| `--accent` | `#35b6ff` | the one color that means this is the one: the active tab, the primary button, a link |
 | `--warn` | `#d29922` | a warning, the amber marks, and the reason under a control a feature switched off for the install holds dead |
 | `--bad` | `#f07178` | an error, a destructive verb |
-| `--note` | `#58a6ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
+| `--note` | `#9aa5ff` | the second color: a link in words, the chosen view in a group's row, an info note; a hue apart from the accent |
 
 Its light half, the same tokens under the mode switch:
 
 | token | value |
 |---|---|
-| `--bg` | `#f1f4f7` |
-| `--panel` | `#fcfeff` |
-| `--ink` | `#242729` |
-| `--dim` | `#5e646a` |
-| `--line` | `#c9d2dd` |
-| `--accent` | `#007c05` |
+| `--bg` | `#eef3fb` |
+| `--panel` | `#fbfdff` |
+| `--ink` | `#1d2633` |
+| `--dim` | `#566275` |
+| `--line` | `#c4d2e6` |
+| `--accent` | `#0a6ab8` |
 | `--warn` | `#996200` |
 | `--bad` | `#c3131b` |
-| `--note` | `#0069e0` |
+| `--note` | `#4d58d0` |
 
 ### Abyss (dark)
 
@@ -1690,7 +1690,7 @@ Notes:
 
 Platform: an Android app: Material's shapes and elevation, 48dp touch targets, the app's sections as a bottom bar, and the system's back gesture respected.
 Layout of the app: projects on a phone frame (6 columns by 12 rows), from the Mobile app template, numbered in drawing order (a later block draws over an earlier one where they overlap):
-  1. Header (the band at the top): the mark, the account, the build and the host, and Refresh; with two BuilderBots, the title switches between them, across the top, row 1 of 12
+  1. Header (the band at the top): the mark, the account, the build and the host, and Refresh; with two AerieOS installs, the title switches between them, across the top, row 1 of 12
   2. Card (a box holding one thing): the bell's row: questions waiting and nodes that need attention, a bar down its side, across the middle, rows 2 to 3 of 12
   3. Card (a box holding one thing): the doctor's problems, for an administrator, only when there are any, across the middle, row 4 of 12
   4. Search (a search box): a box to find a project in, once the list is longer than a screen, across the middle, row 5 of 12
@@ -1742,7 +1742,7 @@ Layout of the app: more on a phone frame (6 columns by 12 rows), from the Mobile
   3. List (rows of like things): the other pages as rows: Profile, Tools, Jobs, Users, What's new, across the middle, rows 4 to 6 of 12
   4. Form (fields a person fills in): The watch: questions, Tell me when Claude can take a message, how often to ask; one Save, across the middle, rows 7 to 9 of 12
   5. Form (fields a person fills in): Lock: Lock the app when it opens, refused with a sentence where the phone has no screen lock, across the middle, row 6 of 12
-  6. List (rows of like things): BuilderBots: each pairing by name, the one in front ticked; Add another, and Forget, across the middle, row 7 of 12
+  6. List (rows of like things): AerieOS installs: each pairing by name, the one in front ticked; Add another, and Forget, across the middle, row 7 of 12
   7. List (rows of like things): Colors: the twelve schemes, each drawn in its own; About; Sign out, across the middle, rows 10 to 11 of 12
   8. Navigation (the way around: tabs or a menu): the bottom bar: Projects, Approvals, Nodes (an administrator), More, across the bottom, row 12 of 12
 Notes:

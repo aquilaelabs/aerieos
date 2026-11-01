@@ -2,7 +2,7 @@
   <!-- AerieOS's mark: a raptor with its wings swept back, which is also the letter A. Fixed greens rather
        than currentColor, because a browser tab has no text color to inherit. The favicon assets are
        generated from this file with the graphics tool's favicon verb. -->
-  <path d="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z" fill="#3fb950"/>
-  <path d="M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z" fill="#1f8a3a"/>
-  <path d="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z" fill="#8fe39a"/>
+  <path d="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z" fill="#35b6ff"/>
+  <path d="M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z" fill="#1c6fd1"/>
+  <path d="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z" fill="#9fdcff"/>
 </svg>
