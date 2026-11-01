@@ -37,6 +37,7 @@ import lzma
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -161,6 +162,7 @@ def release_image(tag, channel="normal"):
     fetch(base + ".sha256", name + ".sha256", say_progress=False)
     check_sha(name, name + ".sha256")
     attested(name)
+    signed(tag, name)
     return name
 
 
@@ -213,6 +215,70 @@ def check_sha(path, sha_file):
     if h.hexdigest() != want:
         die(f"{path} does not match its sha256 ({h.hexdigest()[:12]} against {want[:12] or 'none'}): not written")
     say(f"{os.path.basename(path)}: sha256 matches")
+
+
+# ---- the release's signature (R199) ------------------------------------------------
+# The keys that may sign a release, as config/release-signers holds them (a
+# lint keeps the two the same). A release's SHA256SUMS signed by one of them
+# is what says the image is BuilderBot's own: the sha256 beside it is the
+# release's word for itself, and the attestation proves only which workflow
+# built it, which whoever changes the repository could run.
+RELEASE_SIGNERS = """
+"""
+SIG_NS = "builderbot-release"
+
+
+def signers():
+    return [ln for ln in RELEASE_SIGNERS.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+
+
+def tag_of(path):
+    """The release an image file names (builderbot-os-0.9.0-dev.4724.stick.raw.xz), or ""."""
+    m = re.match(r"builderbot-os-(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.", os.path.basename(path))
+    return f"v{m.group(1)}" if m else ""
+
+
+def signed(tag, path):
+    """The image is in its release's SHA256SUMS, signed by a release key;
+    stops when it is not. Said and passed over only while this tool holds no
+    key at all."""
+    keys = signers()
+    if not keys:
+        say("no release key is set in this tool yet, so the release's signature is not checked")
+        return
+    if not tag:
+        die(f"{os.path.basename(path)} does not name its release, so its signature cannot be checked: use the release's own file name")
+    tool = shutil.which("ssh-keygen")
+    if not tool:
+        die("ssh-keygen is not here to check the release's signature: install OpenSSH (on Windows: Settings, Optional features, OpenSSH Client)")
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        base = f"{RELEASES}/download/{tag}"
+        try:
+            fetch(f"{base}/SHA256SUMS", os.path.join(d, "SHA256SUMS"), say_progress=False)
+            fetch(f"{base}/SHA256SUMS.sig", os.path.join(d, "SHA256SUMS.sig"), say_progress=False)
+        except OSError as e:
+            die(f"the {tag} release carries no signature ({e}): it has not been signed yet, so it is not written")
+        with open(os.path.join(d, "signers"), "w", encoding="utf-8") as f:
+            f.write("\n".join(keys) + "\n")
+        with open(os.path.join(d, "SHA256SUMS"), "rb") as sums:
+            r = subprocess.run([tool, "-Y", "verify", "-f", os.path.join(d, "signers"), "-I", SIG_NS, "-n", SIG_NS,
+                                "-s", os.path.join(d, "SHA256SUMS.sig")], stdin=sums, capture_output=True, text=True, check=False)
+        if r.returncode != 0:
+            die(f"the {tag} release's signature does not verify against BuilderBot's release key: not written")
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(CHUNK), b""):
+                h.update(chunk)
+        listed = {}
+        with open(os.path.join(d, "SHA256SUMS"), encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    listed[parts[1].lstrip("*")] = parts[0].lower()
+        if listed.get(os.path.basename(path)) != h.hexdigest():
+            die(f"{os.path.basename(path)} is not the file the {tag} release signed: not written")
+    say(f"{os.path.basename(path)}: signed by BuilderBot's release key")
 
 
 # ---- the stick's builderbot.env --------------------------------------------------
@@ -422,6 +488,7 @@ def cmd_write(a):
         else:
             say(f"no {os.path.basename(image)}.sha256 beside it: its sha256 is not checked")
         attested(image)
+        signed(tag_of(image), image)
     if not image.endswith(".xz"):
         die("the image is the release's builderbot-os-VERSION.stick.raw.xz (or .raw.xz)")
     # The disk asked about again after the download: one replugged meanwhile

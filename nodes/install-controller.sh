@@ -753,6 +753,26 @@ fetch_tree() {
         else
             printf '   build attestation: gh is not here to check it; the sha256 is what held\n' >&2
         fi
+        # ...and signed by a release key this install already holds (R199):
+        # this tree's config/release-signers, never the download's, so who
+        # changes the repository can build and attest a bundle, not sign it.
+        local signers keys
+        signers="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/config/release-signers"
+        keys="$(grep -v '^[[:space:]]*#' "$signers" 2>/dev/null | grep -c . || true)"
+        if [ "${keys:-0}" -gt 0 ]; then
+            command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
+            local rel="https://github.com/${REPO}/releases/download/${tag}"
+            if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig"; then
+                die "${tag} carries no signature yet: it is taken once its key's holder has signed it"
+            fi
+            ssh-keygen -Y verify -f "$signers" -I builderbot-release -n builderbot-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
+                || die "${tag}'s signature does not verify against this install's release key: not taken"
+            grep -q "^${sum}  \*\?builderbot-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
+                || die "the bundle is not the one ${tag} signed: not taken"
+            printf '   signed by BuilderBot'"'"'s release key\n' >&2
+        else
+            printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
+        fi
     elif [ "$http" = 404 ] && [ "$(printf '%s\n%s\n' "${ver%%-*}" 0.9.0 | sort -V | head -1)" != 0.9.0 ]; then
         # Only a release from before the bundle, said not to have one, falls
         # back to its source archive: any other failure to fetch the bundle

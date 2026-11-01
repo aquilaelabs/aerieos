@@ -12,6 +12,7 @@
 - bb version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
 - bb version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
 - A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
+- A release can be signed with an offline release key (tools/release-sign.py): BuilderBot OS's updater, the stick maker and the installer refuse a release the install's own config/release-signers does not verify, so a change to the repository or its CI cannot hand an install an update (7f98d53)
 
 ### Changed
 

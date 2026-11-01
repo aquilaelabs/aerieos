@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import urllib.request
 
 RELEASE_FILE = "/usr/lib/builderbot-os/release"
@@ -36,6 +37,40 @@ REPO = "aquilaelabs/builderbot"
 # built with, with no network.
 ATTEST_URL = "https://api.github.com/repos/{repo}/attestations/sha256:{digest}"
 TRUSTED_ROOT = "/usr/lib/builderbot-os/trusted-root.jsonl"
+# Who may sign a release (R199): the running controller's own copy of
+# config/release-signers, so a key is trusted because this install already
+# held it, never because the release names it.
+SIGNERS = "/opt/builderbot/config/release-signers"
+SIG_NS = "builderbot-release"
+
+
+def signers():
+    try:
+        with open(_env("BB_RELEASE_SIGNERS", SIGNERS), encoding="utf-8") as f:
+            return [ln.strip() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+    except OSError:
+        return []
+
+
+def sums_verify(sums, sig, keys, run=subprocess.run):
+    """{file: sha256} of a SHA256SUMS whose signature verifies against
+    `keys`, or None."""
+    with tempfile.TemporaryDirectory() as d:
+        allowed = os.path.join(d, "signers")
+        with open(allowed, "w", encoding="utf-8") as f:
+            f.write("\n".join(keys) + "\n")
+        with open(sums, "rb") as fh:
+            r = run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", SIG_NS, "-n", SIG_NS, "-s", sig],
+                    stdin=fh, capture_output=True, check=False)
+    if r.returncode != 0:
+        return None
+    out = {}
+    with open(sums, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
+                out[parts[1].lstrip("*")] = parts[0].lower()
+    return out
 # Each piece of a slot, and where image/build.sh puts it on the ISO.
 PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
           "initrd": "live/initrd", "release": "live/release"}
@@ -377,6 +412,32 @@ class OsImageMixin:
         # step 1).
         if not self._attested(job, iso, have, name, src, work):
             return "failed", 68
+        # ...and signed by a release key this install already holds (R199):
+        # who changes the repository can build and attest, not sign.
+        keys = signers()
+        if keys:
+            sums, sig = os.path.join(work, "SHA256SUMS"), os.path.join(work, "SHA256SUMS.sig")
+            try:
+                if src:
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
+                else:
+                    rel = f"{_env('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
+                    _fetch(f"{rel}/SHA256SUMS", sums, say)
+                    _fetch(f"{rel}/SHA256SUMS.sig", sig, say)
+            except OSError as e:
+                say(f"the release carries no signature yet ({e}): it is taken once its key's holder has signed it; nothing written\n")
+                return "failed", 69
+            listed = sums_verify(sums, sig, keys)
+            if listed is None:
+                say("the release's signature does not verify against this install's release key: nothing written\n")
+                return "failed", 69
+            if listed.get(fn) != have:
+                say(f"{fn} is not the image the release signed: nothing written\n")
+                return "failed", 69
+            say(f"{fn} is signed by BuilderBot's release key\n")
+        else:
+            say("this install holds no release key yet, so the release's signature is not checked\n")
         job.step("reading the image")
         files = self._iso_pieces(job, iso, work)
         if not files:

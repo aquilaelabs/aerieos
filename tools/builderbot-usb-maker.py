@@ -268,6 +268,7 @@ class Maker(tk.Tk):
                 if os.path.isfile(image + ".sha256"):
                     stick.check_sha(image, image + ".sha256")
                 stick.attested(image)
+                stick.signed(stick.tag_of(image), image)
             else:
                 image = stick.release_image(self.choice["tag"].get().strip() if src == "tag" else "latest", "dev" if src == "dev" else "normal")
             d = self.choice["disk"]

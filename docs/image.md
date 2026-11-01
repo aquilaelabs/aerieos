@@ -352,6 +352,23 @@ built with, so a folder on a share others can write cannot hand over an
 image BuilderBot's release workflow did not build. A release's attestation
 is read from GitHub's public API, and neither way asks for a sign-in.
 
+**The release key.** The sha256 and the attestation prove a file is the one
+BuilderBot's release workflow built, which is not enough when the workflow
+or the repository itself is changed by someone else: they would build and
+attest a release of their own. So a release also carries `SHA256SUMS` and
+`SHA256SUMS.sig`, the list of its files' sha256 signed with an Ed25519 key
+that lives offline on the release key holder's own machine
+(`tools/release-sign.py sign TAG`), never in CI, the repository or a
+controller. The keys a signature must verify against are the install's own
+copy of `config/release-signers`, read from the image it is running, never
+from the release: an update that no key this install already held signed
+is refused, by the OS updater, the stick maker (`write` checks the image it
+fetched against the list) and the installer alike. Each checks with
+OpenSSH's `ssh-keygen -Y verify`. While `config/release-signers` holds no
+key the check is skipped and said so, which is how a build before the first
+key behaves; once it holds one, an unsigned release is refused. The key's
+fingerprint is published on builderbot.dev to check the file against.
+
 **On trial.** The slot an update wrote boots on trial: GRUB counts each
 boot of it in its environment, and the health check
 (`builderbot-os-health.service`) marks it good once the controller's health
