@@ -3359,6 +3359,77 @@ def node_storage_array(principal, node_id, req):
     return r
 
 
+ADOPT_ACTIONS = ("dry", "adopt", "release")
+ADOPT_FS = ("xfs", "btrfs", "zfs")
+
+
+def _adopt_want(req):
+    """The disks and pools to adopt, as the request names them, each field
+    checked for its shape; the agent checks each against the machine again.
+    ({...}, "") or (None, why)."""
+    w = req.get("want") if isinstance(req.get("want"), dict) else {}
+    ok_id = lambda v: isinstance(v, str) and 0 < len(v) <= 120 and re.fullmatch(r"[A-Za-z0-9._:+\-]+", v)    # noqa: E731
+    data, parity, pools = [], [], []
+    for x in w.get("data") or []:
+        if not isinstance(x, dict) or not re.fullmatch(r"disk[1-9][0-9]?", str(x.get("slot") or "")) or not ok_id(x.get("id")) \
+                or str(x.get("fs") or "") not in ADOPT_FS:
+            return None, "a data disk is {slot: disk1 to disk99, id: its model and serial, fs: xfs, btrfs or zfs}"
+        data.append({"slot": x["slot"], "id": x["id"], "fs": x["fs"]})
+    for x in w.get("parity") or []:
+        if not isinstance(x, dict) or not ok_id(x.get("id")):
+            return None, "a parity disk is {slot, id: its model and serial}"
+        parity.append({"slot": str(x.get("slot") or "parity")[:16], "id": x["id"]})
+    for x in w.get("pools") or []:
+        if not isinstance(x, dict) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", str(x.get("name") or "")) \
+                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))):
+            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid}"
+        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or "")})
+    if len(data) > 30 or len(parity) > 2 or len(pools) > 8 or not (data or pools):
+        return None, "name the data disks and pools to adopt (at most 30 disks, 2 parity, 8 pools)"
+    return {"data": data, "parity": parity, "pools": pools, "writable": w.get("writable") is True,
+            "from": str(w.get("from") or "adopted")[:16]}, ""
+
+
+def node_storage_adopt(principal, node_id, req):
+    """Another NAS's array and pools taken as they are on the controller's
+    own machine (R163 step 8): a dry run that says every mount, the
+    adoption itself (data disks read-only unless writable is asked, parity
+    never touched, pools writable, the old paths kept), or Release, which
+    unmounts and forgets them; a system job on its node, nothing formatted
+    or partitioned anywhere in it."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    if not own_machine(n):
+        return {"error": "disks are adopted on the controller's own machine (the installed edition's Storage page)"}
+    rep = n.get("reported") or {}
+    if n.get("kind") != "agent" or not rep.get("administers"):
+        return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot mount disks"}
+    action = str(req.get("adopt") or "")
+    if action not in ADOPT_ACTIONS:
+        return {"error": f"an adopt action is one of {', '.join(ADOPT_ACTIONS)}"}
+    cfg = {"adopt": action}
+    if action != "release":
+        want, why = _adopt_want(req)
+        if why:
+            return {"error": why}
+        cfg["want"] = want
+    elif not (rep.get("adopted") or {}).get("mounts") and not (rep.get("adopted") or {}).get("merged"):
+        return {"error": "nothing is adopted on the machine"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-adopt", "config": cfg, "timeout": 600})
+    if r.get("ok"):
+        audit(principal, "storage-adopt", node_id, {"job": r["job"], "adopt": action,
+                                                    "writable": (cfg.get("want") or {}).get("writable") is True})
+    return r
+
+
 pool_keys_offer = pool_keys_forget = None
 
 
@@ -6883,6 +6954,7 @@ def verb(principal, req):
              "storage-pool": lambda: node_storage_pool(principal, nid, req),
              "storage-snapshot": lambda: node_storage_snapshot(principal, nid, req),
              "storage-array": lambda: node_storage_array(principal, nid, req),
+             "storage-adopt": lambda: node_storage_adopt(principal, nid, req),
              "storage-backup": lambda: node_storage_backup(principal, nid, field(req, "name")),
              "storage-key": lambda: node_storage_key(principal, nid, req),
              "host-update": lambda: node_host_update(principal, nid, req.get("reboot") is True),

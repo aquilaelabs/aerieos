@@ -33,6 +33,7 @@ from .osimage import OsImageMixin
 from .shares import SharesMixin
 from .pools import PoolsMixin
 from .array import ArrayMixin
+from .adopt import AdoptMixin
 from .power import PowerMixin
 from .extmounts import ExtMountsMixin
 from .backups import BackupsMixin
@@ -76,7 +77,7 @@ def follow(state, url="", expect=""):
     return True, ""
 
 
-class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
+class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
             TokensMixin, ScanMixin):
     def __init__(self, state):
         self.state = state
@@ -720,6 +721,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             timed("firewall_check", self.session_firewall_check)
             timed("account_users", self.account_users_pass)
             timed("array", self.array_pass)
+            timed("adopted", self.adopt_pass)
             timed("ext_mounts", self.ext_mounts_pass)
             timed("spindown", self.spindown_pass)
             timed("tokens", self.token_pass)
