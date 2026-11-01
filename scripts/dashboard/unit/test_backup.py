@@ -33,7 +33,7 @@ class Backup(unittest.TestCase):
         (self.state / "logs" / "old.log").write_text("not copied")
         self.password = "correct horse battery"
         move.configure(state=self.state, workspace=self.tmp / "ws", secrets_dir="", write_json_fn=write_json,
-                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 16, build_version_fn=lambda: "0.9.0",
+                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 19, build_version_fn=lambda: "0.9.0",
                        install_key_fn=lambda: b"", store_paths_fn=lambda: {}, page_url_fn=lambda: "", node_ids_fn=lambda: [], bare_metal_fn=lambda: True)
         self.configure(self.state)
 
@@ -41,7 +41,7 @@ class Backup(unittest.TestCase):
         backup.configure(state=state, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
                          password_fn=lambda: self.password if password is None else password,
                          dirs_fn=lambda: [str(self.tmp / "mnt" / "tank").replace(str(self.tmp), "", 1) and "/mnt/tank"],
-                         version_fn=lambda: "0.9.0", state_version_fn=lambda: 16, write_json_fn=write_json, host_fn=lambda: "nas")
+                         version_fn=lambda: "0.9.0", state_version_fn=lambda: 19, write_json_fn=write_json, host_fn=lambda: "nas")
         # The pool's folder is under /mnt in life; here it is the temp dir's, so where() is told by hand.
         backup.where = lambda: [state / "backup", self.pool / ".builderbot" / "backup"]
 
@@ -78,13 +78,13 @@ class Backup(unittest.TestCase):
         fresh = self.tmp / "fresh" / "config"
         fresh.mkdir(parents=True)
         (fresh / "nothing.json").write_text("{}")
-        r = backup.restore(found[0]["path"], "wrong password", state_dir=fresh, workspace_dir=self.tmp / "ws2", build_state_version=16)
+        r = backup.restore(found[0]["path"], "wrong password", state_dir=fresh, workspace_dir=self.tmp / "ws2", build_state_version=19)
         self.assertIn("did not open under that password", r.get("error", ""))
-        r = backup.restore(found[0]["path"], self.password, state_dir=fresh, workspace_dir=self.tmp / "ws2", build_state_version=16)
+        r = backup.restore(found[0]["path"], self.password, state_dir=fresh, workspace_dir=self.tmp / "ws2", build_state_version=19)
         self.assertTrue(r.get("ok"), r)
         self.assertIn('"ann"', (fresh / "users.json").read_text())
         self.assertFalse((fresh / "logs" / "old.log").exists())
-        r = backup.restore(found[0]["path"], self.password, state_dir=fresh, build_state_version=15)
+        r = backup.restore(found[0]["path"], self.password, state_dir=fresh, build_state_version=18)
         self.assertIn("never lands on an older build", r.get("error", ""))
         # A move bundle is not a backup, and a backup takes no move token.
         self.assertIn("password, not a move token", move.restore(found[0]["path"], "tok", state_dir=fresh).get("error", ""))

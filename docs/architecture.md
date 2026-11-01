@@ -11,7 +11,7 @@ explained. Everything below is one of seven things.
    |  the notebook: roadmap, bugs, rules,  |  --->  |  jobs: build, test, emu,  |
    |    tests, memory, changelog           |  hello |    compose, tell, update  |
    |  the store: /config (SQLite + JSON)   |  work  |  sessions: bb-session,    |
-   |  the relay: a session's bb verbs      |  result|    bb-tty, tmux, agents   |
+   |  the relay: a session's aerie verbs      |  result|    bb-tty, tmux, agents   |
    |  the asks: root, phone, container,    |        |  the toolchain store      |
    |    rebuild, on the bell               |        |  docker, the emulator,    |
    +---------------------------------------+        |    a phone, an X display  |
@@ -101,7 +101,7 @@ Deny, and the session waits on the answer through the same verb
 ## Where the rest is
 
 - `README.md`: the front page; `docs/README.md` the index of the docs.
-- `docs/reference.md`: the configuration reference, the bb reference
+- `docs/reference.md`: the configuration reference, the aerie reference
   (written from `aerie help` by `tools/bb-ref.sh`), and Android signing.
 - `docs/decisions.md`: the design decisions with their dates and reasons.
 - `docs/layout.md`: every file, held to the tree by `aerie lint`.

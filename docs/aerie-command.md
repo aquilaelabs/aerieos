@@ -102,7 +102,7 @@ tone HZ [--ms N] [--to HZ]` is a plain beep or sweep. Each lands in
 `dist/sound/` as OGG, made by the ffmpeg toolchain, with a waveform and a
 spectrogram beside it, since a session cannot listen to what it made; with no
 ffmpeg on the node it is a WAV and no pictures, and says so. It is a verb of
-bb's rather than a toolchain of its own because there is nothing to fetch.
+aerie's rather than a toolchain of its own because there is nothing to fetch.
 Speech is the **audio** toolchain's, which is a download (about 800 MB):
 `aerie tool sound say "TEXT"` is piper with one English voice, a WAV ready for
 an app's microphone, and `aerie tool sound hear FILE` is faster-whisper's

@@ -438,7 +438,7 @@ card; Remove is on the Installed page's row. A recipe that gives a session
 commands says under which name: they live under `aerie tool NAME` (`aerie tool
 graphics`, `aerie tool diagrams`), one name per recipe, so the card says what
 installing it adds, two toolchains may both have a `render`, and none can
-shadow a verb of bb's own; the suite holds the catalog to the script. A
+shadow a verb of aerie's own; the suite holds the catalog to the script. A
 coding agent (Claude Code, Codex CLI, Copilot CLI, Grok Build) is a kind of
 its own on both pages, installed, updated and removed through its own verb
 (`POST /api/agents`), never as a toolchain. Each toolchain's row also

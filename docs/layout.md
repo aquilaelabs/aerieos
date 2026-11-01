@@ -42,20 +42,20 @@ scripts/
   bb                             what an older agent calls in the bundle until it updates; no PATH carries it
   as-builder                     privilege-dropping wrapper for docker exec
   lib/common.sh                  shared shell helpers
-  lib/host-env.sh                the image's ENV, the release's stamp and the env file, for a bare-metal install's service and its bb (R90)
+  lib/host-env.sh                the image's ENV, the release's stamp and the env file, for a bare-metal install's service and its aerie (R90)
   lib/boot.sh                    the boot's steps both installs take: secrets shield, ssh-agent, home seed, hooks, state gate (R90)
   lib/controller-packages.sh     the controller's package list read one way, for the Dockerfile and a bare-metal install (R90)
   lib/relay-verbs                the aerie verbs a node relays to the controller (aerie and bbrelay.py both read it)
-  lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by bb
-  lib/preflight.sh               `aerie tests preflight`, sourced by bb
-  lib/bbapi.py                   the controller's API from bb: one client, the loopback or BB_CONTROLLER, pinned https
+  lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by aerie
+  lib/preflight.sh               `aerie tests preflight`, sourced by aerie
+  lib/bbapi.py                   the controller's API from aerie: one client, the loopback or BB_CONTROLLER, pinned https
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
   lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
   lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
-  lib/sdkmeta.py                 reads config/toolchains.json for bb, with the tool packs beside it: fields, argv, versions
+  lib/sdkmeta.py                 reads config/toolchains.json for aerie, with the tool packs beside it: fields, argv, versions
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log

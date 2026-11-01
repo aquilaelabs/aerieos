@@ -104,7 +104,7 @@ node in its settings and its containers, builds, tests, CI and
 emulation all go there, so three projects on three VMs stay apart and three
 projects on one VM share it. **Its sessions too** (roadmap #24,
 docs/nodes.md §19): a node provisioned with a session account runs its
-terminals in the agent's screen relay, each a pty running bb-tty from the bb
+terminals in the agent's screen relay, each a pty running bb-tty from the aerie
 the controller ships, so a session on a project bound to it works *on* that machine, with its
 toolchains, in the copy of the project its agent keeps at `/workspace` in
 step with this container's (a synced copy, the one way a node holds its
@@ -781,7 +781,7 @@ bell too, with its log.
 The scripts are kept in the controller's state and never on the share, and
 are a person's alone: the page is its own area of a role (Schedules), which
 administrators hold and no other role is given unless somebody says so, and
-a session's token is refused at it whatever it asks; bb has no verb for
+a session's token is refused at it whatever it asks; aerie has no verb for
 schedules, and a schedule's runs are not among the jobs a session reads.
 
 The static analysis scan is not a schedule here since 0.9.0: it is the

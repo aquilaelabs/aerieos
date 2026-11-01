@@ -268,7 +268,7 @@ wrong for this particular machine:
   web UI you open point at it, so a lease that moves breaks both. Set it
   static, or reserve it on the router against the MAC in the domain XML.
 
-Use `aerie` as the username so it matches `--user bb` below, and take the normal
+Use `bb` as the username so it matches `--user bb` below, and take the normal
 Ubuntu Server rather than *minimized*: minimized strips editors and man
 pages, and this is a box you will eventually log into to work something out.
 

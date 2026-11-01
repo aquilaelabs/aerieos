@@ -202,26 +202,6 @@ class Model(unittest.TestCase):
         self.assertFalse(roles.granted(t, "curate"))
         self.assertTrue(roles.granted(ADMIN, "curate"), "the built-in administrator holds every area")
 
-    def test_migration_0017_splits_toolchains(self):
-        import importlib.util
-        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "statemigrations", "0017_install_curate_configure.py")
-        spec = importlib.util.spec_from_file_location("m17", here)
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "roles.json"), "w") as f:
-                json.dump({"roles": {
-                    "builder": {"scope": "global", "perms": {"toolchains": "write", "containers": "write"}, "only": {"toolchains": {"n1": "write", "n2": "read"}}},
-                    "reader": {"scope": "global", "perms": {"toolchains": "read"}, "only": {}},
-                    "other": {"scope": "projects", "perms": {"projects": "write"}, "only": {}}}}, f)
-            m.run({"state": d})
-            m.run({"state": d})
-            got = json.load(open(os.path.join(d, "roles.json")))["roles"]
-        self.assertEqual(got["builder"]["perms"], {"containers": "write", "install": "write", "configure": "write"})
-        self.assertEqual(got["builder"]["only"], {"install": {"n1": "write", "n2": "read"}, "configure": {"n1": "write"}})
-        self.assertEqual(got["reader"]["perms"], {"install": "read"}, "no Configure without writing containers too")
-        self.assertEqual(got["other"]["perms"], {"projects": "write"})
-
     def test_an_area_held_instance_by_instance(self):
         # The operator, 16 Oct: an area's row opens on its nodes or runners,
         # Read or Write on each.

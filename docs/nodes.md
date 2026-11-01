@@ -702,20 +702,20 @@ controller is.
   removed on one side goes on the other; a conversation is never removed
   across. Before this, moving a node over left the link pointing at
   nothing and its sessions saved no conversation at all.
-- **bb waits for the copy** where the controller acts on its own copy for a
+- **aerie waits for the copy** where the controller acts on its own copy for a
   session (R163): a relayed `aerie git`, `aerie version` or `aerie changelog`, `aerie
   sign`, and `aerie version release --edit --attach`. Before, until a tick of
   the agent that began after the command saw nothing left to send; after a
   relayed verb, until this copy has caught up to the revision the controller
   reached, which is also how a fetch's bundle in `.git/bb-relay/` arrives
   before it is unbundled. The agent keeps each project's state in
-  `.git/.bbsync-state` (or `.bbsync-state` without git) for bb to read
+  `.git/.bbsync-state` (or `.bbsync-state` without git) for aerie to read
   (`lib/syncwait.py`); sync leaves the file alone.
 - **The only way** (R163 step 6, 10 Oct). A node enrolls holding a synced
   copy, and nothing mounts the projects share on a node any more: the
   enroll dialog's choice, Move to a synced copy as a move off the share,
   the share reasons on the session gate (not mounted, refused by the
-  export, read-only), the agent's mount watcher and bb's NFS workarounds
+  export, read-only), the agent's mount watcher and aerie's NFS workarounds
   (re-reading files after a relayed verb, running a build again after an
   NFS lock) are gone. A desired mount at `/workspace` is refused on the
   Storage section and by bb-sandbox, since it would cover the copy; the
@@ -907,7 +907,7 @@ command, sha256), and deletes the workspace; a failed job keeps it and
 replaces the previous kept failure of that project. The census reports the
 cache store's size and *Clear cache* on the row is a `cache-clear` job. A
 toolchain install on a node is a `toolchain` job: the agent fetches the
-bundle (bb, its library, the catalog) by digest into the toolchain store
+bundle (aerie, its library, the catalog) by digest into the toolchain store
 and runs `aerie toolchains install` from it with `SDK_ROOT` at the store, gated on the
 store's headroom when this controller has measured the toolchain before; the
 Installed page shows what the node's census says it has. Not
@@ -1052,7 +1052,7 @@ the pieces stack:
    boot before a crash to read; a fresh VPS keeps its journal in memory.
 2. *Make it hosting only*, ticked in the Enroll dialog or later on its page
    (`nodes.host_only`): no project may list it, so no code, synced copy or
-   session goes there, and its hello hands it no bb bundle, no session
+   session goes there, and its hello hands it no aerie bundle, no session
    tokens and no FTP; the agent stops its session half and runs no sync. At
    the agent door (`Handler._agent`, `nodes.host_refuses`) it may say hello,
    beat, take work, report its own jobs' logs and results, update its agent,
@@ -2337,7 +2337,7 @@ above, in order:
    narrowed to *jobs*: a job's workspace is still a snapshot and never a
    mount; a session's tree is the mount, because it edits one tree for
    hours. Path parity does the rest: `/workspace/<project>` means the same
-   directory on both sides, which is what lets bb's relayed verbs run on the
+   directory on both sides, which is what lets aerie's relayed verbs run on the
    controller in the tree the session is in. *Since replaced* (R162, R163,
    9-10 Oct): the node holds a synced copy at `/workspace` and mounts
    nothing there; path parity still holds, and relayed verbs wait for the
@@ -2371,7 +2371,7 @@ above, in order:
 4. **The terminal is the same bb-tty, on the node.** The agent's screen
    relay, on the node's LAN address at port 7684, opens a pty for each
    terminal the controller carries to it (writable, the read-only twin, or a
-   container's shell as the docker account), running bb-tty from the bb
+   container's shell as the docker account), running bb-tty from the aerie
    bundle the controller ships (refetched when the bundle's digest moves in
    hello). The controller's `/termws` carries the browser's socket there
    instead of to a pty of its own (phase 10b), signed with the node's screen
@@ -2384,12 +2384,12 @@ above, in order:
    open it, a writable terminal is for an account with a shell). No answer,
    no terminal (B166). The tmux server is the node's; a dropped browser
    detaches.
-5. **bb's notebook verbs are relayed**: `POST /api/v1/bb` with the session's
+5. **aerie's notebook verbs are relayed**: `POST /api/v1/bb` with the session's
    token carries the words (`roadmap add …`, `bug show 3`, `version --file`),
-   the controller runs its own bb in that project's tree and returns what it
+   the controller runs its own aerie in that project's tree and returns what it
    printed. One implementation of every verb, kept where the state is;
    the verbs that relay are one list in `scripts/lib/relay-verbs`, read by
-   bb on the node and by the server, and a test holds both to it. `toolchains`, `emu`, `run`, `build`, `test` are NOT
+   aerie on the node and by the server, and a test holds both to it. `toolchains`, `emu`, `run`, `build`, `test` are NOT
    relayed; they answer for the machine the session is on, which is the
    point. The token's scope is the project; a session's credential is the
    same scoped token it has always had (bug #16), now with a hop.
@@ -2519,7 +2519,7 @@ through the controller (`aerie git push|fetch|pull`, relayed, with the keys
 the controller already shields: the shape shelved #15 wanted, arrived at
 from the other side). The controller never runs that git in the shared
 tree, whose hooks and config a session can write: it works in a repository
-of its own that borrows the tree's objects, and the node's bb brings the
+of its own that borrows the tree's objects, and the node's aerie brings the
 result into the tree as the session (scripts/dashboard/gitrelay.py). A
 project's SSH deploy key is one of these: made or pasted in the project's
 settings beside its git access token (the operator, 12 Oct), kept where its
