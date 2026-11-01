@@ -389,6 +389,27 @@ def follow_remove(jid, forgot=False, allowed=False):
           + (": its daemon did not answer, so the row is gone and whatever ran there still runs" if forgot
              else "; its env and data stay for a remake"))
 
+def _warn_of_routes(proj, auth):
+    """A remove leaves its node's nginx as it is, so a route to this container
+    goes on pointing at a port nothing answers (report #130). Said first, since
+    the row that knows it is gone afterwards. A listing that does not answer
+    costs the warning, never the remove."""
+    name = os.environ.get("BB_DEV_CONTAINER") or os.environ.get("BB_DEV_INSTANCE") or ""
+    try:
+        d = bbapi.call("/api/docker?project=" + urllib.parse.quote(proj), auth=auth, timeout=30)
+    except (OSError, SystemExit, ValueError):
+        return
+    rows = (d.get("instances") or []) if isinstance(d, dict) else []
+    mine = [i for i in rows if i.get("owner") == proj and (i.get("name") == name or (not name and i.get("project") == proj))]
+    for i in mine[:1]:
+        routes = (i.get("route") or {}).get("routes") or []
+        if routes:
+            on = f" on {i['node_name']}" if i.get("node_name") else ""
+            print(f"[builderbot] warning: nginx{on} routes {', '.join(r.get('where', '') for r in routes)} to this "
+                  "container. Removing it leaves those routes in place, and they fail until something publishes "
+                  "the port again or they are taken off that node's nginx page", file=sys.stderr)
+
+
 def edit():
     proj, auth = os.environ["BB_DEV_PROJECT"], os.environ["BB_DEV_AUTH"]
     verb, setting = os.environ["BB_DEV_VERB"], os.environ.get("BB_DEV_SET") == "1"
@@ -408,6 +429,8 @@ def edit():
             print("[builderbot] nothing is stored yet: that is the project's .env.example",
                   file=sys.stderr)
         raise SystemExit(0)
+    if verb == "remove":
+        _warn_of_routes(proj, auth)
     body = {"action": "remove" if verb == "remove" else "env-set", "why": os.environ.get("BB_DEV_WHY", "")}
     if text is not None:
         body["text"] = text
@@ -458,7 +481,10 @@ def ls():
         kind = ("written here" if i.get("source") == "file" else
                 "its own" if i.get("project") == proj else f"built from {i.get('project')}")
         state = "?" if blind else "running" if i.get("running") else "stopped" if i.get("exists") else "down"
-        rows.append((i.get("name") or "", kind, state, " ".join(i.get("ports") or []), i.get("node_name") or ""))
+        routes = ((i.get("route") or {}).get("routes")) or []
+        said = " ".join(("https://" if r.get("tls") else "http://") + r.get("where", "") for r in routes)
+        rows.append((i.get("name") or "", kind, state, " ".join(i.get("ports") or []) + (f"  routed from {said}" if said else ""),
+                     i.get("node_name") or ""))
     for c in d.get("containers") or []:
         if c.get("owner") != proj:
             continue

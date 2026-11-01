@@ -41,6 +41,10 @@ class Fake(http.server.BaseHTTPRequestHandler):
             self._send({"ok": True, "job": "j_1"})
 
     def do_GET(self):  # noqa: N802 (the base class's name)
+        if self.path.startswith("/api/docker"):
+            self._send({"instances": [{"name": "site", "owner": "web", "node_name": "edge", "route": {
+                "routes": [{"where": "www.example.com", "port": 8382, "tls": True}]}}]})
+            return
         Fake.polls += 1
         if Fake.polls < 2:
             self._send({"id": "j_1", "state": "running"})
@@ -75,6 +79,12 @@ class RemoveFollowsItsJob(unittest.TestCase):
         self.assertNotIn("removed;", r.stdout)
         self.assertIn("not removed", r.stderr)
         self.assertIn("empty compose file", r.stderr)
+
+    def test_a_route_to_it_is_named_before_it_goes(self):
+        Fake.outcome = "succeeded"
+        r = self.run_remove()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("nginx on edge routes www.example.com to this container", r.stderr)
 
     def test_a_down_that_landed_says_removed(self):
         Fake.outcome = "succeeded"

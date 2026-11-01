@@ -4668,6 +4668,7 @@ def _vm_do(principal, project, req, session):
     return vms.act(principal, project, field(req, "name"), field(req, "action"), dict(req, _session=session))
 
 
+devapp.nginx_routes = lambda nid: nginxproxy.record(nid).get("routes") or []
 nginxproxy.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
                      node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                      taken_ports=devapp.taken_ports)

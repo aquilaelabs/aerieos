@@ -310,7 +310,7 @@ aerie devapp override FILE|none
                    (compose's -f after -f), or none; the next rebuild takes it, and a
                    service it adds is asked about as any new one is. On ask it is a
                    person's, in the container's settings
-aerie devapp ls       every container that belongs to this project, on every node it has one
+aerie devapp ls       every container that belongs to this project, with the nginx routes to it, on every node it has one
 aerie devapp log NAME one of those containers' log
 aerie devapp start|stop|restart NAME [--why "..."]
                    one of those, under the same setting; --container NAME on the

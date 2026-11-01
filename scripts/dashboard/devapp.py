@@ -502,6 +502,25 @@ def _published(ports, local=False):
     return sorted(set(loop)) if local else sorted(set(out) | set(loop))
 
 
+# A node's nginx routes, handed in by server.py: {host, path, port, tls, ...}.
+nginx_routes = None
+
+
+def routes_to(node_id, ports):
+    """The node's nginx routes that go to one of these published ports, as
+    "host/path" with the port and whether 443 serves it (report #130): what a
+    container's row says, and what a remove warns of."""
+    if nginx_routes is None or not node_id:
+        return []
+    want = set(ports or [])
+    out = []
+    for r in nginx_routes(node_id) or []:
+        if int(r.get("port") or 0) in want:
+            where = str(r.get("host") or "") + ("" if str(r.get("path") or "/") == "/" else str(r["path"]))
+            out.append({"where": where, "port": int(r["port"]), "tls": r.get("tls") is not False})
+    return out
+
+
 def route_view(project, instance, ports, prefer=None):
     """The instance's route as the row draws it: the mode and port on the
     record (lan on the first published port when nothing was chosen), the
@@ -517,6 +536,7 @@ def route_view(project, instance, ports, prefer=None):
     n = queue.node(nid) if queue is not None and nid else None
     out = {"mode": mode, "port": port, "ports": pub, "url": "", "ready": False, "why": "",
            "funnel_ok": False}
+    out["routes"] = routes_to(nid, _published(ports, local=True) + pub)
     if n:
         ts = ((n.get("reported") or {}).get("services") or {}).get("tailscale") or {}
         out["funnel_ok"] = bool(n["kind"] == "agent" and ts.get("installed")
@@ -528,6 +548,8 @@ def route_view(project, instance, ports, prefer=None):
         if port in _published(ports, local=True) and port not in _published([p for p in ports or [] if not (
                 isinstance(p, str) and p.split("->", 1)[0].rpartition(":")[0].startswith("127."))]):
             out["why"] = f"published on the node alone (127.0.0.1:{port}): its nginx answers for it"
+            names = ", ".join(r["where"] for r in out["routes"] if r["port"] == port)
+            out["why"] += f", at {names}" if names else ", and no route on it goes here yet"
         elif host and port:
             out["url"] = f"http://{host}:{port}/"
             out["ready"] = port in pub
