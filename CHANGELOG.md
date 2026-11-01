@@ -47,6 +47,9 @@
 - Replacing a file on a release keeps the old one until the new one is up, so a failed upload no longer leaves the release without it (5827373)
 - Renaming a container whose second volume fails to copy no longer leaves its first volume moved and the container on an empty one (0311d7e)
 - A controller restore that fails partway puts the state that was there back and says so, where it left a half-restored controller (75a483a)
+- On a node, the project owner's shells and coding agent sessions are known as the owner's again, so bb treats the owner's own tree as theirs there (0369c15)
+- Moving a controller or restoring a backup no longer holds the whole bundle in memory, so a large workspace can move without the controller being stopped partway; a bundle made by an earlier version still lands (0369c15)
+- A container that cannot start because its port is taken says which port, where the reason was cut off (2e1d46b)
 
 ## 0.9.0: 2026-10-30
 
