@@ -38,7 +38,7 @@ class Backup(unittest.TestCase):
         self.configure(self.state)
 
     def configure(self, state, password=None):
-        backup.configure(state=state, pack_fn=move.pack, seal_fn=signing.seal, restore_fn=move.restore, manifest_fn=move.read_manifest,
+        backup.configure(state=state, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
                          password_fn=lambda: self.password if password is None else password,
                          dirs_fn=lambda: [str(self.tmp / "mnt" / "tank").replace(str(self.tmp), "", 1) and "/mnt/tank"],
                          version_fn=lambda: "0.9.0", state_version_fn=lambda: 16, write_json_fn=write_json, host_fn=lambda: "nas")

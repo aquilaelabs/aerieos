@@ -5350,7 +5350,7 @@ def _own_pool_mounts():
 
 # The configuration backed up onto the machine's pools and found again at a
 # first run (R161 step 4, backup.py): the move's bundle under a password's key.
-backup.configure(state=STATE, pack_fn=move.pack, seal_fn=signing.seal, restore_fn=move.restore, manifest_fn=move.read_manifest,
+backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
                  password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_own_pool_mounts,
                  version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
                  host_fn=lambda: socket.gethostname())
@@ -12820,6 +12820,7 @@ class Handler(BaseHTTPRequestHandler):
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
         spool = Path(STATE).parent / f".restore-upload-{os.getpid()}"
+        file_part = spool.with_name(spool.name + ".file")
         try:
             with open(spool, "wb") as f:
                 left = n
@@ -12829,24 +12830,14 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     f.write(chunk)
                     left -= len(chunk)
-            import email.parser
-            with open(spool, "rb") as f:
-                msg = email.parser.BytesParser().parsebytes(b"Content-Type: " + self.headers.get("Content-Type", "").encode() + b"\r\n\r\n" + f.read())
-            password, found, uploaded = "", "", None
-            for part in msg.walk():
-                name = part.get_param("name", header="content-disposition")
-                if name == "password":
-                    password = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "found":
-                    found = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "bundle":
-                    uploaded = part.get_payload(decode=True) or None
+            # The form read a megabyte at a time, its file part to a file of
+            # its own (B558: never whole in memory).
+            fields, uploaded = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
+            password, found = fields.get("password", ""), fields.get("found", "")
             if not password:
                 return self._restore_page("the backup password is needed")
             if uploaded:
-                with open(spool, "wb") as f:
-                    f.write(uploaded)
-                src = str(spool)
+                src = str(file_part)
             else:
                 known = {c["path"] for c in backup.found(_own_pool_mounts())}
                 if found not in known:
@@ -12856,6 +12847,8 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, ValueError) as e:
             return self._restore_page(f"the restore did not land: {e}")
         finally:
+            with contextlib.suppress(OSError):
+                file_part.unlink()
             with contextlib.suppress(OSError):
                 spool.unlink()
         if r.get("error"):
@@ -12907,6 +12900,7 @@ class Handler(BaseHTTPRequestHandler):
         if not 0 < n <= 16 << 30:
             return self._move_page("the upload is empty or past 16 GB")
         spool = Path(STATE).parent / f".move-upload-{os.getpid()}"
+        file_part = spool.with_name(spool.name + ".file")
         try:
             with open(spool, "wb") as f:
                 left = n
@@ -12916,23 +12910,14 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     f.write(chunk)
                     left -= len(chunk)
-            import email.parser
-            with open(spool, "rb") as f:
-                msg = email.parser.BytesParser().parsebytes(b"Content-Type: " + self.headers.get("Content-Type", "").encode() + b"\r\n\r\n" + f.read())
-            token, bundle, frm = "", None, ""
-            for part in msg.walk():
-                name = part.get_param("name", header="content-disposition")
-                if name == "token":
-                    token = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "from":
-                    frm = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "bundle":
-                    bundle = part.get_payload(decode=True)
+            # The form read a megabyte at a time, its file part to a file of
+            # its own (B558: never whole in memory).
+            fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
+            token, frm = fields.get("token", ""), fields.get("from", "")
             if not token or not (bundle or frm):
                 return self._move_page("the move token is needed, with the bundle file or the old controller's address")
             if bundle:
-                with open(spool, "wb") as f:
-                    f.write(bundle)
+                os.replace(file_part, spool)
             else:
                 # The pull (R175 step 5): the bundle fetched from the old
                 # controller under a proof the token derives.
@@ -12943,6 +12928,8 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, ValueError) as e:
             return self._move_page(f"the move did not land: {e}")
         finally:
+            with contextlib.suppress(OSError):
+                file_part.unlink()
             with contextlib.suppress(OSError):
                 spool.unlink()
         if r.get("error"):

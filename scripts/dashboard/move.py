@@ -48,6 +48,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from pathlib import Path
 
 STATE = Path("/config")
@@ -275,32 +276,212 @@ def pieces():
     return out
 
 
+# A bundle's body (format 2, B558): the gzipped tar sealed a PIECE at a
+# time as it is made, each piece's seal over its number and whether it is the
+# last, so no piece can be dropped, repeated, moved or cut off unseen, and
+# neither end ever holds more than a piece. Format 1, the tar sealed whole in
+# memory, is still opened.
+FORMAT = 2
+PIECE = 8 << 20
+
+
+class _Sealer:
+    """A file to write the tar into: each PIECE sealed under `key` and
+    written to `f` as its length (4 bytes) and its seal."""
+
+    def __init__(self, f, key):
+        self.f, self.key, self.buf, self.n = f, key, bytearray(), 0
+
+    def _out(self, data, last):
+        blob = seal(self.n.to_bytes(8, "big") + (b"\1" if last else b"\0") + bytes(data), self.key)
+        self.f.write(len(blob).to_bytes(4, "big") + blob)
+        self.n += 1
+
+    def write(self, b):
+        self.buf += b
+        while len(self.buf) >= PIECE:
+            self._out(self.buf[:PIECE], False)
+            del self.buf[:PIECE]
+        return len(b)
+
+    def finish(self):
+        self._out(self.buf, True)
+        self.buf = bytearray()
+
+
+class _Opener:
+    """The tar back out of a format 2 body, a piece at a time: each piece
+    opened under `key` and held to its number; the body must end on the
+    piece marked last, and nothing after it. ValueError otherwise."""
+
+    def __init__(self, f, key):
+        self.f, self.key, self.buf, self.n, self.done = f, key, b"", 0, False
+
+    def _next(self):
+        head = self.f.read(4)
+        if len(head) < 4:
+            raise ValueError("the bundle ends before its last piece")
+        size = int.from_bytes(head, "big")
+        if size > PIECE + 256:
+            raise ValueError("a piece of the bundle is larger than any written")
+        blob = self.f.read(size)
+        try:
+            data = open_with(self.key, blob)
+        except Exception as e:                                     # noqa: BLE001 (Locked, or a damaged piece)
+            raise ValueError("a piece of the bundle did not open") from e
+        if len(data) < 9 or int.from_bytes(data[:8], "big") != self.n:
+            raise ValueError("the bundle's pieces are out of order")
+        self.n += 1
+        self.done = data[8:9] == b"\1"
+        if self.done and self.f.read(1):
+            raise ValueError("the bundle goes on past its last piece")
+        self.buf += data[9:]
+
+    def close(self):
+        self.f.close()
+
+    def read(self, n=-1):
+        while not self.done and (n < 0 or len(self.buf) < n):
+            self._next()
+        if n < 0:
+            out, self.buf = self.buf, b""
+        else:
+            out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+
+def split_form(src, content_type, file_field, dest, small=64 << 10):
+    """A multipart form read from the file `src` a megabyte at a time (a
+    landing's upload, B558: never whole in memory): the `file_field` part
+    written to `dest`, each other part kept as text up to `small` bytes.
+    Returns (fields, whether the file part came with any bytes); ValueError
+    for a form it cannot read."""
+    import re as _re
+    m = _re.search(r'boundary="?([^";]+)"?', content_type or "")
+    if not m:
+        raise ValueError("the upload is not a form")
+    delim = b"\r\n--" + m.group(1).encode()
+    fields, got_file, buf = {}, False, b"\r\n"
+    name, sink, out = None, None, None
+    with open(src, "rb") as f, open(dest, "wb") as fout:
+        def more():
+            return f.read(1 << 20)
+        state = "start"
+        while True:
+            if state in ("start", "body"):
+                at = buf.find(delim)
+                if at < 0:
+                    keep = len(delim) + 4
+                    if state == "body" and len(buf) > keep:
+                        sink(buf[:-keep])
+                        buf = buf[-keep:]
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                    continue
+                if state == "body":
+                    sink(buf[:at])
+                    if out is not None:
+                        fields[name] = bytes(out).decode("utf-8", "replace").strip()
+                buf = buf[at + len(delim):]
+                while len(buf) < 2:
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                if buf[:2] == b"--":
+                    return fields, got_file
+                state = "head"
+            else:
+                at = buf.find(b"\r\n\r\n")
+                if at < 0:
+                    if len(buf) > 16 << 10:
+                        raise ValueError("a part of the form has headers past 16 KiB")
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                    continue
+                head = buf[:at].decode("utf-8", "replace")
+                buf = buf[at + 4:]
+                nm = _re.search(r'name="([^"]*)"', head)
+                name = nm.group(1) if nm else ""
+                if name == file_field:
+                    out = None
+
+                    def sink(b):
+                        nonlocal got_file
+                        if b:
+                            got_file = True
+                            fout.write(b)
+                else:
+                    out = bytearray()
+
+                    def sink(b, out=out, name=name):
+                        out.extend(b)
+                        if len(out) > small:
+                            raise ValueError(f"the form's {name or 'unnamed'} field is past {small} bytes")
+                state = "body"
+
+
+def write_bundle(dest, header, manifest, key, **pack_kw):
+    """A bundle written to `dest` as it is packed, never whole in memory:
+    `header`, the manifest line (`manifest(counts)`, a dict, its format
+    set here), then the body sealed under `key` a piece at a time. The body
+    goes first to a file beside `dest`, since the manifest names its counts,
+    and is copied after it. Returns (manifest, counts)."""
+    dest = Path(dest)
+    body = dest.with_name(dest.name + ".body")
+    try:
+        with open(body, "wb") as f:
+            sealer = _Sealer(f, key)
+            with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
+                counts = _pack_into(tar, **pack_kw)
+            sealer.finish()
+        m = dict(manifest(counts), format=FORMAT)
+        with open(dest, "wb") as out, open(body, "rb") as f:
+            out.write(header)
+            out.write(json.dumps(m).encode() + b"\n")
+            shutil.copyfileobj(f, out, 1 << 20)
+    finally:
+        body.unlink(missing_ok=True)
+    return m, counts
+
+
 def pack(repos=False, carry_key=False, stores=None):
-    """The tree a move or a backup carries, as one gzipped tar in memory:
-    the state without its logs and job trees, the stores kept outside it
-    (`stores` names the kinds; None is every kind but STORES_OFF), the
-    repositories when asked, the secrets, the install key when asked.
+    """The tree a move or a backup carries, as one gzipped tar in memory (a
+    small tree, as the tests make; a bundle is write_bundle's, streamed).
     Returns (bytes, counts)."""
     buf = io.BytesIO()
-    counts = {}
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE)
-        for kind, path in (store_paths() or {}).items():
-            if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
-                counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
-        if repos:
-            counts["repos"] = _tar_tree(tar, WORKSPACE, "workspace")
-        if SECRETS and Path(SECRETS).is_dir():
-            counts["secrets"] = _tar_tree(tar, SECRETS, "secrets")
-        if carry_key:
-            k = install_key() or b""
-            if k:
-                info = tarfile.TarInfo("install-key")
-                info.size = len(k)
-                info.mtime = int(time.time())
-                tar.addfile(info, io.BytesIO(k))
-                counts["install_key"] = 1
+        counts = _pack_into(tar, repos=repos, carry_key=carry_key, stores=stores)
     return buf.getvalue(), counts
+
+
+def _pack_into(tar, repos=False, carry_key=False, stores=None):
+    """Into `tar`, the tree a move or a backup carries: the state without
+    its logs and job trees, the stores kept outside it (`stores` names the
+    kinds; None is every kind but STORES_OFF), the repositories when asked,
+    the secrets, the install key when asked. Returns the counts."""
+    counts = {}
+    counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE)
+    for kind, path in (store_paths() or {}).items():
+        if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
+            counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
+    if repos:
+        counts["repos"] = _tar_tree(tar, WORKSPACE, "workspace")
+    if SECRETS and Path(SECRETS).is_dir():
+        counts["secrets"] = _tar_tree(tar, SECRETS, "secrets")
+    if carry_key:
+        k = install_key() or b""
+        if k:
+            info = tarfile.TarInfo("install-key")
+            info.size = len(k)
+            info.mtime = int(time.time())
+            tar.addfile(info, io.BytesIO(k))
+            counts["install_key"] = 1
+    return counts
 
 
 def prepare(principal, to, repos=False, carry_key=False, stores=None):
@@ -347,18 +528,19 @@ def pack_bundle():
     # Named to the millisecond: two packs in one second are two bundles.
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
     name = f"builderbot-move-{stamp}.bbmove"
-    raw, counts = pack(repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
-                       stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
-    sealed = seal(raw, key)
-    manifest = {"format": 1, "version": build_version(), "state_version": int(state_version() or 0), "made_at": int(d["made_at"]),
+    tmp = out_dir / (name + ".partial")
+
+    def manifest_of(counts):
+        return {"version": build_version(), "state_version": int(state_version() or 0), "made_at": int(d["made_at"]),
                 "packed_at": int(time.time()), "from": page_url(), "to": d.get("to", ""), "repos": bool(d.get("repos")),
                 "carries_key": bool(d.get("carries_key") and counts.get("install_key")),
                 "nodes": list(node_ids()), "bare_metal": bool(bare_metal()), "counts": counts, "token_hash": d.get("token_hash", "")}
-    tmp = out_dir / (name + ".partial")
-    with open(tmp, "wb") as f:
-        f.write(HEADER)
-        f.write(json.dumps(manifest).encode() + b"\n")
-        f.write(sealed)
+    try:
+        manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
+                                        stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
+    except OSError as e:
+        tmp.unlink(missing_ok=True)
+        return {"error": f"the bundle could not be written: {e.strerror or e}"}
     os.replace(tmp, out_dir / name)
     with _lock:
         d = _load()
@@ -679,7 +861,7 @@ def read_manifest(path):
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:
             m["kind"] = "backup"
-        return (m, "") if isinstance(m, dict) and m.get("format") == 1 else (None, "a bundle of a format this build does not read")
+        return (m, "") if isinstance(m, dict) and m.get("format") in (1, FORMAT) else (None, "a bundle of a format this build does not read")
     except (OSError, ValueError) as e:
         return None, f"could not read the bundle: {e}"
 
@@ -709,31 +891,34 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         if token_hash(token) != m.get("token_hash"):
             return {"error": "that is not this bundle's move token"}
         key = key_of(token)
-    with open(path, "rb") as f:
-        f.readline(); f.readline()
-        sealed = f.read()
-    try:
-        raw = open_with(key, sealed)
-    except Exception:                                              # noqa: BLE001 (any failure to open is one answer)
-        return {"error": "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")}
+    wrong = "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")
+    fh = open(path, "rb")
+    fh.readline(); fh.readline()
+    if m.get("format") == 1:
+        try:
+            src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
+        except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
+            fh.close()
+            return {"error": wrong}
+        fh.close()
+    else:
+        # A piece at a time; the first opened here, so a wrong token is said
+        # as one before anything is unpacked.
+        src, mode = _Opener(fh, key), "r|gz"
+        try:
+            src._next()
+        except ValueError:
+            fh.close()
+            return {"error": wrong}
     work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(state_dir.parent)))
     counts = {}
     try:
-        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
-            safe_links = hasattr(tarfile, "data_filter")
-            for info in tar.getmembers():
-                if info.name.startswith("/") or ".." in Path(info.name).parts:
-                    continue
-                # A link only where the data filter can check it: it refuses
-                # one that is absolute or leads out of what is restored.
-                if not (info.isfile() or (info.issym() and safe_links)):
-                    continue
-                try:
-                    tar.extract(info, path=str(work), filter="data") if safe_links else tar.extract(info, path=str(work))
-                except tarfile.FilterError:
-                    continue
-                top = Path(info.name).parts[0]
-                counts[top] = counts.get(top, 0) + 1
+        try:
+            unpacked = _unpack(src, mode, work, counts)
+        except (ValueError, EOFError, tarfile.TarError, zlib.error) as e:
+            unpacked = f"the bundle is damaged or cut short ({e}); nothing here was changed"
+        if unpacked:
+            return {"error": unpacked}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir.parent / f"{state_dir.name}.moved-{stamp}"
         # The workspace and the secrets first, which do not need the state;
@@ -803,6 +988,29 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 "nodes": list(m.get("nodes") or []), "kept_here": here}
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        src.close()
+
+
+def _unpack(src, mode, work, counts):
+    """The bundle's tar unpacked into `work`, counting each top folder's
+    files: a file, or a link where the data filter can hold it inside what
+    is restored. "" when done."""
+    with tarfile.open(fileobj=src, mode=mode) as tar:
+        safe_links = hasattr(tarfile, "data_filter")
+        for info in tar:
+            if info.name.startswith("/") or ".." in Path(info.name).parts:
+                continue
+            # A link only where the data filter can check it: it refuses
+            # one that is absolute or leads out of what is restored.
+            if not (info.isfile() or (info.issym() and safe_links)):
+                continue
+            try:
+                tar.extract(info, path=str(work), filter="data") if safe_links else tar.extract(info, path=str(work))
+            except tarfile.FilterError:
+                continue
+            top = Path(info.name).parts[0]
+            counts[top] = counts.get(top, 0) + 1
+    return ""
 
 
 def carry_here(aside, state_dir):

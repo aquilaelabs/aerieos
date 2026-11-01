@@ -49,6 +49,79 @@ class Move(unittest.TestCase):
                        node_name_fn=lambda nid: {"n_1": "alpha", "n_2": "beta"}.get(nid, nid),
                        audit_fn=lambda who, what, detail: self.audits.append((what, detail)))
 
+    def _land(self, path, token):
+        return move.restore(str(path), token, state_dir=self.tmp / "new-config", workspace_dir=self.tmp / "new-ws",
+                            secrets_dir=self.tmp / "new-secrets", build_state_version=16, here_bare_metal=False)
+
+    def _pieces(self, path):
+        """The bundle's head (its two lines) and its pieces, each with its
+        length."""
+        raw = Path(path).read_bytes()
+        cut = raw.index(b"\n", len(move.HEADER)) + 1
+        head, body, out = raw[:cut], raw[cut:], []
+        while body:
+            n = int.from_bytes(body[:4], "big")
+            out.append(body[:4 + n])
+            body = body[4 + n:]
+        return head, out
+
+    def test_a_bundle_is_sealed_a_piece_at_a_time_and_every_piece_is_held_to_its_place(self):
+        # B558: never whole in memory; here pieces of 4 KiB over a
+        # repository of 64 KiB of noise, so a bundle is many pieces.
+        (self.ws / "alpha" / "big.bin").write_bytes(os.urandom(64 << 10))
+        move.PIECE, was = 4096, move.PIECE
+        self.addCleanup(setattr, move, "PIECE", was)
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        path = move.bundle_path()
+        head, pieces = self._pieces(path)
+        self.assertEqual(json.loads(head.split(b"\n")[1])["format"], 2)
+        self.assertGreater(len(pieces), 10)
+        bad = self.tmp / "bad.bbmove"
+        for why, body in (("a piece dropped", pieces[:3] + pieces[4:]), ("two pieces swapped", [pieces[1], pieces[0]] + pieces[2:]),
+                          ("the last piece missing", pieces[:-1]), ("junk after the last", pieces + [b"junk"])):
+            bad.write_bytes(head + b"".join(body))
+            got = self._land(bad, r["token"])
+            self.assertIn("error", got, why)
+            self.assertFalse((self.tmp / "new-config").exists(), f"{why}: nothing here changed")
+        self.assertIn("not this bundle's move token", self._land(path, "not-the-token").get("error", ""))
+        got = self._land(path, r["token"])
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((self.tmp / "new-ws" / "alpha" / "big.bin").read_bytes(), (self.ws / "alpha" / "big.bin").read_bytes())
+
+    def test_a_landings_upload_is_read_a_megabyte_at_a_time(self):
+        # The bundle part straddles the reader's megabyte edges, and its
+        # bytes hold the boundary's start (never the whole: a browser picks
+        # one its content does not hold) and line endings.
+        blob = (os.urandom((1 << 20) - 7) + b"\r\n--XY" + b"\r\n" * 9 + os.urandom(3 << 20)).replace(b"XYZ", b"XYQ") * 2
+        form = (b"--XYZ\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n tok-1 \r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.bbmove\"\r\n"
+                b"Content-Type: application/octet-stream\r\n\r\n" + blob + b"\r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"from\"\r\n\r\n\r\n--XYZ--\r\n")
+        src, dest = self.tmp / "form", self.tmp / "file"
+        src.write_bytes(form)
+        fields, got = move.split_form(src, "multipart/form-data; boundary=XYZ", "bundle", dest)
+        self.assertEqual(fields, {"token": "tok-1", "from": ""})
+        self.assertTrue(got)
+        self.assertEqual(dest.read_bytes(), blob)
+        src.write_bytes(form[:len(form) // 2])
+        with self.assertRaises(ValueError):
+            move.split_form(src, "multipart/form-data; boundary=XYZ", "bundle", dest)
+        with self.assertRaises(ValueError):
+            move.split_form(src, "application/x-www-form-urlencoded", "bundle", dest)
+
+    def test_a_bundle_of_the_format_before_still_lands(self):
+        r = move.prepare("user:ann", "https://new.example")
+        token = r["token"]
+        raw, counts = move.pack()
+        m = {"format": 1, "version": "0.9.0", "state_version": 16, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
+             "to": "https://new.example", "repos": False, "carries_key": False, "nodes": ["n_1"], "bare_metal": False, "counts": counts,
+             "token_hash": move.token_hash(token)}
+        old = self.tmp / "old.bbmove"
+        old.write_bytes(move.HEADER + json.dumps(m).encode() + b"\n" + signing.seal(raw, move.key_of(token)))
+        got = self._land(old, token)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
+
     def test_the_bundle_moves_the_state_and_the_nodes_follow(self):
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
         self.assertTrue(r.get("ok"), r)
