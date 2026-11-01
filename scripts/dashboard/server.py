@@ -5293,6 +5293,7 @@ held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_j
 # A prepared configuration a stick's first boot handed over (R161 step 8,
 # firstboot.py): applied once, here, before anybody can sign in or claim.
 import firstboot                                                 # noqa: E402
+import adoptapps                                                 # noqa: E402
 firstboot.configure(state=STATE, write_json_fn=write_json, users_mod=users, settings_mod=settings, hold_first_fn=held.arm_first)
 if BARE_METAL:
     try:
@@ -9038,6 +9039,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(r, 400 if r.get("error") else 200)
         if act == "hold-next":
             return self._json(held.arm_next(req.get("on") is not False))
+        # The containers another system ran, made again here (R163 step 10,
+        # adoptapps.py): what each would be, made, then started with what it
+        # asks for acknowledged by the press that showed it.
+        if act == "adopt-apps":
+            own = nodes.node(_own_node_id() or "") if BARE_METAL else None
+            if not own:
+                return self._json({"error": "the containers are made on the controller's own machine (a bare-metal install)"}, 400)
+            cfg, adopted = firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {}
+            op = field(req, "op")
+            if op == "plan":
+                return self._json({"ok": True, "apps": adoptapps.plan(cfg, adopted)})
+            if op == "make":
+                names = [str(x) for x in (req.get("names") or []) if isinstance(x, str)][:128]
+                if not names:
+                    return self._json({"error": "name the containers to make"}, 400)
+                r = adoptapps.make(cfg, adopted, names, own["id"])
+                db.audit(self._principal(), "adopt-apps", own["id"], {"made": [m["slug"] for m in r["made"]], "skipped": len(r["skipped"])})
+                return self._json({"ok": True, **r})
+            if op == "start":
+                r = adoptapps.start(req.get("rows") if isinstance(req.get("rows"), list) else [])
+                db.audit(self._principal(), "adopt-apps-start", own["id"], {"started": r["started"]})
+                return self._json({"ok": True, **r})
+            return self._json({"error": "an adopt-apps op is plan, make or start"}, 400)
         got = nodes.verb(self._principal(), req)
         # A node that left is a node the Doctor's cached verdict may still
         # name, for up to its half hour: the next run starts now, on its own

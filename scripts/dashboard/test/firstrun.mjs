@@ -370,6 +370,28 @@ await firstRun(false);
        `serving the shares where no Samba is installed says so for each, with no job (${many.error})`);
     ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
        `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
+    // ...and what the old system ran (R163 steps 10, 11): read first, then
+    // its containers to make and start and its VMs to define and run.
+    const apps = await page.evaluate(async () => {
+      const n = ownMachine();
+      state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
+                                    networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
+      nodesRev++; drawPanes();
+      const unread = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
+      n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
+        adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
+                                                   vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
+                                                   said: ['Docker: 1 container ran, 1 started with the machine'] } } };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]');
+      return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
+    });
+    ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
+       `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
+    ok(/1 started with the machine/.test(apps.text) && /Windows 11shut off/.test(apps.text) && /Ubuntunot defined here yet/.test(apps.text)
+       && ['br0', 'make', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)),
+       `once read: the networks and Make and start, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
     // The verb checks before any job: a filesystem it does not take, and a
     // Release with nothing adopted, each refused with why and no job made.
     const own = await page.evaluate(() => ownMachine()?.id);

@@ -1565,6 +1565,17 @@ def _census(c):
                        for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
             "merged": {aw(k, 120): v is True for k, v in list((ad.get("merged") or {}).items())[:4]} if isinstance(ad.get("merged"), dict) else {},
             "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]]}
+        # ...and what its Docker and libvirt said ran (R163 steps 10, 11).
+        ap = ad.get("apps") if isinstance(ad.get("apps"), dict) else {}
+        if ap:
+            dk = ap.get("docker") if isinstance(ap.get("docker"), dict) else {}
+            nm = lambda v: re.sub(r"[^A-Za-z0-9 ._-]", "", str(v or ""))[:64]  # noqa: E731
+            out["adopted"]["apps"] = {
+                "docker": {"autostart": [nm(x) for x in (dk.get("autostart") or [])[:256]],
+                           "digests": {nm(k): re.sub(r"[^\w./:@-]", "", str(v or ""))[:200] for k, v in list((dk.get("digests") or {}).items())[:256]}},
+                "vms": [{"name": nm(v.get("name")), "autostart": v.get("autostart") is True, "nvram": v.get("nvram") is True}
+                        for v in (ap.get("vms") or [])[:64] if isinstance(v, dict)],
+                "said": [aw(x, 300) for x in (ap.get("said") or [])[:16]]}
     # The machine's time zone (R161 step 3), a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]
@@ -1622,9 +1633,9 @@ def _census(c):
     if isinstance(c.get("vms_other"), list):
         out["vms_other"] = [{"name": str(v["name"]), "state": re.sub(r"[^a-z ]", "", str(v.get("state") or ""))[:20],
                              "vcpus": int(v["vcpus"]) if isinstance(v.get("vcpus"), int) else 0,
-                             "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0}
+                             "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0, "autostart": v.get("autostart") is True}
                             for v in c["vms_other"][:64]
-                            if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", str(v.get("name") or ""))]
+                            if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", str(v.get("name") or ""))]
     # ...and the VMs it runs (R91), each as libvirt says, with the room their
     # disks have: whitelisted field by field like the rest.
     if isinstance(c.get("vms"), list):
@@ -3372,7 +3383,7 @@ def node_storage_array(principal, node_id, req):
     return r
 
 
-ADOPT_ACTIONS = ("dry", "adopt", "release")
+ADOPT_ACTIONS = ("dry", "adopt", "release", "read-apps", "define-vms", "docker-network", "vm")
 ADOPT_FS = ("xfs", "btrfs", "zfs")
 
 
@@ -3422,12 +3433,41 @@ def node_storage_adopt(principal, node_id, req):
     if action not in ADOPT_ACTIONS:
         return {"error": f"an adopt action is one of {', '.join(ADOPT_ACTIONS)}"}
     cfg = {"adopt": action}
-    if action != "release":
+    held_now = (rep.get("adopted") or {}).get("mounts") or (rep.get("adopted") or {}).get("merged")
+    img_ok = lambda v: isinstance(v, str) and re.fullmatch(r"/mnt/[A-Za-z0-9._/ +-]{1,200}", v) and ".." not in v.split("/")  # noqa: E731
+    if action in ("read-apps", "define-vms", "docker-network", "vm") and not held_now:
+        return {"error": "adopt the disks first: what ran is read from them"}
+    if action == "read-apps":
+        dk = req.get("docker") if isinstance(req.get("docker"), dict) else {}
+        vm = req.get("vms") if isinstance(req.get("vms"), dict) else {}
+        if dk.get("image") and not img_ok(dk["image"]) or vm.get("image") and not img_ok(vm["image"]):
+            return {"error": "an image file is a path under /mnt"}
+        af = str(dk.get("autostart_file") or "")
+        if af and not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", af):
+            return {"error": "the autostart file is a name in Docker's folder"}
+        cfg.update(docker={"image": dk.get("image") or "", "autostart_file": af}, vms={"image": vm.get("image") or ""})
+    elif action == "vm":
+        name, op = str(req.get("name") or ""), str(req.get("op") or "")
+        if op not in ("start", "shutdown", "off", "autostart-on", "autostart-off") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", name):
+            return {"error": "an adopted VM by its name, and start, shutdown, off, autostart-on or autostart-off"}
+        cfg.update(name=name, op=op)
+    elif action == "define-vms":
+        names = [str(x) for x in (req.get("names") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", x)][:64]
+        if not names:
+            return {"error": "name the VMs to define"}
+        cfg["names"] = names
+    elif action == "docker-network":
+        name, subnet, gw = str(req.get("name") or ""), str(req.get("subnet") or ""), str(req.get("gateway") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", name) or not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}/\d{1,2}", subnet) \
+                or (gw and not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", gw)):
+            return {"error": "a network is a name, a subnet like 192.168.1.0/24 and a gateway address"}
+        cfg.update(name=name, subnet=subnet, gateway=gw)
+    elif action != "release":
         want, why = _adopt_want(req)
         if why:
             return {"error": why}
         cfg["want"] = want
-    elif not (rep.get("adopted") or {}).get("mounts") and not (rep.get("adopted") or {}).get("merged"):
+    elif not held_now:
         return {"error": "nothing is adopted on the machine"}
     why = node_locked(n)
     if why:

@@ -169,6 +169,16 @@ def share_requests(cfg):
     return rows, notes
 
 
+def kept_config():
+    """The stick's configuration as kept (no password or SMB hash in it),
+    or {}."""
+    try:
+        d = json.loads(_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d.get("config") if isinstance(d.get("config"), dict) else {}
+
+
 def view():
     """This machine's section: what the stick's prepared configuration did,
     and what its plan names to adopt; None when this install had none."""
@@ -176,6 +186,15 @@ def view():
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    rows, notes = share_requests(d.get("config"))
-    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(d.get("config")),
-            "shares": {"rows": rows, "notes": notes} if rows or notes else None}
+    cfg = d.get("config") if isinstance(d.get("config"), dict) else {}
+    rows, notes = share_requests(cfg)
+    dk, vm = cfg.get("docker") if isinstance(cfg.get("docker"), dict) else {}, cfg.get("vms") if isinstance(cfg.get("vms"), dict) else {}
+    nets = {str(k): {"subnet": str(v.get("subnet") or ""), "gateway": str(v.get("gateway") or "")}
+            for k, v in (dk.get("networks") or {}).items() if isinstance(v, dict) and v.get("subnet")}
+    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(cfg),
+            "shares": {"rows": rows, "notes": notes} if rows or notes else None,
+            # Where the old system's containers and VMs are read from, and its
+            # networks of fixed addresses (R163 steps 10, 11).
+            "apps_from": {"docker": {"image": str(dk.get("image") or ""), "autostart_file": str(dk.get("autostart_file") or "")},
+                          "vms": {"image": str(vm.get("image") or "")}, "networks": nets,
+                          "containers": len(cfg.get("apps") or [])} if dk or vm or cfg.get("apps") else None}

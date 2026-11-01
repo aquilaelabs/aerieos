@@ -69,6 +69,7 @@ function renderMachineInto(i){
     + stickSection(n)
     + firstbootSection()
     + adoptSection(n)
+    + adoptAppsSection(n)
     + ndRowHtml(n);
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
@@ -199,6 +200,97 @@ function adoptSection(n){
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, {open: true});
 }
 
+// The containers and VMs the old system ran (R163 steps 10 and 11): read
+// from its Docker and libvirt image files once the disks are adopted, the
+// containers made again here as Containers page containers with the exact
+// image each ran, the VMs defined in this machine's libvirt, each started
+// with the machine where it was. The list of what would be made is the
+// controller's (adopt-apps plan), fetched once a read lands.
+let adoptPlan = null, adoptPlanFor = "";
+function adoptAppsSection(n){
+  const had = n.reported?.adopted, from = state?.firstboot?.apps_from;
+  if (!had || !(had.mounts || []).length || !from) return "";
+  const apps = had.apps;
+  const btn = (attr, word, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} ${attr}>${word}</button>`;
+  if (!apps){
+    return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "not read yet",
+      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run.</div>
+        <div class="actbar">${btn('data-adoptapp="read"', "Read what ran", "primary")}</div></div>`);
+  }
+  const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r");
+  if (adoptPlanFor !== key){ adoptPlanFor = key; adoptPlan = null; loadAdoptPlan(); }
+  const rows = (adoptPlan || []).map(a => [a.name, `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}`, {cls: a.notes.length ? "warn" : ""}]);
+  const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
+  const vms = (apps.vms || []).map(v => { const here = other[v.name];
+    return [v.name, here ? `${here.state}${here.autostart ? " · starts with the machine" : ""}` : `not defined here yet${v.autostart ? " · started with the machine there" : ""}`]; });
+  const nets = Object.entries(from.networks || {});
+  const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
+    return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
+      ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
+      btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}</div>`; }).join("");
+  return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
+    `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
+    `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
+      ${adoptPlan === null ? skRows(2) : factGrid(rows, "adfacts")}
+      <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where BuilderBot keeps its own.</div>
+      <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway)}"`, `Make the ${esc(k)} network`)).join("")}
+        ${btn('data-adoptapp="make"', "Make and start the containers", "primary")}</div>
+      ${vms.length ? `<div class="sub">The VMs</div>${factGrid(vms, "adfacts")}${vmActs}
+        <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn('data-adoptapp="define"', "Define the VMs", "primary") : ""}</div>` : ""}
+    </div>`);
+}
+
+async function loadAdoptPlan(){
+  const j = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""})).json().catch(() => ({error: "no answer"}));
+  adoptPlan = j.apps || [];
+  nodesRev++; drawPanes();
+}
+
+function wireAdoptApps(root){
+  const n = ownMachine();
+  root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const act = b.dataset.adoptapp, from = state?.firstboot?.apps_from || {};
+    if (act === "read"){
+      busy(b, "Reading");
+      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms})).json().catch(() => ({error: "no answer"}));
+      notify(j.error || "reading: the containers and VMs it ran are listed here when it is done", !!j.error);
+    } else if (act === "define"){
+      const other = new Set((n.reported?.vms_other || []).map(v => v.name));
+      const names = (n.reported?.adopted?.apps?.vms || []).map(v => v.name).filter(x => !other.has(x));
+      if (!await askYes(`Define ${names.length} VM${names.length === 1 ? "" : "s"} in this machine's libvirt?\n\n${names.join(", ")}\n\nEach keeps its disks where they are; its network bridge becomes the LAN through this machine's interface, and those that started with the machine there do here.`,
+          {title: "Define the VMs?", verb: "Define"})) return;
+      busy(b, "Defining");
+      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names})).json().catch(() => ({error: "no answer"}));
+      notify(j.error || "defining: its job says each VM's changes", !!j.error);
+    } else {
+      const names = (adoptPlan || []).filter(a => a.ok).map(a => a.name);
+      busy(b, "Making");
+      const m = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "make", id: n.id, names})).json().catch(() => ({error: "no answer"}));
+      if (m.error){ notify(m.error, true); return; }
+      const go = (m.made || []).filter(x => x.autostart);
+      const asks = go.filter(x => x.risks.length).map(x => `${x.name}: ${x.risks.slice(0, 4).join("; ")}`);
+      if (go.length && (!asks.length || await askYes(`Start the ${go.length} that started with the machine there?\n\nWhat they ask for beyond their own folder, acknowledged by this press:\n${asks.join("\n")}`,
+          {title: "Start them?", verb: "Start"}))){
+        const s = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "start", id: n.id, rows: go.map(x => ({slug: x.slug, ack: x.ack}))})).json().catch(() => ({error: "no answer"}));
+        notify(s.error || `made ${(m.made || []).length}, starting ${(s.started || []).length}${(s.failed || []).length ? `; not ${s.failed.map(x => x.slug).join(", ")}` : ""}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => x.name).join(", ")}` : ""}: the Containers page shows each`, !!(s.error || (s.failed || []).length));
+      } else notify(`made ${(m.made || []).length}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}: start each from the Containers page`);
+    }
+    await loadNodes();
+  }));
+  root.querySelectorAll("[data-adoptnet]").forEach(b => b.onclick = () => pressing(b, async () => {
+    busy(b, "Making");
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "docker-network", name: b.dataset.adoptnet, subnet: b.dataset.subnet, gateway: b.dataset.gateway})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || `making the ${b.dataset.adoptnet} network`, !!j.error);
+    await loadNodes();
+  }));
+  root.querySelectorAll("[data-adoptvm]").forEach(b => b.onclick = () => pressing(b, async () => {
+    busy(b, "Asking");
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || `${b.dataset.vmname}: ${b.dataset.adoptvm.replace("-", " ")}`, !!j.error);
+    await loadNodes();
+  }));
+}
+
 // The plan's shares, served from the merged tree once the disks are here:
 // how many, and what of theirs cannot be carried.
 function adoptSharesLine(){
@@ -243,4 +335,5 @@ function wireHeld(root){
   wireHoldNext(root);
   wireStick(root);
   wireAdopt(root);
+  wireAdoptApps(root);
 }
