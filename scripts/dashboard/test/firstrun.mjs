@@ -389,9 +389,22 @@ await firstRun(false);
     });
     ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
        `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
-    ok(/1 started with the machine/.test(apps.text) && /Windows 11shut off/.test(apps.text) && /Ubuntunot defined here yet/.test(apps.text)
+    ok(/1 started with the machine/.test(apps.text) && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
        && ['br0', 'make', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)),
        `once read: the networks and Make and start, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+    // Each VM still to define is a tick, ticked; one taken off is not
+    // defined, and the button says how many are (the operator, 1 Nov).
+    const picked = await page.evaluate(() => {
+      const box = document.querySelector('.machinetab [data-adpick="v:Ubuntu"]');
+      const was = box?.checked;
+      box.checked = false; box.dispatchEvent(new Event('change'));
+      const b = document.querySelector('.machinetab [data-adoptapp="define"]');
+      const after = { was, label: b?.textContent.trim(), dead: !!b?.disabled };
+      adoptSkip.clear();
+      return after;
+    });
+    ok(picked.was === true && picked.label === 'Define the ticked' && picked.dead,
+       `a VM untaken is left out and Define waits for one ticked (${JSON.stringify(picked)})`);
     // The verb checks before any job: a filesystem it does not take, and a
     // Release with nothing adopted, each refused with why and no job made.
     const own = await page.evaluate(() => ownMachine()?.id);

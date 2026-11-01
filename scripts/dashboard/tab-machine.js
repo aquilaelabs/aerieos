@@ -67,7 +67,7 @@ function renderMachineInto(i){
   d.list.innerHTML = machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
     + stickSection(n)
-    + consoleSection(n)
+    + machineConsoleSection(n)
     + firstbootSection()
     + adoptSection(n)
     + adoptAppsSection(n)
@@ -145,7 +145,7 @@ function wireStick(root){
 // A way in at the screen (R194): BuilderBot OS's console takes a password
 // set here, logging in as admin with sudo for root; the boot menu's Rescue
 // entry is the way in when nothing else answers. Only on BuilderBot OS.
-function consoleSection(n){
+function machineConsoleSection(n){
   const c = n.reported?.console;
   if (!c?.os) return "";
   return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
@@ -155,7 +155,7 @@ function consoleSection(n){
       <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);
 }
 
-function wireConsole(root){
+function wireMachineConsole(root){
   root.querySelectorAll("[data-console]").forEach(b => b.onclick = () => pressing(b, async () => {
     const clear = b.dataset.console === "clear", n = ownMachine();
     const pw = $("conPw")?.value || "", pw2 = $("conPw2")?.value || "";
@@ -235,6 +235,9 @@ function adoptSection(n){
 // with the machine where it was. The list of what would be made is the
 // controller's (adopt-apps plan), fetched once a read lands.
 let adoptPlan = null, adoptPlanFor = "";
+// What the person unticked, kept across redraws: "c:NAME" a container, "v:NAME"
+// a VM (the operator, 1 Nov: pick which to bring back, not all of them).
+const adoptSkip = new Set();
 function adoptAppsSection(n){
   const had = n.reported?.adopted, from = state?.firstboot?.apps_from;
   if (!had || !(had.mounts || []).length || !from) return "";
@@ -247,10 +250,19 @@ function adoptAppsSection(n){
   }
   const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r");
   if (adoptPlanFor !== key){ adoptPlanFor = key; adoptPlan = null; loadAdoptPlan(); }
-  const rows = (adoptPlan || []).map(a => [a.name, `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}`, {cls: a.notes.length ? "warn" : ""}]);
+  // Each a tick, ticked unless the person took it off; what cannot be made
+  // is said and has none.
+  const pick = (key, label, said, on, warn = false) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}${on === null ? " disabled" : ""}>
+      <b>${esc(label)}</b> <span class="sub${warn ? " warn" : ""}">${esc(said)}</span></label>`;
+  const rows = (adoptPlan || []).map(a => pick(`c:${a.name}`, a.name,
+    `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}`,
+    a.ok ? !adoptSkip.has(`c:${a.name}`) : null, a.notes.length > 0)).join("");
   const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
   const vms = (apps.vms || []).map(v => { const here = other[v.name];
-    return [v.name, here ? `${here.state}${here.autostart ? " · starts with the machine" : ""}` : `not defined here yet${v.autostart ? " · started with the machine there" : ""}`]; });
+    return here ? `<div class="ndcap adrow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${here.state}${here.autostart ? " · starts with the machine" : ""}`)}</span></div>`
+      : pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`)); }).join("");
+  const nC = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).length;
+  const nV = (apps.vms || []).filter(v => !other[v.name] && !adoptSkip.has(`v:${v.name}`)).length;
   const nets = Object.entries(from.networks || {});
   const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
     return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
@@ -259,12 +271,12 @@ function adoptAppsSection(n){
   return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
-      ${adoptPlan === null ? skRows(2) : factGrid(rows, "adfacts")}
+      ${adoptPlan === null ? skRows(2) : `<div class="adpick">${rows}</div>`}
       <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where BuilderBot keeps its own.</div>
       <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway)}"`, `Make the ${esc(k)} network`)).join("")}
-        ${btn('data-adoptapp="make"', "Make and start the containers", "primary")}</div>
-      ${vms.length ? `<div class="sub">The VMs</div>${factGrid(vms, "adfacts")}${vmActs}
-        <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn('data-adoptapp="define"', "Define the VMs", "primary") : ""}</div>` : ""}
+        ${btn(`data-adoptapp="make"${nC ? "" : " disabled"}`, `Make and start ${nC === (adoptPlan || []).filter(a => a.ok).length ? "the containers" : nC ? `the ${nC} ticked` : "the ticked"}`, "primary")}</div>
+      ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}
+        <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === (apps.vms || []).filter(v => !other[v.name]).length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary") : ""}</div>` : ""}
     </div>`);
 }
 
@@ -276,6 +288,10 @@ async function loadAdoptPlan(){
 
 function wireAdoptApps(root){
   const n = ownMachine();
+  root.querySelectorAll("[data-adpick]").forEach(c => c.onchange = () => {
+    if (c.checked) adoptSkip.delete(c.dataset.adpick); else adoptSkip.add(c.dataset.adpick);
+    nodesRev++; drawPanes();
+  });
   root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.adoptapp, from = state?.firstboot?.apps_from || {};
     if (act === "read"){
@@ -284,14 +300,14 @@ function wireAdoptApps(root){
       notify(j.error || "reading: the containers and VMs it ran are listed here when it is done", !!j.error);
     } else if (act === "define"){
       const other = new Set((n.reported?.vms_other || []).map(v => v.name));
-      const names = (n.reported?.adopted?.apps?.vms || []).map(v => v.name).filter(x => !other.has(x));
+      const names = (n.reported?.adopted?.apps?.vms || []).map(v => v.name).filter(x => !other.has(x) && !adoptSkip.has(`v:${x}`));
       if (!await askYes(`Define ${names.length} VM${names.length === 1 ? "" : "s"} in this machine's libvirt?\n\n${names.join(", ")}\n\nEach keeps its disks where they are; its network bridge becomes the LAN through this machine's interface, and those that started with the machine there do here.`,
           {title: "Define the VMs?", verb: "Define"})) return;
       busy(b, "Defining");
       const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names})).json().catch(() => ({error: "no answer"}));
       notify(j.error || "defining: its job says each VM's changes", !!j.error);
     } else {
-      const names = (adoptPlan || []).filter(a => a.ok).map(a => a.name);
+      const names = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).map(a => a.name);
       busy(b, "Making");
       const m = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "make", id: n.id, names})).json().catch(() => ({error: "no answer"}));
       if (m.error){ notify(m.error, true); return; }
@@ -364,5 +380,5 @@ function wireHeld(root){
   wireStick(root);
   wireAdopt(root);
   wireAdoptApps(root);
-  wireConsole(root);
+  wireMachineConsole(root);
 }
