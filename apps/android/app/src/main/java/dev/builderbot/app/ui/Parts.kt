@@ -1,7 +1,7 @@
 // The app's look, in one place: the few shapes every screen is built from,
 // painted in the dashboard's own tokens (Theme.kt, the scheme in front).
 // A pill, a tag, a panel with a hairline and an optional color bar, a
-// section head in the card-title voice, and the robot mark. The dashboard's
+// section head in the card-title voice, and the raptor mark. The dashboard's
 // design language (docs/design-language.md) is the reference: a filled
 // accent surface is the deep accent with ink on it, a hairline is the line
 // token, corners are 8dp for a surface and 6dp for a control, and severity
@@ -31,6 +31,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -134,19 +135,35 @@ fun Dot(color: Color) {
     Spacer(Modifier.width(6.dp))
 }
 
-/** The dashboard's mark (index.html's #bb-mask, static/favicon.svg): a
- *  rounded head, an antenna, two eyes and a mouth cut out of it. Drawn in
- *  code rather than shipped as an image, the way the site draws it. */
+/** The dashboard's mark (index.html's header, static/mark.svg): a raptor with
+ *  its wings swept back, which is also the letter A. Drawn in code rather
+ *  than shipped as an image, the way the site draws it. */
 @Composable
 fun Mark(size: Dp = 22.dp, color: Color = Accent) {
     Canvas(Modifier.size(size)) {
         val u = this.size.width / 32f
-        val bg = Bg
-        drawRoundRect(color, Offset(4 * u, 8.5f * u), Size(24 * u, 17 * u), CornerRadius(5.5f * u))
-        drawRoundRect(color, Offset(15 * u, 3.5f * u), Size(2 * u, 6 * u), CornerRadius(u))
-        drawCircle(color, 2.3f * u, Offset(16 * u, 3 * u))
-        drawCircle(bg, 2.1f * u, Offset(11.4f * u, 15.4f * u))
-        drawCircle(bg, 2.1f * u, Offset(20.6f * u, 15.4f * u))
-        drawRoundRect(bg, Offset(10.6f * u, 19.6f * u), Size(10.8f * u, 2.6f * u), CornerRadius(1.3f * u))
+        val left = Path().apply {
+            moveTo(16 * u, 3 * u)
+            quadraticBezierTo(11 * u, 11 * u, 2 * u, 27 * u)
+            quadraticBezierTo(9 * u, 23.5f * u, 12.2f * u, 19.5f * u)
+            lineTo(16 * u, 23 * u)
+            close()
+        }
+        val right = Path().apply {
+            moveTo(16 * u, 3 * u)
+            quadraticBezierTo(21 * u, 11 * u, 30 * u, 27 * u)
+            quadraticBezierTo(23 * u, 23.5f * u, 19.8f * u, 19.5f * u)
+            lineTo(16 * u, 23 * u)
+            close()
+        }
+        val tail = Path().apply {
+            moveTo(16 * u, 23 * u)
+            lineTo(13.2f * u, 27.5f * u)
+            quadraticBezierTo(16 * u, 29.6f * u, 18.8f * u, 27.5f * u)
+            close()
+        }
+        drawPath(left, color)
+        drawPath(right, color.copy(alpha = 0.62f))
+        drawPath(tail, color)
     }
 }
