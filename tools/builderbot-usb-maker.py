@@ -263,6 +263,9 @@ class Maker(tk.Tk):
             work_dir = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BuilderBot USB Maker")
             os.makedirs(work_dir, exist_ok=True)
             os.chdir(work_dir)
+            if not stick.is_admin():
+                raise Stopped("writing a stick needs Administrator: close this window and start it again, "
+                              "answering Yes when Windows asks; nothing was fetched or written")
             src = self.choice["source"].get()
             if src == "file":
                 image = self.choice["file"].get()
@@ -321,6 +324,10 @@ class Maker(tk.Tk):
 
 
 def main(extra=None, title=TITLE):
+    # Writing a disk needs Administrator: started without it (python, not
+    # the .exe), the window starts again as Administrator, Windows asking.
+    if stick.elevate():
+        return
     app = Maker(extra, title)
     app.protocol("WM_DELETE_WINDOW", lambda: app.destroy() if not app.busy or messagebox.askyesno(
         TITLE, "A stick is being written. Stop and close? The stick will not boot until it is written again.", parent=app) else None)

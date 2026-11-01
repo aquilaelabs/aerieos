@@ -40,6 +40,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -398,6 +399,30 @@ def patched(src, block, boot=None, mirror=None):
 
 
 # ---- the write ----------------------------------------------------------------
+def is_admin():
+    """Whether this runs with the right to write a whole disk: Administrator
+    on Windows, root elsewhere."""
+    if platform.system() == "Windows":
+        try:
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except (AttributeError, OSError):
+            return False
+    return not hasattr(os, "geteuid") or os.geteuid() == 0
+
+
+def elevate():
+    """On Windows without Administrator, start this same program again as
+    Administrator (Windows asks first) and say whether it was; the caller
+    then ends. A built .exe asks by its manifest, so this is for python."""
+    if platform.system() != "Windows" or is_admin():
+        return False
+    if getattr(sys, "frozen", False):
+        exe, args = sys.executable, sys.argv[1:]
+    else:
+        exe, args = sys.executable, [os.path.abspath(sys.argv[0]), *sys.argv[1:]]
+    return ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, subprocess.list2cmdline(args), None, 1) > 32
+
+
 def open_disk(dev):
     """The disk opened for writing whole: on Windows every volume on it is
     locked and dismounted first, so the write is not undone by the system
@@ -409,19 +434,45 @@ def open_disk(dev):
         n = int(m.group(1))
         ps = f"Get-Partition -DiskNumber {n} -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter"
         letters = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout.split()
+        if not is_admin():
+            die("writing a whole disk on Windows needs Administrator: start this again as Administrator; nothing written")
+        from ctypes import wintypes
         k32 = ctypes.windll.kernel32
+        k32.CreateFileW.restype = wintypes.HANDLE
+        k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                    wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        k32.DeviceIoControl.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+                                        ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
         GENERIC_RW, SHARE_RW, OPEN_EXISTING = 0xC0000000, 0x3, 3
         FSCTL_LOCK_VOLUME, FSCTL_DISMOUNT_VOLUME = 0x00090018, 0x00090020
+        bad = wintypes.HANDLE(-1).value
         handles = []
+
+        def let_go(why):
+            for h in handles:
+                k32.CloseHandle(h)
+            die(why)
+        # Each volume locked before it is dismounted, and the write refused
+        # when one will not lock: a volume still mounted makes Windows refuse
+        # the raw write part way, or remount it under the write.
         for letter in letters:
             h = k32.CreateFileW(f"\\\\.\\{letter}:", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
-            if h in (0, -1):
-                continue
-            out = ctypes.c_ulong(0)
-            k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
-            k32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
+            if not h or h == bad:
+                let_go(f"{letter}: on the stick would not open: nothing written")
             handles.append(h)
-        f = open(f"\\\\.\\PhysicalDrive{n}", "r+b", buffering=0)
+            out = wintypes.DWORD(0)
+            for _ in range(40):
+                if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
+                    break
+                time.sleep(0.25)
+            else:
+                let_go(f"{letter}: on the stick is in use (a window or a program has it open): close it and write again; nothing written")
+            k32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
+        try:
+            f = open(f"\\\\.\\PhysicalDrive{n}", "r+b", buffering=0)
+        except OSError as e:
+            let_go(f"Windows would not open the stick for writing ({e.strerror}): close anything showing it, unplug it and plug it in, and write again; nothing written")
         f.bb_handles = handles  # kept open until the write ends, so the lock holds
         return f
     if platform.system() == "Darwin":
@@ -504,6 +555,8 @@ def pick(dev):
 
 def cmd_write(a):
     d = pick(a.disk)
+    if platform.system() == "Windows" and not is_admin():
+        die("writing a whole disk on Windows needs Administrator: open the command prompt as Administrator and run this again")
     image = a.image
     if not image:
         image = release_image(a.release or "latest", a.channel)
