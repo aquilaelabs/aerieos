@@ -429,6 +429,15 @@ until a visit ends. An image built before this feature cannot boot from files,
 so it is said and not kept. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.
 
+**The short address.** On a controller's own machine the dashboard stays on its
+port, and plain `http://THE-MACHINE/` finds it: a small redirect holds port 80
+while nothing else wants it. It lets go as soon as the machine has an nginx
+container, and for as long as containers are being started, so nothing that
+publishes port 80 finds it taken by this. Once nginx holds the port the short
+address stops: nginx closes a request that names none of your sites and never
+points it at the dashboard, so use the address with its port, or give the
+dashboard a route of its own on the nginx page.
+
 **The boot menu.** Each slot is named with its version, the slot that
 boots is the default after four seconds, and **Safe mode** boots the slot
 that runs now with the start held: the dashboard and the shares come up

@@ -40,6 +40,7 @@ from .extmounts import ExtMountsMixin
 from .backups import BackupsMixin
 from .packconfig import PackConfigMixin
 from .vms import VmsMixin
+from . import http80
 from . import storage
 
 
@@ -121,6 +122,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             console_apply()
         except (OSError, subprocess.SubprocessError) as e:
             log(f"console: the admin account was not made: {e}")
+        # http://THE-MACHINE/ finds the dashboard, on its own machine (R202).
+        http80.start()
         self.screen = ScreenRelay(self)    # its VMs' screens, for the dock (R99)
         self.wssync = WorkspaceSync(self)  # its projects as a synced copy, where it holds them so (R162)
         self.claudesync = ClaudeMirror(self, self.wssync)  # ...and its sessions' conversations with them (B613)

@@ -18,6 +18,7 @@
 - A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
 - Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
 - BuilderBot OS keeps the versions an update replaces, the three newest by default: each is on the boot menu under Older versions and on This machine, a visit lasting one boot with the configuration as it was (300599f)
+- On a bare-metal or USB install, plain http://the-machine/ finds the dashboard: a redirect on port 80 until nginx or anything else takes the port (2a102c2)
 
 ### Changed
 

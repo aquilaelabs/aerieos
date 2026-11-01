@@ -11,6 +11,8 @@ import threading
 import time
 import traceback
 import urllib.request
+
+from . import http80
 from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log
 from .toolchains import sdk_env
 
@@ -234,7 +236,9 @@ class Job(threading.Thread):
             elif self.job.get("type") == "system":
                 state, code = self.agent.system(self, spec)
             elif self.job.get("type") == "compose":
-                state, code = self.agent.compose(self, spec)
+                # Port 80 let go while containers start (R202).
+                with http80.paused():
+                    state, code = self.agent.compose(self, spec)
             elif self.job.get("type") == "scan":
                 # The node's own scanners over its projects (R145, scan.py).
                 state, code = self.agent.scan(self, spec)
