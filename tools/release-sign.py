@@ -37,12 +37,40 @@ def die(s) -> NoReturn:
     sys.exit(1)
 
 
+def token():
+    """Who is asking: a release starts as a draft, which GitHub shows only to
+    the repository's own people. GH_TOKEN, or gh's own sign-in."""
+    if os.environ.get("GH_TOKEN"):
+        return os.environ["GH_TOKEN"]
+    gh = shutil.which("gh")
+    if gh:
+        r = subprocess.run([gh, "auth", "token"], capture_output=True, text=True, check=False)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    return ""
+
+
 def get(url, raw=False):
     req = urllib.request.Request(url, headers={"User-Agent": "builderbot-release-sign",
-                                               **({} if raw else {"Accept": "application/vnd.github+json"})})
+                                               "Accept": "application/octet-stream" if raw else "application/vnd.github+json"})
+    t = token()
+    if t:
+        req.add_unredirected_header("Authorization", f"Bearer {t}")
     with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 (GitHub's own addresses)
         body = r.read()
     return body if raw else json.loads(body)
+
+
+def release_of(tag):
+    """The release for `tag`, a draft too: GitHub's look-up by tag never finds
+    one, so it is looked for among the listed."""
+    for page in (1, 2, 3):
+        rows = get(f"{API}/releases?per_page=50&page={page}")
+        for r in rows:
+            if r.get("tag_name") == tag:
+                return r
+        if len(rows) < 50:
+            break
+    die(f"no release for {tag} that you can see: a draft needs GH_TOKEN or gh signed in to an account of the repository")
 
 
 def keygen() -> str:
@@ -77,7 +105,7 @@ def cmd_sign(a):
     if not os.path.isfile(key):
         die(f"no release key at {key}: make it with tools/release-sign.py key, or name it with --key")
     try:
-        rel = get(f"{API}/releases/tags/{a.tag}")
+        rel = release_of(a.tag)
         ref = get(f"{API}/git/ref/tags/{a.tag}")
     except OSError as e:
         die(f"GitHub does not answer for {a.tag}: {e}")
@@ -89,10 +117,12 @@ def cmd_sign(a):
         die(f"{a.tag} names {sha[:12]}, not {a.commit}: not signed (the tag was moved, or this is not the release you cut)")
     if not a.commit and input("Is that the commit you cut this release from? Type yes: ").strip().lower() != "yes":
         die("not signed")
-    assets = {x["name"]: x["browser_download_url"] for x in rel.get("assets") or []}
+    # By the API's own address, which a draft's files answer at too.
+    assets = {x["name"]: x["url"] for x in rel.get("assets") or []}
     lines = []
     for name in sorted(assets):
-        if name.endswith(".sha256") or name in ("SHA256SUMS", "SHA256SUMS.sig"):
+        # The attestation vouches for the files by their hash itself.
+        if name.endswith((".sha256", ".attestation.jsonl")) or name in ("SHA256SUMS", "SHA256SUMS.sig"):
             continue
         if name + ".sha256" not in assets:
             die(f"{name} has no {name}.sha256 beside it: the release is not whole yet; wait for its builds")
