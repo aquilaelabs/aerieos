@@ -932,9 +932,14 @@ def release_plan(project, comp="", dev=False, stable=False):
         if on and (sha.startswith(on) or on.startswith(sha)):
             return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
-    if (_git(project, "status", "--porcelain") or "").strip():
+    dirty = (_git(project, "status", "--porcelain") or "").strip()
+    if dirty:
+        # Named, since the copy a session works in can be clean while the
+        # controller's holds a file nobody there can see (B628).
+        rows = dirty.splitlines()
+        shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
         return {"error": "there are uncommitted changes in the project directory: commit or "
-                         "discard them first, so the tag marks what is actually in the commit"}
+                         f"discard them first, so the tag marks what is actually in the commit ({shown})"}
     # A dev build is no release an install upgrades from, so it needs no
     # snapshot, as release() has it; planned with one, it was refused.
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
