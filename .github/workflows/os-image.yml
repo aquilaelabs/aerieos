@@ -194,10 +194,17 @@ jobs:
               code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
               case "$code" in
                 200|302|303)
+                  # The machine has to become its own node too, which takes a
+                  # little longer than the dashboard: a failure is said on the serial line.
+                  for _ in $(seq 1 24); do
+                    if grep -aq "did not become its controller's node" "$2"; then
+                      tail -c 3000 "$2"; echo "$3: the machine did not become its own node"; exit 1
+                    fi
+                    sleep 5
+                  done
                   kill "$(cat qemu.pid)" || true; sleep 2
-                  grep -aq "Command line:.*$3" "$2" || {
+                  grep -aq "the root is in memory, $3" "$2" || {
                     echo "the dashboard answered, but this boot was not $3"
-                    grep -a "Command line:" "$2" | head -3 || true
                     grep -a -E "AerieOS.*slot|in memory" "$2" | head -6 || true
                     tail -c 3000 "$2"
                     exit 1

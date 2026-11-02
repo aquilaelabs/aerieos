@@ -36,6 +36,7 @@ if [ -n "$kept" ]; then
     log_end_msg
     umount /run/bbdata
     losetup /dev/loop0 /run/bbroot/root.squashfs || panic "AerieOS: /dev/loop0 did not take version $kept"
+    echo "<5>AerieOS: the root is in memory, aeriekept=$kept" > /dev/kmsg 2>/dev/null || true
     exit 0
 fi
 [ "$toram" = 1 ] && [ -n "$slotdev" ] || exit 0
@@ -53,3 +54,4 @@ log_begin_msg "AerieOS: loading slot ($mb MB) into memory"
 dd if="$dev" of=/run/bbroot/root.squashfs bs=1M count="$mb" 2>/dev/null || panic "AerieOS: the slot did not copy into memory"
 log_end_msg
 losetup /dev/loop0 /run/bbroot/root.squashfs || panic "AerieOS: /dev/loop0 did not take the slot's copy"
+echo "<5>AerieOS: the root is in memory, aerietoram=1" > /dev/kmsg 2>/dev/null || true

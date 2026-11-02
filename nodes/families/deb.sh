@@ -44,6 +44,9 @@ pkg_refresh() {
 # pkg NAME...: install what is named, quietly.
 pkg() {
     if on_os_image; then
+        # The image removes its package database (CleanPackageMetadata), so
+        # there is nothing to ask: what it carries was settled when it was built.
+        [ -s "${BB_DPKG_STATUS:-/var/lib/dpkg/status}" ] || return 0
         local p alt have=0 miss=()
         for p in "$@"; do
             have=0

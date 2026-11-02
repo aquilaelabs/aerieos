@@ -187,6 +187,18 @@ class Installer(unittest.TestCase):
 
 
 class DebianOnTheImage(unittest.TestCase):
+    def test_an_image_with_no_package_database_is_taken_at_its_word(self):
+        # The image removes its database (CleanPackageMetadata), so asking it
+        # called every package missing and no machine became its own node.
+        with tempfile.TemporaryDirectory() as d:
+            rel = os.path.join(d, "release")
+            open(rel, "w", encoding="utf-8").close()
+            r = subprocess.run(["bash", "-c", f'. "{os.path.join(REPO, "nodes", "families", "deb.sh")}"; pkg no-such-package-zz && echo took'],
+                               capture_output=True, text=True, timeout=30, check=False,
+                               env=dict(os.environ, BB_OS_RELEASE=rel, BB_DPKG_STATUS=os.path.join(d, "gone")))
+        self.assertIn("took", r.stdout, r.stderr)
+        self.assertNotIn("not in the AerieOS image", r.stderr)
+
     def test_a_package_the_image_has_passes_and_one_it_lacks_is_named(self):
         with tempfile.TemporaryDirectory() as d:
             rel = os.path.join(d, "release")
