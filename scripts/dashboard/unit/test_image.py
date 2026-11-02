@@ -193,9 +193,8 @@ class DebianOnTheImage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rel = os.path.join(d, "release")
             open(rel, "w", encoding="utf-8").close()
-            r = subprocess.run(["bash", "-c", f'. "{os.path.join(REPO, "nodes", "families", "deb.sh")}"; pkg no-such-package-zz && echo took'],
-                               capture_output=True, text=True, timeout=30, check=False,
-                               env=dict(os.environ, BB_OS_RELEASE=rel, BB_DPKG_STATUS=os.path.join(d, "gone")))
+            r = sh(". nodes/families/deb.sh; pkg no-such-package-zz && echo took",
+                   {"BB_OS_RELEASE": rel, "BB_DPKG_STATUS": os.path.join(d, "gone")})
         self.assertIn("took", r.stdout, r.stderr)
         self.assertNotIn("not in the AerieOS image", r.stderr)
 
