@@ -5,10 +5,12 @@ moved, and what the new home answers a node's knock; and the second pass
 (R175): the move armed with no life and the bundle packed fresh, a late
 node handed its challenge after the move, the landing told both ways under
 the move key, the pull's proof, the pieces, and the nodes not yet here."""
+import io
 import json
 import os
 import shutil
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -365,6 +367,22 @@ class Move(unittest.TestCase):
         self.assertTrue(move.forget("user:ann")["ok"])
         r = move.prepare("user:ann", "", stores=[])
         self.assertNotIn("gitrelay", r["counts"], "no store ticked, none carried")
+
+    def test_the_install_key_under_the_secrets_travels_only_by_its_tick(self):
+        # B619: an install keeps its key at secrets/install-key (lib/boot.sh);
+        # the secrets are packed whole, and the key went with them unticked.
+        (self.secrets / "install-key").mkdir()
+        (self.secrets / "install-key" / "key").write_bytes(b"k" * 32)
+        (self.secrets / "install-key" / "key-previous").write_bytes(b"p" * 32)
+        for carry in (False, True):
+            raw, counts = move.pack(carry_key=carry)
+            names = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz").getnames()
+            self.assertIn("secrets/deploy.env", names)
+            self.assertFalse([n for n in names if n.startswith("secrets/install-key")], f"carry_key={carry}: the key's folder stays out of the secrets")
+            self.assertEqual(("install-key" in names, counts.get("install_key")), (carry, 1 if carry else None))
+            self.assertEqual(counts["secrets"], 1, "the deploy key alone")
+        pcs = {p["key"]: p for p in move.pieces()}
+        self.assertEqual(pcs["secrets"]["size"], len("DEPLOY=1\n"), "the tick's size leaves the key's folder out too")
 
 
 if __name__ == "__main__":

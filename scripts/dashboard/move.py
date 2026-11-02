@@ -239,6 +239,9 @@ def _tar_tree(tar, src, arc, leave=()):
 # The stores a bundle leaves out unless ticked (R175 step 7): what LEAVE
 # leaves out of the state when they live under it.
 STORES_OFF = {"logs", "job-snapshots"}
+# What the secrets folder holds that is not the secrets: the install key's
+# folder (installkey.py), carried only by its own tick (B619).
+SECRETS_LEAVE = {"install-key"}
 
 
 # How long a piece is measured for (B432: the workspace on a share took
@@ -292,7 +295,7 @@ def pieces():
         if path and not str(path).startswith(str(STATE)):
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
-        out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True))
+        out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
     out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the projects folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     return out
@@ -496,8 +499,11 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
             counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
     if repos:
         counts["repos"] = _tar_tree(tar, WORKSPACE, "workspace")
+    # The install key's own folder under the secrets (lib/boot.sh
+    # install_key_made) stays out: the key travels only as the entry below,
+    # when ticked (B619).
     if SECRETS and Path(SECRETS).is_dir():
-        counts["secrets"] = _tar_tree(tar, SECRETS, "secrets")
+        counts["secrets"] = _tar_tree(tar, SECRETS, "secrets", leave=SECRETS_LEAVE)
     if carry_key:
         k = install_key() or b""
         if k:
