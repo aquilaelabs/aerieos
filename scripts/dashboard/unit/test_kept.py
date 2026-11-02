@@ -93,6 +93,33 @@ class Keeping(unittest.TestCase):
         self.assertEqual(av.kept_list(), [])
         self.assertEqual(read(self.w.env["BB_OS_ESP"], "grub", "kept.cfg"), "", "an empty menu")
 
+    def test_a_pruned_version_named_for_the_next_boot_is_unnamed(self):
+        # B620: Boot this next named 0.9.1 (aerie_kept_next in grubenv), then
+        # an update pruned it; GRUB's default named an entry the menu no
+        # longer had and booted slot A, whichever slot was in use.
+        tool, log = os.path.join(self.w.d, "slot"), os.path.join(self.w.d, "slot.log")
+        open(tool, "w").write(f'#!/bin/sh\necho "$@" >> {log}\n')
+        envf = os.path.join(self.w.env["BB_OS_ESP"], "grub", "grubenv")
+        open(envf, "w").write("# GRUB Environment Block\naerie_slot=b\naerie_kept_next=0.9.1\n" + "#" * 40 + "\n")
+        with mock.patch.dict(os.environ, {"BB_OS_SLOT": tool}):
+            for i, v in enumerate(("0.9.1", "0.9.2")):
+                self.keep(v)
+                os.utime(os.path.join(av.kept_dir(), v, "root.squashfs"), (1000 + i, 1000 + i))
+            self.assertFalse(os.path.exists(log), "nothing unnamed while 0.9.1 is kept")
+            said = self.keep("0.9.3", keep=2)
+            self.assertEqual([r["version"] for r in av.kept_list()], ["0.9.3", "0.9.2"])
+            self.assertEqual(read(log).split(), ["kept-next"], "the tool clears the name, nothing else")
+            self.assertIn("0.9.1 was to boot next, once", said)
+            # One not named is left alone; and the room-making prune unnames too.
+            os.unlink(log)
+            open(envf, "w").write("# GRUB Environment Block\naerie_kept_next=0.9.3\n")
+            av._prune_kept(1, lambda s: None)
+            self.assertEqual([r["version"] for r in av.kept_list()], ["0.9.3"])
+            self.assertFalse(os.path.exists(log), "0.9.2 was not the one named")
+            with mock.patch.object(av.os, "statvfs", return_value=os.statvfs_result((4096, 4096, 10, 1, 1, 0, 0, 0, 0, 255))):
+                self.assertIn("free some", av._room(self.w.env["BB_OS_WORK"], 1 << 30))
+            self.assertEqual((av.kept_list(), read(log).split()), ([], ["kept-next"]), "0.9.3 gave way and was unnamed")
+
     def test_what_is_not_kept_is_said_and_stops_nothing(self):
         self.assertIn("built before", self.keep("0.9.0", boots=False))
         self.assertEqual(av.kept_list(), [])

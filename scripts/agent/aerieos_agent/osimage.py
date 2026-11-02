@@ -223,13 +223,39 @@ def write_kept_menu(esp=None):
     os.replace(os.path.join(grub, "kept.cfg.new"), os.path.join(grub, "kept.cfg"))
 
 
+def _unname_kept(ver, say):
+    """A version no longer kept, taken off the next boot where Boot this next
+    named it (slot kept-next, aerie_kept_next in grubenv): GRUB with a default
+    its menu no longer has boots its first entry, slot A, whichever slot is in
+    use (B620). Read from the environment block itself, cleared by the tool."""
+    envf = os.path.join(_env("BB_OS_ESP", ESP), "grub", "grubenv")
+    try:
+        with open(envf, encoding="utf-8", errors="replace") as f:
+            named = f"aerie_kept_next={ver}" in (ln.strip() for ln in f)
+    except OSError:
+        return
+    if not named:
+        return
+    try:
+        subprocess.run(["bash", _env("BB_OS_SLOT", SLOT_TOOL), "kept-next"], capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return
+    say(f"{ver} was to boot next, once; it is not kept any more, so the next boot is this version's slot\n")
+
+
+def _drop_kept(ver, say):
+    """One kept version removed, and unnamed for the next boot."""
+    shutil.rmtree(os.path.join(kept_dir(), ver), ignore_errors=True)
+    _unname_kept(ver, say)
+
+
 def _prune_kept(keep, say, spare=""):
     """Down to `keep` versions, oldest first, never `spare`."""
     for r in reversed(kept_list()):
         if len(kept_list()) <= keep:
             break
         if r["version"] != spare:
-            shutil.rmtree(os.path.join(kept_dir(), r["version"]), ignore_errors=True)
+            _drop_kept(r["version"], say)
             say(f"{r['version']} is no longer kept\n")
 
 
@@ -326,7 +352,7 @@ def _room(where, size):
     free, need = st.f_bavail * st.f_frsize, int(size * ROOM)
     # Kept older versions give way, oldest first, before an update is refused.
     while size and free < need and kept_list():
-        shutil.rmtree(os.path.join(kept_dir(), kept_list()[-1]["version"]), ignore_errors=True)
+        _drop_kept(kept_list()[-1]["version"], lambda s: None)
         write_kept_menu()
         st = os.statvfs(where)
         free = st.f_bavail * st.f_frsize
