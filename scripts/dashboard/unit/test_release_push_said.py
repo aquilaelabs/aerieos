@@ -80,6 +80,13 @@ class DevTag(unittest.TestCase):
         self.assertNotIn("stray-tool.py", p["error"])
         self.assertIn("uncommitted changes", version.release("app", push=False, dev=True).get("error", ""))
         git(d, "checkout", "--", "kept.txt")
+        # The VERSION file itself is the one untracked file that counts: the
+        # tag's number comes from it, so it has to be in the commit.
+        (d / "VERSION").write_text("1.2.4\n")
+        p = version.release_plan("app", dev=True)
+        self.assertIn("uncommitted changes", p.get("error", ""), p)
+        self.assertIn("VERSION", p["error"])
+        git(d, "checkout", "--", "VERSION")
         r = version.release("app", push=False, dev=True)
         self.assertTrue(r.get("ok"), r)
         self.assertTrue((d / "stray-tool.py").exists(), "the untracked file is left where it was")

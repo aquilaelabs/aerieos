@@ -894,6 +894,28 @@ def channel_of(project, dev=False, stable=False):
                  else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
 
 
+def _uncommitted(project, comp=""):
+    """What would make the tag mark something other than the commit: a
+    tracked file changed, or the VERSION file the tag's number comes from
+    not committed (untracked or changed). Other untracked files are in no
+    commit either way, so they do not count: the controller's copy of a tree
+    carries the files a session keeps out of git with .git/info/exclude,
+    which is each clone's own and does not travel, and every tag was refused
+    for 'uncommitted changes' the session's own status never showed (B628).
+    The rows, "" when clean."""
+    rows = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
+    where = _sub(project, comp)
+    if where is not None:
+        try:
+            rel = str((where / VERSION_FILE).relative_to(root(project).resolve()))
+        except ValueError:
+            rel = VERSION_FILE
+        vrow = (_git(project, "status", "--porcelain", "--", rel) or "").strip()
+        if vrow and vrow not in rows:
+            rows = (rows + "\n" + vrow).strip()
+    return rows
+
+
 def release_plan(project, comp="", dev=False, stable=False):
     """What a release here would tag, without doing it: {tag, sha, target}
     or {error}, from the same refusals release() makes first. A session's
@@ -932,12 +954,7 @@ def release_plan(project, comp="", dev=False, stable=False):
         if on and (sha.startswith(on) or on.startswith(sha)):
             return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
-    # Tracked files only: an untracked file is in no commit, so the tag marks
-    # the commit whether or not it is beside it; the controller's copy of a
-    # tree carries files a session keeps out of git with .git/info/exclude,
-    # which is each clone's own and does not travel, so it refused every
-    # tag for files the session's own status never showed (B628).
-    dirty = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
+    dirty = _uncommitted(project, comp)
     if dirty:
         # Named, since the copy a session works in can be clean while the
         # controller's holds a change nobody there can see (B628).
@@ -1053,9 +1070,8 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
                          f"moved from here: bump to the next number, or move it "
                          f"yourself in a terminal if it was never pushed."}
     # A dirty tree is not what the tag would mark: the tag names a commit,
-    # and a tracked file changed beside it is not in it. An untracked file
-    # is in no commit either way (B628, as in plan()).
-    dirty = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
+    # and a tracked file changed beside it is not in it (B628, _uncommitted).
+    dirty = _uncommitted(project, comp)
     if dirty:
         rows = dirty.splitlines()
         shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
