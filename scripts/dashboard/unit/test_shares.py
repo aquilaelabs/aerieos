@@ -158,6 +158,31 @@ class TheAgent(unittest.TestCase):
         self.assertFalse(os.path.exists(users_file))
         self.assertTrue(a.state.get("smb_users_sig"))
 
+    def test_an_accounts_user_the_share_names_is_made_here_when_missing(self):
+        # B633 (the VM walk, 2 Nov): a share adopted from another system
+        # named a person who had never signed in, so their bbu- user was not
+        # here yet and the whole share was refused; it is made at share time.
+        made = []
+
+        def run(argv, **kw):
+            made.append(argv)
+            return mock.Mock(returncode=0, stderr="", stdout="")
+        with mock.patch.object(self.sm.subprocess, "run", side_effect=run):
+            state, code, text = self.run_job({"share": "set", "name": "photos", "path": "/mnt/tank/photos",
+                                              "smb": {"on": True, "users": ["bbu-0a1b2c3d", "bbu-deadbeef"]}})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertEqual([a[-1] for a in made if a[0] == "useradd"], ["bbu-deadbeef"], "the missing one made, the one here left")
+        self.assertIn("-G", made[0]); self.assertIn("bbu", made[0])
+        self.assertIn("bbu-deadbeef made here for the share: they reach it over SMB once their password is set on Profile", text)
+        self.assertIn("valid users = bbu-0a1b2c3d bbu-deadbeef", open(self.smb).read())
+        # One useradd cannot make: said, nothing written.
+        before = open(self.smb).read()
+        with mock.patch.object(self.sm.subprocess, "run", return_value=mock.Mock(returncode=1, stderr="useradd: UID range exhausted", stdout="")):
+            state, code, text = self.run_job({"share": "set", "name": "more", "path": "/mnt/tank/photos", "smb": {"on": True, "users": ["bbu-feedface"]}})
+        self.assertEqual(state, "failed")
+        self.assertIn("could not be made: useradd: UID range exhausted", text)
+        self.assertEqual(open(self.smb).read(), before)
+
     def test_what_is_refused_writes_nothing(self):
         before = open(self.smb).read()
         for cfg, why in (({"share": "set", "name": "x", "path": "/home/ada", "smb": {"on": True, "guest": True}}, "under /mnt or /srv"),

@@ -189,6 +189,20 @@ class SharesMixin:
         except (OSError, subprocess.SubprocessError):
             return ""
 
+    def _make_account_user(self, name):
+        """An account's user made as smb_users_want makes one (a system
+        user, no home, no login shell, the bbu group); "" or why not."""
+        group = getattr(self, "_account_group", None)
+        if group:
+            group()
+        p = subprocess.run(["useradd", "-r", "-M", "-U", "-d", "/nonexistent", "-s", "/usr/sbin/nologin", "-G", "bbu", name],
+                           capture_output=True, text=True, timeout=30, check=False)
+        if p.returncode != 0:
+            why = (p.stderr or "").strip()[:160] or f"useradd exit {p.returncode}"
+            log(f"shares: could not make {name}: {why}")
+            return why
+        return ""
+
     def _apply_storage_share(self, job, cfg):
         say = job.say
         if os.geteuid() != 0:
@@ -249,8 +263,22 @@ class SharesMixin:
                         import pwd
                         pwd.getpwnam(u)
                     except KeyError:
-                        say(f"refused: {u} is not a user this machine has (an account's own user is made when it first signs in here)\n")
-                        return "failed", 66
+                        # An account's own user (bbu-ID, named by the
+                        # controller for an account it has) is made here
+                        # when the share names it, as it would be at the
+                        # account's first sign-in: a share adopted from
+                        # another system names people who have never signed
+                        # in (B633, the VM walk of 2 Nov: 'backups' for two
+                        # people refused). A name that is not an account's
+                        # is still refused.
+                        if not re.fullmatch(r"bbu-[0-9a-f]{8}", u):
+                            say(f"refused: {u} is not a user this machine has (an account's own user is made when it first signs in here)\n")
+                            return "failed", 66
+                        why = self._make_account_user(u)
+                        if why:
+                            say(f"refused: {u} is not a user this machine has and could not be made: {why}\n")
+                            return "failed", 66
+                        say(f"{u} made here for the share: they reach it over SMB once their password is set on Profile\n")
             clients = [str(c) for c in (nfs.get("clients") or []) if isinstance(c, str)]
             if nfs.get("on"):
                 if not clients:
