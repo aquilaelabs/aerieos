@@ -110,6 +110,16 @@
 - Configure on the card: a tool pack says in its manifest what it asks for on a node (keys, choices, a list of endpoints, a switch, the projects allowed), a new Installed page under Machines, with the node picked, lists what the Library put there and draws that form on each row, keeps the answers sealed and hands them to that node for the pack's verbs; an agent's sign-in, a toolchain's system packages and Remove live there too, the Library's cards showing the catalog's entry alone; the Model router is installed from the Library and configured on Installed, and its section leaves the node's page (5155820)
 - A person keeps one token for each git host and sign-in: a new one replaces the one before in place, every project using it moves to the new one, and the older tokens an install already kept for the same host are let go at the upgrade (fb7bd4d)
 
+### Fixed
+
+- The USB maker and the installer take the newest published build that carries their file, by its exact name: a dev build from before the name carries builderbot-os and builderbot-controller files, and the maker took one, asked for an aerieos-os image that was not there and stopped (84604c8)
+- On Windows the USB maker's first write after the stick's partitions are cleared no longer stops at 'the device is not ready': the write waits for the stick for up to thirty seconds, and a Windows refusal is said in Windows' own words (84604c8)
+- A stick's first boot sets the hostname and the time zone its prepared configuration names; they were left at aerieos and UTC, with both under failed on This machine (84604c8)
+- The Storage page shows a disk as mounted as soon as Disks from the stick has adopted it, instead of 'not mounted' until the hourly walk or Measure now (84604c8)
+- Serve the shares on This machine no longer refuses a share for a person who has not signed in yet: their user is made on the machine when the share names them, and they reach it over SMB once their password is set on Profile (84604c8)
+- A release is no longer refused for 'uncommitted changes' over files git does not track; a changed tracked file still refuses it, named (84604c8)
+- A dev build's files all land on one release: the apps, the controller bundle and the OS image each found the tag's draft among the drafts, where two drafts had been made for one tag (84604c8)
+
 ### Security
 
 - Every seal is on vetted cryptography: what the controller keeps sealed (the accounts' keys and key stores, the signing keys, the settings' secrets, two-factor secrets) is ChaCha20-Poly1305 under a key HKDF derives from the install key or the account's, and a node seals the coding agents' sign-ins with X25519 and ChaCha20-Poly1305, all from the cryptography library in the image and on every node; what was sealed the way before is sealed again at the next start, and on a node the next time its person opens a terminal there, and the old format is still read this release (1e534c6)
