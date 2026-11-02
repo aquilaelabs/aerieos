@@ -47,6 +47,45 @@ def run(*argv):
         return str(e)
 
 
+ETC = os.environ.get("BB_ETC", "/etc")
+ZONEINFO = os.environ.get("BB_ZONEINFO", "/usr/share/zoneinfo")
+KHOST = os.environ.get("BB_KERNEL_HOSTNAME", "/proc/sys/kernel/hostname")
+
+
+def set_hostname(host):
+    """The hostname written where systemd reads it at every boot (/etc/hostname)
+    and set on the running kernel: what hostnamectl does, without the bus.
+    This runs from aerieos-os-env.service, before D-Bus is up, where
+    hostnamectl and timedatectl answered 'Failed to connect to system scope
+    bus' and the stick's hostname and time zone were never set (2 Nov, the
+    first boot of 0.9.0-dev.4809 in a VM)."""
+    try:
+        with open(os.path.join(ETC, "hostname"), "w", encoding="utf-8") as f:
+            f.write(host + "\n")
+        with open(KHOST, "w", encoding="utf-8") as f:
+            f.write(host)
+    except OSError as e:
+        return f"could not set: {e}"
+    return "applied"
+
+
+def set_timezone(zone):
+    """/etc/localtime pointed at the zone's file and /etc/timezone named, as
+    timedatectl sets them, without the bus."""
+    try:
+        link = os.path.join(ETC, "localtime")
+        tmp = link + ".new"
+        if os.path.lexists(tmp):
+            os.unlink(tmp)
+        os.symlink(os.path.join("..", "usr", "share", "zoneinfo", zone) if ZONEINFO == "/usr/share/zoneinfo" else os.path.join(ZONEINFO, zone), tmp)
+        os.replace(tmp, link)
+        with open(os.path.join(ETC, "timezone"), "w", encoding="utf-8") as f:
+            f.write(zone + "\n")
+    except OSError as e:
+        return f"could not set: {e}"
+    return "applied"
+
+
 NETKEYS = (("address", "BB_NET_ADDRESS"), ("netmask", "BB_NET_MASK"), ("gateway", "BB_NET_GATEWAY"), ("dns", "BB_NET_DNS"))
 ADDR = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9]{1,2}")
 
@@ -146,10 +185,10 @@ def main():
     m = (cfg or {}).get("machine") or {}
     host, zone = str(m.get("hostname") or ""), str(m.get("timezone") or "")
     if host:
-        said["hostname"] = (run("hostnamectl", "set-hostname", host) or "applied") if HOST.fullmatch(host) else f"{host!r} is not a hostname"
+        said["hostname"] = set_hostname(host) if HOST.fullmatch(host) else f"{host!r} is not a hostname"
     if zone:
-        ok = ZONE.fullmatch(zone) and os.path.isfile(os.path.join("/usr/share/zoneinfo", zone))
-        said["timezone"] = (run("timedatectl", "set-timezone", zone) or "applied") if ok else f"{zone!r} is not a time zone here"
+        ok = ZONE.fullmatch(zone) and os.path.isfile(os.path.join(ZONEINFO, zone))
+        said["timezone"] = set_timezone(zone) if ok else f"{zone!r} is not a time zone here"
     net = network(m.get("network"))
     if net:
         said["network"] = net

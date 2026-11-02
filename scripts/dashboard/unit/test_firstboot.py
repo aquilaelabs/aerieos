@@ -57,6 +57,29 @@ class Take(unittest.TestCase):
             self.assertFalse(run.exists())
 
 
+    def test_the_hostname_and_time_zone_are_set_without_the_bus(self):
+        # 2 Nov, the first boot of 0.9.0-dev.4809 in a VM: hostnamectl and
+        # timedatectl answered 'Failed to connect to system scope bus', since
+        # aerieos-os-env.service runs before D-Bus; the files are written
+        # as those tools write them.
+        with tempfile.TemporaryDirectory() as d:
+            esp = Path(d, "esp", "aerieos"); esp.mkdir(parents=True)
+            (esp / "firstboot.json").write_bytes(b"AERIE-FIRSTBOOT-1\n" + json.dumps(CFG).encode() + b"\n")
+            etc = Path(d, "etc"); etc.mkdir()
+            zi = Path(d, "zoneinfo", "Europe"); zi.mkdir(parents=True); (zi / "Berlin").write_bytes(b"TZif")
+            khost = Path(d, "khost"); khost.write_text("localhost")
+            run = Path(d, "run")
+            r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
+                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
+                                        BB_ETC=str(etc), BB_ZONEINFO=str(Path(d, "zoneinfo")), BB_KERNEL_HOSTNAME=str(khost), PATH=d))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            handed = json.loads((run / "firstboot" / "firstboot.json").read_text())
+            self.assertEqual(handed["machine"], {"hostname": "applied", "timezone": "applied"}, handed)
+            self.assertEqual((etc / "hostname").read_text(), "tower\n")
+            self.assertEqual(khost.read_text(), "tower")
+            self.assertEqual(os.readlink(etc / "localtime"), str(Path(d, "zoneinfo", "Europe", "Berlin")))
+            self.assertEqual((etc / "timezone").read_text(), "Europe/Berlin\n")
+
     def test_a_static_address_becomes_the_sticks_own_network_settings(self):
         # R161 step 12: the configuration's network written into the stick's
         # aerieos.env in its 4 KiB, for every boot's network step, and into
