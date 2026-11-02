@@ -396,6 +396,7 @@ tools/bb-ref.sh                  writes the aerie block of docs/reference.md fro
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
 tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
+tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what every job that attaches a file to a release calls
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal

@@ -430,7 +430,6 @@ jobs:
           # the latest: the dev channel alone takes it. Every release starts
           # a draft, seen by the repository's own people alone, until its
           # owner has read its notes and publishes it (the operator, 1 Nov).
-          pre=(--draft); case "$TAG" in *-dev.*) pre+=(--prerelease --latest=false);; esac
           # The notes are the tree's when it has them for this version
           # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
           # @TAG@, @VER@ and @REPO@ filled in, so the release is published with
@@ -448,16 +447,19 @@ jobs:
             awk -v h="$head" 'index($0, h) == 1 {on = 1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
             grep -q '[^[:space:]]' notes.md || echo "AerieOS $ver: see CHANGELOG.md." > notes.md
           fi
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag "${pre[@]}" --title "$TAG" --notes-file notes.md
+          # One release per tag, found among the drafts and made once
+          # (tools/release-attach.sh): v0.9.0-dev.4797 got two drafts when the
+          # OS job could not see this job's.
+          bash tools/release-attach.sh "$TAG" --notes notes.md "$NAME" "$NAME.sha256" > attach.log
+          cat attach.log
+          case "$(head -1 attach.log)" in *" made for "*)
             # A release this job's own token publishes starts no workflow
             # (GitHub's rule), so the companion apps' release builds, which
             # a release published by a person starts, are started by name.
             for wf in android-app.yml companion-app.yml; do
               gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"
-            done
-          fi
-          gh release upload "$TAG" "$NAME" "$NAME.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+            done ;;
+          esac
 
   # The OS image (R160): built and booted by os-image.yml, which a branch
   # push touching the image also runs on its own, so a fix is proved without
@@ -477,6 +479,9 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          sparse-checkout: tools
       - uses: actions/download-artifact@v4
         with:
           name: aerieos-os
@@ -499,14 +504,12 @@ jobs:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
           tag="${GITHUB_REF_NAME}"
-          pre=(--draft); case "$tag" in *-dev.*) pre+=(--prerelease --latest=false);; esac
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag "${pre[@]}" --title "$tag" --notes "AerieOS ${tag#v}: see CHANGELOG.md."
           # The attestation's bundle beside them, one line: an update from a
           # folder verifies the ISO with it and no network, against the
           # trusted root the image carries.
           iso="$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
           jq -c . "$BUNDLE" > "${iso%.iso}.attestation.jsonl"
-          gh release upload "$tag" out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
+          # On the tag's one release, drafts included (tools/release-attach.sh).
+          bash tools/release-attach.sh "$tag" out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
             out/aerieos-os-*.stick.raw.xz out/aerieos-os-*.stick.raw.xz.sha256 \
-            "${iso%.iso}.attestation.jsonl" --repo "$GITHUB_REPOSITORY" --clobber
+            "${iso%.iso}.attestation.jsonl"

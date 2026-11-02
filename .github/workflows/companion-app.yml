@@ -64,10 +64,12 @@ jobs:
         run: |
           set -eo pipefail
           cd dist
+          files=()
           for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
             sha256sum "$f" > "$f.sha256"
-            gh release upload "$TAG" "$f" "$f.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+            files+=("$f" "$f.sha256")
           done
+          bash ../tools/release-attach.sh "$TAG" "${files[@]}"
 
   build:
     runs-on: windows-2025
@@ -134,7 +136,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
+          files=()
           for f in "$EXE" "$USBEXE"; do
             sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
-            gh release upload "$TAG" "$f" "$f.sha256" --clobber
+            files+=("$f" "$f.sha256")
           done
+          bash tools/release-attach.sh "$TAG" "${files[@]}"
