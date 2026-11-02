@@ -254,7 +254,7 @@ ok(await page.$eval('.phask', r => /Approve for this session/.test(r.textContent
    'a phone ask offers Approve and Approve for this session, in the bell\'s order and words');
 await page.click('.phask [data-allow]:not([data-session])');
 await page.waitForFunction(() => !document.querySelector('.phask'), null, { timeout: 20000 });
-await page.waitForFunction(() => document.title === 'AerieOS', null, { timeout: 15000 });
+await page.waitForFunction(() => document.title === 'Aerie Workshop', null, { timeout: 15000 });
 ok(true, '...and the badge clears when nothing is waiting');
 // The command runs on the node as a job once Allow is pressed, so its
 // outcome is waited for, not read the instant the badge clears: read at

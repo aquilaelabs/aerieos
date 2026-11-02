@@ -343,12 +343,16 @@ SETUP_2FA_FIELDS = """  <p class="note">A role of yours, <b><!--NAME--></b>, req
   })();
   </script>"""
 
+# What this install calls itself where it shows its name: the container is
+# Aerie Workshop, the AI workshop alone, and a machine of its own is AerieOS.
+PRODUCT = "AerieOS" if os.environ.get("BB_INSTALL", "") == "bare-metal" else "Aerie Workshop"
+
 LOGIN_HTML = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b1322">
-<title>AerieOS: <!--TITLE--></title>
+<title><!--PRODUCT-->: <!--TITLE--></title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
@@ -469,7 +473,7 @@ LOGIN_HTML = """<!doctype html>
     <path d="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z"/>
   </g>
     </svg></span>
-    <h1>AerieOS</h1>
+    <h1><!--PRODUCT--></h1>
     <p class="said"><!--SAID--></p>
   </div>
   <!--FIELDS-->
@@ -482,6 +486,7 @@ LOGIN_HTML = """<!doctype html>
 </script>
 </body></html>
 """
+LOGIN_HTML = LOGIN_HTML.replace("<!--PRODUCT-->", PRODUCT)
 
 # Every command the UI can run and every key it can press, by name, and the
 # operator's own command lists: macros.py (R77).
@@ -7328,6 +7333,8 @@ class Handler(BaseHTTPRequestHandler):
         tag = f'W/"{st.st_size:x}-{st.st_mtime_ns:x}"'
         if rel == "index.html":
             raw, tag = _versioned_page(raw, tag)
+            raw = (raw.replace(b"<title>AerieOS</title>", b"<title>" + PRODUCT.encode() + b"</title>", 1)
+                   .replace(b"<h1>AerieOS</h1>", b"<h1>" + PRODUCT.encode() + b"</h1>", 1))
         body, zipped = self._gzip(raw)
         if self.headers.get("If-None-Match") == tag:
             self.send_response(304)

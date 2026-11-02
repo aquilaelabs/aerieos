@@ -132,7 +132,7 @@ function abDrawCredits(){
   if (el.dataset.drawn) return;
   el.dataset.drawn = "1";
   const cols = [{label: "What"}, {label: "Here for"}, {label: "License"}];
-  el.innerHTML = `<p>AerieOS is made by <a href="https://aquilae.dev/" target="_blank" rel="noopener">aquilaeLabs LLC</a>, on other people's open work. Thank you to everyone behind it.</p>${
+  el.innerHTML = `<p>${state?.bare_metal ? "AerieOS" : "Aerie Workshop"} is made by <a href="https://aquilae.dev/" target="_blank" rel="noopener">aquilaeLabs LLC</a>, on other people's open work. Thank you to everyone behind it.</p>${
     AB_CREDITS.map(([head, rows]) => `<h4>${esc(head)}</h4>${tblWrap(cols, rows.map(([name, what, lic, url]) =>
       tblLine(cols, [url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name), esc(what), esc(lic)])).join(""), "abcred")}`).join("")}
     <p class="dim">The Android app is built with Kotlin and Jetpack Compose (Apache-2.0). AerieOS itself is Apache-2.0.</p>`;
