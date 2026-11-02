@@ -182,19 +182,19 @@ def latest():
 
 def newer():
     """The newest version on the channel in force when it is newer than
-    the build running, else "". On the normal channel a released version,
-    a dev build comparing by its target; on the dev channel the newest of
-    the releases and the dev pre-releases by rank, so a dev build moves to
-    a later dev build or to the release it was heading for."""
+    the build running, else "". On the normal channel a released version
+    alone; on the dev channel the newest of the releases and the dev
+    pre-releases. Both by rank, so a dev build moves to a later dev build
+    (dev channel) or to the release it was heading for (either channel: a
+    build that picked Releases again is offered the release, B618)."""
     lt = latest()
+    now = rank(_version()) or rank(str(_version() or "").split("+")[0]) or parse(str(_version() or "").split("-")[0])
+    if now and len(now) == 3:
+        now = (*now, 10 ** 9)
     if channel() == "dev":
-        now = rank(_version()) or rank(str(_version() or "").split("+")[0]) or parse(str(_version() or "").split("-")[0])
-        if now and len(now) == 3:
-            now = (*now, 10 ** 9)
         best = max((v for v in (lt.get("version", ""), (lt.get("dev") or {}).get("version", "")) if rank(v)), key=rank, default="")
         return best if best and now and rank(best) > now else ""
-    now = parse(_version()) or parse(str(_version() or "").split("-")[0])
-    want = parse(lt.get("version"))
+    want = rank(lt.get("version"))
     return lt["version"] if want and now and want > now else ""
 
 

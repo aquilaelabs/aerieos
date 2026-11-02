@@ -44,6 +44,10 @@ class ReleaseCheck(unittest.TestCase):
         self.assertEqual(releasecheck.attention("n_own"), [])
         releasecheck.configure(version=lambda: "0.9.1-dev.12+abc", bare_metal=lambda: True)
         self.assertEqual(releasecheck.newer(), "", "a dev build past the release is not behind it")
+        # B618: a dev build heading for the release stands below it on the
+        # normal channel too, so one that picked Releases again moves to it.
+        releasecheck.configure(version=lambda: "0.9.0-dev.4400+abc", bare_metal=lambda: True, channel=lambda: "normal")
+        self.assertEqual(releasecheck.newer(), "0.9.0", "a dev build moves to the release it was heading for")
         # A container install: nothing drawn, whatever the release.
         releasecheck.configure(version=lambda: "0.8.2", bare_metal=lambda: False)
         self.assertEqual((releasecheck.status(), releasecheck.attention("n_own")), ({}, []))
