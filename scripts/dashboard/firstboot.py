@@ -32,9 +32,9 @@ STATE = None
 POOL_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
-WAITS = {"shares": "a share is served from a pool or the array, adopted first",
-         "pools": "the pools are adopted from This machine's Storage, a later piece",
-         "array": "the array is adopted by its disks' serials, a later piece",
+WAITS = {"shares": "a share is served from a pool or the array once they are adopted",
+         "pools": "adopted on This machine, under Disks from the stick: Check, then Adopt",
+         "array": "adopted on This machine, under Disks from the stick: Check, then Adopt",
          "apps": "an app is a container made from New container once its folders' disks are here"}
 
 
