@@ -456,11 +456,24 @@ def clean_disk(n, tries=4):
         os.unlink(script)
 
 
+class DiskError(OSError):
+    """A Windows call on the disk that failed, said with Windows' own words
+    and error number. Its own class, since OSError(21, ...) read as
+    IsADirectoryError in a window (2 Nov: errno 21 is EISDIR, Windows
+    error 21 is 'the device is not ready')."""
+
+
+ERROR_NOT_READY = 21
+
+
 class WinDisk:
     """A disk opened whole on Windows, written and read with Windows' own
     calls (WriteFile, ReadFile, FlushFileBuffers): the C runtime's file on
     such a handle refused to write (EBADF). The volume handles are held with
-    it, and every lock goes when it is closed."""
+    it, and every lock goes when it is closed. A write met with 'the device
+    is not ready' is tried again for a while: Windows says that of a stick
+    for a moment after diskpart cleaned it, while it looks the disk over
+    again (2 Nov, the first write after the clean, nothing yet written)."""
 
     def __init__(self, h, held=()):
         from ctypes import wintypes
@@ -472,27 +485,45 @@ class WinDisk:
         k.CloseHandle.argtypes = [wintypes.HANDLE]
         self.dword = wintypes.DWORD
         self.h, self.held = h, list(held)
+        self.pos = 0
 
-    def _fail(self, what):
-        e = ctypes.get_last_error()
-        raise OSError(e, f"{what} the stick: {ctypes.FormatError(e).strip()} (Windows error {e})")
+    def _fail(self, what, e=None):
+        e = ctypes.get_last_error() if e is None else e
+        raise DiskError(f"{what} the stick: {ctypes.FormatError(e).strip()} (Windows error {e})")
 
-    def write(self, b):
+    def write(self, b, patience=30):
         n = self.dword(0)
-        if not self.k.WriteFile(self.h, bytes(b), len(b), ctypes.byref(n), None) or n.value != len(b):
-            self._fail("could not write to")
-        return n.value
+        b = bytes(b)
+        for i in range(patience + 1):
+            if self.k.WriteFile(self.h, b, len(b), ctypes.byref(n), None) and n.value == len(b):
+                self.pos += len(b)
+                return n.value
+            e = ctypes.get_last_error()
+            if e != ERROR_NOT_READY or i == patience:
+                if e == ERROR_NOT_READY:
+                    raise DiskError(f"the stick is not ready after {patience} seconds (Windows error {e}): a stick that was pulled, "
+                                    "a reader with no card in it, or one with a write-protect switch on; plug it in and write again")
+                self._fail("could not write to", e)
+            if i == 0:
+                say("  the stick is not ready yet (Windows is looking it over after the clean): waiting")
+            time.sleep(1)
+            # The pointer back where this write belongs: a failed write may
+            # or may not have moved it.
+            self.k.SetFilePointerEx(self.h, self.pos, None, 0)
+        return 0
 
     def read(self, size):
         buf = ctypes.create_string_buffer(size)
         n = self.dword(0)
         if not self.k.ReadFile(self.h, buf, size, ctypes.byref(n), None):
             self._fail("could not read")
+        self.pos += n.value
         return buf.raw[:n.value]
 
     def seek(self, pos):
         if not self.k.SetFilePointerEx(self.h, pos, None, 0):
             self._fail("could not seek on")
+        self.pos = pos
 
     def flush(self):
         pass

@@ -153,6 +153,53 @@ class Stick(unittest.TestCase):
                 self.assertEqual(d.read(4096), b"x" * 4096)
         self.assertEqual(closed, [7, 8, 9], "the disk and its volumes let go when it closes")
 
+    def test_a_write_met_with_not_ready_is_tried_again_and_said_once(self):
+        # 2 Nov: the first write after diskpart's clean met 'The device is not
+        # ready' (Windows error 21), shown as IsADirectoryError, and the
+        # maker stopped with nothing written.
+        import ctypes
+        refusals = [21, 21]
+        at, said, slept = [0], [], []
+
+        class Fn:
+            def __init__(self, f):
+                self.f, self.argtypes = f, None
+
+            def __call__(self, *a):
+                return self.f(*a)
+
+        def write(h, b, n, done, _o):
+            if refusals:
+                refusals.pop()
+                return 0
+            at[0] += n
+            done._obj.value = n
+            return 1
+        k = type("K", (), {})()
+        k.WriteFile, k.SetFilePointerEx = Fn(write), Fn(lambda h, pos, _n, _w: 1)
+        k.ReadFile = k.FlushFileBuffers = k.CloseHandle = Fn(lambda *a: 1)
+        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k), \
+                mock.patch.object(ctypes, "get_last_error", create=True, return_value=21), \
+                mock.patch.object(ctypes, "FormatError", create=True, return_value="The device is not ready."), \
+                mock.patch.multiple(self.m, say=said.append), mock.patch.object(self.m.time, "sleep", slept.append):
+            d = self.m.WinDisk(7)
+            self.assertEqual(d.write(b"x" * 4096), 4096)
+            self.assertEqual(d.pos, 4096)
+            self.assertEqual(len(slept), 2)
+            self.assertEqual(len([s for s in said if "not ready yet" in s]), 1, "said once, not per second")
+            refusals.extend([21] * 5)
+            with self.assertRaises(self.m.DiskError) as e:
+                d.write(b"x" * 4096, patience=3)
+            self.assertIn("not ready after 3 seconds", str(e.exception))
+            self.assertEqual(type(e.exception).__name__, "DiskError")
+            # Any other refusal is said at once, with Windows' words.
+            refusals[:] = [5]
+            with mock.patch.object(ctypes, "get_last_error", create=True, return_value=5), \
+                    mock.patch.object(ctypes, "FormatError", create=True, return_value="Access is denied."):
+                with self.assertRaises(self.m.DiskError) as e:
+                    d.write(b"x" * 4096)
+            self.assertIn("Access is denied. (Windows error 5)", str(e.exception))
+
     def test_a_disk_on_windows_is_cleared_before_it_is_written(self):
         answers = [1, 0]
         scripts = []
