@@ -482,7 +482,7 @@ def ls():
                 "its own" if i.get("project") == proj else f"built from {i.get('project')}")
         state = "?" if blind else "running" if i.get("running") else "stopped" if i.get("exists") else "down"
         routes = ((i.get("route") or {}).get("routes")) or []
-        said = " ".join(("https://" if r.get("tls") else "http://") + r.get("where", "") for r in routes)
+        said = ", ".join("any name" if r.get("where") == "*" else r.get("where", "") for r in routes)
         rows.append((i.get("name") or "", kind, state, " ".join(i.get("ports") or []) + (f"  routed from {said}" if said else ""),
                      i.get("node_name") or ""))
     for c in d.get("containers") or []:

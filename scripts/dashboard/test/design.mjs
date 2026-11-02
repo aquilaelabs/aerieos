@@ -888,14 +888,14 @@ await openSect('themes');   // one section open at a time (the operator, 5 Oct)
 await page.selectOption(`${NB} #dsThemePick`, '0');
 await page.waitForSelector(`${NB} [data-dstheme="0"]`, { timeout: 5000 });
 await page.selectOption(`${NB} [data-dstheme="0"] [data-dst="from"]`, 'default');
-await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-0')?.value === '#1a1f26', null, { timeout: 5000 });
+await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-0')?.value === '#0b1322', null, { timeout: 5000 });
 await page.selectOption(`${NB} #dsThemePick`, '1');
 await page.waitForSelector(`${NB} [data-dstheme="1"]`, { timeout: 5000 });
 await page.click(`${NB} [data-dstheme="1"] [data-dstrm]`);
 await page.waitForFunction(() => document.querySelector('.nb #dsThemePick')?.options.length === 1, null, { timeout: 5000 });
 await saved();
 const gone = await api(`/api/design?project=${P}`);
-ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language.themes[0].colors[0].hex === '#1a1f26',
+ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language.themes[0].colors[0].hex === '#0b1322',
    'Remove page and Save take the page out, and the language goes back to one theme filled from Default');
 // A record saved under the build before the choices were each theme's,
 // with a custom map naming the language's rules and a second theme with

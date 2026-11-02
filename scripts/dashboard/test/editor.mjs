@@ -190,7 +190,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   class Emitter { constructor() { this.subs = []; this.event = f => { this.subs.push(f); return { dispose() {} }; }; }
     fire(x) { fired.push(x); this.subs.forEach(f => f(x)); } }
   const settings = { url: base, allowSelfSignedCertificate: false };
-  const secrets = new Map([[`builderbot.cookie:${base}`, cookie['ed.rw']]]);
+  const secrets = new Map([[`aerieos.cookie:${base}`, cookie['ed.rw']]]);
   let provider = null;
   class FsErr extends Error {}
   const vscode = {
@@ -230,7 +230,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
      && ext.sessionArg('copilot', 'alpha') === 'copilot:alpha' && ext.sessionArg('nope', 'alpha') === 'claude:alpha'
      && ext.sessionArg('codex', 'alpha', '17.5') === 'codex:alpha:b:17.5',
      'the extension opens any live agent\'s session, by the argument the dashboard opens it with');
-  const uri = path => vscode.Uri.from({ scheme: 'builderbot', path: '/alpha' + path });
+  const uri = path => vscode.Uri.from({ scheme: 'aerieos', path: '/alpha' + path });
   const dir = await provider.readDirectory(uri('/'));
   const text = Buffer.from(await provider.readFile(uri('/editor-probe.txt'))).toString();
   const s = await provider.stat(uri('/editor-probe.txt'));
@@ -246,7 +246,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   catch (e) { refused = e; }
   ok(refused && /changed on the controller/.test(refused.message) && readFileSync(`${tree}/editor-probe.txt`, 'utf8') === 'Claude again\n',
      `...a save over a file Claude changed since it was opened is refused, keeping Claude's (${refused?.message})`);
-  await commands['builderbot.search']();
+  await commands['aerieos.search']();
   const ed = opened[0];
   ok(!errors.length && ed && /^\/alpha\//.test(ed.uri.path) && ed.selection?.active.character - ed.selection?.anchor.character === 'again'.length,
      `...Search Project Files opens the match it picked with the word selected (${errors[0] || ed?.uri.path})`);
