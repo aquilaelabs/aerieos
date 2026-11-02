@@ -99,6 +99,101 @@ class Stick(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 self.m.pick("/dev/disk5")
 
+    def test_a_write_that_stops_is_said_with_what_to_do(self):
+        # B615: the stick pulled part way raised out of the tool as a traceback.
+        import argparse
+        img = os.path.join(self.d, "aerieos-os-0.9.0.stick.raw.xz")
+        with lzma.open(img, "wb") as f:
+            f.write(b"\0" * 4096)
+        a = argparse.Namespace(disk="/dev/sdb", image=img, release=None, channel="normal", set=None, config=None, mirror=None, yes=True, no_verify=True)
+        with mock.patch.object(self.m, "write_image", side_effect=OSError(5, "Input/output error")), \
+                mock.patch.object(self.m.shutil, "which", return_value=None), mock.patch.object(self.m, "say"), \
+                mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
+            self.m.cmd_write(a)
+        self.assertIn("the write stopped (Input/output error): the stick was unplugged or is failing", die.call_args[0][0])
+        self.assertIn("write it again", die.call_args[0][0])
+
+    def test_a_disk_on_windows_is_written_and_read_with_windows_own_calls(self):
+        import ctypes
+        disk = bytearray(8192)
+        at = [0]
+        closed = []
+
+        class Fn:
+            def __init__(self, f):
+                self.f, self.argtypes = f, None
+
+            def __call__(self, *a):
+                return self.f(*a)
+
+        def write(h, b, n, done, _o):
+            disk[at[0]:at[0] + n] = b[:n]
+            at[0] += n
+            done._obj.value = n
+            return 1
+
+        def read(h, buf, n, done, _o):
+            got = bytes(disk[at[0]:at[0] + n])
+            ctypes.memmove(buf, got, len(got))
+            at[0] += len(got)
+            done._obj.value = len(got)
+            return 1
+
+        def seek(h, pos, _new, _how):
+            at[0] = pos
+            return 1
+        k = type("K", (), {})()
+        k.WriteFile, k.ReadFile, k.SetFilePointerEx = Fn(write), Fn(read), Fn(seek)
+        k.FlushFileBuffers, k.CloseHandle = Fn(lambda h: 1), Fn(closed.append)
+        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k):
+            with self.m.WinDisk(7, [8, 9]) as d:
+                d.write(b"x" * 4096)
+                d.sync()
+                d.seek(0)
+                self.assertEqual(d.read(4096), b"x" * 4096)
+        self.assertEqual(closed, [7, 8, 9], "the disk and its volumes let go when it closes")
+
+    def test_a_disk_on_windows_is_cleared_before_it_is_written(self):
+        answers = [1, 0]
+        scripts = []
+
+        def run(cmd, **_kw):
+            scripts.append(open(cmd[-1]).read())
+            return subprocess.CompletedProcess(cmd, answers.pop(0), "", "Virtual Disk Service error: access is denied")
+        said = []
+        with mock.patch.object(self.m.subprocess, "run", run), mock.patch.object(self.m.time, "sleep"), \
+                mock.patch.object(self.m, "say", said.append):
+            self.m.clean_disk(5)
+            self.assertEqual(scripts[0], "select disk 5\nclean\n")
+            self.assertEqual(len(scripts), 2, "tried again once it was refused")
+            answers.extend([1] * 4)
+            with mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
+                self.m.clean_disk(5)
+            self.assertIn("access is denied", die.call_args[0][0])
+
+    def test_the_write_is_whole_sectors_as_windows_asks(self):
+        pieces = [b"a" * 1000, b"b" * (3 << 20), b"c" * 70001, b"d" * 5]
+        out = list(self.m.sectors(iter(pieces)))
+        self.assertTrue(all(len(p) % (1 << 20) == 0 for p in out[:-1]), [len(p) for p in out])
+        self.assertEqual(len(out[-1]) % self.m.SECTOR, 0)
+        joined = b"".join(out)
+        whole = b"".join(pieces)
+        self.assertEqual(joined[:len(whole)], whole)
+        self.assertEqual(joined[len(whole):], bytes(len(joined) - len(whole)))
+
+    def test_a_disk_on_windows_is_named_with_its_drive_letters(self):
+        disks = '[{"Number":0,"Size":512110190592,"FriendlyName":"Samsung SSD","BusType":"NVMe","IsSystem":true,"IsBoot":true},' \
+                '{"Number":2,"Size":31457280000,"FriendlyName":"SanDisk Ultra","BusType":"USB","IsSystem":false,"IsBoot":false}]'
+        parts = '[{"DiskNumber":0,"DriveLetter":"C"},{"DiskNumber":2,"DriveLetter":"F"},{"DiskNumber":2,"DriveLetter":"E"}]'
+
+        def ps(cmd, **_kw):
+            return subprocess.CompletedProcess(cmd, 0, parts if "Get-Partition" in cmd[-1] else disks, "")
+        with mock.patch.object(self.m.platform, "system", return_value="Windows"), mock.patch.object(self.m.subprocess, "run", ps):
+            rows = self.m.disks()
+        self.assertEqual([r["letters"] for r in rows], [["C:"], ["E:", "F:"]])
+        self.assertEqual(self.m.named(rows[1]), "SanDisk Ultra, 31.5 GB, E: F:")
+        self.assertEqual(self.m.named({"model": "", "size": 0}), "unnamed, 0.0 GB")
+
     def test_the_newest_release_is_the_newest_that_carries_a_stick_image(self):
         img = [{"name": "aerieos-os-0.9.0-dev.4724.stick.raw.xz"}]
         rows = [{"tag_name": "v0.9.0-dev.4724", "prerelease": True, "assets": img},

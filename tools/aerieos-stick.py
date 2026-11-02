@@ -774,7 +774,12 @@ def cmd_write(a):
     if not a.yes:
         if input("Type yes to write it: ").strip().lower() != "yes":
             die("nothing written")
-    write_image(image, d["id"], verify_after=not a.no_verify, sets=a.set or (), config=a.config, mirror=a.mirror)
+    try:
+        write_image(image, d["id"], verify_after=not a.no_verify, sets=a.set or (), config=a.config, mirror=a.mirror)
+    except OSError as e:
+        # The stick pulled or failing part way (B615): said with what to do.
+        die(f"the write stopped ({e.strerror or e}): the stick was unplugged or is failing, or the image could not be read; "
+            "plug it in and write it again from the start, since nothing on it is usable until then")
     say("Done. Boot the machine from the stick: it comes up as its own controller, and the dashboard's first page, at http://ITS-ADDRESS:7680 on the LAN, makes the owner or restores a saved configuration.")
 
 
