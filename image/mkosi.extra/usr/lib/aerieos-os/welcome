@@ -21,9 +21,13 @@ mkdir -p "$(dirname "$OUT")"
     # The way in at this screen (R194): admin, once a console password is
     # set on This machine; until then, where to set one.
     if [ -s "${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}" ]; then
-        printf '        Log in here as admin with the console password.\n\n'
+        printf '        Log in here as admin with the console password.\n'
     else
-        printf '        To log in here, set a console password on This machine.\n\n'
+        printf '        To log in here, set a console password on This machine.\n'
     fi
+    # ...and the way in when the dashboard itself is what does not answer
+    # (B621): the boot menu's Rescue entry, which needs no password.
+    printf '        If the dashboard does not answer, restart and pick Rescue on the boot menu\n'
+    printf '        for a root shell here; journalctl -u aerieos-controller says why.\n\n'
 } > "$OUT.new"
 mv -f "$OUT.new" "$OUT"

@@ -342,6 +342,9 @@ class Workflow(unittest.TestCase):
         health = read(EXTRA, "usr", "lib", "aerieos-os", "health")
         self.assertIn("systemctl reboot", health)
         self.assertNotIn('"$code" != "000"', health)
+        # B621: a boot that is not healthy says where to look and the way in.
+        self.assertIn("journalctl -u aerieos-controller", health)
+        self.assertIn("Rescue entry", health)
         if not shutil.which("grub-editenv"):
             self.skipTest("no grub-editenv here")
         tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "slot")
@@ -594,6 +597,12 @@ class Workflow(unittest.TestCase):
             self.assertIn("A E R I E O S", issue)
             self.assertIn("AerieOS 0.9.0, slot a", issue)
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
+            # B621: the way in when the dashboard is what does not answer, on
+            # the screen itself (the console password needs the dashboard).
+            self.assertIn("set a console password on This machine", issue)
+            self.assertIn("pick Rescue on the boot menu", issue)
+            self.assertIn("journalctl -u aerieos-controller", issue)
+            self.assertNotIn("\\", issue.replace("\\4", "").replace("\\\\", ""), "no stray escape in an issue file")
             os.unlink(env_file)
             sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file})
             self.assertIn("http://\\4:7680/", open(os.path.join(out, "10-aerieos.issue")).read(), "the default port without an env file")
