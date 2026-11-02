@@ -406,6 +406,8 @@ out=""; url=""; w=""
 while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -w) w="$2"; shift 2;; -H) shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
 case "$url" in
   *attestations/sha256:*) echo '{{"attestations":[{{"bundle":{{"x":1}}}}]}}' > "$out" ;;
+  *releases/latest*) ;;
+  *api.github.com/repos/*/releases?per_page=*) echo '[{{"tag_name":"v0.9.0-dev.4750","assets":[{{"name":"builderbot-controller-0.9.0-dev.4750.tar.gz"}}]}},{{"tag_name":"v0.9.0-dev.4724","assets":[{{"name":"aerieos-controller-0.9.0-dev.4724.tar.gz"}}]}}]' ;;
   *.tar.gz.sha256) echo "{dig}  b.tar.gz" > "$out" ;;
   *archive/refs/tags/*) cp "{tgz}" "$out" ;;
   *.tar.gz) [ "{code}" = 200 ] && cp "{tgz}" "$out"; [ -n "$w" ] && printf '%s' "{code}" ;;
@@ -434,6 +436,14 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("verified by gh", r.stderr)
         self.assertIn("--bundle", log)
+
+    def test_no_tag_takes_the_newest_dev_build_that_carries_the_bundle(self):
+        # No stable release: the newest dev build with an aerieos-controller
+        # bundle, past a newer one whose bundle is named for the old product
+        # (2 Nov, dev.4750 and before).
+        r, _ = self.fetch("", 200)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("bundle aerieos-controller-0.9.0-dev.4724.tar.gz", r.stderr)
 
     def test_a_bundle_that_does_not_verify_is_not_taken(self):
         r, _ = self.fetch("v0.9.1", 200, gh_ok=False)

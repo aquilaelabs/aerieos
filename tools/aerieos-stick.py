@@ -195,12 +195,19 @@ def release_image(tag, channel="normal"):
         dev = channel == "dev"
         live = [x for x in rows if not x.get("draft") and bool(x.get("prerelease")) == dev
                 and re.fullmatch(TAG if dev else r"v\d+\.\d+\.\d+", str(x.get("tag_name") or ""))]
-        # The newest that carries a stick image: a release from before
-        # AerieOS, or one whose image build failed, has none.
-        withimg = [x for x in live if any(str(a.get("name", "")).endswith(".stick.raw.xz") for a in x.get("assets") or [])]
+        # The newest that carries this tool's stick image, by its exact name:
+        # a build from before the name, whose image is named for the old
+        # product and laid out for the old tool, or one whose image build
+        # failed, has none (2 Nov: the maker took v0.9.0-dev.4750 for its
+        # builderbot-os image and then asked for a file that was not there).
+        def has_image(x):
+            want = f"aerieos-os-{str(x.get('tag_name') or '')[1:]}.stick.raw.xz"
+            return any(str(a.get("name", "")) == want for a in x.get("assets") or [])
+        withimg = [x for x in live if has_image(x)]
         if not withimg:
-            die(("no dev build" if dev else "no release") + " carries an AerieOS stick image yet"
-                + ("" if dev else ": the dev builds do, so pick the newest dev build"))
+            die(("no published dev build" if dev else "no published release") + " carries an AerieOS stick image yet"
+                + (" (a build still a draft on GitHub is not published; its owner publishes it)" if dev
+                   else ": the dev builds do, so pick the dev channel"))
         if live and withimg[0] is not live[0]:
             say(f"{live[0]['tag_name']} carries no stick image, so {withimg[0]['tag_name']}'s is written")
         tag = withimg[0]["tag_name"]
@@ -213,7 +220,8 @@ def release_image(tag, channel="normal"):
         fetch(base, name)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            die(f"the {tag} release carries no stick image ({name}): pick another release")
+            die(f"the {tag} release carries no stick image ({name}): pick a release that carries one, "
+                "or name none and the newest that does is taken")
         raise
     fetch(base + ".sha256", name + ".sha256", say_progress=False)
     check_sha(name, name + ".sha256")

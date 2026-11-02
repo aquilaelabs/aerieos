@@ -721,11 +721,19 @@ fetch_tree() {
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
-        # No stable release yet: the newest dev build, which is where AerieOS is.
+        # No stable release yet: the newest dev build that carries the
+        # controller bundle, which is where AerieOS is. A build from before
+        # the name has a bundle named for the old product, so the newest
+        # release is not always the one (2 Nov, dev.4750 and before).
         case "$tag" in
             v[0-9]*) ;;
             *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null \
-                      | grep -o '"tag_name": *"v[0-9][^"]*"' | head -1 | sed 's/.*"\(v[^"]*\)"$/\1/' || true)" ;;
+                      | python3 -c '
+import json, sys
+for r in json.load(sys.stdin):
+    t = str(r.get("tag_name") or "")
+    if t.startswith("v") and not r.get("draft") and any(a.get("name") == "aerieos-controller-%s.tar.gz" % t[1:] for a in r.get("assets") or []):
+        print(t); break' 2>/dev/null || true)" ;;
         esac
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi

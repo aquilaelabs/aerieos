@@ -196,7 +196,11 @@ class Stick(unittest.TestCase):
 
     def test_the_newest_release_is_the_newest_that_carries_a_stick_image(self):
         img = [{"name": "aerieos-os-0.9.0-dev.4724.stick.raw.xz"}]
-        rows = [{"tag_name": "v0.9.0-dev.4724", "prerelease": True, "assets": img},
+        # A build from before the name carries a stick image named for the
+        # old product: not this tool's (2 Nov, the maker took dev.4750's).
+        old = [{"name": "builderbot-os-0.9.0-dev.4740.stick.raw.xz"}]
+        rows = [{"tag_name": "v0.9.0-dev.4740", "prerelease": True, "assets": old},
+                {"tag_name": "v0.9.0-dev.4724", "prerelease": True, "assets": img},
                 {"tag_name": "v0.9.0-dev.4706", "prerelease": True, "assets": []},
                 {"tag_name": "v0.8.2", "prerelease": False, "assets": []}]
         said, got = [], []
@@ -211,7 +215,7 @@ class Stick(unittest.TestCase):
                 mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch):
             with self.assertRaises(SystemExit) as e:
                 self.m.release_image("latest", "normal")
-            self.assertIn("pick the newest dev build", str(e.exception))
+            self.assertIn("pick the dev channel", str(e.exception))
             rows.insert(0, {"tag_name": "v0.9.0-dev.4730", "prerelease": True, "assets": []})
             with self.assertRaises(SystemExit):
                 self.m.release_image("latest", "dev")
