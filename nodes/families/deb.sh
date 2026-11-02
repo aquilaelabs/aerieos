@@ -81,6 +81,12 @@ pkg_names() {
 }
 # docker_install: docker, where this family gets it from.
 docker_install() {
+            # An image's packages were settled when it was built, and its root
+            # takes no repository: a missing docker is a build of the image to fix.
+            if on_os_image; then
+                echo "not in the AerieOS image: docker (image/mkosi.conf lists what it carries)" >&2
+                return 1
+            fi
 
             # Which of Docker's two Debian-family repositories, and which
             # suite in it. A derivative uses its parent's: Mint and Pop!_OS
