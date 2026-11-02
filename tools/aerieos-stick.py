@@ -590,7 +590,7 @@ def open_disk(dev):
         for letter in letters:
             h = k32.CreateFileW(f"\\\\.\\{letter}:", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
             if not h or h == bad:
-                let_go(f"{letter}: on the stick would not open: nothing written")
+                let_go(f"{letter}: on the stick would not open: its old partitions are cleared already and nothing of the image is on it, so write it again")
             handles.append(h)
             out = wintypes.DWORD(0)
             for _ in range(40):
@@ -598,7 +598,7 @@ def open_disk(dev):
                     break
                 time.sleep(0.25)
             else:
-                let_go(f"{letter}: on the stick is in use (a window or a program has it open): close it and write again; nothing written")
+                let_go(f"{letter}: on the stick is in use (a window or a program has it open): close it; its old partitions are cleared already and nothing of the image is on it, so write it again")
             k32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
         # The disk itself opened and locked too: the write lays down a new
         # partition table, and Windows would mount the partitions it finds
@@ -607,7 +607,7 @@ def open_disk(dev):
         h = k32.CreateFileW(f"\\\\.\\PhysicalDrive{n}", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
         if not h or h == bad:
             let_go(f"Windows would not open the stick for writing (error {ctypes.GetLastError()}): close anything showing it, "
-                   "unplug it and plug it in, and write again; nothing written")
+                   "unplug it and plug it in; its old partitions are cleared already and nothing of the image is on it, so write it again")
         out = wintypes.DWORD(0)
         for _ in range(40):
             if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
@@ -615,7 +615,7 @@ def open_disk(dev):
             time.sleep(0.25)
         else:
             k32.CloseHandle(h)
-            let_go("the stick is in use (a window or a program has it open): close it and write again; nothing written")
+            let_go("the stick is in use (a window or a program has it open): close it; its old partitions are cleared already and nothing of the image is on it, so write it again")
         return WinDisk(h, handles)
     if platform.system() == "Darwin":
         subprocess.run(["diskutil", "unmountDisk", dev], capture_output=True, check=False)
