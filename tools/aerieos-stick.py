@@ -4,7 +4,7 @@ and Linux, nothing but Python's own library, that writes a release's stick
 image onto a USB stick and checks it.
 
     aerieos-stick.py list                      the removable disks here
-    aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
+    aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest [--channel dev]] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
     aerieos-stick.py verify DISK --image FILE  the stick read back against the image
 
 DISK is /dev/sdX on Linux, /dev/diskN on a Mac, \\\\.\\PhysicalDriveN or its
@@ -776,7 +776,8 @@ def main(argv=None):
     w.add_argument("--set", action="append", metavar="KEY=VALUE", help="a line for the stick's aerieos.env: TZ=Region/City, BB_RELEASE_LINE=X.Y, BB_HOSTNAME=NAME, BB_NET_ADDRESS=A.B.C.D, BB_NET_MASK=24, BB_NET_GATEWAY=A.B.C.D, BB_NET_DNS=A.B.C.D,E.F.G.H, BB_DATA_MAX=64G")
     w.add_argument("--config", metavar="FILE", help="a prepared configuration (JSON, docs/image.md) the stick's first boot applies, skipping the first-run page where it says so")
     w.add_argument("--mirror", metavar="FILE", help="a mirror of the vetted catalog (tools/catalog-mirror.py) for a machine with no network, imported as the controller starts")
-    w.add_argument("--channel", choices=["normal", "dev"], default="normal", help=argparse.SUPPRESS)
+    w.add_argument("--channel", choices=["normal", "dev"], default="normal",
+                   help="where --latest looks: normal is the published releases, dev the newest dev build (the one channel with anything on it until AerieOS has a stable release)")
     w.add_argument("--yes", action="store_true", help="do not ask")
     w.add_argument("--no-verify", action="store_true", help="skip reading the stick back")
     w.set_defaults(fn=cmd_write)

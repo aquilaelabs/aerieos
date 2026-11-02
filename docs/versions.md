@@ -51,8 +51,8 @@ fallback is what brings the machine back. `aerie version release --dev` cuts
 such a tag on this commit (no bump, no changelog section) and pushes it,
 which is what a session's release from a branch other than main is unless
 `--stable` says otherwise;
-the stick maker's `--latest` and `--release` take only the normal channel, and
-`--dev` the newest dev build.
+the stick maker's `--latest` takes the normal channel unless `--channel dev`
+says otherwise, and `--release` names any tag.
 
 ## Drafts
 

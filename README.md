@@ -53,19 +53,32 @@ it. A session you do start talks to its provider, so you choose what it may see.
 
 ## The editions
 
-One controller, from one tree, in four shapes. They differ only where the
-machine does.
+The same software in four shapes, which differ only where the machine does.
+**AerieOS** is the NAS and the workshop on a machine of its own, in three of
+them; **Aerie Workshop** is the workshop alone, as a container.
 
-| Edition | Runs on | What it is for | How it installs | State |
-| --- | --- | --- | --- | --- |
-| **Aerie Workshop** | A container on any host with Docker: a NAS, a home server, a VPS | The AI workshop alone: the dashboard beside everything else the host runs, nodes elsewhere, and no storage of its own | `docker compose up` with the compose file below, or the app template on a NAS | Released |
-| **Bare-metal install** | A Linux machine of its own (every system a node runs on) | One box that is the controller and its own node: the dashboard, the builds, the sessions and the storage on one machine | `nodes/install-controller.sh --install` on the machine, updates from the page | Released |
-| **AerieOS** | A machine or a VM installed from the ISO | The bare-metal install as an appliance: a read-only root in two slots, an update that falls back by itself, the disks as pools, an array and shares | Boot the ISO and pick a disk | Experimental: it boots and updates in the lab and on one machine, and it is the edition most likely to break |
-| **USB edition** | A stick in any x86-64 machine | AerieOS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/aerieos-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
+**Aerie Workshop**, a container on any host with Docker: a NAS, a home
+server, a VPS. The dashboard beside everything else the host runs, the work
+on machines you enroll, and no storage of its own. Installed with `docker
+compose up` on the compose file below, or the app template on a NAS.
 
-Aerie Workshop and the bare-metal install are what AerieOS has shipped as
-since 0.6. The OS and USB editions are new in 0.9: try them on a machine or
-a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
+**AerieOS, installed on your Linux.** One box that is the controller and
+its own node: the dashboard, the builds, the sessions and the storage on one
+machine. `nodes/install-controller.sh --install` on the machine; updates
+come from the dashboard.
+
+**AerieOS, as its own OS.** The install above as an appliance: a read-only
+root in two slots, an update that falls back by itself when the new one does
+not come up, the disks as pools, an array and shares. Boot the ISO and pick a
+disk.
+
+**AerieOS on a USB stick.** The OS loaded into memory at boot, its
+configuration kept on the stick, the machine's disks its storage. Written
+with the USB maker from the releases page, on Windows, a Mac or Linux.
+
+AerieOS has no stable release yet: every edition is a dev build. The OS and
+the stick are the newest and the least walked, so try them on a machine or a
+VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
 
 ## Features
 
@@ -253,11 +266,13 @@ makes the machine its own node; updates come from the page after that
 Each release carries the appliance image as two files:
 `aerieos-os-VERSION.iso` to install on a machine or a VM, and
 `aerieos-os-VERSION.stick.raw.xz` for a stick. Boot the ISO and pick a
-disk (a VM wants two processors and 4 GB), or write a stick:
+disk (a VM wants two processors and 4 GB), or write a stick, with the USB
+maker's window from the releases page or the tool here (there is no stable
+release yet, so the dev channel is where the builds are):
 
 ```bash
 sudo python3 tools/aerieos-stick.py list
-sudo python3 tools/aerieos-stick.py write /dev/sdX      # the newest release
+sudo python3 tools/aerieos-stick.py write /dev/sdX --channel dev   # the newest dev build
 ```
 
 The machine comes up as its own controller and node at

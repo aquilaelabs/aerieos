@@ -232,7 +232,7 @@ class Stick(unittest.TestCase):
         self.assertIn("--set KEY=VALUE", r.stdout)
         w = subprocess.run([sys.executable, TOOL, "write", "--help"], capture_output=True, text=True, check=False).stdout
         self.assertIn("--set KEY=VALUE", w)
-        self.assertNotIn("--channel", w, "the channel is not the help's to name")
+        self.assertIn("--channel", w, "the dev channel is anyone's to pick (the operator, 2 Nov)")
 
     def stick_with_env(self, at):
         """An image whose aerieos.env starts `at` bytes in, as lay-disk lays it."""
