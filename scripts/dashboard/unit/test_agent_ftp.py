@@ -148,6 +148,11 @@ sys.stderr.write("bb-ftpd: listening on x:2121\\n"); sys.stderr.flush(); time.sl
                                  env=dict(os.environ, FTP_OUT=self.out), stdout=subprocess.PIPE, stdin=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
         self.addCleanup(lambda: other.poll() is None and other.kill())
+        # Up before it is looked for: _end_strays reads /proc for a child
+        # whose command names bb-ftpd, and a child still between fork and
+        # exec carries this process's own (B438: the one failure most gates
+        # ended on, under the tier's load).
+        self.assertIn(b"listening on", other.stderr.readline())
         self.assertFalse(self.ftp._end_strays(2121))
         self.assertIsNone(other.poll())
         # ...while one whose data ports meet it (2141's 2142 to 2150) is not.
