@@ -86,19 +86,44 @@ def disks():
             if d.get("type") != "disk" or str(d.get("name", "")).startswith(("loop", "zram", "ram")):
                 continue
             mnts = mounts(d)
+            # Its mount points ride with it: the confirmation names them, so
+            # a backup disk of the stick's make and size is told apart (B614).
             rows.append({"id": "/dev/" + d["name"], "size": int(d.get("size") or 0), "model": (d.get("model") or "").strip(),
                          "removable": bool(d.get("rm")) or d.get("tran") == "usb",
-                         "system": any(m in ("/", "/boot", "/boot/efi", "/usr", "/var", "/home", "[SWAP]") for m in mnts)})
+                         "system": any(m in ("/", "/boot", "/boot/efi", "/usr", "/var", "/home", "[SWAP]") for m in mnts),
+                         "mounts": sorted(set(mnts))})
         return rows
     if sysname == "Darwin":
-        out = subprocess.run(["diskutil", "list", "-plist", "external", "physical"], capture_output=True, text=True, check=False).stdout
         import plistlib
+
+        def plist(*argv):
+            out = subprocess.run(["diskutil", argv[0], "-plist", *argv[1:]], capture_output=True, text=True, check=False).stdout
+            try:
+                return plistlib.loads(out.encode()) if out else {}
+            except (ValueError, plistlib.InvalidFileException):
+                return {}
+        whole = lambda dev: re.sub(r"s\d+$", "", str(dev or ""))    # noqa: E731 (disk2s1 -> disk2)
+        # Where each external disk's volumes are mounted (B614): a FAT or
+        # exFAT volume on the disk itself, an APFS volume on the synthesized
+        # disk its physical store points back from.
+        mounted = {}
+        for d in plist("list", "external").get("AllDisksAndPartitions") or []:
+            stores = [whole(s.get("DeviceIdentifier")) for s in d.get("APFSPhysicalStores") or [] if isinstance(s, dict)] or [str(d.get("DeviceIdentifier") or "")]
+            vols = [*(d.get("Partitions") or []), *(d.get("APFSVolumes") or [])]
+            for s in stores:
+                mounted.setdefault(s, set()).update(str(v.get("MountPoint")) for v in vols if isinstance(v, dict) and v.get("MountPoint"))
+        # The disk this Mac runs from, by its root volume's physical stores
+        # (B617): a Mac booted from an external disk lists it as external.
+        root = plist("info", "/")
+        system = {whole(s.get("DeviceIdentifier")) for s in root.get("APFSPhysicalStores") or [] if isinstance(s, dict)}
+        system.add(whole(root.get("ParentWholeDisk")))
+        system.discard("")
         rows = []
-        for name in (plistlib.loads(out.encode()).get("WholeDisks") or []) if out else []:
-            info = subprocess.run(["diskutil", "info", "-plist", name], capture_output=True, text=True, check=False).stdout
-            i = plistlib.loads(info.encode()) if info else {}
+        for name in plist("list", "external", "physical").get("WholeDisks") or []:
+            i = plist("info", name)
             rows.append({"id": "/dev/" + name, "size": int(i.get("TotalSize") or 0), "model": str(i.get("MediaName") or ""),
-                         "removable": bool(i.get("RemovableMediaOrExternalDevice", True)), "system": False})
+                         "removable": bool(i.get("RemovableMediaOrExternalDevice", True)), "system": name in system,
+                         "mounts": sorted(mounted.get(name) or [])})
         return rows
     if sysname == "Windows":
         ps = ("Get-Disk | Select-Object Number,Size,FriendlyName,BusType,IsSystem,IsBoot | ConvertTo-Json -Compress")
@@ -124,9 +149,10 @@ def disks():
 
 def named(d):
     """A disk as its person knows it: its model, its size and, on Windows,
-    its drive letters."""
+    its drive letters, elsewhere where its volumes are mounted (B614)."""
     lt = " ".join(d.get("letters") or [])
-    return f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / GB:.1f} GB" + (f", {lt}" if lt else "")
+    at = " ".join(d.get("mounts") or [])
+    return f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / GB:.1f} GB" + (f", {lt}" if lt else "") + (f", mounted at {at}" if at else "")
 
 
 def cmd_list(_):

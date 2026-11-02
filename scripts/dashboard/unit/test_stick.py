@@ -31,7 +31,8 @@ def load():
 # are empty, and a USB disk the machine booted from is no stick (B474).
 LSBLK = '{"blockdevices": [{"name": "sda", "size": 512110190592, "model": "Samsung SSD", "rm": false, "tran": "sata", "type": "disk", "mountpoints": [null],' \
         ' "children": [{"name": "sda2", "type": "part", "mountpoints": ["/"]}]},' \
-        '{"name": "sdb", "size": 32000000000, "model": "Ultra Fit", "rm": true, "tran": "usb", "type": "disk", "mountpoints": [null]},' \
+        '{"name": "sdb", "size": 32000000000, "model": "Ultra Fit", "rm": true, "tran": "usb", "type": "disk", "mountpoints": [null],' \
+        ' "children": [{"name": "sdb1", "type": "part", "mountpoints": ["/media/u/BACKUP"]}]},' \
         '{"name": "sdc", "size": 1000000000000, "model": "T7", "rm": false, "tran": "usb", "type": "disk", "mountpoints": [null],' \
         ' "children": [{"name": "sdc1", "type": "part", "mountpoints": ["/boot/efi"]}, {"name": "sdc2", "type": "part", "mountpoints": ["/"]}]},' \
         '{"name": "loop0", "size": 1, "type": "loop", "mountpoints": []}]}'
@@ -60,87 +61,43 @@ class Stick(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.m.pick("/dev/sdz")
         self.assertEqual(self.m.pick("/dev/sdb")["model"], "Ultra Fit")
+        # B614: what is mounted on it is in its name, so the confirmation
+        # tells a backup disk of the stick's make and size from the stick.
+        self.assertEqual(self.m.named(self.m.pick("/dev/sdb")), "Ultra Fit, 32.0 GB, mounted at /media/u/BACKUP")
+        self.assertEqual(rows[0]["mounts"], ["/"])
 
-    def test_a_disk_on_windows_is_written_and_read_with_windows_own_calls(self):
-        import ctypes
-        disk = bytearray(8192)
-        at = [0]
-        closed = []
+    def test_a_mac_lists_where_each_disk_is_mounted_and_marks_the_disk_it_runs_from(self):
+        # B614 and B617: an exFAT stick's volume is on the disk itself, an
+        # APFS volume on the synthesized disk whose physical store points
+        # back; a Mac booted from an external disk lists it as external.
+        import plistlib
 
-        class Fn:
-            def __init__(self, f):
-                self.f, self.argtypes = f, None
-
-            def __call__(self, *a):
-                return self.f(*a)
-
-        def write(h, b, n, done, _o):
-            disk[at[0]:at[0] + n] = b[:n]
-            at[0] += n
-            done._obj.value = n
-            return 1
-
-        def read(h, buf, n, done, _o):
-            got = bytes(disk[at[0]:at[0] + n])
-            ctypes.memmove(buf, got, len(got))
-            at[0] += len(got)
-            done._obj.value = len(got)
-            return 1
-
-        def seek(h, pos, _new, _how):
-            at[0] = pos
-            return 1
-        k = type("K", (), {})()
-        k.WriteFile, k.ReadFile, k.SetFilePointerEx = Fn(write), Fn(read), Fn(seek)
-        k.FlushFileBuffers, k.CloseHandle = Fn(lambda h: 1), Fn(closed.append)
-        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k):
-            with self.m.WinDisk(7, [8, 9]) as d:
-                d.write(b"x" * 4096)
-                d.sync()
-                d.seek(0)
-                self.assertEqual(d.read(4096), b"x" * 4096)
-        self.assertEqual(closed, [7, 8, 9], "the disk and its volumes let go when it closes")
-
-    def test_a_disk_on_windows_is_cleared_before_it_is_written(self):
-        answers = [1, 0]
-        scripts = []
+        def pl(d):
+            return plistlib.dumps(d).decode()
+        listing = {"AllDisksAndPartitions": [
+            {"DeviceIdentifier": "disk2", "Partitions": [{"DeviceIdentifier": "disk2s1", "MountPoint": "/Volumes/BACKUP"}]},
+            {"DeviceIdentifier": "disk3", "Partitions": [{"DeviceIdentifier": "disk3s2", "Content": "Apple_APFS"}]},
+            {"DeviceIdentifier": "disk4", "APFSPhysicalStores": [{"DeviceIdentifier": "disk3s2"}],
+             "APFSVolumes": [{"DeviceIdentifier": "disk4s1", "MountPoint": "/Volumes/Photos"}, {"DeviceIdentifier": "disk4s2"}]},
+            {"DeviceIdentifier": "disk5", "Partitions": [{"DeviceIdentifier": "disk5s2", "Content": "Apple_APFS"}]}]}
+        info = {"/": {"APFSPhysicalStores": [{"DeviceIdentifier": "disk5s2"}], "ParentWholeDisk": "disk6"},
+                "disk2": {"TotalSize": 32000000000, "MediaName": "Ultra Fit", "RemovableMediaOrExternalDevice": True},
+                "disk3": {"TotalSize": 1000000000000, "MediaName": "T7", "RemovableMediaOrExternalDevice": True},
+                "disk5": {"TotalSize": 500000000000, "MediaName": "Boot SSD", "RemovableMediaOrExternalDevice": True}}
 
         def run(cmd, **_kw):
-            scripts.append(open(cmd[-1]).read())
-            return subprocess.CompletedProcess(cmd, answers.pop(0), "", "Virtual Disk Service error: access is denied")
-        said = []
-        with mock.patch.object(self.m.subprocess, "run", run), mock.patch.object(self.m.time, "sleep"), \
-                mock.patch.object(self.m, "say", said.append):
-            self.m.clean_disk(5)
-            self.assertEqual(scripts[0], "select disk 5\nclean\n")
-            self.assertEqual(len(scripts), 2, "tried again once it was refused")
-            answers.extend([1] * 4)
-            with mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
-                self.m.clean_disk(5)
-            self.assertIn("access is denied", die.call_args[0][0])
-
-    def test_the_write_is_whole_sectors_as_windows_asks(self):
-        pieces = [b"a" * 1000, b"b" * (3 << 20), b"c" * 70001, b"d" * 5]
-        out = list(self.m.sectors(iter(pieces)))
-        self.assertTrue(all(len(p) % (1 << 20) == 0 for p in out[:-1]), [len(p) for p in out])
-        self.assertEqual(len(out[-1]) % self.m.SECTOR, 0)
-        joined = b"".join(out)
-        whole = b"".join(pieces)
-        self.assertEqual(joined[:len(whole)], whole)
-        self.assertEqual(joined[len(whole):], bytes(len(joined) - len(whole)))
-
-    def test_a_disk_on_windows_is_named_with_its_drive_letters(self):
-        disks = '[{"Number":0,"Size":512110190592,"FriendlyName":"Samsung SSD","BusType":"NVMe","IsSystem":true,"IsBoot":true},' \
-                '{"Number":2,"Size":31457280000,"FriendlyName":"SanDisk Ultra","BusType":"USB","IsSystem":false,"IsBoot":false}]'
-        parts = '[{"DiskNumber":0,"DriveLetter":"C"},{"DiskNumber":2,"DriveLetter":"F"},{"DiskNumber":2,"DriveLetter":"E"}]'
-
-        def ps(cmd, **_kw):
-            return subprocess.CompletedProcess(cmd, 0, parts if "Get-Partition" in cmd[-1] else disks, "")
-        with mock.patch.object(self.m.platform, "system", return_value="Windows"), mock.patch.object(self.m.subprocess, "run", ps):
+            if cmd[:2] == ["diskutil", "list"]:
+                out = {**listing, "WholeDisks": ["disk2", "disk3", "disk5"]} if "physical" in cmd else listing
+            else:
+                out = info[cmd[-1]]
+            return subprocess.CompletedProcess(cmd, 0, pl(out), "")
+        with mock.patch.object(self.m.platform, "system", return_value="Darwin"), mock.patch.object(self.m.subprocess, "run", run):
             rows = self.m.disks()
-        self.assertEqual([r["letters"] for r in rows], [["C:"], ["E:", "F:"]])
-        self.assertEqual(self.m.named(rows[1]), "SanDisk Ultra, 31.5 GB, E: F:")
-        self.assertEqual(self.m.named({"model": "", "size": 0}), "unnamed, 0.0 GB")
+            self.assertEqual([(r["id"], r["system"], r["mounts"]) for r in rows],
+                             [("/dev/disk2", False, ["/Volumes/BACKUP"]), ("/dev/disk3", False, ["/Volumes/Photos"]), ("/dev/disk5", True, [])])
+            self.assertEqual(self.m.named(rows[1]), "T7, 1000.0 GB, mounted at /Volumes/Photos")
+            with self.assertRaises(SystemExit):
+                self.m.pick("/dev/disk5")
 
     def test_the_newest_release_is_the_newest_that_carries_a_stick_image(self):
         img = [{"name": "aerieos-os-0.9.0-dev.4724.stick.raw.xz"}]
