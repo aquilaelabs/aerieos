@@ -200,6 +200,58 @@ class Stick(unittest.TestCase):
                     d.write(b"x" * 4096)
             self.assertIn("Access is denied. (Windows error 5)", str(e.exception))
 
+    def test_a_write_refused_after_the_clean_opens_the_disk_again(self):
+        # 2 Nov, the maker on a stick: 'not ready' on the first write, then
+        # 'access denied' on the same handle a second later, since Windows
+        # had looked the disk over again; the handle is closed and the disk
+        # opened and locked anew, then the write goes on where it was.
+        import ctypes
+        errs = [5, 21]
+        handles, at, said, closed = [7], [0], [], []
+
+        class Fn:
+            def __init__(self, f):
+                self.f, self.argtypes = f, None
+
+            def __call__(self, *a):
+                return self.f(*a)
+
+        def write(h, b, n, done, _o):
+            if errs:
+                return 0
+            at[0] += n
+            done._obj.value = n
+            return 1
+
+        def reopen():
+            handles.append(handles[-1] + 1)
+            return handles[-1]
+        seeks = []
+        k = type("K", (), {})()
+        k.WriteFile, k.SetFilePointerEx = Fn(write), Fn(lambda h, pos, _n, _w: seeks.append((h, pos)) or 1)
+        k.ReadFile = k.FlushFileBuffers = Fn(lambda *a: 1)
+        k.CloseHandle = Fn(closed.append)
+        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k), \
+                mock.patch.object(ctypes, "get_last_error", create=True, side_effect=lambda: errs.pop() if errs else 0), \
+                mock.patch.object(ctypes, "FormatError", create=True, return_value="x"), \
+                mock.patch.multiple(self.m, say=said.append), mock.patch.object(self.m.time, "sleep", lambda s: None):
+            d = self.m.WinDisk(7, reopen=reopen)
+            d.write(b"x" * 4096)
+            self.assertEqual(d.write(b"y" * 4096), 4096)
+        self.assertEqual(handles, [7, 8, 9], "opened again on each refusal")
+        self.assertEqual(closed, [7, 8], "the handle from before closed each time")
+        self.assertEqual(seeks, [(8, 0), (9, 0)], "the pointer back where the write belongs, on the new handle")
+        self.assertEqual(d.h, 9)
+        self.assertEqual(d.pos, 8192)
+        self.assertEqual(len([s for s in said if "opening it again" in s]), 1)
+        # Without a way to open again, access denied is said at once.
+        errs[:] = [5]
+        with mock.patch.object(ctypes, "WinDLL", create=True, return_value=k), \
+                mock.patch.object(ctypes, "get_last_error", create=True, return_value=5), \
+                mock.patch.object(ctypes, "FormatError", create=True, return_value="Access is denied."):
+            with self.assertRaises(self.m.DiskError):
+                self.m.WinDisk(7).write(b"z" * 4096)
+
     def test_a_disk_on_windows_is_cleared_before_it_is_written(self):
         answers = [1, 0]
         scripts = []

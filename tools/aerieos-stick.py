@@ -463,7 +463,7 @@ class DiskError(OSError):
     error 21 is 'the device is not ready')."""
 
 
-ERROR_NOT_READY = 21
+ERROR_NOT_READY, ERROR_ACCESS_DENIED = 21, 5
 
 
 class WinDisk:
@@ -475,9 +475,10 @@ class WinDisk:
     for a moment after diskpart cleaned it, while it looks the disk over
     again (2 Nov, the first write after the clean, nothing yet written)."""
 
-    def __init__(self, h, held=()):
+    def __init__(self, h, held=(), reopen=None):
         from ctypes import wintypes
         self.k = k = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.reopen = reopen
         k.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_char_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
         k.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
         k.SetFilePointerEx.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
@@ -499,14 +500,25 @@ class WinDisk:
                 self.pos += len(b)
                 return n.value
             e = ctypes.get_last_error()
-            if e != ERROR_NOT_READY or i == patience:
+            again = e == ERROR_NOT_READY or (e == ERROR_ACCESS_DENIED and self.reopen)
+            if not again or i == patience:
                 if e == ERROR_NOT_READY:
                     raise DiskError(f"the stick is not ready after {patience} seconds (Windows error {e}): a stick that was pulled, "
                                     "a reader with no card in it, or one with a write-protect switch on; plug it in and write again")
                 self._fail("could not write to", e)
-            if i == 0:
-                say("  the stick is not ready yet (Windows is looking it over after the clean): waiting")
-            time.sleep(1)
+            if self.reopen:
+                # Windows looked the stick over again (after the clean) and
+                # the handle from before is not one to trust: opened and
+                # locked again, which waits for the disk to read, then the
+                # pointer back where this write belongs.
+                if i == 0:
+                    say(f"  the stick was not ready for the write (Windows error {e}): opening it again")
+                self.k.CloseHandle(self.h)
+                self.h = self.reopen()
+            else:
+                if i == 0:
+                    say("  the stick is not ready yet (Windows is looking it over after the clean): waiting")
+                time.sleep(1)
             # The pointer back where this write belongs: a failed write may
             # or may not have moved it.
             self.k.SetFilePointerEx(self.h, self.pos, None, 0)
@@ -643,19 +655,39 @@ def open_disk(dev):
         # partition table, and Windows would mount the partitions it finds
         # and write to them (a FAT's dirty flag) while the write and the
         # read back go on; locked, nothing is mounted until it is let go.
-        h = k32.CreateFileW(f"\\\\.\\PhysicalDrive{n}", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
-        if not h or h == bad:
-            let_go(f"Windows would not open the stick for writing (error {ctypes.GetLastError()}): close anything showing it, "
-                   "unplug it and plug it in; its old partitions are cleared already and nothing of the image is on it, so write it again")
-        out = wintypes.DWORD(0)
-        for _ in range(40):
-            if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
-                break
-            time.sleep(0.25)
-        else:
-            k32.CloseHandle(h)
-            let_go("the stick is in use (a window or a program has it open): close it; its old partitions are cleared already and nothing of the image is on it, so write it again")
-        return WinDisk(h, handles)
+        # After diskpart's clean Windows looks the stick over again for a
+        # moment, and a handle from before that is not one to trust: the
+        # first write met 'not ready' and the same handle then 'access
+        # denied' (2 Nov, B630). So the disk is opened once it reads, and
+        # the writer opens it again this way when a write meets either.
+        k32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k32.SetFilePointerEx.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
+
+        def open_locked(patience=30):
+            probe, got, last = ctypes.create_string_buffer(SECTOR), wintypes.DWORD(0), 0
+            for i in range(patience):
+                h = k32.CreateFileW(f"\\\\.\\PhysicalDrive{n}", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
+                if not h or h == bad:
+                    last = ctypes.GetLastError()
+                elif not k32.ReadFile(h, probe, SECTOR, ctypes.byref(got), None):
+                    last = ctypes.GetLastError()
+                    k32.CloseHandle(h)
+                else:
+                    k32.SetFilePointerEx(h, 0, None, 0)
+                    out = wintypes.DWORD(0)
+                    for _ in range(40):
+                        if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
+                            return h
+                        time.sleep(0.25)
+                    k32.CloseHandle(h)
+                    let_go("the stick is in use (a window or a program has it open): close it; its old partitions are cleared already and nothing of the image is on it, so write it again")
+                if i == 0:
+                    say("  the stick is not ready yet (Windows is looking it over after the clean): waiting")
+                time.sleep(1)
+            let_go(f"the stick did not become ready in {patience} seconds (Windows error {last}): a stick that was pulled, a reader with no card in it, "
+                   "or one with a write-protect switch on; plug it in and write again")
+            return None
+        return WinDisk(open_locked(), handles, reopen=open_locked)
     if platform.system() == "Darwin":
         subprocess.run(["diskutil", "unmountDisk", dev], capture_output=True, check=False)
         rdev = dev.replace("/dev/disk", "/dev/rdisk")
