@@ -56,6 +56,34 @@ class DevTag(unittest.TestCase):
         self.assertEqual(tags, ["v1.2.3-dev.1"])
         self.assertIn("already exists", version.release("app", push=False, dev=True).get("error", ""))
 
+    def test_an_untracked_file_beside_the_commit_does_not_refuse_the_tag(self):
+        # B628: the controller's copy of a tree carries files a session keeps
+        # out of git with .git/info/exclude, which does not travel, so every
+        # tag was refused for 'uncommitted changes' the session never saw.
+        # An untracked file is in no commit; a tracked file changed is.
+        ws = Path(tempfile.mkdtemp())
+        d = ws / "app"
+        d.mkdir()
+        git(d, "init", "-q", "-b", "main")
+        (d / "VERSION").write_text("1.2.3\n")
+        (d / "kept.txt").write_text("tracked\n")
+        git(d, "add", "VERSION", "kept.txt")
+        git(d, "commit", "-q", "-m", "one")
+        (d / "stray-tool.py").write_text("untracked\n")
+        version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
+        p = version.release_plan("app", dev=True)
+        self.assertFalse(p.get("error"), p)
+        (d / "kept.txt").write_text("changed\n")
+        p = version.release_plan("app", dev=True)
+        self.assertIn("uncommitted changes", p.get("error", ""), p)
+        self.assertIn("kept.txt", p["error"], "the changed file is named")
+        self.assertNotIn("stray-tool.py", p["error"])
+        self.assertIn("uncommitted changes", version.release("app", push=False, dev=True).get("error", ""))
+        git(d, "checkout", "--", "kept.txt")
+        r = version.release("app", push=False, dev=True)
+        self.assertTrue(r.get("ok"), r)
+        self.assertTrue((d / "stray-tool.py").exists(), "the untracked file is left where it was")
+
     def test_a_dev_release_is_planned_as_its_own_tag_on_the_branchs_line(self):
         # A session's dev release is planned before anybody is asked: as the
         # plain tag, it was refused as the last release's (v0.8.2 already

@@ -932,10 +932,15 @@ def release_plan(project, comp="", dev=False, stable=False):
         if on and (sha.startswith(on) or on.startswith(sha)):
             return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
-    dirty = (_git(project, "status", "--porcelain") or "").strip()
+    # Tracked files only: an untracked file is in no commit, so the tag marks
+    # the commit whether or not it is beside it; the controller's copy of a
+    # tree carries files a session keeps out of git with .git/info/exclude,
+    # which is each clone's own and does not travel, so it refused every
+    # tag for files the session's own status never showed (B628).
+    dirty = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
     if dirty:
         # Named, since the copy a session works in can be clean while the
-        # controller's holds a file nobody there can see (B628).
+        # controller's holds a change nobody there can see (B628).
         rows = dirty.splitlines()
         shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
         return {"error": "there are uncommitted changes in the project directory: commit or "
@@ -1048,10 +1053,14 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
                          f"moved from here: bump to the next number, or move it "
                          f"yourself in a terminal if it was never pushed."}
     # A dirty tree is not what the tag would mark: the tag names a commit,
-    # and the files beside it are not in it.
-    if (_git(project, "status", "--porcelain") or "").strip():
+    # and a tracked file changed beside it is not in it. An untracked file
+    # is in no commit either way (B628, as in plan()).
+    dirty = (_git(project, "status", "--porcelain", "--untracked-files=no") or "").strip()
+    if dirty:
+        rows = dirty.splitlines()
+        shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
         return {"error": "there are uncommitted changes: commit or discard them "
-                         "first, so the tag marks what is actually in the commit"}
+                         f"first, so the tag marks what is actually in the commit ({shown})"}
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
         return {"error": why}
     # The commit that SHIPS is not always the commit you are standing on.
