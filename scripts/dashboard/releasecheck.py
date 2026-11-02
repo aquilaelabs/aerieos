@@ -32,22 +32,23 @@ _latest = {"version": "", "tag": "", "at": 0, "error": "", "checking": False, "u
 _version = lambda: ""       # noqa: E731 (configured)
 _bare = lambda: False       # noqa: E731
 _channel = lambda: "normal"  # noqa: E731 (configured: the release channel picked)
-_dev_ok = lambda: False     # noqa: E731 (configured: whether dev may be picked here)
+_debug = lambda: False      # noqa: E731 (configured: a controller in debug mode)
 _window = lambda: ("", 4)   # noqa: E731 (the update window: day, hour)
 _apply = lambda v: None     # noqa: E731 (queue the update to version v)
 _applied = {"version": ""}  # the version the window last queued, so one window queues once
-# Drafts (the operator, 1 Nov): a controller in debug mode on the dev channel
+# Drafts (the operator, 1 and 2 Nov): a controller in debug mode on the dev channel
 # holding a token for AerieOS's repository sees its draft releases too,
 # and updates from one by fetching its files with that token.
 _draft_token = lambda: ""   # noqa: E731 (configured)
 _drafts = {}                # tag: its assets, from the last check that saw drafts
 _fetch = {"tag": "", "at": 0, "error": "", "done": False}
+_versions = []              # {tag, draft}, newest first, from the last check
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
-def configure(*, version, bare_metal, window=None, apply=None, channel=None, dev_ok=None, draft_token=None):
+def configure(*, version, bare_metal, window=None, apply=None, channel=None, debug=None, draft_token=None):
     globals().update(_version=version, _bare=bare_metal, _window=window or _window, _apply=apply or _apply,
-                     _channel=channel or (lambda: "normal"), _dev_ok=dev_ok or (lambda: False),
+                     _channel=channel or (lambda: "normal"), _debug=debug or (lambda: False),
                      _draft_token=draft_token or (lambda: ""))
 
 
@@ -63,8 +64,8 @@ def _token():
 
 
 def channel():
-    """The channel in force: dev only while it may be picked here."""
-    return "dev" if _channel() == "dev" and _dev_ok() else "normal"
+    """The channel in force."""
+    return "dev" if _channel() == "dev" else "normal"
 
 
 def in_window(now=None):
@@ -153,6 +154,11 @@ def check():
         dev.sort(key=lambda x: parse_dev(x.get("tag_name")), reverse=True)
         devrec = {"version": str(dev[0]["tag_name"]).lstrip("v"), "tag": str(dev[0]["tag_name"]), "url": str(dev[0].get("html_url") or ""),
                   "draft": dev[0].get("draft") is True} if dev else {"version": "", "tag": "", "url": "", "draft": False}
+        # Every version there is, newest first, for debug mode's picker.
+        picks = [x for x in rows if isinstance(x, dict) and rank(str(x.get("tag_name") or "").lstrip("v"))
+                 and (token or not x.get("draft"))]
+        picks.sort(key=lambda x: rank(str(x["tag_name"]).lstrip("v")), reverse=True)
+        _versions[:] = [{"tag": str(x["tag_name"]), "draft": x.get("draft") is True} for x in picks[:40]]
         if token:
             _drafts.clear()
             _drafts.update({str(x["tag_name"]): [a for a in x.get("assets") or [] if isinstance(a, dict)]
@@ -194,13 +200,13 @@ def newer():
 
 def status():
     """What the page draws: nothing on a container install. The channel in
-    force, whether dev may be picked here, and the dev channel's newest."""
+    force, the dev channel's newest, and in debug mode every version to pick."""
     if not _bare():
         return {}
     lt = latest()
     return {"running": _version(), "latest": lt.get("version", ""), "newer": newer(), "at": lt.get("at", 0),
             "error": lt.get("error", ""), "url": lt.get("url", ""),
-            "channel": channel(), "dev_ok": bool(_dev_ok()), "dev_latest": (lt.get("dev") or {}).get("version", ""),
+            "channel": channel(), "pick": list(_versions) if _debug() else [], "dev_latest": (lt.get("dev") or {}).get("version", ""),
             "dev_draft": bool((lt.get("dev") or {}).get("draft")), "draft_fetch": dict(_fetch)}
 
 

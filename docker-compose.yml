@@ -8,7 +8,7 @@
 
 services:
   aerie-workshop:
-    image: ghcr.io/aquilaelabs/aerieos:${BUILDERBOT_TAG:-latest}
+    image: ghcr.io/aquilaelabs/aerieos:${BUILDERBOT_TAG:-dev}
     # An install pulls the image; AerieOS's own dev instance on a node
     # builds this checkout instead, the way any project's dev instance is
     # built from its tree: its env file sets BUILDERBOT_PULL=build and a tag

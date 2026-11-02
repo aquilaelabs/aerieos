@@ -36,10 +36,12 @@ and never a pre-release. A *dev* channel takes the pre-releases CI
 publishes from a dev build: a tag `vX.Y.Z-dev.N` built by the same workflow
 as a release, marked a pre-release and never the latest, with the same
 files (the controller bundle, the OS image, the stick disk, the APK). The
-channel is picked under Controller settings, Updates, and the dev channel
-is offered only on a controller started for development; every other
-install sees the normal channel alone and the pre-releases never, and an
-ordinary start puts the channel back to normal. On
+channel is picked under Controller settings, Updates, on any install, and a
+dev build follows the dev channel until another is picked. Aerie Workshop
+follows its image's tag instead: `:dev` for the dev builds, `:latest` for the
+releases once there is one. Until AerieOS has a stable release, dev is the one
+channel with anything on it.
+On
 the dev channel Check now, Update and the update window take the newest
 of the releases and the dev builds by rank (a release stands above every
 dev build heading for it, a dev build by its ordinal), so a dev build
@@ -49,7 +51,8 @@ fallback is what brings the machine back. `aerie version release --dev` cuts
 such a tag on this commit (no bump, no changelog section) and pushes it,
 which is what a session's release from a branch other than main is unless
 `--stable` says otherwise;
-the stick maker's `--latest` and `--release` take only the normal channel.
+the stick maker's `--latest` and `--release` take only the normal channel, and
+`--dev` the newest dev build.
 
 ## Drafts
 

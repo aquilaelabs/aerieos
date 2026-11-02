@@ -94,7 +94,7 @@ class TheCheck(unittest.TestCase):
         releasecheck._drafts.clear()
 
     def configure(self, channel, token):
-        releasecheck.configure(version=lambda: "1.0.0", bare_metal=lambda: True, channel=lambda: channel, dev_ok=lambda: True,
+        releasecheck.configure(version=lambda: "1.0.0", bare_metal=lambda: True, channel=lambda: channel, debug=lambda: True,
                                draft_token=lambda: token)
 
     def test_drafts_are_seen_with_the_token_on_the_dev_channel_alone(self):

@@ -5252,9 +5252,11 @@ import releasecheck                                              # noqa: E402
 releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
                        window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
                        apply=lambda v: _update_in_window(v),
-                       # The release channel (R179): dev only in debug mode (R193), and
-                       # its drafts seen with AerieOS's own repository's token.
-                       channel=lambda: str(settings.get("release_channel") or "normal"), dev_ok=settings.dev_channel_ok,
+                       # The release channel (R179, R193): the one picked, else a dev build
+                       # follows the dev builds; debug mode alone picks a version, and
+                       # sees the drafts with AerieOS's own repository's token.
+                       channel=lambda: settings.channel_picked() or ("dev" if "-dev." in (image_stamp().get("version") or "") else "normal"),
+                       debug=settings.debug_available,
                        draft_token=lambda: _builderbot_repo_token())
 
 

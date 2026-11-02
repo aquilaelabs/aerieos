@@ -193,7 +193,7 @@ section of your **Profile**, under Settings, each with Disconnect. Which are off
 the Controller settings page, or `/config/seed.json` before the first start
 ([reference.md](reference.md#the-seed-file)).
 
-**Updating**: `:latest` is the newest stable release, moved when its owner
+**Updating**: `:dev` is the newest dev build; once there is a stable release, `:latest` is the newest of those, moved when its owner
 publishes it ([versions.md](versions.md#drafts)); `:main` follows each push to
 `main` that touches the image's inputs (Dockerfile, `scripts/`, `config/`) and
 a weekly freshness rebuild. The host's app page's *Check for Updates* flips the
@@ -206,13 +206,13 @@ back, see [Upgrading](#upgrading). Compose: `docker compose pull && docker compo
 
 ## Upgrading
 
-**Pin a release, not `:latest`.** `:latest` moves to each stable release as it
-is published. Each release publishes its own image, `ghcr.io/aquilaelabs/aerieos:0.6.0`,
-and `:0.6` for the newest release of that line; pin one of those in your
-compose file or template, and move it on when you choose to upgrade.
-`:dev` follows the dev channel instead: every dev build and release as it is
-published, so an install on it takes builds that may not come up
-([versions.md](versions.md#two-channels)).
+**`:dev` for now.** AerieOS has no stable release yet, so `:dev` is the tag
+there is: every dev build and release as it is published, so an install on it
+takes builds that may not come up ([versions.md](versions.md#two-channels)).
+Once there is a stable release, `:latest` moves to each one as it is published,
+and each publishes its own image, `ghcr.io/aquilaelabs/aerieos:X.Y.Z`, and `:X.Y`
+for the newest of that line; pin one of those in your compose file or template
+and move it on when you choose to upgrade.
 
 **What is supported:**
 

@@ -74,6 +74,7 @@
 
 ### Changed
 
+- Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
 - The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
 - The command is aerie, in every shell and session

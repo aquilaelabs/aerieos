@@ -231,17 +231,21 @@ function updatesSection(){
       <div class="actbar"><span class="sp"></span>
         ${h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : ""}
         <button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button></div>`;
-  // The release channel: drawn only where dev may be picked, a controller
-  // in debug mode (R193, the operator, 1 Nov); everybody else is on the
-  // normal channel and sees no pulldown.
-  const channel = r.dev_ok ? `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
+  // The release channel, on any install (the operator, 2 Nov).
+  const channel = `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
       <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? ", a draft not published yet, seen here with this controller's token for AerieOS's repository" : ""}` : ""}.${
-        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back.` : "Releases alone. The dev channel is here because this controller runs in debug mode."}</div></div>` : "";
+        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back.` : "Published releases alone. The dev channel takes every dev build as it is published, which may not come up."}</div></div>`;
+  // Debug mode alone: any version, the unpublished ones with the token
+  // (the operator, 2 Nov), older ones too, since a test goes both ways.
+  const pick = r.pick?.length ? `<div class="field"><label class="pick"><span class="pickw">Version</span><select id="relPick" aria-label="the version to install">${
+      r.pick.map(v => `<option value="${esc(v.tag)}">${esc(v.tag)}${v.draft ? " (not published)" : ""}</option>`).join("")}</select></label>
+      <div class="actbar"><span class="sp"></span><button type="button" data-relpick="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.node ? "" : " disabled"}>Install this version</button></div></div>` : "";
   return `<div class="row stack2" data-group="Updates"><div class="grow">
       <div class="sub">This install runs ${runs}; the newest ${r.channel === "dev" ? "on the dev channel" : "release"} is ${(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) ? esc(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) : "not known yet"} (${when}${r.error ? `; ${esc(r.error)}` : ""}).</div>
       <div class="sub dim">${how}</div>
       ${channel}
+      ${pick}
       ${host}
       ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/aerieos-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
       <div class="actbar"><span class="sp"></span>
@@ -463,6 +467,14 @@ function wireUpdates(root){
     const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from})).json().catch(() => ({error: "no answer"}));
     notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
   }));
+  root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const tag = $("relPick")?.value;
+    if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
+    busy(b, "Installing");
+    const j = await (await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || j.said || `installing ${tag}: its job is on the Jobs page`, !!j.error);
+    unbusy(b, "Install this version");
+  }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
       if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
@@ -642,8 +654,8 @@ const SETTING_GROUPS = [
     {key: "backup_password", label: "Backup password", type: "secret",
      hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, projects, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
   // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
-  // token that may read AerieOS's repository, with which the dev channel
-  // also sees the drafts not published yet, and an update fetches one.
+  // token that may read AerieOS's repository, with which the dev channel and
+  // the version picker see the drafts not published yet.
   {key: "drafts", title: "Unpublished builds", debug: true,
    heading: s => s?.settings?.release_token?.set ? "token set" : "no token",
    fields: [

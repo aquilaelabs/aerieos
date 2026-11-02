@@ -198,7 +198,7 @@ match:
 ```yaml
 services:
   builderbot:
-    image: ghcr.io/aquilaelabs/aerieos:0.9   # a release line; see Upgrading in docs/install.md
+    image: ghcr.io/aquilaelabs/aerieos:dev   # no stable release yet; see Upgrading in docs/install.md
     container_name: Aerie-Workshop
     hostname: builderbot
     restart: unless-stopped

@@ -721,6 +721,12 @@ fetch_tree() {
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
+        # No stable release yet: the newest dev build, which is where AerieOS is.
+        case "$tag" in
+            v[0-9]*) ;;
+            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null \
+                      | grep -o '"tag_name": *"v[0-9][^"]*"' | head -1 | sed 's/.*"\(v[^"]*\)"$/\1/' || true)" ;;
+        esac
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi
     d="$(mktemp -d /tmp/aerieos-release.XXXXXX)"
