@@ -182,6 +182,25 @@ class FromTheStick(unittest.TestCase):
         w, why = nodes._adopt_want({"want": got["want"]})
         self.assertEqual(why, "")
 
+    def test_a_pool_the_adopt_cannot_take_is_set_apart_not_the_whole_request(self):
+        # B612: an encrypted pool, one with no filesystem the adopt takes, or
+        # one named as no pool can be here, left in the request failed its
+        # shape check whole, and nothing of the stick's adopted.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}]},
+               "pools": [{"name": "cache", "fs": "LUKS:btrfs", "uuid": "u-1"}, {"name": "spare", "fs": "auto", "uuid": ""},
+                         {"name": "Fast", "fs": "zfs", "uuid": ""}, {"name": "nvme", "fs": "btrfs", "uuid": "u-4"}]}
+        got = self.want(cfg)
+        self.assertEqual(got["want"]["pools"], [{"name": "nvme", "fs": "btrfs", "uuid": "u-4"}])
+        self.assertEqual([(s["slot"], s["why"]) for s in got["skipped"]],
+                         [("cache", "encrypted: its key is not asked for yet"), ("spare", "its filesystem is auto"),
+                          ("Fast", "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)")])
+        import nodes
+        _w, why = nodes._adopt_want({"want": got["want"]})
+        self.assertEqual(why, "")
+        # Only pools that cannot be taken: the disk still adopts.
+        got = self.want({"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}]}, "pools": [{"name": "cache", "fs": "luks:xfs"}]})
+        self.assertEqual((len(got["want"]["data"]), got["want"]["pools"], len(got["skipped"])), (1, [], 1))
+
     def test_a_plan_with_no_disk_or_pool_offers_nothing(self):
         self.assertIsNone(self.want({}))
         self.assertIsNone(self.want({"array": {"disks": []}}))

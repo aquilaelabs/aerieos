@@ -22,11 +22,14 @@ Format 1:
 """
 import json
 import os
+import re
 import time
 from pathlib import Path
 
 RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/aerieos-os/firstboot/firstboot.json"))
 STATE = None
+# The name a pool may be mounted under (adopt.POOL_RE, nodes._adopt_want).
+POOL_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
 WAITS = {"shares": "a share is served from a pool or the array, adopted first",
@@ -115,8 +118,22 @@ def adopt_want(cfg):
         else:
             skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": f"its filesystem is {fs or 'not said'}"})
     parity = [{"slot": str(x.get("slot") or "parity"), "id": str(x["id"])} for x in ar.get("parity") or [] if isinstance(x, dict) and x.get("id")]
-    pools = [{"name": str(p.get("name") or ""), "fs": str(p.get("fs") or "").lower(), "uuid": str(p.get("uuid") or "")}
-             for p in (cfg or {}).get("pools") or [] if isinstance(p, dict) and p.get("name")]
+    # A pool the adopt cannot take is set apart with why, as a disk is: one
+    # left in the request would fail its shape check whole, and nothing of
+    # the stick's would adopt (B612).
+    pools = []
+    for p in (cfg or {}).get("pools") or []:
+        if not isinstance(p, dict) or not p.get("name"):
+            continue
+        name, fs, uuid = str(p["name"]), str(p.get("fs") or "").lower(), str(p.get("uuid") or "")
+        if fs.startswith("luks"):
+            skipped.append({"slot": name, "id": uuid or name, "why": "encrypted: its key is not asked for yet"})
+        elif fs not in ("xfs", "btrfs", "zfs"):
+            skipped.append({"slot": name, "id": uuid or name, "why": f"its filesystem is {fs or 'not said'}"})
+        elif not POOL_NAME.fullmatch(name):
+            skipped.append({"slot": name, "id": uuid or name, "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
+        else:
+            pools.append({"name": name, "fs": fs, "uuid": uuid})
     if not data and not pools:
         return None
     return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
