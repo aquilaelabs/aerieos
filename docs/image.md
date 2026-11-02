@@ -226,7 +226,10 @@ how much you can use, how many disks may fail and how it grows, and
 Advanced picks another layout. **Make it** names every disk it erases by
 serial before anything is written, and then one press makes the Media,
 Backups and Projects shares on it. The Storage page does all of this too,
-later, the same way.
+later, the same way. On a stick made with a prepared configuration that
+names disks to adopt, those disks are the old system's: each is listed as
+such, with no box, and the step makes nothing of them; they are taken as
+they are on This machine, under Disks from the stick.
 
 ## At the console
 
