@@ -1,4 +1,4 @@
-"""A session's own bb roadmap writes are not news to it (B56): the panel's
+"""A session's own aerie roadmap writes are not news to it (B56): the panel's
 'changed, not told to the session yet' stays off, so the next send carries no
 '(Also: the shared to-do list just changed...)'. Another session still hears
 of it by its own counter, and the operator's edit still sets the flag."""

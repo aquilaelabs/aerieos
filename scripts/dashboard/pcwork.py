@@ -1,6 +1,6 @@
 """A person's Windows PC lent to a project (R270 steps 6 and 7): the Windows
 companion lends a fixed table of verbs per project, and the project's
-sessions ask for them with `bb pc VERB`, under the project's Agents may: Use
+sessions ask for them with `aerie pc VERB`, under the project's Agents may: Use
 a lent PC (deny by default; ask puts each use in front of the person at the
 PC; auto runs it). Nothing here is a command string: a verb is a name from
 VERBS, and what it runs on the PC (which executable, which build command,

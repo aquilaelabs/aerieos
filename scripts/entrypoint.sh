@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# BuilderBot entrypoint.
+# AerieOS entrypoint.
 #
 #   1. remap the `builder` user to PUID/PGID so files written into your host's
 #      shares come out owned by the right account
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 # shellcheck source=lib/common.sh
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 PUID="${PUID:-99}"
 PGID="${PGID:-100}"
@@ -25,7 +25,7 @@ PGID="${PGID:-100}"
 export BB_ACCOUNT=builder
 export BB_DROP=gosu
 # shellcheck source=lib/boot.sh
-. /opt/builderbot/scripts/lib/boot.sh
+. /opt/aerieos/scripts/lib/boot.sh
 
 setup_timezone() {
     if [ -n "${TZ:-}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then

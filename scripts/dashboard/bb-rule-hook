@@ -20,7 +20,7 @@ every call while the controller is not answering.
 
 MAP, and GUARD on a call it lets through: a search for where a name is
 defined or called (grep for `def NAME`, `function NAME`, `NAME(`, or the
-Grep tool's pattern) is handed `bb map find NAME`'s answer beside it, a
+Grep tool's pattern) is handed `aerie map find NAME`'s answer beside it, a
 few lines, so a session that reached for grep out of habit still gets the
 one-call answer and does not spend the reads it would have saved (the
 operator, 12 Oct). The search runs either way; a name the map does not
@@ -84,15 +84,15 @@ def guards(project):
 
 
 # A recording, said at the moment it arrives or is reached for (the
-# operator, 17 Oct: the briefing named bb capture reel, and a session sent a
+# operator, 17 Oct: the briefing named aerie capture reel, and a session sent a
 # phone's screen recording pulled frames with ffmpeg by hand). A note beside
 # the turn, as the code map's is beside a search: it moves what a session
 # does where a line in a briefing read hours earlier does not.
 VIDEO = re.compile(r"[^\s'\"]+\.(?:mp4|mov|webm|mkv|m4v)\b", re.I)
-VIDEO_HINT = ("A recording ({file}): `bb capture reel --video FILE` keeps the frames that changed, each "
+VIDEO_HINT = ("A recording ({file}): `aerie capture reel --video FILE` keeps the frames that changed, each "
               "stamped with its time, on sheet pages under dist/reel/; `--dry` first lists the runs of motion "
               "and how many frames each holds, `--from S --to S` reels one run whole, and `--patch N` "
-              "(12 by default; lower keeps fainter change) and `--max N` tune it. `bb help capture` has the rest.")
+              "(12 by default; lower keeps fainter change) and `--max N` tune it. `aerie help capture` has the rest.")
 
 
 def video_hint(text):
@@ -110,7 +110,7 @@ def prompt(project, req):
 
 
 def map_first(req, patterns, also=""):
-    """`bb map find` for the names these search patterns look up, said
+    """`aerie map find` for the names these search patterns look up, said
     beside the search; nothing when there is none or the map knows none.
     `also` is another note for this call, said with it."""
     names = []
@@ -122,7 +122,7 @@ def map_first(req, patterns, also=""):
             json.dump({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": also}}, sys.stdout)
         return
     import subprocess
-    bb = os.path.join(HERE, "..", "bb")
+    bb = os.path.join(HERE, "..", "aerie")
     said = []
     for n in names:
         try:
@@ -134,14 +134,14 @@ def map_first(req, patterns, also=""):
         if r.returncode or not out or out.startswith("nothing defines"):
             continue
         lines = out.splitlines()
-        said.append(f"$ bb map find {n}\n" + "\n".join(lines[:rulehook.MAP_LINES])
+        said.append(f"$ aerie map find {n}\n" + "\n".join(lines[:rulehook.MAP_LINES])
                     + (f"\n({len(lines) - rulehook.MAP_LINES} more lines)" if len(lines) > rulehook.MAP_LINES else ""))
     if not said:
         if also:
             json.dump({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": also}}, sys.stdout)
         return
     text = ("The code map answers this lookup in one call; its answer, beside your search "
-            "(bb map who-calls NAME gives the callers):\n" + "\n".join(said)) + ("\n\n" + also if also else "")
+            "(aerie map who-calls NAME gives the callers):\n" + "\n".join(said)) + ("\n\n" + also if also else "")
     json.dump({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": text}}, sys.stdout)
 
 

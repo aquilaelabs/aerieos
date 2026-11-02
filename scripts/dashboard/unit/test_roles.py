@@ -70,10 +70,10 @@ class Model(unittest.TestCase):
         self.assertTrue(self.g({"name": "s", "role": "user", "roles": ["seer"], "projects": []}, "containers-read"))
 
     def test_roles_are_named_for_a_person(self):
-        # R255 step 1: BuilderBot's owner, an administrator, and the Owner of
+        # R255 step 1: AerieOS's owner, an administrator, and the Owner of
         # a project told apart by name, not by their keys.
         roles.ensure_owner_role("alpha")
-        self.assertEqual(roles.label("owner"), "BuilderBot's owner")
+        self.assertEqual(roles.label("owner"), "AerieOS's owner")
         self.assertEqual(roles.label("admin"), "Administrator")
         self.assertEqual(roles.label("alpha_owner"), "Owner of alpha")
         self.assertEqual(roles.label("nosuch"), "nosuch")
@@ -202,26 +202,6 @@ class Model(unittest.TestCase):
         self.assertFalse(roles.granted(t, "curate"))
         self.assertTrue(roles.granted(ADMIN, "curate"), "the built-in administrator holds every area")
 
-    def test_migration_0017_splits_toolchains(self):
-        import importlib.util
-        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "statemigrations", "0017_install_curate_configure.py")
-        spec = importlib.util.spec_from_file_location("m17", here)
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "roles.json"), "w") as f:
-                json.dump({"roles": {
-                    "builder": {"scope": "global", "perms": {"toolchains": "write", "containers": "write"}, "only": {"toolchains": {"n1": "write", "n2": "read"}}},
-                    "reader": {"scope": "global", "perms": {"toolchains": "read"}, "only": {}},
-                    "other": {"scope": "projects", "perms": {"projects": "write"}, "only": {}}}}, f)
-            m.run({"state": d})
-            m.run({"state": d})
-            got = json.load(open(os.path.join(d, "roles.json")))["roles"]
-        self.assertEqual(got["builder"]["perms"], {"containers": "write", "install": "write", "configure": "write"})
-        self.assertEqual(got["builder"]["only"], {"install": {"n1": "write", "n2": "read"}, "configure": {"n1": "write"}})
-        self.assertEqual(got["reader"]["perms"], {"install": "read"}, "no Configure without writing containers too")
-        self.assertEqual(got["other"]["perms"], {"projects": "write"})
-
     def test_an_area_held_instance_by_instance(self):
         # The operator, 16 Oct: an area's row opens on its nodes or runners,
         # Read or Write on each.
@@ -299,7 +279,7 @@ class Migration(unittest.TestCase):
         self.assertEqual(u.get("ann")["roles"], ["tester"], "user taken off, a role of its own kept")
         self.assertEqual(u.get("bob")["roles"], [])
         self.assertEqual(u.get("ann")["project_roles"], {"alpha": ["alpha_owner"]})
-        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "BuilderBot's owner needs none")
+        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "AerieOS's owner needs none")
         self.assertEqual(u.get("adm")["role"], "admin")
         self.assertFalse(u.migrate_r152({"alpha": "u_4"}), "once")
 

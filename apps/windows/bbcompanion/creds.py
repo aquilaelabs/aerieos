@@ -7,12 +7,12 @@ import json
 import os
 import sys
 
-TARGET = "BuilderBot companion"
+TARGET = "AerieOS companion"
 
 
 def _file():
     base = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), ".config")
-    d = os.path.join(base, "BuilderBot")
+    d = os.path.join(base, "AerieOS")
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, "device.json")
 

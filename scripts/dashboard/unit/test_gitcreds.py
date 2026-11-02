@@ -58,6 +58,31 @@ class Sealed(unittest.TestCase):
         self.assertEqual(self.ask("gitea.lan:3000", "http"), "username=oauth2\npassword=tok\n")
         self.assertEqual(gitcreds.seal_all(), 0)
 
+    def test_a_reseal_keeps_the_people_who_gave_a_token(self):
+        # B543: a project's own line beside its givers' account: lines;
+        # sealed again (at start, or after the install key changed) it kept
+        # the one line and every giver was gone.
+        signing.load_master(str(self.tmp / "none"))
+        gitcreds.keep_as_own("web", "https://oauth2:tok@github.com")
+        gitcreds._write_givers("web", [("u_0000000a", "f1"), ("u_0000000b", "f2")])
+        self.keyed("k" * 32)
+        self.assertEqual(gitcreds.seal_all(), 1)
+        self.assertEqual(gitcreds.givers("web"), [("u_0000000a", "f1"), ("u_0000000b", "f2")])
+        self.assertEqual(gitcreds.read_line("web"), "https://oauth2:tok@github.com")
+
+    def test_people_giving_a_project_a_token_at_once_are_all_kept(self):
+        # B549: each read the givers and rewrote them, and one lost another.
+        import threading
+        signing.load_master(str(self.tmp / "none"))
+        gitcreds.keep_as_own("web", "https://oauth2:tok@github.com")
+        uids = [f"u_{i:08x}" for i in range(20)]
+        ts = [threading.Thread(target=gitcreds.link_account, args=("web", u, "f")) for u in uids]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        self.assertEqual(sorted(u for u, _f in gitcreds.givers("web")), uids)
+
     def test_a_repo_still_naming_gits_store_counts_as_scoped(self):
         f = str(gitcreds.path("web"))
         self.assertTrue(gitcreds.names_helper(f"store --file={f}\n", "web"))

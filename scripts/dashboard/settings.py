@@ -84,7 +84,7 @@ KEYS = {
     # secrets: kept here, never shown back, only said to be set.
     "tunnel_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
     # The vetted catalog's address (R169 step 2): where index.json and index.sig are read from.
-    "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
+    "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
     "tunnel_token": {"default": "", "kind": "secret", "applied": "now"},
     "cf_api_token": {"default": "", "kind": "secret", "applied": "now"},
     # The dashboard's own connection (R158 step 2, tls.py): http, self (the
@@ -121,6 +121,10 @@ KEYS = {
     # machine's pools are sealed under a key it derives; eight characters
     # at least, sealed here like every secret.
     "backup_password": {"default": "", "kind": "secret", "applied": "now"},
+    # A GitHub token that may read AerieOS's repository, with which a
+    # controller in debug mode sees and fetches unpublished (draft) builds
+    # (the operator, 1 Nov); debug mode's alone, cleared at a start without it.
+    "release_token": {"default": "", "kind": "secret", "applied": "now"},
     "update_window": {"default": "", "kind": "choice", "applied": "now",
                       "choices": ["", "daily", "mon", "tue", "wed", "thu", "fri", "sat", "sun"]},
     # The release channel (R179): normal is the releases as published; dev
@@ -133,6 +137,9 @@ KEYS = {
     **{f"check_{k}": {"default": "weekly", "kind": "choice", "applied": "now", "choices": ["daily", "weekly", "monthly", "off"]}
        for k in ("release", "images", "nginx", "scanners", "catalog")},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
+    # How many versions an update pushes out of its slot stay on the boot
+    # menu (R201), 0 for none; AerieOS alone.
+    "os_keep": {"default": 3, "kind": "number", "min": 0, "max": 10, "applied": "now"},
     # The room a node keeps for itself (R110): the disk left free under
     # which the bell warns and a build, a test or a container's rebuild is
     # refused (a tenth of a disk smaller than ten times this), the memory
@@ -152,18 +159,19 @@ KEYS = {
 # project's Debug grants) is put back off, so setting it to 1 again starts
 # from nothing granted.
 DEBUG_KEYS = ("debug_mode", "offer_unvetted")
-# ...and what only those allow, put back at a start without them.
-DEBUG_ONLY = ("release_channel",)
+# ...and what only those allow, put back at a start without them: the dev
+# release channel (R193, the operator, 1 Nov: dev updates for a controller
+# in debug mode alone).
+DEBUG_ONLY = ("release_token",)
 
 
 def debug_available():
     return os.environ.get("DEBUG_MODE", "").strip() == "1"
 
 
-def dev_channel_ok():
-    """Whether the dev release channel may be picked here (R179): debug mode
-    on and the dev switch on."""
-    return debug_available() and _parse("offer_unvetted", load().get("offer_unvetted")) is True
+def channel_picked():
+    """The release channel someone picked, or "" where none has been."""
+    return str(load().get("release_channel") or "")
 
 
 def reset_debug():
@@ -181,18 +189,16 @@ def reset_debug():
 
 def boot_channel():
     """The release channel a boot asked for (BB_RELEASE_CHANNEL, from a
-    stick's builderbot.env, R161 step 12), taken at start on a controller in
-    debug mode: dev turns the dev switch on and picks the dev channel, so a
-    stick made for it follows the pre-releases from its first start. Nothing
-    without DEBUG_MODE=1, and nothing for any other word. Whether it moved
-    anything."""
-    if not debug_available() or os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
+    stick's aerieos.env, R161 step 12), taken at start: dev picks the dev
+    channel, so a stick made for it follows the pre-releases from its first
+    start. Nothing for any other word. Whether it moved anything."""
+    if os.environ.get("BB_RELEASE_CHANNEL", "").strip() != "dev":
         return False
     with _lock:
         d = load()
-        if d.get("offer_unvetted") is True and d.get("release_channel") == "dev":
+        if d.get("release_channel") == "dev":
             return False
-        d.update(offer_unvetted=True, release_channel="dev")
+        d.update(release_channel="dev")
         write_json(FILE, d)
     return True
 
@@ -376,8 +382,8 @@ def set_many(changes):
             return {"error": "the debug and dev options are not available on this controller"}
         if key == "debug_mode":
             return {"error": "debug mode is on while the controller is started with DEBUG_MODE=1, and off otherwise"}
-        if key == "release_channel" and _parse(key, raw) == "dev" and not dev_channel_ok():
-            return {"error": "the dev channel is offered only on a controller in debug mode with the dev switch on"}
+        if key == "release_token" and str(raw or "").strip() and not debug_available():
+            return {"error": "a token for unpublished builds is taken only on a controller in debug mode"}
         v = _parse(key, raw)
         if v is None:
             kind = KEYS[key]["kind"]

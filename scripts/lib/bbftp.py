@@ -11,7 +11,7 @@ The answer comes back as one JSON line on stdin. Nothing is cached, so an
 access taken away in the settings holds from the next login.
 
 TLS is required on the control and the data connection: the password is
-the account's BuilderBot password, the same one that signs in to the
+the account's AerieOS password, the same one that signs in to the
 dashboard, and plain FTP would send it across the network as written. The
 certificate is made on the first start and kept beside the node's state;
 a client is asked to trust it once.
@@ -50,7 +50,7 @@ def make_cert(path):
     from cryptography.x509.oid import NameOID
 
     key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "BuilderBot file access")])
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "AerieOS file access")])
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
             .public_key(key.public_key()).serial_number(x509.random_serial_number())
@@ -83,7 +83,15 @@ class Asker:
                 self.out.flush()
                 line = self.inp.readline()
             except (OSError, ValueError):
-                return {}
+                line = ""
+            if not line:
+                # Its agent is gone (an exec keeps the pid, so the parent
+                # watch below never sees it): nobody can answer a login
+                # again, so the port goes back for the agent's next server
+                # rather than refusing everyone (B573).
+                sys.stderr.write("bb-ftpd: the agent's pipe closed; ending\n")
+                sys.stderr.flush()
+                os._exit(0)
         try:
             got = json.loads(line) if line else {}
         except ValueError:
@@ -144,7 +152,7 @@ def main(argv=None):
         tls_control_required = True
         tls_data_required = True
         passive_ports = range(a.port + 1, a.port + 1 + PASSIVE)
-        banner = f"BuilderBot file access{': ' + a.project if a.project else ''}"
+        banner = f"AerieOS file access{': ' + a.project if a.project else ''}"
         permit_foreign_addresses = False
         timeout = 600
 

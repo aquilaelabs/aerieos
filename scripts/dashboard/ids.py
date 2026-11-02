@@ -5,7 +5,7 @@ reply, a commit message or a log line saying "#12" could be read against
 either tab, and #137 in the same sentence was a GitHub pull request. The
 operator asked for something that cannot be misread (roadmap #28), and one
 letter is the smallest thing that does it: it fits a sentence, survives
-`bb history --find B62`, and is not what GitHub uses.
+`aerie history --find B62`, and is not what GitHub uses.
 
 Rules are keyed by name (`agent-compat`), not by number, so they need no
 letter, which also keeps R from having to mean two things. A test is keyed
@@ -13,7 +13,7 @@ letter, which also keeps R from having to mean two things. A test is keyed
 
 The letter is a CHECK on the way in, not only a label on the way out: every
 verb accepts the bare number, so nothing a session already knows breaks, but
-`bb bug fix R12` stops with a sentence saying R12 is a roadmap item. That
+`aerie bug fix R12` stops with a sentence saying R12 is a roadmap item. That
 refusal is the whole reason for the letter existing.
 """
 import re

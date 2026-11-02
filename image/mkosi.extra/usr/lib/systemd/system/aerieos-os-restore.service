@@ -1,0 +1,19 @@
+[Unit]
+Description=AerieOS: the configuration put back for the slot a failed update fell back to
+# Before the controller, whose state gate would refuse a configuration the
+# newer slot moved on (B472); only on an AerieOS boot.
+ConditionKernelCommandLine=aerieslot
+DefaultDependencies=yes
+After=local-fs.target
+Before=aerieos-controller.service aerieos-os-health.service
+
+[Service]
+Type=oneshot
+# The boot menu on the ESP follows the image running (R201): a stick written
+# before a change to it takes the change with its first update.
+ExecStartPre=-/usr/lib/aerieos-os/boot-menu
+ExecStart=/usr/lib/aerieos-os/restore-before
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

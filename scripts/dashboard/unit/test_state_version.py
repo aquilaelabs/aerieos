@@ -58,12 +58,12 @@ class Gate(unittest.TestCase):
         self.assertEqual(sv.read(self.state), (self.cur, "0.5.0"))
         self.assertFalse((self.state / "backups").exists())
 
-    def test_a_config_from_0_6_0_is_copied_before_it_moves(self):
+    def test_a_config_a_step_behind_is_copied_before_it_moves(self):
         db = self.lived_in()
         self.addCleanup(db.close)
-        self.stamp(sv.SUPPORTED_FROM, "0.6.0")
-        with redirect_stdout(io.StringIO()):
-            self.assertEqual(sv.gate(self.state, "0.9.0"), sv.SUPPORTED_FROM)
+        self.stamp(self.cur - 1, "0.8.0")
+        with mock.patch.object(sv, "SUPPORTED_FROM", self.cur - 1), redirect_stdout(io.StringIO()):
+            self.assertEqual(sv.gate(self.state, "0.9.0"), self.cur - 1)
         dest = self.state / "backups" / "before-0.9.0"
         self.assertTrue((dest / "users.json").is_file())
         self.assertTrue((dest / "wiki" / "alpha" / "Home.md").is_file(), "the wiki is state")
@@ -72,16 +72,50 @@ class Gate(unittest.TestCase):
         self.assertFalse((dest / "backups").exists())
         got = sqlite3.connect(dest / "builderbot.db").execute("SELECT x FROM t").fetchall()
         self.assertEqual(got, [(7,)], "the database copied whole, its WAL folded in")
-        self.assertEqual(sv.read(self.state), (sv.SUPPORTED_FROM, "0.6.0"), "the stamp moves when the migrations have run")
+        self.assertEqual(sv.read(self.state), (self.cur - 1, "0.8.0"), "the stamp moves when the migrations have run")
 
     def test_a_second_try_keeps_the_first_copy(self):
         self.lived_in().close()
-        self.stamp(sv.SUPPORTED_FROM, "0.6.0")
-        with redirect_stdout(io.StringIO()):
+        self.stamp(self.cur - 1, "0.8.0")
+        with mock.patch.object(sv, "SUPPORTED_FROM", self.cur - 1), redirect_stdout(io.StringIO()):
             sv.gate(self.state, "0.9.0")
             (self.state / "users.json").write_text('{"half": "migrated"}')
             sv.gate(self.state, "0.9.0")
         self.assertEqual((self.state / "backups" / "before-0.9.0" / "users.json").read_text(), '{"users": {}}')
+
+    def test_a_copy_put_back_is_used_once(self):
+        # The copy goes with what it replaced, so a later start of that
+        # version copies afresh rather than reusing the first try's.
+        (self.state / "users.json").write_text('{"v": "old"}')
+        sv.backup(self.state, "0.9.0")
+        (self.state / "users.json").write_text('{"v": "migrated"}')
+        aside = sv.restore(self.state, "0.9.0")
+        self.assertEqual((self.state / "users.json").read_text(), '{"v": "old"}')
+        self.assertEqual((Path(aside) / "users.json").read_text(), '{"v": "migrated"}', "what it held, kept")
+        self.assertFalse((self.state / "backups" / "before-0.9.0").exists())
+        self.assertTrue((Path(aside) / "used-before-0.9.0").is_dir())
+        (self.state / "users.json").write_text('{"v": "a week on"}')
+        sv.backup(self.state, "0.9.0")
+        self.assertEqual((self.state / "backups" / "before-0.9.0" / "users.json").read_text(), '{"v": "a week on"}')
+
+    def test_a_restore_that_fails_leaves_the_state_as_it_was(self):
+        (self.state / "users.json").write_text('{"v": "old"}')
+        (self.state / "roadmap.json").write_text('{"r": "old"}')
+        sv.backup(self.state, "0.9.0")
+        (self.state / "users.json").write_text('{"v": "migrated"}')
+        (self.state / "roadmap.json").write_text('{"r": "migrated"}')
+        real, calls = os.replace, []
+
+        def flaky(a, b):
+            calls.append(a)
+            if len(calls) == 4:
+                raise OSError(28, "No space left on device")
+            return real(a, b)
+        with mock.patch.object(sv.os, "replace", flaky), self.assertRaises(OSError):
+            sv.restore(self.state, "0.9.0")
+        self.assertEqual((self.state / "users.json").read_text(), '{"v": "migrated"}')
+        self.assertEqual((self.state / "roadmap.json").read_text(), '{"r": "migrated"}')
+        self.assertTrue((self.state / "backups" / "before-0.9.0" / "users.json").is_file(), "the copy is still there to try again")
 
     def test_the_newest_three_copies_are_kept(self):
         (self.state / "users.json").write_text("{}")
@@ -107,26 +141,20 @@ class Gate(unittest.TestCase):
         self.assertIn("will not start", err.getvalue())
         self.assertEqual(sv.read(self.state)[0], self.cur + 1, "nothing written")
 
-    def test_an_older_config_than_this_build_migrates_from_names_the_way_through(self):
-        self.stamp(0, "0.4.0")
-        with mock.patch.object(sv, "SUPPORTED_FROM", 1), mock.patch.object(sv, "THROUGH", {0: "0.5"}):
-            why = sv.refusal(self.state, "0.6.0")
-        self.assertIn("Start the newest 0.5 release on it first", why)
-        self.assertIn("install.md#upgrading", why)
-        with mock.patch.object(sv, "SUPPORTED_FROM", 0):
-            self.assertEqual(sv.refusal(self.state, "0.5.0"), "", "a build with no floor migrates from 0")
-
-    def test_this_build_upgrades_from_0_6_0_on_and_sends_older_through_0_6(self):
-        # The operator, 28 Oct: 0.9 upgrades from 0.6, 0.7 and 0.8, no further.
-        self.stamp(2, "0.6.0")
-        self.assertEqual(sv.refusal(self.state, "0.9.0"), "", "0.6.0's state is the floor")
-        for n, by in ((1, "0.5.3"), (0, "")):
+    def test_nothing_older_than_the_floor_starts_and_it_says_to_install_fresh(self):
+        # The operator, 1 Nov: AerieOS starts here, and 0.6, 0.7 and 0.8 have no path.
+        self.stamp(sv.SUPPORTED_FROM, "0.9.0")
+        self.assertEqual(sv.refusal(self.state, "0.9.0"), "", "the floor is what the controller moving over holds")
+        for n, by in ((sv.SUPPORTED_FROM - 1, "0.8.2"), (2, "0.6.0"), (0, "")):
             self.stamp(n, by)
-            self.assertIn("Start the newest 0.6 release on it first", sv.refusal(self.state, "0.9.0"))
+            why = sv.refusal(self.state, "0.9.0")
+            self.assertIn("install fresh", why)
+            self.assertIn("install.md#upgrading", why)
         (self.state / "state.json").unlink()
         self.lived_in().close()
-        self.assertIn("Start the newest 0.6 release on it first", sv.refusal(self.state, "0.9.0"),
-                      "a lived-in /config from before the stamp is state 0")
+        self.assertIn("install fresh", sv.refusal(self.state, "0.9.0"), "a lived-in /config from before the stamp is state 0")
+        with mock.patch.object(sv, "SUPPORTED_FROM", 0):
+            self.assertEqual(sv.refusal(self.state, "0.5.0"), "", "a build with no floor migrates from 0")
 
     def test_an_unreadable_stamp_is_refused_rather_than_guessed(self):
         (self.state / "state.json").write_text("{nope")
@@ -205,7 +233,7 @@ class Migrate(unittest.TestCase):
             self.assertIn("disk full", sv.HELD)
             self.assertEqual(sv.migrate(self.state, {"ran": []}), [])
         self.assertEqual(sv.read(self.state), (None, ""))
-        # B109: said where bb doctor reads it, and cleared once nothing is held.
+        # B109: said where aerie doctor reads it, and cleared once nothing is held.
         self.assertIn("disk full", (self.state / sv.HELD_FILE).read_text())
         with mock.patch.object(sv, "HELD", ""), redirect_stdout(io.StringIO()):
             sv.gate(self.state, "0.6.0")
@@ -234,7 +262,7 @@ class Migrate(unittest.TestCase):
 
 
 class Release(unittest.TestCase):
-    """bb version release, and the Artifacts view's Release, refuse a
+    """aerie version release, and the Artifacts view's Release, refuse a
     version with no snapshot where the tree keeps them."""
     def test_a_tree_that_keeps_snapshots_needs_this_ones(self):
         import version

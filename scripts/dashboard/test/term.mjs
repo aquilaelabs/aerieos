@@ -1,4 +1,4 @@
-// BuilderBot's own terminal (R133): a shell tab is drawn by xterm.js in the
+// AerieOS's own terminal (R133): a shell tab is drawn by xterm.js in the
 // page and joined to /termws, which runs bb-tty in a pty on this
 // controller. What is typed reaches the shell and what it prints reaches
 // the screen; the screen fits its box and the pty follows; a terminal that
@@ -192,7 +192,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
                                          null, { timeout: 10000 }).then(() => true, () => false);
   ok(/\/terminal\?arg=sh%3A7%3Aalpha/.test(win.url()) && seen
      && await page.evaluate(() => !!document.querySelector('#pane1 .slot.on.popped')),
-     `a tab popped out opens BuilderBot's terminal on a page of its own, typed into like the tab (${win.url().replace(/^https?:\/\/[^/]+/, '')})`);
+     `a tab popped out opens AerieOS's terminal on a page of its own, typed into like the tab (${win.url().replace(/^https?:\/\/[^/]+/, '')})`);
   await page.evaluate(id => reattachTab(id), id);
   await page.waitForSelector('#pane1 .slot.on.ownterm .xterm', { timeout: 20000 });
   ok(win.isClosed() || await win.evaluate(() => true).catch(() => true), '...and Reattach brings it back into the dock');

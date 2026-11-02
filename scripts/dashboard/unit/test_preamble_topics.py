@@ -1,5 +1,5 @@
 """R202: the briefing is a core plus an index, and the rest is topics a
-session reads with `bb help TOPIC`. preamble.split reads the template's
+session reads with `aerie help TOPIC`. preamble.split reads the template's
 markers; this holds it to them without a server or a project."""
 import os
 import sys
@@ -30,7 +30,7 @@ How the machine works, at length.
 ## Git
 <!-- BUILDERBOT:TOPIC git: pushing -->
 
-Push with bb git push.
+Push with aerie git push.
 More about git.
 
 ## Kept in the block
@@ -44,9 +44,9 @@ class Split(unittest.TestCase):
         text, topics = preamble.split(TEMPLATE)
         self.assertEqual([t[0] for t in topics], ["start", "git"])
         self.assertEqual(topics[1][1:3], ("Git", "pushing"))
-        self.assertEqual(topics[1][3], "Push with bb git push.\nMore about git.")
+        self.assertEqual(topics[1][3], "Push with aerie git push.\nMore about git.")
         self.assertIn("- start: the machine\n- git: pushing", text)
-        self.assertIn("`bb help TOPIC`", text)
+        self.assertIn("`aerie help TOPIC`", text)
         self.assertNotIn("How the machine works", text)
         self.assertIn("## Kept in the block", text)
         self.assertIn("A section with no marker stays", text)
@@ -93,8 +93,8 @@ class Mentioned(unittest.TestCase):
 
     def test_words_shared_with_a_title_name_it_and_a_parked_one_never(self):
         said, names = preamble.mentioned("p", "the emulator does not boot on the dev node")
-        self.assertIn("R4 The emulator boots headless on the dev node (1 step open): `bb roadmap show R4`", said)
-        self.assertIn("B7 [medium] The emulator boot hangs under software rendering: `bb bug show B7`", said)
+        self.assertIn("R4 The emulator boots headless on the dev node (1 step open): `aerie roadmap show R4`", said)
+        self.assertIn("B7 [medium] The emulator boot hangs under software rendering: `aerie bug show B7`", said)
         self.assertNotIn("parked", said)
         self.assertNotIn("nginx", said)
         self.assertEqual(names, ["roadmap-4", "bug-7"])

@@ -1,5 +1,5 @@
 """A project's wiki (R112): pages a person or Claude writes, kept by the
-controller, readable on the notebook's Wiki view and through `bb wiki`.
+controller, readable on the notebook's Wiki view and through `aerie wiki`.
 
 Kept as a git repository of the controller's own under STATE/wiki/PROJECT,
 in the shape a forge's wiki has: one Markdown file per page at the top,
@@ -115,7 +115,11 @@ def _env():
 
 
 def _git(project, *args, timeout=60, check=True, env=None):
-    r = subprocess.run(["git", "-C", str(repo(project)), *args], capture_output=True, text=True,
+    # A wiki pulled from a forge may hold links: checked out as plain files
+    # naming their target, never as links a save would write through
+    # (/config/users.json), and no hook of its own runs (B532).
+    r = subprocess.run(["git", "-c", "core.symlinks=false", "-c", "core.hooksPath=/dev/null",
+                        "-C", str(repo(project)), *args], capture_output=True, text=True,
                        timeout=timeout, check=False, env=env or _env())
     if check and r.returncode:
         raise Refused((r.stderr or r.stdout or "git failed").strip().splitlines()[-1][:300])
@@ -197,7 +201,7 @@ def page(project, name):
     file = file_of(name)
     blob = _blob(project, file)
     if not blob:
-        raise Refused(f"no page called {title_of(file)!r} in {project}'s wiki: bb wiki lists them")
+        raise Refused(f"no page called {title_of(file)!r} in {project}'s wiki: aerie wiki lists them")
     text = _git(project, "cat-file", "blob", blob).stdout
     by, at = _last(project, file)
     return {"name": file[:-3], "title": title_of(file), "file": file, "text": text,
@@ -218,7 +222,7 @@ def history(project, limit=30):
 # ---- writing -------------------------------------------------------------------
 
 def _commit(project, message, who):
-    name = (who or {}).get("name") or "BuilderBot"
+    name = (who or {}).get("name") or "AerieOS"
     email = (who or {}).get("email") or "wiki@builderbot.invalid"
     env = dict(_env(), GIT_AUTHOR_NAME=name, GIT_AUTHOR_EMAIL=email,
                GIT_COMMITTER_NAME=name, GIT_COMMITTER_EMAIL=email)
@@ -242,6 +246,8 @@ def save(project, name, text, base="", who=None, why=""):
                           f"{title_of(file)!r} is already a page: open it and edit it")
         if not now and len(pages(project)) >= MAX_PAGES:
             raise Refused(f"a wiki holds at most {MAX_PAGES} pages")
+        if (repo(project) / file).is_symlink():
+            raise Refused(f"{title_of(file)!r} is a link on this controller, not a page: pull the wiki again")
         (repo(project) / file).write_text(text, encoding="utf-8")
         _git(project, "add", "--", file)
         if _git(project, "diff", "--cached", "--quiet", check=False).returncode == 0:
@@ -324,6 +330,8 @@ def rename(project, old, new, who=None):
         for p in pages(project):
             f = b if p["file"] == a else p["file"]
             path = repo(project) / f
+            if path.is_symlink():
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
@@ -421,7 +429,7 @@ def pull(project, who=None):
         if not _has_head(project):
             _git(project, "reset", "--quiet", "--hard", theirs)
             return {"ok": True, "took": "all", "pages": len(pages(project))}
-        name = (who or {}).get("name") or "BuilderBot"
+        name = (who or {}).get("name") or "AerieOS"
         email = (who or {}).get("email") or "wiki@builderbot.invalid"
         menv = dict(_env(), GIT_AUTHOR_NAME=name, GIT_AUTHOR_EMAIL=email,
                     GIT_COMMITTER_NAME=name, GIT_COMMITTER_EMAIL=email)

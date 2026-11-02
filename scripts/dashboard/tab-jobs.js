@@ -195,12 +195,17 @@ function jobsShowSet(v){
 
 // Who asked: every job has an asker, so it is a column and not a line
 // under each row; an account is named without its "user:" prefix.
-// A job BuilderBot asked for itself is "system:WHAT", said in words.
-const JOB_BY_SYSTEM = {"auto-update": "automatic update"};
+// A job AerieOS asked for itself is "system:WHAT", said in words, or
+// a bare "system" (a toolchain's daily check), said as automatic as well.
+// One word, which the By column holds whole at a desk beside the Job
+// column's room ("automatic update" was cut to "automatic …"); the Kind
+// column beside it says what it updated.
+const JOB_BY_SYSTEM = {"auto-update": "automatic"};
 function jobBy(j){
   const by = j.requested_by || "";
   return esc(by.startsWith("user:") ? by.slice(5)
-    : by.startsWith("system:") ? JOB_BY_SYSTEM[by.slice(7)] || by.slice(7).replace(/-/g, " ") : by);
+    : by.startsWith("system:") ? JOB_BY_SYSTEM[by.slice(7)] || by.slice(7).replace(/-/g, " ")
+    : by === "system" ? "automatic" : by);
 }
 // The Job column has the room (B112): a title wraps at a word only when
 // its column holds the longest word, so it takes most of the shares; Node
@@ -322,9 +327,9 @@ function renderJobsInto(i){
 }
 
 function wireJobsTab(root){
-  root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => {
-    jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync();
-  });
+  root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => chipMove(
+    () => document.querySelector(".pane .doc.on .jobstab") || root, ".jbrow",
+    () => { jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync(); }));
   // Every tail sits at its own bottom after a draw: the end is where the
   // reason is, the same rule the manager's compose log keeps.
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });

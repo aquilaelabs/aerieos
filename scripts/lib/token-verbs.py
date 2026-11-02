@@ -1,4 +1,4 @@
-"""Behind `bb token keep` (cmd_token in bb): the session token in BB_TOKEN,
+"""Behind `aerie token keep` (cmd_token in bb): the session token in BB_TOKEN,
 stored where this account's sessions on this machine read it
 (bbapi.keep_token), for the agent to run for a session that is idle (R27).
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# BuilderBot's own version stamps, moved with the number.
+# AerieOS's own version stamps, moved with the number.
 #
-# `bb version bump` runs this from the repository root with the new version
+# `aerie version bump` runs this from the repository root with the new version
 # and the part that moved, and commits whatever it changes alongside VERSION.
 # It exists because this project's minor is not only a number: it is the
 # COMPATIBILITY WINDOW, and the window is written down in one more place:
 #
-#   scripts/agent/builderbot_agent/__init__.py   AGENT_VERSION = "WINDOW.BUILD"
+#   scripts/agent/aerieos_agent/__init__.py   AGENT_VERSION = "WINDOW.BUILD"
 #
 # ...which a bump used to leave behind. 0.5.0 only came out consistent because
 # a person moved it by hand first; a bump that forgot would have committed a
@@ -30,7 +30,7 @@ set -euo pipefail
 new="${1:?usage: version-stamp NEW-VERSION PART}"
 part="${2:?usage: version-stamp NEW-VERSION PART}"
 
-AGENT=scripts/agent/builderbot_agent/__init__.py
+AGENT=scripts/agent/aerieos_agent/__init__.py
 
 case "$part" in
     major|minor) ;;

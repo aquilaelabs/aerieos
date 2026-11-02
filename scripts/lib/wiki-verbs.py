@@ -1,18 +1,18 @@
-"""Behind `bb wiki` (cmd_wiki in bb): the project's wiki, through the
+"""Behind `aerie wiki` (cmd_wiki in bb): the project's wiki, through the
 controller's API as the caller (wiki.py on the dashboard's side).
 
-    bb wiki                       the pages: name, size, who changed it last
-    bb wiki show NAME             one page's Markdown, as it is kept
-    bb wiki save NAME FILE|-      write a page whole (new or a rewrite)
-    bb wiki rm NAME               take a page out
-    bb wiki mv OLD NEW            rename one
-    bb wiki history               the last changes, newest first
+    aerie wiki                       the pages: name, size, who changed it last
+    aerie wiki show NAME             one page's Markdown, as it is kept
+    aerie wiki save NAME FILE|-      write a page whole (new or a rewrite)
+    aerie wiki rm NAME               take a page out
+    aerie wiki mv OLD NEW            rename one
+    aerie wiki history               the last changes, newest first
 
 A save or a removal is the project's dial, Agents may: Write the wiki:
 auto lands it, ask holds it for the operator, deny refuses it. A rewrite is
 checked against the page as it was when the save began, so a person's edit
 in between is refused rather than overwritten; --base REV checks against
-the one `bb wiki show --rev` printed instead. BB_WIKI_AUTH is the auth
+the one `aerie wiki show --rev` printed instead. BB_WIKI_AUTH is the auth
 header and BB_WIKI_PROJECT the project.
 """
 import os
@@ -31,7 +31,7 @@ fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
 auth = os.environ["BB_WIKI_AUTH"]
 proj = os.environ["BB_WIKI_PROJECT"]
-USAGE = ("usage: bb wiki [list | show NAME [--rev] | save NAME FILE|- [--why \"...\"] [--base REV] | "
+USAGE = ("usage: aerie wiki [list | show NAME [--rev] | save NAME FILE|- [--why \"...\"] [--base REV] | "
          "rm NAME [--why \"...\"] | mv OLD NEW | history]")
 
 

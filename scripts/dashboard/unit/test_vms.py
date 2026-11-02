@@ -164,6 +164,27 @@ class Controller(unittest.TestCase):
         self.assertEqual(vms.view()[0]["state"], "making")
         self.assertIn("already", self.new()["error"])
 
+    def test_two_projects_names_that_make_one_machine_name_are_refused_on_one_node(self):
+        # web's db-x and web-db's x are both bbvm-web-db-x: the second is
+        # refused on that node, and every action names its project.
+        self.assertTrue(vms.create("user:test", "web", {"name": "db-x", "os": "debian 13", "keys": [KEY]}, ["n1"]).get("ok"))
+        r = vms.create("user:test", "web-db", {"name": "x", "os": "debian 13", "keys": [KEY]}, ["n1"])
+        self.assertIn("share its machine name (bbvm-web-db-x) with web's db-x", r.get("error", ""), r)
+        self.assertEqual(self.f.jobs[0][2]["project"], "web")
+
+    def test_remove_waits_for_a_create_still_going(self):
+        # B553: Remove while the create still ran dropped the record and the
+        # create then made a VM nobody had; a create that stalled may still
+        # be cleared.
+        self.assertTrue(self.new().get("ok"))
+        jid = vms._load()["vms"]["web/db"]["job"]
+        states = {jid: "running"}
+        vms.job_get = lambda j, with_log=True: {"id": j, "state": states[j]}
+        self.addCleanup(setattr, vms, "job_get", None)
+        self.assertIn("still being made", vms.act("user:test", "web", "db", "remove").get("error", ""))
+        states[jid] = "failed"
+        self.assertNotIn("still being made", vms.act("user:test", "web", "db", "remove").get("error", ""))
+
     def test_a_report_from_before_a_vm_was_made_is_an_earlier_vms(self):
         # Made again under a name an earlier VM had: the node's report, taken
         # before, describes that one (B319), and its address is nobody's now.
@@ -196,14 +217,14 @@ class Controller(unittest.TestCase):
 
     def test_made_a_node_it_carries_enroll_node_s_script_and_goes_with_it(self):
         made, retired, marked = [], [], []
-        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# BuilderBot: enroll x"}
+        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# AerieOS: enroll x"}
         vms.node_retire = lambda by, nid: retired.append(nid)
         vms.node_mark = lambda nid, host: marked.append((nid, host))
         try:
             r = self.new(node_agent=True, ctl="http://192.168.1.16:7680")
             self.assertTrue(r.get("ok"), r)
             self.assertEqual((made[0]["system"], made[0]["controller"], made[0]["sessions"]), ("debian", "http://192.168.1.16:7680", True))
-            self.assertTrue(self.f.jobs[-1][2]["enroll"].startswith("#!/usr/bin/env bash\n# BuilderBot: enroll"))
+            self.assertTrue(self.f.jobs[-1][2]["enroll"].startswith("#!/usr/bin/env bash\n# AerieOS: enroll"))
             self.assertEqual(marked, [("n_vm", "n1")])
             # Its own account is not the sessions', which cloud-init would give sudo.
             self.assertEqual(self.f.jobs[-1][2]["user"], "admin")
@@ -217,7 +238,7 @@ class Controller(unittest.TestCase):
         # A create past the cap minted the node's enroll row first, and the
         # next try was refused by that row's name (R97's walk, 21 Oct).
         made, dropped = [], []
-        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# BuilderBot: enroll x"}
+        vms.enroll_script = lambda by, req: made.append(req) or {"id": "n_vm", "script": "#!/usr/bin/env bash\n# AerieOS: enroll x"}
         vms.node_discard = lambda by, nid: dropped.append(nid)
         try:
             self.f.caps = dict(self.f.caps, count=1)
@@ -367,8 +388,8 @@ class Census(unittest.TestCase):
         got = nodes._census({"vms_other": [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "disk": "/x"},
                                            {"name": "bad name!", "state": "running"}, "junk",
                                            {"name": "old-box", "state": "shut <b>off</b>", "vcpus": "2"}]})
-        self.assertEqual(got["vms_other"], [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192},
-                                            {"name": "old-box", "state": "shut boffb", "vcpus": 0, "mem_mb": 0}])
+        self.assertEqual(got["vms_other"], [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "autostart": False},
+                                            {"name": "old-box", "state": "shut boffb", "vcpus": 0, "mem_mb": 0, "autostart": False}])
         self.assertEqual(vms.others.__doc__ is not None, True)
 
     def test_a_usb_device_s_name_and_use_reach_the_record(self):
@@ -395,12 +416,12 @@ class Census(unittest.TestCase):
 class Agent(unittest.TestCase):
     def setUp(self):
         import agentpkg
-        self.agent = agentpkg.load("builderbot_agent_vms")
+        self.agent = agentpkg.load("aerieos_agent_vms")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".vms"]
 
     def test_the_domains_it_did_not_make_are_listed_and_never_ours(self):
         # R165 step 1: a name without the prefix, or with it and without the
-        # agent's marker, is somebody else's; one with both is BuilderBot's
+        # agent's marker, is somebody else's; one with both is AerieOS's
         # and stays out of this list.
         from unittest import mock
         def virsh(argv, timeout=0, **kw):
@@ -415,8 +436,48 @@ class Agent(unittest.TestCase):
                         "bbvm-fake": "State:          shut off\nCPU(s):         1\nMax memory:     1048576 KiB\n"}.get(name, "")
             return ""
         with mock.patch.object(self.av, "_run", side_effect=virsh), mock.patch.object(self.av.shutil, "which", return_value="/usr/bin/virsh"):
-            self.assertEqual(self.av.vms_other(), [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192},
-                                                   {"name": "bbvm-fake", "state": "stopped", "vcpus": 1, "mem_mb": 1024}])
+            self.assertEqual(self.av.vms_other(), [{"name": "win11", "state": "running", "vcpus": 4, "mem_mb": 8192, "autostart": False},
+                                                   {"name": "bbvm-fake", "state": "stopped", "vcpus": 1, "mem_mb": 1024, "autostart": False}])
+
+    def test_an_action_on_another_projects_domain_is_refused(self):
+        # A domain's marker names its project: a job for another project's
+        # name that happens to make the same domain is refused before any
+        # command; one for its own goes on; one naming no project is let by.
+        from unittest import mock
+        xml = f'<domain><metadata><bb:vm xmlns:bb="{self.av.META_NS}" project="foo"/></metadata></domain>'
+        done = mock.Mock(returncode=0, stdout=xml, stderr="")
+        a = self.agent.Agent.__new__(self.agent.Agent)
+        a.drop_privileges = lambda kw: kw
+        a.hello_again = lambda why: None
+        a._vm_remove = mock.Mock(return_value=("succeeded", 0))
+        job = mock.Mock()
+        with mock.patch.object(self.av.subprocess, "run", return_value=done), \
+             mock.patch.object(self.av.shutil, "which", return_value="/usr/bin/virsh"), \
+             mock.patch.object(self.av.os.path, "isdir", return_value=True), \
+             mock.patch.object(self.av, "own_here", return_value=False):
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web", "project": "foo-bar"}), ("failed", 77))
+            a._vm_remove.assert_not_called()
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web", "project": "foo"}), ("succeeded", 0))
+            self.assertEqual(a.vm(job, {"action": "remove", "domain": "bbvm-foo-bar-web"}), ("succeeded", 0))
+
+    def test_the_agents_own_vm_folders_hold_no_link(self):
+        # B552: on the controller's own machine a link the jobs account left
+        # where the root agent writes a disk named any file for root to write
+        # over; the agent removes every link there before a VM job.
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "disks"))
+            target = os.path.join(d, "passwd")
+            open(target, "w").write("root:x:0:0\n")
+            os.symlink(target, os.path.join(d, "disks", "bbvm-p-x.qcow2"))
+            os.symlink(target, os.path.join(d, "iso"))
+            a = self.agent.Agent.__new__(self.agent.Agent)
+            job = mock.Mock()
+            with mock.patch.object(self.av, "VM_DIR", d):
+                a._vm_dirs_roots(job)
+            self.assertFalse(os.path.lexists(os.path.join(d, "disks", "bbvm-p-x.qcow2")))
+            self.assertFalse(os.path.lexists(os.path.join(d, "iso")))
+            self.assertEqual(open(target).read(), "root:x:0:0\n", "the file it named untouched")
 
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
         # R165 step 1: the wall's file says the machine is the controller's
@@ -546,6 +607,21 @@ class Agent(unittest.TestCase):
         fr = sc._Frames()
         self.assertEqual(fr.feed(frame[:5]), [])
         self.assertEqual(fr.feed(frame[5:]), [(2, payload)])
+
+    def test_a_shared_folder_is_where_it_really_is_and_the_projects_own(self):
+        # B541: virtiofsd serves a link's target as root, so a link to / in
+        # the project's tree gave its VM the host; the agent resolves the
+        # path, keeps it inside the project's folder, and writes the target.
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        links = {"/workspace/web/root": "/", "/workspace/web/other": "/workspace/api", "/workspace/web/data": "/workspace/web/store/data"}
+        real = lambda p: links.get(p, p)
+        with mock.patch.object(hw.os.path, "realpath", side_effect=real):
+            self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/root"}}, 2, 2048, project="web")[1])
+            self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/other"}}, 2, 2048, project="web")[1])
+            self.assertIn("project's own", hw.clean({"share": {"path": "/workspace/api/x"}}, 2, 2048, project="web")[1])
+            got, why = hw.clean({"share": {"path": "/workspace/web/data"}}, 2, 2048, project="web")
+            self.assertEqual((why, got["share"]["path"]), ("", "/workspace/web/store/data"))
 
     def test_a_vm_s_hardware_lands_in_its_domain_and_reads_back(self):
         # R100: what clean() lets through, apply() writes, and read() finds
@@ -757,7 +833,7 @@ if __name__ == "__main__":
 
 
 class Verbs(unittest.TestCase):
-    """bb vm's hardware words (R100): what is named is sent, none takes it
+    """aerie vm's hardware words (R100): what is named is sent, none takes it
     off, and what is not a hardware word is left for the verb."""
 
     def setUp(self):
@@ -781,7 +857,7 @@ class Verbs(unittest.TestCase):
 
 class Ask(unittest.TestCase):
     """A session's VM change asked of the administrators shows them the
-    hardware in bb vm's own words, and keeps what the Allow will need."""
+    hardware in aerie vm's own words, and keeps what the Allow will need."""
 
     def test_the_bell_says_what_is_asked(self):
         import phone
@@ -793,7 +869,7 @@ class Ask(unittest.TestCase):
         self.assertEqual(seen["shown"][-7:], ["--pin", "2,3", "--mem-max", "none", "--share", "data", "--ro"])
         phone.ask_vm("bigger", "web", {"action": "disk-grow", "name": "db", "disk": "vdb", "gb": 60}, "s")
         self.assertEqual((seen["shown"][-2:], seen["extra"]["vm"]["gb"], seen["extra"]["vm"]["disk"]), (["vdb", "60G"], 60, "vdb"))
-        # A USB device to a VM (R116), as bb vm usb names it.
+        # A USB device to a VM (R116), as aerie vm usb names it.
         phone.ask_vm("the stick", "web", {"action": "usb-give", "name": "db", "usb": {"vendor": "0x0781", "product": "0x5583", "serial": "4C53"}}, "s")
         self.assertEqual(seen["shown"], ["vm", "usb", "db", "give", "0781:5583:4C53"])
         self.assertEqual(seen["extra"]["vm"]["usb"]["serial"], "4C53")

@@ -1,6 +1,6 @@
 # The dashboard's API
 
-Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `bb lint` holds this page equal to it.
+Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.
 Every request carries the account's credential (a session's token, or the person's cookie or
 basic auth); who may call what is decided in the handler, and the last column names the
 permission a handler refuses on (`refused: NAME`), or that it refuses a locked project
@@ -36,7 +36,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/signing-backup?` | prefix | `_get_signing_backup` | GET /api/signing-backup: a project's keystore for an administrator's own copy (signing.backup), which marks it backed up. |  |
 | GET | `/api/node-busy` | prefix | `_get_node_busy` | GET /api/node-busy: whether one of a project's nodes is quiet enough to time anything on (busy.report, R108). |  |
 | GET | `/api/meta` | prefix | `_get_meta` | GET /api/meta. |  |
-| GET | `/api/welcome` | prefix | `_get_welcome` | GET /api/welcome: BuilderBot's own changelog for the welcome panel (changelog.welcome), and where this account last looked. |  |
+| GET | `/api/welcome` | prefix | `_get_welcome` | GET /api/welcome: AerieOS's own changelog for the welcome panel (changelog.welcome), and where this account last looked. |  |
 | GET | `/api/source?` | prefix | `_get_source` | GET /api/source: the code base as a zip, from the Artifacts view (artifacts.source_download). |  |
 | GET | `/logs/download` | prefix | `_get_logs_download` | GET /logs/download: the container's own log, every project's traffic in it, or the diagnostics whole (logs.download): Controller settings' to read, the diagnostics with them, since they hold the bug reports a person read | refused: controller-read |
 | GET | `/api/phone/wait` | prefix | `_get_phone_wait` | GET /api/phone/wait?since=T: the companion app's live connection (R125). |  |
@@ -56,7 +56,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/extmounts` | exact | `_get_extmounts` | GET /api/extmounts (R162 step 4): the other disks and shares the controller's own machine mounts, as recorded, never a password. |  |
 | GET | `/api/nasapps` | exact | `_get_nasapps` | GET /api/nasapps (R164 step 2): the catalog of ready apps the New container dialog offers, each with what it is and the blanks it takes. |  |
 | GET | `/api/catalog` | prefix | `_get_catalog` | GET /api/catalog[?fresh=1] (R169 step 2): the vetted catalog's index as kept (fetched again when older than an hour, or on fresh), verified against the key this install ships; with the reason when the newest could not be |  |
-| GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything a BuilderBot installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the ve |  |
+| GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything an AerieOS installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the vett |  |
 | GET | `/api/pack-icon` | prefix | `_get_pack_icon` | GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an app's own icon, as the image its file is and nothing else: its type set here and never sniffed, and a policy that runs no script and sandboxes it, so an SVG  |  |
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
@@ -76,9 +76,9 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/global-rules` | prefix | `_get_global_rules` | GET /api/global-rules. |  |
 | GET | `/api/preamble` | prefix | `_get_preamble` | GET /api/preamble. |  |
 | GET | `/api/brief` | prefix | `_get_brief` | GET /api/brief: brief.view, the brief waiting in a project's tree and the one kept after it left, for a project this account sees. |  |
-| GET | `/api/design` | prefix | `_get_design` | GET /api/design: design.view, a project's design language, its pages and the vocabulary they are drawn from, for a project this account sees; a session reads it too, through bb design. |  |
+| GET | `/api/design` | prefix | `_get_design` | GET /api/design: design.view, a project's design language, its pages and the vocabulary they are drawn from, for a project this account sees; a session reads it too, through aerie design. |  |
 | GET | `/api/wiki-export` | prefix | `_get_wiki_export` | GET /api/wiki-export: the wiki as a zip of its Markdown pages, whether or not the project has a remote. |  |
-| GET | `/api/wiki` | prefix | `_get_wiki` | GET /api/wiki: the project's wiki (wiki.view), or one page of it with ?page=, for an account that sees the project; a session reads it too, through bb wiki. |  |
+| GET | `/api/wiki` | prefix | `_get_wiki` | GET /api/wiki: the project's wiki (wiki.view), or one page of it with ?page=, for an account that sees the project; a session reads it too, through aerie wiki. |  |
 | GET | `/api/ci-runs` | prefix | `_get_ci_runs` | GET /api/ci-runs: a project's runs on GitHub's own runners, or with ?run=N (0 the newest finished) that run's jobs and the end of each failed job's log (cilogs), for an account that sees the project; a session reads it t |  |
 | GET | `/api/ci-watch` | prefix | `_get_ci_watch` | GET /api/ci-watch: what the last look at a project's CI found (ciwatch.read), for an account that sees the project. |  |
 | GET | `/api/codebase` | prefix | `_get_codebase` | GET /api/codebase. |  |
@@ -88,7 +88,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/bugs` | prefix | `_get_bugs` | GET /api/bugs. |  |
 | GET | `/api/pubkeys` | prefix | `_get_pubkeys` | GET /api/pubkeys. | refused: create |
 | POST | `/api/v1/nodes` | prefix | `_nodes` | The Nodes page's verbs. |  |
-| POST | `/api/v1/jobs` | prefix | `_jobs` | The Jobs page's one verb, and where `bb run`, `bb build`, `bb test` and `bb emu` land from the controller (nodes.run_job). |  |
+| POST | `/api/v1/jobs` | prefix | `_jobs` | The Jobs page's one verb, and where `aerie run`, `aerie build`, `aerie test` and `aerie emu` land from the controller (nodes.run_job). |  |
 | POST | `/api/v1/bb` | exact | `_bb_relay` | A bb verb from a session on a NODE, run here (roadmap #24). | refused: bb |
 | POST | `/api/v1/claude-login` | exact | `_claude_login` | A node saying what this account is signed in to Claude, or another coding agent, AS there (R47), or that it is not: never the login itself, which stays on the machine that made it (claudegrant.py says why). |  |
 | POST | `/api/v1/hook` | exact | `_hook` | What a session's hooks have to say, from a NODE (roadmap #24): hooks.py says what each kind means. |  |
@@ -99,7 +99,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/project-pin` | prefix | `_project_pin` | Pin or unpin a project: whether the sidebar card shows it (projects.pin). |  |
 | POST | `/api/project-group` | prefix | `_project_group` | Put a project in one of this account's groups, take it out, or rename a group (projects.set_group, rename_group), or delete one (delete_group): a label for the Projects page, nothing more. |  |
 | POST | `/api/apps` | prefix | `_apps` | POST /api/apps: look at the release again now (apps.check_now). | refused: controller |
-| POST | `/api/pc` | prefix | `_pc` | POST /api/pc: a session's word with a PC lent to its project (pcwork.py, bb pc): lent (which PCs lend which verbs), run (ask one, under the project's Agents may: Use a lent PC) and result (an ask's answer, held a while). |  |
+| POST | `/api/pc` | prefix | `_pc` | POST /api/pc: a session's word with a PC lent to its project (pcwork.py, aerie pc): lent (which PCs lend which verbs), run (ask one, under the project's Agents may: Use a lent PC) and result (an ask's answer, held a whil |  |
 | POST | `/api/project-color` | prefix | `_project_color` | Give a project one of the colors for this account alone, or none (projects.set_mark): worn by its card, its tabs and its bar. |  |
 | POST | `/api/project-auth` | prefix | `_project_auth` | What credential this project's remote uses, and what else it could: projects.auth_answer. | refused: rename |
 | POST | `/api/project-ftp` | exact | `_project_ftp` | A project's file access over FTP (ftp.py, R151): what it is, for whoever sees the project, and a change, for an account with the ftp grant (named only: the owner, until a role names it). | refused: ftp |
@@ -135,7 +135,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/profile` | prefix | `_profile` | The signed-in account's own settings (the Profile page): read on GET, saved on POST, by profiletab.py. |  |
 | POST | `/api/git` | prefix | `_git_act` | The Git view's actions (roadmap R36 step 2): fixed git commands on the project's tree on the controller, under the acting account's author and the project's own credentials (gitview.verb). |  |
 | POST | `/api/forge-access` | exact | `_forge_access_post` | POST /api/forge-access {project, action: measure}: the token measured again, for the Permissions section's Measure; an account's on a project it may change. |  |
-| POST | `/api/forge` | exact | `_forge` | POST /api/forge {project, verb, args}: one bb forge verb (R188), run here with the project's own token under what the token allows and the project's override, for a session on its own project or an account that may chang |  |
+| POST | `/api/forge` | exact | `_forge` | POST /api/forge {project, verb, args}: one aerie forge verb (R188), run here with the project's own token under what the token allows and the project's override, for a session on its own project or an account that may ch |  |
 | POST | `/api/project-sessions` | prefix | `_project_sessions` | POST /api/project-sessions {project, action: "end", session, node}: an administrator ending one of them (projsessions.py). | refused: settings |
 | POST | `/api/unlink` | prefix | `_unlink` | Take the remote off a project, with the credential and the push grant that came with it. | refused: create |
 | POST | `/api/link` | prefix | `_link` | Link an existing local repo to an empty repo on a host. | refused: create |
@@ -153,7 +153,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/snapshots` | prefix | `_snapshots` | POST /api/snapshots: take one now, or restore the whole tree as of a day or one file of it (snapshots.restore, which snapshots the tree first so it can be undone). | refused: settings |
 | POST | `/api/transcripts` | exact | `_transcripts` | POST /api/transcripts {project, id, action}: one of the signed-in person's own conversations deleted, or made visible to every session on the project (share) or private again (unshare). |  |
 | POST | `/api/settings` | prefix | `_settings_post` | POST /api/settings. | refused: controller, refused: debug |
-| POST | `/api/checks` | exact | `_checks_post` | POST /api/checks {kind}: Check now, for one of the update checks under Controller settings (R176, checks.py). | refused: controller |
+| POST | `/api/checks` | exact | `_checks_post` | POST /api/checks {kind}: Check for updates, for one of the update checks under Controller settings (R176, checks.py). | refused: controller |
 | POST | `/api/catalog-mirror` | exact | `_catalog_mirror_post` | POST /api/catalog-mirror {action: import, archive} or {action: forget}: the vetted catalog's mirror under Controller settings (R169 step 6), its archive taken through /api/upload-archive. | refused: controller |
 | POST | `/api/rules` | prefix | `_rules` | The operator's house rules for one project: the whole list, saved (rules.verb). | refused: rules |
 | POST | `/api/global-rules` | prefix | `_global_rules` | The rules that apply to EVERY project (R63): rules.global_verb. | refused: controller |
@@ -164,7 +164,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/design` | prefix | `_design` | POST /api/design: a Design section's Save of the language and the pages, and the file written into the tree: design.verb, for an account that works on the project. |  |
 | POST | `/api/wiki` | exact | `_wiki` | POST /api/wiki: a page saved, removed or renamed, and the wiki pushed to or pulled from the forge's (wiki.verb), for an account that works on the project. |  |
 | POST | `/api/ci-watch` | exact | `_ci_watch` | POST /api/ci-watch: look at a project's CI now (ciwatch.look), for an account that sees the project; the answer is what it found. |  |
-| POST | `/api/devapp` | prefix | `_devapp` | The dev-instance controls: the Containers page's buttons, and `bb devapp` from a session. | refused: docker-write, refused: node |
+| POST | `/api/devapp` | prefix | `_devapp` | The dev-instance controls: the Containers page's buttons, and `aerie devapp` from a session. | refused: docker-write, refused: node |
 | POST | `/api/changelog` | prefix | `_changelog` | Write back the Unreleased section a person rearranged: changelog.editor_verb. |  |
 | POST | `/api/version` | prefix | `_version` | Move a project's version, or change who is allowed to: version.verb, behind the gates here. | refused: version |
 | POST | `/api/tls` | prefix | `_tls` | POST /api/tls {action: issue}: a Let's Encrypt certificate for the Connection section's hostname asked for now, by DNS-01 through the Cloudflare API token (nginxproxy's hooks), for an account that changes the controller' | refused: controller |
@@ -175,7 +175,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/artifacts` | prefix | `_artifacts` | Push an .xpi from a project's dist/ to the paired phone, install an .apk there, or stop a push: phone.artifact_verb, behind the gates here. |  |
 | POST | `/api/nodelog` | prefix | `_nodelog` | A machine's own log, for a session that has been granted it. | refused: debug |
 | POST | `/api/diag` | exact | `_diag` | The controller's diagnostics (diag.py). |  |
-| POST | `/api/reports` | exact | `_reports` | Problems with BuilderBot itself, reported by any project's session (reports.py, bb report). |  |
+| POST | `/api/reports` | exact | `_reports` | Problems with AerieOS itself, reported by any project's session (reports.py, aerie report). |  |
 | POST | `/api/v1/files` | exact | `_files` | A project's files for a person's own editor (files.py, R159): the account this request proved, a project it sees, and the file access its settings give it through the editor's door, asked on this request (ftp.access_for) |  |
 | POST | `/api/phone` | prefix | `_phone` | Pair, connect, and push an extension, and the asking: a session's ask for adb, root or a container, and a person's answer. |  |
 | POST | `/api/findings` | prefix | `_findings_log` | The Analysis view's log. |  |
@@ -183,7 +183,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/presence` | prefix | `_presence` | This browser is in a project's notebook, and who else is (roadmap #26): presence.heartbeat, for a signed-in account on a project it sees. |  |
 | POST | `/api/bugs` | prefix | `_bugs` | Report, edit, or close one bug: bugs.verb, behind the gates here. |  |
 | POST | `/api/custom` | prefix | `_custom` | Save or delete one of the operator's own command lists: macros.custom_edit. | refused: terminal |
-| POST | `/api/doctor` | prefix | `_doctor` | Re-run bb doctor now and answer with the fresh verdict. | refused: controller |
+| POST | `/api/doctor` | prefix | `_doctor` | Re-run aerie doctor now and answer with the fresh verdict. | refused: controller |
 | POST | `/api/signout` | prefix | `_signout` | Sign this account out of a coding agent on one node (signin.sign_out): the login is that machine's, so that machine lets go of it. |  |
 | POST | `/api/login-code` | prefix | `_login_code` | Hand the code from the browser to the sign-in flow: signin.take_code, for the person whose flow it is. |  |
 | POST | `/api/signin` | prefix | `_signin` | Start a sign-in on one node, or stop the one that is running: signin.verb. |  |

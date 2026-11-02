@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One disk laid out as BuilderBot OS (R160 steps 1 and 2): the partitions of
+# One disk laid out as AerieOS (R160 steps 1 and 2): the partitions of
 # image/partitions.sh, GRUB for UEFI and BIOS with the menu, slot A written
 # from a root squashfs with its kernel and initrd beside it on the ESP, slot
 # B left for the first update, and the data partition made with /var's
@@ -48,7 +48,7 @@ start=2048, size=2048, type=21686148-6449-6E6F-744E-656564454649, uuid=${BB_PART
 size=${BB_SIZE_ESP_MIB}MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid=${BB_PART_ESP}, name=esp
 size=${BB_SIZE_SLOT_MIB}MiB, type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709, uuid=${BB_PART_ROOT_A}, name=bbroot-a
 size=${BB_SIZE_SLOT_MIB}MiB, type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709, uuid=${BB_PART_ROOT_B}, name=bbroot-b
-${DATA_SIZE}type=4D21B016-B534-45C2-A9FB-5C16E091FD2D, uuid=${BB_PART_DATA}, name=bbdata
+${DATA_SIZE}type=4D21B016-B534-45C2-A9FB-5C16E091FD2D, uuid=${BB_PART_DATA}, name=aeriedata
 PT
 partprobe "$DEV" 2>/dev/null || true
 udevadm settle 2>/dev/null || sleep 1
@@ -75,34 +75,34 @@ grub-install --target=i386-pc --boot-directory="$MNT" "$DEV" >/dev/null 2>&1 \
     || die "grub-install for BIOS failed"
 install -m 0644 "$GRUBCFG" "$MNT/grub/grub.cfg"
 grub-editenv "$MNT/grub/grubenv" create
-grub-editenv "$MNT/grub/grubenv" set bb_slot=a
-install -d "$MNT/builderbot/a" "$MNT/builderbot/b"
-install -m 0644 "$KERNEL" "$MNT/builderbot/a/vmlinuz"
-install -m 0644 "$INITRD" "$MNT/builderbot/a/initrd"
-install -m 0644 "$RELEASE" "$MNT/builderbot/a/release"
-# builderbot.env (R161 step 12): the lines a boot hands the controller
-# (usr/lib/builderbot-os/env), laid at a fixed 4 KiB behind a marker line so
+grub-editenv "$MNT/grub/grubenv" set aerie_slot=a
+install -d "$MNT/aerieos/a" "$MNT/aerieos/b"
+install -m 0644 "$KERNEL" "$MNT/aerieos/a/vmlinuz"
+install -m 0644 "$INITRD" "$MNT/aerieos/a/initrd"
+install -m 0644 "$RELEASE" "$MNT/aerieos/a/release"
+# aerieos.env (R161 step 12): the lines a boot hands the controller
+# (usr/lib/aerieos-os/env), laid at a fixed 4 KiB behind a marker line so
 # the stick maker writes a person's --set lines into these same bytes while
 # the image streams, and nothing writes a FAT by hand on any system. A line
 # without "=" is nothing to the reader, so the padding is blank.
-{ { printf '%s\n' "# builderbot.env BB-STICK-ENV-1: KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)"
+{ { printf '%s\n' "# aerieos.env AERIE-STICK-ENV-1: KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)"
     head -c 4096 /dev/zero | tr '\0' ' '; } | head -c 4095; printf '\n'
-} > "$MNT/builderbot.env"
-[ "$(stat -c %s "$MNT/builderbot.env")" = 4096 ] || die "builderbot.env is not its 4 KiB"
-# builderbot/firstboot.json (R161 step 8): a prepared configuration the
+} > "$MNT/aerieos.env"
+[ "$(stat -c %s "$MNT/aerieos.env")" = 4096 ] || die "aerieos.env is not its 4 KiB"
+# aerieos/firstboot.json (R161 step 8): a prepared configuration the
 # first boot applies, 64 KiB behind its marker line, blank here: a stick
 # maker's --config writes the JSON into these bytes, and the first boot
 # blanks them again once it has taken it.
-{ { printf 'BB-FIRSTBOOT-1\n'; head -c 65536 /dev/zero | tr '\0' ' '; } | head -c 65535; printf '\n'
-} > "$MNT/builderbot/firstboot.json"
-[ "$(stat -c %s "$MNT/builderbot/firstboot.json")" = 65536 ] || die "firstboot.json is not its 64 KiB"
-# builderbot/catalog-mirror.bin (R169 step 6): a mirror of the vetted
+{ { printf 'AERIE-FIRSTBOOT-1\n'; head -c 65536 /dev/zero | tr '\0' ' '; } | head -c 65535; printf '\n'
+} > "$MNT/aerieos/firstboot.json"
+[ "$(stat -c %s "$MNT/aerieos/firstboot.json")" = 65536 ] || die "firstboot.json is not its 64 KiB"
+# aerieos/catalog-mirror.bin (R169 step 6): a mirror of the vetted
 # catalog for a machine with no network, 64 MiB behind its marker line and
 # a length line of zeros here: a stick maker's --mirror writes the archive
 # into these bytes, and each boot hands a filled one to the controller.
 { { printf 'BB-MIRROR-1\n000000000000\n'; head -c 67108864 /dev/zero | tr '\0' ' '; } | head -c 67108863; printf '\n'
-} > "$MNT/builderbot/catalog-mirror.bin"
-[ "$(stat -c %s "$MNT/builderbot/catalog-mirror.bin")" = 67108864 ] || die "catalog-mirror.bin is not its 64 MiB"
+} > "$MNT/aerieos/catalog-mirror.bin"
+[ "$(stat -c %s "$MNT/aerieos/catalog-mirror.bin")" = 67108864 ] || die "catalog-mirror.bin is not its 64 MiB"
 umount "$MNT"
 
 # ---- slot A, and the data partition ----------------------------------------
@@ -114,4 +114,4 @@ if [ -z "$VAR" ]; then
 fi
 mkfs.ext4 -q -L "$BB_DATA_LABEL" -d "$VAR" -E lazy_itable_init=0,lazy_journal_init=0 "$(P 5)"
 cleanup; trap - EXIT
-echo "lay-disk: $DEV holds BuilderBot OS in slot A$([ "$GROW" = 1 ] && echo ', the data partition grown to the disk')"
+echo "lay-disk: $DEV holds AerieOS in slot A$([ "$GROW" = 1 ] && echo ', the data partition grown to the disk')"

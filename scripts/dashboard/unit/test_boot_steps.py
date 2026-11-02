@@ -120,7 +120,7 @@ class Steps(unittest.TestCase):
 
     def test_the_command_handed_off(self):
         r = sh("resolve_command | tr '\\0' ' '; echo; resolve_command bash | tr '\\0' ' '")
-        self.assertEqual(r.stdout.split("\n")[:2], ["/opt/builderbot/scripts/supervisor.sh ", "bash -l "])
+        self.assertEqual(r.stdout.split("\n")[:2], ["/opt/aerieos/scripts/supervisor.sh ", "bash -l "])
 
 
 class RootState(unittest.TestCase):
@@ -142,10 +142,10 @@ class RootState(unittest.TestCase):
 
     def test_one_root_owns_and_nobody_else_writes(self):
         with tempfile.TemporaryDirectory() as d:
-            p = self.env_file(d, "# a comment\nDASHBOARD_STATE=\"/var/lib/builderbot-controller/config\"\n")
+            p = self.env_file(d, "# a comment\nDASHBOARD_STATE=\"/var/lib/aerieos-controller/config\"\n")
             stat = 'stat() { case "$2" in %u) echo 0 ;; %a) echo "${MODE}" ;; esac; }; '
             r = sh(stat + "bb_root_state", {"BB_CONTROLLER_ENV": p, "MODE": "640"})
-            self.assertEqual(r.stdout, "/var/lib/builderbot-controller/config")
+            self.assertEqual(r.stdout, "/var/lib/aerieos-controller/config")
             r = sh(stat + "bb_root_state", {"BB_CONTROLLER_ENV": p, "MODE": "664"})
             self.assertEqual(r.stdout, "/config")
 

@@ -1,6 +1,6 @@
 """An instance answers to both its names (B338): the one it was made with
-(bb devapp new NAME, its record's key) and the one the Containers page lists
-it under after a rename there, which every bb devapp verb takes; an
+(aerie devapp new NAME, its record's key) and the one the Containers page lists
+it under after a rename there, which every aerie devapp verb takes; an
 instance name two projects share names neither."""
 import os
 import sys

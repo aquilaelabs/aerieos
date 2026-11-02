@@ -55,9 +55,9 @@ function renderAuditInto(i){
   const pick = (id, label, opts, now) => `<label class="pick"><span class="pickw">${label}</span>
     <select id="${id}"><option value=""${now ? "" : " selected"}>any</option>${opts.map(([v, l]) =>
       `<option value="${esc(v)}"${v === now ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
-  d.setBar(data ? `<span class="sp"></span><span class="actbar">${
-      pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)}${
-      pick("auditMachine", "Machine", (data.machines || []).map(m => [m.id, m.name]), auditMachine)}</span>` : "");
+  // The picks are the head's, at its right as a page head's actions are,
+  // where on a bar of their own they stood alone on a line.
+  d.setBar("");
   if (data === null){
     d.list.innerHTML = auditErr ? `<div class="field"><div class="notice bad">${esc(auditErr)}</div></div>`
       : skTpl(pageHead({facts: [["Recorded", GHOST], ["Shown", GHOST]]})
@@ -67,7 +67,9 @@ function renderAuditInto(i){
   }
   const rows = data.rows || [];
   d.list.innerHTML = pageHead({facts: [["Recorded", String(data.total || 0)], ["Shown", String(rows.length)],
-      ["Since", rows.length ? new Date(rows[rows.length - 1].at * 1000).toLocaleDateString() : ""]]})
+      ["Since", rows.length ? new Date(rows[rows.length - 1].at * 1000).toLocaleDateString() : ""]],
+      actions: pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)
+        + pick("auditMachine", "Machine", (data.machines || []).map(m => [m.id, m.name]), auditMachine)})
     + (auditErr ? `<div class="notice bad">${esc(auditErr)}</div>` : "")
     + docSection("audit", "trail", "What was done", String(data.total || 0), auditRows(rows));
   wireAudit(d.el);

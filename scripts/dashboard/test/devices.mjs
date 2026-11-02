@@ -19,7 +19,7 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', name, '--role', 'user'],
+const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
   { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
@@ -65,7 +65,7 @@ ok(who.status === 200 && who.account === 'dv.rw' && who.name === 'TEST-PC', `...
 
 // ---- each door stays shut to the other's credential ---------------------------------
 const onPage = await fetch(`${base}/api/status`, { headers: { Authorization: `Bearer ${a.token}` } });
-const sess = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
+const sess = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
 const sessOnDoor = await dev(sess, 'whoami', {});
 ok(onPage.status === 401 && sessOnDoor.status === 401,
    `a device token opens nothing on the dashboard, and a session's token nothing on the device door (${onPage.status} ${sessOnDoor.status})`);
@@ -166,11 +166,11 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     for (let i = 0; i < 60 && !down; i++) { down = existsSync(`${folder}/made-elsewhere.txt`); if (!down) await new Promise(r => setTimeout(r, 500)); }
     ok(down && readFileSync(`${folder}/made-elsewhere.txt`, 'utf8') === 'from another device\n',
        '...and one made elsewhere comes down into the folder within seconds, woken by its long poll');
-    // A session on alpha asks for them with bb pc, under the project's
+    // A session on alpha asks for them with aerie pc, under the project's
     // Agents may: Use a lent PC: refused on Deny, run on Auto with the PC's
     // folder written as the project's path, and on Ask refused by an app
     // with no window to ask in.
-    const stok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'dv.rw'], { encoding: 'utf8', env }).trim();
+    const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'dv.rw'], { encoding: 'utf8', env }).trim();
     const pcApi = async body => {
       const r = await fetch(`${base}/api/pc`, { method: 'POST', headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' },
                                                 body: JSON.stringify(body) });
@@ -241,8 +241,8 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
     return [{ name, browser_download_url: `file://${rel}/${name}` },
             { name: `${name}.sha256`, browser_download_url: `file://${rel}/${name}.sha256` }];
   };
-  const assets = [...asset('builderbot-app-0.4.0.apk', 'an apk'), ...asset('builderbot-vscode-0.4.0.vsix', 'a vsix'),
-                  ...asset('builderbot-companion-0.4.0.exe', 'an exe'), ...asset('builderbot-companion-0.4.0.pyz', 'a pyz', '0'.repeat(64))];
+  const assets = [...asset('aerieos-app-0.4.0.apk', 'an apk'), ...asset('aerieos-vscode-0.4.0.vsix', 'a vsix'),
+                  ...asset('aerieos-companion-0.4.0.exe', 'an exe'), ...asset('aerieos-companion-0.4.0.pyz', 'a pyz', '0'.repeat(64))];
   writeFileSync(`${DIR}/releases.json`, JSON.stringify([{ tag_name: 'v0.5.0', assets: [] }, { tag_name: 'v0.4.0', assets }]));
   // The companion and the extension are dev features (the operator, 20 Oct):
   // on for this block, and checked gone with them off at its end.
@@ -256,17 +256,17 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
   }
   const by = Object.fromEntries((v.apps || []).map(x => [x.name, x]));
   ok(started.ok && v.release === 'v0.4.0' && v.matched && by.android?.files.length === 1 && by.vscode?.files.length === 1,
-     `Look now fetches each offered app from the release matching this controller (${v.release}, ${JSON.stringify((v.apps || []).map(x => [x.name, x.files.length]))})`);
-  ok(by.companion?.files.map(f => f.file).join() === 'builderbot-companion-0.4.0.exe' && /does not match its sha256/.test(v.problem || ''),
+     `Check for updates fetches each offered app from the release matching this controller (${v.release}, ${JSON.stringify((v.apps || []).map(x => [x.name, x.files.length]))})`);
+  ok(by.companion?.files.map(f => f.file).join() === 'aerieos-companion-0.4.0.exe' && /does not match its sha256/.test(v.problem || ''),
      `...and keeps none that does not match its sha256, saying so (${v.problem})`);
-  const dl = await fetch(`${base}/apps/android/builderbot-app-0.4.0.apk`, { headers: PERSON });
+  const dl = await fetch(`${base}/apps/android/aerieos-app-0.4.0.apk`, { headers: PERSON });
   const nope = await fetch(`${base}/apps/android/..%2Fsettings.json`, { headers: PERSON });
-  const anon = await fetch(`${base}/apps/android/builderbot-app-0.4.0.apk`, { redirect: 'manual' });
+  const anon = await fetch(`${base}/apps/android/aerieos-app-0.4.0.apk`, { redirect: 'manual' });
   ok(dl.status === 200 && await dl.text() === 'an apk' && nope.status === 404 && anon.status !== 200,
      `anybody signed in downloads it from /apps, nothing else is named there, and nobody else does (${dl.status} ${nope.status} ${anon.status})`);
   const c3 = await signin('dv.rw', people['dv.rw'], 'UPDATER');
   const offered = await dev(c3.token, 'apps', {});
-  const file = await fetch(`${base}/api/v1/device/app-file?app=companion&file=builderbot-companion-0.4.0.exe`,
+  const file = await fetch(`${base}/api/v1/device/app-file?app=companion&file=aerieos-companion-0.4.0.exe`,
                            { headers: { Authorization: `Bearer ${c3.token}` } });
   ok(offered.status === 200 && offered.door === 1 && offered.apps.some(x => x.name === 'companion' && x.files[0].sha256)
      && file.status === 200 && await file.text() === 'an exe',
@@ -284,13 +284,13 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
     await new Promise(r => setTimeout(r, 250));
   }
   const vs = (v.apps || []).find(x => x.name === 'vscode');
-  const gone = await fetch(`${base}/apps/vscode/builderbot-vscode-0.4.0.vsix`, { headers: PERSON });
+  const gone = await fetch(`${base}/apps/vscode/aerieos-vscode-0.4.0.vsix`, { headers: PERSON });
   ok(!vs?.offered && !vs?.files.length && gone.status === 404,
      `an app switched off is no longer held or served (${JSON.stringify(off).slice(0, 60)}; ${gone.status})`);
   await admin('/api/settings', { set: { apps_vscode: true } });
   await admin('/api/settings', { set: { offer_unvetted: false } });
   const plain = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json();
-  const hidden = await fetch(`${base}/apps/companion/builderbot-companion-0.4.0.exe`, { headers: PERSON });
+  const hidden = await fetch(`${base}/apps/companion/aerieos-companion-0.4.0.exe`, { headers: PERSON });
   ok((plain.apps || []).map(x => x.name).join() === 'android' && hidden.status === 404,
      `without dev features only the Android app is offered, and the companion is not served (${(plain.apps || []).map(x => x.name)}; ${hidden.status})`);
 }

@@ -1,4 +1,4 @@
-"""bb settings names a project's nodes as the Nodes page does, not by the ids
+"""aerie settings names a project's nodes as the Nodes page does, not by the ids
 the record keeps (B58); an id with no node left behind it is printed as it is."""
 import json
 import os

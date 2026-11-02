@@ -11,7 +11,7 @@ from unittest import mock
 import agentpkg  # noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-agent = agentpkg.load("builderbot_agent_verified")
+agent = agentpkg.load("aerieos_agent_verified")
 
 
 class Verified(unittest.TestCase):

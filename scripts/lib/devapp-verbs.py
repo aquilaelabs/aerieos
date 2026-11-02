@@ -1,7 +1,7 @@
-"""Behind `bb devapp` (cmd_devapp in bb): this project's dev instance, and what
+"""Behind `aerie devapp` (cmd_devapp in bb): this project's dev instance, and what
 a session may be given over it under the project's one setting (Agents may:
 Run its container). Everything here goes through the controller's API like
-`bb root` and `bb phone`, because the daemon is the controller's connection
+`aerie root` and `aerie phone`, because the daemon is the controller's connection
 to the node; nothing runs docker anywhere.
 
 The first argument is the verb: status, rebuild, new, test (the test
@@ -45,10 +45,10 @@ def status():
     st = d.get("state") if isinstance(d.get("state"), dict) else d
     if not st.get("compose"):
         print("no compose file at this project's root (docker-compose.yml or compose.yml), so there is "
-              "no dev instance: with one there, bb devapp new builds it from this tree")
+              "no dev instance: with one there, aerie devapp new builds it from this tree")
         raise SystemExit(0)
     # Its own name, and the one the Containers page lists it under where it
-    # was renamed there: either names it to every bb devapp verb (B338).
+    # was renamed there: either names it to every aerie devapp verb (B338).
     # A project's default instance (main) is called by its project's name,
     # which is the one it is listed under.
     inst, named = st.get("instance") or "", st.get("name") or ""
@@ -65,14 +65,14 @@ def status():
     elif st.get("needs_build"):
         # Said what it waits for (B127): an ask on the bell, or a rebuild.
         print(f"  {'built from':<12} nothing here yet: its first build is an Approve on the bell, "
-              "or bb devapp rebuild")
+              "or aerie devapp rebuild")
     if st.get("running"):
         _answers_at(st.get("name") or "")
     miss = st.get("missing_env") or []
     if miss:
-        # Kept by BuilderBot for this container, never a file in the project.
+        # Kept by AerieOS for this container, never a file in the project.
         print(f"  {'env':<12} missing " + ", ".join(miss[:6])
-              + (" …" if len(miss) > 6 else "") + "; bb devapp env prints it and bb devapp env set "
+              + (" …" if len(miss) > 6 else "") + "; aerie devapp env prints it and aerie devapp env set "
               "replaces it where the project's settings allow, else the operator's Env on the Containers page")
     job = st.get("job") or {}
     if job.get("running"):
@@ -265,7 +265,7 @@ def _watch(look, was, auth, job_id=""):
                      else "built and not running" if st.get("await_env")
                      else "not running"))
             if st.get("await_env"):
-                print("[builderbot] its env is not filled in: bb devapp env set FILE writes it where "
+                print("[builderbot] its env is not filled in: aerie devapp env set FILE writes it where "
                       "the project's settings allow, else the operator's Env on the Containers page",
                       file=sys.stderr)
             raise SystemExit(0)
@@ -282,7 +282,7 @@ def new():
     unnamed, the controller gives it the project's own name while it has
     none and one beside it after. BB_DEV_REF pins the branch it builds from,
     BB_DEV_HOST a hosting node to ship it to, and BB_DEV_FILE is its env. On `ask` one request carries all of it and
-    Allow makes and builds it; on `auto` it is made, then built as `bb
+    Allow makes and builds it; on `auto` it is made, then built as `aerie
     devapp rebuild` builds."""
     auth = os.environ["BB_DEV_AUTH"]
     post, _ = _client()
@@ -339,8 +339,8 @@ def test():
         # The one refusal that does not mean nothing happened.
         if "timed out" in str(r["error"]).lower():
             sys.exit(f"[builderbot] ERROR: the controller did not answer within {START_WAIT}s. The run MAY "
-                     "HAVE STARTED anyway: `bb jobs` lists a `test` job on this project if it did, "
-                     "`bb jobs ID` is its log, and starting another run on top of it breaks both")
+                     "HAVE STARTED anyway: `aerie jobs` lists a `test` job on this project if it did, "
+                     "`aerie jobs ID` is its log, and starting another run on top of it breaks both")
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     jid = r.get("job") or ""
     print(f"[builderbot] testing {proj} inside its dev instance ({jid})", file=sys.stderr)
@@ -378,7 +378,7 @@ def follow_remove(jid, forgot=False, allowed=False):
             sys.exit(f"[builderbot] ERROR: {j['error']}")
         if j.get("state") in ("failed", "canceled"):
             sys.exit(f"[builderbot] ERROR: not removed, and it is still in the manager: "
-                     f"{j.get('error') or j['state']} (bb jobs {jid} is its log)")
+                     f"{j.get('error') or j['state']} (aerie jobs {jid} is its log)")
         if j.get("state") == "succeeded":
             break
         time.sleep(1)
@@ -388,6 +388,27 @@ def follow_remove(jid, forgot=False, allowed=False):
     print(("[builderbot] allowed, and removed" if allowed else "[builderbot] removed")
           + (": its daemon did not answer, so the row is gone and whatever ran there still runs" if forgot
              else "; its env and data stay for a remake"))
+
+def _warn_of_routes(proj, auth):
+    """A remove leaves its node's nginx as it is, so a route to this container
+    goes on pointing at a port nothing answers (report #130). Said first, since
+    the row that knows it is gone afterwards. A listing that does not answer
+    costs the warning, never the remove."""
+    name = os.environ.get("BB_DEV_CONTAINER") or os.environ.get("BB_DEV_INSTANCE") or ""
+    try:
+        d = bbapi.call("/api/docker?project=" + urllib.parse.quote(proj), auth=auth, timeout=30)
+    except (OSError, SystemExit, ValueError):
+        return
+    rows = (d.get("instances") or []) if isinstance(d, dict) else []
+    mine = [i for i in rows if i.get("owner") == proj and (i.get("name") == name or (not name and i.get("project") == proj))]
+    for i in mine[:1]:
+        routes = (i.get("route") or {}).get("routes") or []
+        if routes:
+            on = f" on {i['node_name']}" if i.get("node_name") else ""
+            print(f"[builderbot] warning: nginx{on} routes {', '.join(r.get('where', '') for r in routes)} to this "
+                  "container. Removing it leaves those routes in place, and they fail until something publishes "
+                  "the port again or they are taken off that node's nginx page", file=sys.stderr)
+
 
 def edit():
     proj, auth = os.environ["BB_DEV_PROJECT"], os.environ["BB_DEV_AUTH"]
@@ -408,6 +429,8 @@ def edit():
             print("[builderbot] nothing is stored yet: that is the project's .env.example",
                   file=sys.stderr)
         raise SystemExit(0)
+    if verb == "remove":
+        _warn_of_routes(proj, auth)
     body = {"action": "remove" if verb == "remove" else "env-set", "why": os.environ.get("BB_DEV_WHY", "")}
     if text is not None:
         body["text"] = text
@@ -428,12 +451,12 @@ def edit():
             out = str(o.get("out") or "")
             follow_remove(out if out.startswith("j_") else "", allowed=True)
         else:
-            print("[builderbot] allowed, and its env is saved; bb devapp rebuild applies it")
+            print("[builderbot] allowed, and its env is saved; aerie devapp rebuild applies it")
         raise SystemExit(0)
     if verb == "remove":
         follow_remove(r.get("job") or "", forgot=bool(r.get("forgot")))
     else:
-        print("[builderbot] its env is saved; bb devapp rebuild applies it")
+        print("[builderbot] its env is saved; aerie devapp rebuild applies it")
 
 
 def ls():
@@ -447,7 +470,7 @@ def ls():
     if d.get("error") and not (d.get("instances") or d.get("containers")):
         if "timed out" in str(d["error"]).lower():
             sys.exit("[builderbot] ERROR: the node did not list its containers in three minutes; "
-                     "a build just started there is the usual reason, and bb jobs says whether one "
+                     "a build just started there is the usual reason, and aerie jobs says whether one "
                      "is running. Try again when it is done")
         sys.exit(f"[builderbot] ERROR: {d['error']}")
     blind = bool(d.get("blind"))
@@ -458,7 +481,10 @@ def ls():
         kind = ("written here" if i.get("source") == "file" else
                 "its own" if i.get("project") == proj else f"built from {i.get('project')}")
         state = "?" if blind else "running" if i.get("running") else "stopped" if i.get("exists") else "down"
-        rows.append((i.get("name") or "", kind, state, " ".join(i.get("ports") or []), i.get("node_name") or ""))
+        routes = ((i.get("route") or {}).get("routes")) or []
+        said = ", ".join("any name" if r.get("where") == "*" else r.get("where", "") for r in routes)
+        rows.append((i.get("name") or "", kind, state, " ".join(i.get("ports") or []) + (f"  routed from {said}" if said else ""),
+                     i.get("node_name") or ""))
     for c in d.get("containers") or []:
         if c.get("owner") != proj:
             continue
@@ -466,16 +492,16 @@ def ls():
                      " ".join(c.get("ports") or []), c.get("node_name") or ""))
     if not rows:
         # What the session can do next, not what the operator could (B537):
-        # with a compose file at the root, its own bb devapp new is the way
+        # with a compose file at the root, its own aerie devapp new is the way
         # in, and the Docker tab's row is for a container made elsewhere.
         st = bbapi.call("/api/devapp", {"project": proj, "action": "state"}, auth=os.environ["BB_DEV_AUTH"])
         st = st.get("state") if isinstance(st.get("state"), dict) else st
         if st.get("compose"):
-            print(f"nothing belongs to {proj} on any node yet: bb devapp new builds its dev instance "
+            print(f"nothing belongs to {proj} on any node yet: aerie devapp new builds its dev instance "
                   "from the compose file at this project's root and starts it")
         else:
             print(f"nothing belongs to {proj} on any node: a compose file at its root "
-                  "(docker-compose.yml or compose.yml) and bb devapp new make its dev instance, "
+                  "(docker-compose.yml or compose.yml) and aerie devapp new make its dev instance, "
                   "and a container made elsewhere is put under it on the Containers page by an administrator")
         raise SystemExit(0)
     # Which node each is on, where the project's containers are on more
@@ -487,7 +513,7 @@ def ls():
         print(f"  {name:<{w}}  {on}{kind:<14} {state:<8} {ports}".rstrip())
     if blind:
         print("[builderbot] the daemon did not answer, so what is running is not known", file=sys.stderr)
-    print("[builderbot] bb devapp log NAME reads one; bb devapp start|stop|restart NAME, and "
+    print("[builderbot] aerie devapp log NAME reads one; aerie devapp start|stop|restart NAME, and "
           "--container NAME on the other verbs, act on one where the project's settings allow",
           file=sys.stderr)
 
@@ -514,7 +540,7 @@ def ctl():
 
 
 def probe():
-    """bb devapp probe [--port N] [--path /x]: whether the instance answers on
+    """aerie devapp probe [--port N] [--path /x]: whether the instance answers on
     its node's loopback (R248), each published port: open or refused, and
     the HTTP status of a GET of the path."""
     args, port, path = sys.argv[2:], "", "/"
@@ -525,7 +551,7 @@ def probe():
         elif a == "--path" and args:
             path = args.pop(0)
         else:
-            sys.exit(f"[builderbot] ERROR: bb devapp probe takes --port N and --path /x, not {a}")
+            sys.exit(f"[builderbot] ERROR: aerie devapp probe takes --port N and --path /x, not {a}")
     d = bbapi.call("/api/devapp", {"project": os.environ["BB_DEV_PROJECT"],
                                    "instance": os.environ.get("BB_DEV_INSTANCE", ""),
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
@@ -555,7 +581,7 @@ def override():
     if r.get("error"):
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     print(f"[builderbot] {'its override is ' + r['override'] if r.get('override') else 'no override'}; "
-          "bb devapp rebuild applies it", file=sys.stderr)
+          "aerie devapp rebuild applies it", file=sys.stderr)
 
 
 VERBS = {"status": status, "rebuild": rebuild, "new": new, "test": test, "edit": edit, "ls": ls, "ctl": ctl,

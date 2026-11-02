@@ -78,7 +78,7 @@ def verdict(sample, jobs, sessions_working, now=None):
 
 
 def report(node, jobs, sessions_working, project=""):
-    """The answer `bb node busy` prints, for one node: the numbers, what runs
+    """The answer `aerie node busy` prints, for one node: the numbers, what runs
     there by kind, the jobs by type (this project's marked), and the verdict.
     `node` is the node record; `jobs` its active jobs."""
     s = ((node or {}).get("reported") or {}).get("sample") or {}

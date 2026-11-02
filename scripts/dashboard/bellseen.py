@@ -121,6 +121,11 @@ def filter_rows(uid, rows):
             if r.get("key") in gone:
                 hidden += 1
                 continue
+        elif r.get("kind") == "node-refused":
+            # To when it began: put away until a new refusal begins.
+            r["key"] = f"noderefused:{r['id']}@{r.get('since') or 0}"
+            if r["key"] in gone:
+                hidden += 1
         elif r.get("kind") == "token-reuse":
             # To when it was found: put away until it happens again.
             r["key"] = f"tokenreuse:{r['id']}@{r.get('at') or 0}"

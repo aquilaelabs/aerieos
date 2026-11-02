@@ -11,7 +11,7 @@ Three things, each built on the one before:
     the host refuses for its content when the token may make it (an issue
     with no title answers 422) and refuses outright when it may not (403),
     so nothing ever lands. Kept per project, with when it was taken.
-  * **the relay**: `bb forge VERB`, a table of fixed verbs run here with
+  * **the relay**: `aerie forge VERB`, a table of fixed verbs run here with
     the token, which never reaches a node (the MACROS rule: no command
     strings). Each verb names its ability; one the token lacks is refused
     with what to enable, and the project's own override (Permissions, On
@@ -49,19 +49,19 @@ def configure(*, state, write_json, target, prefs_get):     # noqa: A002 - injec
 # ---- the abilities ---------------------------------------------------------
 #
 # `gh` is the fine-grained permission and level, `classic` the classic
-# token's scope, `gitlab` and `gitea` theirs. `verbs` are bb forge's verbs
+# token's scope, `gitlab` and `gitea` theirs. `verbs` are aerie forge's verbs
 # that use it ("" for one used another way, said in `how`). `default` is the
 # project's override until somebody changes it: allow, except merging, which
 # lands work on a branch somebody else may protect by hand.
 ABILITIES = (
     {"id": "code_read", "label": "Read the code and its history",
      "gh": ("Contents", "read"), "classic": "repo, or public_repo for a public repository",
-     "gitlab": "read_repository", "gitea": "read:repository", "how": "git fetch and pull (bb git)",
-     "verbs": (), "default": "allow"},
+     "gitlab": "read_repository", "gitea": "read:repository", "how": "git fetch and pull (aerie git)",
+     "verbs": (), "default": "allow", "fixed": "always: a session has the tree itself"},
     {"id": "push", "label": "Push branches",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "write_repository",
-     "gitea": "write:repository", "how": "bb git push, under Permissions: Pushing",
-     "verbs": (), "default": "allow"},
+     "gitea": "write:repository", "how": "aerie git push, under Permissions: Pushing",
+     "verbs": (), "default": "allow", "fixed": "set under Pushing"},
     {"id": "workflows", "label": "Change CI workflow files",
      "gh": ("Workflows", "write"), "classic": "workflow", "gitlab": "write_repository",
      "gitea": "write:repository", "how": "a push that touches .github/workflows",
@@ -92,7 +92,8 @@ ABILITIES = (
      "how": "", "verbs": ("release list", "release view"), "default": "allow"},
     {"id": "releases_write", "label": "Publish and edit releases",
      "gh": ("Contents", "write"), "classic": "repo", "gitlab": "api", "gitea": "write:repository",
-     "how": "bb version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow"},
+     "how": "aerie version release, under Agents may: Tag and publish a release", "verbs": (), "default": "allow",
+     "fixed": "set under Agents may: Tag and publish a release"},
 )
 BY_ID = {a["id"]: a for a in ABILITIES}
 
@@ -137,7 +138,7 @@ def _call(t, method, path, data=None, raw=False):
     job's log)."""
     base = forges.api_base(t["forge"], t["host"], t["scheme"])
     url = path if path.startswith("https://") else base + path
-    headers = {"User-Agent": "BuilderBot", **forges._auth(t["forge"]["kind"], t["token"])}
+    headers = {"User-Agent": "AerieOS", **forges._auth(t["forge"]["kind"], t["token"])}
     body = None
     if data is not None:
         body = json.dumps(data).encode()
@@ -145,9 +146,16 @@ def _call(t, method, path, data=None, raw=False):
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with forges._OPENER.open(req, timeout=30) as r:
-            got = r.read(4_000_000 if raw else 2_000_000)
             if raw:
-                return r.status, got.decode("utf-8", "replace"), dict(r.headers)
+                # A log's end is where it says why: the last 4 MB of it kept,
+                # where the first 4 MB's end was taken for the tail (B563).
+                got, cut = b"", False
+                while (chunk := r.read(1_000_000)):
+                    got = (got + chunk)[-4_000_000:]
+                    cut = cut or len(got) == 4_000_000
+                text = got.decode("utf-8", "replace")
+                return r.status, ("[the log's start is left out: its last 4 MB follow]\n" + text if cut else text), dict(r.headers)
+            got = r.read(2_000_000)
             return r.status, (json.loads(got) if got.strip() else {}), dict(r.headers)
     except urllib.error.HTTPError as e:
         try:
@@ -337,7 +345,10 @@ def override(project):
     """{ability: allow|deny}: what the project lets an agent do, over what
     the token allows."""
     pol = ((prefs_of(project) or {}).get("forgepol") if prefs_of else None) or {}
-    return {k: (pol.get(k) if pol.get(k) in ("allow", "deny") else v) for k, v in defaults().items()}
+    # An ability another setting governs has no switch here (B559): a deny
+    # kept from before it was taken away changed nothing, and said it did.
+    return {k: (pol.get(k) if pol.get(k) in ("allow", "deny") and not BY_ID[k].get("fixed") else v)
+            for k, v in defaults().items()}
 
 
 def may(project, ab, m=None):
@@ -365,7 +376,7 @@ def view(project, measure_now=False):
         got = (m.get("has") or {}).get(a["id"])
         rows.append({"id": a["id"], "label": a["label"], "token": got, "set": pol[a["id"]],
                      "default": a["default"], "needs": needs(a["id"], m.get("kind") or "github"),
-                     "verbs": list(a["verbs"]), "how": a["how"]})
+                     "verbs": list(a["verbs"]), "how": a["how"], "fixed": a.get("fixed", "")})
     return {"rows": rows, "measure": {k: m.get(k) for k in ("at", "host", "repo", "forge", "kind", "login",
                                                            "token", "expires", "notes", "error", "scopes")}
             if m else None}
@@ -382,7 +393,7 @@ def briefing(project):
             return ""
         threading.Thread(target=measure, args=(project, t), daemon=True).start()
         return ("Your git host: not measured yet, so what this project's token may do there is unknown; "
-                "`bb forge whoami` measures it now.")
+                "`aerie forge whoami` measures it now.")
     if m.get("error") and not m.get("has"):
         return f"Your git host: {m['error']}."
     pol = override(project)
@@ -394,7 +405,7 @@ def briefing(project):
     exp = f", expiring {m['expires']}" if m.get("expires") else ""
     lines = [f"Your git host: {m.get('forge') or m.get('host')} {m.get('repo')}{who}, a {m.get('token') or ''} "
              f"token{exp}, measured {time.strftime('%d %b %H:%M', time.localtime(m.get('at') or 0))}. "
-             "`bb forge whoami` prints it whole, `bb forge VERB` does it."]
+             "`aerie forge whoami` prints it whole, `aerie forge VERB` does it."]
     if yes:
         lines.append("You may: " + "; ".join(a["label"].lower() for a in yes) + ".")
     for a in no:
@@ -408,7 +419,7 @@ def briefing(project):
 # ---- the verbs -------------------------------------------------------------
 #
 # Each takes the parsed arguments and the target and returns (payload, code).
-# Arguments arrive as {"pos": [...], "flags": {...}} from bb forge; nothing in
+# Arguments arrive as {"pos": [...], "flags": {...}} from aerie forge; nothing in
 # them reaches a path but numbers, refs checked against REF, and the words
 # the verb itself names.
 
@@ -531,9 +542,21 @@ def v_issue_list(t, a):
     st = _text(a, "state") or "open"
     if st not in ("open", "closed", "all"):
         raise ValueError("--state: open, closed or all")
-    extra = "&type=issues&limit=30" if t["forge"]["kind"] == "gitea" else "&per_page=30"
-    c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}{extra}")
-    return _ok(c, b, lambda x: [_row_issue(i) for i in x if not i.get("pull_request")])
+    if t["forge"]["kind"] == "gitea":
+        c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}&type=issues&limit=30")
+        return _ok(c, b, lambda x: [_row_issue(i) for i in x])
+    # GitHub lists pull requests among its issues, so thirty asked for could
+    # be thirty pull requests and no issue said (B562): pages of a hundred,
+    # up to five, until thirty issues are in hand.
+    got = []
+    for page in range(1, 6):
+        c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/issues?state={st}&per_page=100&page={page}")
+        if not 200 <= c < 300:
+            return _ok(c, b)
+        got += [_row_issue(i) for i in b or [] if not i.get("pull_request")]
+        if len(got) >= 30 or len(b or []) < 100:
+            break
+    return got[:30], 200
 
 
 def v_issue_view(t, a):
@@ -546,7 +569,7 @@ def v_issue_create(t, a):
     data = {"title": _text(a, "title", True), "body": _text(a, "body") or ""}
     lab = _text(a, "label")
     if lab and t["forge"]["kind"] == "gitea":
-        raise ValueError("Gitea takes labels by their number: create it, then bb forge issue label N NAME")
+        raise ValueError("Gitea takes labels by their number: create it, then aerie forge issue label N NAME")
     if lab:
         data["labels"] = [x.strip() for x in lab.split(",") if LABEL.fullmatch(x.strip())]
     c, b, _h = _call(t, "POST", f"/repos/{t['repo']}/issues", data)
@@ -605,10 +628,17 @@ def v_run_log(t, a):
     if (a.get("flags") or {}).get("job"):
         want = [n]
     else:
-        c, j, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/runs/{n}/jobs?per_page=50")
-        if not 200 <= c < 300:
-            return _ok(c, j)
-        jobs = (j or {}).get("jobs") or []
+        # Every page of a big matrix, so a failure past the first fifty jobs
+        # is found rather than the first jobs' passing logs shown (B563).
+        jobs = []
+        for page in range(1, 4):
+            c, j, _h = _call(t, "GET", f"/repos/{t['repo']}/actions/runs/{n}/jobs?per_page=100&page={page}")
+            if not 200 <= c < 300:
+                return _ok(c, j)
+            got = (j or {}).get("jobs") or []
+            jobs += got
+            if len(got) < 100 or any(x.get("conclusion") == "failure" for x in got):
+                break
         want = [str(x["id"]) for x in jobs if x.get("conclusion") == "failure"] or [str(x["id"]) for x in jobs]
     out = []
     for jid in want[:6]:
@@ -624,7 +654,7 @@ def v_run_log(t, a):
 def v_run_rerun(t, a):
     n = _num(a, 0, "the run")
     if t["forge"]["kind"] == "gitea":
-        raise ValueError("Gitea's API has no rerun: start the workflow again with bb forge run dispatch")
+        raise ValueError("Gitea's API has no rerun: start the workflow again with aerie forge run dispatch")
     path = f"/repos/{t['repo']}/actions/runs/{n}/" + ("rerun-failed-jobs" if (a.get("flags") or {}).get("failed") else "rerun")
     c, b, _h = _call(t, "POST", path, {})
     return _ok(c, b, lambda _x: {"rerun": n})
@@ -656,6 +686,12 @@ def v_release_view(t, a):
     if not REF.fullmatch(tag):
         raise ValueError("name the release by its tag")
     c, b, _h = _call(t, "GET", f"/repos/{t['repo']}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+    if c == 404:
+        # A draft is never found by its tag: looked for among the listed.
+        lc, lb, _h = _call(t, "GET", f"/repos/{t['repo']}/releases?per_page=50")
+        found = next((r for r in lb if isinstance(r, dict) and r.get("tag_name") == tag), None) if lc == 200 and isinstance(lb, list) else None
+        if found:
+            c, b = 200, found
     return _ok(c, b, lambda r: {"tag": r.get("tag_name"), "name": r.get("name"), "body": r.get("body"),
                                 "prerelease": r.get("prerelease"), "url": r.get("html_url"),
                                 "files": [{"name": f.get("name"), "size": f.get("size")} for f in r.get("assets") or []]})
@@ -827,10 +863,16 @@ def gl_run_log(t, a):
     if (a.get("flags") or {}).get("job"):
         want = [n]
     else:
-        c, j, _h = _call(t, "GET", f"{_gl(t)}/pipelines/{n}/jobs?per_page=50")
-        if not 200 <= c < 300:
-            return _ok(c, j)
-        jobs = j if isinstance(j, list) else []
+        # As on GitHub (B563): every page until a failure is found.
+        jobs = []
+        for page in range(1, 4):
+            c, j, _h = _call(t, "GET", f"{_gl(t)}/pipelines/{n}/jobs?per_page=100&page={page}")
+            if not 200 <= c < 300:
+                return _ok(c, j)
+            got = j if isinstance(j, list) else []
+            jobs += got
+            if len(got) < 100 or any(x.get("status") == "failed" for x in got):
+                break
         want = [str(x["id"]) for x in jobs if x.get("status") == "failed"] or [str(x["id"]) for x in jobs]
     out = []
     for jid in want[:6]:
@@ -892,7 +934,7 @@ ABILITY_OF = {v: a["id"] for a in ABILITIES for v in a["verbs"]}
 
 
 def run(project, verb, args):
-    """One bb forge verb for this project: (payload, status)."""
+    """One aerie forge verb for this project: (payload, status)."""
     if verb == "whoami":
         m = fresh(project)
         return {"measure": m, "override": override(project), "briefing": briefing(project)}, 200
@@ -900,7 +942,7 @@ def run(project, verb, args):
         return measure(project), 200
     fn = VERBS.get(verb)
     if fn is None:
-        return {"error": f"bb forge has no {verb}: {', '.join(['whoami', 'measure', *VERBS])}"}, 400
+        return {"error": f"aerie forge has no {verb}: {', '.join(['whoami', 'measure', *VERBS])}"}, 400
     t = target_of(project)
     if t.get("error"):
         return {"error": t["error"]}, 400
@@ -911,4 +953,4 @@ def run(project, verb, args):
     try:
         return fn[1 if t["forge"]["kind"] == "gitlab" else 0](t, args)
     except ValueError as e:
-        return {"error": f"bb forge {verb}: {e}"}, 400
+        return {"error": f"aerie forge {verb}: {e}"}, 400

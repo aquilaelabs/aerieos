@@ -18,7 +18,7 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 // happens to answer there, which is the failure the runner refuses to allow.
 export const URL = process.env.DASHBOARD_TEST_URL
   || (() => { throw new Error('DASHBOARD_TEST_URL is not set. Run this through '
-                              + '`bb dashboard test`, which starts the server'); })();
+                              + '`aerie dashboard test`, which starts the server'); })();
 export const DIR = process.env.DASHBOARD_TEST_DIR;
 const CHROME = process.env.DASHBOARD_TEST_CHROME;
 const CREDS = { username: 'test', password: 'test' };
@@ -111,7 +111,7 @@ export async function leaveNotebooks(p){
     .catch(() => {});
 }
 
-// Function coverage (roadmap R76): under `bb tests coverage` the copy the
+// Function coverage (roadmap R76): under `aerie tests coverage` the copy the
 // run is made from is instrumented and every page keeps its counts in
 // window.__bbcovc; they are written out when a page closes and when a
 // suite is done, one file per page, for the run to merge into the tree's
@@ -317,7 +317,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   return page;
 }
 
-// Flip the stub `bb doctor` between the ok and failing fixtures.
+// Flip the stub `aerie doctor` between the ok and failing fixtures.
 export const doctorFixture = name =>
   writeFileSync(`${DIR}/doctor.txt`, readFileSync(`${DIR}/doctor-${name}.txt`));
 

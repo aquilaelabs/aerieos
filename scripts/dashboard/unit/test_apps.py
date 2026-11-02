@@ -49,23 +49,23 @@ class Apps(unittest.TestCase):
         self.assertEqual(apps._pick(rels, "0.9.0"), (rels[1], False))
 
     def test_only_what_matches_its_sha256_is_kept_and_served(self):
-        rel = self.release("v0.7.0", ["builderbot-app-0.7.0.apk", "builderbot-vscode-0.7.0.vsix",
-                                      "builderbot-companion-0.7.0.exe", "builderbot-companion-0.7.0.pyz"],
-                           bad={"builderbot-companion-0.7.0.pyz"})
+        rel = self.release("v0.7.0", ["aerieos-app-0.7.0.apk", "aerieos-vscode-0.7.0.vsix",
+                                      "aerieos-companion-0.7.0.exe", "aerieos-companion-0.7.0.pyz"],
+                           bad={"aerieos-companion-0.7.0.pyz"})
         (self.tmp / "releases.json").write_text(json.dumps([rel]))
         apps.RELEASES_URL = f"file://{self.tmp / 'releases.json'}"
         v = apps.check()
         held = {a["name"]: [f["file"] for f in a["files"]] for a in v["apps"]}
-        self.assertEqual(held["companion"], ["builderbot-companion-0.7.0.exe"])
+        self.assertEqual(held["companion"], ["aerieos-companion-0.7.0.exe"])
         self.assertIn("does not match its sha256", v["problem"])
-        self.assertTrue(apps.path("android", "builderbot-app-0.7.0.apk"))
+        self.assertTrue(apps.path("android", "aerieos-app-0.7.0.apk"))
         self.assertIsNone(apps.path("android", "../index.json"))
-        self.assertIsNone(apps.path("companion", "builderbot-companion-0.7.0.pyz"))
+        self.assertIsNone(apps.path("companion", "aerieos-companion-0.7.0.pyz"))
 
     def test_a_release_with_no_file_of_an_app_says_so_on_its_row(self):
         # 0.5.3 went out with no APK: every install's Apps page said its look
         # at the release did not work, where the look was fine.
-        rel = self.release("v0.7.0", ["builderbot-vscode-0.7.0.vsix", "builderbot-companion-0.7.0.exe"])
+        rel = self.release("v0.7.0", ["aerieos-vscode-0.7.0.vsix", "aerieos-companion-0.7.0.exe"])
         (self.tmp / "releases.json").write_text(json.dumps([rel]))
         apps.RELEASES_URL = f"file://{self.tmp / 'releases.json'}"
         v = apps.check()
@@ -73,24 +73,24 @@ class Apps(unittest.TestCase):
         self.assertEqual(rows["android"]["absent"], "v0.7.0")
         self.assertEqual(rows["android"]["files"], [])
         self.assertEqual(rows["vscode"]["absent"], "")
-        self.assertIn("builderbot-companion-*.pyz not in v0.7.0", v["problem"])
+        self.assertIn("aerieos-companion-*.pyz not in v0.7.0", v["problem"])
         self.assertNotIn("Android", v["problem"])
 
     def test_the_companion_and_the_extension_are_dev_features(self):
         # The operator, 20 Oct: offered, fetched and served only with Offer
         # dev features on; the Android app is not one.
-        rel = self.release("v0.7.0", ["builderbot-app-0.7.0.apk", "builderbot-vscode-0.7.0.vsix",
-                                      "builderbot-companion-0.7.0.exe"])
+        rel = self.release("v0.7.0", ["aerieos-app-0.7.0.apk", "aerieos-vscode-0.7.0.vsix",
+                                      "aerieos-companion-0.7.0.exe"])
         (self.tmp / "releases.json").write_text(json.dumps([rel]))
         apps.RELEASES_URL = f"file://{self.tmp / 'releases.json'}"
         apps.check()
-        self.assertTrue(apps.path("vscode", "builderbot-vscode-0.7.0.vsix"))
+        self.assertTrue(apps.path("vscode", "aerieos-vscode-0.7.0.vsix"))
         self.dev = False
         self.assertEqual([a["name"] for a in apps.view()["apps"]], ["android"])
         self.assertFalse(apps.offered("vscode") or apps.offered("companion"))
-        self.assertIsNone(apps.path("vscode", "builderbot-vscode-0.7.0.vsix"))
-        self.assertIsNone(apps.path("companion", "builderbot-companion-0.7.0.exe"))
-        self.assertTrue(apps.path("android", "builderbot-app-0.7.0.apk"))
+        self.assertIsNone(apps.path("vscode", "aerieos-vscode-0.7.0.vsix"))
+        self.assertIsNone(apps.path("companion", "aerieos-companion-0.7.0.exe"))
+        self.assertTrue(apps.path("android", "aerieos-app-0.7.0.apk"))
 
     def test_the_seed_is_read_once_and_put_aside(self):
         (self.tmp / "seed.json").write_text(json.dumps({"version": 1, "apps": ["companion"]}))

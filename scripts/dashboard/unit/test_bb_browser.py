@@ -1,4 +1,4 @@
-"""bb browser (scripts/lib/browser.mjs, R247): Chrome and Firefox with an
+"""aerie browser (scripts/lib/browser.mjs, R247): Chrome and Firefox with an
 unpacked extension loaded, each on its own port and profile, driven from one
 verb and ended by its process group. Run against the toolchain store's
 Playwright browsers where this node has them, skipped where it does not."""

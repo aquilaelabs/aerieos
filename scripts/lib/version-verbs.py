@@ -1,4 +1,4 @@
-"""Behind `bb version` (cmd_version in bb): this project's version identity in
+"""Behind `aerie version` (cmd_version in bb): this project's version identity in
 whatever form is asking. Everything that decides what a version IS lives
 in dashboard/version.py, because the notebook needs the same answers;
 this resolves the words and prints what the module returns.
@@ -31,7 +31,7 @@ proj, argv = sys.argv[2], sys.argv[3:]
 
 # --for NAME asks about a component: a directory with its own VERSION file.
 # Pulled out of argv first so it can sit anywhere, which is what anybody
-# typing `bb version --for extension --code` expects.
+# typing `aerie version --for extension --code` expects.
 comp = ""
 if "--for" in argv:
     i = argv.index("--for")
@@ -41,23 +41,23 @@ if "--for" in argv:
     comp = argv[i + 1]
     argv = argv[:i] + argv[i + 2:]
 
-USAGE = ("bb version [--for DIR] "
+USAGE = ("aerie version [--for DIR] "
          "[--semver|--code|--quad|--win|--msi|--pep440|--file|--json]\n"
-         "bb version --list                 every version this repo carries\n"
-         "bb version [--for DIR] bump major|minor|patch\n"
-         "bb version [--for DIR] set X.Y.Z     straight to a later version, as one bump; from a\n"
+         "aerie version --list                 every version this repo carries\n"
+         "aerie version [--for DIR] bump major|minor|patch\n"
+         "aerie version [--for DIR] set X.Y.Z     straight to a later version, as one bump; from a\n"
          "                                     number never released, its changelog notes come along\n"
-         "bb version [--for DIR] unbump        take the last bump or set back, while unreleased: its\n"
+         "aerie version [--for DIR] unbump        take the last bump or set back, while unreleased: its\n"
          "                                     changelog section returns to Unreleased (once: the one\n"
          "                                     before it stays)\n"
-         "bb version [--for DIR] init X.Y.Z    give one its first VERSION\n"
-         "bb version policy                    what a session may move here\n"
-         "bb version forward BRANCH            merge a released patch line (0.6.2) into this branch's\n"
+         "aerie version [--for DIR] init X.Y.Z    give one its first VERSION\n"
+         "aerie version policy                    what a session may move here\n"
+         "aerie version forward BRANCH            merge a released patch line (0.6.2) into this branch's\n"
          "                                     later line: its fixes carried, this line's number kept,\n"
          "                                     the changelog's sections placed by version\n"
-         "bb version backport COMMIT           a fix from a later line onto this patch line, its\n"
+         "aerie version backport COMMIT           a fix from a later line onto this patch line, its\n"
          "                                     changelog entries under this line's Unreleased\n"
-         "bb version [--for DIR] release --why \"...\"   tag this commit and publish the release, as\n"
+         "aerie version [--for DIR] release --why \"...\"   tag this commit and publish the release, as\n"
          "                                     Release on the Artifacts view does (Agents may: Tag and\n"
          "                                     publish a release)\n"
          "A section dated under the wrong number: unbump, then set the number you meant.")
@@ -92,7 +92,7 @@ def policy_line():
 
 if argv and argv[0] == "bump":
     if len(argv) < 2:
-        fail("bb version bump major|minor|patch")
+        fail("aerie version bump major|minor|patch")
     # `by` is not a flag: this runs AS the session, so the only honest value
     # is the one the policy is about. The operator's bumps come from the
     # dashboard, which calls bump() directly.
@@ -108,7 +108,7 @@ if argv and argv[0] == "bump":
 
 if argv and argv[0] == "set":
     if len(argv) < 2:
-        fail("bb version set X.Y.Z: a later version, moved to in one commit")
+        fail("aerie version set X.Y.Z: a later version, moved to in one commit")
     r = version.jump(proj, argv[1], by="claude", comp=comp)
     if r.get("error"):
         fail(r["error"])
@@ -131,7 +131,7 @@ if argv and argv[0] == "unbump":
 
 if argv and argv[0] == "init":
     if len(argv) < 2:
-        fail("bb version init X.Y.Z [--for DIR]")
+        fail("aerie version init X.Y.Z [--for DIR]")
     r = version.init(proj, argv[1], by="claude", comp=comp)
     if r.get("error"):
         fail(r["error"])
@@ -141,31 +141,33 @@ if argv and argv[0] == "init":
     raise SystemExit(0)
 
 if argv and argv[0] == "release":
-    # bb version release (R138): the tag on this commit and the forge's
+    # aerie version release (R138): the tag on this commit and the forge's
     # release, made on the controller with the project's own credentials,
     # which this session never holds. Under Agents may: Tag and publish a
     # release: auto releases at once, ask waits for the project's owner.
     import bbapi
     import waits
     rest = argv[1:]
-    # Help is help: `bb version release -h` was sent on as a release with
+    # Help is help: `aerie version release -h` was sent on as a release with
     # no reason (Shebang-DevBoard, 5 Oct), refused only because the tag
     # already existed. Anything but --why and its sentence is refused by name.
     if "-h" in rest or "--help" in rest:
-        print('bb version [--for DIR] release --why "..."   tag this commit, push the tag and publish the\n'
+        print('aerie version [--for DIR] release --why "..."   tag this commit, push the tag and publish the\n'
               "    forge's release (GitHub, Gitea or GitLab), as Release on the Artifacts view does. Under\n"
               "    Agents may: Tag and publish a release: auto releases at once, ask waits for the\n"
               "    project's owner, deny refuses. A release whose Android APK could not be signed (bb\n"
               "    sign status) is refused before the tag; --without-apk releases it anyway, to be\n"
-              "    signed after with bb sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N):\n"
+              "    signed after with aerie sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N):\n"
               "    no bump, no changelog section; CI publishes it as a pre-release for the dev channel.\n"
-              'bb version [--for DIR] release --edit --why "..." [--tag TAG] [--notes FILE] [--attach FILE]...\n'
+              "    From any branch but the one builds ship from, a release is a dev one unless --stable\n"
+              "    says otherwise; the first line printed names the channel it lands on.\n"
+              'aerie version [--for DIR] release --edit --why "..." [--tag TAG] [--notes FILE] [--attach FILE]...\n'
               "    change the published release: its notes replaced whole (- reads stdin), a file from\n"
               "    dist/ or the committed tree attached (one of the same name replaced), (asset:NAME) in\n"
               "    the notes the address of an attached file, (file:PATH) a committed picture shown from\n"
               "    the repository at its pushed commit, never a download: the way for a screenshot. TAG\n"
               "    is the version's own unless named. The same dial; on ask, every edit is its own ask.\n"
-              'bb version [--for DIR] release --remove NAME [--remove NAME]... --why "..." [--tag TAG]\n'
+              'aerie version [--for DIR] release --remove NAME [--remove NAME]... --why "..." [--tag TAG]\n'
               "    take files off the published release, named as the forge lists them: its own ask,\n"
               "    never part of an edit, the names checked against the release before anybody is asked.")
         raise SystemExit(0)
@@ -182,14 +184,19 @@ if argv and argv[0] == "release":
     # A dev pre-release (R179): the dev build's tag, vX.Y.Z-dev.N, on the
     # dev channel, its release page CI's.
     dev = "--dev" in rest
-    rest = [x for x in rest if x not in ("--without-apk", "--dev")]
+    # ...and a stable one from a branch other than main is said in so many
+    # words (R190 step 1): without it, it is a dev one.
+    stable = "--stable" in rest
+    rest = [x for x in rest if x not in ("--without-apk", "--dev", "--stable")]
     if rest:
-        fail(f"bb version release takes --why \"...\" [--without-apk] [--dev] and nothing else, not {rest[0]}")
+        fail(f"aerie version release takes --why \"...\" [--without-apk] [--dev|--stable] and nothing else, not {rest[0]}")
     auth = os.environ.get("BB_VERSION_AUTH", "")
     r = bbapi.call("/api/version", {"action": "release", "project": proj, "component": comp, "why": why, "dev": dev,
-                                    "unsigned": unsigned}, auth=auth, timeout=240)
+                                    "stable": stable, "unsigned": unsigned}, auth=auth, timeout=240)
     if r.get("error"):
         fail(f"[builderbot] ERROR: {r['error']}")
+    if r.get("channel"):
+        print(f"[builderbot] {r['channel']}", file=sys.stderr)
     if r.get("id") and not r.get("released"):
         print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}) to release, waiting up "
               "to 15 minutes for Approve in their bell", file=sys.stderr)
@@ -206,6 +213,45 @@ if argv and argv[0] == "release":
         print(f"the release: {forge['url']}")
     elif forge.get("error"):
         print(f"no release on the forge: {forge['error']}")
+    raise SystemExit(0)
+
+if argv and argv[0] == "rehearse":
+    # A release rehearsed (R190 step 2): the project's release-rehearsal
+    # workflow started on this branch through the controller, which holds
+    # the forge's token. It builds what a tag would and publishes nothing.
+    import bbapi
+    if any(x in ("-h", "--help") for x in argv[1:]):
+        print("aerie version rehearse   run every build a release's tag runs on this branch, as it is pushed,\n"
+              "    publishing nothing (.github/workflows/release-rehearsal.yml); tag once it is green.\n"
+              "    The run's summary lists the files the release would carry (.release-files).")
+        raise SystemExit(0)
+    if argv[1:]:
+        fail(f"aerie version rehearse takes nothing more, not {argv[1]}")
+    wf = "release-rehearsal.yml"
+    if not (version.root(proj) / ".github/workflows" / wf).is_file():
+        fail(f"{proj} has no .github/workflows/{wf} to rehearse a release with")
+    branch = version.branch_of(proj)
+    if not branch:
+        fail("HEAD is not on a branch: a rehearsal runs a pushed branch")
+    here = version._git(proj, "rev-parse", "HEAD") or ""
+    there = version._git(proj, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}") or ""
+    if here.strip() != there.strip():
+        fail(f"{branch} here is not what was last pushed: aerie git push it first, since the rehearsal builds "
+             "the remote's branch")
+    r = bbapi.call("/api/forge", {"project": proj, "verb": "run dispatch",
+                                  "args": {"pos": [wf], "flags": {"ref": branch}}},
+                   auth=os.environ.get("BB_VERSION_AUTH", ""), timeout=120)
+    if isinstance(r, dict) and r.get("error"):
+        # GitHub starts a dispatch only for a workflow its default branch
+        # also carries: until the rehearsal is merged there, it is said so.
+        if "404" in r["error"] or "not found" in r["error"].lower() or "workflow_dispatch" in r["error"]:
+            fail(f"[builderbot] ERROR: GitHub would not start {wf} on {branch} ({r['error']}): it starts a "
+                 "workflow by hand only once the repository's default branch carries that file too, so the "
+                 "rehearsal works from the first merge that brings it there. Meanwhile a branch push runs "
+                 "the OS image's build and boot (os-image.yml)")
+        fail(f"[builderbot] ERROR: {r['error']}")
+    print(f"the release rehearsal is started on {branch} at {here.strip()[:7]}: aerie forge run list shows it, "
+          "aerie ci-log reads it, and its summary lists what a release from here would carry")
     raise SystemExit(0)
 
 if argv and argv[0] == "line":
@@ -251,7 +297,7 @@ if argv and argv[0] == "policy":
     # held to and never to move it.
     print(f"{proj}: {policy_line()}")
     print("a person changes this with Agents may: Move the version in the project's settings,"
-          " or on its Artifacts view; bb version set X.Y.Z moves to a later version in one step")
+          " or on its Artifacts view; aerie version set X.Y.Z moves to a later version in one step")
     raise SystemExit(0)
 
 if argv and argv[0] == "--list":
@@ -265,7 +311,7 @@ if argv and argv[0] == "--list":
     if len(rows) == 1:
         print("\n  one version for the whole repo. A directory with its own "
               "VERSION\n  file becomes a component with its own; see "
-              "`bb version --for DIR`.")
+              "`aerie version --for DIR`.")
     raise SystemExit(0)
 
 v = version.render(proj, comp)
@@ -315,7 +361,7 @@ print(("  released as       " if v["released"] else "  building towards  ") + (
 if v["released"]:
     print(f"  tag               {v['tag']}  (on this commit)")
 elif v["target"]:
-    print("  not released yet  Release on the Artifacts view, or bb version release "
+    print("  not released yet  Release on the Artifacts view, or aerie version release "
           "--why under Agents may: Tag and publish a release, tags this commit and "
           "pushes it")
 if v["ordinal"] is not None:
@@ -341,7 +387,7 @@ print(f"  who may bump      {policy_line()}")
 comps = version.components(proj)
 if comps and not comp:
     print(f"  components        {', '.join(comps)}"
-          f"   (bb version --for {comps[0]})")
+          f"   (aerie version --for {comps[0]})")
 since = version.since_bump(proj, comp)
 if since.get("commits"):
     print(f"  since that target {since['commits']} commit"

@@ -98,7 +98,7 @@ class Record(unittest.TestCase):
 
 
 class UsersTab(unittest.TestCase):
-    """Which Anthropic accounts each BuilderBot account is on, and who
+    """Which Anthropic accounts each AerieOS account is on, and who
     shares one."""
 
     def setUp(self):

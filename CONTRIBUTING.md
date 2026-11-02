@@ -1,7 +1,7 @@
 # Contributing
 
-BuilderBot is the source of the container it runs in: `scripts/` becomes
-`/opt/builderbot/scripts`, `config/templates/` ships the briefing every
+AerieOS is the source of the container it runs in: `scripts/` becomes
+`/opt/aerieos/scripts`, `config/templates/` ships the briefing every
 session is handed, and the Dockerfile is the whole product. That decides
 the shape of a change: nothing you edit here is live until CI builds a new
 image and the box updates to it, so the loop is edit, prove on the checkout,
@@ -9,50 +9,50 @@ open a pull request, and let the image follow.
 
 ## Getting a checkout
 
-Clone the repository and open it as a project on a BuilderBot, which is what
+Clone the repository and open it as a project on an AerieOS, which is what
 its own sessions do: the tree lives on the projects share, the notebook
-(roadmap, bugs, rules, tests) is the controller's, and `bb` is on the PATH.
-Outside a BuilderBot the linters and the dashboard's suite still run; the
+(roadmap, bugs, rules, tests) is the controller's, and `aerie` is on the PATH.
+Outside an AerieOS the linters and the dashboard's suite still run; the
 notebook verbs do not, since they relay to a controller.
 
 ## Seeing a change
 
-- `bb dashboard dev` restarts the live dashboard from `./scripts/dashboard`
+- `aerie dashboard dev` restarts the live dashboard from `./scripts/dashboard`
   (same port, same credential, until the container restarts; `--off` puts
   it back), so a dashboard change is looked at in a browser without an
   image build.
-- `bash scripts/bb <verb>` runs the checkout's `bb` rather than the image's;
-  the installed one on your PATH is `/opt/builderbot/scripts/bb`.
-- `bb capture shot URL FILE` pictures a page at rest; `bb capture reel`
+- `bash scripts/aerie <verb>` runs the checkout's `aerie` rather than the image's;
+  the installed one on your PATH is `/opt/aerieos/scripts/aerie`.
+- `aerie capture shot URL FILE` pictures a page at rest; `aerie capture reel`
   shows what changed over time. Both are how a change is shown to somebody
   who was not watching.
 - A change that touches how sessions start, what they are handed, or what a
   node does is rebuilt onto the project's dev instance and walked there
-  before production is asked to build it (`bb devapp rebuild`; the house
+  before production is asked to build it (`aerie devapp rebuild`; the house
   rule `prove-on-dev`).
 
 ## Proving it
 
-- `bb lint` runs shellcheck, hadolint, ruff, actionlint, compose validation,
-  XML well-formedness, and the checks that hold the docs to the tree (bb
+- `aerie lint` runs shellcheck, hadolint, ruff, actionlint, compose validation,
+  XML well-formedness, and the checks that hold the docs to the tree (aerie
   help against `docs/reference.md`, the settings across their five places,
   `docs/layout.md` against `git ls-files`, the agent's version against its
   file). CI runs the same set on a pull request.
-- `bb tests run` runs the dashboard's Playwright suite, isolated: its own
+- `aerie tests run` runs the dashboard's Playwright suite, isolated: its own
   server on a spare port, a scratch state, fake projects, a private tmux
-  server. `bb dashboard test FILE` runs one file; `bb tests keep` holds the
-  fixture up so `bb tests probe FILE.mjs` can ask the page a question.
-- `bb tests preflight` lists what the branch changed, asks the code map
+  server. `aerie dashboard test FILE` runs one file; `aerie tests keep` holds the
+  fixture up so `aerie tests probe FILE.mjs` can ask the page a question.
+- `aerie tests preflight` lists what the branch changed, asks the code map
   which suites reach it, and runs those with the lint, voice and design
   checks. Run it before a push.
-- `bb map` answers "where would I look" from an index over the tree
+- `aerie map` answers "where would I look" from an index over the tree
   (`find`, `who-calls`, `draws`, `suites`, `sections`, `state`): where a
   name is defined or called is its question; grep is for text.
 
 ## The house rules
 
-`bb rules` prints them; the Briefing tab carries them; every session started
-here is held to them, and the ones with a check (`bb rules check NAME`) run
+`aerie rules` prints them; the Briefing tab carries them; every session started
+here is held to them, and the ones with a check (`aerie rules check NAME`) run
 before a change is handed back. Two you meet first: no em dash on a line the
 branch adds, and one file per feature, with `server.py` holding a route and
 one call into the module beside it.
@@ -60,13 +60,13 @@ one call into the module beside it.
 ## Landing it
 
 Work lands on a branch and merges through a pull request the operator opens
-from their desktop: push the branch (`bb git push` on a node, since the
+from their desktop: push the branch (`aerie git push` on a node, since the
 controller holds the keys), hand over the link, move on. A pull request runs
 lint and, for a dashboard change, the browser suite, on the repository's own
 runner; it does not build the image. The image is built on `main`, by a
 hosted job, on a push that touches its inputs, and `:latest` does not move
 until that build passes. What a change means for the person using the
-product goes in `CHANGELOG.md` through `bb changelog add`, under Added,
+product goes in `CHANGELOG.md` through `aerie changelog add`, under Added,
 Changed, Deprecated, Removed, Fixed or Security.
 
 ## Why the harness is shaped the way it is
@@ -90,14 +90,14 @@ timed out a dozen checks a day that passed alone (27 Sep 2026). Inside tmux
 the client ignores `TMUX_TMPDIR`, so an ad-hoc harness that makes a session
 lands it on the real server. And `run.sh` called by hand once tested a
 whole day's work on the node while the container it was meant to prove sat
-untouched (R65), which is why `bb tests run` goes through `bb test`.
+untouched (R65), which is why `aerie tests run` goes through `aerie test`.
 
 The `dashboard tests` workflow is separate from `lint` because the suite is
 timing-sensitive and the runner shares its box with everything else: while
 it was a step in the lint job it took the linters' verdict with it (bug 19).
 The image is built on a hosted runner because building it on the box that
 runs it is circular: a bad image would take down the runner that has to
-build the fix (R116). `bb ci-log` exists because the runner keeps no
+build the fix (R116). `aerie ci-log` exists because the runner keeps no
 console output, and without it the only evidence of a red run was the
 runner's `_diag` directory, which names the failing step and nothing it
 said; that cost a round trip through the operator once. The preflight
@@ -109,7 +109,7 @@ answering from the old reading (8 Oct 2026).
 ## Where things are explained
 
 `README.md` is the front page; `docs/README.md` the index of the docs;
-`docs/reference.md` the configuration and `bb` reference;
+`docs/reference.md` the configuration and `aerie` reference;
 `docs/architecture.md` the map; `docs/how-it-works.md` the overview, and the
 docs it names (one per part of the dashboard) the prose behind each part; `docs/decisions.md` the design decisions with their dates and reasons;
 `docs/layout.md` the file-by-file list; `docs/nodes.md` the design record for

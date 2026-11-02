@@ -156,7 +156,7 @@ ok(await page.$('.phonetab #phDisconnect') !== null, '...and offers Disconnect t
 }
 
 // A second account sees the connection and cannot drive it.
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'visitor', '--role', 'admin'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--role', 'admin'],
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
@@ -169,7 +169,7 @@ ok(seen.phone && !seen.phone.model && !seen.phone.serial && !seen.mine && !seen.
    `another account is told a phone is connected and whose, nothing that names it, and may not drive it (${JSON.stringify(seen.phone)})`);
 // A plain account for the refusals: an administrator may disconnect
 // somebody else's phone since R120 (the unit tier holds that half).
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'plainuser', '--role', 'user'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'plainuser', '--role', 'user'],
   { input: 'plainpass1\nplainpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const plain = asUser('plainuser', 'plainpass1');
@@ -254,7 +254,7 @@ ok(await page.$eval('.phask', r => /Approve for this session/.test(r.textContent
    'a phone ask offers Approve and Approve for this session, in the bell\'s order and words');
 await page.click('.phask [data-allow]:not([data-session])');
 await page.waitForFunction(() => !document.querySelector('.phask'), null, { timeout: 20000 });
-await page.waitForFunction(() => document.title === 'BuilderBot', null, { timeout: 15000 });
+await page.waitForFunction(() => document.title === 'Aerie Workshop', null, { timeout: 15000 });
 ok(true, '...and the badge clears when nothing is waiting');
 // The command runs on the node as a job once Allow is pressed, so its
 // outcome is waited for, not read the instant the badge clears: read at
@@ -398,11 +398,11 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
 // a project's), and an administrator's Allow is not the owner's. Take back
 // ends it.
 {
-  const token = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+  const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const session = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
   const use = (op, args) => api('/api/phone', { action: 'use', op, args, why: `${op} for the test` }, session);
-  // Asked, allowed by the owner, and what it answered, as bb phone reads it.
+  // Asked, allowed by the owner, and what it answered, as aerie phone reads it.
   const allowed = async (op, args) => {
     const r = await use(op, args);
     if (!r.body.asked) return { status: r.status, body: r.body };

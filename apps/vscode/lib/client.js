@@ -1,5 +1,5 @@
 'use strict';
-// BuilderBot's controller as the extension speaks to it: sign in as the
+// AerieOS's controller as the extension speaks to it: sign in as the
 // person, then every call carries their own cookie and nothing wider. What
 // they may do is decided by the server on every request (the Files API's
 // gate, the terminal's); this file only carries the answers back.
@@ -82,7 +82,7 @@ class Client {
     let j = {};
     try { j = JSON.parse(r.body.toString() || '{}'); } catch { j = {}; }
     if (r.status === 401 || (r.status >= 300 && r.status < 400)) {
-      throw new Refused(401, 'Not signed in to BuilderBot, or the sign-in has expired: BuilderBot: Sign In.');
+      throw new Refused(401, 'Not signed in to AerieOS, or the sign-in has expired: AerieOS: Sign In.');
     }
     if (r.status >= 400) throw new Refused(r.status, j.error || `refused (${r.status})`, j);
     return j;
@@ -105,7 +105,7 @@ class Client {
   async status() {
     const r = await request(this.base, '/api/status', { headers: this.headers(), rejectUnauthorized: this.tls });
     if (r.status === 401 || (r.status >= 300 && r.status < 400)) {
-      throw new Refused(401, 'Not signed in to BuilderBot, or the sign-in has expired: BuilderBot: Sign In.');
+      throw new Refused(401, 'Not signed in to AerieOS, or the sign-in has expired: AerieOS: Sign In.');
     }
     let j = {};
     try { j = JSON.parse(r.body.toString() || '{}'); } catch { j = {}; }
@@ -130,7 +130,7 @@ function controllerTooOld(answer) {
   const said = (answer || {}).api;
   const theirs = said === undefined || said === null ? 1 : Number(said) || 0;
   return theirs >= API ? ''
-    : `BuilderBot's Files API is version ${theirs} and this extension needs ${API}: update BuilderBot on the controller.`;
+    : `AerieOS's Files API is version ${theirs} and this extension needs ${API}: update AerieOS on the controller.`;
 }
 
 module.exports = { API, SAYS, Client, Refused, signIn, request, controllerTooOld };

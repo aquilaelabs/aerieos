@@ -168,7 +168,7 @@ for (const os of SYSTEMS){
     }).on('error', e => res(String(e))));
     ok(/a websocket is asked for here/.test(page), `[${os}] a terminal there opens through the controller (${page.slice(0, 120)})`);
     await api('/api/prefs', { project: PROJECT, node: home, nodes: [home] });
-    // Uninstall: the row retired, nothing of BuilderBot's left.
+    // Uninstall: the row retired, nothing of AerieOS's left.
     await api('/api/v1/nodes', { action: 'uninstall', id: nid });
     const gone = await wait(async () => !(await nodes()).some(n => n.id === nid && n.state !== 'retired'), 20 * 60000);
     ok(!!gone, `[${os}] Uninstall takes it off the Nodes page`);

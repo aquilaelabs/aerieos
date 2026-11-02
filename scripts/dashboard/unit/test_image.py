@@ -45,15 +45,15 @@ class Partitions(unittest.TestCase):
         self.p = shell_vars(os.path.join(IMG, "partitions.sh"))
 
     def test_the_initramfs_mounts_the_data_partition_named_here(self):
-        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "builderbot-os")
+        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
         self.assertIn(f"by-partuuid/{self.p['BB_PART_DATA']}", script)
 
     def test_the_projects_under_srv_are_kept_on_the_data_partition(self):
-        # B437: the staged WORKSPACE is /srv/builderbot/projects, and the
+        # B437: the staged WORKSPACE is /srv/aerieos/projects, and the
         # root is a tmpfs overlay, so /srv is bound from /var.
-        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "builderbot-os")
-        self.assertIn('mount --bind "${rootmnt}/var/lib/builderbot-os/srv" "${rootmnt}/srv"', script)
-        self.assertIn("WORKSPACE_DIR=/srv/builderbot/projects", read(ROOT, "nodes", "install-controller.sh"))
+        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
+        self.assertIn('mount --bind "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv"', script)
+        self.assertIn("WORKSPACE_DIR=/srv/aerieos/projects", read(ROOT, "nodes", "install-controller.sh"))
 
     def test_fstab_names_the_esp_here(self):
         self.assertIn(f"PARTUUID={self.p['BB_PART_ESP']}  /boot/efi", read(EXTRA, "etc", "fstab"))
@@ -63,8 +63,8 @@ class Partitions(unittest.TestCase):
         self.assertIn(f'set root_a="root=PARTUUID={self.p["BB_PART_ROOT_A"]}"', g)
         self.assertIn(f'set root_b="root=PARTUUID={self.p["BB_PART_ROOT_B"]}"', g)
         self.assertIn(f"--fs-uuid --set=root {self.p['BB_ESP_FSUUID']}", g)
-        self.assertIn("bbslot=a", g)
-        self.assertIn("bbslot=b", g)
+        self.assertIn("aerieslot=a", g)
+        self.assertIn("aerieslot=b", g)
         self.assertIn("overlayroot=tmpfs", g)
 
     def test_the_disk_is_laid_out_by_these_names(self):
@@ -121,9 +121,9 @@ class Packages(unittest.TestCase):
 
 
 class SlotTool(unittest.TestCase):
-    TOOL = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "slot")
+    TOOL = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "slot")
 
-    def run_tool(self, *args, cmdline="bbslot=b quiet", esp=None):
+    def run_tool(self, *args, cmdline="aerieslot=b quiet", esp=None):
         with tempfile.TemporaryDirectory() as d:
             c = os.path.join(d, "cmdline")
             with open(c, "w", encoding="utf-8") as f:
@@ -134,12 +134,12 @@ class SlotTool(unittest.TestCase):
     def test_the_slot_is_read_from_the_command_line(self):
         self.assertEqual(self.run_tool("current").stdout.strip(), "b")
         self.assertEqual(self.run_tool("other").stdout.strip(), "a")
-        self.assertEqual(self.run_tool("current", cmdline="bbslot=a").stdout.strip(), "a")
+        self.assertEqual(self.run_tool("current", cmdline="aerieslot=a").stdout.strip(), "a")
 
     def test_a_boot_that_names_no_slot_is_said(self):
         r = self.run_tool("current", cmdline="root=/dev/sda1 ro")
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("not a BuilderBot OS boot", r.stderr)
+        self.assertIn("not an AerieOS boot", r.stderr)
 
     def test_next_is_slot_a_until_grub_says_otherwise_and_cannot_be_set_without_the_esp(self):
         self.assertEqual(self.run_tool("next").stdout.strip(), "a")
@@ -161,16 +161,16 @@ class Installer(unittest.TestCase):
         self.assertEqual(r.stdout.split(), ["cmd_stage", "cmd_firstboot"], r.stderr)
 
     def test_the_first_boot_unit_runs_the_installer_where_it_is_laid_out_and_once(self):
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-firstboot.service")
-        self.assertIn("ExecStart=/opt/builderbot/nodes/install-controller.sh --firstboot", unit)
-        self.assertIn("ConditionPathExists=!/etc/builderbot-controller/own-node", unit)
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-firstboot.service")
+        self.assertIn("ExecStart=/opt/aerieos/nodes/install-controller.sh --firstboot", unit)
+        self.assertIn("ConditionPathExists=!/etc/aerieos-controller/own-node", unit)
         inst = read(self.INST)
         self.assertIn('OWN_MARK="$ETC/own-node"', inst)
-        self.assertIn('ETC="$P/etc/builderbot-controller"', inst)
+        self.assertIn('ETC="$P/etc/aerieos-controller"', inst)
         # Enabled by the post-install script, not a link in the extra tree
         # (a symlink does not travel with the tree, B417).
         post = read(IMG, "mkosi.postinst")
-        self.assertIn("systemctl enable builderbot-os-firstboot.service builderbot-os-installer.service builderbot-os-health.service", post)
+        self.assertIn("systemctl enable aerieos-os-firstboot.service aerieos-os-installer.service aerieos-os-health.service", post)
         self.assertFalse(os.path.exists(os.path.join(EXTRA, "etc", "systemd", "system", "multi-user.target.wants")))
 
     def test_the_postinst_stages_the_controller_from_the_checkout(self):
@@ -187,6 +187,17 @@ class Installer(unittest.TestCase):
 
 
 class DebianOnTheImage(unittest.TestCase):
+    def test_an_image_with_no_package_database_is_taken_at_its_word(self):
+        # The image removes its database (CleanPackageMetadata), so asking it
+        # called every package missing and no machine became its own node.
+        with tempfile.TemporaryDirectory() as d:
+            rel = os.path.join(d, "release")
+            open(rel, "w", encoding="utf-8").close()
+            r = sh(". nodes/families/deb.sh; pkg no-such-package-zz && echo took",
+                   {"BB_OS_RELEASE": rel, "BB_DPKG_STATUS": os.path.join(d, "gone")})
+        self.assertIn("took", r.stdout, r.stderr)
+        self.assertNotIn("not in the AerieOS image", r.stderr)
+
     def test_a_package_the_image_has_passes_and_one_it_lacks_is_named(self):
         with tempfile.TemporaryDirectory() as d:
             rel = os.path.join(d, "release")
@@ -196,7 +207,7 @@ class DebianOnTheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             r = sh(". nodes/families/deb.sh; pkg bash no-such-package-zz", env)
             self.assertNotEqual(r.returncode, 0)
-            self.assertIn("not in the BuilderBot OS image: no-such-package-zz", r.stderr)
+            self.assertIn("not in the AerieOS image: no-such-package-zz", r.stderr)
 
 
 def workflows():
@@ -238,15 +249,15 @@ class Workflow(unittest.TestCase):
         self.assertIn('bash "$HERE/lay-disk" "$LOOP"', b)
         self.assertNotIn("sfdisk --quiet", b, "the layout lives in lay-disk alone")
         for f in ("lay-disk", "partitions.sh", "grub.cfg"):
-            self.assertIn(f'"$TREE/usr/lib/builderbot-os/{f}"', b)
+            self.assertIn(f'"$TREE/usr/lib/aerieos-os/{f}"', b)
         lay = read(IMG, "lay-disk")
         self.assertIn('. "$HERE/partitions.sh"', lay)
         self.assertIn("--grow", lay)
-        inst = read(EXTRA, "usr", "lib", "builderbot-os", "installer")
+        inst = read(EXTRA, "usr", "lib", "aerieos-os", "installer")
         self.assertIn('bash "$LIB/lay-disk" "$pick"', inst)
         self.assertIn("--grow", inst)
-        self.assertIn("lib/builderbot-os/features", inst)
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-installer.service")
+        self.assertIn("lib/aerieos-os/features", inst)
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-installer.service")
         self.assertIn("ConditionKernelCommandLine=bbinstaller=1", unit)
         self.assertIn("TTYPath=/dev/tty1", unit)
 
@@ -262,11 +273,11 @@ class Workflow(unittest.TestCase):
             self.assertIn(p, conf, p)
         wf = workflows()
         self.assertIn("xorriso mtools", wf)
-        self.assertIn("out/builderbot-os-*.iso", wf)
+        self.assertIn("out/aerieos-os-*.iso", wf)
 
     def test_the_first_boot_turns_on_the_features_the_installer_was_asked_for(self):
         inst = read(ROOT, "nodes", "install-controller.sh")
-        self.assertIn('OS_FEATURES_FILE="$P/var/lib/builderbot-os/features"', inst)
+        self.assertIn('OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"', inst)
         self.assertIn('"${OS_FEATURES[@]}"', inst)
         self.assertIn("vmhost|firewall|iommu) OS_FEATURES+=(--feature", inst)
 
@@ -280,29 +291,29 @@ class Workflow(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/os-image.yml", wf)
         self.assertIn("hostfwd=tcp:127.0.0.1:7680-:7680", wf)
         self.assertIn("github.event_name == 'schedule'", wf)
-        self.assertIn("builderbot-os-*.packages", wf)
+        self.assertIn("aerieos-os-*.packages", wf)
         self.assertIn('"$OUT/$NAME.packages"', read(IMG, "build.sh"))
 
     def test_a_stick_loads_the_slot_into_memory_when_grub_says_so(self):
-        # R161 step 1: bb_toram=1 in grubenv turns root= into the copy in
+        # R161 step 1: aerie_toram=1 in grubenv turns root= into the copy in
         # memory and names the slot's partition; the initramfs script and
         # hook do the copy, and the slot tool reads and sets the switch.
         p = shell_vars(os.path.join(IMG, "partitions.sh"))
         g = read(IMG, "grub.cfg")
-        self.assertIn('if [ "$bb_toram" = 1 ]', g)
-        self.assertIn(f'root=/dev/loop0 bbslotdev=PARTUUID={p["BB_PART_ROOT_A"]} bbtoram=1', g)
-        self.assertIn(f'root=/dev/loop0 bbslotdev=PARTUUID={p["BB_PART_ROOT_B"]} bbtoram=1', g)
+        self.assertIn('if [ "$aerie_toram" = 1 ]', g)
+        self.assertIn(f'root=/dev/loop0 bbslotdev=PARTUUID={p["BB_PART_ROOT_A"]} aerietoram=1', g)
+        self.assertIn(f'root=/dev/loop0 bbslotdev=PARTUUID={p["BB_PART_ROOT_B"]} aerietoram=1', g)
         self.assertIn("$root_a rootfstype=squashfs", g)
-        top = read(EXTRA, "etc", "initramfs-tools", "scripts", "local-top", "builderbot-os-toram")
+        top = read(EXTRA, "etc", "initramfs-tools", "scripts", "local-top", "aerieos-os-toram")
         self.assertIn("od -An -t u8 -j 40 -N 8", top)
         self.assertIn("losetup /dev/loop0 /run/bbroot/root.squashfs", top)
-        hook = read(EXTRA, "etc", "initramfs-tools", "hooks", "builderbot-os")
+        hook = read(EXTRA, "etc", "initramfs-tools", "hooks", "aerieos-os")
         self.assertIn("copy_exec /sbin/losetup", hook)
         self.assertIn("loop", read(EXTRA, "etc", "initramfs-tools", "modules").split())
-        tool = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "slot")
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "slot")
         with tempfile.TemporaryDirectory() as d:
             c = os.path.join(d, "cmdline")
-            open(c, "w").write("root=/dev/loop0 bbslotdev=PARTUUID=x bbtoram=1 bbslot=a\n")
+            open(c, "w").write("root=/dev/loop0 bbslotdev=PARTUUID=x aerietoram=1 aerieslot=a\n")
             r = sh(f"bash {tool} status", {"BB_CMDLINE": c, "BB_ESP": os.path.join(d, "esp"), "BB_OS_RELEASE": os.path.join(d, "none")})
             self.assertIn("root in memory: yes", r.stdout)
             self.assertEqual(sh(f"bash {tool} ram", {"BB_CMDLINE": c, "BB_ESP": os.path.join(d, "esp")}).stdout.strip(), "off")
@@ -313,97 +324,173 @@ class Workflow(unittest.TestCase):
         # the slot held; the slot tool sets and ends a trial in GRUB's
         # environment, which grub-editenv reads back.
         g = read(IMG, "grub.cfg")
-        self.assertIn('if [ "$bb_trial" = 1 ]', g)
-        self.assertIn('set bb_slot="$bb_prev"', g)
-        self.assertIn("save_env bb_slot bb_trial bb_tries bb_fell_back", g)
+        self.assertIn('if [ "$aerie_trial" = 1 ]', g)
+        self.assertIn('set aerie_slot="$aerie_prev"', g)
+        self.assertIn("save_env aerie_slot aerie_trial aerie_tries aerie_fell_back", g)
         self.assertIn('menuentry "Safe mode', g)
-        self.assertIn("bbsafe=1", g)
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-health.service")
-        self.assertIn("ConditionKernelCommandLine=bbslot", unit)
-        self.assertIn("ExecStart=/usr/lib/builderbot-os/health", unit)
-        self.assertIn('bash "$SLOT" good', read(EXTRA, "usr", "lib", "builderbot-os", "health"))
+        self.assertIn("aeriesafe=1", g)
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-health.service")
+        self.assertIn("ConditionKernelCommandLine=aerieslot", unit)
+        self.assertIn("ExecStart=/usr/lib/aerieos-os/health", unit)
+        self.assertIn('bash "$SLOT" good', read(EXTRA, "usr", "lib", "aerieos-os", "health"))
+        # B471: a slot that panics or never gets healthy comes back by itself.
+        self.assertEqual(g.count("panic=15 console="), 4)
+        # R194: Rescue, a root shell at the screen with nothing started.
+        self.assertIn('menuentry "Rescue', g)
+        self.assertIn("systemd.unit=rescue.target systemd.setenv=SYSTEMD_SULOGIN_FORCE=1", g)
+        self.assertIn('set fallback="slot-${aerie_prev}"', g)
+        health = read(EXTRA, "usr", "lib", "aerieos-os", "health")
+        self.assertIn("systemctl reboot", health)
+        self.assertNotIn('"$code" != "000"', health)
         if not shutil.which("grub-editenv"):
             self.skipTest("no grub-editenv here")
-        tool = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "slot")
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "slot")
         with tempfile.TemporaryDirectory() as d:
             esp = os.path.join(d, "esp"); os.makedirs(os.path.join(esp, "grub"))
-            c = os.path.join(d, "cmdline"); open(c, "w").write("bbslot=a\n")
+            c = os.path.join(d, "cmdline"); open(c, "w").write("aerieslot=a\n")
             env = {"BB_CMDLINE": c, "BB_ESP": esp, "BB_OS_RELEASE": os.path.join(d, "none")}
             self.assertEqual(sh(f"bash {tool} next b", env).returncode, 0)
             r = sh(f"bash {tool} trial a 0.9.1", env)
             self.assertEqual(r.returncode, 0, r.stderr)
             got = sh(f"grub-editenv {esp}/grub/grubenv list", env).stdout
-            for want in ("bb_slot=b", "bb_trial=1", "bb_tries=0", "bb_prev=a", "bb_ver_b=0.9.1"):
+            for want in ("aerie_slot=b", "aerie_trial=1", "aerie_tries=0", "aerie_prev=a", "aerie_ver_b=0.9.1"):
                 self.assertIn(want, got, got)
             st = sh(f"bash {tool} status", env).stdout
             self.assertIn("trial: slot b, 0 boot(s) so far, back to slot a", st)
+            envf = f"{esp}/grub/grubenv"
+            # B471: the slot running now is healthy while b waits to boot for
+            # the first time: b's trial stands.
             self.assertEqual(sh(f"bash {tool} good", env).returncode, 0)
-            got = sh(f"grub-editenv {esp}/grub/grubenv list", env).stdout
-            self.assertIn("bb_trial=0", got)
+            self.assertIn("aerie_trial=1", sh(f"grub-editenv {envf} list", env).stdout)
+            # ...b booted once and a was picked from the menu: back on a.
+            sh(f"grub-editenv {envf} set aerie_tries=1", env)
+            sh(f"bash {tool} good", env)
+            got = sh(f"grub-editenv {envf} list", env).stdout
+            self.assertIn("aerie_slot=a", got)
+            self.assertIn("aerie_trial=0", got)
+            # ...and b healthy on its own boot ends its trial on b.
+            self.assertEqual(sh(f"bash {tool} switch b a 0.9.2", env).returncode, 0)
+            got = sh(f"grub-editenv {envf} list", env).stdout
+            for want in ("aerie_slot=b", "aerie_trial=1", "aerie_tries=0", "aerie_prev=a", "aerie_ver_b=0.9.2"):
+                self.assertIn(want, got, got)
+            open(c, "w").write("aerieslot=b\n")
+            sh(f"grub-editenv {envf} set aerie_tries=1", env)
+            sh(f"bash {tool} good", env)
+            got = sh(f"grub-editenv {envf} list", env).stdout
+            self.assertIn("aerie_slot=b", got)
+            self.assertIn("aerie_trial=0", got)
+            # B470: hold points the next boot back at the running slot.
+            self.assertEqual(sh(f"bash {tool} hold", env).returncode, 0)
+            self.assertIn("aerie_slot=b", sh(f"grub-editenv {envf} list", env).stdout)
+            # A healthy boot with nothing to change leaves GRUB's file alone.
+            before = os.stat(envf).st_mtime_ns
+            sh(f"bash {tool} good", env)
+            self.assertEqual(os.stat(envf).st_mtime_ns, before)
             self.assertEqual(sh(f"bash {tool} fell-back", env).stdout.strip(), "no")
-            sh(f"grub-editenv {esp}/grub/grubenv set bb_fell_back=1", env)
+            sh(f"grub-editenv {esp}/grub/grubenv set aerie_fell_back=1", env)
             self.assertEqual(sh(f"bash {tool} fell-back", env).stdout.strip(), "yes")
             self.assertEqual(sh(f"bash {tool} fell-back", env).stdout.strip(), "no", "read once, then cleared")
 
+    def test_a_slot_fallen_back_to_gets_the_configuration_it_reads(self):
+        # B472: the newer slot migrated the configuration and failed; the
+        # slot before refuses it, so the copy the update took is put back,
+        # what it held moved aside with the logs kept.
+        import tarfile
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "restore-before")
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-restore.service")
+        self.assertIn("Before=aerieos-controller.service", unit)
+        self.assertIn("aerieos-os-restore.service", read(IMG, "mkosi.postinst"))
+        with tempfile.TemporaryDirectory() as d:
+            slot = os.path.join(d, "slot")
+            open(slot, "w").write('#!/bin/sh\n[ "$1 $2" = "fell-back keep" ] && cat "$(dirname "$0")/fb"\n')
+            open(os.path.join(d, "fb"), "w").write("yes\n")
+            opt = os.path.join(d, "opt")
+            os.makedirs(os.path.join(opt, "scripts", "dashboard"))
+            gate = os.path.join(opt, "scripts", "dashboard", "stateversion.py")
+            open(gate, "w").write("import sys, os\nsys.exit(int(os.environ.get('GATE', '78')))\n")
+            rel = os.path.join(d, "release"); open(rel, "w").write("BUILDERBOT_OS_VERSION=0.9.0\n")
+            state = os.path.join(d, "var", "config"); os.makedirs(os.path.join(state, "logs"))
+            open(os.path.join(state, "state.json"), "w").write('{"v": "newer"}')
+            open(os.path.join(state, "logs", "today.log"), "w").write("kept")
+            os.makedirs(os.path.join(d, "old", "config"))
+            open(os.path.join(d, "old", "config", "state.json"), "w").write('{"v": "older"}')
+            os.makedirs(os.path.join(d, "work", "before"))
+            with tarfile.open(os.path.join(d, "work", "before", "0.9.0.tar.gz"), "w:gz") as t:
+                t.add(os.path.join(d, "old", "config"), arcname="config")
+            env = {"BB_OS_SLOT": slot, "BB_OS_WORK": os.path.join(d, "work"), "BB_OS_STATE": state, "BB_OS_OPT": opt,
+                   "BB_OS_RELEASE": rel}
+            r = sh(f"GATE=0 bash {tool}", env)
+            self.assertIn("nothing put back", r.stdout, r.stderr)
+            self.assertIn("newer", open(os.path.join(state, "state.json")).read())
+            r = sh(f"bash {tool}", env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("older", open(os.path.join(state, "state.json")).read(), r.stdout + r.stderr)
+            self.assertEqual(open(os.path.join(state, "logs", "today.log")).read(), "kept")
+            aside = [x for x in os.listdir(os.path.join(d, "work")) if x.startswith("rolled-back-")]
+            self.assertEqual(len(aside), 1)
+            self.assertIn("newer", open(os.path.join(d, "work", aside[0], "config", "state.json")).read())
+            open(os.path.join(d, "fb"), "w").write("no\n")
+            self.assertEqual(sh(f"bash {tool}", env).stdout, "", "a boot that did not fall back says nothing")
+
     def test_the_boots_own_settings_reach_the_controller_from_the_esp_and_the_command_line(self):
-        # R161 step 6: builderbot.env on the ESP and builderbot.debug=1 on
-        # the command line land in /run/builderbot-os/env, a short list of
+        # R161 step 6: aerieos.env on the ESP and aerieos.debug=1 on
+        # the command line land in /run/aerieos-os/env, a short list of
         # names only, which the controller's unit reads if it is there.
-        tool = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "env")
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "env")
         with tempfile.TemporaryDirectory() as d:
             esp = os.path.join(d, "esp"); os.makedirs(esp)
-            open(os.path.join(esp, "builderbot.env"), "w").write("# the stick's own\r\nDEBUG_MODE=1\r\nTZ=Europe/Paris\nPATH=/evil\nBB_RELEASE_LINE=0.9\nBB_RELEASE_CHANNEL=dev\n" + " " * 3000 + "\n")
-            c = os.path.join(d, "cmdline"); open(c, "w").write("bbslot=a quiet\n")
+            open(os.path.join(esp, "aerieos.env"), "w").write("# the stick's own\r\nDEBUG_MODE=1\r\nTZ=Europe/Paris\nPATH=/evil\nBB_RELEASE_LINE=0.9\nBB_RELEASE_CHANNEL=dev\n" + " " * 3000 + "\n")
+            c = os.path.join(d, "cmdline"); open(c, "w").write("aerieslot=a quiet\n")
             run = os.path.join(d, "run")
             r = sh(f"bash {tool}", {"BB_ESP": esp, "BB_OS_RUN": run, "BB_CMDLINE": c})
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(open(os.path.join(run, "env")).read().splitlines(), ["DEBUG_MODE=1", "TZ=Europe/Paris", "BB_RELEASE_LINE=0.9", "BB_RELEASE_CHANNEL=dev"])
             self.assertEqual(open(os.path.join(run, "net")).read(), "", "a stick that names no network settings")
-            with open(os.path.join(esp, "builderbot.env"), "a") as f:
+            with open(os.path.join(esp, "aerieos.env"), "a") as f:
                 f.write("BB_HOSTNAME=tower\nBB_NET_ADDRESS=192.0.2.20\nBB_NET_DNS=1.1.1.1,9.9.9.9;x\n")
             sh(f"bash {tool}", {"BB_ESP": esp, "BB_OS_RUN": run, "BB_CMDLINE": c})
             self.assertNotIn("BB_NET_ADDRESS", open(os.path.join(run, "env")).read(), "the network's keys are not the controller's")
             self.assertEqual(open(os.path.join(run, "net")).read().splitlines(), ["BB_HOSTNAME=tower", "BB_NET_ADDRESS=192.0.2.20", "BB_NET_DNS=1.1.1.1,9.9.9.9x"])
-            os.unlink(os.path.join(esp, "builderbot.env"))
-            open(c, "w").write("bbslot=a builderbot.debug=1\n")
+            os.unlink(os.path.join(esp, "aerieos.env"))
+            open(c, "w").write("aerieslot=a aerieos.debug=1\n")
             sh(f"bash {tool}", {"BB_ESP": esp, "BB_OS_RUN": run, "BB_CMDLINE": c})
             self.assertEqual(open(os.path.join(run, "env")).read().splitlines(), ["DEBUG_MODE=1"])
-            open(c, "w").write("bbslot=a\n")
+            open(c, "w").write("aerieslot=a\n")
             sh(f"bash {tool}", {"BB_ESP": esp, "BB_OS_RUN": run, "BB_CMDLINE": c})
             self.assertEqual(open(os.path.join(run, "env")).read(), "", "off at a start that did not ask")
         # ...and the stick is laid with the file at its fixed 4 KiB behind
         # the marker the stick maker writes --set into (R161 step 12).
         lay = read(IMG, "lay-disk")
-        self.assertIn('"$MNT/builderbot.env"', lay)
-        self.assertIn("# builderbot.env BB-STICK-ENV-1", lay)
+        self.assertIn('"$MNT/aerieos.env"', lay)
+        self.assertIn("# aerieos.env AERIE-STICK-ENV-1", lay)
         # ...and the prepared configuration's 64 KiB (R161 step 8), taken off
         # the stick by a root step before the controller starts.
-        self.assertIn('"$MNT/builderbot/firstboot.json"', lay)
-        self.assertIn("BB-FIRSTBOOT-1", lay)
+        self.assertIn('"$MNT/aerieos/firstboot.json"', lay)
+        self.assertIn("AERIE-FIRSTBOOT-1", lay)
         # ...and the catalog's mirror's 64 MiB (R169 step 6).
-        self.assertIn('"$MNT/builderbot/catalog-mirror.bin"', lay)
+        self.assertIn('"$MNT/aerieos/catalog-mirror.bin"', lay)
         self.assertIn("BB-MIRROR-1", lay)
-        self.assertIn("ExecStart=-/usr/lib/builderbot-os/firstboot-take",
-                      read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-env.service"))
-        self.assertTrue(os.access(os.path.join(EXTRA, "usr", "lib", "builderbot-os", "firstboot-take"), os.X_OK))
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-env.service")
-        self.assertIn("Before=builderbot-controller.service systemd-networkd.service", unit)
-        self.assertIn("ExecStart=-/usr/lib/builderbot-os/net", unit)
-        self.assertIn("builderbot-os-env.service", read(IMG, "mkosi.postinst"))
-        self.assertIn("EnvironmentFile=-/run/builderbot-os/env", read(ROOT, "nodes", "install-controller.sh"))
+        self.assertIn("ExecStart=-/usr/lib/aerieos-os/firstboot-take",
+                      read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-env.service"))
+        self.assertTrue(os.access(os.path.join(EXTRA, "usr", "lib", "aerieos-os", "firstboot-take"), os.X_OK))
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-env.service")
+        self.assertIn("Before=aerieos-controller.service systemd-networkd.service", unit)
+        self.assertIn("ExecStart=-/usr/lib/aerieos-os/net", unit)
+        self.assertIn("aerieos-os-env.service", read(IMG, "mkosi.postinst"))
+        self.assertIn("EnvironmentFile=-/run/aerieos-os/env", read(ROOT, "nodes", "install-controller.sh"))
 
     def test_the_sticks_network_settings_write_a_network_file_before_dhcps(self):
         # R161 step 12: BB_NET_ADDRESS and its mask, gateway and DNS become a
         # runtime .network file that sorts before the image's 80-dhcp one;
         # anything that is not an address leaves DHCP standing.
-        tool = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "net")
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "net")
         self.assertTrue(os.access(tool, os.X_OK))
         self.assertIn("80-dhcp.network", read(IMG, "mkosi.postinst"))
         with tempfile.TemporaryDirectory() as d:
             run, nd = os.path.join(d, "run"), os.path.join(d, "network")
             os.makedirs(run)
             env = {"BB_OS_RUN": run, "BB_NETWORK_DIR": nd, "BB_NET_NO_APPLY": "1"}
-            out = os.path.join(nd, "10-builderbot-stick.network")
+            out = os.path.join(nd, "10-aerieos-stick.network")
 
             def boot(lines):
                 open(os.path.join(run, "net"), "w").write("".join(x + "\n" for x in lines))
@@ -436,8 +523,8 @@ class Workflow(unittest.TestCase):
         # the last, grown to the disk's end at boot, no further than
         # BB_DATA_MAX, and never shrunk; a last partition that is not the
         # data partition is left as it is.
-        tool = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "grow")
-        self.assertIn("ExecStart=-/usr/lib/builderbot-os/grow", read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-env.service"))
+        tool = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "grow")
+        self.assertIn("ExecStart=-/usr/lib/aerieos-os/grow", read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-env.service"))
         v = shell_vars(os.path.join(IMG, "partitions.sh"))
         with tempfile.TemporaryDirectory() as d:
             run = os.path.join(d, "run"); os.makedirs(run)
@@ -447,7 +534,7 @@ class Workflow(unittest.TestCase):
                 with open(disk, "wb") as f:
                     f.truncate(64 << 20)
                 table = ("label: gpt\nstart=2048, size=2048, name=bios\nsize=4MiB, name=esp\nsize=4MiB, name=a\nsize=4MiB, name=b\n"
-                         f"size=16MiB, uuid={data_uuid}, name=bbdata\n")
+                         f"size=16MiB, uuid={data_uuid}, name=aeriedata\n")
                 r = subprocess.run(["sfdisk", "--quiet", disk], input=table, capture_output=True, text=True, check=False)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 with open(disk, "r+b") as f:
@@ -478,19 +565,19 @@ class Workflow(unittest.TestCase):
             self.assertEqual(mib, 16)
 
     def test_the_console_welcomes_with_the_logo_the_release_and_the_address(self):
-        # R185: BuilderBot's logo, plain characters a serial console draws and
+        # R185: AerieOS's logo, plain characters a serial console draws and
         # no backslash (an escape in an issue file), opens the installer and
         # sits over every boot's login prompt with the release, the slot and
         # the dashboard's address, the getty's own \\4 standing for this
         # machine's IPv4 address; Debian's own line is blanked.
-        lib = os.path.join(EXTRA, "usr", "lib", "builderbot-os")
+        lib = os.path.join(EXTRA, "usr", "lib", "aerieos-os")
         logo = read(lib, "logo")
         self.assertTrue(logo.strip())
         self.assertTrue(all(32 <= ord(c) < 127 for c in logo.replace("\n", "")), "plain printable ASCII")
         self.assertNotIn("\\", logo)
         self.assertLessEqual(max(len(x) for x in logo.splitlines()), 72, "inside the installer's box")
         self.assertIn('LOGO="$(cat "$LIB/logo"', read(lib, "installer"))
-        self.assertIn("ExecStart=-/usr/lib/builderbot-os/welcome", read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-env.service"))
+        self.assertIn("ExecStart=-/usr/lib/aerieos-os/welcome", read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-env.service"))
         self.assertEqual(read(EXTRA, "etc", "issue").strip(), "", "Debian's own line goes")
         with tempfile.TemporaryDirectory() as d:
             fake = os.path.join(d, "lib"); os.makedirs(fake)
@@ -503,22 +590,22 @@ class Workflow(unittest.TestCase):
             out = os.path.join(d, "issue.d")
             r = sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file})
             self.assertEqual(r.returncode, 0, r.stderr)
-            issue = open(os.path.join(out, "10-builderbot.issue")).read()
-            self.assertIn("B U I L D E R B O T", issue)
-            self.assertIn("BuilderBot OS 0.9.0, slot a", issue)
+            issue = open(os.path.join(out, "10-aerieos.issue")).read()
+            self.assertIn("A E R I E O S", issue)
+            self.assertIn("AerieOS 0.9.0, slot a", issue)
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
             os.unlink(env_file)
             sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file})
-            self.assertIn("http://\\4:7680/", open(os.path.join(out, "10-builderbot.issue")).read(), "the default port without an env file")
+            self.assertIn("http://\\4:7680/", open(os.path.join(out, "10-aerieos.issue")).read(), "the default port without an env file")
 
     def test_the_disk_is_xz_and_the_stick_variant_runs_from_memory(self):
         # R161 step 5: xz, which the stick maker opens with Python's own
-        # library; the stick's disk is the same with bb_toram=1 set.
+        # library; the stick's disk is the same with aerie_toram=1 set.
         b = read(IMG, "build.sh")
         self.assertIn('xz -q -T0 -6 "$RAW"', b)
-        self.assertIn('grub-editenv "$MNT/grub/grubenv" set bb_toram=1', b)
+        self.assertIn('grub-editenv "$MNT/grub/grubenv" set aerie_toram=1', b)
         self.assertIn("stick.raw.xz", workflows())
-        self.assertTrue(os.access(os.path.join(ROOT, "tools", "builderbot-stick.py"), os.X_OK))
+        self.assertTrue(os.access(os.path.join(ROOT, "tools", "aerieos-stick.py"), os.X_OK))
 
     def test_build_sh_says_how_without_root(self):
         r = sh("bash image/build.sh --help")

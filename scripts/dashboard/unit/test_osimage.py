@@ -1,16 +1,19 @@
-"""BuilderBot OS updated from the page (R160 step 4): the agent's os-update
-job fetches the release's four files (or takes them from a folder), holds
-each to its sha256, writes the slot not in use, puts the kernel beside it on
+"""AerieOS updated from the page (R160 step 4): the agent's os-update
+job fetches the release's ISO (or takes it from a folder), holds it to its
+sha256, takes the slot, kernel, initrd and release stamp out of its live/
+folder, writes the slot not in use, puts the kernel beside it on
 the ESP and names the slot for the next boot; a file that does not match
 writes nothing; the census says the image, the slot and the next; the
 controller queues the job only for a machine that runs the image; the
 update window applies once per release at its hour and never by default."""
 import hashlib
+import json
 import os
 import re
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import unittest
@@ -40,8 +43,13 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+# Where image/build.sh puts each piece on the ISO.
+IN_ISO = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
+          "initrd": "live/initrd", "release": "live/release"}
+
+
 class World:
-    """A BuilderBot OS machine in a folder: the release file, a slot tool that
+    """An AerieOS machine in a folder: the release file, a slot tool that
     keeps the next slot in a file, two slot partitions as files, an ESP, and
     a release's files served by file://."""
     def __init__(self, slot="a", version="0.9.0"):
@@ -56,6 +64,8 @@ class World:
             f.write(f'#!/usr/bin/env bash\ncase "$1" in current) echo {slot};; other) echo {"b" if slot == "a" else "a"};; '
                     f'next) if [ -n "$2" ]; then echo "$2" > {self.nextf}; else cat {self.nextf} 2>/dev/null || echo a; fi;; '
                     f'trial) echo "prev=$2 ver=$3" > {self.trialf};; good) rm -f {self.trialf};; '
+                    f'hold) echo {slot} > {self.nextf}; rm -f {self.trialf};; '
+                    f'switch) [ -z "$BB_FAKE_SWITCH_FAILS" ] || exit 1; echo "$2" > {self.nextf}; echo "prev=$3 ver=$4" > {self.trialf};; '
                     f'status) echo "booted: slot {slot}"; [ -f {self.trialf} ] && echo "trial: on";; fell-back) echo no;; esac\n')
         self.state = os.path.join(self.d, "state", "config")
         os.makedirs(self.state)
@@ -71,35 +81,64 @@ class World:
             with open(self.dev[s], "wb") as f:
                 f.write(b"\0" * 4096)
         self.esp = os.path.join(self.d, "esp")
-        os.makedirs(os.path.join(self.esp, "builderbot", "a"))
+        os.makedirs(os.path.join(self.esp, "aerieos", "a"))
         self.work = os.path.join(self.d, "work")
         self.env = {"BB_OS_RELEASE": self.release, "BB_OS_SLOT": self.tool, "BB_OS_DEV_A": self.dev["a"], "BB_OS_DEV_B": self.dev["b"],
                     "BB_OS_ESP": self.esp, "BB_OS_WORK": self.work, "BB_OS_RELEASE_URL": "file://" + os.path.join(self.d, "rel"),
-                    "BB_OS_STATE": self.state}
+                    "BB_OS_STATE": self.state, "BB_OS_ATTEST_URL": "file://" + os.path.join(self.d, "attestations.json"),
+                    "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl")}
+        with open(os.path.join(self.d, "trusted-root.jsonl"), "w") as f:
+            f.write("{}\n")
 
-    def publish(self, version, bad=None):
-        """The release's files under rel/vVERSION, each with its sha256; `bad`
-        names a piece whose sha256 file lies."""
+    def publish(self, version, bad=False, without=""):
+        """The release's ISO under rel/vVERSION with its sha256: here a tar
+        holding the ISO's live/ folder, which the test's mount unpacks. `bad`
+        makes the sha256 file lie; `without` leaves a piece out."""
         d = os.path.join(self.d, "rel", "v" + version)
         os.makedirs(d, exist_ok=True)
         files = {"root.squashfs": b"hsqs" + version.encode() * 300, "vmlinuz": b"MZkernel" + version.encode(),
                  "initrd": b"initrd" + version.encode(), "release": f"BUILDERBOT_OS_VERSION={version}\n".encode()}
+        live = os.path.join(self.d, "live-" + version)
+        os.makedirs(os.path.join(live, "live"), exist_ok=True)
         for piece, data in files.items():
-            with open(os.path.join(d, f"builderbot-os-{version}.{piece}"), "wb") as f:
-                f.write(data)
-            with open(os.path.join(d, f"builderbot-os-{version}.{piece}.sha256"), "w") as f:
-                f.write(f"{'0' * 64 if piece == bad else sha(data)}  builderbot-os-{version}.{piece}\n")
+            if piece != without:
+                with open(os.path.join(live, IN_ISO[piece]), "wb") as f:
+                    f.write(data)
+        iso = os.path.join(d, f"aerieos-os-{version}.iso")
+        with tarfile.open(iso, "w") as t:
+            t.add(os.path.join(live, "live"), arcname="live")
+        with open(iso, "rb") as f:
+            want = sha(f.read())
+        with open(iso + ".sha256", "w") as f:
+            f.write(f"{'0' * 64 if bad else want}  aerieos-os-{version}.iso\n")
+        # Its build attestation: what GitHub's API answers for the ISO's
+        # digest, and the bundle the release carries beside it.
+        bundle = {"mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json", "subject": want}
+        with open(os.path.join(self.d, "attestations.json"), "w") as f:
+            json.dump({"attestations": [{"bundle": bundle}]}, f)
+        with open(os.path.join(d, f"aerieos-os-{version}.attestation.jsonl"), "w") as f:
+            f.write(json.dumps(bundle) + "\n")
         return d, files
 
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_os")
+        self.agent = agentpkg.load("aerieos_agent_os")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
         av = self.av
 
         class A(av.OsImageMixin):
             def _sh(self, job, argv, timeout=0, **kw):
+                # The ISO is opened by mount, which needs root: here the
+                # test's ISO is a tar, unpacked where it would be mounted.
+                if argv[0] == "mount":
+                    self.mounted = argv
+                    with tarfile.open(argv[-2]) as t:
+                        t.extractall(argv[-1], filter="data")
+                    return 0
+                if argv[0] == "umount":
+                    self.unmounted = argv
+                    return 0
                 r = subprocess.run(argv, capture_output=True, text=True, check=False)
                 job.say(r.stdout + r.stderr)
                 return r.returncode
@@ -107,10 +146,21 @@ class TheAgent(unittest.TestCase):
             def hello_again(self, why):
                 self.said = why
         self.A = A
+        # A gh that answers as BB_FAKE_GH_RC says, standing in for GitHub's
+        # attestation check; BB_FAKE_NO_GH takes it away.
         real = self.av.shutil.which
-        self.nogh = mock.patch.object(self.av.shutil, "which", side_effect=lambda n: None if n == "gh" else real(n))
-        self.nogh.start()
-        self.addCleanup(self.nogh.stop)
+        self.ghd = tempfile.mkdtemp()
+        gh = os.path.join(self.ghd, "gh")
+        with open(gh, "w") as f:
+            # It wants --bundle, a file holding a bundle for the ISO's digest,
+            # as the real one checks the bundle against the file.
+            f.write('#!/bin/sh\necho "gh $*"\nf="$3"; b="$5"\n[ "$4" = --bundle ] || exit 9\n'
+                    'grep -q "$(sha256sum "$f" | cut -d" " -f1)" "$b" || exit 8\nexit "${BB_FAKE_GH_RC:-0}"\n')
+        os.chmod(gh, stat.S_IRWXU)
+        self.fakegh = mock.patch.object(self.av.shutil, "which", side_effect=lambda n: (
+            None if os.environ.get("BB_FAKE_NO_GH") else gh) if n == "gh" else real(n))
+        self.fakegh.start()
+        self.addCleanup(self.fakegh.stop)
 
     def run_update(self, w, cfg):
         with mock.patch.dict(os.environ, w.env):
@@ -143,10 +193,10 @@ class TheAgent(unittest.TestCase):
         with open(w.dev["a"], "rb") as f:
             self.assertEqual(f.read(), b"\0" * 4096, "the running slot is untouched")
         for piece in ("vmlinuz", "initrd", "release"):
-            with open(os.path.join(w.esp, "builderbot", "b", piece), "rb") as f:
+            with open(os.path.join(w.esp, "aerieos", "b", piece), "rb") as f:
                 self.assertEqual(f.read(), files[piece])
         self.assertEqual(open(w.nextf).read().strip(), "b")
-        self.assertIn("slot b holds BuilderBot OS 0.9.1", text)
+        self.assertIn("slot b holds AerieOS 0.9.1", text)
         # On trial (R161 step 2), going back to slot a; and the configuration
         # as it was kept beside it, without its logs.
         self.assertEqual(open(w.trialf).read().strip(), "prev=a ver=0.9.1")
@@ -159,8 +209,75 @@ class TheAgent(unittest.TestCase):
             got = self.av.os_release()
         self.assertTrue(got["trial"])
         self.assertEqual(got["fell_back"], "")
-        self.assertIn("no gh here", text)
+        self.assertIn("gh attestation verify", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "the working files are gone")
+
+    def test_a_slot_on_trial_is_never_the_one_an_update_runs_from(self):
+        # B470: running slot b on trial, slot a is the only good one, and an
+        # update would have written it.
+        w = World(slot="b")
+        with open(w.nextf, "w") as f:
+            f.write("b\n")
+        with open(w.trialf, "w") as f:
+            f.write("prev=a ver=0.9.1\n")
+        w.publish("0.9.2")
+        state, code, text = self.run_update(w, {"release": "v0.9.2"})
+        self.assertEqual((state, code), ("failed", 79), text)
+        with open(w.dev["a"], "rb") as f:
+            self.assertEqual(f.read(), b"\0" * 4096, "the good slot is untouched")
+
+    def test_an_image_with_no_attestation_check_writes_nothing(self):
+        w = World(slot="a")
+        w.publish("0.9.1")
+        for env, said in (({"BB_FAKE_NO_GH": "1"}, "no gh here"), ({"BB_FAKE_GH_RC": "1"}, "did not verify")):
+            with mock.patch.dict(os.environ, env):
+                state, code, text = self.run_update(w, {"release": "v0.9.1"})
+            self.assertEqual((state, code), ("failed", 68), text)
+            self.assertIn(said, text)
+            with open(w.dev["b"], "rb") as f:
+                self.assertEqual(f.read(), b"\0" * 4096)
+            self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "a failed update leaves nothing behind")
+
+    def test_an_image_that_would_not_fit_is_not_fetched(self):
+        # R191 step 4: refused before a byte is written, saying how much.
+        w = World(slot="a")
+        w.publish("0.9.1")
+        full = mock.Mock(f_bavail=10, f_frsize=4096)
+        with mock.patch.object(self.av.os, "statvfs", return_value=full):
+            state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 66), text)
+        self.assertIn("the update needs about", text)
+        with open(w.dev["b"], "rb") as f:
+            self.assertEqual(f.read(), b"\0" * 4096)
+
+    def test_an_offline_folder_without_its_attestation_writes_nothing(self):
+        # R191 step 1: a folder on a share is no proof of who built it.
+        w = World(slot="a")
+        d, _ = w.publish("0.9.2")
+        os.unlink(os.path.join(d, "aerieos-os-0.9.2.attestation.jsonl"))
+        state, code, text = self.run_update(w, {"from": d})
+        self.assertEqual((state, code), ("failed", 68), text)
+        self.assertIn("attestation.jsonl", text)
+        with open(w.dev["b"], "rb") as f:
+            self.assertEqual(f.read(), b"\0" * 4096)
+
+    def test_github_with_no_attestation_for_the_image_writes_nothing(self):
+        w = World(slot="a")
+        w.publish("0.9.1")
+        with open(os.path.join(w.d, "attestations.json"), "w") as f:
+            f.write('{"attestations": []}')
+        state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 68), text)
+        self.assertIn("no build attestation", text)
+
+    def test_a_trial_not_set_leaves_the_next_boot_here(self):
+        w = World(slot="a")
+        w.publish("0.9.1")
+        with mock.patch.dict(os.environ, {"BB_FAKE_SWITCH_FAILS": "1"}):
+            state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 73), text)
+        self.assertEqual(open(w.nextf).read().strip(), "a")
+        self.assertFalse(os.path.exists(w.trialf))
 
     def test_a_fallback_the_health_check_recorded_is_said_until_the_next_update(self):
         w = World(slot="a")
@@ -174,15 +291,29 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(state, "succeeded", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "fell-back")))
 
-    def test_a_file_that_does_not_match_its_sha256_writes_nothing(self):
+    def test_an_image_that_does_not_match_its_sha256_writes_nothing(self):
         w = World(slot="a")
-        w.publish("0.9.1", bad="vmlinuz")
+        w.publish("0.9.1", bad=True)
         state, code, text = self.run_update(w, {"release": "v0.9.1"})
         self.assertEqual((state, code), ("failed", 67), text)
-        self.assertIn("vmlinuz: its sha256 does not match", text)
+        self.assertIn("aerieos-os-0.9.1.iso: its sha256 does not match", text)
         with open(w.dev["b"], "rb") as f:
             self.assertEqual(f.read(), b"\0" * 4096)
         self.assertFalse(os.path.exists(w.nextf))
+
+    def test_an_image_missing_a_piece_writes_nothing_and_is_closed_again(self):
+        w = World(slot="a")
+        w.publish("0.9.1", without="initrd")
+        a = self.A()
+        with mock.patch.dict(os.environ, w.env):
+            job = Job()
+            state, code = a._apply_os_update(job, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 66), job.text())
+        self.assertIn("the image has no live/initrd", job.text())
+        self.assertEqual(a.mounted[:3], ["mount", "-o", "loop,ro,nodev,nosuid,noexec"])
+        self.assertEqual(a.unmounted[-1], a.mounted[-1])
+        with open(w.dev["b"], "rb") as f:
+            self.assertEqual(f.read(), b"\0" * 4096)
 
     def test_an_offline_machine_takes_the_files_from_a_folder(self):
         w = World(slot="b")
@@ -192,9 +323,19 @@ class TheAgent(unittest.TestCase):
         with open(w.dev["a"], "rb") as f:
             self.assertTrue(f.read().startswith(files["root.squashfs"]))
         self.assertEqual(open(w.nextf).read().strip(), "a")
+        # Verified with no network, against the root the image was built with.
+        self.assertIn("--custom-trusted-root", text)
         state, code, text = self.run_update(w, {"from": os.path.join(w.d, "nowhere")})
         self.assertEqual(state, "failed")
         self.assertIn("is not a folder", text)
+
+    def test_a_dev_build_is_taken_by_its_tag(self):
+        # B589: the dev channel's update names a dev build, v0.9.1-dev.12.
+        w = World(slot="a")
+        w.publish("0.9.1-dev.12")
+        state, code, text = self.run_update(w, {"release": "v0.9.1-dev.12"})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertIn("aerieos-os-0.9.1-dev.12", text)
 
     def test_what_is_refused(self):
         w = World()

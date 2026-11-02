@@ -28,7 +28,7 @@ a briefed session reads:
 
 A migration is statemigrations/NNNN_name.py with run(ctx): idempotent, so a
 start cut short runs it again safely, and never edited once a release has
-shipped it (`bb lint` holds every one present at the newest v* tag
+shipped it (`aerie lint` holds every one present at the newest v* tag
 byte-for-byte). Adding one moves CURRENT, since CURRENT is the newest file.
 Stdlib only, and importable on its own: the entrypoint runs it as a script.
 """
@@ -48,18 +48,11 @@ FILE = "state.json"
 BACKUPS = "backups"
 KEEP = 3
 
-# The oldest state this build migrates from: state 2, what 0.6.0 shipped,
-# so any 0.6.x, 0.7.x or 0.8.x install upgrades in one step (the operator,
-# 28 Oct: 0.9 is a clean break with upgrade paths from 0.6, 0.7 and 0.8).
-# The migrations below it are gone from the tree (bb lint allows that for a
-# number under this floor alone). A release that drops a state from here
-# names the release that still reads it in THROUGH.
-SUPPORTED_FROM = 2
-
-# state -> the release line to go through for a state this build no longer
-# migrates from: its newest release carries it to one this build reads.
-# State 0 is a /config from before the stamp (before 0.5.0), state 1 a 0.5.x.
-THROUGH = {0: "0.6", 1: "0.6"}
+# The oldest state this build reads: AerieOS starts here, and nothing upgrades
+# from the releases before it (the operator, 1 Nov: 0.6, 0.7 and 0.8 have no
+# path, and the migrations below this number are gone from the tree). A move
+# from a controller already at this state still lands.
+SUPPORTED_FROM = 19
 
 # What the copy before a migration leaves out: what grows and is not state
 # (each kind paths.py lets the Settings page move: logs, the trees jobs ran
@@ -76,7 +69,7 @@ SKIP = {BACKUPS, "logs", "snapshots", "project-snapshots", "images", "gitrelay",
 SKIP_GLOBS = (".reset-*", "*.lock", "*.tmp")
 
 # Why this start migrates nothing, when the copy before it failed; written
-# to /config/state-held too, which bb doctor says in red (B109).
+# to /config/state-held too, which aerie doctor says in red (B109).
 HELD = ""
 HELD_FILE = "state-held"
 
@@ -153,7 +146,7 @@ def refusal(state, version=None):
     try:
         n, by = read(state)
     except ValueError as e:
-        return (f"BuilderBot {version} will not start: {e}, so which build wrote this /config is not "
+        return (f"AerieOS {version} will not start: {e}, so which build wrote this /config is not "
                 f"known. Restore {FILE} from a copy under {Path(state) / BACKUPS}, or put back the "
                 f"build that wrote it.")
     cur = current()
@@ -163,15 +156,14 @@ def refusal(state, version=None):
         back = _newest_backup(state)
         where = (f"restore {back} over {state} with the controller stopped" if back
                  else f"restore {state} from your own backup")
-        return (f"BuilderBot {version} will not start: this /config is at state {n}, written by "
-                f"BuilderBot {by or 'a newer build'}, and this build reads state {cur} and older. "
+        return (f"AerieOS {version} will not start: this /config is at state {n}, written by "
+                f"AerieOS {by or 'a newer build'}, and this build reads state {cur} and older. "
                 f"Downgrades are not supported: start {by or 'the newer build'} again, or {where}.")
     if n < SUPPORTED_FROM:
-        via = THROUGH.get(n, "an older release")
-        return (f"BuilderBot {version} will not start: this /config is at state {n}"
-                f"{f', written by BuilderBot {by}' if by else ''}, and this build upgrades from state "
-                f"{SUPPORTED_FROM} on. Start the newest {via} release on it first, then this one "
-                f"(docs/install.md#upgrading).")
+        return (f"AerieOS {version} will not start: this /config is at state {n}"
+                f"{f', written by {by}' if by else ''}, and this build reads state "
+                f"{SUPPORTED_FROM} on. Nothing upgrades from a build before it: install fresh, "
+                f"with a new /config (docs/install.md#upgrading).")
     return ""
 
 
@@ -329,18 +321,29 @@ def restore(state, version):
                          f"({src}) to put back")
     aside = state / BACKUPS / time.strftime("rolled-back-%Y%m%d-%H%M%S")
     aside.mkdir(parents=True)
-    for p in sorted(state.iterdir()):
-        if _skipped(p.name):
-            continue
-        os.replace(p, aside / p.name)
-    for p in sorted(src.iterdir()):
-        if p.name == "NOT-COPIED.txt":
-            continue
-        dst = state / p.name
-        if p.is_dir() and not p.is_symlink():
-            shutil.copytree(p, dst, symlinks=True)
-        else:
-            shutil.copy2(p, dst, follow_symlinks=False)
+    # Moved, not copied: the copy is used once (below), and a rename within
+    # one disk needs no room, where a copy that ran out of it halfway left
+    # half a state for the newer build to start on. Every move is undone if
+    # one fails, so it is the whole copy or the state as it was.
+    done = []
+    try:
+        for p in sorted(state.iterdir()):
+            if _skipped(p.name):
+                continue
+            os.replace(p, aside / p.name)
+            done.append((aside / p.name, p))
+        for p in sorted(src.iterdir()):
+            if p.name == "NOT-COPIED.txt":
+                continue
+            os.replace(p, state / p.name)
+            done.append((state / p.name, p))
+    except OSError:
+        for now, was in reversed(done):
+            try:
+                os.replace(now, was)
+            except OSError:
+                pass
+        raise
     # ...and what the copy could not read is still in what was moved aside:
     # brought back rather than lost (a root-only file, B109), a file inside
     # a folder the copy took the rest of included.
@@ -349,6 +352,10 @@ def restore(state, version):
         if (was.exists() or was.is_symlink()) and not (now.exists() or now.is_symlink()):
             now.parent.mkdir(parents=True, exist_ok=True)
             os.replace(was, now)
+    # The copy used goes with what it replaced, so the next start of that
+    # version takes a fresh one: kept, a retry a week later reused the copy
+    # from the first try, and a second rollback put that week-old state back.
+    os.replace(src, aside / f"used-{name}")
     return aside
 
 

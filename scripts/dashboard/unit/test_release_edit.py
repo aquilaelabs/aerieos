@@ -67,8 +67,12 @@ class Forge(BaseHTTPRequestHandler):
             b = {"bytes": len(raw), "type": self.headers.get("Content-Type")}
         SEEN.append((verb, self.path, b))
         name = self.path.split("name=")[-1] if "name=" in self.path else ""
+        # An asset renamed (a replacing file named for the one it replaced)
+        # answers with its address under the new name, as the hosts do.
+        if verb == "PATCH" and isinstance(b, dict) and set(b) == {"name"}:
+            name = b["name"]
         return self.answer(201 if verb != "DELETE" else 204,
-                           {"browser_download_url": f"http://dl/{name}"} if name else ({} if verb != "DELETE" else None))
+                           {"id": 11, "browser_download_url": f"http://dl/{name}"} if name else ({} if verb != "DELETE" else None))
 
     def do_POST(self):
         return self.write("POST")
@@ -119,6 +123,12 @@ class Plan(Base):
         self.assertEqual([(x["name"], x["signed"]) for x in p["files"]],
                          [("app-0.5.4-dev.1-abc1234-release-signed.apk", True), ("shot.png", False)])
         self.assertEqual(p["files"][0]["size"], 1200)
+
+    def test_a_tracked_file_changed_since_its_commit_is_refused(self):
+        # B564: a committed screenshot changed since was attached as it is
+        # now, which no commit holds.
+        (self.app / "docs" / "shot.png").write_bytes(b"changed")
+        self.assertIn("not committed", fr.edit_plan("app", "v0.5.4", None, ["docs/shot.png"]).get("error", ""))
 
     def test_what_is_refused_before_anybody_is_asked(self):
         for attach, why in ((["loose.png"], "not committed"), (["../secret.txt"], "not a file in app"),
@@ -176,7 +186,10 @@ class Edit(Base):
         r = fr.edit("app", self.plan)
         self.assertNotIn("error", r, r)
         self.assertEqual((r["attached"], r["replaced"]), (["shot.png"], ["shot.png"]))
-        self.assertTrue([1 for m, p, b in SEEN if m == "DELETE"], "the old file of that name went first")
+        self.assertTrue([1 for m, p, b in SEEN if m == "DELETE"], "the old file of that name went")
+        # B560: the new file was in before the old one went.
+        verbs = [m for m, p, b in SEEN if m in ("POST", "PUT", "DELETE") and "links" not in p or m == "DELETE"]
+        self.assertLess(verbs.index("POST" if "PUT" not in verbs else "PUT"), verbs.index("DELETE"), SEEN)
         notes = [b for m, p, b in SEEN if m == notes_verb and p == notes_path][0][notes_key]
         return r, notes
 

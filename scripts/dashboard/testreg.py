@@ -31,7 +31,7 @@ went is what is left, and that is the drift report, which is the failure mode
 this whole file exists to catch, because a registry that has quietly stopped
 describing the code is worse than no registry.
 
-Same arrangement as roadmap.py and bugs.py: the server or the `bb` CLI hands over
+Same arrangement as roadmap.py and bugs.py: the server or the `aerie` CLI hands over
 write_json and the state directory; nothing here reaches back.
 """
 import difflib
@@ -40,7 +40,7 @@ import os
 import re
 import sys
 
-# `bb` execs this module by path, so its directory is not on sys.path the way
+# `aerie` execs this module by path, so its directory is not on sys.path the way
 # it is for the dashboard's own import. Same reasoning as bugs.py: one module
 # object per process, because statefile's in-process half is a dict in there.
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -58,7 +58,7 @@ FILE = None
 
 # How many durations to keep per test. Short on purpose: this is read to see
 # whether something got slower, not to plot it, and every one of these is paid
-# for in the file every session's `bb tests` reads.
+# for in the file every session's `aerie tests` reads.
 KEEP = 5
 
 # ...and how many run summaries. Enough to say "the suite was 11 minutes last
@@ -138,12 +138,12 @@ def parse(text):
     """The runner's output as a roster: [{suite, ord, name, status, ms}].
 
     Tolerant of a line it does not know, because this is fed whole run logs:
-    a `bb` error, a stray warning and a python traceback all appear in one,
+    a `aerie` error, a stray warning and a python traceback all appear in one,
     and none of them is a result.
     """
     out, suites, suite, n = [], {}, "", 0
     for raw in text.splitlines():
-        # A timestamped log (the shape `bb tests ingest` is usually handed)
+        # A timestamped log (the shape `aerie tests ingest` is usually handed)
         # carries an epoch in front. Stripped here rather than asked for, so
         # the same command takes a log either way.
         line = re.sub(r"^\d{9,}\.\d+ ", "", raw)
@@ -339,7 +339,7 @@ def describe(project, key, protects=None, notes=None):
         p = _project(d, project)
         t = (p.get("tests") or {}).get(key)
         if not t:
-            return {"error": f"no test called {key} here; `bb tests` lists them"}
+            return {"error": f"no test called {key} here; `aerie tests` lists them"}
         if protects is not None:
             t["protects"] = str(protects).strip()[:MAX_TEXT]
         if notes is not None:
@@ -359,7 +359,7 @@ def accept(project, key, why):
         p = _project(d, project)
         t = (p.get("tests") or {}).get(key)
         if not t:
-            return {"error": f"no test called {key} here; `bb tests` lists them"}
+            return {"error": f"no test called {key} here; `aerie tests` lists them"}
         why = " ".join(str(why or "").split())[:MAX_TEXT]
         if why:
             t["accepted"] = why
@@ -523,7 +523,7 @@ def payload(project):
         # The last run's own wall time, for the honest gap between what the
         # tests cost and what the suite costs: the difference is the harness.
         "last_wall_ms": int((runs[-1].get("wall") or 0) * 1000) if runs else 0,
-        # The run going right now, if bb test said so (begin/end), or None:
+        # The run going right now, if aerie test said so (begin/end), or None:
         # the view names it before the last run's record (R99).
         "running": running(project),
     }
@@ -547,7 +547,7 @@ def counts():
 def revisions():
     """{project: a number that moves when this tab has to re-read}, the same
     shape bugs.revisions() has. What moves it is a run, and a bulk fill from
-    `bb tests describe --from FILE`: both change rows an open tab has no other
+    `aerie tests describe --from FILE`: both change rows an open tab has no other
     way to notice. Describing ONE deliberately does not: the panel draws its
     own save, and a redraw it did not need would take a neighboring row's
     unsaved typing with it.
@@ -564,7 +564,7 @@ def revisions():
 # ---- the Tests tab's writes, one call from the dashboard ---------------------
 
 # ---- a run in progress -----------------------------------------------------
-# What `bb test` says at its start and its end, per project, kept in memory
+# What `aerie test` says at its start and its end, per project, kept in memory
 # only: a controller restart forgets a run, which costs one note sent early
 # and never one held back. The companion app reads it to time its "Claude
 # is waiting on you" note by the project's During-a-test-run setting (the
@@ -625,7 +625,7 @@ def verb(name, act, req):
     """The hand-written half of the registry: describe a test (a
     write-through edit of one row, like the bug tracker's fields: there is
     nothing to stage, because what is written is a sentence about a thing
-    that already exists) or accept a changed one. Ingesting a run is `bb
+    that already exists) or accept a changed one. Ingesting a run is `aerie
     tests ingest`, in process: a run log is far past the body cap every
     request here has. (payload, status)."""
     if act == "begin":

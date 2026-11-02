@@ -12,7 +12,7 @@ plugins {
 // not removed, and the directory around it is not empty. So a build on a
 // node writes under the node's own disk: a job's cache folder when the
 // agent hands one (BUILDERBOT_CACHE), else the session's own folder in the
-// account's BuilderBot cache, which is on the node's disk and outlives the
+// account's AerieOS cache, which is on the node's disk and outlives the
 // session. $HOME and not user.home: Java reads the latter from the account
 // database, which on a node names the base home, and the base home's cache
 // in a session's view is a tmpfs made for that session. Anywhere else (the
@@ -28,6 +28,6 @@ val scratch: String? = System.getenv("BUILDERBOT_CACHE")
     } else null
 if (scratch != null) {
     allprojects {
-        layout.buildDirectory.set(File(scratch, "BuilderBot" + project.path.replace(':', '/')))
+        layout.buildDirectory.set(File(scratch, "AerieOS" + project.path.replace(':', '/')))
     }
 }

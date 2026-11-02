@@ -273,20 +273,24 @@ def handout(uid, project, fid, why="", by="", host="", login=""):
     """The path git's helper reads the opened token from, for `project`:
     RUN_DIR/<uid>/<project>, written now from token(), or "" when there is
     nothing to hand out."""
-    line = token(uid, fid, why, project, by, host, login)
-    if not line:
-        return ""
-    d = _run_dir() / uid
-    try:
-        d.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(d, 0o700)
-        p = d / project
-        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
-            fh.write(line + "\n")
-        return str(p)
-    except OSError:
-        return ""
+    # The lock held from the opening to the file (B547): a Lock landing
+    # between them shredded the handouts and this then wrote one with no
+    # window left to shred it, there until a restart.
+    with _lock:
+        line = token(uid, fid, why, project, by, host, login)
+        if not line or uid not in _open:
+            return ""
+        d = _run_dir() / uid
+        try:
+            d.mkdir(parents=True, exist_ok=True, mode=0o700)
+            os.chmod(d, 0o700)
+            p = d / project
+            fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(line + "\n")
+            return str(p)
+        except OSError:
+            return ""
 
 
 def _run_dir():

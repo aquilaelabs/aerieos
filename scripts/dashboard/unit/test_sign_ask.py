@@ -1,4 +1,4 @@
-"""bb sign's ask (R106 step 3): a project on `ask` puts the signing in
+"""aerie sign's ask (R106 step 3): a project on `ask` puts the signing in
 front of its owner, and only its owner; Approve starts it as the session's
 own; the dial is ask unless a project says otherwise."""
 import os

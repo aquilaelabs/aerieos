@@ -1,8 +1,8 @@
-"""BuilderBot's own documentation, read in the dashboard (R258, the operator
+"""AerieOS's own documentation, read in the dashboard (R258, the operator
 16 Oct): the Help page lists the docs, reads one, and searches them all.
 
 The docs are docs/*.md beside scripts/ in this tree, which the image carries
-at /opt/builderbot/docs. Which of them are shown, in which groups and with
+at /opt/aerieos/docs. Which of them are shown, in which groups and with
 which line under each, is docs/README.md's: its "## Group" headings and the
 "- [name.md](name.md): what it is" lines under them, so the index a reader
 on a forge sees is the one the page shows, and a doc not in it (a frozen
@@ -14,7 +14,7 @@ against the listed files before it is read, so no path reaches the disk.
 import re
 from pathlib import Path
 
-DIR = Path(__file__).resolve().parents[2] / "docs"     # the tree's, or /opt/builderbot/docs
+DIR = Path(__file__).resolve().parents[2] / "docs"     # the tree's, or /opt/aerieos/docs
 NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,60}")
 SEARCH_MAX = 60
 

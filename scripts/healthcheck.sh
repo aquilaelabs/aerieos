@@ -4,13 +4,13 @@
 # sessions run on a node, which carries its own.
 set -uo pipefail
 
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # Path-anchored, same reason as everywhere else in this repo: a bare
 # 'supervisor\.sh' also matches any process that merely mentions the string
 # (an editor open on the file, a grep), and a match like that reports a dead
 # supervisor as healthy.
-pgrep -f '/opt/builderbot/scripts/supervisor\.sh' >/dev/null \
+pgrep -f '/opt/aerieos/scripts/supervisor\.sh' >/dev/null \
     || { echo "supervisor not running"; exit 1; }
 
 # The supervisor is a sleep loop, so its being alive said nothing about the

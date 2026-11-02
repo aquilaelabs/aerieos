@@ -1,7 +1,7 @@
 # Data and privacy
 
-BuilderBot is software you run yourself. Everything it keeps stays on your
-controller and your nodes, and nothing is ever sent to BuilderBot's authors:
+AerieOS is software you run yourself. Everything it keeps stays on your
+controller and your nodes, and nothing is ever sent to AerieOS's authors:
 there is no telemetry, no usage reporting and no account with us. This page
 says what an install keeps about the people who use it, what it contacts on
 their behalf, and how to remove it, so whoever runs one can tell their own
@@ -22,7 +22,7 @@ On the controller, in its state directory (`/config`):
 - **Every project's notebook**: its roadmap, bugs, house rules, design,
   wiki, memories and chat, with who wrote each entry.
 - **Notifications** each account was shown, and **problem reports** sessions
-  filed about BuilderBot itself (`bb report`), both cleared from the
+  filed about AerieOS itself (`aerie report`), both cleared from the
   dashboard. Reports pass through redaction before they are kept.
 - **Node records**: each node's name, address and what it reported about
   itself.
@@ -37,7 +37,7 @@ On the projects share and the nodes:
   share).
 - **Toolchains** installed into each node's store.
 
-What it does not keep: BuilderBot writes no log of requests, so it holds no
+What it does not keep: AerieOS writes no log of requests, so it holds no
 record of the addresses people sign in from or of the pages they open.
 
 ## What it contacts
@@ -63,11 +63,11 @@ Installed page. The
 whole install is removed by deleting the controller's `/config`, the
 projects share and each node's store.
 
-## If you run BuilderBot for other people
+## If you run AerieOS for other people
 
 The data above is yours as the operator: you decide who has an account,
 which projects they see and what an agent may do, and any duty to tell the
 people you give accounts to how their data is handled is yours. This page is
-meant as the basis for that notice. A BuilderBot that is reachable from the
+meant as the basis for that notice. An AerieOS that is reachable from the
 internet holds the same data, so it also needs the care any service holding
 accounts and source code does: HTTPS, strong passwords and timely updates.

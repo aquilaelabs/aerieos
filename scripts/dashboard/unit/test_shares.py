@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import agentpkg  # noqa: E402
 
-SMB = """# Written by BuilderBot
+SMB = """# Written by AerieOS
 [media]
     path = /mnt/tank/media
     browseable = yes
@@ -27,7 +27,7 @@ SMB = """# Written by BuilderBot
     guest ok = no
     valid users = bbu-0a1b2c3d ada
 """
-NFS = """# Written by BuilderBot
+NFS = """# Written by AerieOS
 /mnt/tank/media 192.168.1.0/24(rw,sync,no_subtree_check,root_squash) nas2(ro,sync,no_subtree_check,root_squash)
 /mnt/tank/backup *(ro,sync,no_subtree_check,root_squash)
 """
@@ -49,7 +49,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_shares")
+        self.agent = agentpkg.load("aerieos_agent_shares")
         self.sm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".shares"]
         self.d = tempfile.mkdtemp()
         self.smb = os.path.join(self.d, "samba", "builderbot.conf")

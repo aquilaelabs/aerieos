@@ -437,7 +437,7 @@ function rnFillReads(){
   box.innerHTML = others.map(c => lrow(c.key, c.name,
     c.rows.length === 1 && c.rows[0].branch ? `git: ${c.rows[0].branch}` : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
     was.has(c.key))).join("");
-  // BuilderBot's owner's alone (the operator, 6 Oct): shown to everybody,
+  // AerieOS's owner's alone (the operator, 6 Oct): shown to everybody,
   // changed by the owner, and why not said on the row (not a tooltip).
   const mine = state?.can?.reads !== false;
   box.querySelectorAll("input").forEach(i => { i.disabled = !mine; });
@@ -808,17 +808,6 @@ function rnFolds(){
 // Withdraw act on the press, as the actions they are.
 let rnPeople = null, rnPeopleDraft = {};
 
-// The Git view's session dials, read here with the rest of what a session
-// may do and set on the Git view (R255 step 7).
-function rnDrawGitPol(name){
-  // A project on the defaults carries no gitpol: read as the Git view does.
-  const pol = (state?.projects || []).find(p => p.name === name)?.prefs?.gitpol || {};
-  setHidden($("rnGitPolField"), rnMode === "git");
-  setText($("rnGitPol"), `its branches ${pol.push || "allow"} · to main ${pol.main || "deny"} · a sensitive push ${
-    (pol.scan || "hold") === "hold" ? "held for you" : "not held"}`);
-  $("rnGitPolGo").onclick = () => { closeRename(); openNotebook(name, "git"); };
-}
-
 // `keep`: read again in place, and drawn only when nothing there is being
 // changed, so a staged owner or Invite only is not put back under the hand.
 function rnLoadPeople(name, keep = false){
@@ -827,7 +816,6 @@ function rnLoadPeople(name, keep = false){
     $("rnPeopleField").hidden = true;
     setHidden($("rnPeopleField").closest("details"), true);
   }
-  rnDrawGitPol(name);
   if (rnMode === "git") return;
   postJSON("/api/members", {action: "view", project: name})
     .then(r => r.json())
@@ -850,7 +838,7 @@ function rnDrawPeople(){
     <div class="setrow ctlrow">${v.may_manage
       ? `<label class="ndcap" for="rnOwner">Project owner</label>
          <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
-      : `<span>Project owner: ${esc(v.owner || "BuilderBot's owner")}</span>`}</div>
+      : `<span>Project owner: ${esc(v.owner || "AerieOS's owner")}</span>`}</div>
     ${v.may_manage && !v.bb_owner && d.owner && d.owner !== v.owner
       ? `<div class="sub">Saving offers it to ${esc(d.owner)}, who becomes its owner on accepting from their bell.</div>` : ""}
     ${v.offer ? `<div class="rninvite">Ownership offered to ${esc(v.offer.name)} <span class="dim">${esc(ago(v.offer.at))}, waiting for them to accept</span>
@@ -905,7 +893,7 @@ async function rnSavePeople(name){
 
 // ---- file access over FTP (R151) and in an editor (R159) ----
 // The project's tree over FTPS on its node, and in a person's editor through
-// the controller (BuilderBot for VS Code), each its own switch, for the
+// the controller (AerieOS for VS Code), each its own switch, for the
 // accounts given read or read and write (ftp.py). Who may set it is the ftp
 // grant; anybody else is shown what is on and where. The switches, the port
 // and each account's access are a draft until Save.
@@ -941,9 +929,9 @@ function rnDrawFtp(){
   if (!v.may_set){
     $("rnFtpField").hidden = !v.on && !v.editor;
     box.innerHTML = `${v.on ? `<div>Served over FTPS${where ? `, at ${esc(where)}` : ""}.</div>` : ""}
-      ${v.editor ? `<div>Open from your own machine: BuilderBot for VS Code and the Windows companion.</div>` : ""}
-      <div class="hint">Sign in with your BuilderBot name and password, if you were given access.
-        Who may is set by BuilderBot's owner, or a role that grants ftp.</div>`;
+      ${v.editor ? `<div>Open from your own machine: AerieOS for VS Code and the Windows companion.</div>` : ""}
+      <div class="hint">Sign in with your AerieOS name and password, if you were given access.
+        Who may is set by AerieOS's owner, or a role that grants ftp.</div>`;
     return;
   }
   $("rnFtpField").hidden = false;
@@ -952,14 +940,18 @@ function rnDrawFtp(){
   const status = on && !v.on && v.missing ? `<div class="hint bad">${esc(v.missing)}</div>`
     : !v.on ? ""
     : st.up ? `<div class="hint">Running at ${esc(where)}. Use FTPS (FTP over explicit TLS, not SFTP) and
-        your BuilderBot name and password. The certificate is the node's own, so the client asks to trust it once.</div>`
+        your AerieOS name and password. The certificate is the node's own, so the client asks to trust it once.</div>`
     : st.why ? `<div class="hint bad">Not running: ${esc(st.why)}</div>`
     : `<div class="hint">Starting on its node.</div>`;
   box.innerHTML = `
     <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this project's files over FTPS</label>
-    <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: BuilderBot for VS Code and the Windows companion</label>
+    <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the project gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
     ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
+    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpFor">Keep it on</label>
+      <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
+        ...(v.on && v.until ? [["", `until ${new Date(v.until * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
+        ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
     <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; projects on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
       <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
       <span class="dim">and the ${v.span - 1} after it</span></div>
@@ -971,6 +963,8 @@ function rnDrawFtp(){
     }).join("")}</div>`;
   $("rnFtpOn").onchange = e => { d.on = e.target.checked; rnDrawFtp(); };
   $("rnFtpEditor").onchange = e => { d.editor = e.target.checked; rnDrawFtp(); };
+  const fo = $("rnFtpFor");
+  if (fo) fo.onchange = () => { d.for = fo.value; rnDrawFtp(); };
   const pi = $("rnFtpPort");
   if (pi) pi.oninput = () => { d.port = pi.value.trim(); };
   box.querySelectorAll("[data-ftpuid]").forEach(sel => sel.onchange = () => {
@@ -985,6 +979,8 @@ function rnFtpChange(){
   if (d.on !== undefined && d.on !== v.on) out.on = d.on;
   if (d.editor !== undefined && d.editor !== v.editor) out.editor = d.editor;
   if (d.port !== undefined && String(d.port) !== String(v.port)) out.port = d.port;
+  // How long it stays on (R196): sent when picked, counted from the Save.
+  if (d.for !== undefined && d.for !== "" && (out.on ?? v.on)) out.for = Number(d.for);
   // A port shown for a project turned on now is its offer, and is sent.
   if (out.on && out.port === undefined) out.port = v.port;
   const acc = Object.fromEntries(Object.entries(d.access || {})
@@ -1375,7 +1371,7 @@ function closeRename(){
 // or put back that section's fields and nothing else. One Save at the foot of
 // eleven sections was a long way from the field it saved, and its first press
 // with a session running only asked a question: a person who pressed it once
-// and moved on had saved nothing (Reads on BuilderBot, 10 Oct). Where the
+// and moved on had saved nothing (Reads on AerieOS, 10 Oct). Where the
 // section holds something a running session takes only when it starts, its
 // bar offers both answers at once: Save, keep it running and Save and end it.
 const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "claude", "yours"];

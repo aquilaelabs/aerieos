@@ -31,11 +31,10 @@
 # Entirely optional: without the mount this exits quietly.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 CACHE="${UNRAID_ICON_DIR:-/unraid-icons}"
-SRC="${UNRAID_ICON_SRC:-/opt/builderbot/icon.png}"
-NAME="BuilderBot"          # the container's name on Unraid, which the icon cache is keyed by
+SRC="${UNRAID_ICON_SRC:-/opt/aerieos/icon.png}"
 
 [ -d "$CACHE" ] || exit 0
 [ -f "$SRC" ]   || { warn "icon source $SRC is missing"; exit 0; }
@@ -45,20 +44,25 @@ if [ ! -w "$CACHE" ]; then
     exit 0
 fi
 
-DEST="$CACHE/$NAME-icon.png"
+install_icon() {
+    local NAME="$1" DEST TMP
+    DEST="$CACHE/$NAME-icon.png"
 
-# Only write when it would change something. Unraid re-reads this on its own
-# schedule and a needless rewrite is a needless write to the docker data root.
-if [ -f "$DEST" ] && cmp -s "$SRC" "$DEST"; then
-    exit 0
-fi
+    # Only write when it would change something. Unraid re-reads this on its own
+    # schedule and a needless rewrite is a needless write to the docker data root.
+    if [ -f "$DEST" ] && cmp -s "$SRC" "$DEST"; then
+        return 0
+    fi
 
-# Same-filesystem temp + rename, so the web UI never sees a half-written PNG.
-TMP="$(mktemp "$CACHE/.$NAME-icon.XXXXXX")" || { warn "cannot write to $CACHE"; exit 0; }
-trap 'rm -f "$TMP"' EXIT
-cp "$SRC" "$TMP"
-chmod 0644 "$TMP"
-mv -f "$TMP" "$DEST"
-trap - EXIT
+    # Same-filesystem temp + rename, so the web UI never sees a half-written PNG.
+    TMP="$(mktemp "$CACHE/.$NAME-icon.XXXXXX")" || { warn "cannot write to $CACHE"; return 0; }
+    cp "$SRC" "$TMP"
+    chmod 0644 "$TMP"
+    mv -f "$TMP" "$DEST"
 
-log "installed the container icon at $DEST"
+    log "installed the container icon at $DEST"
+}
+
+# The template's name, and the one a container made from an older template keeps.
+install_icon "${UNRAID_ICON_NAME:-Aerie-Workshop}"
+install_icon BuilderBot

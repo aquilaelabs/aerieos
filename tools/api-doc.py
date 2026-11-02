@@ -3,7 +3,7 @@
 two route tables, its method and how it is matched, the first sentence of
 its handler's docstring, and the permissions the handler refuses on. Read
 with ast rather than by running the server, so a route that is added and
-not described shows up as a row with no words, which bb lint's check turns
+not described shows up as a row with no words, which aerie lint's check turns
 into a failure by holding the page equal to this output. --check compares
 and says what differs."""
 import ast
@@ -63,7 +63,7 @@ def render():
     tree = ast.parse(SRC.read_text(encoding="utf-8"))
     fns = handlers(tree)
     lines = ["# The dashboard's API", "",
-             "Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `bb lint` holds this page equal to it.",
+             "Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.",
              "Every request carries the account's credential (a session's token, or the person's cookie or",
              "basic auth); who may call what is decided in the handler, and the last column names the",
              "permission a handler refuses on (`refused: NAME`), or that it refuses a locked project",

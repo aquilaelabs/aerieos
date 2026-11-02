@@ -18,7 +18,7 @@ import projsessions  # noqa: E402
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 
-node = agentpkg.load("builderbot_agent")
+node = agentpkg.load("aerieos_agent")
 
 
 class Table(unittest.TestCase):
@@ -143,7 +143,7 @@ class Asker(unittest.TestCase):
 
 
 class Transcripts(unittest.TestCase):
-    """bb transcripts (the operator, 22 Oct): the asking account's own
+    """aerie transcripts (the operator, 22 Oct): the asking account's own
     conversations on the project, each marked with its agent, and never
     another account's."""
 
@@ -173,7 +173,7 @@ class Briefing(unittest.TestCase):
         self.assertEqual(preamble.for_agent("claude", "BODY"), "BODY")
         self.assertEqual(preamble.for_agent("", "BODY"), "BODY")
         got = preamble.for_agent("copilot", "BODY")
-        self.assertTrue(got.startswith("This session runs Copilot CLI, BuilderBot's Copilot agent."))
+        self.assertTrue(got.startswith("This session runs Copilot CLI, AerieOS's Copilot agent."))
         self.assertTrue(got.endswith("\n\nBODY"))
         self.assertEqual(preamble.for_agent("codex", ""), "")
 
@@ -231,7 +231,7 @@ class OtherTranscripts(unittest.TestCase):
          "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Make the page blue"}]}},
         {"timestamp": "2026-10-22T10:00:03Z", "type": "response_item",
          "payload": {"type": "function_call", "name": "shell", "call_id": "c1",
-                     "arguments": json.dumps({"command": ["bash", "-lc", "bb roadmap"]})}},
+                     "arguments": json.dumps({"command": ["bash", "-lc", "aerie roadmap"]})}},
         {"timestamp": "2026-10-22T10:00:04Z", "type": "response_item",
          "payload": {"type": "function_call_output", "call_id": "c1", "output": {"output": "R1 the page"}}},
         {"timestamp": "2026-10-22T10:00:05Z", "type": "response_item",
@@ -285,11 +285,11 @@ class OtherTranscripts(unittest.TestCase):
         self.assertEqual(got["agent_name"], "ChatGPT")
         self.assertEqual([(t["who"], t["text"]) for t in got["turns"]],
                          [("you", "Make the page blue"), ("claude", ""), ("claude", "Done.")])
-        self.assertEqual(got["turns"][1]["tools"][0]["call"], "shell: $ bb roadmap")
+        self.assertEqual(got["turns"][1]["tools"][0]["call"], "shell: $ aerie roadmap")
         self.assertEqual(got["turns"][1]["tools"][0]["result"], "R1 the page")
         text, name = self.t.render("u_0000aaaa", "alpha", "cx-1")
         self.assertIn("ChatGPT", text)
-        self.assertIn("$ bb roadmap", text)
+        self.assertIn("$ aerie roadmap", text)
         self.assertTrue(name.startswith("codex-alpha-"))
 
     def test_a_grok_conversation_joins_its_chunks_and_pairs_its_tools(self):
@@ -383,7 +383,7 @@ class Copies(unittest.TestCase):
         # its table (apps/android/.../Agents.kt) is the live rows, Claude first,
         # with each other agent's own models.
         path = os.path.join(HERE, "..", "..", "..", "apps", "android", "app", "src", "main", "java",
-                            "dev", "builderbot", "app", "Agents.kt")
+                            "org", "aerieos", "app", "Agents.kt")
         with open(path) as f:
             kt = f.read()
         body = kt[kt.index("val LIVE = listOf("):kt.index("\n    )\n", kt.index("val LIVE = listOf("))]

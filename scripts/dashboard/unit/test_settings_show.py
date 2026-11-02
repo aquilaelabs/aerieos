@@ -1,4 +1,4 @@
-"""bb settings show (scripts/lib/settings-verbs.py): every Agents may dial
+"""aerie settings show (scripts/lib/settings-verbs.py): every Agents may dial
 is on the list a session reads, the signing ones included (R106), each as
 the project has it or at its default."""
 import json

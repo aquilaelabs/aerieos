@@ -1,5 +1,5 @@
 """This PC lent to a project (R270 steps 6 and 7): the verbs its person set
-up here, run when a session on the project asks with `bb pc VERB`, under the
+up here, run when a session on the project asks with `aerie pc VERB`, under the
 project's Claude may: Use a lent PC.
 
 What each verb runs is this machine's own, set by its person (settings.py

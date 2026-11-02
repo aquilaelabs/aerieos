@@ -1,6 +1,6 @@
 """The bundle comes back by itself when it is gone from the toolchain store
 while sessions run (the operator, 12 Oct: the store emptied by hand, and
-"no bundle bb at .../.bb/current/scripts/bb, so no idle session's token is
+"no bundle bb at .../.bb/current/scripts/aerie, so no idle session's token is
 refreshed" until the next job or session start fetched it)."""
 import os
 import shutil
@@ -9,7 +9,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_bundle_back")
+agent = agentpkg.load("aerieos_agent_bundle_back")
 agent.log = lambda *a, **k: None
 
 
@@ -32,9 +32,9 @@ class BundleBack(unittest.TestCase):
                 test.fetched.append(who)
                 d = os.path.join(test.store, ".bb", "current", "scripts")
                 os.makedirs(d, exist_ok=True)
-                with open(os.path.join(d, "bb"), "w") as f:
+                with open(os.path.join(d, "aerie"), "w") as f:
                     f.write("#!/bin/sh\n")
-                os.chmod(os.path.join(d, "bb"), 0o755)
+                os.chmod(os.path.join(d, "aerie"), 0o755)
                 return d
 
             def session_start(self, into):

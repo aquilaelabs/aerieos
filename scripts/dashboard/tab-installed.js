@@ -109,13 +109,15 @@ function instState(r){
   if (r.machine){
     const m = r.machine, st = m.state;
     if (!m.managed) return w("installed by hand on this machine");
-    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("running the card", "ok")
+    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("installed and in use", "ok")
       : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
     return st === "absent" ? w("not installed") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
   }
   if (r.kind === "agent" && !r.installed) return w("not installed: the Library installs it", "warn");
-  if (r.installed) return w(r.update ? `update available: ${esc(r.latest)}` : "installed", r.update ? "warn" : "ok");
+  // The version that is out is the row's pill ("2.1.314 is out"), so the
+  // state says only that, as the Library's card does.
+  if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
 }
@@ -162,13 +164,13 @@ function instAboutLines(r){
   const lines = [];
   if (r.machine){
     lines.push(r.name === TC_DRIVER ? tcDriverLine(r.machine) : tcToolkitLine(r.machine));
-    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not a BuilderBot sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
+    if (!r.machine.managed) lines.push(`<span class="sub warn">This machine is its owner's, not an AerieOS sandbox: ${r.name === TC_DRIVER ? "its driver" : "the toolkit"} is installed there by hand.</span>`);
     if (r.machine.settling) lines.push(`<span class="sub">The node is reporting what the last job left<span class="dots"></span></span>`);
     return lines.filter(Boolean).join("");
   }
   if (r.about) lines.push(`<span class="sub">${esc(r.about)}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
-    if (r.tool) lines.push(`<span class="sub">Adds <code>bb tool ${esc(r.tool)}</code> to a session.</span>`);
+    if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.${r.needed_by?.length ? ` Needed by ${esc(r.needed_by.join(", "))}.` : ""}</span>`);
     else if (r.needed_by?.length) lines.push(`<span class="sub">Needed by ${esc(r.needed_by.join(", "))}.</span>`);
     lines.push(tcSystemLine(r, !!inst?.managed));

@@ -236,7 +236,7 @@ class Briefing(unittest.TestCase):
         self.assertIn("shown as Shop", preamble.identity_line("app"), "a project of one is briefed as the project")
 
     def test_bb_preamble_briefs_the_project(self):
-        """bb preamble (preamble-verbs.py), which every session's briefing
+        """aerie preamble (preamble-verbs.py), which every session's briefing
         comes from, wired as the server is: the project, both repositories
         its own, and neither called read-only."""
         import subprocess  # noqa: PLC0415
@@ -279,7 +279,7 @@ class Briefing(unittest.TestCase):
         self.assertIn("### server", claude)
         self.assertIn("Fact of server", claude)
         self.assertNotIn("Fact of app", claude, "Claude Code loads its own repository's index")
-        self.assertIn("bb -p REPO memory add", claude)
+        self.assertIn("aerie -p REPO memory add", claude)
         other = preamble.memory_part("app", "u_1", "codex")[0]
         self.assertIn("Fact of app", other)
         self.assertIn("Fact of server", other)

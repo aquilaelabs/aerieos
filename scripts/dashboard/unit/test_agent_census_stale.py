@@ -6,7 +6,7 @@ import threading
 import unittest
 
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_census_stale")
+agent = agentpkg.load("aerieos_agent_census_stale")
 Agent = agent.module("agent").Agent
 
 

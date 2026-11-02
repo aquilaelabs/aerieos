@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Timed touches on the running emulator (R101): `bb emu touch`, and $BB_TOUCH
+"""Timed touches on the running emulator (R101): `aerie emu touch`, and $BB_TOUCH
 inside a capture's --drive script.
 
     touch.py tap X Y
@@ -65,7 +65,7 @@ def die(msg) -> NoReturn:
 
 def adb():
     return os.environ.get("BB_CAPTURE_ADB") or os.environ.get("ADB") or shutil.which("adb") or die(
-        "adb is not on this node: bb emu says what the emulator needs")
+        "adb is not on this node: aerie emu says what the emulator needs")
 
 
 def shell(a, *words):
@@ -90,7 +90,7 @@ def ensure_root(a):
         die("this device's adb shell is not root and its build will not make it so "
             "(a user build: a phone, or a Play Store image), and sendevent needs root; "
             "adb shell input tap and swipe work without it, with adb's own timing")
-    sys.stderr.write("[builderbot] adb was not root here: running adb root, as bb emu start does\n")
+    sys.stderr.write("[builderbot] adb was not root here: running adb root, as aerie emu start does\n")
     subprocess.run([a, "root"], capture_output=True, text=True, timeout=30, check=False)
     subprocess.run([a, "wait-for-device"], capture_output=True, text=True, timeout=60, check=False)
     for _ in range(40):
@@ -129,7 +129,7 @@ def panel(a):
     # panel (B321, diagnostics #128: it went off adb a moment later).
     if not dev:
         die("the emulator listed no input devices at all: it is not answering, or going down. "
-            "bb emu status says whether it is still up, bb emu log what it said")
+            "aerie emu status says whether it is still up, aerie emu log what it said")
     die("no touch panel found on the emulator (getevent -p reports none with ABS_MT_POSITION_X); "
         "BB_TOUCH_DEV=/dev/input/eventN names one")
 

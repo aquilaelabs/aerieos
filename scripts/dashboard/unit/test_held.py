@@ -68,19 +68,19 @@ class Held(unittest.TestCase):
         self.assertFalse(held.boot()["held"], "a later boot holds only for its own reasons")
 
     def test_safe_mode_at_the_boot_menu_holds_the_start(self):
-        # R161 step 2: GRUB's Safe mode entry puts bbsafe=1 on the command
+        # R161 step 2: GRUB's Safe mode entry puts aeriesafe=1 on the command
         # line, and the start is held with that said.
         from unittest import mock
         with tempfile.TemporaryDirectory() as d:
             c = os.path.join(d, "cmdline")
             with open(c, "w") as f:
-                f.write("root=/dev/loop0 bbslot=a bbsafe=1 quiet\n")
+                f.write("root=/dev/loop0 aerieslot=a aeriesafe=1 quiet\n")
             with mock.patch.dict(os.environ, {"BB_CMDLINE": c}):
                 got = held.boot()
             self.assertTrue(got["held"])
             self.assertIn("Safe mode was chosen at the boot menu", got["why"])
             with open(c, "w") as f:
-                f.write("root=/dev/loop0 bbslot=a quiet\n")
+                f.write("root=/dev/loop0 aerieslot=a quiet\n")
             held.start()
             held.shutdown_clean()
             with mock.patch.dict(os.environ, {"BB_CMDLINE": c}):

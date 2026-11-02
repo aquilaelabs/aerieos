@@ -29,39 +29,39 @@ ok(meta.status === 200 && meta.body.api === surface.api && appApi === surface.ap
    `the surface number agrees everywhere: server ${meta.body.api}, source ${srcApi}, app ${appApi}, contract ${surface.api}`);
 ok(typeof meta.body.version === 'string' && typeof meta.body.apk === 'string',
    '...and /api/meta names the image and where a newer app would be');
-// `built` rides the same endpoint for bb status on a node (R62): a session
+// `built` rides the same endpoint for aerie status on a node (R62): a session
 // there reads the controller's build off /api/meta, since its own env carries
 // no image stamp. Not an app field (not in api-surface.json), so it does not
 // move APP_API; asserted here because this is where /api/meta's shape is kept.
 ok(typeof meta.body.built === 'string',
-   '...and carries the build time, which bb status on a node shows for the controller');
+   '...and carries the build time, which aerie status on a node shows for the controller');
 // Where a newer app would be is a SIGNED build when there is one, however
 // new an unsigned one is: the phone's app was installed signed and Android
 // will not update it with a debug build (B507, 5 Oct).
-// BuilderBot's own project is the one whose origin is its repository, whatever
-// its folder is called (B4): a folder named BuilderBot with no such remote,
+// AerieOS's own project is the one whose origin is its repository, whatever
+// its folder is called (B4): a folder named AerieOS with no such remote,
 // holding a newer signed build, is not where the app is sent.
 {
   const self = `${DIR}/ws/bb-public`, d = `${self}/dist`;
   mkdirSync(d, { recursive: true });
   mkdirSync(`${self}/.git`, { recursive: true });
   writeFileSync(`${self}/.git/config`,
-    '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/aquilaelabs/builderbot.git\n'
+    '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/aquilaelabs/aerieos.git\n'
     + '\tfetch = +refs/heads/*:refs/remotes/origin/*\n');
-  const signed = 'builderbot-app-0.7.0-dev.2284-d51d651-signed.apk';
+  const signed = 'aerieos-app-0.7.0-dev.2284-d51d651-signed.apk';
   writeFileSync(`${d}/${signed}`, 'signed');
-  writeFileSync(`${d}/builderbot-app-0.7.0-dev.2290-abc1234-dirty.apk`, 'dirty');
-  writeFileSync(`${d}/builderbot-app-dev.apk`, 'a debug build');
+  writeFileSync(`${d}/aerieos-app-0.7.0-dev.2290-abc1234-dirty.apk`, 'dirty');
+  writeFileSync(`${d}/aerieos-app-dev.apk`, 'a debug build');
   const old = new Date(Date.now() - 3600_000);
   utimesSync(`${d}/${signed}`, old, old);
-  mkdirSync(`${DIR}/ws/BuilderBot/dist`, { recursive: true });
-  writeFileSync(`${DIR}/ws/BuilderBot/dist/builderbot-app-0.7.0-dev.9999-fffffff-signed.apk`, 'not ours');
+  mkdirSync(`${DIR}/ws/AerieOS/dist`, { recursive: true });
+  writeFileSync(`${DIR}/ws/AerieOS/dist/aerieos-app-0.7.0-dev.9999-fffffff-signed.apk`, 'not ours');
   const meta = (await get('/api/meta')).body;
   rmSync(self, { recursive: true, force: true });
-  rmSync(`${DIR}/ws/BuilderBot`, { recursive: true, force: true });
+  rmSync(`${DIR}/ws/AerieOS`, { recursive: true, force: true });
   ok(meta.apk === signed, `the app is offered the signed build, not a newer unsigned one (${meta.apk})`);
   ok(meta.apk_sha256 === createHash('sha256').update('signed').digest('hex'),
-     `...read from the project whose origin is BuilderBot's repository, not a folder named BuilderBot (${meta.apk_sha256})`);
+     `...read from the project whose origin is AerieOS's repository, not a folder named AerieOS (${meta.apk_sha256})`);
 }
 
 // ---- a row in each list the app reads ----------------------------------------------
@@ -73,7 +73,7 @@ ok(typeof meta.body.built === 'string',
   const ENV = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
                 WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ROADMAP_PROJECT: 'alpha', BB_BUG_PROJECT: 'alpha',
                 BB_TESTS_PROJECT: 'alpha' };
-  const bb = (...a) => execFileSync(join(REPO, 'scripts', 'bb'), a, { env: ENV, encoding: 'utf8' });
+  const bb = (...a) => execFileSync(join(REPO, 'scripts', 'aerie'), a, { env: ENV, encoding: 'utf8' });
   const post = async (p, b) => (await fetch(base + p, { method: 'POST', headers: H, body: JSON.stringify(b) })).json();
   bb('roadmap', 'add', 'a row the contract types', '--step', 'and a step');
   bb('bug', 'add', 'a row the contract types', '--area', 'contract');

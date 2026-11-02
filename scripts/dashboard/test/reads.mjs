@@ -16,7 +16,7 @@ const api = async (path, body, headers = H) => {
   let j; try { j = await r.json(); } catch { j = {}; }
   return { status: r.status, ...j };
 };
-const token = project => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', project, 'test'],
+const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const asSession = tok => ({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
 
@@ -84,7 +84,7 @@ ok(dropped.status === 400, 'a read taken away in the settings is gone from a run
 // ---- the relay: reading words only ----------------------------------------------------
 const relay = (argv, project) => api('/api/v1/bb', { argv, project, cwd: `${DIR}/ws/${project}` }, asSession(tok));
 const list = await relay(['roadmap'], 'beta');
-ok(list.status === 200 && !list.error, `bb roadmap relayed for beta from alpha's session answers (${list.status} ${(list.error || '').slice(0, 60)})`);
+ok(list.status === 200 && !list.error, `aerie roadmap relayed for beta from alpha's session answers (${list.status} ${(list.error || '').slice(0, 60)})`);
 // A new install's setup from a shell is an administrator's: the relay
 // refuses it to a session on its own project, whatever the verb does (R84).
 for (const argv of [['nodes', 'enroll-token', 'sneaky'], ['settings', 'node', 'shed']]){
@@ -98,8 +98,8 @@ for (const argv of [['roadmap', 'list'], ['bug', 'list']]){
   ok(r.status === 200 && !r.error, `bb ${argv.join(' ')} relayed for beta from alpha's session answers (${r.status} ${(r.error || '').slice(0, 60)})`);
 }
 const add = await relay(['roadmap', 'add', 'from alpha'], 'beta');
-ok(add.status === 403 && /beta is read-only from a session on alpha: bb roadmap add would change it/.test(add.error || ''),
-   `...and bb roadmap add for beta is refused, naming the words (${add.error})`);
+ok(add.status === 403 && /beta is read-only from a session on alpha: aerie roadmap add would change it/.test(add.error || ''),
+   `...and aerie roadmap add for beta is refused, naming the words (${add.error})`);
 const gitp = await relay(['git', 'push'], 'beta');
 ok(gitp.status === 403 && /acts on the project's own machines/.test(gitp.error || ''),
    `...as is a verb that acts on beta's machines (${gitp.error})`);
@@ -154,8 +154,8 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const kept = (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.sees;
   ok(set.status === 200 && kept.join() === '/mnt/media,/srv/samples',
      `a project's settings keep the places on its node it is shown, each once (${set.status} ${JSON.stringify(kept)})`);
-  const bad = [['/etc', /the machine's own or BuilderBot's/], ['/workspace/beta', /the machine's own or BuilderBot's/],
-               ['/home/builder/.ssh', /the machine's own or BuilderBot's/], ['/var/lib/builderbot/appdata', /the machine's own/],
+  const bad = [['/etc', /the machine's own or AerieOS's/], ['/workspace/beta', /the machine's own or AerieOS's/],
+               ['/home/builder/.ssh', /the machine's own or AerieOS's/], ['/var/lib/builderbot/appdata', /the machine's own/],
                ['/mnt/../etc', /not a place on a node/], ['mnt/media', /not a place on a node/], ['/mnt/my media', /not a place on a node/]];
   const got = [];
   for (const [p, re] of bad){
@@ -189,10 +189,10 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   ok(/Of the shares and disks mounted on its node, this project is shown \/mnt\/media, \/srv\/samples, as the node has each/.test(said)
      && /a share or disk mounted on the\s+node, another project's build cache or container data, and the home of the\s+account sessions run as are not in its view/.test(where),
      'the block says which shares this project is shown, and the where topic that the rest of the node is not in its view');
-  const shown = execFileSync('bash', [`${REPO}/scripts/bb`, 'settings'],
+  const shown = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings'],
     { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
       WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
-  ok(/^\s+sees\s+\/mnt\/media, \/srv\/samples$/m.test(shown), `bb settings lists them (${(shown.match(/^.*sees.*$/m) || ['nothing'])[0].trim()})`);
+  ok(/^\s+sees\s+\/mnt\/media, \/srv\/samples$/m.test(shown), `aerie settings lists them (${(shown.match(/^.*sees.*$/m) || ['nothing'])[0].trim()})`);
   // The dialog: a field beside the node's, there when there is a node to
   // be on, filled with what is stored and read when Save is pressed.
   // ...the GPU setting back on too: the dialog fills from the poll, and one
@@ -229,7 +229,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   // account's is running, since Also sees is taken at its start), and the
   // refusal on that section's bar.
   const err = await sectSave(page, 'sees');
-  ok(/\/etc\/ssh is the machine's own or BuilderBot's/.test(err) && await page.$eval('#rnmodal', e => !e.hidden),
+  ok(/\/etc\/ssh is the machine's own or AerieOS's/.test(err) && await page.$eval('#rnmodal', e => !e.hidden),
      `a place it cannot be shown is refused on its section's bar, the dialog open with the reason (${err.trim().slice(0, 90)})`);
   await page.keyboard.press('Escape');
   // The refusal is the one error the page logged, and it was asked for.
@@ -301,7 +301,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
 // ---- the briefing names them ------------------------------------------------------------
 const pre = await api('/api/preamble?project=alpha');
 const whereTopic = (await api('/api/preamble?project=alpha&topic=where')).text || '';
-ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `bb -p NAME` in front/.test(pre.text)
+ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `aerie -p NAME` in front/.test(pre.text)
    && /its containers answer from here on this project's nodes/.test(pre.text) && /Nothing there is yours to change/.test(pre.text) && /beyond the ones it reads/.test(whereTopic),
    'the block says which projects the session reads and that nothing there is its to change; the where topic, to look for context nowhere else');
 await api('/api/prefs', { project: 'alpha', reads: [] });

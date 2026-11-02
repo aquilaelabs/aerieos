@@ -3,17 +3,17 @@
 # and a node compares the FILE while the Nodes tab names the NUMBER: when the
 # file moved without it, three tabs said "runs 0.6.92 and ships 0.6.92" and
 # refused work (B221). So the agent (scripts/agent: the entry and the
-# builderbot_agent package, which a node gets as one zip) may not change
+# aerieos_agent package, which a node gets as one zip) may not change
 # against the branch's base without AGENT_VERSION's patch moving.
 #
 # The base is origin/main's merge point when there is one (a checkout with
 # history), origin/main itself on a shallow checkout that fetched it (CI),
 # the previous commit otherwise; a tree with no base to compare is said, not
-# passed. Run by `bb lint` and by the lint workflow, so the two agree.
+# passed. Run by `aerie lint` and by the lint workflow, so the two agree.
 # Exit 0 clean, 1 on a finding, 0 with [skip] when it cannot compare.
 set -eu
 f=scripts/agent
-v=scripts/agent/builderbot_agent/__init__.py
+v=scripts/agent/aerieos_agent/__init__.py
 if [ ! -f "$v" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "  [skip] no agent here, or not a git tree"; exit 0
 fi
@@ -28,7 +28,7 @@ if [ -z "$base" ]; then
 fi
 short="$(git rev-parse --short "$base" 2>/dev/null || echo "$base")"
 # What a node runs: the entry and the package (not the ruff pin beside them).
-if git diff --quiet "$base" -- "$f/builderbot-agent.py" "$f/builderbot_agent" 2>/dev/null; then
+if git diff --quiet "$base" -- "$f/builderbot-agent.py" "$f/aerieos_agent" 2>/dev/null; then
     echo "  [ok]   the agent is as it is on $short"; exit 0
 fi
 now="$(grep '^AGENT_VERSION = ' "$v" | head -n 1)"

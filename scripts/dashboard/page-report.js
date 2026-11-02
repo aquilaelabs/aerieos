@@ -1,6 +1,6 @@
-// Report a bug in BuilderBot from a project's row (the operator, 2 Oct): a
+// Report a bug in AerieOS from a project's row (the operator, 2 Oct): a
 // person's way into the same diagnostics a session reaches with
-// `bb report`. The dialog asks for a category, what happened and how to make
+// `aerie report`. The dialog asks for a category, what happened and how to make
 // it happen; the project is the row's, and the server adds the node and the
 // build it was seen on. One classic script beside index.html; the button is
 // projectActions' (nb-core.js), its handler page-sidebar.js's and the markup
@@ -31,8 +31,8 @@ function openReport(project, repos = []){
   $("reportRepoField").hidden = repos.length < 2;
   pick.onchange = () => { reportProject = pick.value; reportConvFor(pick.value); };
   $("reportHint").textContent = project
-    ? "It goes to the diagnostics with this project, its node and the build it was seen on, where whoever maintains BuilderBot reads it."
-    : "It goes to the diagnostics with the build it was seen on, where whoever maintains BuilderBot reads it. A problem in one project is better sent from that project's row.";
+    ? "It goes to the diagnostics with this project, its node and the build it was seen on, where whoever maintains AerieOS reads it."
+    : "It goes to the diagnostics with the build it was seen on, where whoever maintains AerieOS reads it. A problem in one project is better sent from that project's row.";
   const cat = $("reportCat");
   if (!cat.options.length)
     cat.innerHTML = REPORT_CATS.map(c => `<option>${esc(c)}</option>`).join("");

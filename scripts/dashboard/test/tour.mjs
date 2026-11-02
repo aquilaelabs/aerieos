@@ -23,7 +23,7 @@ await page.waitForSelector('#tourCard:not([hidden])', { timeout: 15000 });
 const first = await page.evaluate(() => ({ step: $('tourCard').querySelector('.tourstep').textContent,
   say: $('tourCard').querySelector('.toursay').textContent, ring: $('tourRing').hidden, back: !!$('tourBack'),
   skip: !!$('tourSkip'), box: !!$('tourAll') }));
-ok(/^1 of \d+$/.test(first.step) && /Welcome to BuilderBot/.test(first.say) && first.ring && !first.back && first.skip && first.box,
+ok(/^1 of \d+$/.test(first.step) && /Welcome to AerieOS/.test(first.say) && first.ring && !first.back && first.skip && first.box,
    `a first visit to Home opens its tour: the first step is the page's whole, no ring, no Back, Skip tour and its box (${first.step})`);
 await page.click('#tourNext');
 await page.waitForTimeout(400);           // the ring's glide to its part
@@ -104,7 +104,9 @@ const overShimmer = await page.evaluate(async () => {
   await new Promise(r => setTimeout(r, 1200));
   const during = !$('tourCard')?.hidden;
   ph.remove(); tourSoon(tabOf(panes[0])?.kind);
-  await new Promise(r => setTimeout(r, 1200));
+  // Up to ten seconds for the tour to come, not a fixed second a loaded
+  // gate outran (B384).
+  for (let i = 0; i < 100 && $('tourCard')?.hidden !== false; i++) await new Promise(r => setTimeout(r, 100));
   const after = !$('tourCard')?.hidden;
   const shade = getComputedStyle($('tourRing')).boxShadow;
   tourEnd?.(); state.tour = seen;

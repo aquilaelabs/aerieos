@@ -1,7 +1,7 @@
-"""Behind the build line of `bb status` on a node (bb_controller_stamp in bb):
+"""Behind the build line of `aerie status` on a node (bb_controller_stamp in bb):
 which image the controller is on, asked over /api/meta, said softly. A
 session is always on a node, where BB_IMAGE_REV and BB_VERSION are empty, and
-the which-build rule sends it to bb status to learn the build, so this has to
+the which-build rule sends it to aerie status to learn the build, so this has to
 work there. A controller that is down, or a session with no token, is a
 state the line reports rather than dies on.
 
@@ -20,7 +20,7 @@ import bbapi
 # refused connection both come back as {"error": sentence}. Reporting an
 # expired token as "the controller is down" is the mistake bb-gate already
 # made once, and the first version of this line made it again.
-# Short timeout: bb status is run often, and a controller that is down should
+# Short timeout: aerie status is run often, and a controller that is down should
 # cost a line rather than a 30-second wait.
 # `agent` as the argument: the line for this node's agent instead (R131),
 # its version and when it was built, or nothing when it cannot be had.

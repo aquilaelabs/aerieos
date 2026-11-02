@@ -1,7 +1,7 @@
 # The threat model
 
-What BuilderBot protects, from whom, and what it does not. Written before
-BuilderBot ships as an operating system (R158), so that every hardening
+What AerieOS protects, from whom, and what it does not. Written before
+AerieOS ships as an operating system (R158), so that every hardening
 step names the line here it closes, and so that whoever runs an install
 can tell their own users what a copy of the disk, a person on the LAN or a
 tampered page would and would not get. [privacy.md](privacy.md) says what
@@ -19,7 +19,7 @@ controller can; nobody else reads anything whole.
 | **The owner** | run the install: the controller's settings, every project, every account, the install key, maintenance mode | open another person's key store (their agent sign-ins, their git tokens): sealed under that person's key, which only the install key opens, which the owner holds, so this is a line of policy today and a line of cryptography once R157 lands |
 | **An administrator** | projects, nodes, people, the Keys page's inventory, purging a store | read a store's contents; sign in as another person |
 | **A person** | their own projects, their own key store, their own sign-ins | another person's sessions, store or sign-ins; the controller's settings |
-| **A person's coding agent (a session)** | the project it runs in, the projects it reads, `bb` on its person's behalf under the project's dials | the controller's state, another project's tree, any token (it pushes and signs through BuilderBot, which holds the credential), another account's home or tmux (R125), the dashboard's shell history (R155) |
+| **A person's coding agent (a session)** | the project it runs in, the projects it reads, `aerie` on its person's behalf under the project's dials | the controller's state, another project's tree, any token (it pushes and signs through AerieOS, which holds the credential), another account's home or tmux (R125), the dashboard's shell history (R155) |
 | **Root on a node** | the machine: every session there, every token file on it | the controller: a node has no credential to the controller beyond its own enrollment, which reaches its own project's work and nothing of another node's |
 | **Root on the controller** | everything the controller can read, the install key included | nothing is kept from root on the running controller; this is the host's own trust (`docker exec`, the machine's console) |
 | **A copy of a disk** (a backup, a stolen drive, a copy of `/config`) | nothing | the sealed stores open without the install key (kept outside `/config`), the node's sealed sign-ins open without the controller, the signing keys and git tokens are ciphertext |
@@ -57,7 +57,7 @@ seals those under derive from it.
 **A person's key store** (`account-secrets.json`: their git tokens, each
 sealed under their account's key; the project's `gitcreds/NAME` names
 entries and holds no token). A token is handed to git only for that
-person's own work (their session's `bb git`, their presses, the release
+person's own work (their session's `aerie git`, their presses, the release
 they cut) and only while they hold a live sign-in (`logins.json`); work
 that is nobody's (watching CI) takes any signed-in giver's.
 
@@ -150,7 +150,7 @@ them under their key and accept that this work waits for their unlock.
 ## Memory and process
 
 The dashboard and the node agent each do three things about the keys they
-hold (R158 step 6, `hardening.py` and `builderbot_agent.base.harden`): no
+hold (R158 step 6, `hardening.py` and `aerieos_agent.base.harden`): no
 core dump (the core limit is zero and the process is not dumpable, which
 also keeps another process of the same user from reading its memory
 through ptrace or `/proc/PID/mem`), no swap (the process locks its pages

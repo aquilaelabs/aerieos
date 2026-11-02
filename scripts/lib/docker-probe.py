@@ -2,7 +2,7 @@
 """Which docker daemon this container talks to, and whether it answers.
 
 One line on stdout, as `ok|FAIL|skip <sentence>`, for whoever wants to render
-it: `bb doctor` as a check row, the startup hook as a boot line.
+it: `aerie doctor` as a check row, the startup hook as a boot line.
 
 Shared rather than written twice, for the reason source() itself exists: two
 readers each deriving it had already disagreed in public, and a sentence that

@@ -1,10 +1,10 @@
-"""Behind `bb ci-log` for a project whose workflows run on GitHub's own
+"""Behind `aerie ci-log` for a project whose workflows run on GitHub's own
 runners (R115): the runs and a run's failed jobs, read by the controller
 with its credential (cilogs.py on the dashboard's side), since the session
 holds none and GitHub hands out a log only to a token.
 
-    bb ci-log --list      the newest runs: id, when, workflow, branch, result
-    bb ci-log [RUN]       a run's jobs, and the end of each failed job's log
+    aerie ci-log --list      the newest runs: id, when, workflow, branch, result
+    aerie ci-log [RUN]       a run's jobs, and the end of each failed job's log
                           (the newest finished run when none is named)
 
 BB_CI_AUTH is the auth header and BB_CI_PROJECT the project.
@@ -40,13 +40,13 @@ if "--list" in args:
         res = x.get("conclusion") or x.get("status") or ""
         print(f"  {x['id']:<13} {x.get('at', '')[:16].replace('T', ' ')}  {x.get('name', '')[:24]:<24} "
               f"{x.get('branch', '')[:28]:<28} {res}")
-    print("  ('bb ci-log RUN' for one: its jobs and the end of each failed one's log)")
+    print("  ('aerie ci-log RUN' for one: its jobs and the end of each failed one's log)")
     sys.exit(0)
 
 run = next((a for a in args if not a.startswith("-")), "")
 run = run.split("-")[0]
 if run and not run.isdigit():
-    fail("bb ci-log RUN: a run is named by its number, as bb ci-log --list prints it")
+    fail("aerie ci-log RUN: a run is named by its number, as aerie ci-log --list prints it")
 r = get("&run=" + (run or "0"))
 m = r.get("run") or {}
 print(f"{r.get('repo')} run {m.get('id')}: {m.get('name')} on {m.get('branch')}, "

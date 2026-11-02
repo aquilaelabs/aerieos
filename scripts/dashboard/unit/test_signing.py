@@ -312,14 +312,14 @@ class Start(unittest.TestCase):
     def test_refusals(self):
         self.assertIn("no Play upload key", signing.start("u", "app", "app-release.apk", "play")[0]["error"])
         self.assertIn(".apk or an .aab", signing.start("u", "app", "notes.txt", "sideload")[0]["error"])
-        self.assertIn("bb build", signing.start("u", "app", "other.apk", "sideload")[0]["error"])
+        self.assertIn("aerie build", signing.start("u", "app", "other.apk", "sideload")[0]["error"])
         signing.node_of = lambda p: ""
         self.assertIn("no node", signing.start("u", "app", "app-release.apk", "sideload")[0]["error"])
         self.assertEqual(self.queued, [])
 
 
 class KeyChoice(unittest.TestCase):
-    """With no key named and none called default (B509, BuilderBot's own app,
+    """With no key named and none called default (B509, AerieOS's own app,
     5 Oct): the project's only key for the route signs an unmapped build,
     and when several could and none is mapped, the signing is refused
     before anybody is asked to allow it."""

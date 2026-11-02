@@ -2,7 +2,7 @@
 
 A project's virtual machines, made, started, stopped, snapshotted and removed
 on the nodes whose VM host feature is installed, by a person on the VMs page
-or by a project's session with `bb vm`, under the project's own
+or by a project's session with `aerie vm`, under the project's own
 setting. The VMs page sits in the Containers group beside Containers, and
 is built from the Containers page's pieces.
 
@@ -36,9 +36,9 @@ On the controller's own machine (a bare-metal install, the appliance) VM
 host installs too, with one difference: libvirt's group is root on that
 machine, so the jobs account stays out of it and the VMs there run through
 the node's root agent, each action still one of its table's. Domains the
-machine's libvirt has that BuilderBot did not make (made with virt-manager,
+machine's libvirt has that AerieOS did not make (made with virt-manager,
 say) are listed on the VMs page for an administrator under **Not
-BuilderBot's**, by name, state and size, with nothing to press: the page
+AerieOS's**, by name, state and size, with nothing to press: the page
 reads them and never changes them.
 
 ## What a VM is made from
@@ -51,16 +51,16 @@ Tumbleweed, Gentoo, Alpine 3.24. Gentoo's image is a dated build, which the
 catalog moves on by hand. Each is its publisher's cloud image, downloaded once per node
 and checked against the checksum file the publisher posts beside it before
 it is kept. cloud-init makes one account (`builder`, sudo without a password)
-that lets in the ssh keys given and no password. `bb vm os` lists them.
+that lets in the ssh keys given and no password. `aerie vm os` lists them.
 
 Windows and macOS are in the catalog only to be refused by name: each has a
 license to accept or a key to enter, which a session never does for a
-person, and BuilderBot does not make them.
+person, and AerieOS does not make them.
 
 ## The dial, the area and the limits
 
 - **Make VMs**, under Agents may in the project's settings, reads as Run its
-  container does: deny (the default) refuses a session's `bb vm`, ask holds
+  container does: deny (the default) refuses a session's `aerie vm`, ask holds
   each for the administrators' bell with Allow and Deny, auto does it. A
   person may always do from the page what the dial holds a session to
   asking for. Changing it is the VMs area's.
@@ -75,7 +75,7 @@ person, and BuilderBot does not make them.
 ## The network
 
 Each project has a network of its own on each node, a /24 out of
-10.232.0.0/16 kept for it, NAT'd to the internet. A table of BuilderBot's
+10.232.0.0/16 kept for it, NAT'd to the internet. A table of AerieOS's
 own (`builderbot_vmnet`) keeps a VM off other projects' VMs, off the LAN
 (unless the node's Features row lets its VMs onto it), and off the node
 itself but for the DHCP and DNS libvirt serves; the controller's address and
@@ -87,13 +87,13 @@ through the sessions' own table; no other project's session does.
 A VM's state saved under a name and gone back to, as in VMware: libvirt's
 own, inside its qcow2 disk. A running VM's memory is kept too, so a revert
 lands where it was, mid-program. Listed under its row with Revert and
-Delete; `bb vm snapshot NAME SNAP`, `bb vm revert NAME SNAP` and `bb vm
+Delete; `aerie vm snapshot NAME SNAP`, `aerie vm revert NAME SNAP` and `aerie vm
 snapshot-rm NAME SNAP` from a session, under the same dial. A snapshot taken
 before a session changes a VM is the undo.
 
 ## Made a node
 
-New VM's **Make it a node** and `bb vm new --node-agent` enroll the VM as a
+New VM's **Make it a node** and `aerie vm new --node-agent` enroll the VM as a
 node at its first boot: Enroll node's own script, for the OS's system, run by
 cloud-init and removed once it has run. It appears on the Nodes page marked
 as a VM on its host, and is retired with its credential revoked when the VM
@@ -143,7 +143,7 @@ kept only when it matches; or an .iso uploaded from your computer, sent
 through the controller (up to 16 GB, held there only until the node has
 taken it) and checked on the node against the hash taken as it arrived. The ISO is then offered under **From** on that
 node. A VM made from it boots the installer with a blank disk of the size
-given, UEFI or BIOS as picked, and nothing of BuilderBot's inside it (no
+given, UEFI or BIOS as picked, and nothing of AerieOS's inside it (no
 account, no key, no cloud-init): its **Screen** is where you install it.
 Once the system is on its disk, **Eject ISO** under More empties the drive
 so it boots from the disk. Making one is a person's: a session has no screen
@@ -231,24 +231,24 @@ one, VT-d or AMD-Vi is off in the firmware.
 ## From a session
 
 ```
-bb vm                       this project's VMs: state, OS, node, address, size, snapshots
-bb vm os                    the operating systems there are
-bb vm new db --os debian --mem 4G --disk 30 --why "a database to test the migration on"
-bb vm ssh db                in, as builder, with the session's own key (made when there is none)
-bb vm snapshot db clean     before changing it
-bb vm revert db clean       and back
-bb vm stop db && bb vm grow db 60          a larger disk; the system inside grows its partition
-bb vm hardware db --pin 2,3 --mem-max 8G --share data --ro
-bb vm autostart db on       it starts when its node boots
-bb vm devices               the USB devices on the project's VM hosts, each with what holds it
-bb vm usb db give 0781:5583:4C53   a device to the VM, held for a person on the bell
-bb vm usb db take 0781:5583:4C53   and back
-bb vm rm db
+aerie vm                       this project's VMs: state, OS, node, address, size, snapshots
+aerie vm os                    the operating systems there are
+aerie vm new db --os debian --mem 4G --disk 30 --why "a database to test the migration on"
+aerie vm ssh db                in, as builder, with the session's own key (made when there is none)
+aerie vm snapshot db clean     before changing it
+aerie vm revert db clean       and back
+aerie vm stop db && aerie vm grow db 60          a larger disk; the system inside grows its partition
+aerie vm hardware db --pin 2,3 --mem-max 8G --share data --ro
+aerie vm autostart db on       it starts when its node boots
+aerie vm devices               the USB devices on the project's VM hosts, each with what holds it
+aerie vm usb db give 0781:5583:4C53   a device to the VM, held for a person on the bell
+aerie vm usb db take 0781:5583:4C53   and back
+aerie vm rm db
 ```
 
 Each is under the same Make VMs setting as making one. A session's
 hardware stops at its own project: it may pin, give a memory ceiling and
 share a folder of the project, while putting a VM on the LAN and passing a
 device through are a person's, from the VMs page; a USB device asked for
-with `bb vm usb` is held for an administrator on the bell whatever Make VMs
+with `aerie vm usb` is held for an administrator on the bell whatever Make VMs
 says, since a device can be a disk or a key.

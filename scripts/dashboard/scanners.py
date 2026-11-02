@@ -1,4 +1,4 @@
-"""BuilderBot's own scanners on each node (R145, the operator, 26 Oct).
+"""AerieOS's own scanners on each node (R145, the operator, 26 Oct).
 
 The Scanners page, in the Containers group beside nginx, deploys one
 compose project of the three static analysis scanners (Semgrep, Trivy,
@@ -129,7 +129,7 @@ def compose_text(nid, rec):
     v = versions_of(rec)
     excl = "--exclude node_modules --exclude .git --exclude .worktrees --exclude .claude"
     return "\n".join([
-        "# Written by BuilderBot from the Scanners page (scanners.py); Deploy and Update rewrite it.",
+        "# Written by AerieOS from the Scanners page (scanners.py); Deploy and Update rewrite it.",
         "services:",
         "  semgrep:",
         f"    image: {IMAGES['semgrep']}:{v['semgrep']}",
@@ -294,7 +294,7 @@ def _newest(tags):
 
 
 def _fetch_json(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "BuilderBot"}), timeout=30) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "AerieOS"}), timeout=30) as r:
         return json.loads(r.read())
 
 

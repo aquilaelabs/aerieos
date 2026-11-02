@@ -1,8 +1,8 @@
 // Claude Code plugins (plugins.py): what each person installed with /plugin,
-// seen from the dashboard. `bb login --list` reads each account's plugins off
+// seen from the dashboard. `aerie login --list` reads each account's plugins off
 // the node's disk, the agent carries its rows up on the heartbeat, and the
 // controller shows a person theirs on the Profile tab and every account's in
-// bb diag. Then the two recipes that give the language-server plugins what
+// aerie diag. Then the two recipes that give the language-server plugins what
 // they run, since a session cannot npm install -g into the store.
 import { URL, launch, newPage, ok, done, ready, sleep, DIR } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const BB = join(HERE, '..', 'bb');
+const BB = join(HERE, '..', 'aerie');
 const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
                 'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
@@ -24,7 +24,7 @@ const call = async (path, body, headers = ADMIN) => {
 const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
 
-// ---- bb login --list reads them off the disk --------------------------------
+// ---- aerie login --list reads them off the disk --------------------------------
 // Staged the way Claude Code leaves them (captured from a real install on 19
 // Sep): installed_plugins.json and the account's enabledPlugins.
 const homes = join(DIR, 'pluginhomes');
@@ -53,7 +53,7 @@ const byId = Object.fromEntries((mine?.plugins || []).map(p => [p.id.split('@')[
 ok(mine && byId['code-simplifier']?.enabled === true && byId['pyright-lsp']?.enabled === false
    && byId['feature-dev']?.scope === 'project' && byId['feature-dev']?.project === 'alpha'
    && byId['feature-dev']?.enabled === null,
-   `bb login --list names each account's plugins, on or off, and a project's by name (${Object.keys(byId).join(', ')})`);
+   `aerie login --list names each account's plugins, on or off, and a project's by name (${Object.keys(byId).join(', ')})`);
 ok(!JSON.stringify(mine).includes('/x') && !JSON.stringify(mine).includes('c447c32'),
    '...and not where they live on the disk or what commit they came from');
 ok(none && none.plugins === null, 'an account that never installed one says none');
@@ -113,14 +113,14 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
   await browser.close();
 }
 
-// ---- bb diag, for an administrator ----------------------------------------
+// ---- aerie diag, for an administrator ----------------------------------------
 await beat([{ ...mine, email: '' }]);
 {
   const r = await call('/api/diag', { sections: ['plugins'] });
   const row = (r.plugins || []).find(x => x.node === 'plugbox');
   ok(row && row.account === 'test' && row.plugins.includes('pyright-lsp@claude-plugins-official 1.0.0 (off)')
      && row.plugins.includes('feature-dev@claude-plugins-official 1.0.0 (project alpha)'),
-     `bb diag names every account's plugins on every node (${row ? row.plugins.length : 'none'})`);
+     `aerie diag names every account's plugins on every node (${row ? row.plugins.length : 'none'})`);
   const out = execFileSync('bash', [BB, 'diag', 'plugins'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_CONTROLLER: base, DASHBOARD_AUTH: 'test:test' } });
   ok(/== plugins ==/.test(out) && /test on plugbox: .*code-simplifier/.test(out),
@@ -145,7 +145,7 @@ await beat([{ ...mine, email: '' }]);
   const v = execFileSync('sed', ['-n', sed, answer], { encoding: 'utf8' }).trim();
   ok(v === '263.4702.0', `...whose version is read out of GitHub's latest-release answer (${v})`);
   const plan = execFileSync('bash', [BB, 'toolchains', 'plan', 'language-servers'], { encoding: 'utf8' });
-  ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'bb toolchains plan shows what an install would run');
+  ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'aerie toolchains plan shows what an install would run');
 }
 
 await done();

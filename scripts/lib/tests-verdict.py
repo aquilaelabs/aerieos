@@ -1,4 +1,4 @@
-"""Behind `bb tests last` and the end of `bb tests run` (tests_verdict in
+"""Behind `aerie tests last` and the end of `aerie tests run` (tests_verdict in
 bb): what went wrong, from a run's own log. Per file, its failed
 assertions by name and, when it printed no totals line, the fact that it
 died and the line it died on. Nothing here re-runs anything.
@@ -20,7 +20,7 @@ BANNER = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) ==")
 # B124): its result decides whether the first failure was the file's or the
 # run's.
 AGAIN = re.compile(r"^\[(?:dashboard-test|builderbot)\] == (\S+) again ==")
-# ` in Xs` only when the run was timed: `bb dashboard test FILE` prints the
+# ` in Xs` only when the run was timed: `aerie dashboard test FILE` prints the
 # bare form, and a verdict that required the seconds read a passing file as a
 # crash, which is the one thing this tool must never do.
 TOTALS = re.compile(r"^(\d+) passed, (\d+) failed(?: in ([\d.]+)s)?")

@@ -123,7 +123,7 @@ class Shipped(unittest.TestCase):
         # trusted no index (B451); a bare-metal install lays out by the same lines.
         root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         with open(os.path.join(root, "Dockerfile"), encoding="utf-8") as f:
-            self.assertIn("COPY config/catalog.pub /opt/builderbot/config/catalog.pub", f.read())
+            self.assertIn("COPY config/catalog.pub /opt/aerieos/config/catalog.pub", f.read())
         self.assertIsNotNone(catalogindex._pubkey(os.path.join(root, "config", "catalog.pub")))
 
 

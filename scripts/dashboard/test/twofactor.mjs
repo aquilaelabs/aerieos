@@ -10,7 +10,7 @@ import { createHmac } from 'node:crypto';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const BASE = URL.replace(/\/$/, '');
-const bbUsers = (args, input) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', ...args],
+const bbUsers = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
   { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const basic = (u, p) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64'), 'Content-Type': 'application/json' });
 const owner = basic('test', 'test');

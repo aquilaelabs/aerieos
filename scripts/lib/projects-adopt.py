@@ -1,6 +1,6 @@
-"""Behind `bb projects adopt FOLDER [--name NAME]` (cmd_projects in bb): a
+"""Behind `aerie projects adopt FOLDER [--name NAME]` (cmd_projects in bb): a
 folder already under the projects share recorded as a project (R84), under
-its shown name, as a project BuilderBot made is. Refused for a folder that
+its shown name, as a project AerieOS made is. Refused for a folder that
 is not there, or that the registry already knows (live, trashed or deleted
 for good: a directory is never handed out twice).
 

@@ -1,4 +1,4 @@
-"""Behind `bb findings history` and `bb findings sample` (cmd_findings_history
+"""Behind `aerie findings history` and `aerie findings sample` (cmd_findings_history
 and cmd_findings_sample in bb): the scanner log's history, read through
 dashboard/findings.py, and a sample SARIF report written for the Analysis
 tab to show when no scanner has run.
@@ -17,6 +17,13 @@ import dash
 
 verb, args = sys.argv[1], sys.argv[2:]
 
+
+
+def _in_project(path):
+    """Whether `path` resolves inside the folder this runs in (the project's,
+    on the controller, for a relayed verb)."""
+    top = os.path.realpath(os.getcwd())
+    return os.path.realpath(path).startswith(top + os.sep)
 
 def history():
     fx = dash.load("findings", dash.beside(args[0]))
@@ -49,7 +56,7 @@ def history():
         elif a in ("--find", "-f") and i + 1 < len(argv):
             find = argv[i + 1]; i += 2
         else:
-            print("usage: bb findings history [-n N|--all] [--since 7d|YYYY-MM-DD] "
+            print("usage: aerie findings history [-n N|--all] [--since 7d|YYYY-MM-DD] "
                   "[--find TEXT]", file=sys.stderr)
             sys.exit(1)
 
@@ -103,9 +110,13 @@ def sample():
            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
            "runs": [{"tool": {"driver": {
                "name": "builderbot-sample",
-               "informationUri": "https://github.com/aquilaelabs/builderbot",
+               "informationUri": "https://github.com/aquilaelabs/aerieos",
                "rules": [{"id": r, "shortDescription": {"text": t}} for r, _, t in RULES]}},
                "results": results}]}
+    # Relayed, it runs on the controller: a path is the project's own, or
+    # a session could write over the controller's state (/config/users.json).
+    if os.environ.get("BB_RELAYED") and not _in_project(args[0]):
+        sys.exit(f"[builderbot] ERROR: {args[0]} is not a file in this project; write it inside the project")
     with open(args[0], "w") as f:
         json.dump(doc, f, indent=1)
     print(f"{len(results)} sample findings, one each in {', '.join(names)} "

@@ -7,7 +7,7 @@
 
 function nbRoadmapView({$, nb}){
   // ---- the shared to-do list ---------------------------------------------
-  // Both sides write it: the operator here, a session through `bb roadmap`. Its
+  // Both sides write it: the operator here, a session through `aerie roadmap`. Its
   // open items are appended to every Claude session bb-tty starts, which is why
   // something noticed mid-task and left undone survives the conversation.
 
@@ -245,7 +245,7 @@ function nbRoadmapView({$, nb}){
   // imperative DOM under a row, so the innerHTML below takes them and every
   // word typed into them. The poll's own guard upstream watches for STAGED
   // changes, and typing is not staged until the box's Save, so a session
-  // running `bb roadmap add` in the background deleted a half-written
+  // running `aerie roadmap add` in the background deleted a half-written
   // rewording under the finger holding it. Bugs has skipped its redraw while
   // a form is open since it was built; this is the same rule on the one view
   // that did not have it. `nb.roadmapItems` is still updated underneath, so
@@ -330,19 +330,20 @@ function nbRoadmapView({$, nb}){
                                {key: "shelved", label: "Shelved", count: parked}], nb.roadmapChip, "data-rmchip");
     if (paint($("roadmapChips"), chips, true))
       $("roadmapChips").querySelectorAll("[data-rmchip]").forEach(b => b.onclick = () => {
-        fadeThrough(() => [$("roadmapList")], () => { nb.roadmapChip = b.dataset.rmchip; redrawRoadmap(); }); });
+        chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp",
+                 () => { nb.roadmapChip = b.dataset.rmchip; redrawRoadmap(); }); });
     setHidden($("roadmapFind"), rows.length + finishedN < 2 && !nb.roadmapFind);
     // ...and by the release an item is meant for (the operator, 21 Oct): a
     // chip per target, oldest first, and No target; the Finished section
     // narrows by it too, so what went into a release can be read back.
     const vers = versionChips(rows, rmVers, "No target");
     if (nb.roadmapVer && !vers.some(v => v.key === nb.roadmapVer)) nb.roadmapVer = "";
-    const verChips = chipButtons(vers, nb.roadmapVer, "data-rmver");
+    const verChips = chipButtons(vers, nb.roadmapVer, "data-rmver", undefined, "Any version");
     // One band for every group (R109), drawn while any group has two.
     setHidden($("roadmapFilter"), !chips && !verChips);
     if (paint($("roadmapVers"), verChips, true))
       $("roadmapVers").querySelectorAll("[data-rmver]").forEach(b => b.onclick = () => {
-        fadeThrough(() => [$("roadmapList"), $("roadmapDoneList")], () => {
+        chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp, #roadmapDoneList > details.grp", () => {
           nb.roadmapVer = b.dataset.rmver; redrawRoadmap(); if (nb.roadmapDone) nb.drawFinished(); }); });
     const q = (nb.roadmapFind || "").trim().toLowerCase();
     const shown = r => (!nb.roadmapChip || (nb.roadmapChip === "shelved") === !!r.shelved) && rmVer(r, nb.roadmapVer) && rmMatch(r, q);
@@ -864,7 +865,7 @@ function nbRoadmapView({$, nb}){
     <textarea maxlength="4000" spellcheck="false"></textarea>
     <div class="q qd"><span>Details: the technical half: files, functions, approach</span></div>
     <textarea class="dta" maxlength="20000" spellcheck="false"
-      placeholder="mostly Claude's to write; empty is fine"></textarea>
+      placeholder="mostly the agent's to write; empty is fine"></textarea>
     <div class="q qd"><span>${step < 0 ? "Target: the release it is meant to ship in; empty for none"
         : `Target: the release this step ships in; empty goes with the item${r0?.target ? ` (${esc(r0.target)})` : ""}`}</span></div>
     <input class="tgt" maxlength="24" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="${step < 0 ? "0.6.0" : esc(r0?.target || "0.6.0")}">

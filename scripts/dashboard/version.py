@@ -37,7 +37,7 @@ unrecoverable. Do not rewrite the trunk of a project that ships an APK.
 And adopting this scheme in a CLONED repo that already published elsewhere
 needs one check first: Play requires the next versionCode to exceed the last
 one ever uploaded, and this repo's commit count bears no relation to codes a
-previous maintainer picked by hand. Compare `bb version --code` against the
+previous maintainer picked by hand. Compare `aerie version --code` against the
 app's last published code before shipping: if it is not higher, the store
 will refuse the build, and nothing here can know that.
 
@@ -56,7 +56,7 @@ silently move the extension's user-visible version for whoever installed it.
 
 So a *component* is any directory holding its own VERSION file: discovered,
 not configured, the same deal `dist/` is. The root VERSION is the project's
-and is what an unqualified `bb version` answers, unchanged. A component
+and is what an unqualified `aerie version` answers, unchanged. A component
 answers for itself.
 
 Only the target splits. The sha is the repo's either way, and the ordinal
@@ -71,7 +71,7 @@ happens through prompts and by bump time nobody remembers what three weeks
 contained. `locked` (the default) keeps it entirely with the operator; `patch`,
 `minor` and `open` delegate progressively more. Enforced here rather than
 requested in a prompt, because the point of the setting is not relying on the
-model's judgment. It stops `bb version bump` and the file tools; it does not
+model's judgment. It stops `aerie version bump` and the file tools; it does not
 stop Bash, the same honest limit the sibling-project deny list has. What
 actually makes a bad bump recoverable is that VERSION is committed: every move
 is in `git log` with a date and a message saying who made it.
@@ -89,7 +89,7 @@ import re
 import subprocess
 import sys
 
-# `bb` execs this module by path, so its directory is not on sys.path the way
+# `aerie` execs this module by path, so its directory is not on sys.path the way
 # it is when the dashboard imports it. One module object per process either
 # way: the in-process half of the lock is a dict in there.
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -140,7 +140,7 @@ _MAY_INIT = ("start", "patch", "minor", "open")
 PARTS = ("major", "minor", "patch")
 
 # The same lock the roadmap and the tracker take, and for the same reason: the
-# dashboard is one process and a `bb` invocation is another, and a threading
+# dashboard is one process and a `aerie` invocation is another, and a threading
 # lock guards the threads of one. Both would load, both mutate their own copy,
 # both write, and os.replace makes each write atomic while doing nothing about
 # the second landing on top of the first. See statefile.py.
@@ -160,7 +160,7 @@ def root(project):
     """The tree a question is asked of: the project directory, or the
     worktree the caller stands in (BB_VERSION_TREE, which bb sets from its
     cwd) when that is one of this project's. A session working in a
-    worktree asked `bb version --file` for a package name and was answered
+    worktree asked `aerie version --file` for a package name and was answered
     for the main checkout's HEAD, and shipped nothing rather than a file
     named after a commit that did not hold its code (24 Sep): the branch's
     own commits, VERSION file and ordinal are what a build there is about.
@@ -287,15 +287,25 @@ def _git(project, *args, timeout=10, env=None):
     # would otherwise take can make a session's git in the same tree fail
     # with index.lock: File exists (B155). A commit still takes the locks it
     # needs; only the optional one is skipped.
-    try:
-        r = subprocess.run(["git", "-C", tree, *args],
-                           capture_output=True, text=True,
-                           timeout=timeout, check=False,
-                           env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(env or {})})
-    except (OSError, subprocess.SubprocessError):
-        return None
-    out = r.stdout.strip() if r.returncode == 0 else None
-    if stamp is not None:
+    out = None
+    # A read about history that fails is tried once more: a push landing in
+    # the tree that moment fails it, and once was said as no history at all
+    # (B586).
+    for attempt in range(2 if keep else 1):
+        try:
+            r = subprocess.run(["git", "-C", tree, *args],
+                               capture_output=True, text=True,
+                               timeout=timeout, check=False,
+                               env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(env or {})})
+        except (OSError, subprocess.SubprocessError):
+            r = None
+        if r is not None and r.returncode == 0:
+            out = r.stdout.strip()
+            break
+        if attempt == 0 and keep:
+            time.sleep(0.5)
+    # ...and a failure is never kept as the answer, so the next ask asks again.
+    if stamp is not None and out is not None:
         kept = _git_kept.get(tree)
         if not kept or kept[0] != stamp or time.time() - kept[1] >= GIT_KEPT_S:
             kept = _git_kept[tree] = (stamp, time.time(), {})
@@ -333,7 +343,7 @@ def target(project, comp=""):
     except OSError as e:
         # Every failed read was "not adopted here yet", and the answer then
         # fell back to git describe: Shebang-DevBoard, whose VERSION says
-        # 0.5.5, got v0.5.4-13-g7766f70 from bb version --file for a minute
+        # 0.5.5, got v0.5.4-13-g7766f70 from aerie version --file for a minute
         # and filed builds under it, and the next call was right again (B524;
         # the share answered this read with an error the controller's git
         # did not meet). The committed VERSION is asked for next; only a
@@ -405,7 +415,7 @@ def _repo(project):
 
 
 # A branch's line (R112): the release it is working toward, said with
-# `bb version line X.Y.Z` (the branch's own git config) or read off a branch
+# `aerie version line X.Y.Z` (the branch's own git config) or read off a branch
 # named for it, claude/0.7.0 or release/v0.6.2.
 LINE_RE = re.compile(r"(?:^|/)v?(\d{1,4}\.\d{1,5}\.\d{1,6})$")
 _VER = re.compile(r"\d{1,4}\.\d{1,5}\.\d{1,6}")
@@ -453,15 +463,15 @@ def forward(project, source, env=None):
     A conflict anywhere else is left in the tree for a person, named."""
     here = line(project)
     if not here:
-        return {"error": "this branch has no line: bb version line X.Y.Z first"}
+        return {"error": "this branch has no line: aerie version line X.Y.Z first"}
     src = (source or "").strip()
     if not src or src.startswith("-"):
-        return {"error": "forward which branch? bb version forward BRANCH"}
+        return {"error": "forward which branch? aerie version forward BRANCH"}
     if _git(project, "rev-parse", "--verify", "--quiet", src + "^{commit}") is None:
         return {"error": f"{src} is not a branch or tag here"}
     there = line_of(project, src) or (src.lstrip("vV") if _VER.fullmatch(src.lstrip("vV")) else "")
     if not there:
-        return {"error": f"{src} has no line: say which with bb version line on it, or forward its tag (v0.6.2)"}
+        return {"error": f"{src} has no line: say which with aerie version line on it, or forward its tag (v0.6.2)"}
     if vkey(there) >= vkey(here):
         return {"error": f"{src} works toward {there}, not before this branch's {here}: forward goes from an older line to a newer one"}
     if _git(project, "status", "--porcelain", "--untracked-files=no"):
@@ -494,7 +504,7 @@ def forward(project, source, env=None):
     if left:
         return {"ok": False, "carried": carried, "conflicts": left,
                 "error": said + f". The merge is open with conflicts in {', '.join(left)}: resolve them, git add, then git commit"}
-    msg = (f"The {there} line merged forward into {here} (bb version forward)\n\n"
+    msg = (f"The {there} line merged forward into {here} (aerie version forward)\n\n"
            + "\n".join(f"- {c}" for c in carried[:60]) + ("\n- ..." if len(carried) > 60 else ""))
     if _git(project, "commit", "-m", msg, timeout=60, env=env) is None:
         return {"error": said + ", but the commit failed: the merge is open, commit it by hand"}
@@ -510,10 +520,10 @@ def backport(project, commit, env=None):
     release between them). A conflict anywhere else is left for a person."""
     here = line(project)
     if not here:
-        return {"error": "this branch has no line: bb version line X.Y.Z on the patch line first"}
+        return {"error": "this branch has no line: aerie version line X.Y.Z on the patch line first"}
     sha = _git(project, "rev-parse", "--verify", "--quiet", (commit or "").strip() + "^{commit}")
     if not commit or not sha:
-        return {"error": f"{commit or 'which commit'}? bb version backport COMMIT"}
+        return {"error": f"{commit or 'which commit'}? aerie version backport COMMIT"}
     if _git(project, "merge-base", "--is-ancestor", sha, "HEAD") is not None:
         return {"error": f"{commit} is already on this branch"}
     if _git(project, "status", "--porcelain", "--untracked-files=no"):
@@ -546,7 +556,7 @@ def backport(project, commit, env=None):
         _git(project, "cherry-pick", "--abort")
         return {"error": f"{short} changes nothing on {here}: it is here already in another form"}
     msg = (_git(project, "log", "-1", "--format=%B", sha) or f"Backport {short}").rstrip()
-    msg += f"\n\n(cherry picked from commit {sha}, bb version backport)"
+    msg += f"\n\n(cherry picked from commit {sha}, aerie version backport)"
     if _git(project, "commit", "-m", msg, timeout=60, env=env) is None:
         return {"error": said + ", but the commit failed: commit it by hand"}
     return {"ok": True, "said": said, "entries": [t for t, _ in added],
@@ -783,7 +793,7 @@ def _branch_facts(project):
 
 def lands(project, comp="", facts=None):
     """Where this block's number lives against the branch builds come from,
-    in the words the version row and `bb version` both print (B338).
+    in the words the version row and `aerie version` both print (B338).
 
     A bump commits on whatever branch the checkout is on and never pushes,
     and that stays: a bump can belong in a release branch's pull request.
@@ -858,7 +868,7 @@ def lands(project, comp="", facts=None):
 
 def current_tag(project, comp=""):
     """The tag of the version this tree is on, once it is released: (tag,
-    "") or ("", why). What bb version release --edit edits unless it names
+    "") or ("", why). What aerie version release --edit edits unless it names
     another (R139)."""
     tgt, err = target(project, comp)
     if err:
@@ -867,18 +877,34 @@ def current_tag(project, comp=""):
         return "", "there is no version here yet"
     name = f"{comp}-v{tgt}" if comp else f"v{tgt}"
     if _git(project, "rev-parse", "--verify", "--quiet", f"refs/tags/{name}") is None:
-        return "", f"{name} is not released yet: bb version release makes it, or --tag names an older one"
+        return "", f"{name} is not released yet: aerie version release makes it, or --tag names an older one"
     return name, ""
 
 
-def release_plan(project, comp="", dev=False):
+def channel_of(project, dev=False, stable=False):
+    """(dev, words): whether a session's release is the dev build's, and
+    the channel it lands on said for the person (R190 step 1). Asked for
+    neither, a release from a branch other than the one builds ship from
+    is a dev pre-release: a stable one from claude/0.9.0 had to be pulled
+    (the operator, 30 Oct). --stable says otherwise in so many words."""
+    f = _branch_facts(project) if not (dev or stable) else None
+    if f and f["branch"] and f["branch"] != f["base"]:
+        dev = True
+    return dev, ("a dev pre-release: the dev channel takes it and Latest stays where it is" if dev
+                 else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
+
+
+def release_plan(project, comp="", dev=False, stable=False):
     """What a release here would tag, without doing it: {tag, sha, target}
     or {error}, from the same refusals release() makes first. A session's
-    ask is made from this (bb version release, R138), so the person asked
+    ask is made from this (aerie version release, R138), so the person asked
     reads which tag on which commit, and a release that could not happen is
     refused before anybody is asked. With `dev` the tag is the dev build's
     (R179), as release() names it; planned as the plain one, a dev release
     was refused because the last release's tag already existed."""
+    if dev and stable:
+        return {"error": "a release is --dev or --stable, not both"}
+    dev, channel = channel_of(project, dev, stable)
     tgt, err = target(project, comp)
     if err:
         return {"error": err}
@@ -904,7 +930,7 @@ def release_plan(project, comp="", dev=False):
         # what is left is its page on the forge (B399).
         on = _git(project, "rev-list", "-n", "1", "--abbrev-commit", name) or ""
         if on and (sha.startswith(on) or on.startswith(sha)):
-            return {"tag": name, "sha": sha, "target": tgt, "finish": True}
+            return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
     if (_git(project, "status", "--porcelain") or "").strip():
         return {"error": "there are uncommitted changes in the project directory: commit or "
@@ -913,10 +939,10 @@ def release_plan(project, comp="", dev=False):
     # snapshot, as release() has it; planned with one, it was refused.
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
         return {"error": why}
-    return {"tag": name, "sha": sha, "target": tgt}
+    return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "channel": channel}
 
 
-# A tree that keeps a /config snapshot per release (BuilderBot's own, R79)
+# A tree that keeps a /config snapshot per release (AerieOS's own, R79)
 # releases only a version it has one for: the upgrade suite starts every
 # later build on each release's snapshot, and a release without one is an
 # install nothing proves the next build can read.
@@ -933,7 +959,7 @@ def no_upgrade_snapshot(project, comp, tgt):
 
 
 def _creds_c(project):
-    """BuilderBot's credential for this project as git's -c arguments
+    """AerieOS's credential for this project as git's -c arguments
     (gitcreds.git_c), never the tree's own config's."""
     try:
         import gitcreds                                     # noqa: PLC0415
@@ -1071,8 +1097,8 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
 
 
 def _push_tag(project, name, out, env=None):
-    """The tag pushed to origin with BuilderBot's own credential helpers, as
-    bb git push hands them, never the tree's own config, whose helper may
+    """The tag pushed to origin with AerieOS's own credential helpers, as
+    aerie git push hands them, never the tree's own config, whose helper may
     name a store git cannot read (a sealed token, one in a person's key
     store). `out` gains pushed, or a note saying why not."""
     cfg = _creds_c(project)
@@ -1133,7 +1159,7 @@ def _cl_guard(project, where):
 # exists: a project may carry the same number somewhere else, and a bump that
 # moves one and not the other commits a lie.
 #
-# BuilderBot is the case. Its minor IS the compatibility window, stamped again
+# AerieOS is the case. Its minor IS the compatibility window, stamped again
 # in the agent's AGENT_VERSION and in the CLAUDE.md template's WINDOW line, and
 # 0.5.0 only came out consistent because a person moved both by hand before
 # pressing Bump (B91). A test holds the three equal, but only after the
@@ -1331,7 +1357,7 @@ def jump(project, value, by="claude", comp="", env=None):
     b = [int(x) for x in value.split("-")[0].split("+")[0].split(".")[:3]]
     if b <= a:
         return {"error": f"{value} is not after {tgt}: a version only moves forward "
-                         "(bb version unbump takes the last bump back)"}
+                         "(aerie version unbump takes the last bump back)"}
     part = PARTS[next(i for i in range(3) if a[i] != b[i])]
     return bump(project, part, by=by, comp=comp, env=env, to=value, fold=True)
 
@@ -1359,7 +1385,7 @@ def bump(project, part, by="claude", comp="", env=None, to=None, fold=False):
         thing = f"{project}/{comp}" if comp else project
         forflag = f" --for {comp}" if comp else ""
         return {"error": f"{thing} has no {VERSION_FILE} yet; give it one "
-                         f"with `bb version init 0.1.0{forflag}`, or from "
+                         f"with `aerie version init 0.1.0{forflag}`, or from "
                          "the Artifacts view"}
     where = _sub(project, comp)
     if where is None:
@@ -1393,7 +1419,7 @@ def bump(project, part, by="claude", comp="", env=None, to=None, fold=False):
     # line's number.
     ln = line(project) if not comp else ""
     if ln and new != ln:
-        return {"error": f"this branch works toward {ln} (bb version line), so its version moves to {ln}, "
+        return {"error": f"this branch works toward {ln} (aerie version line), so its version moves to {ln}, "
                          f"not {new}: the other line's work goes on its own branch"}
     # A set (jump) renumbers: "it is 0.5.0, not 0.2.0". When the number being
     # left was never released (no tag, unbump's own test), its dated section
@@ -1656,7 +1682,7 @@ def unbump(project, by="claude", comp="", env=None):
     # leaves the compatibility window where the bump put it: a controller
     # returned to 0.5.0 still promising 0.6 to every node and every briefing.
     # The hook is given the version being returned TO, and its own rules
-    # apply: BuilderBot's moves the window down and the agent's build up,
+    # apply: AerieOS's moves the window down and the agent's build up,
     # since a build that went backwards could not say which agent is newer.
     if not comp:
         extra, why = _stamp(project, prev, part, env=env)
@@ -1682,7 +1708,7 @@ def unbump(project, by="claude", comp="", env=None):
 def ask(project, sessions=(), comp=""):
     """Put the version question to the project's own Claude session.
 
-    There used to be a `bb version suggest` beside this: commit count, does
+    There used to be a `aerie version suggest` beside this: commit count, does
     dist/ hold anything, how the roadmap's done-to-open ratio reads. It was
     removed rather than kept as an input, and the reason is worth recording:
     a mechanical number does not merely fail to help, it ANCHORS. Handing a
@@ -1714,7 +1740,7 @@ def ask(project, sessions=(), comp=""):
     # CLAUDE.md; that block went with R63 step 3, so it points at the verb
     # that answers the same question wherever it is run.
     line = (f"From the operator, on the Artifacts view: what version should "
-            f"{what} start at? Read the code and `bb version policy`, then "
+            f"{what} start at? Read the code and `aerie version policy`, then "
             f"propose a number you derived here and ask; do not apply one.")
     if tgt:
         # A different question once a version exists: not "what should this
@@ -1773,7 +1799,8 @@ MAY_PUSH = None
 SESSIONS = None
 AUDIT = None
 FORGE = None        # (project, tag, version, sha, comp) -> the forge's release (forgerelease.publish)
-_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE")
+MADE = None         # (project, tag): a release's tag pushed, dev or not (what follows it is looked for)
+_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE")
 
 
 def configure_verbs(**parts):
@@ -1818,6 +1845,10 @@ def verb(name, act, req, who, principal):
         # page is CI's (R179): made a pre-release by the image workflow.
         if r.get("pushed") and FORGE and not dev:
             r["forge"] = FORGE(name, r["tag"], r["target"], r["sha"], comp)
+        # What CI builds for it is looked for whichever channel it is on: a
+        # dev release's APK was left to the hourly look (B469).
+        if r.get("pushed") and MADE:
+            MADE(name, r["tag"])
         if dev:
             r["dev"] = True
         AUDIT(principal, "version-release", name,

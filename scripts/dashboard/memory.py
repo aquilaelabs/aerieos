@@ -280,7 +280,7 @@ def _rev(text):
     nothing to count. The digest is what the editor carries back at Save, and
     a mismatch means the file moved underneath it (roadmap #26).
 
-    Content rather than an mtime: a memory is written by the panel, by `bb`,
+    Content rather than an mtime: a memory is written by the panel, by `aerie`,
     and by a session using its own file tools, and only the last of those
     goes through this module at all. A digest catches every one of them, and
     is the same answer on both sides of a second.

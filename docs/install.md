@@ -1,17 +1,17 @@
-# Installing BuilderBot
+# Installing AerieOS
 
 The Unraid-specific detail for every step lives in
 **[unraid.md](unraid.md)**; this is the complete checklist with the
 decisions you need to make.
 
-The image, `ghcr.io/aquilaelabs/builderbot`, is public: pulling it needs no
+The image, `ghcr.io/aquilaelabs/aerieos`, is public: pulling it needs no
 login.
 
-BuilderBot comes in four editions, one controller in four shapes. This
-checklist is the **container** edition, on any host with Docker. The
-**bare-metal install** puts the same controller on a Linux machine of its
-own, which is also its own node ([Bare metal](#bare-metal)). **BuilderBot
-OS** is that install as an appliance, from an ISO or a VM image, and the
+AerieOS comes in four editions, one controller in four shapes. This
+checklist is **Aerie Workshop**, the container edition, on any host with
+Docker. The **bare-metal install** puts the same controller on a Linux machine
+of its own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS**
+is that install as an appliance, from an ISO or a VM image, and the
 **USB edition** runs it from a stick ([image.md](image.md)); those two are
 new in 0.9 and experimental. A controller moves between any of them
 ([Moving a controller](#moving-a-controller)).
@@ -78,9 +78,9 @@ just see them.
 ### 3. Install the container
 
 **Docker template (recommended)**: get
-[`platforms/unraid/builderbot.xml`](../platforms/unraid/builderbot.xml) into
+[`platforms/unraid/aerie-workshop.xml`](../platforms/unraid/aerie-workshop.xml) into
 `/boot/config/plugins/dockerMan/templates-user/`, then **Docker → Add
-Container →** pick *builderbot*. From the host's terminal that is one
+Container →** pick *Aerie-Workshop*. From the host's terminal that is one
 `curl` of the raw file, in [docs/unraid.md](unraid.md#install).
 
 **Compose Manager**: copy `docker-compose.yml` + `.env.example`→`.env` into
@@ -114,13 +114,13 @@ Everything else has sane defaults: full reference in [reference.md](reference.md
 ### 6. First boot
 
 ```bash
-docker logs -f BuilderBot          # banner → hooks → ready
-docker exec -it BuilderBot bb doctor
+docker logs -f Aerie-Workshop          # banner → hooks → ready
+docker exec -it Aerie-Workshop aerie doctor
 ```
 
 Then open the dashboard. The first page makes the owner account; the setup
 page after it is four steps, each a card with its own button: your first
-node (**Enroll node** for a machine you already have, **Create sandbox VM**
+node (**Enroll node** for a machine you already have, **New VM**
 for a new VM), your name and email, Claude Code on that node, and a first
 project. The node cannot be skipped: nothing runs without one, so **Finish**
 opens only once one is enrolled and answering, and it has to be one that
@@ -130,7 +130,7 @@ asked; their defaults are under Controller settings. After Finish, each page
 gives a short tour the first time an account opens it; **Skip tour** with its
 box skips them all, and About or your Profile brings them back.
 
-Every `bb doctor` line should be `[ok]` or an expected `[skip]`. On the
+Every `aerie doctor` line should be `[ok]` or an expected `[skip]`. On the
 controller it verifies: the workspace and home are writable, git is new
 enough, each account has a commit identity, GitHub is reachable, a node can
 take a session, the **Docker daemon** on each node that has one
@@ -164,8 +164,8 @@ jobs:
 **Every label in `runs-on` must be one some runner carries.** A job asking for
 a label nothing has sits in *Waiting for a runner* forever while the runners
 show *Idle*: the job is simply not addressed to any of them, and neither
-screen mentions the other. `bb ci-labels` lists every label the registry
-knows, `bb lint` refuses a `runs-on` naming one that nothing carries, and
+screen mentions the other. `aerie ci-labels` lists every label the registry
+knows, `aerie lint` refuses a `runs-on` naming one that nothing carries, and
 stale **Offline** runners carrying a label a job wants are worth deleting for
 the same reason; they make a job look routable when nothing will pick it up.
 
@@ -176,13 +176,13 @@ project's card or page, and runs on that project's node. There is no
 `claude`, `codex` or `copilot` in this container to exec into.
 
 ```bash
-docker exec -it BuilderBot bb shell                        # shell as builder
-docker exec -it BuilderBot bb status                       # what this box is
+docker exec -it Aerie-Workshop aerie shell                        # shell as builder
+docker exec -it Aerie-Workshop aerie status                       # what this box is
 ```
 
 **Adding a project**: **New project** on the Projects page makes one, as a
 fresh repository, a clone of one on a git host, or from an archive you already
-have. Only BuilderBot makes a project: a folder made by hand on the projects
+have. Only AerieOS makes a project: a folder made by hand on the projects
 share is not listed. A project with a problem says so on its card: no git
 repository or the wrong ownership in red.
 
@@ -193,39 +193,41 @@ section of your **Profile**, under Settings, each with Disconnect. Which are off
 the Controller settings page, or `/config/seed.json` before the first start
 ([reference.md](reference.md#the-seed-file)).
 
-**Updating**: CI publishes `:latest` for any push to `main` that touches the
-image's inputs (Dockerfile, `scripts/`, `config/`) + a weekly freshness
-rebuild. The host's app page's *Check for Updates* flips the container to **update ready**,
-so click it. Builds seed their layer cache from the previous `:latest`, so a
-scripts-only change is a small pull; the Monday rebuild is uncached on purpose
-and is always the big one. *Run workflow* takes a **Rebuild every layer** box
+**Updating**: `:dev` is the newest dev build; once there is a stable release, `:latest` is the newest of those, moved when its owner
+publishes it ([versions.md](versions.md#drafts)); `:main` follows each push to
+`main` that touches the image's inputs (Dockerfile, `scripts/`, `config/`) and
+a weekly freshness rebuild. The host's app page's *Check for Updates* flips the
+container to **update ready**, so click it. Builds seed their layer cache from
+`:main`, so a scripts-only change is a small pull; the Monday rebuild is
+uncached on purpose and is always the big one. *Run workflow* takes a **Rebuild every layer** box
 for the same effect on demand: leave it off and a manual run is a cheap retry,
 tick it to force a fresh pull of everything. To upgrade between releases, and roll
 back, see [Upgrading](#upgrading). Compose: `docker compose pull && docker compose up -d`.
 
 ## Upgrading
 
-**Pin a release, not `:latest`.** `:latest` follows the main branch between
-releases. Each release publishes its own image, `ghcr.io/aquilaelabs/builderbot:0.6.0`,
-and `:0.6` for the newest release of that line; pin one of those in your
-compose file or template, and move it on when you choose to upgrade.
+**`:dev` for now.** AerieOS has no stable release yet, so `:dev` is the tag
+there is: every dev build and release as it is published, so an install on it
+takes builds that may not come up ([versions.md](versions.md#two-channels)).
+Once there is a stable release, `:latest` moves to each one as it is published,
+and each publishes its own image, `ghcr.io/aquilaelabs/aerieos:X.Y.Z`, and `:X.Y`
+for the newest of that line; pin one of those in your compose file or template
+and move it on when you choose to upgrade.
 
 **What is supported:**
 
-- From any release to any later release **in the same line** (0.5.0 to
-  0.5.3, say), in one step.
-- To a **new line** (0.6.0) **from the last release of the line before**
-  (the newest 0.5.x). An older install goes there first, then on.
-- **0.9 upgrades from any 0.6.x, 0.7.x or 0.8.x** in one step. A 0.5.x or
-  older install goes through the newest 0.6.x first.
+- From any release to any later release, in one step, from 0.9 on.
+- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from BuilderBot
+  0.8 or earlier: install fresh, with a new `/config`, and add your projects
+  again from their repositories.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
   below, with the older image.
 
 **What the controller does for you.** `/config` carries the version of its
 state. On start, a controller moves older state forward, one numbered step
 at a time, after copying `/config` to `/config/backups/before-VERSION` (the
-last three are kept). It refuses to start, saying which release to go
-through, on state older than it can move forward, and it refuses state from
+last three are kept). It refuses to start on state older than it can move
+forward, and it refuses state from
 a newer release rather than reading what it does not understand.
 
 **Nodes and apps follow.** After the controller, update each node's agent
@@ -244,10 +246,10 @@ it.
 ## Bare metal
 
 The same controller can be installed on a Linux machine of its own, without
-the container: the same dashboard, state, `bb` and updates, laid out under
-`/opt/builderbot` the way the image lays it out, run by the machine's own
+the container: the same dashboard, state, `aerie` and updates, laid out under
+`/opt/aerieos` the way the image lays it out, run by the machine's own
 service manager (systemd, OpenRC or runit) with an env file in place of
-compose's. It is for a machine that is only BuilderBot, a small server or
+compose's. It is for a machine that is only AerieOS, a small server or
 a NAS, and it can use that machine as one of its own nodes, so one box runs
 the dashboard and the builds and sessions with it.
 
@@ -260,26 +262,26 @@ beside the system's 3.9.
 **Install**, from a checkout or an unpacked release, as root:
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 sudo bash nodes/install-controller.sh --check        # changes nothing
 sudo bash nodes/install-controller.sh --install
 ```
 
 It installs the packages the image carries (`config/controller-packages.tsv`,
-one list for both), makes an account for the controller (`builderbot`, no
+one list for both), makes an account for the controller (`aerieos`, no
 password, no sudo but the image's two root helpers), lays the release out,
-writes `/etc/builderbot-controller/controller.env` (yours to edit; every
+writes `/etc/aerieos-controller/controller.env` (yours to edit; every
 setting is in [reference.md](reference.md#a-controller-installed-bare-metal-its-env-file)),
-starts `builderbot-controller`, and then makes this machine a node of
+starts `aerieos-controller`, and then makes this machine a node of
 itself. Open `http://ADDRESS:7680` and make the owner account, as on a
 container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
 it to answer rather than for a node you enroll; Enroll another machine is
-there for more, and none is needed. `sudo bb ...` is the container's `docker exec -it
-BuilderBot bb ...`.
+there for more, and none is needed. `sudo aerie ...` is the container's `docker exec -it
+AerieOS aerie ...`.
 
 Options worth knowing: `--workspace PATH` (the projects folder, by default
-`/srv/builderbot/projects`), `--port N`, `--no-node` (the controller alone),
+`/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),
 `--docker` (the controller's account in the docker group, the bare-metal
 form of mounting the docker socket into the container: containers can then
 run on this machine's daemon from the controller; docker is root here).
@@ -300,12 +302,12 @@ controller). The reasons and the threat model are in
 **Updating** is the image pull's equivalent:
 
 ```bash
-sudo bash /opt/builderbot/nodes/install-controller.sh --update                 # the newest release
-sudo bash /opt/builderbot/nodes/install-controller.sh --update --release v0.7.0
+sudo bash /opt/aerieos/nodes/install-controller.sh --update                 # the newest release
+sudo bash /opt/aerieos/nodes/install-controller.sh --update --release v0.7.0
 ```
 
 An update fetches the release's controller bundle
-(`builderbot-controller-X.Y.Z.tar.gz`, published by the release workflow
+(`aerieos-controller-X.Y.Z.tar.gz`, published by the release workflow
 with its sha256 beside it and a build attestation), checks the archive
 against the sha256 and, where `gh` is installed, against the attestation
 (a release from before the bundle falls back to its source archive, said
@@ -322,27 +324,27 @@ no going back by hand: a release moves forward only, and the
 The page does the same without a shell: a newer release is a line on the
 bell and the **Updates** section under Controller settings says which
 release this install runs and which is newest (checked weekly unless
-Update checks says otherwise, **Check now** sooner); **Update** runs the installer through this machine's own
+Update checks says otherwise, **Check for updates** sooner); **Update** runs the installer through this machine's own
 node, whose root agent is the only account that runs it, and the page comes
 back on the new release.
 
 **Taking it away.** `--remove` stops the controller and takes away its
-release, service, `bb` and wall, and this machine's node; the state, the
+release, service, `aerie` and wall, and this machine's node; the state, the
 env file, the secrets, the account and the projects stay, and `--install`
 puts it back on them. `--remove --purge` takes all but the projects.
 
-**The appliance image.** A machine that is only BuilderBot can run the
+**The appliance image.** A machine that is only AerieOS can run the
 installed edition from the appliance image instead: Debian pinned to a
 snapshot with the controller staged in, a read-only root in two slots so an
 update is a whole image and a bad one falls back, and the machine its own
-node at its first boot. Each release carries it as an installer ISO, a
-VM disk (qcow2 and OVA) and a USB stick's image; [image.md](image.md) says
+node at its first boot. Each release carries it as an installer ISO, for a machine or a VM, and a
+USB stick's image; [image.md](image.md) says
 what it is, how each is installed and how it is built.
 
 ## Building locally instead of pulling
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 cp .env.example .env && nano .env
 docker compose build && docker compose up -d
 ```
@@ -356,9 +358,11 @@ container to a machine of its own, and back.
 1. On the old controller, Controller settings, **Move this controller**:
    name the new home's address (where its page will be reached), tick what
    the bundle carries beyond the state and the deploy key (each store kept
-   outside the state, with its size; the repositories, when the two homes
-   do not mount the same share; the install key, when the new home should
-   not ask for it), and press **Prepare to move**. That arms the move: it
+   outside the state, with its size; the repositories, unless the new home
+   reaches the same folder, a share both mount or the disks the new machine
+   adopts, where This machine names it as the projects folder (see
+   [image.md](image.md)); the install key, when the new home should not ask
+   for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
    every node hears the new address and a challenge of its own, which it
    keeps. The move stays armed until it lands or you press **Forget it**,
@@ -368,7 +372,11 @@ container to a machine of its own, and back.
    the first-run card press **Moving a controller here?** and give the
    token with the old controller's address, while it still runs: the new
    home pulls the bundle from it, packed at that moment, under a proof
-   derived from the token. An old home that is already off is moved from
+   derived from the token. An AerieOS stick takes the move later
+   instead, once its disks hold the projects: make a setup account, set
+   the disks up on This machine, and land it from Controller settings,
+   **Move a controller here**, with the same token and address or bundle
+   (see [image.md](image.md)). An old home that is already off is moved from
    a bundle instead: **Download the bundle** on the old controller (packed
    fresh each time it is pressed, with what was ticked) and give the file
    with the token. Either way the bundle is held to the version gate (a
@@ -395,8 +403,12 @@ container to a machine of its own, and back.
    nothing is enrolled again (the node keeps its id, its token, its
    containers and its synced copies). The list empties as each says hello.
 5. A bare-metal source's own machine is not a node of the new home (its
-   row is retired there); a bare-metal destination enrolls its own machine
-   afresh with the installer. A same-address move (the new home takes over
+   row is retired there). A bare-metal destination keeps the node its own
+   machine already is: AerieOS enrolls it at the first boot, and the
+   landing carries that node and its credential into the moved state, so
+   its agent goes on without enrolling again; a stick's prepared plan of
+   disks to adopt is kept the same way. A bare-metal install whose machine
+   is not a node yet enrolls it afresh with the installer. A same-address move (the new home takes over
    the old hostname) needs no knock: the certificate travels in the
    bundle's secrets, so the pin holds.
 

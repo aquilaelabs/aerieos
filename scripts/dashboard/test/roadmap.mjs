@@ -1,7 +1,7 @@
 // The shared to-do list: the one surface here that both sides write.
 //
 // The operator adds an item in the panel, a session adds one through
-// `bb roadmap`, and either can tick it off. The open items are appended to every
+// `aerie roadmap`, and either can tick it off. The open items are appended to every
 // Claude session bb-tty starts, which is the whole point: something noticed
 // mid-task and left undone used to live in the conversation and die with it.
 import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, URL, DIR, closePage, nbGo, projectKey } from './lib.mjs';
@@ -13,9 +13,9 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-// The checkout's bb, not the stub on the harness PATH: `bb roadmap` is the half
+// The checkout's bb, not the stub on the harness PATH: `aerie roadmap` is the half
 // of this a session uses, and it is the real implementation under test.
-const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bb');
+const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'aerie');
 const FILE = `${DIR}/state/roadmap.json`;
 const read = () => existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : { projects: {} };
 
@@ -133,7 +133,7 @@ await page.waitForFunction(() => document.querySelectorAll('#roadmapList .roadma
 items = await open();
 const mine = items.find(i => i.text.includes('delete a project'));
 ok(mine && mine.claude,
-   'an item a session added through bb roadmap shows up, marked as Claude\'s');
+   'an item a session added through aerie roadmap shows up, marked as Claude\'s');
 ok(items.filter(i => i.claude).length === 1,
    '...and the operator\'s own is not');
 // At the end, not the top. The number on a row is the item's own id, so the
@@ -331,12 +331,12 @@ ok((await open()).some(i => i.can),
    '...so the arrows are live again');
 
 // ---- what a session is told --------------------------------------------
-// Counts and the verbs (R202): the list itself is a `bb roadmap` away, and
+// Counts and the verbs (R202): the list itself is a `aerie roadmap` away, and
 // the items a prompt names arrive on that prompt (preamble.mjs).
 const prompt = execFileSync(BB, ['roadmap', '--prompt'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
-ok(/\d+ open items?/.test(prompt) && /bb roadmap show R4/.test(prompt) && !prompt.includes('make the picker wrap properly'),
+ok(/\d+ open items?/.test(prompt) && /aerie roadmap show R4/.test(prompt) && !prompt.includes('make the picker wrap properly'),
    'the block a session is started with counts the open items and says how to read one, and carries no list');
 
 // ---- an order that matters ---------------------------------------------
@@ -484,7 +484,7 @@ const unwritable = execFileSync(BB, ['roadmap'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: '/proc/bb-no-such-state',
            WORKSPACE: `${DIR}/ws` }, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
 ok(!/Traceback|PermissionError/.test(unwritable),
-   'bb roadmap on a state dir it cannot write prints the list and exits clean');
+   'aerie roadmap on a state dir it cannot write prints the list and exits clean');
 ok(/and \d+ parked by the operator/.test(shelvedPrompt) && !/rework the picker/.test(shelvedPrompt),
    '...and a session is told how many are parked, and never a parked title (R202)');
 const up = await post({ action: 'move', project: 'alpha', id: Number(c1.id), dir: -1 });
@@ -589,15 +589,15 @@ const bbRoadmap = bbRoadmapEarly;
 const grp = () => read().projects.alpha.find(r => String(r.id) === String(c1.id));
 bbRoadmap('edit', c1.id, 'rework the picker, properly this time');
 ok(grp().text === 'rework the picker, properly this time',
-   'bb roadmap edit rewords an item');
+   'aerie roadmap edit rewords an item');
 bbRoadmap('step', 'add', c1.id, 'and check it on a phone');
 ok(grp().steps.length === 2 && grp().steps[1].text === 'and check it on a phone',
-   'bb roadmap step add gives an existing item another step');
+   'aerie roadmap step add gives an existing item another step');
 bbRoadmap('step', 'edit', c1.id, '2', 'and check it at both sizes');
 ok(grp().steps[1].text === 'and check it at both sizes',
-   'bb roadmap step edit rewords one step, numbered the way a human reads it');
+   'aerie roadmap step edit rewords one step, numbered the way a human reads it');
 bbRoadmap('step', 'rm', c1.id, '2');
-ok(grp().steps.length === 1, 'bb roadmap step rm drops one step and leaves the rest');
+ok(grp().steps.length === 1, 'aerie roadmap step rm drops one step and leaves the rest');
 // ...and says which moved up when it was not the last (B818): a fold that
 // removed one went on naming the old numbers.
 bbRoadmap('step', 'add', c1.id, 'a second');
@@ -616,11 +616,11 @@ const orderNow = () => read().projects.alpha.map(r => String(r.id));
 const wasOrder = orderNow();
 bbRoadmap('mv', c1.id, 'up');
 ok(orderNow().indexOf(c1.id) === wasOrder.indexOf(c1.id) - 1,
-   'bb roadmap mv moves an item up the list');
+   'aerie roadmap mv moves an item up the list');
 bbRoadmap('mv', c1.id, 'down');
 ok(JSON.stringify(orderNow()) === JSON.stringify(wasOrder), '...and back down');
 bbRoadmap('shelve', c1.id);
-ok(read().projects.alpha.at(-1).shelved, 'bb roadmap shelve parks one');
+ok(read().projects.alpha.at(-1).shelved, 'aerie roadmap shelve parks one');
 // ...and asking for it back is a request (R78): held for a person on the
 // project with its reason, the item still shelved until they answer. The
 // pending suite walks the approval; here the ask and the hold.
@@ -713,7 +713,7 @@ bbBug('note', String(bugsFile().projects.alpha.at(-1).id), 'a first thought');
 bbBug('note', String(bugsFile().projects.alpha.at(-1).id), 'a second thought');
 const bugCommit = bbBug('commit');
 ok(/entr/.test(bugCommit) && /folded/.test(bugCommit),
-   'bb bug commit closes the same batch, folding the notes into the filing');
+   'aerie bug commit closes the same batch, folding the notes into the filing');
 const bugLog = bbBug('history', '-n', '20');
 ok(/this one is kept/.test(bugLog) && !/a first thought/.test(bugLog),
    '...so the log says it was filed, not that it was thought about three times');
@@ -1020,7 +1020,7 @@ const fin = await post({ action: 'add', project: 'alpha', text: 'a job to finish
 const finId = String(fin.body.item.id);
 bbRoadmap('done', finId);
 ok(!read().projects.alpha.some(r => String(r.id) === finId),
-   'bb roadmap done takes the item off the list rather than fading it in place');
+   'aerie roadmap done takes the item off the list rather than fading it in place');
 // ...and the Roadmap tab can still show it (R78): a Finished section under
 // the list (R254 step 1), shut until opened, draws the ticked-off items with
 // their plans, and the head counts them.
@@ -1231,7 +1231,7 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] 
 // The reword box, the drop box, the send note and the + step field are DOM
 // put under a row after the render, so a redraw takes them and every word
 // typed into them. The poll's guard upstream watches for STAGED changes, and
-// typing is not staged until Save, so a session running `bb roadmap add` in
+// typing is not staged until Save, so a session running `aerie roadmap add` in
 // the background deleted a half-written rewording under the finger holding
 // it. Bugs has skipped its redraw while a form is open since it was built.
 {
@@ -1293,7 +1293,7 @@ ok(true, 'Cancel closes the step field without adding anything');
 bbRoadmapEarly('info', plainId, 'lives in scripts/dashboard/roadmap.py\n\nGUI half: stepRow');
 ok(read().projects.alpha.find(r => String(r.id) === plainId).info
      === 'lives in scripts/dashboard/roadmap.py\n\nGUI half: stepRow',
-   'bb roadmap info attaches details to an item, breaks kept');
+   'aerie roadmap info attaches details to an item, breaks kept');
 bbRoadmapEarly('info', plainId, '1', 'the select is built in stepRow()');
 ok(read().projects.alpha.find(r => String(r.id) === plainId).steps[0].info
      === 'the select is built in stepRow()',
@@ -1309,12 +1309,12 @@ ok(read().projects.alpha.find(r => String(r.id) === plainId).info
      === 'lives in scripts/dashboard/roadmap.py\n\nGUI half: stepRow',
    '...and --replace setting them outright');
 // The details are the long half and only the session that picks the item up
-// needs them, so the prompt carries a pointer and `bb roadmap show` carries
+// needs them, so the prompt carries a pointer and `aerie roadmap show` carries
 // the text. On this repository that was 35KB of a 45KB block that every
 // conversation paid for whether or not it touched the roadmap.
 {
   const block = bbRoadmapEarly('--prompt');
-  ok(!/lives in scripts\/dashboard\/roadmap\.py/.test(block) && /`bb roadmap show R4` prints one whole/.test(block),
+  ok(!/lives in scripts\/dashboard\/roadmap\.py/.test(block) && /`aerie roadmap show R4` prints one whole/.test(block),
      'the prompt names where the details are rather than carrying them');
   ok(/lives in scripts\/dashboard\/roadmap\.py/.test(bbRoadmapEarly('show', plainId)),
      '...and that command prints them in full');
@@ -1710,7 +1710,7 @@ ok(await phone.evaluate(() =>
 await closePage(phone);
 
 // ---- two writers, which is what the notebook actually has ----------------
-// The dashboard is one process and `bb roadmap` is another, and both do
+// The dashboard is one process and `aerie roadmap` is another, and both do
 // load-mutate-save. The lock around that was a threading.Lock, which guards
 // the threads of ONE process, so the second write landed on top of the first
 // and the item added from a terminal was simply not there afterwards.
@@ -1761,7 +1761,7 @@ ok(JSON.parse(reent.trim().split('\n').pop()).ok,
 // ---- a step a session finished ------------------------------------------
 // Sent is the dashboard's mark and says a line went. A session told in chat
 // to go ahead had no mark of its own, so it reworded the step to say LANDED
-// and the panel went on offering it. `bb roadmap step done` is that mark:
+// and the panel went on offering it. `aerie roadmap step done` is that mark:
 // struck like sent, ticked rather than numbered, skipped by the frontier,
 // and cleared by a re-send, which is the operator saying it was not done.
 bbRoadmapEarly('add', 'ship the widget', '--step', 'cut the hole', '--step', 'fit the widget',
@@ -1847,11 +1847,11 @@ await page.waitForFunction(() => [...document.querySelectorAll('#roadmapList .ro
   .some(t => t.textContent === 'a line dropped by mistake'));
 const dropped = (await open()).find(i => i.text === 'a line dropped by mistake');
 bbRoadmapEarly('info', dropped.id, 'the details ride along');
-ok(new RegExp(`removed R${dropped.id}; bb roadmap restore R${dropped.id} puts it back`).test(
+ok(new RegExp(`removed R${dropped.id}; aerie roadmap restore R${dropped.id} puts it back`).test(
      bbRoadmapEarly('rm', dropped.id, 'abandoned for now')),
    'dropping names the way back');
 ok(new RegExp(`put back R${dropped.id}: a line dropped by mistake`).test(bbRoadmapEarly('restore', dropped.id)),
-   'bb roadmap restore puts it back under its own number');
+   'aerie roadmap restore puts it back under its own number');
 {
   const row = read().projects.alpha.find(r => String(r.id) === String(dropped.id));
   ok(row && row.steps.length === 2 && row.steps[1].text === 'second' && row.info === 'the details ride along',
@@ -2139,7 +2139,7 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   await page.evaluate(n => openNotebook(n, 'roadmap'), 'ep.silon');
   await page.waitForFunction(() => document.querySelectorAll('.pane .doc.on #roadmapVers [data-rmver]').length === 4, null, { timeout: 15000 });
   const chips = await page.$$eval('.pane .doc.on #roadmapVers [data-rmver]', bs => bs.map(b => b.textContent.replace(/\s+/g, ' ').trim()));
-  ok(chips.join('|') === 'All3|0.5.41|0.6.01|No target1', `a chip per target, oldest first, and No target, each with its count (${chips.join('|')})`);
+  ok(chips.join('|') === 'Any version3|0.5.41|0.6.01|No target1', `a chip per target, oldest first, and No target, each with its count (${chips.join('|')})`);
   const tag = await page.$$eval('.pane .doc.on #roadmapList .roadmap .tag.ver', ts => ts.map(t => t.textContent.trim()));
   ok(tag.includes('for 0.6.0') && tag.includes('for 0.5.4') && tag.length === 2, `an item with a target says it above its words (${tag.join(', ')})`);
   const texts = () => page.$$eval('.pane .doc.on #roadmapList .roadmap[data-step="-1"] .txt', ts => ts.filter(t => t.checkVisibility()).map(t => t.textContent));
@@ -2170,7 +2170,7 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   ok(/not a version/.test(refused), `...and a target that is not X.Y.Z is refused (${refused.trim().slice(0, 90)})`);
   const listed = bbEps('--target', '0.6.0');
   ok(/ship the first\s+\[for 0\.6\.0\]/.test(listed) && /ship the third/.test(listed) && !/ship the second/.test(listed),
-     `bb roadmap --target lists what is meant for one release (${listed.trim().replace(/\n/g, ' / ')})`);
+     `aerie roadmap --target lists what is meant for one release (${listed.trim().replace(/\n/g, ' / ')})`);
 }
 
 // ---- a step's own release (R108, the operator, 22 Oct) ------------------

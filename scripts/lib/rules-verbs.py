@@ -1,4 +1,4 @@
-"""Behind `bb rules` (cmd_rules in bb): the house rules, the operator's on
+"""Behind `aerie rules` (cmd_rules in bb): the house rules, the operator's on
 the Briefing tab and a session's own through add, edit and rm here, read
 and written through dashboard/rules.py, which holds the ownership and the
 log.
@@ -31,7 +31,7 @@ if "--global" in argv:
     argv = [a for a in argv if a != "--global"]
     proj = reg.GLOBAL
 # `--format json|yaml|markdown` on a list or a show (R167); `--json` stays
-# the plain list the page, the briefing and bb rules check read.
+# the plain list the page, the briefing and aerie rules check read.
 if "--json" in argv:
     fmt, argv = "text", ["--json"] + [a for a in argv if a != "--json"]
 else:
@@ -55,7 +55,7 @@ elif op == "--json":
     print(json.dumps(reg.effective(proj)))
 elif op == "show":
     if not rest:
-        sys.exit("usage: bb rules show <name>")
+        sys.exit("usage: aerie rules show <name>")
     want = rest[0].strip().lower()
     for r in reg.effective(proj):
         if r["name"] == want:
@@ -65,7 +65,7 @@ elif op == "show":
             if r.get("doc"):
                 print(f"\ndefined in full in {r['doc']}")
             if r.get("check"):
-                print(f"checked by: {r['check']}   (bb rules check {r['name']})")
+                print(f"checked by: {r['check']}   (aerie rules check {r['name']})")
             if r.get("refuse"):
                 print("refuses: " + ", ".join(r["refuse"]))
             if r.get("replaces"):
@@ -84,7 +84,7 @@ elif op == "show":
             sys.exit(f"no rule called {want} here; this project has: {names}")
 elif op == "add":
     if len(rest) < 2:
-        sys.exit('usage: bb rules add <name> "the rule" [--files GLOB,...] [--words W,...] '
+        sys.exit('usage: aerie rules add <name> "the rule" [--files GLOB,...] [--words W,...] '
                  '[--refuse "CMD, CMD"] [--replaces GLOBAL-RULE] [--why "..."]')
     name, said, paths_, wds_, doc_, chk_, i = rest[0], [], "", "", "", "", 1
     ref_, repl_, why_ = "", "", ""
@@ -111,7 +111,7 @@ elif op == "add":
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     if r.get("held"):
         print(f"held for approval as the rule {r['held']['number']}: it takes "
-              "effect when the operator approves it on the notebook. `bb rules "
+              "effect when the operator approves it on the notebook. `aerie rules "
               "pending` lists what is waiting; you are told on a later turn what "
               "they decided")
         sys.exit(0)
@@ -119,7 +119,7 @@ elif op == "add":
           "Briefing tab, and in front of every session started here")
 elif op == "edit":
     if len(rest) < 2:
-        sys.exit('usage: bb rules edit <name> "what it should say now"')
+        sys.exit('usage: aerie rules edit <name> "what it should say now"')
     held = pending.held(proj, "rules", rest[0].strip().lower())
     if held is not None:
         # Reworded before it was even approved: the rewording rides behind
@@ -143,7 +143,7 @@ elif op == "edit":
         else:
             said.append(rest[i]); i += 1
     if not said and not flags:
-        sys.exit('usage: bb rules edit <name> "what it should say now" [--doc PATH] [--check CMD] '
+        sys.exit('usage: aerie rules edit <name> "what it should say now" [--doc PATH] [--check CMD] '
                  '[--refuse "CMD, CMD"] [--replaces GLOBAL-RULE] [--why "..."]')
     r = reg.edit(proj, rest[0], text=" ".join(said) if said else None, by="claude", **flags)
     if r.get("error"):
@@ -151,10 +151,10 @@ elif op == "edit":
     print(f"reworded {rest[0]}" if said else f"updated {rest[0]}: {', '.join(flags)}")
 elif op == "rm":
     if not rest:
-        sys.exit('usage: bb rules rm <name> ["why it went"]')
+        sys.exit('usage: aerie rules rm <name> ["why it went"]')
     if pending.held(proj, "rules", rest[0].strip().lower()) is not None:
         sys.exit(f"[builderbot] ERROR: the rule {rest[0]} is still waiting for the "
-                 "operator's approval; there is nothing to drop yet. `bb rules pending`")
+                 "operator's approval; there is nothing to drop yet. `aerie rules pending`")
     r = reg.remove(proj, rest[0], why=" ".join(rest[1:]), by="claude")
     if r.get("error"):
         sys.exit(f"[builderbot] ERROR: {r['error']}")
@@ -189,7 +189,7 @@ elif op == "list":
         dump_rules(rs); sys.exit(0)
     if not rs:
         print("no house rules on this project yet. The operator writes them on "
-              "the notebook's Briefing tab; `bb rules add NAME \"...\"` leaves "
+              "the notebook's Briefing tab; `aerie rules add NAME \"...\"` leaves "
               "one of yours there, marked as a session's.")
         sys.exit(0)
     p = reg.payload(proj)
@@ -210,9 +210,9 @@ elif op == "list":
                  + (" [refuses]" if r.get("refuse") else "")
                  + (f" [for {r['replaces']}]" if r.get("replaces") else ""))
         print(f" {mine}{r['name']:<{w}}{first[:60]}{when}{frame}")
-    print("\n`bb rules show <name>` for one in full. A * is one a session "
+    print("\n`aerie rules show <name>` for one in full. A * is one a session "
           "wrote: yours to `edit` or `rm`. The rest are the operator's: read "
           "them, and say in your reply if one looks wrong.")
 else:
-    print(f"[builderbot] ERROR: unknown: bb rules {op}", file=sys.stderr)
+    print(f"[builderbot] ERROR: unknown: aerie rules {op}", file=sys.stderr)
     sys.exit(1)

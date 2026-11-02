@@ -1,11 +1,11 @@
-"""Behind `bb design` (cmd_design in bb): a project's design language and
+"""Behind `aerie design` (cmd_design in bb): a project's design language and
 its pages, through the controller's API as the caller (design.py on the
 dashboard's side), which is where the words are made.
 
 The first argument is the verb: nothing or `list` prints the language in a
 line and the pages; `show` prints the prompt for the language, or for one
 page named by its id or its name; `file` prints docs/design-language.md as
-the notebook would write it, for `bb design file > docs/design-language.md`,
+the notebook would write it, for `aerie design file > docs/design-language.md`,
 and `file --from FILE` the same from a record given (what `json` prints,
 edited) rather than the saved one, so a branch writes it from its own design;
 `json` prints the record (language, pages, and the presets they are drawn
@@ -33,7 +33,7 @@ fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
 auth = os.environ["BB_DESIGN_AUTH"]
 proj = os.environ["BB_DESIGN_PROJECT"]
-USAGE = "usage: bb design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]"
+USAGE = "usage: aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]"
 
 
 def fail(msg):
@@ -43,12 +43,12 @@ def fail(msg):
 if verb == "save" and (len(argv) < 2 or argv[1] in ("-h", "--help")):
     # Help, not a file called -h (B342): the shape and every limit.
     r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=schema", auth=auth)
-    print("bb design save FILE (or - for stdin): a JSON file of this shape, saved whole")
+    print("aerie design save FILE (or - for stdin): a JSON file of this shape, saved whole")
     print()
     print(r.get("text", "") if isinstance(r, dict) else "")
     raise SystemExit(0 if len(argv) > 1 else 1)
 def read_record(src):
-    """A record of the shape bb design json prints, from a file or stdin."""
+    """A record of the shape aerie design json prints, from a file or stdin."""
     try:
         rec = json.loads(sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read())
     except (OSError, ValueError) as e:
@@ -62,7 +62,7 @@ if verb == "file" and len(argv) > 1:
     # From a record given rather than the saved one (B227): a branch writes
     # the file from its own design, not from what other branches saved.
     if argv[1] != "--from" or len(argv) != 3:
-        fail("usage: bb design file [--from FILE]")
+        fail("usage: aerie design file [--from FILE]")
     rec = read_record(argv[2])
     r = bbapi.call("/api/design", {"action": "render", "project": proj,
                                    "language": rec.get("language") or {},
@@ -90,7 +90,7 @@ if verb == "save":
         raise SystemExit(0)
     n = len(r.get("pages") or [])
     print(f"saved {proj}'s design: {n} page{'' if n == 1 else 's'}; the notebook's Design view shows it, "
-          "and bb design file prints docs/design-language.md from it")
+          "and aerie design file prints docs/design-language.md from it")
     raise SystemExit(0)
 
 if verb == "show":

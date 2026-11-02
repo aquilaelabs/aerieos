@@ -7,7 +7,7 @@
 # toolchains it found, the dashboard prints its URL), and the daemon that the
 # dev-instance controls are built on was the one that did not, so "is the
 # sandbox up" was a question you could only answer by opening the dashboard or
-# running `bb doctor`. The boot log is where you look when something is wrong,
+# running `aerie doctor`. The boot log is where you look when something is wrong,
 # and a capability that is silent there looks like one that is absent.
 #
 #
@@ -16,10 +16,10 @@
 # and everything else in here works without it.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
-PROBE=/opt/builderbot/scripts/lib/docker-probe.py
-DEVAPP=/opt/builderbot/scripts/dashboard/devapp.py
+PROBE=/opt/aerieos/scripts/lib/docker-probe.py
+DEVAPP=/opt/aerieos/scripts/dashboard/devapp.py
 [ -f "$PROBE" ] && [ -f "$DEVAPP" ] || exit 0
 
 # Bounded: available() gives its `docker version` ten seconds, and reaching the

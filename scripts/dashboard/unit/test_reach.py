@@ -83,7 +83,7 @@ class Reach(unittest.TestCase):
         self.assertEqual(n, 1)
         self.assertEqual(len(Hook.got), 1)
         body = json.loads(Hook.got[0]["body"])
-        self.assertEqual(body["title"], "BuilderBot: 2 things for you")
+        self.assertEqual(body["title"], "AerieOS: 2 things for you")
         self.assertEqual(len(body["lines"]), 2, "the CI row is not a kind this destination takes")
         self.assertEqual(Hook.got[0]["headers"].get("X-Key"), "abc")
         self.assertEqual(body["url"], "https://bb.example/")
@@ -112,7 +112,7 @@ class Reach(unittest.TestCase):
         self.assertTrue(reach._in_quiet({"from": "22:00", "to": "07:00"}, time.mktime((2026, 1, 1, 6, 59, 0, 0, 0, -1))))
         did = reach.list_for(UID)[0]["id"]
         self.assertTrue(reach.test(UID, did, "ann")["ok"])
-        self.assertIn("test from BuilderBot for ann", json.loads(Hook.got[-1]["body"])["lines"][0])
+        self.assertIn("test from AerieOS for ann", json.loads(Hook.got[-1]["body"])["lines"][0])
         self.assertIn("no mail server", reach.test(UID, reach.set_dest(UID, {"kind": "email", "fields": {"to": "a@b"}})["dest"]["id"])["error"])
 
     def test_each_preset_posts_its_shape(self):

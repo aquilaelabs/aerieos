@@ -21,7 +21,7 @@ PAD = {"padx": 12, "pady": 6}
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("BuilderBot")
+        self.title("AerieOS")
         self.minsize(560, 360)
         self.comp = None
         self.body = None
@@ -53,7 +53,7 @@ class App(tk.Tk):
     # -- signing in ----------------------------------------------------------------
     def signin(self):
         f = self.clear()
-        ttk.Label(f, text="Sign this machine in to BuilderBot", font=("", 13, "bold")).pack(anchor="w", **PAD)
+        ttk.Label(f, text="Sign this machine in to AerieOS", font=("", 13, "bold")).pack(anchor="w", **PAD)
         ttk.Label(f, text="Your password is used once, for this machine's own token, and kept nowhere.").pack(anchor="w", padx=12)
         s = settings.load()
         fields = {}
@@ -139,7 +139,7 @@ class App(tk.Tk):
         while not self.asks.empty():
             req, done, said = self.asks.get()
             said.append(messagebox.askyesno(
-                "BuilderBot", f"{req.get('by') or 'A session'} asks this PC to {req['verb']} for {req['project']}"
+                "AerieOS", f"{req.get('by') or 'A session'} asks this PC to {req['verb']} for {req['project']}"
                 + (f":\n\n{req['why']}" if req.get("why") else ".") + "\n\nLet it?"))
             done.set()
         s = settings.load()
@@ -181,7 +181,7 @@ class App(tk.Tk):
             said += (" " if said else "") + held
         up = st.get("update") or {}
         if up.get("pending"):
-            said += (" " if said else "") + f"BuilderBot companion {up['pending']} is fetched: it starts the next time this app does."
+            said += (" " if said else "") + f"AerieOS companion {up['pending']} is fetched: it starts the next time this app does."
         if left:
             said += (" " if said else "") + f"{left} file{'s' if left != 1 else ''} with names Windows cannot hold left out of the copy."
         self.note.config(text=said)
@@ -193,7 +193,7 @@ class App(tk.Tk):
         s = settings.load()
         name = self.selected() or next((n for n in sorted(self.mine, key=str.lower) if n not in s["picked"]), "")
         if not name:
-            messagebox.showinfo("BuilderBot", self.mine_said or "You are not on any project yet: an owner adds you on "
+            messagebox.showinfo("AerieOS", self.mine_said or "You are not on any project yet: an owner adds you on "
                                 "its People section, and it shows up here.")
             return
         folder = filedialog.askdirectory(title=f"The folder {name} is kept in")
@@ -210,7 +210,7 @@ class App(tk.Tk):
     def remove(self):
         name = self.selected()
         if name and name in settings.load()["picked"] and messagebox.askyesno(
-                "BuilderBot", f"Stop keeping {name} in step? Its folder stays as it is."):
+                "AerieOS", f"Stop keeping {name} in step? Its folder stays as it is."):
             s = settings.load()
             s["picked"].pop(name, None)
             settings.save(s)
@@ -226,12 +226,12 @@ class App(tk.Tk):
 
     def show_conflicts(self):
         found = self.comp.conflicts() if self.comp else []
-        messagebox.showinfo("BuilderBot", "\n".join(found) if found else
+        messagebox.showinfo("AerieOS", "\n".join(found) if found else
                             "No conflict copies. When a change here and one on the controller meet, the one that "
                             "arrived first is kept and the other is saved beside it as NAME.conflict-WHO-TIME.")
 
     def signout(self):
-        if messagebox.askyesno("BuilderBot", "Sign this machine out? Its folders stay; Disconnect it on your Devices "
+        if messagebox.askyesno("AerieOS", "Sign this machine out? Its folders stay; Disconnect it on your Devices "
                                              "list to end its token at the controller too."):
             if self.comp:
                 self.comp.stop()

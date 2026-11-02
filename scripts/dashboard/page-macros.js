@@ -51,7 +51,7 @@ function wireMacros(el){
 
 // Macros run in a terminal rather than reporting into a pane of their own: the
 // output belongs where the operator can scroll it, page it, and follow a
-// `bb toolchains install` that takes minutes: none of which a one-shot text box did.
+// `aerie toolchains install` that takes minutes: none of which a one-shot text box did.
 async function macro(name, custom){
   const t = macroTarget();
   if (!t) return;                        // grayed out; a stray tap does nothing

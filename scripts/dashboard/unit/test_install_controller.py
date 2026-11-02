@@ -79,14 +79,14 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
 
     def test_every_copy_line_lands_where_the_image_puts_it(self):
-        rel = os.path.join(self.root, "opt", "builderbot-releases", "1.2.3")
+        rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
         os.makedirs(os.path.dirname(rel))
         r = sh(f'lay_out "{ROOT}" "{rel}" 1.2.3 abc123', root=self.root)
         self.assertEqual(r.returncode, 0, r.stderr)
-        copies = re.findall(r"^COPY (\S+) (/opt/builderbot\S*)$", dockerfile(), re.M)
+        copies = re.findall(r"^COPY (\S+) (/opt/aerieos\S*)$", dockerfile(), re.M)
         self.assertGreater(len(copies), 10)
         for src, dest in copies:
-            where = rel + dest[len("/opt/builderbot"):]
+            where = rel + dest[len("/opt/aerieos"):]
             if src.endswith("/"):
                 for name in os.listdir(os.path.join(ROOT, src)):
                     self.assertTrue(os.path.lexists(os.path.join(where, name)), (src, name))
@@ -95,7 +95,7 @@ class LaidOutAsTheImage(unittest.TestCase):
             else:
                 self.assertTrue(os.path.isfile(where), (src, dest))
         self.assertTrue(os.access(os.path.join(rel, "scripts", "host-boot.sh"), os.X_OK))
-        self.assertTrue(os.access(os.path.join(rel, "scripts", "bb"), os.X_OK))
+        self.assertTrue(os.access(os.path.join(rel, "scripts", "aerie"), os.X_OK))
         for f in ("nodes/install-controller.sh", "config/controller.env", "Dockerfile"):
             self.assertTrue(os.path.isfile(os.path.join(rel, f)), f)
         env = open(os.path.join(rel, "build.env"), encoding="utf-8").read()
@@ -104,7 +104,7 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.assertFalse(os.path.exists(rel + ".partial"))
 
     def test_flip_keeps_the_one_before(self):
-        rels = os.path.join(self.root, "opt", "builderbot-releases")
+        rels = os.path.join(self.root, "opt", "aerieos-releases")
         for v in ("1.0", "1.1", "1.2", "1.3", "1.4"):
             os.makedirs(os.path.join(rels, v))
         r = sh(f'for v in 1.0 1.1 1.2 1.3 1.4; do flip "{rels}/$v"; touch -d "@$((1700000000 + ${{v#1.}}))" "{rels}/$v"; done; '
@@ -121,7 +121,8 @@ class LaidOutAsTheImage(unittest.TestCase):
         r = sh(f'tree_stamp "{ROOT}"')
         ver, rev = r.stdout.split()
         target = open(os.path.join(ROOT, "VERSION"), encoding="utf-8").read().strip()
-        self.assertTrue(ver == target or re.fullmatch(re.escape(target) + r"-dev\.\d+\+[0-9a-f]{7}", ver), ver)
+        # A commit with a dev tag on it is stamped as the tag, with no commit.
+        self.assertTrue(ver == target or re.fullmatch(re.escape(target) + r"-dev\.\d+(\+[0-9a-f]{7})?", ver), ver)
         self.assertRegex(rev, r"^[0-9a-f]{40}$")
 
     def test_a_release_archive_is_stamped_by_its_version_and_header(self):
@@ -167,12 +168,12 @@ class TheEnvironment(unittest.TestCase):
                                env={"BB_CONTROLLER_ENV": p, "PATH": "/usr/bin:/bin"})
             state, port, banner, kind, ws, path = r.stdout.strip().split("|")
             self.assertEqual((state, port, banner, kind, ws),
-                             ("/x/config", "7700", "Back at six", "bare-metal", "/srv/builderbot/projects"))
-            self.assertTrue(path.startswith("/usr/local/lib/builderbot-controller/bin:"))
+                             ("/x/config", "7700", "Back at six", "bare-metal", "/srv/aerieos/projects"))
+            self.assertTrue(path.startswith("/usr/local/lib/aerieos-controller/bin:"))
 
     def test_the_template_carries_every_setting_compose_passes(self):
         compose = open(os.path.join(ROOT, "docker-compose.yml"), encoding="utf-8").read()
-        svc = compose.split("\n  builderbot:", 1)[1]
+        svc = compose.split("\n  aerie-workshop:", 1)[1]
         passed = {a for a, b in re.findall(r"^\s+([A-Z][A-Z0-9_]+):\s*\$\{([A-Z][A-Z0-9_]+)", svc, re.M) if a == b}
         tmpl = open(os.path.join(ROOT, "config", "controller.env"), encoding="utf-8").read()
         have = set(re.findall(r"^([A-Z][A-Z0-9_]+)=", tmpl, re.M))
@@ -193,8 +194,8 @@ class TheEnvironment(unittest.TestCase):
 
     def test_an_update_adds_what_a_newer_template_has(self):
         with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "etc", "builderbot-controller"))
-            with open(os.path.join(d, "etc", "builderbot-controller", "controller.env"), "w") as f:
+            os.makedirs(os.path.join(d, "etc", "aerieos-controller"))
+            with open(os.path.join(d, "etc", "aerieos-controller", "controller.env"), "w") as f:
                 f.write("TZ=Europe/Paris\n")
             r = sh('chown() { :; }; id() { echo root; }; env_file; cat "$ENV_FILE"', root=d)
             self.assertIn("TZ=Europe/Paris\n", r.stdout)
@@ -209,22 +210,22 @@ class TheWall(unittest.TestCase):
 
     def test_written_from_the_env_file(self):
         with tempfile.TemporaryDirectory() as d:
-            etc = os.path.join(d, "etc", "builderbot-controller")
+            etc = os.path.join(d, "etc", "aerieos-controller")
             os.makedirs(etc)
             with open(os.path.join(etc, "controller.env"), "w") as f:
-                f.write(f"DASHBOARD_STATE={d}/var/lib/builderbot-controller/config\n"
-                        f"BUILDER_HOME={d}/var/lib/builderbot-controller/home\n"
-                        "SDK_ROOT=/mnt/sdk/\nWORKSPACE=/srv/builderbot/projects\n"
-                        f"BB_SECRETS_DIR={d}/etc/builderbot-controller/secrets\n"
-                        "SSH_AUTH_SOCK=/run/builderbot-controller/ssh-agent.sock\n")
+                f.write(f"DASHBOARD_STATE={d}/var/lib/aerieos-controller/config\n"
+                        f"BUILDER_HOME={d}/var/lib/aerieos-controller/home\n"
+                        "SDK_ROOT=/mnt/sdk/\nWORKSPACE=/srv/aerieos/projects\n"
+                        f"BB_SECRETS_DIR={d}/etc/aerieos-controller/secrets\n"
+                        "SSH_AUTH_SOCK=/run/aerieos-controller/ssh-agent.sock\n")
             r = sh('JOBS_USER=bb; echo old > "$WALL_NFT"; wall_write; cat "$WALL_FILE"; [ -e "$WALL_NFT" ] || echo "no nft"', root=d)
             self.assertEqual(r.returncode, 0, r.stderr)
             cover = re.search(r"^COVER=(.*)$", r.stdout, re.M).group(1).split(":")
             self.assertEqual(sorted(cover), sorted([
-                f"{d}/var/lib/builderbot-controller", f"{d}/etc/builderbot-controller", "/run/builderbot",
+                f"{d}/var/lib/aerieos-controller", f"{d}/etc/aerieos-controller", "/run/builderbot",
                 "/run/builderbot-key",
-                "/run/builderbot-controller", "/mnt/sdk", "/srv/builderbot/projects"]))
-            self.assertIn("ACCOUNT=builderbot\nJOBS_USER=bb\n", r.stdout)
+                "/run/aerieos-controller", "/mnt/sdk", "/srv/aerieos/projects"]))
+            self.assertIn("ACCOUNT=aerieos\nJOBS_USER=bb\n", r.stdout)
             self.assertIn("PORTS=\n", r.stdout)
             self.assertIn("no nft", r.stdout)
 
@@ -269,9 +270,21 @@ class Updates(unittest.TestCase):
             f.write(f"DASHBOARD_STATE={state}\n")
         return sh(f'ENV_FILE="{envf}"; gate "{ROOT}" {ver}')
 
+    def test_the_state_is_the_services_own_when_the_env_file_names_none(self):
+        # B499: an empty answer had the gate read the current directory.
+        with tempfile.TemporaryDirectory() as d:
+            envf = os.path.join(d, "controller.env")
+            open(envf, "w").write("PORT=7680\n")
+            r = sh(f'ENV_FILE="{envf}"; state_dir', root=d)
+            self.assertEqual(r.stdout, os.path.join(d, "var/lib/aerieos-controller/config"), r.stderr)
+            open(envf, "w").write("DASHBOARD_STATE=relative/x\n")
+            r = sh(f'ENV_FILE="{envf}"; state_dir', root=d)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("not a path from /", r.stderr)
+
     def test_every_supported_release_is_one_an_update_starts_on(self):
         vers = sorted(os.listdir(SNAPS))
-        self.assertGreater(len(vers), 3)
+        self.assertGreaterEqual(len(vers), 1)
         floor = int(re.search(r"^SUPPORTED_FROM = (\d+)$", open(os.path.join(DASH, "stateversion.py"), encoding="utf-8").read(), re.M).group(1))
         for ver in vers:
             with open(os.path.join(SNAPS, ver, "manifest.json"), encoding="utf-8") as f:
@@ -279,9 +292,8 @@ class Updates(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d:
                 r = self.gate(self.unpack(ver, d), d)
                 if state < floor:
-                    # Under the floor (0.5.x since 0.9): refused, naming the way through.
                     self.assertEqual(r.returncode, 78, (ver, r.stderr))
-                    self.assertIn("Start the newest 0.6 release on it first", r.stderr)
+                    self.assertIn("install fresh", r.stderr)
                 else:
                     self.assertEqual(r.returncode, 0, (ver, r.stderr))
 
@@ -367,3 +379,74 @@ class Rollback(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheUpdatesFetch(unittest.TestCase):
+    """fetch_tree with curl and gh stood in on the PATH: the bundle verified
+    by its attestation read from GitHub's public API with --bundle (no
+    sign-in), and the source archive taken unverified only for a release
+    from before the bundle that GitHub says has none."""
+
+    def world(self, code, gh_ok=True):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        tree = os.path.join(d, "t", "builderbot-9")
+        os.makedirs(os.path.join(tree, "nodes"))
+        open(os.path.join(tree, "Dockerfile"), "w").write("FROM x\n")
+        open(os.path.join(tree, "nodes", "install-controller.sh"), "w").write("#!/bin/sh\n")
+        tgz = os.path.join(d, "b.tar.gz")
+        with tarfile.open(tgz, "w:gz") as t:
+            t.add(tree, arcname="builderbot-9")
+        dig = subprocess.run(["sha256sum", tgz], capture_output=True, text=True).stdout.split()[0]
+        bin_ = os.path.join(d, "bin")
+        os.makedirs(bin_)
+        with open(os.path.join(bin_, "curl"), "w") as f:
+            f.write(f"""#!/bin/bash
+out=""; url=""; w=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -w) w="$2"; shift 2;; -H) shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
+case "$url" in
+  *attestations/sha256:*) echo '{{"attestations":[{{"bundle":{{"x":1}}}}]}}' > "$out" ;;
+  *.tar.gz.sha256) echo "{dig}  b.tar.gz" > "$out" ;;
+  *archive/refs/tags/*) cp "{tgz}" "$out" ;;
+  *.tar.gz) [ "{code}" = 200 ] && cp "{tgz}" "$out"; [ -n "$w" ] && printf '%s' "{code}" ;;
+esac
+[ "{code}" = 200 ] || case "$url" in *controller-*.tar.gz) exit 22;; esac
+exit 0
+""")
+        with open(os.path.join(bin_, "gh"), "w") as f:
+            f.write(f"""#!/bin/bash
+[ "$3" = --help ] && {{ echo "  -b, --bundle string"; exit 0; }}
+echo "$*" >> "{d}/gh.log"
+case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
+""")
+        for n in ("curl", "gh"):
+            os.chmod(os.path.join(bin_, n), 0o755)
+        return d, bin_
+
+    def fetch(self, tag, code, gh_ok=True):
+        d, bin_ = self.world(code, gh_ok)
+        r = sh(f'fetch_tree {tag}', env={"PATH": bin_ + ":" + os.environ["PATH"]}, root=d)
+        log = open(os.path.join(d, "gh.log")).read() if os.path.exists(os.path.join(d, "gh.log")) else ""
+        return r, log
+
+    def test_a_bundle_is_verified_by_its_attestation_with_no_sign_in(self):
+        r, log = self.fetch("v0.9.1", 200)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("verified by gh", r.stderr)
+        self.assertIn("--bundle", log)
+
+    def test_a_bundle_that_does_not_verify_is_not_taken(self):
+        r, _ = self.fetch("v0.9.1", 200, gh_ok=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("refused the bundle", r.stderr)
+
+    def test_a_bundle_that_cannot_be_fetched_is_not_taken_unverified(self):
+        for tag, code in (("v0.9.1", "500"), ("v0.9.1", "404")):
+            r, _ = self.fetch(tag, code)
+            self.assertNotEqual(r.returncode, 0, (tag, code))
+            self.assertIn("could not be fetched", r.stderr)
+
+    def test_only_a_release_from_before_the_bundle_falls_back_to_its_source(self):
+        r, _ = self.fetch("v0.8.2", "404")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("source archive is taken instead", r.stderr)

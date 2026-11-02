@@ -10,7 +10,7 @@
 // this file fills slots. Every rule about WHO may do WHAT lives on the server
 // (users.py): a row that cannot be deleted is drawn without the control and
 // says why, rather than being offered one that fails, but the store refuses
-// it regardless, because `bb users` reaches the same rules from a shell.
+// it regardless, because `aerie users` reaches the same rules from a shell.
 
 "use strict";
 

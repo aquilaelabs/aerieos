@@ -58,7 +58,7 @@ def configure(*, run, write_json, state, project_nodes=None, workspace=None):
 
 
 # The catalog lives beside the code rather than in it: config/toolchains.json,
-# which ships to /opt/builderbot/config/ and so sits at the same place relative
+# which ships to /opt/aerieos/config/ and so sits at the same place relative
 # to this file in the image and in a checkout.
 #
 # Adding a toolchain is an entry there and nothing else, as long as it fits one
@@ -107,7 +107,7 @@ def load_toolchains(packs=()):
         plats = [x for x in (r.get("platforms") or []) if isinstance(x, str) and "/" in x]
         if plats:
             row["platforms"] = plats[:8]
-        # Whether `bb toolchains update` has a case for this recipe. Five do (a git
+        # Whether `aerie toolchains update` has a case for this recipe. Five do (a git
         # clone, two installers and sdkmanager's own), and the rest are a
         # tarball fetched and unpacked whole, where getting a newer one means
         # removing this one first. Declared rather than inferred from the
@@ -123,7 +123,7 @@ def load_toolchains(packs=()):
         reqs = [x for x in (r.get("requires") or []) if isinstance(x, str) and x]
         if reqs:
             row["requires"] = reqs[:4]
-        # The tool it adds under `bb tool`, projected like the rest: one plain
+        # The tool it adds under `aerie tool`, projected like the rest: one plain
         # word, since it is drawn on the row and matched against bb's case.
         tool = r.get("tool")
         if isinstance(tool, str) and tool and tool.replace("-", "").isalnum():
@@ -155,7 +155,7 @@ def load_toolchains(packs=()):
             row["system"] = {str(k)[:12]: [str(x)[:80] for x in (v or [])][:64]
                              for k, v in sysd.items() if isinstance(v, list)}
         # Added by a person rather than shipped (R77): who added it, from
-        # where and at which commit, and the verbs bb tool gives it, for the
+        # where and at which commit, and the verbs aerie tool gives it, for the
         # row to say so and a project's Toolchains group to offer it.
         pk = r.get("pack")
         if isinstance(pk, dict):
@@ -263,7 +263,7 @@ def load_versions():
 # and megabytes wide: a request that waited for them would time out, and two
 # at once would fight over the same sdkmanager lock.
 _tc_lock = threading.Lock()
-# What `bb toolchains check` last reported: {name: {installed, latest, status}}.
+# What `aerie toolchains check` last reported: {name: {installed, latest, status}}.
 # Filled only when asked: every probe in it reaches the network, so doing it
 # on the fifteen-second poll would be a background service nobody requested.
 # Reloaded from disk at startup, so what it found outlives this process.
@@ -282,13 +282,13 @@ _tc_job = {"running": False, "queue": [], "current": "", "action": "",
 _sdk_root_cache = []
 
 
-# The bb that ships with this server.py: /opt/builderbot/scripts/bb in the
-# image, the checkout's copy under `bb dashboard dev`. Same relative position
+# The bb that ships with this server.py: /opt/aerieos/scripts/aerie in the
+# image, the checkout's copy under `aerie dashboard dev`. Same relative position
 # either way, and it keeps the pair in step: a page offering a subcommand
 # the bb beside it does not have would be a button that cannot work.
 # BB_BIN exists for the test harness, which points it at a stub: the suite
 # must be able to drive install and remove without downloading gigabytes.
-BB = os.environ.get("BB_BIN") or str(HERE.parent / "bb")
+BB = os.environ.get("BB_BIN") or str(HERE.parent / "aerie")
 
 
 def sdk_root_path():
@@ -515,7 +515,7 @@ def payload():
             origin = ""
         items.append({**{k: p[k] for k in ("name", "label", "about")},
                       "terms": p.get("terms") or [],
-                      # The tool this recipe adds under `bb tool`, one name
+                      # The tool this recipe adds under `aerie tool`, one name
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
                       "tool": p.get("tool") or "",
@@ -608,7 +608,7 @@ def job_rev():
     tab watches this instead of holding a third clock.
 
     The store root's mtime is the one stat, and it is the case none of the
-    in-memory state can see: `bb toolchains install` run in a terminal is
+    in-memory state can see: `aerie toolchains install` run in a terminal is
     another process entirely, and what it changes is a directory under the
     root. Nothing else here would notice it at all.
     """
@@ -632,14 +632,14 @@ def job_is_automatic():
         return bool(_tc_job.get("auto"))
 
 
-# The recipes `bb toolchains update` knows, as the agent's tc_verbs has them.
+# The recipes `aerie toolchains update` knows, as the agent's tc_verbs has them.
 UPDATE_VERBS = ("flutter", "dotnet", "swift", "playwright")
 
 
 def _tc_worker():
     """Run the queued work one item at a time, keeping a tail of the output.
 
-    Everything it can do is `bb toolchains <verb> <name>` for a name that came out of
+    Everything it can do is `aerie toolchains <verb> <name>` for a name that came out of
     TOOLCHAINS: the page posts an index into the table, never a command, which
     is the same rule the macro buttons follow. The verb is decided here rather
     than by the page: "install" on something already present means update it,
@@ -665,7 +665,7 @@ def _tc_worker():
             row = next((p for p in TOOLCHAINS if p["name"] == name), {})
             probe = row.get("probe", name)
             # Only where the recipe HAS an update. Sending the rest to
-            # `bb toolchains update` earned a usage line naming five toolchains the
+            # `aerie toolchains update` earned a usage line naming five toolchains the
             # operator had not asked about (bug #43); they go to install now,
             # which refuses with a sentence about the one they did.
             # The same rule as the agent's (tc_verbs): `update` only for a
@@ -804,11 +804,11 @@ def _node_errors(job_id, failed, verb):
     """{name: why} for the toolchains a node job did not land, in the words
     the controller's own path puts on a row: the end of what that
     toolchain's section of the log said, minus the progress frames, and
-    the verb. The section is what `bb toolchains install` prints between
-    its own `== bb toolchains install NAME` line and the next `==` line.
+    the verb. The section is what `aerie toolchains install` prints between
+    its own `== aerie toolchains install NAME` line and the next `==` line.
     Without this a failed install on a node ended with the row simply
     unticked: the reason was in the job's log and nowhere the tab draws
-    (the graphics recipe's 404 was found with bb jobs, not on the tab)."""
+    (the graphics recipe's 404 was found with aerie jobs, not on the tab)."""
     if not failed:
         return {}
     key = (job_id, tuple(failed))
@@ -819,7 +819,7 @@ def _node_errors(job_id, failed, verb):
         # An install's section is bb's header; a system-packages job's is the
         # agent's own (sysdeps), which this did not read, so that row said
         # only that it failed.
-        m = (re.match(r"== bb toolchains \S+ (\S+)", line)
+        m = (re.match(r"== aerie toolchains \S+ (\S+)", line)
              or re.match(r"== system packages for (\S+?):", line))
         if m:
             cur = m.group(1)
@@ -883,10 +883,10 @@ _tried_memo = {}
 
 def _tried(job_id):
     """The toolchains a node's job began, read from its log's headers
-    (`== bb toolchains VERB NAME`), kept per job."""
+    (`== aerie toolchains VERB NAME`), kept per job."""
     if job_id not in _tried_memo:
         text = (nodes.job(job_id) or {}).get("log") or "" if nodes else ""
-        _tried_memo[job_id] = set(re.findall(r"^== bb toolchains [a-z]+ (\S+)$", text, re.M))
+        _tried_memo[job_id] = set(re.findall(r"^== aerie toolchains [a-z]+ (\S+)$", text, re.M))
         while len(_tried_memo) > 32:
             _tried_memo.pop(next(iter(_tried_memo)))
     return _tried_memo[job_id]
@@ -914,7 +914,7 @@ def finished(act, names, here, rep, state):
 def _check_rows(job_id):
     """{name: {installed, latest, status}} from a finished check job's log.
 
-    `bb toolchains check` prints one TSV line per recipe: name, what is
+    `aerie toolchains check` prints one TSV line per recipe: name, what is
     installed, what upstream has, and a word for the difference. The log is
     the transport because the job channel carries a log and not a payload,
     and this is the same shape the controller's own checker writes into its
@@ -1270,7 +1270,7 @@ def payload_for_node(nid):
     plat = platform_of(n)
     store = (rep.get("stores") or {}).get("toolchains") or {}
     items = []
-    # What is IN the store, by directory, which is where bb toolchains puts things:
+    # What is IN the store, by directory, which is where aerie toolchains puts things:
     # <root>/<name>, and android's parts under <root>/android/. The census's
     # `toolchains` is a six-name placement summary and reading it as an
     # inventory called the emulator, the NDK, Playwright and Zig missing on
@@ -1294,7 +1294,7 @@ def payload_for_node(nid):
             here = False                    # the directory without what completes it
         # A node that has not reported its store yet is not evidence of
         # absence, so say nothing rather than "not installed".
-        # The node's own `bb toolchains versions` first: the same generator this
+        # The node's own `aerie toolchains versions` first: the same generator this
         # controller runs for its own list, so one store is described one
         # way. The census's toolchains dict is the fallback for a node that
         # has not run it yet, and it is a placement summary rather than an
@@ -1306,7 +1306,7 @@ def payload_for_node(nid):
         kb = _tc_remembered.get(name)
         items.append({**{k: p[k] for k in ("name", "label", "about")},
                       "terms": p.get("terms") or [],
-                      # The tool this recipe adds under `bb tool`, one name
+                      # The tool this recipe adds under `aerie tool`, one name
                       # per recipe, so a row says what installing it adds to
                       # a session and the suite holds two from claiming one.
                       "tool": p.get("tool") or "",
@@ -1719,7 +1719,7 @@ def layout_for_node():
 
 def node_has(n):
     """The toolchain names already in this node's toolchain store, by the
-    directories bb toolchains puts them in. Empty when the node has not reported
+    directories aerie toolchains puts them in. Empty when the node has not reported
     its store, which is not evidence of absence, so a caller must treat it
     as "unknown" rather than "nothing"."""
     rep = n.get("reported") or {}
@@ -1999,7 +1999,7 @@ def _machine_name(n, action, name, also):
     if row["state"] == "nocard" and action != "remove":
         return "", f"{n['name']} has no NVIDIA card now: its toolkit can only be removed"
     if not row["managed"]:
-        return "", (f"{n['name']} is its owner's machine, not a BuilderBot sandbox: the container toolkit "
+        return "", (f"{n['name']} is its owner's machine, not an AerieOS sandbox: the container toolkit "
                     "is installed or removed there, the way NVIDIA's guide does it")
     if (n.get("config") or {}).get("lock"):
         return "", f"{n['name']} is locked to its console: nothing on it is installed from here"
@@ -2020,7 +2020,7 @@ def _driver_name(n, action, pkg):
     if row["state"] == "nocard" and action != "remove":
         return "", f"{n['name']} has no NVIDIA card now: its driver can only be removed"
     if not row["managed"]:
-        return "", (f"{n['name']} is its owner's machine, not a BuilderBot sandbox: its driver is "
+        return "", (f"{n['name']} is its owner's machine, not an AerieOS sandbox: its driver is "
                     "installed or removed there, the way its distribution does it")
     if (n.get("config") or {}).get("lock"):
         return "", f"{n['name']} is locked to its console: nothing on it is installed from here"
@@ -2054,7 +2054,7 @@ def node_job(principal, nid, action, names, driver=""):
     if action not in ("install", "remove", "sysdeps", "check"):
         return {"error": f"a node takes install, remove, sysdeps or check, not {action!r}"}
     if action == "sysdeps" and not (n.get("reported") or {}).get("sandbox"):
-        return {"error": f"{n['name']} was not provisioned as a BuilderBot sandbox, so its "
+        return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so its "
                          "system packages are its owner's to install; the row names them"}
     # The driver leaves the list for the store's checks and joins it again
     # at the end, since it is the machine's and ends at a restart.
@@ -2134,7 +2134,7 @@ def auto_sysdeps(nid):
     The libraries a toolchain needs are the machine's own, outside the
     store, so they can be missing while the toolchain is there (a package
     removed since, a machine rebuilt under its store). Those packages were
-    already chosen when the recipe was installed, so a node BuilderBot
+    already chosen when the recipe was installed, so a node AerieOS
     manages (the sandbox stamp) installs them itself when its census says
     they are missing. Not on a guest node, whose system is its owner's, and
     not while the node's system changes are locked to its console. The

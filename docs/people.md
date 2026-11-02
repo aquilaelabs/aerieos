@@ -14,7 +14,7 @@ to make the **owner** account, and it is the only page it serves until you
 have; nothing else is reachable, signed in or not. So open it as soon as the
 container is up: until somebody claims it, whoever can reach the port can.
 The setup page follows (R199, R267): four steps, each a card with its state
-and its own button. A first node cannot wait: **Create sandbox VM** or
+and its own button. A first node cannot wait: **New VM** or
 **Enroll node** in its card opens the Nodes page's own dialogs, the card says
 when the machine dials in, and **Finish** stays shut, on the server too,
 until a node is enrolled, answering and running sessions: a hosting-only node
@@ -26,10 +26,10 @@ kept and when an idle session ends are not asked; their defaults are under
 Controller settings. A public hostname and hosting-only nodes come later,
 from the Network page and Enroll node.
 
-Afterwards, `bb users passwd <name>` changes a password and `bb users add`
-makes the others. `bb users token <project> [<account>]` mints the scoped
+Afterwards, `aerie users passwd <name>` changes a password and `aerie users add`
+makes the others. `aerie users token <project> [<account>]` mints the scoped
 session token a session is given, for proving a node by hand, where
-`bb` reaches the controller with `BB_TOKEN` and nothing else; with an
+`aerie` reaches the controller with `BB_TOKEN` and nothing else; with an
 account named it is the token a node-bound terminal carries, which is also
 what reports that account's sign-ins to each agent on the node.
 
@@ -116,18 +116,18 @@ refusals consistent.
 
 **Every project has an owner, and an owner can close it to administrators.**
 Whoever made a project owns it; one from before there were owners belongs to
-BuilderBot's owner. Under **People** in the project's settings
-BuilderBot's owner hands it to another account at once, and the project's own
+AerieOS's owner. Under **People** in the project's settings
+AerieOS's owner hands it to another account at once, and the project's own
 owner offers it: the offer waits in the other person's bell like an
 invitation, and the project changes hands when they accept (and only if the
 one who offered still owns it then). Either can make it
 **invite only**: then nobody else changes who is on it, so an administrator
 can still see it but cannot add themselves, or anybody, on the Users page or
-anywhere, and people join by invitation. BuilderBot's owner is never kept
+anywhere, and people join by invitation. AerieOS's owner is never kept
 out. **Invite** there picks an existing account, user or admin; the
 invitation waits in that person's bell with **Accept** and **Decline**, and
 accepting puts the project on their list. Whoever invited, the owner, or
-BuilderBot's owner can **Withdraw** one still waiting. On a project that is
+AerieOS's owner can **Withdraw** one still waiting. On a project that is
 not invite only any administrator may invite too, as they could always add
 people. A session has no say in any of it.
 
@@ -185,7 +185,7 @@ you have taken on.
 the channel is drawn rather than leaving it to be discovered: what you ask
 a session on a project you share goes to the people you share it with.
 
-`bb work` says who else is in the project and which files two of you have
+`aerie work` says who else is in the project and which files two of you have
 uncommitted at once. Two answers, and the cheap one is the truthful one: **git**
 is exact: a file changed in two trees at once is a collision whatever anybody
 intended, and it needs nothing recorded, while a **PreToolUse hook** adds the
@@ -201,7 +201,7 @@ Each account signs in to the agents it uses for itself, on each node it
 works on, from that node's Installed page (Machines, then Installed, with that
 node picked in the header), and People and Profile name the account each agent is signed in as.
 Which account that is is the person's own choice: the Users page says when
-two BuilderBot accounts are on one Anthropic account, since Anthropic's
+two AerieOS accounts are on one Anthropic account, since Anthropic's
 terms allow one person per Claude account, and nothing is refused for it.
 
 The notebook (roadmap, bugs, analysis) stays shared, because it is about the
@@ -238,7 +238,7 @@ the ones above); **What you may do** is what their roles add up to;
 **Password** is a change that asks for the current one first;
 **Two-factor sign-in** is described below; **Your key store** is the key
 the person's agent sign-ins and tokens are sealed under, who holds it (this
-BuilderBot, their passkey, or a key they keep: *Hold the key yourself*
+AerieOS, their passkey, or a key they keep: *Hold the key yourself*
 moves it, *Give the key back* moves it back), the tokens they gave
 repositories with the projects that use them, *Unlock for* with the window
 a token stays opened (a quarter of an hour, an hour, eight hours, or while
@@ -291,7 +291,7 @@ The password alone opens nothing for such an account:
 
 - Basic auth with it is refused.
 - A companion app's sign-in asks for a code beside the password.
-- `bb` from a dashboard terminal is unaffected: it carries its own token.
+- `aerie` from a dashboard terminal is unaffected: it carries its own token.
 
 Wrong codes are counted per account and per address: after five, each try
 waits; after ten in a quarter of an hour, the account or the address is held
@@ -306,11 +306,11 @@ Roles page. An account in such a role without one meets the setup page at its
 next sign-in and reaches nothing else until it has added one.
 
 An owner who has lost every factor gets back in from a shell on the
-controller: `bb users reset-2fa NAME` removes that account's factors, and its
+controller: `aerie users reset-2fa NAME` removes that account's factors, and its
 password signs in alone until one is added again.
 
 Neither a session nor a shell starts for an account with no
-name and email for commits, and `bb git` refuses for it: every project is a
+name and email for commits, and `aerie git` refuses for it: every project is a
 repository, and a shell is where git is typed, and the project's Start agent
 and Shell say so until the Profile has them. Blank git fields fall back to the name and email
 above and to nothing else; no address is ever made up. A project's
@@ -320,20 +320,20 @@ newest first with the first thing typed, each with **Resume**, which opens
 the Start chooser on that conversation (Start agent's menu resumes only each
 agent's last), **Read**, **Download**, and
 behind its ⋯ **Make visible**, which lets every session on the project read
-it with `bb transcripts` until **Make private**, and **Delete**, for good (one
+it with `aerie transcripts` until **Make private**, and **Delete**, for good (one
 still being written by a running session is refused). A session never
 deletes or shares one. The download is a text file: what
 was said on both sides, every command the agent ran and what the command
-answered, `bb roadmap` and its reply included, from the transcript the agent
+answered, `aerie roadmap` and its reply included, from the transcript the agent
 writes as the session goes (transcripts.py reads the account's own: Claude
 Code's `~/.claude/projects`, the one on the share, Codex CLI's
 `~/.codex/sessions` and Copilot CLI's `~/.copilot/session-state`). Each line
 is stamped in the browser's own zone, the one the page shows times in, so
-the log and the page agree; a line headed System is what BuilderBot or the
+the log and the page agree; a line headed System is what AerieOS or the
 agent put in front of it. An agent's private reasoning is not conversation
 and is left out, and another account's file is simply not found. A session
-reads the same: `bb transcripts` lists the account's own conversations on
-its project and `bb transcripts show ID` prints one, and with `bb -p NAME`
+reads the same: `aerie transcripts` lists the account's own conversations on
+its project and `aerie transcripts show ID` prints one, and with `aerie -p NAME`
 the same on a project its own reads, whose transcript files of the account's
 are in the session's view read-only as well; nobody else's are anywhere. The commit identity is per account rather than per project, and
 reaches every session and shell that account opens as git's environment,

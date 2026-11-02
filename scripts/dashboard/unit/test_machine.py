@@ -31,7 +31,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_machine")
+        self.agent = agentpkg.load("aerieos_agent_machine")
         self.cp = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".configplane"]
         self.d = tempfile.mkdtemp()
         self.seenf = os.path.join(self.d, "seen")

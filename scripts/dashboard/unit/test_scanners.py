@@ -1,4 +1,4 @@
-"""BuilderBot's own scanners on each node (R145, scanners.py): the record
+"""AerieOS's own scanners on each node (R145, scanners.py): the record
 and the compose file with pinned versions, Deploy and Update as compose
 jobs, a run as a scan job over the projects whose node it is, the schedule
 firing from the timer, a report taken from a node and read by findings

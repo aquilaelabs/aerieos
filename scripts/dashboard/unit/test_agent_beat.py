@@ -13,7 +13,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_beat")
+agent = agentpkg.load("aerieos_agent_beat")
 agent.log = lambda *a, **k: None
 sys.path.insert(0, os.path.join(HERE, ".."))
 import nodes  # noqa: E402

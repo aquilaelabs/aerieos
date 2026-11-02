@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""`bb gpu`: this node's NVIDIA card, from where a session stands (R102).
+"""`aerie gpu`: this node's NVIDIA card, from where a session stands (R102).
 
     gpu.py                  what the card is, how much of its memory is free,
                             who is computing on it, whether this session may
-    gpu.py line             that in one line, for bb status; nothing with no card
+    gpu.py line             that in one line, for aerie status; nothing with no card
     gpu.py run [--mem MB] [--wait S] -- CMD...
                             CMD with a turn on the card
 
@@ -135,7 +135,7 @@ def line():
         return f"{s['name']}, not this session's to compute on: {s['why']}"
     h = holder()
     return (f"{s['name']}, {gb(s['free'])} of {gb(s['total'])} free"
-            + (f"; the card's turn is held by {h}" if h else "") + "; bb gpu run -- CMD takes a turn on it")
+            + (f"; the card's turn is held by {h}" if h else "") + "; aerie gpu run -- CMD takes a turn on it")
 
 
 def status():
@@ -145,7 +145,7 @@ def status():
         return 0
     if not s["name"]:
         print("an NVIDIA card, and NVIDIA's driver does not have it: nothing can compute on it.")
-        print("The operator installs the driver from the Library with this node picked; bb toolchains says where it stands.")
+        print("The operator installs the driver from the Library with this node picked; aerie toolchains says where it stands.")
         return 0
     print(f"card      {s['name']}")
     print(f"memory    {gb(s['free'])} free of {gb(s['total'])} ({s['used']} MB in use)")
@@ -158,7 +158,7 @@ def status():
     if s["why"]:
         print(f"you       may not compute on it: {s['why']}. A program here finds no card and takes its CPU path.")
     else:
-        print("you       may compute on it: bb gpu run [--mem MB] -- CMD takes a turn, so two heavy jobs do not run out of memory together")
+        print("you       may compute on it: aerie gpu run [--mem MB] -- CMD takes a turn, so two heavy jobs do not run out of memory together")
     return 0
 
 
@@ -172,15 +172,15 @@ def run(argv):
                 wait = int(argv[1])
             argv = argv[2:]
         else:
-            die("bb gpu run [--mem MB] [--wait SECONDS] -- CMD...")
+            die("aerie gpu run [--mem MB] [--wait SECONDS] -- CMD...")
     cmd = argv[1:] if argv and argv[0] == "--" else []
     if not cmd:
-        die("bb gpu run [--mem MB] [--wait SECONDS] -- CMD...: the command comes after --")
+        die("aerie gpu run [--mem MB] [--wait SECONDS] -- CMD...: the command comes after --")
     s = state()
     if not s["card"]:
-        die("no NVIDIA card on this machine: run the command without bb gpu run, on the CPU")
+        die("no NVIDIA card on this machine: run the command without aerie gpu run, on the CPU")
     if s["why"]:
-        die(f"{s['why']}: run the command without bb gpu run, and it takes its CPU path")
+        die(f"{s['why']}: run the command without aerie gpu run, and it takes its CPU path")
     if not s["name"]:
         die("the card has no driver on it, so nothing can compute on it: say so in your reply; "
             "the operator installs it from the Library with this node picked")
@@ -251,7 +251,7 @@ def main(argv):
     if argv[0] in ("-h", "--help"):
         sys.stderr.write(__doc__ or "")
         return 0
-    die("bb gpu [run [--mem MB] [--wait SECONDS] -- CMD...]")
+    die("aerie gpu [run [--mem MB] [--wait SECONDS] -- CMD...]")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# A BuilderBot node on VirtualBox. Run as the user the VMs belong to.
+# An AerieOS node on VirtualBox. Run as the user the VMs belong to.
 #
 # Rendered by the dashboard's Create sandbox VM (vmtemplate.py). VirtualBox
 # takes a MAC without separators, from its own range (08:00:27:xx:xx:xx), and

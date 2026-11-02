@@ -32,7 +32,7 @@ MACROS = {
     # The last test run's output, followed while it is still running: the
     # Tests view's button sends this into the project's shell. A row used
     # to carry a tail of the job's log and redraw for every line of it.
-    "tests-log":        ["bb", "tests", "log", "-f"],
+    "tests-log":        ["aerie", "tests", "log", "-f"],
 }
 
 # The Linux and git lists. Strings typed into the shell as-is, not
@@ -64,7 +64,7 @@ GIT_MACROS = {
     "git-pull":   "git pull",
 }
 # No gh: a node carries none (the operator, 17 Oct), so its four buttons
-# could only fail; a push is bb git push's, under the project's policy.
+# could only fail; a push is aerie git push's, under the project's policy.
 SHELL_MACROS = {**LINUX_MACROS, **GIT_MACROS}
 
 # What the stored half and the typing need from the server, set by
@@ -85,7 +85,7 @@ session_tmux = None
 PINS_FILE = None             # <state>/pinned-commands.json, set by configure()
 
 # The operator's own command lists. Stored, never executed here: pressing one
-# types its lines into a terminal exactly as `bb` macros do. That is why this is
+# types its lines into a terminal exactly as `aerie` macros do. That is why this is
 # not the "arbitrary command string" the API refuses everywhere else: the text
 # goes to a tty the same authenticated operator is already sitting at, and they
 # could have typed it themselves. Nothing runs in the server's own process.
@@ -307,7 +307,7 @@ def send(session, name, cid, on_node):
     # arrives glued to the end of it. End-of-line then kill-line, which is
     # readline editing and not a signal: Ctrl-C would also interrupt
     # whatever is running in there, which is not what pressing a button
-    # labeled `bb status` should be able to do.
+    # labeled `aerie status` should be able to do.
     run(["tmux", "send-keys", "-t", session, "C-e", "C-u"], timeout=10)
     # Typed one after another without waiting. That is what happens when a
     # person types ahead too: the tty buffers the input and the shell reads

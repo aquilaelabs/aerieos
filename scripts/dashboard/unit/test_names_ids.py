@@ -16,7 +16,7 @@ class TmuxName(unittest.TestCase):
         self.assertEqual(names.claude_session("ep.silon"), "claude-ep_silon")
 
     def test_a_plain_name_is_itself(self):
-        self.assertEqual(names.claude_session("BuilderBot"), "claude-BuilderBot")
+        self.assertEqual(names.claude_session("AerieOS"), "claude-AerieOS")
 
 
 class EveryAgent(unittest.TestCase):

@@ -62,39 +62,33 @@ class DebugMode(unittest.TestCase):
 
 
 
-    def test_a_boot_that_asks_for_the_dev_channel_gets_it_in_debug_mode_alone(self):
-        # R161 step 12: a stick's builderbot.env says BB_RELEASE_CHANNEL=dev.
+    def test_a_boot_that_asks_for_the_dev_channel_gets_it(self):
+        # R161 step 12: a stick's aerieos.env says BB_RELEASE_CHANNEL=dev.
         was = os.environ.get("BB_RELEASE_CHANNEL")
         self.addCleanup(lambda: os.environ.pop("BB_RELEASE_CHANNEL", None) if was is None else os.environ.__setitem__("BB_RELEASE_CHANNEL", was))
         os.environ["BB_RELEASE_CHANNEL"] = "dev"
         os.environ.pop("DEBUG_MODE", None)
-        self.assertFalse(settings.boot_channel(), "nothing without DEBUG_MODE=1")
-        os.environ["DEBUG_MODE"] = "1"
         self.assertTrue(settings.boot_channel())
-        self.assertTrue(settings.dev_channel_ok())
         self.assertEqual(settings.get("release_channel"), "dev")
         self.assertFalse(settings.boot_channel(), "the next start finds it so and writes nothing")
-        os.environ["BB_RELEASE_CHANNEL"] = "nightly"
-        settings.set_many({"release_channel": "normal"})
-        self.assertFalse(settings.boot_channel(), "no other word")
-        self.assertEqual(settings.get("release_channel"), "normal")
 
-    def test_the_dev_channel_is_offered_only_with_debug_and_the_dev_switch(self):
-        # R179: refused without debug mode, refused with it until the dev
-        # switch is on, back to normal at a start without debug mode.
+    def test_any_install_picks_the_channel_and_keeps_it(self):
+        # The operator, 2 Nov: the dev channel is for anyone, and a start
+        # without debug mode leaves it where it was.
         os.environ.pop("DEBUG_MODE", None)
-        self.assertIn("dev channel", settings.set_many({"release_channel": "dev"}).get("error", ""))
-        self.assertTrue(settings.set_many({"release_channel": "normal"}).get("ok"), "normal may always be picked")
-        os.environ["DEBUG_MODE"] = "1"
-        self.assertIn("dev channel", settings.set_many({"release_channel": "dev"}).get("error", ""), "debug alone is not enough")
-        settings.set_many({"offer_unvetted": True})
-        self.assertTrue(settings.dev_channel_ok())
+        self.assertEqual(settings.channel_picked(), "")
         self.assertTrue(settings.set_many({"release_channel": "dev"}).get("ok"))
-        self.assertEqual(settings.get("release_channel"), "dev")
+        settings.reset_debug()
+        self.assertEqual(settings.channel_picked(), "dev")
+
+    def test_the_token_for_unpublished_builds_is_debug_modes_alone(self):
+        os.environ.pop("DEBUG_MODE", None)
+        self.assertIn("debug mode", settings.set_many({"release_token": "x"}).get("error", ""))
+        os.environ["DEBUG_MODE"] = "1"
+        self.assertTrue(settings.set_many({"release_token": "x"}).get("ok"))
         os.environ.pop("DEBUG_MODE")
         self.assertTrue(settings.reset_debug())
-        self.assertEqual(settings.get("release_channel"), "normal", "a start without debug mode puts the channel back")
-        self.assertFalse(settings.dev_channel_ok())
+        self.assertEqual(settings.get("release_token"), "", "a start without debug mode takes it off")
 
 
 if __name__ == "__main__":

@@ -3,19 +3,19 @@
 *.local
 .DS_Store
 _work/
-# A generated descriptions file for `bb tests describe --from`, derived from
+# A generated descriptions file for `aerie tests describe --from`, derived from
 # the test files, applied to /config, and no more part of the repository than
 # a run log is.
-# The last run's output, written by `bb tests run` and read back by the
+# The last run's output, written by `aerie tests run` and read back by the
 # ingest half. Beside the project because on a node the ingest is relayed and
 # the controller reads the path on its own filesystem, and /workspace is the
 # one place both machines see.
 .bb-test-run.log
-# ...and where a run log lands. From a session on a node `bb tests ingest` is
+# ...and where a run log lands. From a session on a node `aerie tests ingest` is
 # relayed, and the controller opens the path it is given, so the log has to
 # be somewhere both machines see, which means inside the project.
 scratchpad/
-# bb map's index, built from the tree and rebuilt when a source is newer.
+# aerie map's index, built from the tree and rebuilt when a source is newer.
 .bb-map/
 __pycache__/
 *.pyc

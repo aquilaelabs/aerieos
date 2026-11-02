@@ -8,7 +8,7 @@ working directory's path with its slashes turned to dashes: common.sh's
 claude_projects_link), which is why the controller can read a node's
 sessions here. This lists an account's own, newest first, and renders one
 as plain text: a turn a line, the tool calls with their command and the
-whole of what the tool answered, so `bb roadmap` and its reply are in it
+whole of what the tool answered, so `aerie roadmap` and its reply are in it
 as they were. Claude's private reasoning is not conversation and is left
 out. A notebook's Sessions view offers each to resume, read, download,
 delete, or make visible to every session on the project (shared(); the
@@ -339,7 +339,7 @@ def render(uid, project, sid, tz=None, tail=0):
     `tz` is the zone the stamps are written in (zone()), or the controller's.
     `tail`, when not 0, is how many bytes of a longer file are read, from its
     end: read from the start, a day-long conversation (900 MB on 19 Oct)
-    outran `bb transcripts show`'s wait and printed nothing."""
+    outran `aerie transcripts show`'s wait and printed nothing."""
     f = _find(uid, project, sid)
     if f is None:
         return None, "no such conversation of yours on this project"
@@ -352,7 +352,7 @@ def render(uid, project, sid, tz=None, tail=0):
     started = datetime.fromtimestamp(mtime, timezone.utc).astimezone(tz).strftime("%Y-%m-%d %H:%M")
     out = [f"Conversation on {project}, session {sid}, last written {started}",
            "What was said, every tool call with its command, and what each answered, as the "
-           "transcript Claude Code wrote holds them. A line headed System is what BuilderBot "
+           "transcript Claude Code wrote holds them. A line headed System is what AerieOS "
            "or Claude Code put in front of Claude (a hook's verdict, a subagent's report, a "
            "summary after the context filled). Claude's private reasoning is not in it.", ""]
     total = 0
@@ -728,7 +728,7 @@ def audit(uid, project, judge, days=AUDIT_DAYS):
     """How this account's conversations on the project have kept to the
     rules that can be counted, over the last `days`: each Bash call a guard
     refuses (or would have, before it refused anything), by the guard's
-    name with a few of the commands; how many calls asked `bb map` against
+    name with a few of the commands; how many calls asked `aerie map` against
     how many searched the code (grep -r, rg, git grep, the Grep and Glob
     tools); and how many calls the guard did refuse. `judge(command, background)` is the
     guard's name for a shell line or "". A turn a person can read is
@@ -795,7 +795,7 @@ def audit(uid, project, judge, days=AUDIT_DAYS):
                         # rg, git grep), not a grep filtering a pipe.
                         mapped = searched = False
                         for w in _simple_commands(cmd):
-                            if w[:1] == ["bb"] and "map" in w[1:4]:
+                            if w[:1] in (["aerie"], ["bb"]) and "map" in w[1:4]:
                                 mapped = True
                             elif w[:1] in (["rg"], ["ag"]) or w[:2] == ["git", "grep"] or (
                                     w[:1] in (["grep"], ["egrep"]) and any(

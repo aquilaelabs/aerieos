@@ -206,7 +206,7 @@ await ready(page);
   }));
   ok(probLines.length === 2 && probLines.every(l => l.same),
      `↻ runs it again, and a FAIL turns the dot red with each problem in its level's color (${JSON.stringify(probLines.map(l => l.same))})`);
-  ok(probLines.some(l => /runner offline/.test(l.text) && /bb logs --runner/.test(l.why)),
+  ok(probLines.some(l => /runner offline/.test(l.text) && /aerie logs --runner/.test(l.why)),
      '...and carries the rest of what the check said under it');
   ok(await page.$eval('#docPanel', p => !p.hidden), '...with the panel still open after ↻ redrew it');
   await page.keyboard.press('Escape');
@@ -315,13 +315,13 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
      'the tab\'s filter bar, headings, rules and footer all start at one x: '
      + JSON.stringify(xs));
 }
-// `bb findings sample`: the report a box with no scanner can still work on.
+// `aerie findings sample`: the report a box with no scanner can still work on.
 // Every surface above ghosts or empties without one, and a development stack
 // has no scanner by design, so this is how they are exercised at all.
 {
   const bb = (...a) => {
     try {
-      return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/bb`, 'findings', ...a],
+      return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'findings', ...a],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, FINDINGS_DIR: `${DIR}/sample-reports`, WORKSPACE: `${DIR}/ws` } }) };
     } catch (e) { return { code: e.status ?? 1, out: String(e.stdout || '') + String(e.stderr || '') }; }
@@ -345,7 +345,7 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   // every number on the card wrong and nothing would say why.
   const beside = (() => {
     try {
-      execFileSync('bash', [`${REPO}/scripts/bb`, 'findings', 'sample'],
+      execFileSync('bash', [`${REPO}/scripts/aerie`, 'findings', 'sample'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, FINDINGS_DIR: `${DIR}/reports`, WORKSPACE: `${DIR}/ws` } });
       return '';
@@ -356,14 +356,14 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   ok(bb('sample', '--remove').code === 0 && !existsSync(f),
      '...and taken away again by the same verb');
 
-  // `bb findings` from a session, which is what BB_RELAYED marks: the report
+  // `aerie findings` from a session, which is what BB_RELAYED marks: the report
   // covers the whole share, so the two lines that used to help are the two
   // that leak. With no findings of its own it listed every project the report
   // covered, by name, and with some it advertised --all, which the relay
   // refuses. The operator still gets both.
   const asSession = (cwd) => {
     try {
-      return execFileSync('bash', [`${REPO}/scripts/bb`, 'findings', `${DIR}/reports`],
+      return execFileSync('bash', [`${REPO}/scripts/aerie`, 'findings', `${DIR}/reports`],
         { encoding: 'utf8', cwd, stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, BB_RELAYED: '1', WORKSPACE: `${DIR}/ws` } });
     } catch (e) { return String(e.stdout || '') + String(e.stderr || ''); }
@@ -711,7 +711,7 @@ print(json.dumps(sorted(ns.siblings_of(mi, '/workspace'))))
 const sib = JSON.parse(sibOut.trim().split('\n').pop());
 ok(sib.includes('SDK'),
    'a share mounted beside the projects folder is known to be one');
-ok(!sib.includes('BuilderBot'),
+ok(!sib.includes('AerieOS'),
    '...while a mount from somewhere else is not, even named after a project');
 ok(!sib.includes('reports') && sib.length === 1,
    '...and a whole-filesystem mount names no directory, so it says nothing');
@@ -1021,15 +1021,15 @@ ok(true, '...and so does a click on the page under it');
              share: Math.round(100 * g.getBoundingClientRect().height / box.height),
              build: !$('abBuild').hidden };
   });
-  ok(look.links.length && look.links.every(t => !/\.md$/.test(t)) && look.links.includes('How BuilderBot works')
+  ok(look.links.length && look.links.every(t => !/\.md$/.test(t)) && look.links.includes('How AerieOS works')
      && look.indent === 0 && look.caps === 'none' && look.share >= 65 && !look.build,
      `the guide's links read as the docs' titles, its headings sit flush with their text, and it fills the box (${JSON.stringify(look)})`);
-  // Credits: what BuilderBot is built on, each with its license.
+  // Credits: what AerieOS is built on, each with its license.
   await page.click('.abswitch [data-ab="credits"]');
   const cred = await page.$eval('#abCredits', e => ({ hidden: e.hidden, rows: e.querySelectorAll('.tline').length,
     novnc: /noVNC/.test(e.textContent), lic: /MPL-2\.0/.test(e.textContent), build: !document.querySelector('#abBuild').hidden }));
   ok(!cred.hidden && cred.rows >= 20 && cred.novnc && cred.lic && !cred.build,
-     `About's Credits lists what BuilderBot is built on, with licenses (${JSON.stringify(cred)})`);
+     `About's Credits lists what AerieOS is built on, with licenses (${JSON.stringify(cred)})`);
   await page.click('.abswitch [data-ab="log"]');
   ok(await page.$eval('#abBuild', e => !e.hidden), '...and the build lines are under the changelog');
   // Whatever the top section is: Unreleased while entries are accumulating,
@@ -1760,11 +1760,12 @@ ok(await page.$eval('#rnPeopleField', f => f.closest('details')?.dataset.sect ==
    && await page.$eval('.rnbar[data-rnbar="project"] [data-rnsave]', b => b.disabled),
    '...in a People section of its own, whose Save it wakes and The project\'s not');
 await page.click('#rnInviteOnly');
-// ...and Agents may reads the Git view's session dials too, set there.
-const gp = await page.evaluate(() => ({ text: document.getElementById('rnGitPol')?.textContent, hidden: document.getElementById('rnGitPolField')?.hidden,
-  sect: document.getElementById('rnGitPolField')?.closest('details')?.dataset.sect, pol: (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.gitpol }));
-ok(/its branches allow · to main deny · a sensitive push held for you/.test(gp.text || '') && !gp.hidden && gp.sect === 'rn:claude',
-   `Agents may shows the Git view's push dials, with the way to where they are set (${JSON.stringify(gp)})`);
+// ...and Agents may says what each part is for, its guards folded, and no
+// push line of its own: Permissions' Pushing shows and sets that.
+const gp = await page.evaluate(() => ({ push: !!document.getElementById('rnGitPolField'),
+  guards: document.getElementById('rnAgentGuards')?.closest('details')?.open, label: document.getElementById('rnAgentsLabel')?.textContent }));
+ok(!gp.push && gp.guards === false && /Claude, which always may/.test(gp.label || ''),
+   `Agents may: no push line, the guards folded, and Claude's place said beside the list (${JSON.stringify(gp)})`);
 await page.click('#rnCancel');
 
 // Its Android signing keys (R106) are a view of the notebook's own, Signing,
@@ -1785,9 +1786,9 @@ await page.click('#rnCancel');
   const where = await page.evaluate(v => ({ ship: [...document.querySelectorAll('.pane .nb .nbsub [data-in="ship"]')].map(b => b.dataset.v).join(),
     sect: !!document.querySelector('details.rngroup[data-sect="rn:signing"]'), hash: location.hash,
     head: (document.querySelector(`${v} #sgHint`)?.textContent || '').replace(/\s+/g, ' ').trim(),
-    empty: document.querySelector(`${v} .sghead`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
+    empty: document.querySelector(`${v} > .nbhead > .nbsaidslot`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
   ok(where.ship === 'artifacts,docker,vms,signing' && !where.sect && /\/projects\/alpha\/signing$/.test(where.hash)
-     && where.head === '' && /Keys\s*none yet/.test(where.empty),
+     && where.head === '' && /no key yet/.test(where.empty),
      `the keys are the notebook's Signing view, last in Ship, at its own address, no tiles over its head, and the settings have no signing section (${JSON.stringify(where)})`);
   const signRows = await page.$$eval(`${V} .rnsign[data-key]`, rs => rs.map(r => r.firstElementChild.textContent.trim()));
   // ...under the backup password's line, the project's owner's to set (the
@@ -2097,6 +2098,10 @@ await page.click('#rnCancel');
   const draft = await page.evaluate(() => rnFtpChange());
   ok(draft?.on === true && draft.port === 2121 && draft.access?.[uid] === 'rw',
      `...and what Save sends is the switch, the port and the access picked (${JSON.stringify(draft)})`);
+  // ...and how long it stays on (R196): a day picked is sent as its seconds.
+  await page.selectOption('#rnFtpFor', '86400');
+  const timed = await page.evaluate(() => rnFtpChange());
+  ok(timed?.for === 86400 && timed.on === true, `...and Keep it on for a day sends how long (${JSON.stringify(timed)})`);
   // The editor's door (R159): its own switch over the same people, with no
   // port, and FTPS left off.
   await page.click('#rnFtpOn');
@@ -2675,7 +2680,7 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
   });
   ok(arc.status === 200 && arc.ct === 'application/gzip' && arc.len > 0,
      'and the whole archive comes back as a tarball');
-  // ...and the diagnostics, with what sessions reported about BuilderBot in
+  // ...and the diagnostics, with what sessions reported about AerieOS in
   // them (the operator, 24 Sep): a zip from a link beside the logs, the
   // report as diagnostics.json and each conversation a report carries as a
   // file of its own beside it (the operator, 2 Oct).

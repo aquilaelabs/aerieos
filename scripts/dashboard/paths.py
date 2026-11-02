@@ -1,6 +1,6 @@
 """Where the controller keeps what grows, as the Settings page sets it.
 
-Everything BuilderBot keeps lives in its state directory (/config) by
+Everything AerieOS keeps lives in its state directory (/config) by
 default. The directories here are the ones that grow with use, and each can
 be put somewhere else on the controller's disks, where there is room: the
 operator's ask of 10 Oct. What stays in /config whatever is set: the JSON
@@ -12,7 +12,7 @@ A path is changed in one step from the page: the new directory is made, what
 is in the old one is moved across (a rename on one filesystem, a copy and a
 removal across two, in the background), and until the move has finished the
 old place is the one in use, so nothing reads a half-moved directory.
-Reset BuilderBot moves the state directory aside and with it this file,
+Reset AerieOS moves the state directory aside and with it this file,
 so a directory kept elsewhere is left where it is, and found by nothing,
 until it is named here again.
 """

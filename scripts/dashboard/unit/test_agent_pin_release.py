@@ -11,7 +11,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_pin_release")
+agent = agentpkg.load("aerieos_agent_pin_release")
 
 
 def release(root, version):

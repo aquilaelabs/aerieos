@@ -8,17 +8,17 @@
 # "REACHED", as whichever account runs it.
 tries() {
     local st
-    st="$(sed -n 's/^DASHBOARD_STATE=//p' /etc/builderbot-controller/controller.env 2>/dev/null)"
-    [ -n "$st" ] || st=/var/lib/builderbot-controller/config
+    st="$(sed -n 's/^DASHBOARD_STATE=//p' /etc/aerieos-controller/controller.env 2>/dev/null)"
+    [ -n "$st" ] || st=/var/lib/aerieos-controller/config
     try() { if "$@" >/dev/null 2>&1; then echo "REACHED $*"; else echo "refused $*"; fi; }
     try cat "$st/users.json"
     try ls "$st"
-    try cat /etc/builderbot-controller/controller.env
-    try ls /etc/builderbot-controller/secrets
+    try cat /etc/aerieos-controller/controller.env
+    try ls /etc/aerieos-controller/secrets
     try cat /run/builderbot/secrets.env
     try ls /run/builderbot
     # ssh-add exits 2 when it cannot reach an agent, 1 for an empty one.
-    try sh -c 'SSH_AUTH_SOCK=/run/builderbot-controller/ssh-agent.sock ssh-add -l; [ $? -ne 2 ]'
+    try sh -c 'SSH_AUTH_SOCK=/run/aerieos-controller/ssh-agent.sock ssh-add -l; [ $? -ne 2 ]'
     try curl -s -m 5 --unix-socket /run/docker.sock http://localhost/version
 }
 
@@ -42,7 +42,7 @@ outside() {
 start_install() {
     set -e
     mkdir -p /root/bb && cd /root/bb
-    curl -fsSL "https://github.com/aquilaelabs/builderbot/archive/$1.tar.gz" | tar -xz --strip-components=1
+    curl -fsSL "https://github.com/aquilaelabs/aerieos/archive/$1.tar.gz" | tar -xz --strip-components=1
     bash nodes/install-controller.sh --check > /root/check.log 2>&1; echo $? > /root/check.rc
     setsid bash -c 'bash nodes/install-controller.sh --install > /root/install.log 2>&1; echo $? > /root/install.rc' \
         < /dev/null > /dev/null 2>&1 &
@@ -53,10 +53,10 @@ start_install() {
 # account and the nodes as bb lists them.
 status() {
     curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7680/; echo
-    systemctl is-active builderbot-controller
-    readlink /opt/builderbot
+    systemctl is-active aerieos-controller
+    readlink /opt/aerieos
     id builderbot
-    bb nodes 2>&1 | tail -3
+    aerie nodes 2>&1 | tail -3
 }
 
 # inside: the tries and the covers inside a session's view, built by
@@ -81,17 +81,17 @@ inside() {
 start_update() {
     set -e
     rm -rf /root/bb-next && mkdir -p /root/bb-next && cd /root/bb-next
-    curl -fsSL "https://github.com/aquilaelabs/builderbot/archive/$1.tar.gz" | tar -xz --strip-components=1
-    setsid bash -c 'bash /opt/builderbot/nodes/install-controller.sh --update --from /root/bb-next > /root/update.log 2>&1; echo $? > /root/update.rc' \
+    curl -fsSL "https://github.com/aquilaelabs/aerieos/archive/$1.tar.gz" | tar -xz --strip-components=1
+    setsid bash -c 'bash /opt/aerieos/nodes/install-controller.sh --update --from /root/bb-next > /root/update.log 2>&1; echo $? > /root/update.rc' \
         < /dev/null > /dev/null 2>&1 &
     echo started
 }
 
 # release: the release the install runs now (its link and its stamp).
 release() {
-    readlink /opt/builderbot
-    sed -n 's/^BB_VERSION=//p' /opt/builderbot/build.env
-    sed -n 's/^STATE_VERSION=//p' "$(sed -n 's/^DASHBOARD_STATE=//p' /etc/builderbot-controller/controller.env)/state.json" 2>/dev/null \
+    readlink /opt/aerieos
+    sed -n 's/^BB_VERSION=//p' /opt/aerieos/build.env
+    sed -n 's/^STATE_VERSION=//p' "$(sed -n 's/^DASHBOARD_STATE=//p' /etc/aerieos-controller/controller.env)/state.json" 2>/dev/null \
         || python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("version",""))' \
-            "$(sed -n 's/^DASHBOARD_STATE=//p' /etc/builderbot-controller/controller.env)/state.json" 2>/dev/null || true
+            "$(sed -n 's/^DASHBOARD_STATE=//p' /etc/aerieos-controller/controller.env)/state.json" 2>/dev/null || true
 }

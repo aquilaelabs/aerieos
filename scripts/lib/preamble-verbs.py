@@ -1,11 +1,11 @@
-"""Behind `bb preamble` (cmd_preamble in bb): what a session started on this
+"""Behind `aerie preamble` (cmd_preamble in bb): what a session started on this
 project is handed, the house rules, the open roadmap and the open bugs,
 in the order it reads them, assembled once by dashboard/preamble.py so
 the Briefing tab cannot drift from what a session actually gets.
 
 Arguments: the dashboard directory, the project, and --json for the
 payload rather than the text, --topic SLUG for one topic of the briefing
-(what `bb help TOPIC` prints), --topics for the list. DASHBOARD_STATE
+(what `aerie help TOPIC` prints), --topics for the list. DASHBOARD_STATE
 says where the notebook's files are.
 """
 import json

@@ -55,7 +55,7 @@ def configure(*, state):
 def open_readonly(state):
     """Open the store to read it: no migration and no writes.
 
-    For `bb nodes` and anything else that looks without being the boot: a
+    For `aerie nodes` and anything else that looks without being the boot: a
     read-only caller mutating the store on its way in would make "look at
     the list" a write, and two processes racing the boot's.
     """
@@ -146,6 +146,13 @@ def migrate():
             except sqlite3.Error:
                 _db.rollback()
                 raise
+
+
+def checkpoint():
+    """The write-ahead log folded into the database, so a copy of the file
+    alone is whole (a move's bundle, B601)."""
+    with _lock:
+        _db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def _statements(text):

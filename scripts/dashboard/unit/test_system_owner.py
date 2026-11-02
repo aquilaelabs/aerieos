@@ -1,4 +1,4 @@
-"""System, the owner of what BuilderBot deploys itself (R180): no project, so
+"""System, the owner of what AerieOS deploys itself (R180): no project, so
 never a deleted one; given every compose project on its node by the
 containers' network map's `all`; and set by the deployment alone, never
 through the owner picker."""
@@ -35,7 +35,7 @@ class SystemOwner(unittest.TestCase):
         self.assertNotIn("all", m["alpha"])
 
     def test_a_strangers_name_must_be_unique_for_the_project_it_is_given_to(self):
-        """A container BuilderBot did not start keeps the name docker gave it,
+        """A container AerieOS did not start keeps the name docker gave it,
         so giving it to a project is refused while that name is an instance's
         compose name, or a stranger already the project's on another node
         (the operator, 11 Oct)."""
@@ -54,7 +54,7 @@ class SystemOwner(unittest.TestCase):
     def test_no_picker_sets_it(self):
         containers._known_container = lambda name: {"name": name, "ours": False}
         r = containers.set_container_owner("stranger", devapp.SYSTEM)
-        self.assertIn("BuilderBot's own", r.get("error", ""))
+        self.assertIn("AerieOS's own", r.get("error", ""))
 
 
 if __name__ == "__main__":

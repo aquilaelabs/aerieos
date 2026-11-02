@@ -15,7 +15,7 @@
 # conversation ended, and a new session wearing its name would be a lie.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 SESSION_DIR="${DASHBOARD_STATE:-/config}/sessions"
 INDEX="$SESSION_DIR/index.json"

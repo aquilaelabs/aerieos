@@ -23,7 +23,7 @@
 #
 set -euo pipefail
 
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # Under /config rather than /run so a token survives the container being
 # recreated; root-only, so the dashboard and every session reach it only

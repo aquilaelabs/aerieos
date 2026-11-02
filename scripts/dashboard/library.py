@@ -1,4 +1,4 @@
-"""The Library (R170): everything a BuilderBot installs or runs, as one
+"""The Library (R170): everything an AerieOS installs or runs, as one
 list of one shape, for one node. The toolchains the catalog offers with
 what the node's store holds (toolchains.payload_for_node), the coding
 agents with their version against the latest (agentcode.rows), the tool
@@ -19,6 +19,15 @@ TIER_WORDS = {"official": "Official", "vetted": "Vetted", "url": "Sideloaded", "
 def _an(w):
     """"a" or "an" before a word, by its sound (Any model, OpenCode, xAI)."""
     return ("an " if w[:1].upper() in "AEIOU" or (w[:1] == "x" and w[1:2].isupper()) else "a ") + w
+
+
+def _agent_about(provider):
+    """What an agent's card says it is: a Claude session's, a ChatGPT
+    session's; Any model's is a session on any model, which "an Any model
+    session" did not say."""
+    if provider.lower().startswith("any "):
+        return f"What a session on {provider.lower()} runs on the node."
+    return f"What {_an(provider)} session runs on the node."
 
 
 def service_values(fields, status):
@@ -58,7 +67,7 @@ def _tier(t):
 
 def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(), pack_values=None, pack_mine=None):
     """The one list, in the page's order: agents, toolchains, packs, the
-    services (R172: a deployed thing of BuilderBot's, its configuration on
+    services (R172: a deployed thing of AerieOS's, its configuration on
     the card), apps, the catalog's offers, the companions. `services` is
     [{manifest, status, ready, all_projects}] and `pack_values` {pack name:
     its answers on this node} for the packs with a config block."""
@@ -73,7 +82,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     busy_on = job.get("current") if job.get("running") and job.get("action") != "check" else ""
     for r in agent_rows or []:
         out.append({"kind": "agent", "tier": "official", "name": r["name"], "label": r.get("label") or r["name"], "agent": r.get("agent", ""),
-                    "about": f"What {_an(r.get('for') or r.get('label') or '')} session runs on the node.", "platforms": [],
+                    "about": _agent_about(r.get("for") or r.get("label") or ""), "platforms": [],
                     "installed": bool(r.get("installed")), "version": r.get("installed") or "", "latest": r.get("latest") or "",
                     "update": r.get("state") == "update", "running": bool(r.get("running")), "doing": r.get("action") or "",
                     "error": r.get("error") or "",

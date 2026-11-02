@@ -30,7 +30,7 @@ project ships, so the listing
 leaves them out and the tab draws them as one Captures fold, and they go by
 age: the project's "captures kept" days, swept here when the tab draws,
 since nothing can tell whether another session is still reading one. The
-rule is capture.py's (scripts/lib, loaded by path), the same one `bb
+rule is capture.py's (scripts/lib, loaded by path), the same one `aerie
 capture prune` applies on a node.
 """
 import importlib.util
@@ -391,7 +391,7 @@ def pin(project, rel, on, by=""):
 
 
 # ---- dev builds: the newest few builds of each product (R105) ---------------------
-# A dev build carries its version in its name the way bb version --file
+# A dev build carries its version in its name the way aerie version --file
 # spells it (0.1.0-dev.17-9e09ad3, -dirty when the tree was), and a session
 # building all day leaves one file per build: seven debug APKs, 133 MB, in
 # one day on Shebang-DevBoard (30 Sep). Of each product (the name before its

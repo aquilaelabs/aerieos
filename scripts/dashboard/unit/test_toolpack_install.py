@@ -1,5 +1,5 @@
 """R77: a tool pack installs on a node the way a shipped toolchain does. A
-copy laid out as the bundle a node unpacks (scripts/bb, scripts/lib and the
+copy laid out as the bundle a node unpacks (scripts/aerie, scripts/lib and the
 catalog, with the packs' toolpacks.json beside it, as workspace.bundle()
 writes it) installs a pack repository at its pinned commit into a scratch
 store, runs its install steps and its verify, and puts its bin on PATH."""
@@ -59,6 +59,7 @@ class Install(unittest.TestCase):
         # The bundle's layout: what workspace.bundle() tars, plus toolpacks.json.
         self.b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(self.b, "scripts", "lib"))
+        shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(self.b, "scripts", "aerie"))
         shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(self.b, "scripts", "bb"))
         os.makedirs(os.path.join(self.b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(self.b, "config"))
@@ -71,7 +72,7 @@ class Install(unittest.TestCase):
         self.env["SDK_ROOT"] = self.store
 
     def bb(self, *a):
-        return subprocess.run(["bash", os.path.join(self.b, "scripts", "bb"), *a], capture_output=True, text=True,
+        return subprocess.run(["bash", os.path.join(self.b, "scripts", "aerie"), *a], capture_output=True, text=True,
                               env=self.env, timeout=120, check=False)
 
     def test_installs_at_the_approved_commit_and_joins_the_environment(self):
@@ -85,17 +86,17 @@ class Install(unittest.TestCase):
             self.assertEqual(f.read().strip(), "fetched", "its install steps ran")
         env = self.bb("toolchains", "env").stdout
         self.assertIn(os.path.join(d, "bin"), env, "its bin is on PATH")
-        # bb tool PACK VERB: the manifest's words, the caller's in place of
+        # aerie tool PACK VERB: the manifest's words, the caller's in place of
         # {args}, each a word of its own and nothing a shell reads.
         r = self.bb("tool", "hexkit", "dump", "a b", "$(id)")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("arg[a b]\narg[$(id)]", r.stdout)
         r = self.bb("tool", "hexkit")
-        self.assertIn("bb tool hexkit dump", r.stdout, "the pack's verbs listed")
+        self.assertIn("aerie tool hexkit dump", r.stdout, "the pack's verbs listed")
         r = self.bb("tool", "hexkit", "nope")
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("hexkit has no verb nope: dump", r.stderr)
-        self.assertIn("bb tool hexkit dump|", self.bb("tool").stdout.replace("dump ...", "dump|"))
+        self.assertIn("aerie tool hexkit dump|", self.bb("tool").stdout.replace("dump ...", "dump|"))
         r = self.bb("tool", "nosuch")
         self.assertIn("no tool called nosuch", r.stderr)
         # Switched off for the project (its settings' Toolchains group): bb
@@ -104,7 +105,7 @@ class Install(unittest.TestCase):
         r = self.bb("tool", "hexkit", "dump", "x")
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("hexkit is switched off for this project", r.stderr)
-        self.assertIn("bb tool hexkit dump ...   (switched off for this project", self.bb("tool").stdout,
+        self.assertIn("aerie tool hexkit dump ...   (switched off for this project", self.bb("tool").stdout,
                       "the listing says so too")
 
 
@@ -152,6 +153,7 @@ class MadeHere(unittest.TestCase):
         b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(b, "scripts", "lib"))
         shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(b, "scripts", "bb"))
+        shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(b, "scripts", "aerie"))
         os.makedirs(os.path.join(b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(b, "config"))
         with open(os.path.join(b, "config", "toolpacks.json"), "w") as f:
@@ -165,7 +167,7 @@ class MadeHere(unittest.TestCase):
         env["SDK_ROOT"] = store
 
         def bb(*a):
-            return subprocess.run(["bash", os.path.join(b, "scripts", "bb"), *a], capture_output=True, text=True,
+            return subprocess.run(["bash", os.path.join(b, "scripts", "aerie"), *a], capture_output=True, text=True,
                                   env=env, timeout=120, check=False)
         r = bb("toolchains", "install", "hexkit")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

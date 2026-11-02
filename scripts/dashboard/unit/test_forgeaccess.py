@@ -1,6 +1,6 @@
 """What an agent may do on a project's git host (R188): the token measured
 against a recorded host without changing anything, the project's Allow or
-Deny over it, the briefing's lines, and bb forge's verbs in each host's
+Deny over it, the briefing's lines, and aerie forge's verbs in each host's
 dialect."""
 import json
 import os
@@ -238,3 +238,50 @@ class Dialects(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IssueList(Base):
+    def test_issues_behind_a_page_of_pull_requests_are_found(self):
+        # B562: GitHub lists pull requests among its issues; thirty asked for
+        # were thirty pull requests and no issue said.
+        prs = [{"number": n, "title": "pr", "state": "open", "pull_request": {"url": "x"}} for n in range(100)]
+        issues = [{"number": 200 + n, "title": "bug", "state": "open"} for n in range(5)]
+        pages = {1: prs, 2: issues}
+        asked = []
+        def call(t, method, path, data=None, raw=False):
+            asked.append(path)
+            page = int(path.rsplit("page=", 1)[1])
+            return 200, pages.get(page, []), {}
+        forgeaccess._call = call
+        got, code = forgeaccess.v_issue_list(self.t, {})
+        self.assertEqual((code, [i["number"] for i in got]), (200, [200, 201, 202, 203, 204]))
+        self.assertEqual(len(asked), 2)
+
+
+class RunLog(Base):
+    def test_a_failure_past_the_first_page_is_the_log_shown(self):
+        # B563: fifty jobs were asked for, and with no failure among them the
+        # first jobs' passing logs were shown as the answer.
+        ok = [{"id": n, "conclusion": "success"} for n in range(100)]
+        pages = {1: {"jobs": ok}, 2: {"jobs": [{"id": 163, "conclusion": "failure"}]}}
+        def call(t, method, path, data=None, raw=False):
+            if raw:
+                return 200, "line\n" * 5 + "the error", {}
+            return 200, pages[int(path.rsplit("page=", 1)[1])], {}
+        forgeaccess._call = call
+        got, code = forgeaccess.v_run_log(self.t, {"pos": ["7"]})
+        self.assertEqual((code, [x["job"] for x in got]), (200, ["163"]))
+        self.assertTrue(got[0]["log"].endswith("the error"))
+
+
+class Governed(Base):
+    def test_an_ability_another_setting_governs_has_no_switch(self):
+        # B559: a deny on Push, Read the code or Publish and edit releases was
+        # told to sessions and enforced nowhere; it is fixed at allow, with
+        # where it is set, and Change CI workflow files keeps its switch.
+        self.pol = {"push": "deny", "releases_write": "deny", "code_read": "deny", "workflows": "deny"}
+        o = forgeaccess.override("app")
+        self.assertEqual((o["push"], o["releases_write"], o["code_read"], o["workflows"]), ("allow", "allow", "allow", "deny"))
+        rows = {r["id"]: r for r in forgeaccess.view("app")["rows"]}
+        self.assertEqual(rows["push"]["fixed"], "set under Pushing")
+        self.assertEqual(rows["workflows"]["fixed"], "")

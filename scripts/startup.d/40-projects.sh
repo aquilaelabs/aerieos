@@ -6,7 +6,7 @@
 # says so at the first commit rather than committing as nobody.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 shopt -s nullglob
 

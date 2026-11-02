@@ -1,6 +1,6 @@
 """Which git host a project's remote is on, and what that host can be asked.
 
-Everything BuilderBot does with a remote is plain git except three things, and
+Everything AerieOS does with a remote is plain git except three things, and
 those three are the whole of this file:
 
   * **what an address may look like.** `git clone` accepts transports a web
@@ -399,7 +399,7 @@ def _ask_full(url, kind, token, data=None):
     """_ask with the response's headers and status as well: (body, why,
     headers, status), status 0 when the host could not be reached. GitHub
     says a classic token's scopes in a header and nowhere else."""
-    headers = {"User-Agent": "BuilderBot", **_auth(kind, token)}
+    headers = {"User-Agent": "AerieOS", **_auth(kind, token)}
     if data is not None:
         headers["Content-Type"] = "application/json"
     # api_base() built `url` from a host that matched URL and a scheme this

@@ -2,7 +2,7 @@
 load, and the trace could say which request but not why). A part of the
 work wraps itself in `timed("name")`; the request's parts, its own thread's
 CPU time beside its wall time, ride its line in the trace (server.py
-trace_note), and `bb dashboard trace` sums them. Thread-local, so two
+trace_note), and `aerie dashboard trace` sums them. Thread-local, so two
 requests at once never mix their parts; free when nothing reads it.
 """
 import contextlib

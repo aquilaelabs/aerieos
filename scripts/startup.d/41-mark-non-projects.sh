@@ -20,7 +20,7 @@
 # the UI honors is a suggestion. This is housekeeping, not a boundary.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 MARKER=".bbignore"
 
@@ -33,7 +33,7 @@ mark() {
     case "$dir" in "$WORKSPACE"/*) ;; *) return 0 ;; esac
     [ -e "$dir/$MARKER" ] && return 0
     if cat > "$dir/$MARKER" <<EOF 2>/dev/null
-# BuilderBot: this directory is ${why}, not a project.
+# AerieOS: this directory is ${why}, not a project.
 #
 # The file's existence is the whole signal: the dashboard skips any
 # directory under the projects share that holds one. Delete it to have this

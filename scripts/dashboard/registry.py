@@ -18,7 +18,7 @@ as one, so no folder ever takes it, though none is on disk; its id and name
 are the project's, and every repository is in one, keeping its own record,
 folder and name. A project's name is a title (spaces and punctuation kept,
 title()); a repository's is GitHub's (clean_name). Each is unique among its
-own kind, so a project and its repository may share one. Only BuilderBot
+own kind, so a project and its repository may share one. Only AerieOS
 makes a repository: a folder made by hand on the share is not one. On the
 first run every folder already there is recorded, which is the whole
 migration.
@@ -105,7 +105,7 @@ def _on_disk():
 
 
 def sync():
-    """Bring the records in step with the disk. Only BuilderBot makes a
+    """Bring the records in step with the disk. Only AerieOS makes a
     project (create, clone, an imported archive: claim()); a folder made by
     hand on the share is not one and is not listed (the operator, 8 Oct).
     The one exception is the first run, when every folder already there is
@@ -135,9 +135,16 @@ def sync():
                 if r.get("state") == "live":
                     r["name"] = unique_name(r["name"], but=name)
                 changed = True
+        # Not a folder of the projects there, and records say there were: the
+        # disk is not (not mounted yet, a stick's hold, a move landed before
+        # its folder was named), not every project gone at once. A purge has
+        # no way back and takes the owners with it (B595).
+        absent = not live and not gone
         for name, r in ps.items():
             st = r.get("state")
             if st == "live" and name not in live:
+                if absent:
+                    continue
                 r["state"] = "trashed" if name in gone else "purged"
                 changed = True
             elif st == "trashed" and name in live and name not in gone:

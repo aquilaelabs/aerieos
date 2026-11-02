@@ -1,5 +1,5 @@
 """A project's CI watched from the day it is linked (R117), on every
-BuilderBot and for every project, with nothing set up in the repository.
+AerieOS and for every project, with nothing set up in the repository.
 
 Shebang-DevBoard's CI had failed for weeks on an action GitHub had moved
 past (setup-android v3 asking for an SDK package Google stopped serving),
@@ -16,7 +16,7 @@ then once a day:
     runner image about to move.
 
 What it finds is kept per project (STATE/ciwatch/PROJECT.json) and read
-by the Git view, bb catchup and, for a red main branch, the bell. It only
+by the Git view, aerie catchup and, for a red main branch, the bell. It only
 reads, with one exception a person presses for (R117 step 4): a moving
 label and an action a major behind each carry their fix, the one line
 that changes, and fix() writes that line into the project's working tree,
@@ -61,7 +61,7 @@ def _file(project):
 
 def read(project):
     """What the last look found, or {} before the first, or when it was
-    made by a BuilderBot that judged differently (FORMAT)."""
+    made by an AerieOS that judged differently (FORMAT)."""
     try:
         rec = json.loads(_file(project).read_text())
     except (OSError, ValueError):
@@ -163,7 +163,7 @@ def fix(project, where):
     rec = read(project)
     hit = next((f for f in rec.get("findings") or [] if f.get("where") == where and f.get("fix")), None)
     if not hit:
-        return {"error": "no fix for that line in the last look: Look now looks again"}
+        return {"error": "no fix for that line in the last look: Check now looks again"}
     name, _, num = str(where).rpartition(":")
     folder, _, base = name.rpartition("/")
     folder = folder or WORKFLOW_DIRS[0]
@@ -177,7 +177,7 @@ def fix(project, where):
     i = int(num) - 1
     old, new = hit["fix"]["from"], hit["fix"]["to"]
     if not 0 <= i < len(lines) or old not in lines[i]:
-        return {"error": f"{name}:{num} no longer says {old}: Look now looks again"}
+        return {"error": f"{name}:{num} no longer says {old}: Check now looks again"}
     lines[i] = lines[i].replace(old, new, 1)
     try:
         path.write_text("\n".join(lines))
@@ -194,7 +194,7 @@ NOTICE = re.compile(r"deprecat|will (?:be )?(?:migrat|remov|retir|stop)|no longe
 
 
 def look(project):
-    """Look now, keep what was found, and return it."""
+    """Check now, keep what was found, and return it."""
     found, run, err = [], {}, ""
     token = cilogs._token(project)
     flows = workflows(project)
@@ -236,7 +236,7 @@ def look(project):
             main = _main_branch(project)
             # Each workflow by its newest run on main that came to a verdict:
             # a run stopped because a newer one superseded it, or skipped,
-            # says nothing about the code (BuilderBot's android app run,
+            # says nothing about the code (AerieOS's android app run,
             # stopped by its successor, read as red on the first look).
             verdict = {}
             # ...and a check that passed since on a release (a tag's run of
@@ -264,7 +264,7 @@ def look(project):
                     found.append({"kind": "run", "sev": "bad", "where": f"run {r['id']}",
                                   "text": f"The {r['name']} check {ended(r['conclusion'])} on {r['branch']}"
                                           f" ({_when(r['at'])}). A session can read why with "
-                                          f"bb ci-log {r['id']}.",
+                                          f"aerie ci-log {r['id']}.",
                                   "url": r.get("url", "")})
             if newest:
                 run = {k: newest[k] for k in ("id", "name", "branch", "conclusion", "at")}

@@ -1,4 +1,4 @@
-# BuilderBot OS (R160): the appliance image built by mkosi and image/build.sh,
+# AerieOS (R160): the appliance image built by mkosi and image/build.sh,
 # then booted under QEMU until its dashboard answers. Called by
 # build-image.yml for a release's tag, a manual run and the weekly rebuild,
 # which publishes what it built; and run on its own when a branch push
@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 jobs:
-  # The appliance image (R160 step 1): BuilderBot OS, built by image/build.sh
+  # The appliance image (R160 step 1): AerieOS, built by image/build.sh
   # on a hosted runner, since mkosi installs packages and the disk is laid
   # out on a loop device, neither of which the self-hosted node's container
   # has. On a tag, on a dispatch with its box ticked, and on the weekly
@@ -66,6 +66,9 @@ jobs:
           echo "snapshot: $(cat image/SNAPSHOT)"
       - name: Build the image
         shell: bash
+        # For gh's trusted root, which build.sh bakes into the image.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           # A failure's last lines as the job's error annotation (its end, under
@@ -83,19 +86,19 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName' || true)"
-          now="$(find out -maxdepth 1 -name 'builderbot-os-*.packages' | head -1)"
-          if [ -z "$tag" ] || ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern 'builderbot-os-*.packages' --dir last 2>/dev/null; then
+          now="$(find out -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
+          if [ -z "$tag" ] || ! gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern 'aerieos-os-*.packages' --dir last 2>/dev/null; then
             echo "no release carries a package list yet: nothing to compare against" | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          last="$(find last -maxdepth 1 -name 'builderbot-os-*.packages' | head -1)"
+          last="$(find last -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
           { echo "## System packages moved since ${tag}"; echo; echo '```'; diff <(sort "$last") <(sort "$now") | grep '^[<>]' || echo "none"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
       - uses: actions/upload-artifact@v4
         with:
-          name: builderbot-os
+          name: aerieos-os
           path: |
-            out/builderbot-os-*
+            out/aerieos-os-*
             out/packages-moved.diff
           if-no-files-found: error
 
@@ -108,25 +111,26 @@ jobs:
   appliance-boot:
     needs: appliance
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
-          name: builderbot-os
+          name: aerieos-os
           path: out
       - name: QEMU
         shell: bash
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 ovmf mtools grub-common jq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
           sudo chmod a+rw /dev/kvm 2>/dev/null || true
       - name: Boot the image and wait for the dashboard
         shell: bash
         run: |
           set -euo pipefail
-          qcow="$(find out -maxdepth 1 -name 'builderbot-os-*.qcow2' | head -1)"
+          qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
           # A copy of the disk with the console on the serial line and the
-          # initramfs tracing each step to it (bb_args
+          # initramfs tracing each step to it (aerie_args
           # in the ESP's grubenv, which the menu adds to the kernel line), so
           # what the initramfs and systemd say reaches serial.log; the disk
           # as shipped writes them to the screen.
@@ -135,7 +139,7 @@ jobs:
           esp="$(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start')"
           at="$disk@@$((esp * 512))"
           mcopy -n -i "$at" ::/grub/grubenv grubenv
-          grub-editenv grubenv set bb_args="console=ttyS0,115200 debug=vc loglevel=7"
+          grub-editenv grubenv set aerie_args="console=ttyS0,115200 debug=vc loglevel=7"
           mcopy -o -i "$at" grubenv ::/grub/grubenv
           grub-editenv grubenv list
           kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
@@ -166,9 +170,94 @@ jobs:
           [ -s first.log ] || head -n 400 plain.log > first.log
           tail -n 400 first.log
           exit 1
+      # What only a stick does (B592) and a kept older version (R201): the same
+      # disk booted with the slot in memory, the projects held; and booted once
+      # from a version laid on the data partition, as an update leaves one, its
+      # menu written by the agent's own code. Each must reach the dashboard and
+      # say on the kernel's command line that it is what it was asked to be.
+      - name: Boot it as a stick and from a kept version
+        shell: bash
+        run: |
+          set -euo pipefail
+          qcow="$(find out -maxdepth 1 -name 'aerieos-os-*.qcow2' | head -1)"
+          name="$(basename "$qcow" .qcow2)"
+          ver="${name#aerieos-os-}"
+          kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
+          boot() {  # disk, log, the word its command line must carry
+            # shellcheck disable=SC2086
+            qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+              -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+              -drive file="$1",format=raw,if=virtio \
+              -netdev user,id=n0,hostfwd=tcp:127.0.0.1:7680-:7680 -device virtio-net-pci,netdev=n0 \
+              -display none -serial file:"$2" -daemonize -pidfile qemu.pid
+            for i in $(seq 1 120); do
+              code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
+              case "$code" in
+                200|302|303)
+                  # The machine has to become its own node too, which takes a
+                  # little longer than the dashboard: a failure is said on the serial line.
+                  for _ in $(seq 1 24); do
+                    if grep -aq "did not become its controller's node" "$2"; then
+                      tail -c 3000 "$2"; echo "$3: the machine did not become its own node"; exit 1
+                    fi
+                    sleep 5
+                  done
+                  kill "$(cat qemu.pid)" || true; sleep 2
+                  grep -aq "the root is in memory, $3" "$2" || {
+                    echo "the dashboard answered, but this boot was not $3"
+                    grep -a -E "AerieOS.*slot|in memory" "$2" | head -6 || true
+                    tail -c 3000 "$2"
+                    exit 1
+                  }
+                  echo "$3: the dashboard answered $code after $((i * 5)) s"; return 0 ;;
+              esac
+              if grep -aq "end Kernel panic" "$2" 2>/dev/null; then break; fi
+              sleep 5
+            done
+            kill "$(cat qemu.pid)" || true
+            tail -n 200 "$2"; echo "$3: no dashboard"; exit 1
+          }
+          env_set() {  # disk, settings for GRUB's environment
+            local disk="$1" at; shift
+            at="$disk@@$(( $(sfdisk -J "$disk" | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
+            mcopy -n -i "$at" ::/grub/grubenv grubenv
+            grub-editenv grubenv set "$@" aerie_args="console=ttyS0,115200 loglevel=6"
+            mcopy -o -i "$at" grubenv ::/grub/grubenv
+            grub-editenv grubenv list
+          }
+          qemu-img convert -O raw "$qcow" stick.raw
+          env_set stick.raw aerie_toram=1
+          boot stick.raw serial-stick.log "aerietoram=1"
+          rm -f stick.raw
+          qemu-img convert -O raw "$qcow" kept.raw
+          # Room on the data partition for a root, as a stick's first boot
+          # grows it (p1 the BIOS partition, p2 the ESP, p5 the data).
+          truncate -s +8G kept.raw
+          sudo sfdisk --relocate gpt-bak-std kept.raw
+          echo ", +" | sudo sfdisk -N 5 --no-reread kept.raw
+          loop="$(sudo losetup -Pf --show kept.raw)"
+          sudo e2fsck -fy "${loop}p5" || true
+          sudo resize2fs "${loop}p5"
+          sudo mkdir -p /mnt/bbdata /mnt/bbesp
+          sudo mount "${loop}p5" /mnt/bbdata
+          sudo mount "${loop}p2" /mnt/bbesp
+          k=/mnt/bbdata/lib/aerieos-os/kept/kept-test
+          sudo mkdir -p "$k"
+          sudo cp "out/$name.root.squashfs" "$k/root.squashfs"
+          sudo cp "out/$name.vmlinuz" "$k/vmlinuz"
+          sudo cp "out/$name.initrd" "$k/initrd"
+          sudo cp "out/$name.release" "$k/release"
+          sudo env BB_OS_WORK=/mnt/bbdata/lib/aerieos-os BB_OS_ESP=/mnt/bbesp PYTHONPATH=scripts/agent \
+            python3 -c 'from aerieos_agent.osimage import write_kept_menu, kept_list; assert [r["version"] for r in kept_list()] == ["kept-test"]; write_kept_menu()'
+          sudo cat /mnt/bbesp/grub/kept.cfg
+          sudo umount /mnt/bbdata /mnt/bbesp
+          sudo losetup -d "$loop"
+          env_set kept.raw aerie_kept_next=kept-test
+          boot kept.raw serial-kept.log "aeriekept=kept-test"
+          echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: builderbot-os-boot
-          path: serial.log
+          name: aerieos-os-boot
+          path: serial*.log
           if-no-files-found: ignore

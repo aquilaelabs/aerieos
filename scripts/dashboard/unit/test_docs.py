@@ -1,4 +1,4 @@
-"""docs.py, behind bb tool docs: the page range it draws and what it says
+"""docs.py, behind aerie tool docs: the page range it draws and what it says
 when the office toolchain that makes a PDF of anything else is missing.
 Reading and drawing need markitdown and PyMuPDF, which the documents
 toolchain carries and this tier does not; those were walked by hand
@@ -48,7 +48,7 @@ class AsPdf(unittest.TestCase):
             if was is not None:
                 os.environ["BB_DOCS_SOFFICE"] = was
         self.assertIn("office toolchain", msg)
-        self.assertIn("bb tool docs read", msg)
+        self.assertIn("aerie tool docs read", msg)
 
 
 class Usage(unittest.TestCase):
@@ -56,7 +56,7 @@ class Usage(unittest.TestCase):
         self.assertIn(".docx", refused(docs.read, []))
 
     def test_an_unknown_verb(self):
-        self.assertIn("bb tool docs read", refused(docs.main, ["show", "x"]))
+        self.assertIn("aerie tool docs read", refused(docs.main, ["show", "x"]))
 
 
 class Poppler(unittest.TestCase):

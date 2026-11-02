@@ -14,7 +14,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "agent"))
-from builderbot_agent import tokens  # noqa: E402
+from aerieos_agent import tokens  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("loginlist", HERE.parent / "lib" / "login-list.py")
 loginlist = importlib.util.module_from_spec(spec)

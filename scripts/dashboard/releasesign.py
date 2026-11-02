@@ -1,4 +1,4 @@
-"""A release's Android APK signed by BuilderBot with the project's own
+"""A release's Android APK signed by AerieOS with the project's own
 sideload key, not in CI (R106, the operator 22 Oct: four keystore secrets
 set by hand on GitHub failed three ways, and one put a password in a public
 log).
@@ -7,7 +7,7 @@ The project's workflow builds an UNSIGNED release APK and hands it over as a
 workflow artifact named `bb-release-apk-TAG` (kept a few days, never on the
 release). The controller, which made the release, watches for that artifact:
 it fetches it with the project's GitHub token, hands each APK in it to a
-sign-key job on the project's node, which signs it as `bb sign` does
+sign-key job on the project's node, which signs it as `aerie sign` does
 (signing.sign_release: zipalign, apksigner with the proof of a rotation,
 verify, the certificate checked against the kept key) with the node's own
 tools, and attaches what comes back to the release under its name less
@@ -70,7 +70,7 @@ SCAN_S = 3600
 TICK_S = int(os.environ.get("BB_RELEASESIGN_TICK", "120"))
 RUN_AGE_S = 3 * 86400
 MAX_ZIP = 400 << 20
-NOTE = "Signed by BuilderBot:"
+NOTE = "Signed by AerieOS:"
 _lock = threading.Lock()
 _busy = set()
 _cache = {}
@@ -213,7 +213,8 @@ def status(project):
     newest = lambda d: sorted(({"tag": t, **v} for t, v in (d or {}).items() if isinstance(v, dict)),
                               key=lambda x: -int(x.get("at") or 0))[:5]
     return readiness(project, fresh=True) | {"signed": newest(rec.get("signed")), "failed": newest(rec.get("failed")),
-                                             "looking": looking(project)}
+                                             "looking": looking(project), "last": rec.get("last") or {},
+                                             "expect": sorted(rec.get("expect") or {})}
 
 
 # ---- GitHub -----------------------------------------------------------------
@@ -224,7 +225,7 @@ def _download(repo, aid, token, into):
     path = f"/repos/{repo}/actions/artifacts/{int(aid)}/zip"
     if not re.fullmatch(r"/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/artifacts/\d+/zip", path):
         raise cilogs.Refused("not a path this asks GitHub for")
-    req = urllib.request.Request(cilogs.API + path, headers={"User-Agent": "BuilderBot",
+    req = urllib.request.Request(cilogs.API + path, headers={"User-Agent": "AerieOS",
                                                              "Accept": "application/vnd.github+json"})
     req.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
@@ -246,11 +247,15 @@ def _download(repo, aid, token, into):
         raise cilogs.Refused(f"could not fetch the run's artifact: {e}") from e
 
 
-def _waiting(project, repo, token):
+def _waiting(project, repo, token, seen=None):
     """[(run, artifact id, tag)] of the recent runs that passed and handed
-    over an unsigned APK."""
+    over an unsigned APK; `seen`, when given, counts the runs asked about
+    and the ones skipped as known to hand over nothing (what a look says,
+    R190 step 5)."""
     j = cilogs._get(f"/repos/{repo}/actions/runs?per_page=30&status=success", token)
     out = []
+    seen = seen if seen is not None else {}
+    seen.update(asked=0, known_bare=0)
     for r in (j.get("workflow_runs") or [])[:30]:
         rid = int(r.get("id") or 0)
         at = str(r.get("created_at") or "")
@@ -258,8 +263,12 @@ def _waiting(project, repo, token):
             t = calendar.timegm(time.strptime(at[:19], "%Y-%m-%dT%H:%M:%S"))
         except ValueError:
             t = 0
-        if not rid or (t and time.time() - t > RUN_AGE_S) or (project, rid) in _bare:
+        if not rid or (t and time.time() - t > RUN_AGE_S):
             continue
+        if (project, rid) in _bare:
+            seen["known_bare"] += 1
+            continue
+        seen["asked"] += 1
         arts = cilogs._get(f"/repos/{repo}/actions/runs/{rid}/artifacts?per_page=50", token)
         found = False
         for a in (arts.get("artifacts") or [])[:50]:
@@ -271,7 +280,14 @@ def _waiting(project, repo, token):
         # A finished run's artifacts do not change: one that handed over
         # nothing is not asked about again (a look every few minutes for a
         # release's twelve hours would otherwise ask about thirty runs each).
-        if not found:
+        # GitHub can list a run as finished a little before it lists the
+        # artifact it uploaded, so a run that ended in the last ten minutes
+        # is asked about again (B467).
+        try:
+            ended = calendar.timegm(time.strptime(str(r.get("updated_at") or "")[:19], "%Y-%m-%dT%H:%M:%S"))
+        except ValueError:
+            ended = 0
+        if not found and (not ended or time.time() - ended > 600):
             _bare.add((project, rid))
     return out
 
@@ -298,7 +314,9 @@ def _attach(project, repo, token, tag, files, lines):
     while kept and not kept[-1].strip():
         kept.pop()
     body = "\n".join([*kept, *([""] if kept else []), *lines])
-    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body})
+    # The release's draft said back with the notes: a draft whose notes were
+    # sent alone was published, unread, by the APK's attach (B590).
+    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body, "draft": rel.get("draft") is True})
     return rel.get("html_url") or ""
 
 
@@ -366,21 +384,30 @@ def check(project, force=False):
         done["error"] = ("not on GitHub" if not repo else
                          "the controller has no GitHub token for this project, so it cannot fetch the APK to sign")
         return done
+    seen = {}
     try:
-        waiting = _waiting(project, repo, token)
+        waiting = _waiting(project, repo, token, seen)
     except cilogs.Refused as e:
         done["error"] = str(e)
         waiting = []
     d = _load()
     rec = _mine(d, project)
     rec["scanned"] = now
+    # What this look found, run by run, for aerie sign release to say (R190
+    # step 5): "looking" alone left a missing APK unexplained.
+    last = {"at": now, "error": done["error"], "asked": seen.get("asked", 0),
+            "known_bare": seen.get("known_bare", 0), "runs": []}
     for rid, aid, tag in waiting:
         ran = rec["runs"].get(str(rid)) or {}
         if ran.get("state") == "signed":
+            last["runs"].append({"run": rid, "tag": tag, "state": "signed before"})
             continue
         if ran.get("state") == "failed" and not force and now - int(ran.get("at") or 0) < SCAN_S:
+            last["runs"].append({"run": rid, "tag": tag, "state": "failed within the hour, not tried again"})
             continue
         r = _sign_run(project, repo, token, rid, aid, tag)
+        last["runs"].append({"run": rid, "tag": tag, "state": "failed" if r.get("error") else "signed",
+                             "why": r.get("error") or "", "url": r.get("url") or ""})
         if r.get("error"):
             rec["runs"][str(rid)] = {"state": "failed", "at": now, "tag": tag}
             rec["failed"][tag] = {"why": r["error"], "at": now, "run": rid}
@@ -401,6 +428,7 @@ def check(project, force=False):
                                              f"{EXPECT_S // 3600} hours: did the Android workflow run for it?",
                                       "at": now, "run": 0}
                 done["failed"].append(tag)
+    rec["last"] = last
     # Old runs forgotten: their artifacts are gone by now.
     rec["runs"] = {k: v for k, v in rec["runs"].items() if now - int((v or {}).get("at") or 0) < 2 * RUN_AGE_S}
     with _lock:
@@ -444,7 +472,9 @@ def check_soon(project, force=False):
 
     def go():
         try:
-            check(project, force)
+            said = check(project, force).get("error")
+            if said:
+                print(f"dashboard: release signing {project}: {said}", flush=True)
         except Exception as e:                                      # noqa: BLE001 (a look must not take the server)
             print(f"dashboard: release signing {project}: {e}", flush=True)
         finally:

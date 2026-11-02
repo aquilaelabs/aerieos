@@ -32,7 +32,7 @@ from cryptography.x509.oid import NameOID
 
 LETS_ENCRYPT = "https://acme-v02.api.letsencrypt.org/directory"
 LETS_ENCRYPT_STAGING = "https://acme-staging-v02.api.letsencrypt.org/directory"
-AGENT = "BuilderBot (+https://github.com/aquilaelabs/builderbot)"
+AGENT = "AerieOS (+https://github.com/aquilaelabs/aerieos)"
 TIMEOUT = 30
 POLL_S = 2.0
 POLL_FOR = 180

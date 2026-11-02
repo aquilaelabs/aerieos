@@ -3,7 +3,7 @@
 # A controller installed bare metal starts here (R90 step 3).
 #
 # What the container's entrypoint is under tini, this is under systemd: the
-# unit nodes/install-controller.sh writes (builderbot-controller.service)
+# unit nodes/install-controller.sh writes (aerieos-controller.service)
 # runs it as root with the env file the installer wrote in place of
 # compose's, and it takes the same steps in the same order (lib/boot.sh):
 # the secrets stash, the state gate, the log, the home seed, the deploy-key
@@ -18,7 +18,7 @@
 #
 set -euo pipefail
 
-[ "$(id -u)" -eq 0 ] || { echo "host-boot.sh runs as root, from the builderbot-controller service" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || { echo "host-boot.sh runs as root, from the aerieos-controller service" >&2; exit 1; }
 # What the controller writes is its account's alone, wherever it writes it
 # (R90 step 15): its own folders are 0700 already, and a store moved from
 # Settings to a folder of the machine's is made the same way rather than
@@ -27,16 +27,16 @@ umask 077
 # The environment the image's ENV gives the container, the release's stamp
 # and the env file, before anything reads a path.
 # shellcheck source=lib/host-env.sh
-. /opt/builderbot/scripts/lib/host-env.sh
+. /opt/aerieos/scripts/lib/host-env.sh
 # shellcheck source=lib/common.sh
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
-BB_ACCOUNT="${BB_ACCOUNT:-builderbot}"
+BB_ACCOUNT="${BB_ACCOUNT:-aerieos}"
 # Exported with the ids below: a root hook (46-playwright.root.sh) is a
 # process of its own, and drops to the account through common.sh with them.
 BB_DROP=setpriv
 export BB_DROP
-BB_SECRETS_DIR="${BB_SECRETS_DIR:-/etc/builderbot-controller/secrets}"
+BB_SECRETS_DIR="${BB_SECRETS_DIR:-/etc/aerieos-controller/secrets}"
 export BOOT_WHAT="controller"
 id -u "$BB_ACCOUNT" >/dev/null 2>&1 \
     || die "there is no account ${BB_ACCOUNT} on this machine: run nodes/install-controller.sh again"
@@ -44,14 +44,14 @@ PUID="$(id -u "$BB_ACCOUNT")"
 PGID="$(id -g "$BB_ACCOUNT")"
 export PUID PGID BB_ACCOUNT
 # shellcheck source=lib/boot.sh
-. /opt/builderbot/scripts/lib/boot.sh
+. /opt/aerieos/scripts/lib/boot.sh
 
 # The folder the deploy-key agent's socket for the account lives in: the
 # account's group may enter it and nobody else (the node's session and job
 # accounts above all, R90's wall), where the container's sits in /run.
 sock_dir() {
     local d
-    d="$(dirname "${SSH_AUTH_SOCK:-/run/builderbot-controller/ssh-agent.sock}")"
+    d="$(dirname "${SSH_AUTH_SOCK:-/run/aerieos-controller/ssh-agent.sock}")"
     install -d -m 0750 -o root -g "$PGID" "$d"
 }
 

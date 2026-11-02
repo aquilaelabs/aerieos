@@ -1,10 +1,10 @@
 // The companion app.
 //
-// Its VERSION is BuilderBot's, not a number of its own: the app ships from
+// Its VERSION is AerieOS's, not a number of its own: the app ships from
 // this repository, talks to this dashboard, and the APK the workflow names
-// already carries `bb version --file`. A hand-kept versionName drifted from
+// already carries `aerie version --file`. A hand-kept versionName drifted from
 // that immediately (it still said 0.1.0 on the day the project reached
-// 0.5.0), so the build takes both from `bb version` when it is told them
+// 0.5.0), so the build takes both from `aerie version` when it is told them
 // (-PbbVersion, -PbbCode, which the workflow passes) and falls back to
 // reading them itself. A checkout with no bb and no git still builds; it
 // just says so in the name.
@@ -15,7 +15,7 @@
 // moves the surface fails there until this app is updated with it, and
 // the app, seeing a dashboard ahead of it, says so and points at the newer
 // build. Bump both together, never one.
-// Asked once, at configuration time. `bb` is on PATH inside BuilderBot and on
+// Asked once, at configuration time. `aerie` is on PATH inside AerieOS and on
 // its nodes; anywhere else the property the workflow passes is the answer,
 // and "0.0.0-unknown" is the honest last resort rather than a number somebody
 // would trust.
@@ -28,10 +28,10 @@ fun ask(vararg argv: String): String? = try {
 } catch (e: Exception) { null }
 
 // BB_RELAYED, for the same reason the workflow sets it: from a checkout that
-// is not a project the controller knows, an unset `bb version` tries to relay
+// is not a project the controller knows, an unset `aerie version` tries to relay
 // and answers nothing.
 fun bb(what: String): String? =
-    ask("bb", "version", what) ?: ask("bash", "scripts/bb", "version", what)
+    ask("aerie", "version", what) ?: ask("bash", "scripts/aerie", "version", what)
 
 val bbVersion: String = (findProperty("bbVersion") as String?)?.takeIf { it.isNotBlank() }
     ?: bb("--semver") ?: "0.0.0-unknown"
@@ -56,11 +56,11 @@ tasks.register<Copy>("bbApk") {
 }
 
 android {
-    namespace = "dev.builderbot.app"
+    namespace = "org.aerieos.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.builderbot.app"
+        applicationId = "org.aerieos.app"
         minSdk = 26
         targetSdk = 36
         versionCode = bbCode
@@ -68,8 +68,8 @@ android {
         buildConfigField("int", "TARGET_API", "9")
     }
     // A release has no signing config here, so Gradle writes it unsigned
-    // (R106): BuilderBot signs it with the project's own sideload key, on the
-    // controller for a release (releasesign.py) and with bb sign otherwise.
+    // (R106): AerieOS signs it with the project's own sideload key, on the
+    // controller for a release (releasesign.py) and with aerie sign otherwise.
     // No key, alias or password is in the tree or in CI.
     buildTypes {
         release {

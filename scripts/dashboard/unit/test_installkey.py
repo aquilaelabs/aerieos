@@ -62,8 +62,11 @@ class InstallKey(unittest.TestCase):
         self.assertEqual(code, 200, body)
         self.assertNotEqual((self.kd / "key").read_bytes(), OLD)
         self.assertEqual(body["resealed"], 2)
-        # Opened under the new key alone: the one before is gone, nothing
-        # on the nodes needing it.
+        # The one before is kept until the next start has sealed everything
+        # again with both (B550), then let go, nothing on the nodes needing it.
+        self.assertEqual((self.kd / "key-previous").read_bytes(), OLD)
+        self.assertEqual(installkey.status()["previous"], True)
+        installkey.settle()
         self.assertIsNone(signing.PREVIOUS)
         self.assertFalse((self.kd / "key-previous").exists())
         raw = (self.d / "gitcreds" / "web").read_text().strip()
@@ -80,8 +83,26 @@ class InstallKey(unittest.TestCase):
         self.assertEqual(code, 409)
         self.assertIn("2 sign-ins", body["error"])
         self.nodes = 0
+        installkey.settle()
         self.assertFalse(installkey.status()["previous"])
         self.assertEqual(installkey.change()[1], 200)
+
+    def test_what_a_pass_left_is_sealed_again_at_the_next_start(self):
+        # B550: a pass that failed for one thing at the change had its old
+        # seal opened by nothing once the key before was dropped at once.
+        calls = []
+        def flaky(again=False):
+            calls.append(again)
+            if len(calls) == 1:
+                raise OSError("busy")
+            return 1
+        was = installkey.reseal
+        installkey.reseal = was + (flaky,)
+        self.addCleanup(setattr, installkey, "reseal", was)
+        self.assertIn("next start", installkey.change()[0].get("note", ""))
+        self.assertEqual((self.kd / "key-previous").read_bytes(), OLD, "kept: a pass did not finish")
+        self.assertEqual(installkey.settle(), 1)
+        self.assertFalse((self.kd / "key-previous").exists(), "let go once every pass has run")
 
     def test_a_pasted_key_and_a_bad_one(self):
         self.assertEqual(installkey.change("short")[1], 400)

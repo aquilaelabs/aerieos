@@ -870,7 +870,7 @@ function dmOverrideLine(d){
 function dmClaudeSaid(d, other = false){
   // What a Claude session may do with it, in a pill's few words: the
   // setting of the PROJECT it belongs to (Agents may: Run its container),
-  // the words linking there. `other` is a container BuilderBot did not
+  // the words linking there. `other` is a container AerieOS did not
   // start, which is started and stopped rather than rebuilt.
   if (!d.owner || !mayDocker() || d.owner === "System") return "";
   const mode = devClaudeMode(d.owner);
@@ -953,7 +953,7 @@ function dmOwnerLine(r, key){
   // System's is the deployment's to set (R180): said, with nothing to pick.
   if (saved === "System")
     return `<div class="setcell ro dmowner">${lbl("", "Project",
-      "BuilderBot deployed this itself, so it is System's: no project's Claude sees it, "
+      "AerieOS deployed this itself, so it is System's: no project's session sees it, "
       + "and the network lets it reach every container on this node.")}<div class="val">System</div></div>`;
   const pick = dmOwnDraft[key] ?? saved;
   // A project since deleted is still what the row says until it is changed.
@@ -1023,7 +1023,7 @@ function dmInstPills(d, managed){
     r && (mode || url) ? ["Reached via", [esc(mode), url].filter(Boolean).join(" · ")] : null,
     dmRoutesOf(d).length ? ["nginx", dmRoutesOf(d).map(dmRouteLink).join(" · ")] : null,
     d.exists && !managed ? ["", d.boot ? "✓ Starts on boot" : "not on boot", d.boot ? "ok" : ""] : null,
-    ["Claude", dmClaudeSaid(d)],
+    ["Agent", dmClaudeSaid(d)],
     ["Tests", dmTestSaid(d)],
   ];
 }
@@ -1297,12 +1297,12 @@ async function openEditContainer(name){
   // reloads, it found no row and locked itself; the server still refuses a
   // rename of one that is up.
   const down = !row?.running;
-  // BuilderBot's own (System) is managed: for reading, whatever its state
+  // AerieOS's own (System) is managed: for reading, whatever its state
   // (the operator, 11 Oct).
   const managed = row?.owner === "System";
   $("cName").disabled = !down || managed;
   $("cNameHint").textContent = managed
-    ? "BuilderBot manages this one: its name, compose file and env are written where it was deployed from (the nginx page)."
+    ? "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page)."
     : down
     ? "Change the name while it is down: its volumes and data directory follow it on the node, then Build it again."
     : "It is running, so this is for reading: Down it to change its name, compose file or env.";
@@ -1702,7 +1702,7 @@ function dmState(d, job, mine, busy, blind){
   // ends a job on purpose, said nothing at all.
   if (mine && job.error) return esc(jobWhy(job.error));
   if (d.interrupted && !d.running)
-    return `a build was interrupted: BuilderBot restarted while it was running${
+    return `a build was interrupted: AerieOS restarted while it was running${
       d.built_rev ? `; still on ${esc(d.built_rev)}` : ", and nothing was built"}`;
   // The pill on the name says it is running; this says how many, worded.
   if (d.running) return `${d.containers} container${d.containers === 1 ? "" : "s"} up`;
@@ -1757,7 +1757,7 @@ function dmRowsHtml(ins, job, blind){
     // forever.
     const mine = job && job.project === d.project && job.instance === d.instance;
     const busy = !!(mine && job.running);
-    // BuilderBot's own nginx (System's, R180): what a person changes about
+    // AerieOS's own nginx (System's, R180): what a person changes about
     // it is the nginx tab's, and Deploy there makes it again, so its row
     // keeps Up, Down, Remove and the image update and loses Edit, Rebuild
     // and Copy or move (the operator, 13 Oct; R207).
@@ -2255,7 +2255,7 @@ function dmWireRows(el, list = dockerList){
                : `${dmCalled(project, instance)} builds from the project's own checkout again`);
   };
   // Start, stop, restart and the log, on any container the daemon reported,
-  // including the ones BuilderBot did not create (R68 steps 1 and 2). The
+  // including the ones AerieOS did not create (R68 steps 1 and 2). The
   // name goes back to the server, which looks it up in a fresh listing
   // before it acts: the rule every executing surface here follows.
   // The node the LIST is about: the notebook reads its project's node, which
@@ -2425,7 +2425,7 @@ function dmWireRows(el, list = dockerList){
 
 // Grouped by the PROJECT each row belongs to (the operator, 24 Sep): a
 // project's containers together under its name, the groups in alphabetical
-// order, and what belongs to no project last. In each, BuilderBot's own
+// order, and what belongs to no project last. In each, AerieOS's own
 // containers first and then the others, by name. Where a row came from
 // (built from a project, written here, or started by somebody else) is said
 // on the row itself, since that is what decides what can be done to it.
@@ -2465,7 +2465,7 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
   // and the way onto it said under its heading.
   const notMine = o => !!state?.admin && o !== "System" && !gone(o)
     && (state?.projects || []).some(p => p.name === o && !p.mine);
-  // ...BuilderBot's own (System) pinned above them all (R181, the operator,
+  // ...AerieOS's own (System) pinned above them all (R181, the operator,
   // 29 Oct), then this account's, then another project's.
   const rank = o => o === "System" ? -1 : notMine(o) ? 2 : 0;
   const owners = [...new Set([...ins, ...cs].map(r => r.owner || ""))]
@@ -2477,14 +2477,14 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
         .sort((a, b) => byName(a.name || a.id, b.name || b.id)));
   const group = o => dmView === "list" ? tblWrap(DM_COLS, rowsOf(o), "dmtbl") : rowsOf(o);
   const loose = [...ins, ...cs].some(r => !r.owner) && (!only || only === "none");
-  // System is BuilderBot's own (R180): what it deploys itself, the nginx
+  // System is AerieOS's own (R180): what it deploys itself, the nginx
   // container today, set by that deployment and by no picker.
   // Each group a card at a desk (R262): its heading and its rows together.
   const card = (html, cls = "") => `<section class="dmcard${cls}">${html}</section>`;
   return owners.map(o => gone(o)
       ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another project", null) + group(o))
       : o === "System"
-        ? card(head("System", "BuilderBot's own · no session sees these", null) + group(o))
+        ? card(head("System", "AerieOS's own · no session sees these", null) + group(o))
         : notMine(o)
           ? card(head(projLabel(o), "", colorTone(projectColor(o)))
               + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of projects: add it to your own list on ${
@@ -2507,7 +2507,7 @@ function dmChipGroups(ins, cs){
   return loose ? [...groups, {key: "none", label: "No project", count: loose}] : groups;
 }
 
-// A container BuilderBot did not start: what the daemon says about it,
+// A container AerieOS did not start: what the daemon says about it,
 // started, stopped and restarted by name, and put under a project on its row.
 // Start on boot (R122): a switch on a row, a draft until its Apply, as every
 // setting here is. `name` is what the server acts on (a container, or an
@@ -2553,7 +2553,7 @@ function dmOtherRowsHtml(cs){
         <div class="dmhead">
         <div class="dmid">
         <div class="name">${esc(c.name || c.id)}<span class="pill stat${c.state === "running" ? " ok" : " off"}">${
-          esc(c.state || "unknown")}</span> <span class="pill" title="not started by BuilderBot">not ours</span></div>
+          esc(c.state || "unknown")}</span> <span class="pill" title="not started by AerieOS">not ours</span></div>
         <div class="sub">${esc(c.image)} · ${esc(c.status || c.state)}${
           c.project ? ` · ${esc(c.project)}${c.service ? "/" + esc(c.service) : ""}` : ""}${
           c.ports.length ? ` · ${c.ports.map(esc).join(", ")}` : ""}</div>
@@ -2574,14 +2574,14 @@ function dmOtherRowsHtml(cs){
         </div>
         ${dmSetPills([["Project", c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "none"],
                         ["", c.boot ? "✓ Starts on boot" : "not on boot", c.boot ? "ok" : ""],
-                        ["Claude", dmClaudeSaid(c, true)]])}
+                        ["Agent", dmClaudeSaid(c, true)]])}
         ${dmEditing.has("ctr:" + (c.name || c.id)) || dmRowDirty("ctr:" + (c.name || c.id))
           ? dmSetDialog(c.name || c.id, "ctr:" + (c.name || c.id),
                         [dmOwnerLine(c, "ctr:" + (c.name || c.id)), dmBootLine(c.name || c.id, !!c.boot),
                          dmLanLine(c.name || c.id, !!c.lan)]) : ""}
       </div>`)).join("");
 }
-// A container BuilderBot did not start is a line in list view too, with
+// A container AerieOS did not start is a line in list view too, with
 // what the daemon says in the same columns, so the table has one shape.
 function dmOtherWrap(c, inner){
   const name = c.name || c.id;
@@ -2787,7 +2787,7 @@ function renderDockerInto(i){
     ? `<div class="dmsrc">${src.agent ? `on ${esc(src.kind)}`
                                        : `on ${esc(src.kind)} at <code>${esc(src.where)}</code>`}${
         // A mapped path this container does not have. Not a fault: it can be a
-        // share the daemon mounts and BuilderBot has no business reading. It is
+        // share the daemon mounts and AerieOS has no business reading. It is
         // said because nothing else here will ever act on it, and a line of
         // configuration that does nothing should not look like it does.
         (src.strays || []).length
@@ -2880,7 +2880,8 @@ function renderDockerInto(i){
   // redraw from what is already here, nothing fetched and nothing saved.
   el.querySelectorAll("[data-dmchip]").forEach(c => c.onclick = () =>
     // ...the groups it leaves fading through, as a page does (fadeThrough).
-    fadeThrough(DM_PARTS, () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
+             () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
   dmViewWire(el, () => fadeThrough(DM_PARTS, () => { dockerRev++; drawPanes(); }));
   // The search redraws as it is typed, and keeps its focus and its caret
   // across the redraw, which replaces the box.

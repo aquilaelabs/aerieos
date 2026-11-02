@@ -38,7 +38,7 @@ unseal = None
 sealing = None            # () -> whether an install key is loaded now
 
 _lock = threading.Lock()
-ISSUER = "BuilderBot"
+ISSUER = "AerieOS"
 STEP = 30                 # seconds per authenticator code
 RECOVERY_N = 10
 TRUST_DAYS = 30
@@ -430,7 +430,7 @@ def passkey_add(uid, origin, name, client_b64, att_b64, prf=False):
         cred_id = auth[55:55 + cred_len]
         key, _ = cbor(auth[55 + cred_len:])
         if key.get(1) != 2 or key.get(3) != -7 or key.get(-1) != 1:
-            return {"error": "BuilderBot takes a P-256 passkey (ES256), and this authenticator offered another"}
+            return {"error": "AerieOS takes a P-256 passkey (ES256), and this authenticator offered another"}
         x, y = int.from_bytes(key[-2], "big"), int.from_bytes(key[-3], "big")
         if not _on_curve((x, y)):
             return {"error": "that passkey's key is not a point on its curve"}
@@ -516,7 +516,7 @@ def trust_remove(uid, tid=""):
 
 
 def remove_all(uid):
-    """Every factor gone: `bb users reset-2fa` on the controller's console."""
+    """Every factor gone: `aerie users reset-2fa` on the controller's console."""
     _update(uid, lambda r: r.clear())
 
 

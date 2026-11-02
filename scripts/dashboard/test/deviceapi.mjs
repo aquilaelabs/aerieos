@@ -23,7 +23,7 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', name, '--role', 'user'],
+const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
   { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
@@ -61,7 +61,7 @@ const dev = async (verb, body, { method = 'POST', query = '', raw = null, header
 };
 const signedIn = await dev('signin', { username: 'pin.rw', password: 'pinrwpass1', name: 'PIN-PC', kind: 'pc' });
 token = signedIn.json?.token || '';
-const stok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'pin.rw'], { encoding: 'utf8', env }).trim();
+const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'pin.rw'], { encoding: 'utf8', env }).trim();
 const pcApi = async body => (await fetch(`${base}/api/pc`, { method: 'POST',
   headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
 
@@ -191,7 +191,7 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
   // The extension: its headers on every call, and the same refusal.
   const pkg = JSON.parse(readFileSync(`${REPO}/apps/vscode/package.json`, 'utf8'));
   const h = ed.headers();
-  ok(h['X-BB-Api'] === String(client.API) && h['X-BB-App'] === `vscode/${pkg.version}` && pkg.builderbotApi === client.API,
+  ok(h['X-BB-Api'] === String(client.API) && h['X-BB-App'] === `vscode/${pkg.version}` && pkg.aerieosApi === client.API,
      `the extension says its Files API and its release on every call (${h['X-BB-Api']} ${h['X-BB-App']})`);
   const r = await fetch(`${base}/api/v1/files`, { method: 'POST', body: JSON.stringify({ action: 'projects' }),
     headers: { Cookie: `bb_session=${cookie}`, 'Content-Type': 'application/json', 'X-BB-Api': '0', 'X-BB-App': 'vscode/0.0.1' } });
@@ -199,7 +199,7 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
   ok(r.status === 426 && /vscode\/0\.0\.1 speaks the Files API 0/.test(j.error || ''),
      `an extension older than the Files API's window is told to update, by name (${r.status}: ${j.error})`);
   const mine = await ed.projects();
-  ok(mine.tooOld === '' && /needs 1: update BuilderBot on the controller/.test(client.controllerTooOld({ api: 0 }))
+  ok(mine.tooOld === '' && /needs 1: update AerieOS on the controller/.test(client.controllerTooOld({ api: 0 }))
      && client.controllerTooOld({ api: client.API }) === '',
      'the extension says plainly when its controller is too old for it, and nothing when it is not');
 }

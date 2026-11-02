@@ -34,7 +34,7 @@ const AT_REST = {
 function nbSigningView({$, nb, project}){
   // Named keys (default first), each with a Play upload slot and a sideload
   // slot, and which of the project's apps (by package) signs with which key.
-  // The controller keeps them and bb sign uses them on the node; the page
+  // The controller keeps them and aerie sign uses them on the node; the page
   // only ever sees aliases and fingerprints. An upload, a removal and a
   // mapping are staged behind their section's Save; Generate, Rotate,
   // Download backup and the backup password act on the press.
@@ -128,10 +128,14 @@ function nbSigningView({$, nb, project}){
     // while it holds no key, whose empty state is said where the keys are.
     const mappedN = Object.values({...map, ...mapDraft}).filter(k => k !== null).length;
     // ...and under them how the controller keeps them (R111 step 2).
+    // With none held, the words that say so share the control row with its
+    // buttons, as the other views' status lines do (a button never on a
+    // line of its own), short enough to keep the row one control high.
     viewGlance($("sgHint"), !held ? [] : [
       {label: held === 1 ? "key" : "keys", value: held},
       {label: mappedN === 1 ? "app" : "apps", value: mappedN, omit: !mappedN}],
-      !held ? "" : AT_REST[atRest] || "");
+      !held ? (why ? "" : "no key yet: aerie sign uses the ones kept here")
+        : AT_REST[atRest] || "", "", held ? {open: "warn", locked: "bad"}[atRest] || "" : "");
     // Import a backup and New key, the view's adds, the control row's
     // actions with New key the primary (a-notebook/views, R109), the form
     // either opens unrolling under the row.
@@ -157,7 +161,7 @@ function nbSigningView({$, nb, project}){
         </div></div>`
       : "";
     // The backup password (the operator, 1 Oct): the project's owner's to
-    // set, and every download's to give, BuilderBot's owner's included.
+    // set, and every download's to give, AerieOS's owner's included.
     const lock = `<div class="field"><div class="rnsign rnsignlock">
       <div>Backup password: ${locked ? "set" : "none"}</div>
       <div class="sub dim">${locked ? "Every key backup asks for it, whoever downloads it."
@@ -200,7 +204,7 @@ function nbSigningView({$, nb, project}){
     // would stop it, and how the newest went.
     const r = rel || {};
     const relBody = !r.wanted
-      ? `<div class="field"><div class="sub dim">This project's workflows hand over no unsigned APK, so BuilderBot signs none of its releases.
+      ? `<div class="field"><div class="sub dim">This project's workflows hand over no unsigned APK, so AerieOS signs none of its releases.
           A workflow that uploads its unsigned release APK as an artifact named <code>bb-release-apk-TAG</code> has it signed
           on the project's node with the sideload key and attached to the release, with no key or password on GitHub.</div></div>`
       : `<div class="field" id="sgRel">
@@ -233,8 +237,7 @@ function nbSigningView({$, nb, project}){
       // node from it is said in its words (B232).
       + (why ? `<div class="field"><div class="notice warn">${esc(why)}</div></div>` : "")
       + (why ? "" : pageHead({cls: "sghead", facts: [
-          ["Node", tool ? "" : nodeWhy, {cls: "sgnode"}],
-          ["Keys", held ? "" : "none yet: bb sign signs this project's builds on its node with the keys kept here, and a session never sees one"]]}))
+          ["Node", tool ? "" : nodeWhy, {cls: "sgnode"}]]}))
       + docSection("signing", "lock", "Backup password", locked ? "set" : "none", lock, {cls: locked ? "" : "warn"})
       + names.filter(key => !keyPick || !names.includes(keyPick) || key === keyPick)
           .map(key => docSection("signing", `key:${key}`, key === "default" ? "Default key" : `Key: ${key}`,
@@ -245,7 +248,8 @@ function nbSigningView({$, nb, project}){
       + docSection("signing", "releases", "Releases", relStatus, relBody,
           {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""});
     wireSections($("sgBox"));
-    $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () => { keyPick = c.dataset.sgkey; drawSigning(); });
+    $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () =>
+      chipMove(() => $("sgBox"), ".sect", () => { keyPick = c.dataset.sgkey; drawSigning(); }));
     wire();
     nb.syncSave();
   }

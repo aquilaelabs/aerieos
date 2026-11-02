@@ -99,11 +99,20 @@ def _keep(project, tag, url, error="", forge="GitHub"):
 
 # ---- what goes in it ----------------------------------------------------------
 
-def notes(where, version):
-    """The changelog's section for `version`, as Markdown, or "" when the
-    file has none: its categories as headings and its entries as a list.
-    A version cut without a bump has its changes still under Unreleased,
-    and those are what it releases (v0.5.0 went out with no notes, B116)."""
+def notes(where, version, tag="", repo=""):
+    """The release's notes: the tree's docs/release-notes/VERSION.md when it
+    has one (@TAG@, @VER@ and @REPO@ filled in, as CI fills them for a
+    release it makes), else the changelog's section for `version`, as
+    Markdown, or "" when the file has none: its categories as headings and
+    its entries as a list. A version cut without a bump has its changes
+    still under Unreleased, and those are what it releases (v0.5.0 went out
+    with no notes, B116)."""
+    own = Path(where) / "docs" / "release-notes" / f"{version}.md"
+    try:
+        return (own.read_text().replace("@TAG@", tag or f"v{version}")
+                .replace("@VER@", version).replace("@REPO@", repo)).strip()
+    except OSError:
+        pass
     text = changelog.read(where) or ""
     pending = None
     for sec in changelog.sections(text):
@@ -175,22 +184,44 @@ def _same_tree(project, sha, others):
 
 # ---- asking GitHub ------------------------------------------------------------
 
+# A release asked for by its tag, for _req's draft fallback.
+_BY_TAG = re.compile(re.escape(API) + r"/repos/([^/?#]+/[^/?#]+)/releases/tags/([^/?#]+)")
+
+def _draft_by_tag(repo, tag, token, pages=3):
+    """The release (a draft among them) whose tag is `tag`, from the listed
+    releases, newest first, or None."""
+    for page in range(1, pages + 1):
+        rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=50&page={page}", token) or []
+        for r in rows if isinstance(rows, list) else []:
+            if isinstance(r, dict) and r.get("tag_name") == tag:
+                return r
+        if not isinstance(rows, list) or len(rows) < 50:
+            return None
+    return None
+
+
 def _req(method, url, token, body=None, data=None, ctype="application/json"):
     if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/")):
         raise Refused("not an address this asks GitHub at")
     payload = data if data is not None else (json.dumps(body).encode() if body is not None else None)
     req = urllib.request.Request(url, data=payload, method=method,
-                                 headers={"User-Agent": "BuilderBot", "Accept": "application/vnd.github+json",
+                                 headers={"User-Agent": "AerieOS", "Accept": "application/vnd.github+json",
                                           **({"Content-Type": ctype} if payload is not None else {})})
     req.add_unredirected_header("Authorization", f"Bearer {token}")
     try:
         # The host is one of the two literals above, checked; the path is the repo's.
-        with urllib.request.urlopen(req, timeout=600) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        # Ten minutes for an upload, thirty seconds for anything else: a
+        # host that stopped answering held a page's lookup that long (B566).
+        with urllib.request.urlopen(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             raw = r.read(2_000_000)
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as e:
         if e.code == 404 and method == "GET":
-            return None
+            # A draft release is never found by its tag (GitHub's rule), and
+            # every release starts a draft (the operator, 1 Nov): looked for
+            # among the listed ones, which a token that may see drafts lists.
+            m = _BY_TAG.fullmatch(url)
+            return _draft_by_tag(m.group(1), urllib.parse.unquote(m.group(2)), token) if m else None
         try:
             why = (json.loads(e.read(20000)) or {}).get("message") or ""
         except (ValueError, OSError):
@@ -205,7 +236,12 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
 
 def publish(project, tag, version, sha, comp=""):
     """The forge's release for `tag`, made if it is not there:
-    {url, made, assets, skipped, forge} or {error, forge}."""
+    {url, made, assets, skipped, forge} or {error, forge}. A project whose CI
+    makes its releases says so with .release-files: its release is CI's draft,
+    which a person publishes, so nothing is published here ahead of it."""
+    if not comp and (WORKSPACE / project / ".release-files").is_file():
+        return {"url": "", "made": False, "assets": [], "skipped": [], "forge": "CI",
+                "note": "CI makes this release as a draft: read it and publish it from the Artifacts view's Drafts"}
     if cilogs.repo_of(project):
         return _github(project, tag, version, sha, comp)
     at = _remote(project)
@@ -224,7 +260,7 @@ def publish(project, tag, version, sha, comp=""):
     base = forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"]))
     where = WORKSPACE / project / comp if comp else WORKSPACE / project
     title = f"{comp + ' ' if comp else ''}{version}"
-    body = notes(where, version) or f"{_shown(project)} {version}"
+    body = notes(where, version, tag, at["path"]) or f"{_shown(project)} {version}"
     try:
         made = (_gitlab if entry["kind"] == "gitlab" else _gitea)(
             _Forge(base, entry, token), at, project, tag, version, sha, title, body)
@@ -244,13 +280,13 @@ def _github(project, tag, version, sha, comp=""):
         return {"error": why, "forge": "GitHub"}
     base = f"{API}/repos/{repo}/releases"
     try:
-        have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag)}", token)
+        have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
         if have:
             _keep(project, tag, have.get("html_url") or "")
             return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": [],
                     "forge": "GitHub"}
         where = WORKSPACE / project / comp if comp else WORKSPACE / project
-        body = notes(where, version) or f"{_shown(project)} {version}"
+        body = notes(where, version, tag, repo) or f"{_shown(project)} {version}"
         rel = _req("POST", base, token, {"tag_name": tag, "name": f"{comp + ' ' if comp else ''}{version}",
                                          "body": body, "draft": False, "prerelease": False})
         up, skipped = [], []
@@ -321,13 +357,13 @@ class _Forge:
         auth = ({"PRIVATE-TOKEN": self.token} if self.entry["kind"] == "gitlab"
                 else {"Authorization": f"token {self.token}"})
         req = urllib.request.Request(url, data=payload, method=method,
-                                     headers={"User-Agent": "BuilderBot", "Accept": "application/json", **auth,
+                                     headers={"User-Agent": "AerieOS", "Accept": "application/json", **auth,
                                               **({"Content-Type": ctype} if payload is not None else {})})
         name = self.entry["name"]
         try:
             # The root is forges.api_base()'s, from a host its URL pattern
             # matched and a scheme of http or https, checked above.
-            with forges._OPENER.open(req, timeout=600) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            with forges._OPENER.open(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                 raw = r.read(2_000_000)
                 return json.loads(raw) if raw.strip() else {}
         except urllib.error.HTTPError as e:
@@ -352,7 +388,7 @@ def _gitea(f, at, project, tag, version, sha, title, body):
     not there, and each build attached to it as a multipart upload."""
     owner, _, repo = at["path"].partition("/")
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases"
-    have = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag)}")
+    have = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}")
     if have:
         return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": []}
     # Gitea takes a pushed tag into its database on a queue, a moment after
@@ -388,8 +424,8 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
     links rather than files: each build goes into the generic package
     registry under the version, and the release links to it there."""
     pid = urllib.parse.quote(at["path"], safe="")
-    web = f"{f.base.split('/api/')[0]}/{at['path']}/-/releases/{urllib.parse.quote(tag)}"
-    have = f.ask("GET", f"/projects/{pid}/releases/{urllib.parse.quote(tag)}")
+    web = f"{f.base.split('/api/')[0]}/{at['path']}/-/releases/{urllib.parse.quote(tag, safe="")}"
+    have = f.ask("GET", f"/projects/{pid}/releases/{urllib.parse.quote(tag, safe="")}")
     if have:
         return {"url": ((have.get("_links") or {}).get("self") or web), "made": False, "assets": [], "skipped": []}
     rel = f.ask("POST", f"/projects/{pid}/releases", {"tag_name": tag, "name": title, "description": body})
@@ -406,7 +442,7 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(p.name)}"
         try:
             f.ask("PUT", path, data=p.read_bytes(), ctype="application/octet-stream")
-            f.ask("POST", f"/projects/{pid}/releases/{urllib.parse.quote(tag)}/assets/links",
+            f.ask("POST", f"/projects/{pid}/releases/{urllib.parse.quote(tag, safe="")}/assets/links",
                   {"name": p.name, "url": f.base + path, "link_type": "package"})
             up.append(p.name)
         except Refused as e:
@@ -416,7 +452,7 @@ def _gitlab(f, at, project, tag, version, sha, title, body):
 
 def _multipart(field, name, data):
     """One file as multipart/form-data, which is how Gitea takes an asset."""
-    boundary = "bb" + os.urandom(12).hex()
+    boundary = "aerie" + os.urandom(12).hex()
     safe = name.replace('"', "_").replace("\r", "_").replace("\n", "_")
     head = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; filename=\"{safe}\"\r\n"
             f"Content-Type: application/octet-stream\r\n\r\n").encode()
@@ -502,6 +538,12 @@ def edit_plan(project, tag, notes=None, attach=()):
             if t is None or t.returncode:
                 return {"error": f"{rel} is not committed: a release carries a build in dist/ or a file "
                                  "the project's history has, so what it shows can be found again"}
+            # ...as the history has it: a tracked file changed since was
+            # attached as it is now, which no commit holds (B564).
+            same = _tree_git(project, "diff", "--quiet", "HEAD", "--", rel)
+            if same is None or same.returncode:
+                return {"error": f"{rel} has changes not committed: commit them first, so what the release "
+                                 "carries is what the history has"}
         size = p.stat().st_size
         if size > ASSET_MAX:
             return {"error": f"{p.name} is {size // 1_000_000} MB, too big to attach"}
@@ -570,56 +612,71 @@ def _said(rel, notes, urls, attached, replaced, skipped):
     return {"url": rel, "notes": notes is not None, "attached": attached, "replaced": replaced, "skipped": skipped}
 
 
+# The name a replacing file is uploaded under before the one it replaces is
+# taken off and it is named for it.
+_TMP = "replacing-"
+
+
 def _ctype(name):
     return mimetypes.guess_type(name)[0] or "application/octet-stream"
 
 
 def _github_edit(project, repo, token, tag, notes, files):
     base = f"{API}/repos/{repo}/releases"
-    rel = _req("GET", f"{base}/tags/{urllib.parse.quote(tag)}", token)
+    rel = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
     if not rel:
-        raise Refused(f"there is no release for {tag} on GitHub to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on GitHub to edit: aerie version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
     urls = {n: a.get("browser_download_url") or "" for n, a in have.items()}
     attached, replaced, skipped = [], [], []
     for x in files:
         p = WORKSPACE / project / x["path"]
         try:
-            if x["name"] in have:
-                _req("DELETE", f"{base}/assets/{int(have[x['name']]['id'])}", token)
-                replaced.append(x["name"])
+            # The new file first, under a name of its own, and only then the
+            # old one gone and the new one named for it (B560): deleted
+            # first, a failed upload left the release without the file.
+            old = have.get(x["name"])
             got = _req("POST", f"{UPLOADS}/repos/{repo}/releases/{int(rel['id'])}/assets"
-                               f"?name={urllib.parse.quote(x['name'])}", token,
+                               f"?name={urllib.parse.quote(_TMP + x['name'] if old else x['name'])}", token,
                        data=p.read_bytes(), ctype=_ctype(x["name"]))
+            if old:
+                _req("DELETE", f"{base}/assets/{int(old['id'])}", token)
+                got = _req("PATCH", f"{base}/assets/{int(got['id'])}", token, {"name": x["name"]})
+                replaced.append(x["name"])
             urls[x["name"]] = (got or {}).get("browser_download_url") or ""
             attached.append(x["name"])
-        except (Refused, OSError) as e:
+        except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
-        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls)})
+        # Its draft said back with the notes, or a draft is published (B590).
+        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls), "draft": rel.get("draft") is True})
     return _said(rel.get("html_url") or "", notes, urls, attached, replaced, skipped)
 
 
 def _gitea_edit(f, at, project, tag, notes, files):
     owner, _, repo = at["path"].partition("/")
     base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases"
-    rel = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag)}")
+    rel = f.ask("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}")
     if not rel:
-        raise Refused(f"there is no release for {tag} on {f.entry['name']} to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on {f.entry['name']} to edit: aerie version release makes one")
     have = {a.get("name"): a for a in rel.get("assets") or []}
     urls = {n: a.get("browser_download_url") or "" for n, a in have.items()}
     attached, replaced, skipped = [], [], []
     for x in files:
         try:
-            if x["name"] in have:
-                f.ask("DELETE", f"{base}/{int(rel['id'])}/assets/{int(have[x['name']]['id'])}")
-                replaced.append(x["name"])
-            data, ctype = _multipart("attachment", x["name"], (WORKSPACE / project / x["path"]).read_bytes())
-            got = f.ask("POST", f"{base}/{int(rel['id'])}/assets?name={urllib.parse.quote(x['name'])}",
+            # As on GitHub (B560): the new file in, then the old one out.
+            old = have.get(x["name"])
+            up = _TMP + x["name"] if old else x["name"]
+            data, ctype = _multipart("attachment", up, (WORKSPACE / project / x["path"]).read_bytes())
+            got = f.ask("POST", f"{base}/{int(rel['id'])}/assets?name={urllib.parse.quote(up)}",
                         data=data, ctype=ctype)
+            if old:
+                f.ask("DELETE", f"{base}/{int(rel['id'])}/assets/{int(old['id'])}")
+                got = f.ask("PATCH", f"{base}/{int(rel['id'])}/assets/{int(got['id'])}", {"name": x["name"]})
+                replaced.append(x["name"])
             urls[x["name"]] = (got or {}).get("browser_download_url") or ""
             attached.append(x["name"])
-        except (Refused, OSError) as e:
+        except (Refused, OSError, KeyError, TypeError, ValueError) as e:
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
         f.ask("PATCH", f"{base}/{int(rel['id'])}", {"body": _with_assets(notes, urls)})
@@ -628,10 +685,10 @@ def _gitea_edit(f, at, project, tag, notes, files):
 
 def _gitlab_edit(f, at, project, tag, notes, files):
     pid = urllib.parse.quote(at["path"], safe="")
-    t = urllib.parse.quote(tag)
+    t = urllib.parse.quote(tag, safe="")
     rel = f.ask("GET", f"/projects/{pid}/releases/{t}")
     if not rel:
-        raise Refused(f"there is no release for {tag} on GitLab to edit: bb version release makes one")
+        raise Refused(f"there is no release for {tag} on GitLab to edit: aerie version release makes one")
     links = {x.get("name"): x for x in ((rel.get("assets") or {}).get("links") or [])}
     urls = {n: x.get("url") or "" for n, x in links.items()}
     pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"
@@ -640,13 +697,20 @@ def _gitlab_edit(f, at, project, tag, notes, files):
     for x in files:
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(x['name'])}"
         try:
-            if x["name"] in links:
-                f.ask("DELETE", f"/projects/{pid}/releases/{t}/assets/links/{int(links[x['name']]['id'])}")
-                replaced.append(x["name"])
+            # The package first (B560): a failed upload leaves the link and
+            # what it serves as they were. A link already at this address
+            # serves the new file now and stays.
             f.ask("PUT", path, data=(WORKSPACE / project / x["path"]).read_bytes(), ctype="application/octet-stream")
-            f.ask("POST", f"/projects/{pid}/releases/{t}/assets/links",
-                  {"name": x["name"], "url": f.base + path,
-                   "link_type": "image" if re.search(r"\.(png|jpe?g|gif|webp)$", x["name"], re.I) else "package"})
+            old = links.get(x["name"])
+            if old and old.get("url") == f.base + path:
+                replaced.append(x["name"])
+            else:
+                if old:
+                    f.ask("DELETE", f"/projects/{pid}/releases/{t}/assets/links/{int(old['id'])}")
+                    replaced.append(x["name"])
+                f.ask("POST", f"/projects/{pid}/releases/{t}/assets/links",
+                      {"name": x["name"], "url": f.base + path,
+                       "link_type": "image" if re.search(r"\.(png|jpe?g|gif|webp)$", x["name"], re.I) else "package"})
             urls[x["name"]] = f.base + path
             attached.append(x["name"])
         except (Refused, OSError) as e:
@@ -696,7 +760,7 @@ def _handle(project):
 
 def _files_on(kind, name, ctx, tag):
     """(release url, {file name: (id, size)}) of the release for `tag`."""
-    t = urllib.parse.quote(tag)
+    t = urllib.parse.quote(tag, safe="")
     if kind == "github":
         repo, token = ctx
         rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{t}", token)
@@ -765,7 +829,10 @@ def remove(project, plan):
             elif kind == "gitlab":
                 f, at = ctx
                 pid = urllib.parse.quote(at["path"], safe="")
-                f.ask("DELETE", f"/projects/{pid}/releases/{urllib.parse.quote(plan['tag'])}/assets/links/{got[0]}")
+                f.ask("DELETE", f"/projects/{pid}/releases/{urllib.parse.quote(plan['tag'], safe='')}/assets/links/{got[0]}")
+                # ...and the file the link served (B561): the link gone, the
+                # package registry still handed the build out.
+                _gl_pkg_drop(f, pid, project, plan["tag"], x["name"])
             else:
                 f, at = ctx
                 owner, _, repo = at["path"].partition("/")
@@ -782,3 +849,186 @@ def remove_said(r):
         return f"nothing removed: {r['error']}"
     return (f"removed from the release on {r.get('forge')}: {', '.join(r.get('removed') or []) or 'nothing'}"
             + (f"; not done: {'; '.join(r['skipped'])}" if r.get("skipped") else "") + f"; {r.get('url')}")
+
+
+def _gl_pkg(project, tag):
+    """The generic package a release's builds are kept in on GitLab: the
+    project's name and the tag's version, in GitLab's charset."""
+    pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"
+    ver = re.sub(r"[^A-Za-z0-9._+-]", "-", re.sub(r"^(?:.*-)?v(?=\d)", "", tag)) or "0"
+    return pkg, ver
+
+
+def _gl_pkg_drop(f, pid, project, tag, name=None):
+    """The release's package deleted, or its file called `name`; how many."""
+    pkg, ver = _gl_pkg(project, tag)
+    got = f.ask("GET", f"/projects/{pid}/packages?package_type=generic&package_name={urllib.parse.quote(pkg, safe='')}"
+                       f"&package_version={urllib.parse.quote(ver, safe='')}")
+    n = 0
+    for pk in got if isinstance(got, list) else []:
+        if pk.get("name") != pkg or pk.get("version") != ver:
+            continue
+        if name is None:
+            f.ask("DELETE", f"/projects/{pid}/packages/{int(pk['id'])}")
+            n += 1
+            continue
+        files = f.ask("GET", f"/projects/{pid}/packages/{int(pk['id'])}/package_files")
+        for pf in files if isinstance(files, list) else []:
+            if pf.get("file_name") == name:
+                f.ask("DELETE", f"/projects/{pid}/packages/{int(pk['id'])}/package_files/{int(pf['id'])}")
+                n += 1
+    return n
+
+
+# ---- withdrawing a release, its tag with it --------------------------------
+# A release taken back takes its tag too (R190 step 3): the forge keeps a
+# tag while its release exists, a session may not push a deletion, and the
+# 0.9.0 dev release left three to be deleted by hand, one of them a tag with
+# no release (the operator, 30 Oct). Always a person's answer, whatever the
+# dial: it is the one change here nothing undoes.
+
+def _paths(kind, ctx, tag):
+    """The API paths for `tag` on this forge, and the caller for them:
+    {rel: the release by tag, ref: the tag read, unref: the tag deleted,
+    by_id: a release by its id ("" where the tag names it), call}."""
+    t = urllib.parse.quote(tag, safe="")
+    if kind == "github":
+        repo, token = ctx
+        # git/ref/ reads one ref exactly; git/refs/ would list every tag
+        # the name begins (v0.9.0-dev.45 reading v0.9.0-dev.4500).
+        return {"rel": f"{API}/repos/{repo}/releases/tags/{t}", "ref": f"{API}/repos/{repo}/git/ref/tags/{t}",
+                "unref": f"{API}/repos/{repo}/git/refs/tags/{t}", "by_id": f"{API}/repos/{repo}/releases/",
+                "call": lambda m, u: _req(m, u, token)}
+    f, at = ctx
+    if kind == "gitlab":
+        pid = urllib.parse.quote(at["path"], safe="")
+        return {"rel": f"/projects/{pid}/releases/{t}", "ref": f"/projects/{pid}/repository/tags/{t}",
+                "unref": f"/projects/{pid}/repository/tags/{t}", "by_id": "", "call": f.ask}
+    owner, _, repo = at["path"].partition("/")
+    base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}"
+    return {"rel": f"{base}/releases/tags/{t}", "ref": f"{base}/tags/{t}", "unref": f"{base}/tags/{t}",
+            "by_id": f"{base}/releases/", "call": f.ask}
+
+
+
+# ---- drafts (the operator, 1 Nov) --------------------------------------------
+# Every release CI makes starts a draft, seen by the repository's own people
+# alone, so its notes are read before anybody else sees it. GitHub's alone:
+# Gitea and GitLab releases made here are published as they are made.
+
+def drafts(project):
+    """The project's draft releases on GitHub, newest first: {drafts:
+    [{tag, prerelease, notes, url}], forge} or {error}. [] on another forge."""
+    try:
+        kind, name, ctx = _handle(project)
+    except Refused as e:
+        return {"error": str(e)}
+    if kind != "github":
+        return {"drafts": [], "forge": name}
+    repo, token = ctx
+    try:
+        rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=30", token) or []
+    except Refused as e:
+        return {"error": str(e)}
+    return {"forge": name, "drafts": [{"tag": str(r.get("tag_name") or ""), "prerelease": r.get("prerelease") is True,
+                                       "notes": str(r.get("body") or ""), "url": str(r.get("html_url") or "")}
+                                      for r in rows if isinstance(r, dict) and r.get("draft") and TAG.fullmatch(str(r.get("tag_name") or ""))]}
+
+
+def _draft(project, tag):
+    """(repo, token, release) of the draft for `tag`, or raises Refused."""
+    if not tag or not TAG.fullmatch(tag) or ".." in tag:
+        raise Refused(f"not a tag: {tag or '(none)'}")
+    kind, name, ctx = _handle(project)
+    if kind != "github":
+        raise Refused(f"{name} releases are published as they are made: there is no draft to publish")
+    repo, token = ctx
+    rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}", token)
+    if not rel:
+        raise Refused(f"there is no release for {tag} on GitHub")
+    if not rel.get("draft"):
+        raise Refused(f"{tag} is published already")
+    return repo, token, rel
+
+
+def draft_notes(project, tag, notes):
+    """A draft's notes replaced, as read and corrected before it is
+    published: {ok, tag} or {error}."""
+    try:
+        repo, token, rel = _draft(project, tag)
+        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, {"body": str(notes)[:120000], "draft": True})
+    except Refused as e:
+        return {"error": str(e)}
+    return {"ok": True, "tag": tag}
+
+
+def publish_draft(project, tag, notes=None, missing=()):
+    """A draft published, its notes first replaced when given: {ok, tag,
+    url} or {error}. Refused while `missing` names a file the release must
+    carry (releasefiles), so nothing goes out half built."""
+    if missing:
+        return {"error": f"{tag} is not whole yet: {', '.join(missing)} still missing. CI may still be building it"}
+    try:
+        repo, token, rel = _draft(project, tag)
+        body = {"draft": False, **({"body": str(notes)[:120000]} if notes is not None else {})}
+        out = _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, body) or {}
+    except Refused as e:
+        return {"error": str(e)}
+    return {"ok": True, "tag": tag, "url": str(out.get("html_url") or rel.get("html_url") or "")}
+
+
+def withdraw_plan(project, tag):
+    """What withdrawing `tag` would take away, read from the forge before
+    anybody is asked: {tag, forge, release, tagged, prerelease, files, url}
+    or {error}. A tag whose release is already gone is withdrawn alone."""
+    if not tag or not TAG.fullmatch(tag) or ".." in tag:
+        return {"error": f"not a tag: {tag or '(none)'}"}
+    try:
+        kind, name, ctx = _handle(project)
+        p = _paths(kind, ctx, tag)
+        rel, ref = p["call"]("GET", p["rel"]), p["call"]("GET", p["ref"])
+    except Refused as e:
+        return {"error": str(e)}
+    if not rel and not ref:
+        return {"error": f"{name} has neither a release nor a tag called {tag}"}
+    rel = rel or {}
+    files = (rel.get("assets") or {}).get("links") or [] if kind == "gitlab" else rel.get("assets") or []
+    return {"tag": tag, "forge": name, "release": bool(rel), "tagged": bool(ref),
+            "prerelease": bool(rel.get("prerelease")), "files": len(files),
+            "url": rel.get("html_url") or (rel.get("_links") or {}).get("self") or ""}
+
+
+def withdraw(project, tag):
+    """Delete the release for `tag`, then the tag, each looked up again at
+    the Allow: {forge, tag, release, tagged} saying what went, or
+    {error, forge}."""
+    try:
+        kind, name, ctx = _handle(project)
+    except Refused as e:
+        return {"error": str(e), "forge": ""}
+    p, out = _paths(kind, ctx, tag), {"forge": name, "tag": tag, "release": False, "tagged": False}
+    try:
+        rel = p["call"]("GET", p["rel"])
+        if rel:
+            p["call"]("DELETE", p["by_id"] + str(int(rel["id"])) if p["by_id"] else p["rel"])
+            out["release"] = True
+        if kind == "gitlab":
+            # GitLab keeps a release's builds in its package registry, which
+            # deleting the release leaves serving them (B561).
+            f, at = ctx
+            out["packages"] = _gl_pkg_drop(f, urllib.parse.quote(at["path"], safe=""), project, tag)
+        if p["call"]("GET", p["ref"]):
+            p["call"]("DELETE", p["unref"])
+            out["tagged"] = True
+    except Refused as e:
+        return {**out, "error": str(e)}
+    return out
+
+
+def withdraw_said(r):
+    went = [w for w, on in (("its release", r.get("release")), ("its tag", r.get("tagged"))) if on]
+    if r.get("error"):
+        return (f"{r.get('tag') or 'the release'} not withdrawn" + (" (" + " and ".join(went) + " already deleted)" if went else "")
+                + f": {r['error']}")
+    return (f"{r.get('tag')} withdrawn from {r.get('forge')}: " + " and ".join(went) + " deleted") if went \
+        else f"{r.get('tag')} had nothing left on {r.get('forge')} to withdraw"

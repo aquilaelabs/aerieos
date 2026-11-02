@@ -27,7 +27,7 @@ SMART = {"smart_status": {"passed": True}, "temperature": {"current": 34}, "powe
 
 class Disks(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_disks")
+        self.agent = agentpkg.load("aerieos_agent_disks")
         self.dk = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".disks"]
 
     def test_every_whole_disk_with_what_it_holds_and_its_smart_facts(self):

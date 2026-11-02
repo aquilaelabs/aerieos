@@ -1,4 +1,4 @@
-// The doctor: bb doctor's verdict, run by the server on a slow loop and on
+// The doctor: aerie doctor's verdict, run by the server on a slow loop and on
 // the ↻ button, behind a dot in the top bar after the bell (R218 step 3).
 // The dot wears the worst check's color; its panel lists failures and
 // warnings as full lines (they are for reading) and passing checks as chips.
@@ -16,7 +16,7 @@ function drawDoctor(){
   setText($("docWhen"), d?.running ? "running…" : d?.when ? ago(d.when) : "");
   if (!d || !d.when){
     setClass(dot, "st");
-    setAttr($("bDocDot"), "aria-label", "bb doctor: no verdict yet");
+    setAttr($("bDocDot"), "aria-label", "aerie doctor: no verdict yet");
     paint(el, `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`);
     return;
   }
@@ -33,8 +33,8 @@ function drawDoctor(){
   const level = probs.some(c => c.level === "FAIL") ? "bad"
               : probs.length ? "warn" : "ok";
   setClass(dot, "st " + level);
-  setAttr($("bDocDot"), "aria-label", level === "ok" ? `bb doctor: all ${fine.length} ok`
-    : `bb doctor: ${probs.length} to look at`);
+  setAttr($("bDocDot"), "aria-label", level === "ok" ? `aerie doctor: all ${fine.length} ok`
+    : `aerie doctor: ${probs.length} to look at`);
   paint(el,
     `<div class="probs">${probs.map(c =>
        `<div class="sub ${c.level === "FAIL" ? "bad" : "warn"}" title="${esc(tip(c))}">${esc(c.text)}${

@@ -1,4 +1,4 @@
-"""bb map's C and C++ scanner (B544, report #74 from Shebang-DevBoard): a
+"""aerie map's C and C++ scanner (B544, report #74 from Shebang-DevBoard): a
 function is its header at file, namespace or class level, a type is
 `struct|union|enum|class NAME {` or a typedef's name, a prototype is
 neither and is no call, calls are made inside functions, and a JNI

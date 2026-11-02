@@ -1,4 +1,4 @@
-"""Behind `bb capture reel` (cmd_capture in bb): eyes on change over time (R95).
+"""Behind `aerie capture reel` (cmd_capture in bb): eyes on change over time (R95).
 
 A screenshot shows one moment; what a session cannot see is an element
 popping in or a transition. So: the frames of a recording that CHANGED,

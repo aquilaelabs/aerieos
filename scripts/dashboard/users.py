@@ -83,7 +83,7 @@ def check_password(stored, password):
 
     A record this cannot parse is a record nobody can sign in as, which is the
     safe direction: a corrupted file locks the dashboard rather than opening
-    it, and `bb users passwd` is the way back.
+    it, and `aerie users passwd` is the way back.
     """
     try:
         kind, iters, salt, want = str(stored).split("$", 3)
@@ -123,7 +123,7 @@ def load():
 
 def _save(d):
     # Private from the instant it is in place, where the helper can take a
-    # mode (statefile's); the harness and bb users hand in one that cannot.
+    # mode (statefile's); the harness and aerie users hand in one that cannot.
     try:
         write_json(_file(), d, mode=0o600)
     except TypeError:
@@ -165,7 +165,7 @@ def uid_of(u):
 
     The server's own contexts (ALL) and a session's scoped token both reach
     code that wants to remember something per account. Neither should: a
-    background sweep has no tab strip and a `bb` invocation has no browser. So
+    background sweep has no tab strip and a `aerie` invocation has no browser. So
     they answer "" and every per-account store treats that as "do not store".
     """
     uid = (u or {}).get("uid") or ""
@@ -361,7 +361,7 @@ def authenticate(name, password):
     return u
 
 
-# Basic auth arrives on EVERY request `bb` makes and on every request the test
+# Basic auth arrives on EVERY request `aerie` makes and on every request the test
 # suite makes, and a pbkdf2 verify costs a fifth of a second BY DESIGN. So the
 # answer is remembered for a minute: the price stays on the sign-in rather than
 # on the poll. What is kept is a digest of the credential and never the
@@ -372,7 +372,7 @@ _RECENT_S = 60
 
 
 def authenticate_pair(pair):
-    """`user:password` as Basic auth and `bb` send it.
+    """`user:password` as Basic auth and `aerie` send it.
 
     Split on the FIRST colon: a password may contain one, a username may not.
     """
@@ -606,7 +606,7 @@ def may(u, action, project=None):
         return "not a project"              # the same answer a typo gets
     # A session on a project that reads this one: every read goes through,
     # and every write is refused with the reason, which is the whole of
-    # what "reads" means. `bb` is the relay, whose own door keeps the
+    # what "reads" means. `aerie` is the relay, whose own door keeps the
     # relayed words to reads (bbrelay.admit).
     if project is not None and u.get("session") and project != u["session"] \
             and project in (u.get("reads") or []):
@@ -625,8 +625,8 @@ def may(u, action, project=None):
     # to be talked out of `user` above.
     if action == "rules" and (u or {}).get("session"):
         return ("a session cannot change the rules it is being held to: they "
-                "are the operator's, written on the notebook's Briefing tab")
-    # ...nor hand out the project's files to people outside BuilderBot (R151).
+                "are the operator's, written on the project's Overview in the notebook")
+    # ...nor hand out the project's files to people outside AerieOS (R151).
     if action == "ftp" and (u or {}).get("session"):
         return "who may reach a project's files over FTP is a person's to set, not a session's"
     # ...and may not approve what it has waiting (roadmap #27): a session
@@ -690,8 +690,8 @@ def may(u, action, project=None):
             "toolchains-write": ("installing on a node", "these are gigabytes on shared disk"),
             # Named only (roles.NAMED_ONLY): an administrator too is
             # refused until a role grants it by name (the operator, 6 Oct).
-            "debug": ("the debug options", "BuilderBot's owner's, or a role's that grants debug by name"),
-            "ftp": ("file access over FTP", "BuilderBot's owner's, or a role's that grants ftp by name"),
+            "debug": ("the debug options", "AerieOS's owner's, or a role's that grants debug by name"),
+            "ftp": ("file access over FTP", "AerieOS's owner's, or a role's that grants ftp by name"),
         }[action]
         return f"{what} {_needs(action, project)}" + (f" ({why})" if why else "")
     if action == "admin":
@@ -1097,6 +1097,15 @@ def _signed_out_everywhere(uid):
             logins.drop_all(uid)
     except ImportError:
         pass
+    # ...and the key store shut with them (B545): a window picked for eight
+    # hours went on handing out the person's tokens after a password change
+    # meant to stop exactly that.
+    try:
+        import unlocks                                      # noqa: PLC0415
+        if uid:
+            unlocks.lock(uid, why="signed out everywhere")
+    except ImportError:
+        pass
 
 
 def set_role(name, role):
@@ -1195,7 +1204,7 @@ def give_owner_role(project, new_uid, old_uid=""):
 def migrate_r152(owned):
     """Once (R152, the operator, 7 Oct): an account on `user` carries no role
     and so no permission, and each project's owner (`owned`, {project: uid},
-    BuilderBot's owner's own projects left out, since it holds everything)
+    AerieOS's owner's own projects left out, since it holds everything)
     holds PROJECT_owner on it. Marked done in the store."""
     with _lock:
         d = load()
@@ -1238,7 +1247,7 @@ def migrate_r155():
     is given on each project it was on, so nobody gains or loses anything
     (an account on every project, "*", gets it on each one there is now);
     a project it was on with no role, which allowed nothing, is let go.
-    BuilderBot's owner and administrators hold everything and are left as
+    AerieOS's owner and administrators hold everything and are left as
     they are. Marked done in the store."""
     import registry
     known = roles.all_roles()
@@ -1314,7 +1323,7 @@ def remove(name):
             return {"error": "the owner cannot be deleted: rename it instead"}
         d["users"].pop(name)
         _save(d)
-    # Its invitations go, and what it owned falls back to BuilderBot's owner.
+    # Its invitations go, and what it owned falls back to AerieOS's owner.
     import membership
     membership.forget_account(u.get("uid") or "")
     # ...and its key store (R154): its own key, what it linked, and the
@@ -1366,7 +1375,7 @@ def own_prefs(name, want):
         keep["tour_seen"] = sorted({str(k) for k in want["tour_seen"][:64] if re.fullmatch(r"[a-z][a-z0-9-]{0,30}", str(k))})
     if isinstance(want.get("tour_off"), bool):
         keep["tour_off"] = want["tour_off"]
-    # A terminal's look, this person's in every tab of BuilderBot's own
+    # A terminal's look, this person's in every tab of AerieOS's own
     # terminal (R133 step 10): its text size, cursor and colors. Named and
     # bounded, as everything here is.
     if isinstance(want.get("term"), dict):

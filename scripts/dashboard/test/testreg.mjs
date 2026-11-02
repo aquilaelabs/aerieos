@@ -1,7 +1,7 @@
 // The notebook's test registry: the hand-written half, the parsed half, and
 // the thing that makes them worth keeping together: the drift between them.
 //
-// What is exercised for real here: the module through `bb tests` (the CLI a
+// What is exercised for real here: the module through `aerie tests` (the CLI a
 // session drives), the endpoint through the page, and the tab against a run
 // log this file writes itself. What is faked: the run log. Nothing here runs
 // a suite: a test that ran the suite to test the thing that reads the suite
@@ -13,11 +13,11 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bb');
+const BB = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'aerie');
 const FILE = `${DIR}/state/tests.json`;
 const read = () => existsSync(FILE)
   ? JSON.parse(readFileSync(FILE, 'utf8')).projects.alpha || {} : {};
-// The role is forced: this suite runs from a session on a node, where `bb`
+// The role is forced: this suite runs from a session on a node, where `aerie`
 // relays the notebook verbs to the real controller. The harness's bb is the
 // controller's copy talking to the harness's own state.
 const bb = (...a) => execFileSync(BB, ['tests', ...a], { env: { ...process.env,
@@ -71,7 +71,7 @@ ok(/slow\.mjs\s+3 tests\s+2 flagged/.test(listed),
    'the rollup is per suite: one file dominating is the more useful view');
 
 // ---- narrowing ------------------------------------------------------------
-// A change touches two files and the whole suite is minutes, so `bb tests
+// A change touches two files and the whole suite is minutes, so `aerie tests
 // run` takes the files to run and passes them to the project's test command.
 // The projection has to follow it: asked about named suites it is those
 // suites' own measured time, and asked about the whole thing it ignores the
@@ -101,7 +101,7 @@ ok(!/4\.0s/.test(flagged),
 // reason stays on the test, because "decided" and "tolerated" look the same
 // from the number alone.
 ok(/accepted; it will not be flagged/.test(bb('accept', 'slow.mjs#1', 'a real thirty-second boot')),
-   'bb tests accept marks a flagged test as taking the time it takes');
+   'aerie tests accept marks a flagged test as taking the time it takes');
 const afterAccept = bb('flagged');
 ok(!/slow\.mjs#1/.test(afterAccept) && /10\.0s\s+slow\.mjs#3/.test(afterAccept)
    && /1 accepted as the work/.test(afterAccept),
@@ -436,14 +436,14 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
   ok(read().rev > before, 'a bulk fill moves it too, having changed what the tab draws');
 }
 
-// The run's output is the shell's, not a box on a row. `bb tests log`
+// The run's output is the shell's, not a box on a row. `aerie tests log`
 // prints what the last run wrote beside the project, and the Tests view's
-// button sends `bb tests log -f` into the project's shell (the macro the
+// button sends `aerie tests log -f` into the project's shell (the macro the
 // server holds under that name).
 {
   writeFileSync(`${DIR}/ws/alpha/.bb-test-run.log`, 'PASS  [+0.1s] a line the run wrote\n3 passed, 0 failed in 1.0s\n');
   const shown = bb('log');
-  ok(/a line the run wrote/.test(shown) && /3 passed/.test(shown), 'bb tests log prints the last run\'s output whole');
+  ok(/a line the run wrote/.test(shown) && /3 passed/.test(shown), 'aerie tests log prints the last run\'s output whole');
   ok(await page.$eval('.pane .nb [data-view="tests"] #tstOut', b => !b.hidden && /run's output/.test(b.textContent)),
      'the Tests view carries Open the run\'s output beside its summary');
 }
@@ -484,13 +484,13 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
   ok(shown, 'a run ingested while the panel was reading shows on the next poll, not never');
 }
 
-// `bb tests run` is the loop this file's subject was missing: run the
+// `aerie tests run` is the loop this file's subject was missing: run the
 // project's own test command, time it, record it, so the registry stops
 // going stale because somebody forgot the second step.
 //
 // What is asserted here is the part that is this file's: a run that never
 // happened is not recorded, and says so once rather than twice. The run
-// itself is `bb test`, which the job suites already drive, and pointing this
+// itself is `aerie test`, which the job suites already drive, and pointing this
 // one at a real suite would be a suite inside a suite.
 {
   let out = '';
@@ -508,7 +508,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
   // projecting the next full one from it would call it stuck while it was
   // still getting started.
   ok(/^projected 40s, what the last whole run took over \d+ tests in \d+ suites; one past 80s is stuck, not slow$/m.test(out),
-     `bb tests run says first when it should finish, from the last whole run's wall time (${out.split('\n')[0]})`);
+     `aerie tests run says first when it should finish, from the last whole run's wall time (${out.split('\n')[0]})`);
   ok(/nothing timed, so nothing recorded/.test(out),
      'a run that could not start records nothing, and says so');
   ok(!/looks like a test run/.test(out),
@@ -525,20 +525,20 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
   const B = `${DIR}/bundleish`;
   rmSync(B, { recursive: true, force: true });
   mkdirSync(`${B}/scripts`, { recursive: true });
-  cpSync(BB, `${B}/scripts/bb`);
+  cpSync(BB, `${B}/scripts/aerie`);
   cpSync(join(dirname(BB), 'lib'), `${B}/scripts/lib`, { recursive: true });
   ok(!existsSync(`${B}/scripts/dashboard/testreg.py`),
      'the bundle shape: bb and its library, no dashboard python beside it');
   let out = '';
   try {
-    out = execFileSync(`${B}/scripts/bb`, ['tests', 'run'], { env: { ...process.env,
+    out = execFileSync(`${B}/scripts/aerie`, ['tests', 'run'], { env: { ...process.env,
       BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
       WORKSPACE: `${DIR}/ws`, BB_TESTS_PROJECT: 'alpha',
       DASHBOARD_PORT: new globalThis.URL(URL).port, DASHBOARD_AUTH: 'test:test' },
       stdio: ['ignore', 'pipe', 'pipe'] }).toString();
   } catch (e) { out = String(e.stdout || '') + String(e.stderr || ''); }
   ok(!/testreg\.py is missing/.test(out),
-     `bb tests run works with no testreg.py beside it, which is every node (${
+     `aerie tests run works with no testreg.py beside it, which is every node (${
        out.trim().split('\n')[0] || 'no output'})`);
   ok(/nothing timed, so nothing recorded/.test(out),
      '...reaching the same place a controller run reaches');
@@ -560,7 +560,7 @@ ok((await page.evaluate(async () => {
 page.errors = [];
 
 // ---- a run in progress ------------------------------------------------------
-// `bb test` says when a run starts and ends (run_here's tests_going), and the
+// `aerie test` says when a run starts and ends (run_here's tests_going), and the
 // status poll carries it on the project row, so the companion app can hold
 // its "waiting on you" note until the tests finish where the project's
 // During-a-test-run setting waits for them (the operator, 30 Sep).

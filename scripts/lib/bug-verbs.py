@@ -1,4 +1,4 @@
-"""Behind `bb bug` (cmd_bug in bb): the bug tracker's CLI half, the side a
+"""Behind `aerie bug` (cmd_bug in bb): the bug tracker's CLI half, the side a
 session drives, read and written through dashboard/bugs.py, the module
 the dashboard writes it with.
 
@@ -21,7 +21,7 @@ _state = os.environ.get("DASHBOARD_STATE", "/config")
 bugs.configure(write_json=write_json, state=_state)
 
 # The roadmap's half of a notebook batch, and the coordinator over the two.
-# `bb bug begin` and `bb roadmap begin` are the same command reached from
+# `aerie bug begin` and `aerie roadmap begin` are the same command reached from
 # either tab's name: one batch covers the notebook, so it would be a lie for
 # the tracker to have a private one.
 _roadmap = dash.load("roadmap", _here)
@@ -57,7 +57,7 @@ def behind(n, verb, args, summary):
         return False
     if verb is None:
         print(f"[builderbot] ERROR: {B(n)} is still waiting for the operator's "
-              "approval; there is nothing to close or drop yet. `bb bug pending`",
+              "approval; there is nothing to close or drop yet. `aerie bug pending`",
               file=sys.stderr)
         sys.exit(1)
     r = pending.hold(proj, "bugs", verb, args, summary, number=n, after=rec["id"])
@@ -68,7 +68,7 @@ def behind(n, verb, args, summary):
 
 
 def ident(word):
-    """The bug a verb names, with the letter checked first: `bb bug fix R12`
+    """The bug a verb names, with the letter checked first: `aerie bug fix R12`
     stops here saying R12 is a roadmap item. See cmd_roadmap's twin."""
     n, err = ids.parse("bugs", word)
     if err:
@@ -121,12 +121,12 @@ def rows():
 
 
 def builderbot_tree(root):
-    """Whether a project's tree is BuilderBot's own source (B743): there, a
-    bug that names BuilderBot or bb is this tracker's, since its readers are
-    BuilderBot's maintainers, and sending it to bb report sent it to them by
+    """Whether a project's tree is AerieOS's own source (B743): there, a
+    bug that names AerieOS or aerie is this tracker's, since its readers are
+    AerieOS's maintainers, and sending it to aerie report sent it to them by
     the long way round."""
     return all(os.path.isfile(os.path.join(root, f)) for f in
-               ("config/templates/briefing.md", "scripts/dashboard/server.py", "scripts/bb"))
+               ("config/templates/briefing.md", "scripts/dashboard/server.py", "scripts/aerie"))
 
 
 def pull_flags(args):
@@ -138,19 +138,19 @@ def pull_flags(args):
              "--actual": "actual", "--notes": "notes", "--report": "report"}
     while i < len(args):
         # Anything else that looks like a flag is asked about or refused, not
-        # glued onto the title: `bb bug add "T" --help` filed "T --help"
+        # glued onto the title: `aerie bug add "T" --help` filed "T --help"
         # (diagnostics #112). After `--` every word is the title's.
         if args[i] == "--":
             words.extend(args[i + 1:])
             break
         if args[i] in ("--help", "-h"):
-            print("usage: bb bug add TITLE [--sev low|medium|high] [--area AREA] [--repro HOW "
+            print("usage: aerie bug add TITLE [--sev low|medium|high] [--area AREA] [--repro HOW "
                   "--reproduces always|sometimes|once|untried] [--expected ..] [--actual ..] [--notes ..] "
                   "[--report N] [--here]; -- ends the flags. --report N files diagnostics report N "
-                  "(bb diag reports): its words, area, repro and whether it reproduces, unless given here")
+                  "(aerie diag reports): its words, area, repro and whether it reproduces, unless given here")
             sys.exit(0)
         if args[i].startswith("--") and args[i] not in names:
-            print(f"[builderbot] ERROR: bb bug add does not take {args[i]} (it takes --sev, --area, --repro, "
+            print(f"[builderbot] ERROR: aerie bug add does not take {args[i]} (it takes --sev, --area, --repro, "
                   "--reproduces, --expected, --actual, --notes, --report and --here; -- before a title word "
                   "that starts with --)",
                   file=sys.stderr)
@@ -174,12 +174,12 @@ if op in ("list", "ls"):
     if _b:
         print(f"  [batch open: {_b['changes']} change"
               f"{'' if _b['changes'] == 1 else 's'} unrecorded across this "
-              "notebook; bb bug commit, or revert]")
+              "notebook; aerie bug commit, or revert]")
     open_rows = [b for b in rows() if b.get("status") == "open"]
     if fmt != "text":
         dump_records(open_rows); sys.exit(0)
     if not open_rows:
-        print(f"no open bugs on {proj}; `bb bug all` includes the closed ones")
+        print(f"no open bugs on {proj}; `aerie bug all` includes the closed ones")
     for b in open_rows:
         print(line(b))
 elif op == "all":
@@ -190,7 +190,7 @@ elif op == "all":
     for b in rows():
         print(line(b))
 elif op in ("begin", "commit", "revert"):
-    # The same batch `bb roadmap begin` opens: one over the whole notebook,
+    # The same batch `aerie roadmap begin` opens: one over the whole notebook,
     # reached from whichever tab's name you happened to be thinking in.
     if op == "begin":
         bail(_nb.begin(proj))
@@ -210,7 +210,7 @@ elif op in ("find", "search"):
     # above all, which is how you find out whether the thing you just tripped
     # over is already known.
     if not rest:
-        print("usage: bb bug find <text>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie bug find <text>", file=sys.stderr); sys.exit(1)
     needle = " ".join(rest).lower()
     hits = [b for b in rows()
             if any(needle in str(b.get(k, "")).lower()
@@ -222,7 +222,7 @@ elif op in ("find", "search"):
         print(line(b))
 elif op == "show":
     if not rest:
-        print("usage: bb bug show <n>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie bug show <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0])
     b = next((x for x in rows() if x.get("id") == n), None)
     if b is None:
@@ -232,7 +232,7 @@ elif op == "show":
         dump_records([b]); sys.exit(0)
     show(b)
 elif op == "add" and "--from" in rest:
-    # Reports from a file (R167): `bb bug add --from FILE` files each
+    # Reports from a file (R167): `aerie bug add --from FILE` files each
     # record as one, with its severity, area, repro and the rest; a
     # record's id and status are ignored, since a new report takes the
     # next number and opens.
@@ -257,7 +257,7 @@ elif op == "add":
     title, flags = pull_flags([a for a in rest if a != "--here"])
     # A diagnostics report taken into this tracker (R124 step 4): its words,
     # area, repro and whether it reproduces come across unless given here,
-    # and the note says where it came from. bb read it through bb diag, the
+    # and the note says where it came from. bb read it through aerie diag, the
     # diagnostics' own gate, into BB_BUG_REPORTS.
     if flags.get("report"):
         import json
@@ -268,7 +268,7 @@ elif op == "add":
             got = []
         rep = next((x for x in got if str(x.get("id")) == want), None)
         if rep is None:
-            print(f"[builderbot] ERROR: no diagnostics report #{want} (bb diag reports lists them)", file=sys.stderr)
+            print(f"[builderbot] ERROR: no diagnostics report #{want} (aerie diag reports lists them)", file=sys.stderr)
             sys.exit(1)
         text = " ".join(str(rep.get("text") or "").split())
         title = title or text
@@ -284,15 +284,15 @@ elif op == "add":
             flags.get("notes") or "") if x)
         here = True
     # The title and the area, not the repro: a project's own bug is often
-    # reproduced with bb (bb capture reel ...), and two of MediaReducer's
-    # were sent to bb report for it (7 Oct).
+    # reproduced with bb (aerie capture reel ...), and two of MediaReducer's
+    # were sent to aerie report for it (7 Oct).
     said = " ".join([title, str(flags.get("area") or "")])
-    # A bug that names BuilderBot, filed in another project's tracker, is
-    # usually BuilderBot's, which is what bb report is for. Asked before it is
-    # filed rather than said after: said after, a session filed BuilderBot's
+    # A bug that names AerieOS, filed in another project's tracker, is
+    # usually AerieOS's, which is what aerie report is for. Asked before it is
+    # filed rather than said after: said after, a session filed AerieOS's
     # bug in its own tracker anyway and the operator had to tell it (24 Sep).
     # --here is the answer "it is this project's own". Not where the project
-    # has reporting BuilderBot bugs off, nor on BuilderBot's own tree, whose
+    # has reporting AerieOS bugs off, nor on AerieOS's own tree, whose
     # tracker it is (B743).
     #
     #
@@ -304,12 +304,12 @@ elif op == "add":
     import prefs
     if not here and prefs.get(proj).get("report") != "deny" \
             and not builderbot_tree(os.path.join(os.environ.get("BB_WORKSPACE", "/workspace"), proj)) \
-            and re.search(r"\bbuilder ?bot\b|\bbb\b", said, re.I):
-        print("[builderbot] not filed yet. Send it with bb report \"what happened\" [--area A] "
-              f"[--repro \"...\"] if it is a problem with BuilderBot itself, or add --here if it is "
-              f"{proj}'s own bug. It names BuilderBot or bb, and BuilderBot's problems go to its "
+            and re.search(r"\bbuilder ?bot\b|\baerie(?: ?os)?\b|\bbb\b", said, re.I):
+        print("[builderbot] not filed yet. Send it with aerie report \"what happened\" [--area A] "
+              f"[--repro \"...\"] if it is a problem with AerieOS itself, or add --here if it is "
+              f"{proj}'s own bug. It names AerieOS or aerie, and AerieOS's problems go to its "
               f"maintainers, not into {proj}'s tracker, while {proj}'s setting Agents may: Report "
-              "BuilderBot bugs is on (off makes bb bug add file here)",
+              "AerieOS bugs is on (off makes aerie bug add file here)",
               file=sys.stderr)
         sys.exit(1)
     r = bugs.add(proj, title, by="claude",
@@ -318,7 +318,7 @@ elif op == "add":
     if r.get("held"):
         h = r["held"]
         print(f"held for approval as {B(h['number'])}: it lands in the tracker "
-              "when the operator approves it on the notebook. `bb bug pending` "
+              "when the operator approves it on the notebook. `aerie bug pending` "
               "lists what is waiting; you are told on a later turn what they decided")
         sys.exit(0)
     print(f"filed {B(r['bug']['id'])}: {r['bug']['title']}")
@@ -327,7 +327,7 @@ elif op == "note":
     # Appended rather than replacing, because the last analysis is not made
     # wrong by the next one; it is how the next one starts.
     if len(rest) < 2:
-        print("usage: bb bug note <n> \"what you learned\"", file=sys.stderr)
+        print("usage: aerie bug note <n> \"what you learned\"", file=sys.stderr)
         sys.exit(1)
     n = ident(rest[0])
     b = next((x for x in rows() if x.get("id") == n), None)
@@ -348,7 +348,7 @@ elif op == "note":
 elif op == "edit":
     if len(rest) < 3 or rest[1] not in ("title", "sev", "severity", "area",
                                         "repro", "reproduces", "expected", "actual", "notes"):
-        print("usage: bb bug edit <n> title|sev|area|repro|reproduces|expected|actual|notes"
+        print("usage: aerie bug edit <n> title|sev|area|repro|reproduces|expected|actual|notes"
               " \"...\"", file=sys.stderr)
         sys.exit(1)
     k = "severity" if rest[1] in ("sev", "severity") else rest[1]
@@ -364,7 +364,7 @@ elif op in ("rm", "remove"):
     # project. A bug that was real and is dealt with gets `fix` or `wontfix`,
     # which keeps it; this does not, and says why in the log.
     if not rest:
-        print("usage: bb bug rm <n> [\"why it should not have been filed\"]",
+        print("usage: aerie bug rm <n> [\"why it should not have been filed\"]",
               file=sys.stderr)
         sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None)
@@ -372,7 +372,7 @@ elif op in ("rm", "remove"):
     print(f"removed {B(n)}; closing keeps a bug, this does not")
 elif op in ("fix", "wontfix", "na", "reopen"):
     if not rest:
-        print(f"usage: bb bug {op} <n> [\"note\"]", file=sys.stderr); sys.exit(1)
+        print(f"usage: aerie bug {op} <n> [\"note\"]", file=sys.stderr); sys.exit(1)
     status = {"fix": "fixed", "wontfix": "wontfix", "na": "na",
               "reopen": "open"}[op]
     n = ident(rest[0]); behind(n, None, None, None)
@@ -396,8 +396,8 @@ elif op == "pending":
     print(f"  (this project's setting for new bug reports from a session: "
           f"{pending.mode(proj, 'bugs')})")
 elif op in ("history", "log"):
-    # The same filters `bb roadmap history` takes, because whoever learned one
-    # should not have to learn the other. `bb history` merges all four.
+    # The same filters `aerie roadmap history` takes, because whoever learned one
+    # should not have to learn the other. `aerie history` merges all four.
     limit, since, find, i = 20, None, None, 0
     while i < len(rest):
         a = rest[i]
@@ -420,7 +420,7 @@ elif op in ("history", "log"):
         elif a in ("--find", "-f") and i + 1 < len(rest):
             find = rest[i + 1]; i += 2
         else:
-            print("usage: bb bug history [-n N|--all] [--since 7d|YYYY-MM-DD] "
+            print("usage: aerie bug history [-n N|--all] [--since 7d|YYYY-MM-DD] "
                   "[--find TEXT]", file=sys.stderr)
             sys.exit(1)
     h = bugs.history(proj, limit=limit, since=since, find=find)
@@ -437,7 +437,7 @@ elif op in ("history", "log"):
 elif op == "--prompt":
     sys.stdout.write(bugs.prompt(proj))
 else:
-    print("usage: bb bug [list|all|show N|find TEXT|begin|commit|revert|add TITLE [--sev S] [--area ..] [--here] "
+    print("usage: aerie bug [list|all|show N|find TEXT|begin|commit|revert|add TITLE [--sev S] [--area ..] [--here] "
           "[--repro ..]|note N TEXT|edit N FIELD TEXT|fix N [NOTE]|"
           "wontfix N [WHY]|na N [WHY]|reopen N|rm N [WHY]|pending|"
           "history [-n N] [--since D] [--find TEXT]]", file=sys.stderr)

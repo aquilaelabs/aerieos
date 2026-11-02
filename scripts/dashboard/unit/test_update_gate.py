@@ -150,7 +150,7 @@ class HeldJobs(unittest.TestCase):
         self.assertIn("not retried", err)
 
 
-agent = agentpkg.load("builderbot_agent_held")
+agent = agentpkg.load("aerieos_agent_held")
 agent.log = lambda *a, **k: None
 
 

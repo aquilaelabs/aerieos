@@ -20,17 +20,17 @@ const SHIPPED = `${DIR}/agentsrc`;
 // The agent's own modules, in-process: a fresh copy of the package as one
 // object (unit/agentpkg.py), the way the single file was loaded by path.
 const LOAD_AGENT = `import sys; sys.path.insert(0, ${JSON.stringify(`${REPO}/scripts/dashboard/unit`)}); import agentpkg`;
-// What a node runs: the zip the controller ships (builderbot_agent/bundle.py).
+// What a node runs: the zip the controller ships (aerieos_agent/bundle.py).
 const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); '
-  + 'from builderbot_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED]);
-// Under bb tests coverage (R76) every python this file starts, the agent it
+  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED]);
+// Under aerie tests coverage (R76) every python this file starts, the agent it
 // runs and the module it drives in-process alike, counts the agent's
 // functions into its own file: PID is each process's own, so a self-update's
 // successor and every snippet get a file apiece. Set once, inherited by all.
 if (process.env.BB_COVERAGE_DIR){
   process.env.BB_COVERAGE_OUT = `${process.env.BB_COVERAGE_DIR}/agent-PID.json`;
   process.env.BB_COVERAGE_SUITE = 'agent';
-  process.env.BB_COVERAGE_AS = 'scripts/agent/builderbot_agent';   // the copy's modules count as the tree's
+  process.env.BB_COVERAGE_AS = 'scripts/agent/aerieos_agent';   // the copy's modules count as the tree's
 }
 // A node's toolchains live under <store>/<node id> (R196), so every fixture
 // written INTO a store goes there, while the store's own path (the setting)
@@ -298,7 +298,7 @@ const SCREEN_PORT = 17684 + Math.floor(Math.random() * 1000);
 // A terminal through the controller, as the page opens one (R133): its
 // screen, what is typed into it, and the reason it closes with.
 const { connect: wsConnect } = createRequire(import.meta.url)(`${REPO}/apps/vscode/lib/ws.js`);
-const termRun = async (arg, type, hdr) => {
+const termRun = async (arg, type, hdr, answer) => {
   const sock = await wsConnect(URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/termws?arg='
     + encodeURIComponent(arg) + '&cols=120&rows=30', { headers: hdr });
   let out = '', why = null;
@@ -308,6 +308,8 @@ const termRun = async (arg, type, hdr) => {
   if (type && why === null){
     sock.send(Buffer.concat([Buffer.from([0]), Buffer.from(type, 'utf8')]));
     await sleep(2500);
+    // A shell that is slow to start under a whole run's load answers late.
+    for (const t0 = Date.now(); answer && !answer.test(out) && why === null && Date.now() - t0 < 30000;) await sleep(200);
   }
   sock.close();
   return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b[()][0-9A-Za-z]/g, ''), why };
@@ -411,7 +413,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
 
 // ---- the loop: hello, heartbeat, a job ---------------------------------------
 // The agent's output goes to a FILE, never a pipe. A pipe has to be drained
-// by this process's event loop, and this file also runs `bb run` and friends
+// by this process's event loop, and this file also runs `aerie run` and friends
 // with execFileSync, which blocks that loop while it waits for a job that
 // needs the agent to keep polling. Once the agent had logged 64KB it blocked
 // on a write nobody would ever read, the job never started, and the suite
@@ -465,7 +467,7 @@ try {
     ok(unsigned >= 400 && unsigned < 500, `...and the relay answers on that port, refusing a terminal nobody signed (${unsigned})`);
     const st = JSON.parse(readFileSync(NODE_JSON, 'utf8'));
     const store = `${st.stores.toolchains}/${SCOPE}`;   // the node's scope in it (roadmap R19)
-    ok(existsSync(`${store}/.bb/current/scripts/bb`)
+    ok(existsSync(`${store}/.bb/current/scripts/aerie`)
        && lstatSync(`${store}/.bb/current`).isSymbolicLink(),
        'the toolchain store carries a .bb/current link at the newest bundle, for a shell at the console');
     ok(existsSync(`${store}/.bb/current/scripts/dashboard/bb-work-note`)
@@ -661,7 +663,7 @@ print(json.dumps({'first': first, 'again': case('process'), 'guest': case('contr
          '...once: a unit that already stops only itself and a needrestart already told are left as they are, and a guest is never touched');
     }
     // R27's refresh, run against the bundle's real layout: bb is at
-    // <store>/.bb/current/scripts/bb. The agent looked for .bb/current/bb,
+    // <store>/.bb/current/scripts/aerie. The agent looked for .bb/current/bb,
     // which no bundle has, and returned in silence, so no idle session's
     // token was ever refreshed (B335). A stand-in bb records what it was
     // handed, for each live session the controller named.
@@ -674,7 +676,7 @@ m.log = lambda *a, **k: None
 store = tempfile.mkdtemp()
 os.makedirs(os.path.join(store, '.bb', 'current', 'scripts'))
 seen = os.path.join(store, 'seen')
-bb = os.path.join(store, '.bb', 'current', 'scripts', 'bb')
+bb = os.path.join(store, '.bb', 'current', 'scripts', 'aerie')
 with open(bb, 'w') as f:
     f.write('#!/bin/sh\\nprintf "%s %s %s %s\\\\n" "$1 $2" "$BB_PROJECT" "$BB_ACCOUNT_UID" "$BB_TOKEN" >> ' + seen + '\\n')
 os.chmod(bb, 0o755)
@@ -702,7 +704,7 @@ logged = []
 m.log = lambda msg, *a, **k: logged.append(msg)
 store = tempfile.mkdtemp()
 os.makedirs(os.path.join(store, '.bb', 'current', 'scripts'))
-bb = os.path.join(store, '.bb', 'current', 'scripts', 'bb')
+bb = os.path.join(store, '.bb', 'current', 'scripts', 'aerie')
 with open(bb, 'w') as f:
     f.write('#!/bin/sh\\necho "[builderbot] ERROR: the session token was not kept under /nowhere: PermissionError" >&2\\nexit 1\\n')
 os.chmod(bb, 0o755)
@@ -716,7 +718,7 @@ a.keep_session_tokens(rows)
 print(json.dumps({"logged": logged, "report": a.keep_report()}))
 `], { encoding: 'utf8' }).trim();
       const { logged, report } = JSON.parse(said);
-      ok(logged.length === 1 && /session tokens: bb token keep failed \(exit 1\): .*not kept under \/nowhere/.test(logged[0]),
+      ok(logged.length === 1 && /session tokens: aerie token keep failed \(exit 1\): .*not kept under \/nowhere/.test(logged[0]),
          `...and one it could not keep is said in the agent's log with bb's reason, once, not on every hello (${said.slice(0, 160)})`);
       ok(report.said.length === 1 && report.said[0].key === 'u_12345678/alpha' && /not kept under \/nowhere/.test(report.said[0].msg)
          && report.ok === 0,
@@ -846,7 +848,7 @@ print(json.dumps({
                          {'name': 'beta-db-1', 'compose': 'beta', 'ips': ['172.20.0.3'], 'bridges': ['br-bbbbbbbbbbbb'], 'ports': [5432]},
                          {'name': 'stranger', 'compose': 'other', 'ips': ['172.21.0.9'], 'bridges': ['br-cccccccccccc'], 'ports': [9000]}],
                         {'alpha': {'owner': 'alpha', 'to': ['alpha', 'beta']}, 'beta': {'owner': 'beta', 'to': ['beta']}}),
-  # ...and BuilderBot's own (R180): the map's 'all' gives a System-owned
+  # ...and AerieOS's own (R180): the map's 'all' gives a System-owned
   # compose project every bridge and every published port here, the
   # stranger's included, which the controller never named.
   'ctrsys': m.ctrnet_reach([{'name': 'alpha-app-1', 'compose': 'alpha', 'ips': ['172.18.0.2'], 'bridges': ['br-aaaaaaaaaaaa'], 'ports': [8080]},
@@ -1009,15 +1011,15 @@ print(json.dumps(sorted(os.listdir(d))))
   }
 
   // ---- the relay (roadmap #24): bb's notebook verbs from a node ---------------
-  // A session on a node has no /config, so `bb roadmap`, `bb bug`, `bb
+  // A session on a node has no /config, so `aerie roadmap`, `aerie bug`, `bb
   // version` and the rest send their words to /api/v1/bb with the session's
   // token, and the controller runs its own bb in that project's tree. What
   // is asserted: it runs, its answer comes back, the token pins the project,
   // and the verbs that answer for the machine the session is on are refused.
   {
-    const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha'],
+    const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha'],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-    ok(/^bbs_/.test(tok), `bb users token mints a session token for a project (${tok.slice(0, 8)}…)`);
+    ok(/^bbs_/.test(tok), `aerie users token mints a session token for a project (${tok.slice(0, 8)}…)`);
     const relay = async (body, auth = 'Bearer ' + tok) => {
       const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
         headers: { Authorization: auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1025,15 +1027,15 @@ print(json.dumps(sorted(os.listdir(d))))
     };
     const added = await relay({ argv: ['roadmap', 'add', 'relayed from a node'], cwd: `${DIR}/ws/alpha` });
     ok(added.status === 200 && added.code === 0 && /added R\d+/.test(added.out),
-       `a session's bb roadmap runs on the controller and answers (${(added.out || added.error || '').trim().slice(0, 60)})`);
+       `a session's aerie roadmap runs on the controller and answers (${(added.out || added.error || '').trim().slice(0, 60)})`);
     // The scanner's reports live on the controller and cover the whole share,
-    // so a relayed `bb findings --all` is the one verb whose own flag walks
+    // so a relayed `aerie findings --all` is the one verb whose own flag walks
     // out of the project this door keeps a session inside. Measured from a
     // real session before this refusal existed: it listed file paths out of
     // three other projects' trees.
     const everyone = await relay({ argv: ['findings', '--all'], cwd: `${DIR}/ws/alpha` });
     ok(everyone.status === 403 && /its own/.test(everyone.error || ''),
-       `a session's bb findings --all is refused, naming what it may read instead (${
+       `a session's aerie findings --all is refused, naming what it may read instead (${
          (everyone.error || '').slice(0, 60)})`);
     ok((await relay({ argv: ['findings', '-a'], cwd: `${DIR}/ws/alpha` })).status === 403,
        '...by the short flag too, which is the same door');
@@ -1081,7 +1083,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const env = { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''),
                     BB_TOKEN: short, BB_PROJECT: 'alpha', XDG_CACHE_HOME: cache,
                     BB_ACCOUNT_UID: 'u_0000abcd' };
-      execFileSync('bash', [`${REPO}/scripts/bb`, 'roadmap'], { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
+      execFileSync('bash', [`${REPO}/scripts/aerie`, 'roadmap'], { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
       // Under the account's id (B159): the cache folder is shared between
       // accounts on a node, so the uid is what keeps one account's token out
       // of another's session.
@@ -1089,22 +1091,22 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         ? readFileSync(`${cache}/builderbot/u/u_0000abcd/project/alpha/token`, 'utf8').trim() : '';
       ok(/^bbs_/.test(kept) && expOf(kept) > expOf(short),
          'bb keeps the renewed token in the account\'s cache, where it reads when the environment\'s has expired');
-      const again = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', '--now'],
+      const again = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', '--now'],
         { encoding: 'utf8', env: { ...env }, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
       ok(again === kept, '...and prefers it over the older one in its environment from then on');
     }
     const settings = await relay({ argv: ['settings', '--json'] });
     ok(settings.code === 0 && JSON.parse(settings.out).project === 'alpha'
        && typeof JSON.parse(settings.out).locked === 'boolean',
-       'bb settings --json relays the project\'s settings, lock included: what bb-tty and bb build read on a node');
+       'aerie settings --json relays the project\'s settings, lock included: what bb-tty and aerie build read on a node');
     const other = await relay({ argv: ['roadmap'], project: 'ep.silon' });
     ok(other.status === 403 && /alpha does not read ep\.silon/.test(other.error),
        `a token for alpha cannot ask about another project, and says it does not read it (${other.error})`);
     const sdk = await relay({ argv: ['sdk'] });
     ok(sdk.status === 400 && /not relayed/.test(sdk.error),
-       'bb toolchains is refused: it answers for the machine the session is on');
+       'aerie toolchains is refused: it answers for the machine the session is on');
     const emu = await relay({ argv: ['emu', 'start'] });
-    ok(emu.status === 400, '...and so is bb emu');
+    ok(emu.status === 400, '...and so is aerie emu');
     const nobody = await relay({ argv: ['roadmap'] }, 'Bearer bbs_nonsense');
     ok(nobody.status === 401, 'a token that does not verify gets nothing');
 
@@ -1119,7 +1121,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
   // signed in here as X", or that it is not.
   {
     const seed = readFileSync(`${DIR}/home/.claude/.bb-grant.json`, 'utf8');
-    const forMe = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+    const forMe = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const api = async (body) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
       { method: 'POST',
@@ -1163,7 +1165,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     ok(!(await agentsAt()).codex?.nodes?.[minted.id] && (await where())[minted.id]?.email === 'tester@example.com',
        '...and its sign-out takes Codex off that node and leaves Claude signed in');
     const odd = await api({ agent: 'nonesuch', email: 'x@example.invalid', signed_in: true });
-    ok(odd.status === 400 && /nonesuch/.test(odd.error || ''), 'an agent BuilderBot does not sign in to is refused by name');
+    ok(odd.status === 400 && /nonesuch/.test(odd.error || ''), 'an agent AerieOS does not sign in to is refused by name');
 
     // The flow itself finds Claude Code where a SESSION finds it: the session
     // account's own ~/.local/bin (the provisioner's install) and the pinned
@@ -1176,7 +1178,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       writeFileSync(`${base}/.local/bin/claude`, '#!/bin/sh\necho "fake claude $*"\n');
       chmodSync(`${base}/.local/bin/claude`, 0o755);
       const run = (uid) => { try {
-        return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/bb`, 'login', '--flow'],
+        return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'login', '--flow'],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
             env: { ...process.env, BUILDERBOT_ROLE: 'node', BUILDER_HOME: base, HOME: base,
                    BB_ACCOUNT_UID: uid, BB_TOKEN: '', PATH: '/usr/bin:/bin',
@@ -1193,7 +1195,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // nobody else's. Run here with a home and a Claude Code of its own: a
       // job on this suite's agent would find the machine's real ones.
       const out = (uid) => { try {
-        return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/bb`, 'login', '--out'],
+        return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'login', '--out'],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
             env: { ...process.env, BUILDERBOT_ROLE: 'node', BUILDER_HOME: base, HOME: base,
                    BB_ACCOUNT_UID: uid, BB_TOKEN: '', PATH: '/usr/bin:/bin',
@@ -1284,17 +1286,17 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // Inside a session on a node the two hooks bb-tty writes into its
     // settings have no /config to write: they post to the controller with
     // the session's token, and the same modules record them here: the
-    // overlap note `bb work` reads, the prompt in the project's feed, and
+    // overlap note `aerie work` reads, the prompt in the project's feed, and
     // the "started" line the proxy cannot announce for a session it does
     // not see start.
     {
-      const forMe = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+      const forMe = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
         { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
       const nodeEnv = { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''),
                         BB_TOKEN: forMe, BB_NODE: 'agentbox', BB_TREE: '/workspace/alpha' };
       const hook = (name, args, input) => execFileSync('python3', [`${REPO}/scripts/dashboard/${name}`, ...args],
         { input, encoding: 'utf8', env: nodeEnv, stdio: ['pipe', 'pipe', 'pipe'] });
-      // ---- bb-gate: nothing runs while BuilderBot is away --------------
+      // ---- bb-gate: nothing runs while AerieOS is away --------------
       // A session outlives an update. The gate refuses every tool call while
       // the controller does not answer, and lets the first call after it
       // comes back through without a wait. It used to weigh a second thing,
@@ -1323,7 +1325,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         // A controller that answers with a refusal is up. A session idle past
         // its token's twelve hours is refused "not signed in", and the gate
         // used to read any error without "HTTP" in it as no connection at all,
-        // so it told that session BuilderBot was restarting after an update.
+        // so it told that session AerieOS was restarting after an update.
         fresh();
         rmSync(`${cache}/builderbot/u/_none/project/alpha/token`, { force: true });
         r = gate({ BB_TOKEN: 'bbs_bm90LWEtcmVhbC10b2tlbg' });
@@ -1348,10 +1350,10 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       }
       // bb itself in the node role: a relayed verb is the controller's
       // answer and nothing else; the dispatch used to fall through and run
-      // the verb a second time locally, so `bb bug` on bb-sandbox printed
+      // the verb a second time locally, so `aerie bug` on bb-sandbox printed
       // the tracker and then died with "bugs.py is missing from this image".
       const bbOnNode = args => { try {
-        return execFileSync('bash', [`${REPO}/scripts/bb`, ...args],
+        return execFileSync('bash', [`${REPO}/scripts/aerie`, ...args],
           { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...nodeEnv, BB_PROJECT: 'alpha' },
             stdio: ['ignore', 'pipe', 'pipe'] });   // BB_PROJECT: what bb-tty exports into a session
       } catch (e) { return `FAILED ${e.status}: ${e.stderr}`; } };
@@ -1373,14 +1375,14 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
            refused.replace(/\s+/g, ' ').slice(0, 60)})`);
       const num = (once.match(/added R(\d+)/) || [])[1];
       bbOnNode(['roadmap', 'rm', String(num), 'test']);
-      // bb git: git's network half from a node runs on the controller, with
+      // aerie git: git's network half from a node runs on the controller, with
       // the keys that live only there (docs/nodes.md §20, rule 2), in a
       // repository of the controller's own (B148). The fixture's origin is
       // an ssh address nobody holds a key for, so git itself answers, which
       // is the proof that git ran there and not on the "node".
       const ls = bbOnNode(['git', 'ls-remote', 'origin']);
       ok(/fatal:/.test(ls) && !/not relayed|not accepted/.test(ls),
-         `bb git ls-remote from a node reaches the controller's git (${ls.replace(/\s+/g, ' ').slice(0, 70)})`);
+         `aerie git ls-remote from a node reaches the controller's git (${ls.replace(/\s+/g, ' ').slice(0, 70)})`);
       const exec = bbOnNode(['git', 'push', '--upload-pack=/bin/sh', 'origin']);
       const conf = bbOnNode(['git', 'fetch', '-c', 'core.sshCommand=id']);
       const other = bbOnNode(['git', 'status']);
@@ -1395,21 +1397,21 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // library and NO dashboard modules, which is what a node actually has
       // (workspace.BUNDLE_PARTS ships bb, lib and the hooks, and deliberately
       // not the notebook modules, because a node has no /config for them to
-      // read). Run from the checkout this passed while `bb rules check` was
+      // read). Run from the checkout this passed while `aerie rules check` was
       // dead on every real node, because cmd_rules demanded rules.py at its
       // top for verbs that need it and `check` does not: it takes the rules
-      // through `bb rules --json`, which a node relays.
+      // through `aerie rules --json`, which a node relays.
       const nb = `${DIR}/nodebundle`;
       rmSync(nb, { recursive: true, force: true });
       mkdirSync(`${nb}/scripts/dashboard`, { recursive: true });
-      copyFileSync(`${REPO}/scripts/bb`, `${nb}/scripts/bb`);
+      copyFileSync(`${REPO}/scripts/aerie`, `${nb}/scripts/aerie`);
       cpSync(`${REPO}/scripts/lib`, `${nb}/scripts/lib`, { recursive: true });
       ok(!existsSync(`${nb}/scripts/dashboard/rules.py`),
          'the bundle a node runs bb from carries no dashboard module, as BUNDLE_PARTS ships it');
       // WORKSPACE as a node has it: the check runs in the project's tree.
       let checked;
       try {
-        checked = execFileSync('bash', [`${nb}/scripts/bb`, 'rules', 'check', 'relayprobe'],
+        checked = execFileSync('bash', [`${nb}/scripts/aerie`, 'rules', 'check', 'relayprobe'],
           { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...nodeEnv, BB_PROJECT: 'alpha', WORKSPACE: `${DIR}/ws` },
             stdio: ['ignore', 'pipe', 'pipe'] });
       } catch (e) { checked = `FAILED ${e.status}: ${e.stdout}${e.stderr}`; }
@@ -1418,13 +1420,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         headers: { Authorization: 'Bearer ' + forMe, 'Content-Type': 'application/json' },
         body: JSON.stringify({ argv: ['rules', 'check', '--all'], cwd: `${DIR}/ws/alpha` }) })).json();
       ok(/relayed=no/.test(checked) && /runs on the machine the session is on/.test(sent.error || ''),
-         `bb rules check on a node runs the rule's command there, and the controller refuses one relayed to it (${
+         `aerie rules check on a node runs the rule's command there, and the controller refuses one relayed to it (${
            checked.replace(/\s+/g, ' ').slice(0, 120)} | ${(sent.error || '').slice(0, 50)})`);
       // The identity a node session adopts is the controller's, through the
       // same settings answer bb-tty reads.
       const st = JSON.parse(bbOnNode(['settings', '--json']));
       ok('git_email' in st && 'git_name' in st,
-         `bb settings carries the commit identity for a node's session to adopt (${st.git_name || '(none)'} <${st.git_email || '(none)'}>)`);
+         `aerie settings carries the commit identity for a node's session to adopt (${st.git_name || '(none)'} <${st.git_email || '(none)'}>)`);
       const feed = async () => ((await api('/api/chat', { action: 'read', project: 'alpha' })).messages || []);
       const n0 = (await feed()).length;
       hook('bb-prompt-relay', ['alpha', 'ignored'], JSON.stringify({ prompt: 'refactor the picker <system-reminder>x</system-reminder>' }));
@@ -1452,10 +1454,10 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       ok(ask().trim() === '', '...once, not on every prompt afterwards');
       const noteOut = hook('bb-work-note', ['alpha', 'ignored'],
         JSON.stringify({ tool_input: { file_path: '/workspace/alpha/src/picker.py', old_string: 'def pick():\n  pass' } }));
-      const work = execFileSync('bash', [`${REPO}/scripts/bb`, 'work'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`,
+      const work = execFileSync('bash', [`${REPO}/scripts/aerie`, 'work'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`,
         env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
       ok(/test \(Claude Code\)\s+src\/picker\.py\s+\[pick\]/.test(work) && noteOut === '',
-         `an edit's note from the node is what bb work reads here, symbol guessed and file relative to the tree, the agent named (${
+         `an edit's note from the node is what aerie work reads here, symbol guessed and file relative to the tree, the agent named (${
            (work.split('\n').find(l => /picker/.test(l)) || '').trim()})`);
       // The notes are per account and agent (R95): the same person's Codex
       // session about to edit that file is told their Claude session has it.
@@ -1619,7 +1621,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // in one file, lib/relay-verbs, and this is what keeps both reading it.
     const verbs = readFileSync(`${REPO}/scripts/lib/relay-verbs`, 'utf8').split(/\s+/).filter(Boolean);
     ok(verbs.includes('roadmap') && verbs.includes('git')
-       && /lib\/relay-verbs/.test(readFileSync(`${REPO}/scripts/bb`, 'utf8'))
+       && /lib\/relay-verbs/.test(readFileSync(`${REPO}/scripts/aerie`, 'utf8'))
        && /"lib" \/ "relay-verbs"/.test(readFileSync(`${REPO}/scripts/dashboard/bbrelay.py`, 'utf8')),
        `bb and the server read the relay verbs from one file (${verbs.length} verbs)`);
     await relay({ argv: ['roadmap', 'rm', String(((added.out || '').match(/added R(\d+)/) || [])[1]), 'test'] });
@@ -2112,9 +2114,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // and bb through .bb/current, so a shell open since before an update
       // still runs the bundle delivered last (bug #66).
       const sh = await termRun('shell:alpha',
-        'echo "W:$BB_ACCOUNT_UID:$BB_ACCOUNT_NAME:$BB_TREE_OWNER:${BB_TOKEN%%_*}:$BUILDERBOT_ROLE:$(command -v bb | sed s,.*/.bb/,,)"\r', auth);
+        'echo "W:$BB_ACCOUNT_UID:$BB_ACCOUNT_NAME:$BB_TREE_OWNER:${BB_TOKEN%%_*}:$BUILDERBOT_ROLE:$(command -v aerie | sed s,.*/.bb/,,)"\r', auth, /W:u_[0-9a-f]+:[^\s]*\s/);
       const said = (sh.out.match(/W:u_[0-9a-f]+:[^\s]*/g) || []).pop() || '';
-      ok(said === `W:${uid}:test:1:bbs:node:current/scripts/bb`,
+      ok(said === `W:${uid}:test:1:bbs:node:current/scripts/aerie`,
          `a project shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
            said || sh.why || sh.out.slice(-160)})`);
       const root = await term('shell');
@@ -2214,7 +2216,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const fresh = await api(`/api/docker?node=${minted.id}`);
       ok(!fresh.error && !fresh.stale, `...and the look after the job ends is a fresh read (stale ${fresh.stale})`);
     }
-    // Bug #45: a plain exec, which is what bb build, bb test and bb run
+    // Bug #45: a plain exec, which is what aerie build, aerie test and aerie run
     // submit, got a bare PATH, because the node's SDK environment was only
     // applied in the bb-verb branch. Measured on a real node: java and go
     // NOT-ON-PATH, JAVA_HOME unset, on a node whose census reported both.
@@ -2223,7 +2225,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       mkdirSync(`${PK}/go/bin`, { recursive: true });
       // An android system image in the node's own store, and an AVD in the
       // data store built on it (roadmap #20). The agent walks for these
-      // rather than running `bb emu images`, which is the same listing plus
+      // rather than running `aerie emu images`, which is the same listing plus
       // a du over tens of gigabytes of NFS every ten minutes.
       const IMG = `${PK}/android/system-images`;
       mkdirSync(`${IMG}/android-34/google_apis/x86_64`, { recursive: true });
@@ -2419,36 +2421,36 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       if (unknown.job) await api('/api/v1/jobs', { action: 'cancel', id: unknown.job });
     }
 
-    // bb run and bb build, from a session's shell
+    // aerie run and aerie build, from a session's shell
     const port = new globalThis.URL(URL).port;
     // The harness may itself run inside a session, whose BB_TOKEN bb would
     // take over the test account's password (B412).
     const env = { ...process.env, DASHBOARD_AUTH: 'test:test', DASHBOARD_PORT: port, BB_TOKEN: '',
                   DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha', CLAUDECODE: '1' };
-    const out = execFileSync('bash', [`${REPO}/scripts/bb`, 'run', '--node', 'agentbox', '--', 'sh', '-c', 'echo hi from bb run'],
+    const out = execFileSync('bash', [`${REPO}/scripts/aerie`, 'run', '--node', 'agentbox', '--', 'sh', '-c', 'echo hi from aerie run'],
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
-    ok(/queued on agentbox/.test(out) && /hi from bb run/.test(out) && /succeeded/.test(out),
-       'bb run queues on the named node, streams the log and says how it ended');
-    // On a node, bb run with no --node (or its own name) runs right here;
+    ok(/queued on agentbox/.test(out) && /hi from aerie run/.test(out) && /succeeded/.test(out),
+       'aerie run queues on the named node, streams the log and says how it ended');
+    // On a node, aerie run with no --node (or its own name) runs right here;
     // naming ANOTHER node used to be dropped without a word and run here
     // too, printing this machine's answer to a question about that one.
     {
       const onNode = { ...env, BUILDERBOT_ROLE: 'node', BB_NODE: 'agentbox', BB_CONTROLLER: URL.replace(/\/$/, '') };
-      const here = execFileSync('bash', [`${REPO}/scripts/bb`, 'run', '--', 'sh', '-c', 'echo ran on this node'],
+      const here = execFileSync('bash', [`${REPO}/scripts/aerie`, 'run', '--', 'sh', '-c', 'echo ran on this node'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' });
       let other = '';
-      try { other = execFileSync('bash', [`${REPO}/scripts/bb`, 'run', '--node', 'elsewhere', '--', 'sh', '-c', 'echo ran on this node'],
+      try { other = execFileSync('bash', [`${REPO}/scripts/aerie`, 'run', '--node', 'elsewhere', '--', 'sh', '-c', 'echo ran on this node'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' }); }
       catch (e) { other = String(e.stdout) + String(e.stderr); }
       ok(/ran on this node/.test(here) && !/ran on this node/.test(other) && /no node called elsewhere/.test(other),
-         `on a node, bb run runs here, and --node naming another machine goes to the controller instead of running here (${other.trim().split('\n').pop().slice(0, 90)})`);
-      // ...and bb build there puts what the outputs name into dist/ under
+         `on a node, aerie run runs here, and --node naming another machine goes to the controller instead of running here (${other.trim().split('\n').pop().slice(0, 90)})`);
+      // ...and aerie build there puts what the outputs name into dist/ under
       // the project and its version, the name the briefing asks shipped
       // output to carry, so a session need not copy it by hand (R104).
       // A version needs a repository with a commit, which this fixture's
       // alpha is not: made one for the check and put back after it. Without
       // one the file keeps its own name, which the check below it holds.
-      const plain = execFileSync('bash', [`${REPO}/scripts/bb`, 'build'],
+      const plain = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' });
       ok(/into dist\/: app-1\.0\.apk/.test(plain), 'on a node, a build of a project with no version keeps its file\'s own name');
       const hadGit = existsSync(`${DIR}/ws/alpha/.git`), hadVersion = existsSync(`${DIR}/ws/alpha/VERSION`);
@@ -2460,7 +2462,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       let hadHead = true;
       try { git('rev-parse', '-q', '--verify', 'HEAD'); } catch { hadHead = false; }
       if (!hadHead){ git('add', 'VERSION'); git('commit', '-qm', 'v', '--', 'VERSION'); }
-      const b = execFileSync('bash', [`${REPO}/scripts/bb`, 'build'],
+      const b = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' });
       if (!hadGit) rmSync(`${DIR}/ws/alpha/.git`, { recursive: true, force: true });
       else if (!hadHead){ git('update-ref', '-d', 'HEAD'); git('rm', '-q', '--cached', 'VERSION'); }
@@ -2468,33 +2470,33 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       rmSync(`${DIR}/ws/alpha/dist/app-1.0.apk`, { force: true });
       const m = /into dist\/: (alpha-[0-9][^\s]*-app-1\.0\.apk)/.exec(b);
       ok(!!m && existsSync(`${DIR}/ws/alpha/dist/${m[1]}`),
-         `on a node, bb build names what it puts in dist/ with the project and its version (${m ? m[1] : b.trim().split('\n').pop().slice(0, 90)})`);
+         `on a node, aerie build names what it puts in dist/ with the project and its version (${m ? m[1] : b.trim().split('\n').pop().slice(0, 90)})`);
       if (m) rmSync(`${DIR}/ws/alpha/dist/${m[1]}`, { force: true });
     }
-    const built = execFileSync('bash', [`${REPO}/scripts/bb`, 'build'],
+    const built = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
     ok(/hi from the tree/.test(built) && /into dist\/: app-1.0.apk/.test(built),
-       'bb build runs the project\'s build command on its build node and names what came back');
+       'aerie build runs the project\'s build command on its build node and names what came back');
     let failed = '';
-    try { execFileSync('bash', [`${REPO}/scripts/bb`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
+    try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
     catch (e) { failed = String(e.stderr) + String(e.stdout); }
-    ok(/no test command is set/.test(failed) && /bb settings set test/.test(failed),
-       'bb test with nothing set refuses, and names the verb that fills the field in');
+    ok(/no test command is set/.test(failed) && /aerie settings set test/.test(failed),
+       'aerie test with nothing set refuses, and names the verb that fills the field in');
     // Nothing runs that nobody wrote down: a tree with a go.mod is not a
-    // test command, and bb test says so rather than guessing one. The session
+    // test command, and aerie test says so rather than guessing one. The session
     // fills the field in, and from then on it runs.
     writeFileSync(`${DIR}/ws/alpha/go.mod`, 'module alpha\n');
     let still = '';
-    try { execFileSync('bash', [`${REPO}/scripts/bb`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
+    try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
     catch (e) { still = String(e.stderr) + String(e.stdout); }
     rmSync(`${DIR}/ws/alpha/go.mod`, { force: true });
     ok(/no test command is set/.test(still), 'a go.mod in the tree is not a test command: it still refuses');
-    const filled = execFileSync('bash', [`${REPO}/scripts/bb`, 'settings', 'set', 'test', 'echo TEST-SET-RAN'],
+    const filled = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings', 'set', 'test', 'echo TEST-SET-RAN'],
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
-    ok(/set test for alpha: echo TEST-SET-RAN/.test(filled), 'bb settings set test fills the field in under auto');
-    const ran = execFileSync('bash', [`${REPO}/scripts/bb`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
-    ok(/TEST-SET-RAN/.test(ran), '...and bb test runs what the session set');
-    execFileSync('bash', [`${REPO}/scripts/bb`, 'settings', 'set', 'test', ''], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' });
+    ok(/set test for alpha: echo TEST-SET-RAN/.test(filled), 'aerie settings set test fills the field in under auto');
+    const ran = execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
+    ok(/TEST-SET-RAN/.test(ran), '...and aerie test runs what the session set');
+    execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings', 'set', 'test', ''], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' });
     const sess = (await api('/api/v1/jobs?project=alpha&n=3')).jobs;
     ok(sess.some(j => j.requested_by === 'session:alpha'), 'a run from a session is attributed to the session');
   }
@@ -2517,8 +2519,8 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // digest is exactly what the digest is for.
     ok(pfin && pfin.type === 'toolchain'
        && (/bb .* unpacked into .*agenttoolchains\/n_[0-9a-f]+\/\.bb/.test(pfin.log)
-           || existsSync(`${PK}/.bb/current/scripts/bb`))
-       && /== bb toolchains remove flutter/.test(pfin.log) && /not installed|unknown toolchain/.test(pfin.log),
+           || existsSync(`${PK}/.bb/current/scripts/aerie`))
+       && /== aerie toolchains remove flutter/.test(pfin.log) && /not installed|unknown toolchain/.test(pfin.log),
        `the bundle lands in the toolchain store and bb runs from it there (${pfin?.state}: ${(pfin?.log || '').slice(-500).replace(/\n/g, ' / ')})`);
     ok(existsSync(`${PK}/.bb/bundle.tar`), '...and stays for the next one');
     // The store changed, so the terminals' environment is made again from
@@ -2532,7 +2534,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // An install that fails on the node says why on its row, as one on the
     // controller does (B211). The reason was only in the job's log before:
     // the row went back to unticked and said nothing, and the graphics
-    // recipe's 404 was found with bb jobs rather than on the tab. The
+    // recipe's 404 was found with aerie jobs rather than on the tab. The
     // fixture node installs everything it is asked for, so the words are
     // proved on the log that install actually left, through the parser the
     // payload uses, and the payload is proved to carry the field.
@@ -2553,10 +2555,10 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
          `a node's finished toolchain job carries an errors field for the rows (${JSON.stringify(tcv?.job?.errors)})`);
       const log = [
         'toolchain', '== system packages for graphics: fonts-dejavu-core',
-        '== bb toolchains install diagrams', '[builderbot] installing diagrams into /mnt/SDK/n_9381e721/diagrams',
+        '== aerie toolchains install diagrams', '[builderbot] installing diagrams into /mnt/SDK/n_9381e721/diagrams',
         '######################################################################## 100.0%',
         '[builderbot] diagrams ready: new shells pick it up',
-        '== bb toolchains install graphics', '[builderbot] installing graphics into /mnt/SDK/n_9381e721/graphics',
+        '== aerie toolchains install graphics', '[builderbot] installing graphics into /mnt/SDK/n_9381e721/graphics',
         '#=#=#', '##O#-#',
         '##O=#  #                                                   curl: (22) The requested URL returned error: 404',
         '[builderbot] ERROR: could not download https://example.invalid/ImageMagick-gcc-x86_64.AppImage',
@@ -2612,7 +2614,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // the controller answers about its own store (R67). Proven end to end
     // because the controller reads the answer out of the job's LOG, which is
     // the one part no unit test can stand in for: the agent runs
-    // `bb toolchains check`, bb prints a TSV line per recipe, and the rows
+    // `aerie toolchains check`, bb prints a TSV line per recipe, and the rows
     // on the tab are filled from it.
     {
       const cj = await api('/api/toolchains', { action: 'check', node: minted.id, names: ['zig'] });
@@ -2621,7 +2623,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
         const r = await api(`/api/v1/jobs?id=${cj.job}`);
         return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
       }, 90000);
-      ok(cf && /== bb toolchains check zig/.test(cf.log || ''),
+      ok(cf && /== aerie toolchains check zig/.test(cf.log || ''),
          `...and the agent runs it there (${cf?.state}: ${(cf?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
       const view = await until(async () => {
         const v = await api(`/api/toolchains?node=${minted.id}`);
@@ -2636,7 +2638,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     }
 
     // An Android system image is its own job (the Emulator tab), run as
-    // `bb emu image` from the same bundle. sdkmanager is a stub that says
+    // `aerie emu image` from the same bundle. sdkmanager is a stub that says
     // what it was asked, so this proves the path and not a download.
     {
       const SM = `${PK}/android/cmdline-tools/latest/bin`;
@@ -2661,9 +2663,9 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
         return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
       }, 60000) : null;
       ok(rf && rf.type === 'image' && rf.state === 'succeeded'
-         && /== bb emu image remove system-images;android-34;google_apis;x86_64/.test(rf.log)
+         && /== aerie emu image remove system-images;android-34;google_apis;x86_64/.test(rf.log)
          && /sdkmanager .*--uninstall system-images;android-34;google_apis;x86_64/.test(rf.log),
-         `...which runs bb emu image there, and sdkmanager uninstalls it (${rf?.state}: ${
+         `...which runs aerie emu image there, and sdkmanager uninstalls it (${rf?.state}: ${
            (rf?.log || '').slice(-400).replace(/\n/g, ' / ')})`);
       rmSync(`${PK}/android/cmdline-tools`, { recursive: true, force: true });
     }
@@ -2720,7 +2722,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     }, 60000);
     ok(dfin && dfin.state === 'failed' && dfin.exit_code === 77
        && /does not administer the machine, so its owner installs these: playwright: /.test(dfin.log)
-       && /libnss3/.test(dfin.log) && !/bb toolchains install/.test(dfin.log),
+       && /libnss3/.test(dfin.log) && !/aerie toolchains install/.test(dfin.log),
        `...and refused on the node with the names, without reinstalling the recipe (${dfin?.state} ${dfin?.exit_code}: ${(dfin?.log || '').slice(-160).replace(/\n/g, ' / ')})`);
     ok(sfin && sfin.state === 'failed' && /npm: stub/.test(sfin.log)
        && !existsSync(`${PK}/playwright/node_modules`),
@@ -2856,10 +2858,10 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
        && /Self-hosted runners/.test(why),
        `a reinstall whose token cannot mint leaves the working runner untouched and says which permission the token lacks (${refin?.state}: ${why.slice(-90)})`);
     rmSync(`${DIR}/runner-store/mint-fail`, { force: true });
-    const labels = execFileSync('bash', [`${REPO}/scripts/bb`, 'ci-labels'],
+    const labels = execFileSync('bash', [`${REPO}/scripts/aerie`, 'ci-labels'],
       { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
     ok(/^agentbox$/m.test(labels) && /^gpu$/m.test(labels) && /^builderbot$/m.test(labels),
-       'bb ci-labels lists the node runner\'s labels beside this box\'s own');
+       'aerie ci-labels lists the node runner\'s labels beside this box\'s own');
     // A second runner on the same node, for a Gitea (R53): the same fold, a
     // different host. The picker says which when the address is a private
     // host the catalog has never seen; act_runner registers with a token the
@@ -2904,7 +2906,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
   }
 
   // ---- emulation as a job (phase 9) --------------------------------------------
-  // `bb emu` on the project's node is bb from the bundle with the node's
+  // `aerie emu` on the project's node is bb from the bundle with the node's
   // store as its SDK; inputs come from dist/ and what it writes comes back.
   // The store here holds no emulator, so `list` is the verb that proves the
   // plumbing without booting anything.
@@ -2913,7 +2915,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       files: ['dist/missing.apk'] });
     ok(/not a file in alpha's dist/.test(nofile.error || ''), 'an input that is not in dist/ is refused up front');
     const ej = await api('/api/v1/jobs', { action: 'emu', project: 'alpha', argv: ['emu', 'list'] });
-    ok(ej.ok && ej.node === minted.id, `bb emu list is queued on the project's node (${ej.job || ej.error})`);
+    ok(ej.ok && ej.node === minted.id, `aerie emu list is queued on the project's node (${ej.job || ej.error})`);
     const efin = await until(async () => {
       const r = await api(`/api/v1/jobs?id=${ej.job}`);
       return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
@@ -2942,12 +2944,12 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     }, 60000);
     ok(i2 && /already on this node \(6 bytes\)/.test(i2.log),
        '...and the next run of the same build fetches nothing: the node uses its copy');
-    const cli = execFileSync('bash', [`${REPO}/scripts/bb`, 'emu', 'list'],
+    const cli = execFileSync('bash', [`${REPO}/scripts/aerie`, 'emu', 'list'],
       // ...with no token of the harness's own session leaking in (B412).
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...process.env, DASHBOARD_AUTH: 'test:test', BB_TOKEN: '',
         DASHBOARD_PORT: new globalThis.URL(URL).port, DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha' } });
-    ok(/bb emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
-       `bb emu from a shell goes to the project's node and streams the answer back (${cli.replace(/\s+/g, ' ').slice(0, 120)})`);
+    ok(/aerie emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
+       `aerie emu from a shell goes to the project's node and streams the answer back (${cli.replace(/\s+/g, ' ').slice(0, 120)})`);
   }
 
   // ---- Tailscale Funnel, the route's second mode (phase 8) ---------------------
@@ -2984,7 +2986,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
   // reads the agent's own node.json instead of keeping a list of stores),
   // and this proves they answer the one shared question the same way. It
   // runs the REAL bb-sandbox, pulled out of the provisioner the same way
-  // bb lint pulls it out for shellcheck.
+  // aerie lint pulls it out for shellcheck.
   {
     const SBDIR = `${DIR}/sandbox-src`;
     mkdirSync(SBDIR, { recursive: true });
@@ -3325,7 +3327,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
       }, 60000);
     }
     // A compose file that reads its settings through `env_file: .env`: the
-    // project's own .env, which BuilderBot never writes. The instance's env
+    // project's own .env, which AerieOS never writes. The instance's env
     // went to compose as --env-file only, which fills ${VAR} and nothing
     // else, so what was typed into Send to Docker never reached the
     // container, and Up failed on the missing file (Is-someone-Listening,
@@ -3399,9 +3401,12 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // Its facts a grid (R218 step 26): the account jobs run as is one.
     const runsAs = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .ndfacts .fact`,
       fs => fs.find(f => f.querySelector('dt').textContent === 'Jobs run as')?.querySelector('dd').textContent || '');
-    ok(/agentbox/.test(row) && /live/.test(row) && /cpu/.test(row) && /data/.test(row)
-       && runsAs === (process.env.USER || 'builder'),
-       `the row shows the agent live, its numbers and the account jobs run as (${row.slice(0, 160)}…)`);
+    // The node's name is the Machines header's, in its picker (R177), not
+    // the row's.
+    const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
+    const missing = ['live', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker']);
+    ok(!missing.length && runsAs === (process.env.USER || 'builder'),
+       `the node named in the header's picker, its row the agent live, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
     // Each session kept to its own project's network (R79): a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
     // apply-not-onchange: it wrote itself on the click at first, the
@@ -3509,19 +3514,19 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
   if (process.env.AGENT_DEBUG) console.log('AGENT LOG:\n' + agentLog());
 }
 
-// bb nodes shows liveness
+// aerie nodes shows liveness
 {
-  const out = execFileSync('bash', ['scripts/bb', 'nodes'],
+  const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/agentbox/.test(out) && /agent/.test(out),
-     'bb nodes lists the agent node');
+     'aerie nodes lists the agent node');
   // ...with the agent it runs on the row, and one node in full (B9).
   const row = out.split('\n').find(l => /agentbox/.test(l)) || '';
   ok(/ · agent \d+\.\d+\.\d+/.test(row), `...naming the agent it runs (${row.trim()})`);
-  const one = execFileSync('bash', ['scripts/bb', 'nodes', 'show', 'agentbox'],
+  const one = execFileSync('bash', ['scripts/aerie', 'nodes', 'show', 'agentbox'],
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/node\s+agentbox \(/.test(one) && /agent\s+\S+ \(this controller ships \d+\.\d+\.\d+\)/.test(one),
-     `bb nodes show NAME prints that node, its agent against the one this controller ships (${one.trim().replace(/\s+/g, ' ').slice(0, 160)})`);
+     `aerie nodes show NAME prints that node, its agent against the one this controller ships (${one.trim().replace(/\s+/g, ' ').slice(0, 160)})`);
 }
 
 // Retire what this file made: the rows stay as history (door 1) and leave
@@ -3803,7 +3808,7 @@ print(json.dumps({'w_backend': w_backend, 'r1': r1, 'w_files': w_files, 'r2': r2
      && R.w_after.ifroute === R.w_files.ifroute && R.w_after.config === R.w_files.config,
      '...and a change the controller cannot confirm puts all three files back');
   ok(R.d_backend === 'dhcpcd' && R.r3[0] === 'succeeded'
-     && /^hostname\nnoipv6\n\n# BuilderBot: eth0\ninterface eth0\nstatic ip_address=10\.3\.3\.5\/24\nstatic routers=10\.3\.3\.1\nstatic domain_name_servers=10\.3\.3\.1 10\.3\.3\.2\n# BuilderBot: end\n$/.test(R.d_text)
+     && /^hostname\nnoipv6\n\n# AerieOS: eth0\ninterface eth0\nstatic ip_address=10\.3\.3\.5\/24\nstatic routers=10\.3\.3\.1\nstatic domain_name_servers=10\.3\.3\.1 10\.3\.3\.2\n# AerieOS: end\n$/.test(R.d_text)
      && /systemctl restart dhcpcd/.test(R.calls),
      `with dhcpcd alone the spec is a marked block after the file's own lines, and a restart (${R.d_backend}, ${R.r3[0]})`);
   ok(R.r4[0] === 'succeeded' && R.d_after === 'hostname\nnoipv6\n',
@@ -3903,14 +3908,14 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 }
 
 // ---- the agent's version is WINDOW.BUILD ----------------------------------
-// The window is the project's compatibility promise (while BuilderBot is
+// The window is the project's compatibility promise (while AerieOS is
 // 0.4.x, any 0.4 agent works with any 0.4 controller), and it is a constant
 // in a file, which means it drifts the moment somebody bumps the minor and
 // does not think about the agent. That is the bump this is about, so the
 // check is here rather than in anybody's memory.
 {
   // the package's sources, the number in its __init__
-  const PKG = `${REPO}/scripts/agent/builderbot_agent`;
+  const PKG = `${REPO}/scripts/agent/aerieos_agent`;
   const src = readdirSync(PKG).filter(f => f.endsWith('.py')).sort()
     .map(f => readFileSync(`${PKG}/${f}`, 'utf8')).join('\n');
   const av = /^AGENT_VERSION\s*=\s*"([^"]+)"/m.exec(src)?.[1] || '';

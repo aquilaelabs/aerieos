@@ -58,11 +58,11 @@ def safe_mode():
 
 
 def _safe_mode():
-    """Safe mode on BuilderBot OS (R161 step 2): bbsafe=1 on the kernel's
+    """Safe mode on AerieOS (R161 step 2): aeriesafe=1 on the kernel's
     command line, which GRUB's Safe mode entry adds."""
     try:
         with open(os.environ.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
-            return "bbsafe=1" in f.read().split()
+            return "aeriesafe=1" in f.read().split()
     except OSError:
         return False
 

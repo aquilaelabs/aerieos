@@ -260,7 +260,7 @@ ok(existsSync(`${DIR}/ws/zeta/.git`), 'zeta is a git repository');
      `a new project is committed and given its first version (${log.join(' | ')})`);
 }
 // The brief is a task for the first session, not standing instructions:
-// not CLAUDE.md, which every session reads, but a file of BuilderBot's that
+// not CLAUDE.md, which every session reads, but a file of AerieOS's that
 // the first Claude press offers in a dialog and that leaves the tree then
 // (brief.py). Out of git from the start, so the starting version's commit
 // does not take it and its leaving is not a deletion.
@@ -549,7 +549,7 @@ ok(made.status === 200 && made.body.name === 'My-New-App',
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'Signed-App' && p.prefs?.sign === 'auto'), { timeout: 15000 });
   const sp = await page.evaluate(() => (state?.projects || []).find(p => p.name === 'Signed-App')?.prefs || {});
   ok(signed.status === 200 && sp.sign === 'auto' && sp.keys === 'deny' && sp.release === 'auto' && sp.report === 'deny',
-     `Sign a build, Manage signing keys, Tag and publish a release and Report BuilderBot bugs from the dialog land on the new project (${sp.sign}/${sp.keys}/${sp.release}/${sp.report})`);
+     `Sign a build, Manage signing keys, Tag and publish a release and Report AerieOS bugs from the dialog land on the new project (${sp.sign}/${sp.keys}/${sp.release}/${sp.report})`);
   const bad = await postJson({ name: 'Gated Bad', mode: 'init', gate: { roadmap: 'maybe' } });
   ok(bad.status === 200 && /gates not set/.test(bad.body.note || ''),
      `a gate value that is not auto, ask or deny is refused in the note, and the project still exists (${bad.body.note})`);

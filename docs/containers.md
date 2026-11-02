@@ -4,7 +4,7 @@ The Containers group on the rail: **Containers** is the Docker manager,
 where a project's containers are built, started, stopped and given their env
 on a node, and **VMs** the virtual machines ([vms.md](vms.md)), both for
 the node picked once in the group's header. The containers
-BuilderBot deploys itself (each node's nginx, its scanners and its model
+AerieOS deploys itself (each node's nginx, its scanners and its model
 router) are the **System** section at the top of the Containers page: rows
 like any other container's, with **Configure**, which opens that
 container's own settings page (the nginx page, the Scanners page, the
@@ -25,7 +25,7 @@ manager**, which names a container and takes you there; every container of a
 project is built from that project's codebase, and rebuilding takes whatever
 that codebase says at the time. It opens on the project's own name while the
 project has no container and on `<project>-2`, `-3` after, so another one is
-the same press, and a session sends its project the same way with `bb
+the same press, and a session sends its project the same way with `aerie
 devapp new`, under the project's **Run its container** setting.
 
 **The page at a glance.** Under the bar, a row of tiles says how many
@@ -64,7 +64,7 @@ the address's word for which container it is.
 any other node, and what this container's paths are called over there is set
 on the node's page (its path mapping, under Advanced), because the daemon resolves a compose file's bind sources
 on its own filesystem. The Containers page names the node it is on and
-`bb doctor` prints the same line from the same function, so the two cannot
+`aerie doctor` prints the same line from the same function, so the two cannot
 disagree about which daemon is live.
 
 **A daemon has to say it is the sandbox before anything is driven on it.**
@@ -205,7 +205,7 @@ to the project picked when it was made, and one somebody else started belongs
 to none until an administrator picks a project on its row; that choice is kept
 by name on its node, so the same container recreated keeps it. The project it
 belongs to lists it in its notebook's Docker view, and that project's
-sessions are the only ones that can see it: `bb devapp ls` lists them and `bb
+sessions are the only ones that can see it: `aerie devapp ls` lists them and `aerie
 devapp log NAME` reads one, while rebuilding, changing the env, starting and
 stopping follow that project's *Agents may: Run its container*. An account
 that is not an administrator sees what belongs to its projects.
@@ -280,13 +280,13 @@ convention, in a per-instance directory the VM makes itself, so that share is
 mounted over there and needs no mount here at all. By the same convention a
 build sees `BB_BUILD_REV`, `BB_BUILD_AT` and `BB_BUILD_VERSION`: the commit
 it is from, when, and the project's version, for a compose whose build args
-want a stamp (BuilderBot's own passes them to its Dockerfile). An image tag
+want a stamp (AerieOS's own passes them to its Dockerfile). An image tag
 takes `BB_BUILD_TAG`, the same version with no `+`, which a tag cannot carry.
 `BB_DOCKER_GID` is the docker group's id on the instance's node, for a
 service that reaches the daemon's socket as a member of that group.
 Every step of a rebuild (the pull, the stop, the start) reads the compose
 file with the same variables, so an image named by `${BB_BUILD_REV}` is the
-one pulled and started. BuilderBot itself gets the
+one pulled and started. AerieOS itself gets the
 row too, as a second container on another machine, never the one you are
 using; expect
 `up` to refuse while the real one holds the same host ports, which is the env
@@ -300,7 +300,7 @@ over there, and docker answers a missing bind source by creating an empty
 directory and mounting that, so on a host whose root filesystem is RAM, the
 result is an app that starts with no data and loses it again at reboot. It
 reads as a bug in the app. The node's path mapping states it once: the
-same one you made when you mounted the volumes, and BuilderBot both hands
+same one you made when you mounted the volumes, and AerieOS both hands
 over host paths (that is what `BB_DEV_DATA` carries) and names any of a
 compose file's *own* paths the host will not find, on the row, before you
 press Up. Absolute host paths, which is what a working compose here already
@@ -313,16 +313,16 @@ directories that have to exist, and docker creates a missing bind source
 itself (as root, then chowning it) which on a share that squashes root fails
 and takes the whole run down with *operation not permitted*, leaving the
 directory behind so the second press works: an intermittent-looking failure
-with a fixed cause. So they are made first, owned by whoever BuilderBot runs
+with a fixed cause. So they are made first, owned by whoever AerieOS runs
 as, which is the ownership the host's shares expect.
 
 Made on whichever side can reach them, which is not something to think about:
 a share this container mounts is a local `mkdir`, and anything else is a
 one-shot container on the VM: the same mechanism that makes the per-instance
-dev-data directory, running as BuilderBot's uid, which is the whole point
+dev-data directory, running as AerieOS's uid, which is the whole point
 since docker's own attempt is as root. Which shares the VM has is the VM's
 business: nothing is declared on this side, so a share added over there next
-month needs no BuilderBot setting touched.
+month needs no AerieOS setting touched.
 
 The one thing it will not create is a bind at a share root itself; there is
 nothing below it to make, and docker creating the root is the as-root failure
@@ -342,10 +342,10 @@ reading of a file compose is about to read for itself.
 `/workspace:/workspace` covers the projects share and nothing else. If you also
 map the dev-data share here, so you can create a compose file's bind
 directories from a shell, which is the usual reason to, then a compose
-mounting `/devdata/...` is naming a path BuilderBot has, and it will say so
+mounting `/devdata/...` is naming a path AerieOS has, and it will say so
 until the mapping answers for it. `/devdata:/devdata` is that answer when both
 machines mount the same share at the same path, which is the arrangement the
-sandbox is for. The alternative is to not map it here at all: what BuilderBot
+sandbox is for. The alternative is to not map it here at all: what AerieOS
 cannot see, it does not check.
 
 **Container names and project names are separate groups.** A project existing
@@ -383,6 +383,13 @@ what it is (docs/nodes.md §7).
 
 ## nginx
 
+Each node's nginx is what stands in front of its containers, unless you
+choose to run your own proxy: a container, a site included, serves plain
+HTTP on a port of its own with the smallest server it needs, and its
+hostname and certificate are a route on the nginx page. A static site needs
+no nginx of its own; a few-megabyte static server behind the node's nginx
+is the whole of it.
+
 The nginx page keeps one list of public **Hostnames**, shared by every node's
 nginx (the operator, 12 Oct): a name is added once and shows where it is
 routed, and is deleted only when nothing routes it, the refusal saying
@@ -417,13 +424,13 @@ need not be reachable at all; the domain must be on that account. The pair
 is kept like a pasted one, filed under its hostname, and renewed thirty
 days before it ends, the way it was first got; a renewal that fails is on
 the bell and tried again a few hours later. The client is `acme.py`,
-BuilderBot's own on the `cryptography` library; `BB_ACME_DIRECTORY` points
+AerieOS's own on the `cryptography` library; `BB_ACME_DIRECTORY` points
 it at another ACME directory (a staging one, or a private CA).
 
 ## Scanners
 
 The Scanners page, opened from the scanners' row in the System section,
-deploys BuilderBot's own static analysis
+deploys AerieOS's own static analysis
 scanners (Semgrep, Trivy, mobsfscan) to each node that holds projects as
 one compose project of one-shot services, their versions pinned at the
 deploy like nginx's image (R145), and runs them there on one schedule over
@@ -454,23 +461,23 @@ the session switch elsewhere); a prefs change or the switch asks for a
 hello, so a container reaches a newly read project within a poll. Nothing
 is marked: a missing table leaves Docker's own rules, and the row says not
 in force rather than a container being cut off. A container that has to talk
-to a machine on the LAN (a BuilderBot controller under test to its nodes, an
+to a machine on the LAN (an AerieOS controller under test to its nodes, an
 app to a device) is let through by an administrator: **Reaches the LAN** in
 its settings, kept in `docker-lan.json` by node and by the name the map
 gives it, puts its bridges in the table's `lanok` set, which passes the
-private ranges and nothing more of the node's. A container BuilderBot
+private ranges and nothing more of the node's. A container AerieOS
 deploys itself is **System**'s (R180, the operator, 11 Oct): the nginx
 page's container today, set by that deployment and by no picker, a person's
 or a session's, and given every bridge and every published port on its node
 by the map (`all`), since a proxy or a monitor that is nobody's has to see
 everybody's. nginx needs none of it yet, being on the host network; the
-owner is for the day a deployment of BuilderBot's sits on a bridge.
+owner is for the day a deployment of AerieOS's sits on a bridge.
 
 ## Image updates
 
 Every other container's registry images keep up to date the same way (R195,
 the operator, 11 Oct). A service that runs an image by tag, with no `build:`
-(mariadb, a linuxserver image, ghcr.io/aquilaelabs/builderbot:latest), is
+(mariadb, a linuxserver image, ghcr.io/aquilaelabs/aerieos:latest), is
 compared once a week, and on Check for updates on the Containers page: the digest
 its node pulled (`docker inspect`'s RepoDigests) against what the
 registry serves for that tag now, over the registry's v2 API with an

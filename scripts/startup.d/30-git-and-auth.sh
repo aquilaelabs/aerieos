@@ -3,7 +3,7 @@
 # Git identity, credential helper and SSH known_hosts.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 # No global commit identity: it is a project's own setting (prefs.py), written
 # into each repo's config by the settings dialog and by 40-projects.sh at boot.

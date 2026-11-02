@@ -1,4 +1,4 @@
-"""B1: the briefing a session is handed (bb preamble, scripts/lib/
+"""B1: the briefing a session is handed (aerie preamble, scripts/lib/
 preamble-verbs.py) names each project as the dashboard shows it, with its
 directory beside it when the two differ, so a session and the person mean
 the same project by the same name."""
@@ -48,7 +48,7 @@ class PreambleLabels(unittest.TestCase):
 
     def test_a_project_is_told_its_tool_packs(self):
         # R77: the packs its settings switch on, by name, and a pack's own
-        # guidance as bb help tool-NAME; a project that has not switched one
+        # guidance as aerie help tool-NAME; a project that has not switched one
         # on is told nothing about it.
         with tempfile.TemporaryDirectory() as t:
             for d in ("here", "other"):
@@ -62,7 +62,7 @@ class PreambleLabels(unittest.TestCase):
             def run(proj, *a):
                 return subprocess.run([sys.executable, VERBS, DASH, proj, *a], env=env,
                                       capture_output=True, text=True, timeout=60)
-            self.assertIn("This project's sessions may use the tool packs Hex kit (`bb tool hexkit`)", run("here", "").stdout)
+            self.assertIn("This project's sessions may use the tool packs Hex kit (`aerie tool hexkit`)", run("here", "").stdout)
             self.assertIn("Dump before you patch.", run("here", "--topic", "tool-hexkit").stdout)
             self.assertNotIn("tool packs", run("other", "").stdout)
             self.assertNotEqual(run("other", "--topic", "tool-hexkit").returncode, 0)

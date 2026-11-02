@@ -4,14 +4,14 @@
 #
 # `docker exec` does NOT go through the entrypoint, so it lands you as root,
 # which would leave root-owned files in your Unraid shares. A symlink named
-# `bb` in /opt/builderbot/bin points here so the command re-execs as
+# `aerie` in /opt/aerieos/bin points here so the command re-execs as
 # `builder` whichever way you enter the container.
 #
 set -euo pipefail
 
 target="$(basename "$0")"
 
-# Deliberately excludes /opt/builderbot/bin so the exec below finds the real
+# Deliberately excludes /opt/aerieos/bin so the exec below finds the real
 # binary instead of recursing into this wrapper.
 REAL_PATH="/home/builder/.npm-global/bin:/home/builder/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/emulator"
 

@@ -3,7 +3,7 @@
 upgrade suite's fixture for this release (R79): every later build is started
 on it by scripts/dashboard/test/upgrade.mjs, which checks the build migrates
 it and keeps everything in it. A release runs this once, commits what it
-writes, and `bb version release` refuses a version that has none.
+writes, and `aerie version release` refuses a version that has none.
 
     tools/upgrade-snapshot.py [--version V] [--force]
 
@@ -72,7 +72,7 @@ class Controller:
         self.world, self.port = world, free_port()
         stub = world / "stub"
         stub.mkdir()
-        for name in ("bb", "docker", "adb", "web-ext"):
+        for name in ("aerie", "docker", "adb", "web-ext"):
             (stub / name).write_text("#!/bin/sh\nexit 0\n")
             (stub / name).chmod(0o755)
         (world / "doctor.txt").write_text("")

@@ -313,7 +313,7 @@ def _insert_node(rec):
 
 STORE_ID_FILE = ".bb-store-id"
 
-# Where this container keeps its toolchains. `bb toolchains root` is the authority
+# Where this container keeps its toolchains. `aerie toolchains root` is the authority
 # and toolchains.py asks it, but nodes.py is imported at boot before any of
 # that and must not shell out on the seed path, so the same two answers bb
 # itself resolves between, in the same order.
@@ -721,7 +721,7 @@ def node_avd_remove(principal, node_id, project, uid, name):
     if not ph:
         return {"error": f"{name} is not one of {project}'s phones on {n['name']} as last measured"}
     if ph.get("running"):
-        return {"error": f"{name} is running on {n['name']}: stop it first (bb emu stop in a {project} session)"}
+        return {"error": f"{name} is running on {n['name']}: stop it first (aerie emu stop in a {project} session)"}
     r = job_add(principal, {"node": node_id}, "avd-remove",
                 {"timeout": 900, "project": project, "uid": uid, "name": name})
     if r.get("ok"):
@@ -785,7 +785,7 @@ def node_lock(principal, node_id, lock):
     OS level only. For a node somebody manages by hand, or one whose fstab
     and netplan are not the dashboard's to rewrite. The desired config is
     kept and still shown beside what the node reports; only applying it
-    stops. The runner and a funnel are BuilderBot's own footprint and are
+    stops. The runner and a funnel are AerieOS's own footprint and are
     not covered."""
     n = node(node_id)
     if not n:
@@ -923,6 +923,24 @@ def rotate_token(node_id):
     return bearer
 
 
+def _refused(node_id, why):
+    """A node's agent turned away, kept on its row so the page says why it
+    is quiet (B569): the agent asked every five minutes for two days with
+    its token expired while the Nodes page said only quiet. Written at most
+    once a minute; its next good hello takes it off."""
+    n = node(node_id) if node_id else None
+    if not n:
+        return
+    ag = dict(n.get("agent") or {})
+    was = ag.get("refused") if isinstance(ag.get("refused"), dict) else {}
+    now = int(time.time())
+    if was.get("why") == why and now - int(was.get("at") or 0) < 60:
+        return
+    ag["refused"] = {"at": now, "why": why, "since": int(was.get("since") or now) if was.get("why") == why else now}
+    _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), node_id))
+    _bump()
+
+
 def _token_reused(t):
     """A retired token presented after its grace: every token of the node
     revoked, and the bell told, with when and from where."""
@@ -954,7 +972,7 @@ def authenticate(bearer):
     kind = next((k for k, p in TOKEN_PREFIX.items() if bearer.startswith(p)),
                 None)
     if not kind:
-        return {"error": "not a BuilderBot token"}
+        return {"error": "not an AerieOS token"}
     secret = bearer[len(TOKEN_PREFIX[kind]):]
     rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = ?",
                  (_hash(secret), kind))
@@ -964,19 +982,33 @@ def authenticate(bearer):
     if kind == "node" and t["revoked"] == TOKEN_PENDING:
         # Its first use (R135 step 4): this token is the node's now, and
         # the one before retires with its grace.
+        # The one coming live is never among those retired, and comes live
+        # with no expiry (B570): two of the agent's calls carrying it at once
+        # each ran the retire, the second catching the first's live token,
+        # which then expired with the grace and left the node no credential.
         now = int(time.time())
-        _exec("UPDATE tokens SET revoked = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND revoked = 0",
-              (TOKEN_RETIRED, now + ROTATE_GRACE_S, t["node_id"]))
-        _exec("UPDATE tokens SET revoked = 0 WHERE id = ?", (t["id"],))
-        t = dict(t, revoked=0)
+        _exec("UPDATE tokens SET revoked = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND revoked = 0 AND id != ?",
+              (TOKEN_RETIRED, now + ROTATE_GRACE_S, t["node_id"], t["id"]))
+        _exec("UPDATE tokens SET revoked = 0, expires = NULL WHERE id = ?", (t["id"],))
+        t = dict(t, revoked=0, expires=None)
     elif kind == "node" and t["revoked"] == TOKEN_RETIRED:
         if not (t["expires"] and t["expires"] >= time.time()):
             _token_reused(t)
+            _refused(t["node_id"], "credential revoked")
             return {"error": "credential revoked"}
         t = dict(t, revoked=0, expires=None)
     if t["revoked"]:
+        if kind == "node":
+            _refused(t["node_id"], "credential revoked")
         return {"error": "credential revoked" if kind == "node"
                 else "enrollment token already used"}
+    # A node's live token has no expiry (only an enroll token's TTL and a
+    # retired one's grace do): one that carries one got it from the race
+    # above, and is given back its life rather than leaving the node shut
+    # out until it is enrolled again (B570).
+    if kind == "node" and t["expires"]:
+        _exec("UPDATE tokens SET expires = NULL WHERE id = ? AND revoked = 0", (t["id"],))
+        t = dict(t, expires=None)
     if t["expires"] and t["expires"] < time.time():
         return {"error": "token expired"}
     n = node(t["node_id"])
@@ -1337,7 +1369,7 @@ def _census(c):
                 # The node's own directory in the store: linux-x86_64,
                 # darwin-arm64 (roadmap R19).
                 "scope": re.sub(r"[^A-Za-z0-9_-]", "", str(s.get("scope") or ""))[:40]}
-    # {name: version} from `bb toolchains versions` on the node: the controller's
+    # {name: version} from `aerie toolchains versions` on the node: the controller's
     # own generator, run there. Whitelisted like store_dirs, and for the same
     # reason: a value the agent reports and this drops is a value that does
     # not exist.
@@ -1434,7 +1466,7 @@ def _census(c):
                                   **({"virtiofs": vm["virtiofs"] is True} if "virtiofs" in vm else {})},
                        "firewall": {"installed": fw.get("installed") is True},
                        # The IOMMU on the kernel's command line (R116 step 4):
-                       # put there by BuilderBot, and on now, which a restart
+                       # put there by AerieOS, and on now, which a restart
                        # and the firmware decide.
                        "iommu": {"installed": io.get("installed") is True, "on": io.get("on") is True},
                        "storage": {k: sto.get(k) is True for k in ("installed", "zfs", "mergerfs", "snapraid", "smart")},
@@ -1520,6 +1552,33 @@ def _census(c):
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16)}
+    # ...and whether its console takes a password (R194, AerieOS).
+    if isinstance(c.get("console"), dict) and c["console"]:
+        out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
+    # ...and what it adopted of another NAS (R163 step 8): each mount, its
+    # filesystem, read-only or not and mounted now, the merged trees, and
+    # the parity disk left alone.
+    if isinstance(c.get("adopted"), dict) and c["adopted"]:
+        ad = c["adopted"]
+        aw = lambda v, n: re.sub(r"[^\w .,:;/()'@%+-]", "", str(v or ""))[:n]  # noqa: E731
+        out["adopted"] = {
+            "from": aw(ad.get("from"), 16), "writable": ad.get("writable") is True,
+            "at": ad["at"] if isinstance(ad.get("at"), int) and not isinstance(ad.get("at"), bool) else 0,
+            "mounts": [{"where": aw(m.get("where"), 120), "fs": aw(m.get("fs"), 8), "ro": m.get("ro") is True, "mounted": m.get("mounted") is True}
+                       for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
+            "merged": {aw(k, 120): v is True for k, v in list((ad.get("merged") or {}).items())[:4]} if isinstance(ad.get("merged"), dict) else {},
+            "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]]}
+        # ...and what its Docker and libvirt said ran (R163 steps 10, 11).
+        ap = ad.get("apps") if isinstance(ad.get("apps"), dict) else {}
+        if ap:
+            dk = ap.get("docker") if isinstance(ap.get("docker"), dict) else {}
+            nm = lambda v: re.sub(r"[^A-Za-z0-9 ._-]", "", str(v or ""))[:64]  # noqa: E731
+            out["adopted"]["apps"] = {
+                "docker": {"autostart": [nm(x) for x in (dk.get("autostart") or [])[:256]],
+                           "digests": {nm(k): re.sub(r"[^\w./:@-]", "", str(v or ""))[:200] for k, v in list((dk.get("digests") or {}).items())[:256]}},
+                "vms": [{"name": nm(v.get("name")), "autostart": v.get("autostart") is True, "nvram": v.get("nvram") is True}
+                        for v in (ap.get("vms") or [])[:64] if isinstance(v, dict)],
+                "said": [aw(x, 300) for x in (ap.get("said") or [])[:16]]}
     # The machine's time zone (R161 step 3), a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]
@@ -1551,7 +1610,7 @@ def _census(c):
     # ...and its disks' spin-down in minutes (R164 step 3), 0 for never.
     if isinstance(c.get("spindown"), int) and not isinstance(c.get("spindown"), bool) and c["spindown"] in SPINDOWN_MINUTES:
         out["spindown"] = c["spindown"]
-    # BuilderBot OS on the machine (R160 step 4): the image's version and
+    # AerieOS on the machine (R160 step 4): the image's version and
     # snapshot, the slot this boot came from and the one GRUB boots next.
     if isinstance(c.get("os_image"), dict) and c["os_image"].get("version"):
         o = c["os_image"]
@@ -1563,6 +1622,14 @@ def _census(c):
                      # On trial, and a fallback said (R161 step 2).
                      "trial": o.get("trial") is True,
                      "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200]}
+    # The older versions kept on its boot menu, and whether this boot is one (R201).
+    if isinstance(c.get("os_kept"), dict) and (c["os_kept"].get("versions") or c["os_kept"].get("booted")):
+        vs = c["os_kept"].get("versions")
+        num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0  # noqa: E731
+        out["os_kept"] = {"booted": re.sub(r"[^A-Za-z0-9.+-]", "", str(c["os_kept"].get("booted") or ""))[:60],
+                          "versions": [{"version": re.sub(r"[^A-Za-z0-9.+-]", "", str(x.get("version") or ""))[:60], "mb": num(x.get("mb")),
+                                        "at": num(x.get("at")), "state": x.get("state") is True}
+                                       for x in (vs if isinstance(vs, list) else [])[:16] if isinstance(x, dict) and x.get("version")]}
     # A stick boot (R161 step 10): its system pool, whether docker and the
     # VMs may run yet, what still lives on the stick, what it has written.
     if isinstance(c.get("os_stick"), dict) and c["os_stick"].get("stick") is True:
@@ -1571,15 +1638,19 @@ def _census(c):
         out["os_stick"] = {"stick": True, "pool": str(s.get("pool") or "")[:200] if str(s.get("pool") or "").startswith("/") else "",
                            "ready": s.get("ready") is True,
                            "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects")],
-                           "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb"))}
-    # The domains its libvirt has that BuilderBot did not make (R165 step 1):
+                           "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb")),
+                           # A folder of the machine's own as the projects folder (R163).
+                           "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
+                           "projects_bound": s.get("projects_bound") is True,
+                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else ""}
+    # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
         out["vms_other"] = [{"name": str(v["name"]), "state": re.sub(r"[^a-z ]", "", str(v.get("state") or ""))[:20],
                              "vcpus": int(v["vcpus"]) if isinstance(v.get("vcpus"), int) else 0,
-                             "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0}
+                             "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0, "autostart": v.get("autostart") is True}
                             for v in c["vms_other"][:64]
-                            if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", str(v.get("name") or ""))]
+                            if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", str(v.get("name") or ""))]
     # ...and the VMs it runs (R91), each as libvirt says, with the room their
     # disks have: whitelisted field by field like the rest.
     if isinstance(c.get("vms"), list):
@@ -1824,7 +1895,7 @@ def _census(c):
             # false from a node that could not set it up, with why.
             "ctr": bool(se.get("ctr")),
             "ctr_why": str(se.get("ctr_why") or "")[:120],
-            # Whether its agent serves BuilderBot's own terminal (R133): one
+            # Whether its agent serves AerieOS's own terminal (R133): one
             # that does not (an agent before 0.8) opens no terminal until
             # it is updated.
             "term": bool(se.get("term")),
@@ -1832,7 +1903,7 @@ def _census(c):
             "workspace": bool(se.get("workspace")),
             # None is "not probed", read as unknown rather than read-only:
             # a /workspace the agent could not test is not one it found
-            # closed. Said in bb diag; no gate reads it since the synced
+            # closed. Said in aerie diag; no gate reads it since the synced
             # copy is the node's own directory (R163).
             "writable": None if "writable" not in se else bool(se.get("writable")),
             "claude": str(se.get("claude") or "")[:40],
@@ -2144,7 +2215,7 @@ def node_session_net(principal, node_id, on):
 
 
 def node_vm_of(node_id, host_id):
-    """A node that is a VM BuilderBot made on another node (R91 step 14),
+    """A node that is a VM AerieOS made on another node (R91 step 14),
     said on its row; retired with the VM."""
     n = node(node_id)
     if not n:
@@ -2170,7 +2241,7 @@ def node_vm_lan(principal, node_id, on):
 
 
 def node_root_asks(principal, node_id, on):
-    """Whether a session on this node may ask for a root command (bb root
+    """Whether a session on this node may ask for a root command (aerie root
     run): on, the ask goes to a person as ever; off, it is refused with the
     sentence root_refused says. An administrator's, like the rest of the
     config plane."""
@@ -2328,7 +2399,7 @@ def session_net_nudge():
 def node_test_workers(principal, node_id, n):
     """How many workers a test run on this node may use (R81): 0 means the
     node's own core count. Handed to every test job there as
-    BB_TEST_WORKERS, for the project's test command and BuilderBot's own
+    BB_TEST_WORKERS, for the project's test command and AerieOS's own
     harness to read. An administrator's, like the rest of the config plane;
     the node hears it by a fresh hello."""
     node_ = node(node_id)
@@ -2383,7 +2454,7 @@ def node_log_read(principal, asking_id, target_id, stream="agent", lines=200,
     if not asking_id:
         return {"error": "this session is not on a node, and the grant is a "
                          "node's; a controller session reads its own log with "
-                         "`bb logs`"}
+                         "`aerie logs`"}
     tgt = node(target_id)
     if not tgt:
         return {"error": "no such node"}
@@ -3052,7 +3123,7 @@ def node_in_use(n):
     rep = n.get("reported") or {}
     # The sessions the card lists: an account's (u_<uid>~name), the way
     # server._SESS_OWNER reads them. The node's tmux may hold others (the
-    # harness's own, somebody's shell), which are not BuilderBot's to end.
+    # harness's own, somebody's shell), which are not AerieOS's to end.
     sessions = [s for s in (rep.get("sessions") or []) if isinstance(s, dict)
                 and re.match(r"^u_[0-9a-f]{8}~", str(s.get("name") or ""))]
     containers = list((rep.get("published") or {}).keys())
@@ -3066,9 +3137,9 @@ def node_in_use(n):
 
 
 def node_uninstall(principal, node_id, rings=None):
-    """Take BuilderBot off a node from its row: a system job the agent
+    """Take AerieOS off a node from its row: a system job the agent
     answers by deregistering its runners and starting bb-sandbox uninstall
-    detached, after which nothing of BuilderBot's is left on the machine
+    detached, after which nothing of AerieOS's is left on the machine
     but docker, the packages and the shares' contents. The node is retired
     when the job succeeds (job_result), so the row leaves every list the
     way Remove's does."""
@@ -3078,7 +3149,7 @@ def node_uninstall(principal, node_id, rings=None):
     if n.get("kind") != "agent":
         return {"error": "only an agent node can be uninstalled from here"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox can be uninstalled "
+        return {"error": "only a node provisioned as an AerieOS sandbox can be uninstalled "
                          "from here: on the machine, sudo bb-sandbox uninstall"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
@@ -3229,6 +3300,14 @@ ARRAY_POLICIES = ("mfs", "lfs", "epmfs", "ff")
 ARRAY_LONG = 86400
 
 
+def _disk_ids(known, names):
+    """Each named disk as the census showed it to the person (its by-id link
+    and serial), for the agent to hold the name to: a kernel name can move
+    to another disk between the pick and the job (a stick plugged in, a
+    reboot), and the wipe would land on whichever disk took it (B527)."""
+    return {d: {"by_id": str(known[d].get("by_id") or ""), "serial": str(known[d].get("serial") or "")}
+            for d in names if d in known}
+
 def node_storage_array(principal, node_id, req):
     """The array on the controller's own machine (R162 step 2): made of
     data disks and one or two parity disks, a disk added or a slot's disk
@@ -3280,7 +3359,8 @@ def node_storage_array(principal, node_id, req):
         small = [p for p in parity if int(known[p].get("size_mb") or 0) < biggest]
         if small:
             return {"error": f"a parity disk is at least as large as the largest data disk; {', '.join(small)} is smaller"}
-        cfg.update(data=data, parity=parity, fs=fs, policy=policy, wipe=req.get("wipe") is True)
+        cfg.update(data=data, parity=parity, fs=fs, policy=policy, wipe=req.get("wipe") is True,
+                   ids=_disk_ids(known, data + parity))
     elif action in ("add", "replace"):
         new = str(req.get("new" if action == "replace" else "disk") or "")
         if not have.get("data"):
@@ -3293,9 +3373,9 @@ def node_storage_array(principal, node_id, req):
             slots = {f"d{x['slot']}" for x in have.get("data") or []} | {f"p{x['slot']}" for x in have.get("parity") or []}
             if which not in slots:
                 return {"error": f"replace takes the slot to replace, one of {', '.join(sorted(slots))}"}
-            cfg.update(which=which, new=new, wipe=req.get("wipe") is True)
+            cfg.update(which=which, new=new, wipe=req.get("wipe") is True, ids=_disk_ids(known, [new]))
         else:
-            cfg.update(disk=new, wipe=req.get("wipe") is True)
+            cfg.update(disk=new, wipe=req.get("wipe") is True, ids=_disk_ids(known, [new]))
     elif action == "destroy":
         if not have.get("data"):
             return {"error": "no array on the machine yet"}
@@ -3315,6 +3395,141 @@ def node_storage_array(principal, node_id, req):
                 {"apply": "storage-array", "config": cfg, "timeout": 900 if action in ("check", "destroy") else ARRAY_LONG})
     if r.get("ok"):
         audit(principal, "storage-array", node_id, {"job": r["job"], **cfg})
+    return r
+
+
+def node_console(principal, node_id, password, clear=False):
+    """A console password for AerieOS's screen (R194): hashed here
+    (SHA-512 crypt, by openssl, so neither the job nor its record holds the
+    password itself), sent to the machine's agent, which makes the admin
+    account from it at every boot. clear takes it away."""
+    import subprocess
+    n = node(node_id)
+    if not n or not own_machine(n):
+        return {"error": "a console password is the controller's own machine's"}
+    rep = n.get("reported") or {}
+    if not (rep.get("console") or {}).get("os"):
+        return {"error": "a console password is AerieOS's; on a Linux of your own, log in with its own accounts"}
+    cfg = {"clear": True} if clear else {}
+    if not clear:
+        pw = str(password or "")
+        if len(pw) < 10 or len(pw) > 200 or "\n" in pw:
+            return {"error": "a console password is ten characters at least"}
+        try:
+            r = subprocess.run(["openssl", "passwd", "-6", "-stdin"], input=pw + "\n", capture_output=True, text=True, timeout=20, check=False)
+        except (OSError, subprocess.SubprocessError) as e:
+            return {"error": f"the password could not be hashed here: {e}"}
+        h = r.stdout.strip()
+        if r.returncode != 0 or not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", h):
+            return {"error": "the password could not be hashed here (openssl passwd -6)"}
+        cfg["hash"] = h
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "console", "config": cfg, "timeout": 60})
+    if r.get("ok"):
+        audit(principal, "console-password", node_id, {"job": r["job"], "cleared": bool(clear)})
+    return r
+
+
+ADOPT_ACTIONS = ("dry", "adopt", "release", "read-apps", "define-vms", "docker-network", "vm")
+ADOPT_FS = ("xfs", "btrfs", "zfs")
+
+
+def _adopt_want(req):
+    """The disks and pools to adopt, as the request names them, each field
+    checked for its shape; the agent checks each against the machine again.
+    ({...}, "") or (None, why)."""
+    w = req.get("want") if isinstance(req.get("want"), dict) else {}
+    ok_id = lambda v: isinstance(v, str) and 0 < len(v) <= 120 and re.fullmatch(r"[A-Za-z0-9._:+\-]+", v)    # noqa: E731
+    data, parity, pools = [], [], []
+    for x in w.get("data") or []:
+        if not isinstance(x, dict) or not re.fullmatch(r"disk[1-9][0-9]?", str(x.get("slot") or "")) or not ok_id(x.get("id")) \
+                or str(x.get("fs") or "") not in ADOPT_FS:
+            return None, "a data disk is {slot: disk1 to disk99, id: its model and serial, fs: xfs, btrfs or zfs}"
+        data.append({"slot": x["slot"], "id": x["id"], "fs": x["fs"]})
+    for x in w.get("parity") or []:
+        if not isinstance(x, dict) or not ok_id(x.get("id")):
+            return None, "a parity disk is {slot, id: its model and serial}"
+        parity.append({"slot": str(x.get("slot") or "parity")[:16], "id": x["id"]})
+    for x in w.get("pools") or []:
+        if not isinstance(x, dict) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", str(x.get("name") or "")) \
+                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))):
+            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid}"
+        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or "")})
+    if len(data) > 30 or len(parity) > 2 or len(pools) > 8 or not (data or pools):
+        return None, "name the data disks and pools to adopt (at most 30 disks, 2 parity, 8 pools)"
+    return {"data": data, "parity": parity, "pools": pools, "writable": w.get("writable") is True,
+            "from": str(w.get("from") or "adopted")[:16]}, ""
+
+
+def node_storage_adopt(principal, node_id, req):
+    """Another NAS's array and pools taken as they are on the controller's
+    own machine (R163 step 8): a dry run that says every mount, the
+    adoption itself (data disks read-only unless writable is asked, parity
+    never touched, pools writable, the old paths kept), or Release, which
+    unmounts and forgets them; a system job on its node, nothing formatted
+    or partitioned anywhere in it."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    if not own_machine(n):
+        return {"error": "disks are adopted on the controller's own machine (the installed edition's Storage page)"}
+    rep = n.get("reported") or {}
+    if n.get("kind") != "agent" or not rep.get("administers"):
+        return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot mount disks"}
+    action = str(req.get("adopt") or "")
+    if action not in ADOPT_ACTIONS:
+        return {"error": f"an adopt action is one of {', '.join(ADOPT_ACTIONS)}"}
+    cfg = {"adopt": action}
+    held_now = (rep.get("adopted") or {}).get("mounts") or (rep.get("adopted") or {}).get("merged")
+    img_ok = lambda v: isinstance(v, str) and re.fullmatch(r"/mnt/[A-Za-z0-9._/ +-]{1,200}", v) and ".." not in v.split("/")  # noqa: E731
+    if action in ("read-apps", "define-vms", "docker-network", "vm") and not held_now:
+        return {"error": "adopt the disks first: what ran is read from them"}
+    if action == "read-apps":
+        dk = req.get("docker") if isinstance(req.get("docker"), dict) else {}
+        vm = req.get("vms") if isinstance(req.get("vms"), dict) else {}
+        if dk.get("image") and not img_ok(dk["image"]) or vm.get("image") and not img_ok(vm["image"]):
+            return {"error": "an image file is a path under /mnt"}
+        af = str(dk.get("autostart_file") or "")
+        if af and not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", af):
+            return {"error": "the autostart file is a name in Docker's folder"}
+        cfg.update(docker={"image": dk.get("image") or "", "autostart_file": af}, vms={"image": vm.get("image") or ""})
+    elif action == "vm":
+        name, op = str(req.get("name") or ""), str(req.get("op") or "")
+        if op not in ("start", "shutdown", "off", "autostart-on", "autostart-off") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", name):
+            return {"error": "an adopted VM by its name, and start, shutdown, off, autostart-on or autostart-off"}
+        cfg.update(name=name, op=op)
+    elif action == "define-vms":
+        names = [str(x) for x in (req.get("names") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", x)][:64]
+        if not names:
+            return {"error": "name the VMs to define"}
+        cfg["names"] = names
+    elif action == "docker-network":
+        name, subnet, gw = str(req.get("name") or ""), str(req.get("subnet") or ""), str(req.get("gateway") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}", name) or not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}/\d{1,2}", subnet) \
+                or (gw and not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", gw)):
+            return {"error": "a network is a name, a subnet like 192.168.1.0/24 and a gateway address"}
+        cfg.update(name=name, subnet=subnet, gateway=gw)
+    elif action != "release":
+        want, why = _adopt_want(req)
+        if why:
+            return {"error": why}
+        cfg["want"] = want
+    elif not held_now:
+        return {"error": "nothing is adopted on the machine"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-adopt", "config": cfg, "timeout": 600})
+    if r.get("ok"):
+        audit(principal, "storage-adopt", node_id, {"job": r["job"], "adopt": action,
+                                                    "writable": (cfg.get("want") or {}).get("writable") is True})
     return r
 
 
@@ -3351,7 +3566,7 @@ def node_storage_key(principal, node_id, req):
 def node_storage_share(principal, node_id, req):
     """A share on the controller's own machine (R162 step 1): set (SMB,
     NFS or both, on a folder under a pool's mount) or removed, a system job
-    on its node whose root agent writes BuilderBot's own two files whole and
+    on its node whose root agent writes AerieOS's own two files whole and
     tells Samba and NFS to read again. Refused anywhere else, and without
     the shares feature's daemons."""
     n = node(node_id)
@@ -3364,43 +3579,26 @@ def node_storage_share(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot serve a share"}
     sh = (rep.get("features") or {}).get("shares") or {}
     action = str(req.get("share") or "")
-    name = str(req.get("name") or "").strip()
-    if action not in ("set", "remove"):
-        return {"error": "a share action is set or remove"}
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", name):
-        return {"error": "a share's name is letters, digits, dots, hyphens and underscores, 63 at most"}
-    cfg = {"share": action, "name": name}
-    if action == "set":
-        path = str(req.get("path") or "").strip()
-        smb = req.get("smb") if isinstance(req.get("smb"), dict) else {}
-        nfs = req.get("nfs") if isinstance(req.get("nfs"), dict) else {}
-        if not (path.startswith(("/mnt/", "/srv/")) and ".." not in path.split("/") and len(path) <= 200):
-            return {"error": "a share's path is a folder under /mnt or /srv"}
-        if not smb.get("on") and not nfs.get("on"):
-            return {"error": "a share is served over SMB, NFS or both"}
-        if smb.get("on") and not sh.get("smb"):
-            return {"error": "no Samba on the machine yet: install Shares on its Features section first"}
-        if nfs.get("on") and not sh.get("nfs"):
-            return {"error": "no NFS server on the machine yet: install Shares on its Features section first"}
-        users = [str(u).strip() for u in (smb.get("users") or []) if isinstance(u, str) and str(u).strip()]
-        # An account's name or role:NAME to the Unix users Samba is told (R164 step 1).
-        if smb_resolve and users:
-            users, why = smb_resolve(users)
+    # Many at once (R163 step 9): an adopted system's shares, each checked
+    # as one alone is; one that does not pass is left out with why.
+    if action == "set-many":
+        rows, skipped = [], []
+        for x in (req.get("shares") or [])[:64]:
+            if not isinstance(x, dict):
+                continue
+            one, why = _share_cfg(sh, {**x, "share": "set"})
             if why:
-                return {"error": why}
-        clients = [str(c).strip() for c in (nfs.get("clients") or []) if isinstance(c, str) and str(c).strip()]
-        if smb.get("on") and not smb.get("guest") and not users:
-            return {"error": "an SMB share takes the users who may reach it, or everybody as a guest"}
-        if nfs.get("on") and not clients:
-            return {"error": "an NFS share takes the clients it is exported to (an address, a network, a name, or *)"}
-        for u in users:
-            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", u):
-                return {"error": f"{u!r} is not a user name"}
-        for c in clients:
-            if not re.fullmatch(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}", c):
-                return {"error": f"{c!r} is not a client (an address, a network like 192.168.1.0/24, a name, or *)"}
-        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
-                   nfs={"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]})
+                skipped.append({"name": str(x.get("name") or "")[:63], "why": why})
+            else:
+                rows.append({k: v for k, v in one.items() if k != "share"})
+        if not rows:
+            return {"error": "no share to serve" + (f": {skipped[0]['name']}: {skipped[0]['why']}" if skipped else "")}
+        cfg = {"share": "set-many", "shares": rows}
+    else:
+        cfg, why = _share_cfg(sh, req)
+        if why:
+            return {"error": why}
+        skipped = []
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -3408,10 +3606,56 @@ def node_storage_share(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120})
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120 * max(1, len(cfg.get("shares") or []))})
     if r.get("ok"):
-        audit(principal, "storage-share", node_id, {"job": r["job"], **cfg})
+        audit(principal, "storage-share", node_id, {"job": r["job"], **({"share": "set-many", "names": [x["name"] for x in cfg["shares"]]} if action == "set-many" else cfg)})
+        if skipped:
+            r["skipped"] = skipped
     return r
+
+
+def _share_cfg(sh, req):
+    """One share's request checked, as the job takes it: (cfg, "") or
+    (None, why). `sh` is the shares feature's daemons on the machine."""
+    action = str(req.get("share") or "")
+    name = str(req.get("name") or "").strip()
+    if action not in ("set", "remove"):
+        return None, "a share action is set or remove"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", name):
+        return None, "a share's name is letters, digits, dots, hyphens and underscores, 63 at most"
+    cfg = {"share": action, "name": name}
+    if action == "set":
+        path = str(req.get("path") or "").strip()
+        smb = req.get("smb") if isinstance(req.get("smb"), dict) else {}
+        nfs = req.get("nfs") if isinstance(req.get("nfs"), dict) else {}
+        if not (path.startswith(("/mnt/", "/srv/")) and ".." not in path.split("/") and len(path) <= 200):
+            return None, "a share's path is a folder under /mnt or /srv"
+        if not smb.get("on") and not nfs.get("on"):
+            return None, "a share is served over SMB, NFS or both"
+        if smb.get("on") and not sh.get("smb"):
+            return None, "no Samba on the machine yet: install Shares on its Features section first"
+        if nfs.get("on") and not sh.get("nfs"):
+            return None, "no NFS server on the machine yet: install Shares on its Features section first"
+        users = [str(u).strip() for u in (smb.get("users") or []) if isinstance(u, str) and str(u).strip()]
+        # An account's name or role:NAME to the Unix users Samba is told (R164 step 1).
+        if smb_resolve and users:
+            users, why = smb_resolve(users)
+            if why:
+                return None, why
+        clients = [str(c).strip() for c in (nfs.get("clients") or []) if isinstance(c, str) and str(c).strip()]
+        if smb.get("on") and not smb.get("guest") and not users:
+            return None, "an SMB share takes the users who may reach it, or everybody as a guest"
+        if nfs.get("on") and not clients:
+            return None, "an NFS share takes the clients it is exported to (an address, a network, a name, or *)"
+        for u in users:
+            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", u):
+                return None, f"{u!r} is not a user name"
+        for c in clients:
+            if not re.fullmatch(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}", c):
+                return None, f"{c!r} is not a client (an address, a network like 192.168.1.0/24, a name, or *)"
+        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
+                   nfs={"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]})
+    return cfg, ""
 
 
 def smb_shares_for(uid):
@@ -3465,6 +3709,11 @@ def node_storage_pool(principal, node_id, req):
         return {"error": f"a pool action is one of {', '.join(POOL_ACTIONS)}"}
     if not re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", name):
         return {"error": "a pool's name is a letter, then letters, digits, hyphens and underscores, 31 at most"}
+    # /mnt/NAME is where it mounts: not the array's folders, the other
+    # mounts', or what disks adopted from another system are found under.
+    held = {m.get("where", "").rsplit("/", 1)[-1] for m in ((rep.get("adopted") or {}).get("mounts") or [])}
+    if action == "create" and (re.fullmatch(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)", name) or name in held):
+        return {"error": f"/mnt/{name} means something else on this machine (the array's folders, the other mounts', or adopted disks): pick another name"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
     known = {d["name"]: d for d in rep.get("disks") or [] if isinstance(d, dict)}
@@ -3481,7 +3730,7 @@ def node_storage_pool(principal, node_id, req):
                 return {"error": f"{d} is not a disk {n['name']} lists"}
             if known[d].get("system"):
                 return {"error": f"{d} is the system disk, which never goes into a pool"}
-        cfg.update(layout=layout, disks=disks, wipe=req.get("wipe") is True)
+        cfg.update(layout=layout, disks=disks, wipe=req.get("wipe") is True, ids=_disk_ids(known, disks))
         # Native encryption (R162 step 3): the passphrase goes to the key
         # record (kept sealed here, or asked after every boot), never into
         # the job; the hello hands it to the agent before the job runs.
@@ -3496,7 +3745,7 @@ def node_storage_pool(principal, node_id, req):
         old, new = str(req.get("old") or "")[:120], str(req.get("new") or "")
         if not old or new not in known or known[new].get("system"):
             return {"error": "replace takes the member to replace and a disk the machine lists that is not the system's"}
-        cfg.update(old=old, new=new, wipe=req.get("wipe") is True)
+        cfg.update(old=old, new=new, wipe=req.get("wipe") is True, ids=_disk_ids(known, [new]))
     elif action == "destroy":
         if str(req.get("confirm") or "") != name:
             return {"error": "destroying a pool takes its name typed again"}
@@ -3642,7 +3891,7 @@ def node_storage_backup(principal, node_id, name):
 def node_host_update(principal, node_id, reboot=False):
     """The controller's own machine's own packages updated (R164 step 3):
     apt on its node by the root agent, a restart after when asked for;
-    refused anywhere else, on BuilderBot OS (whole images), and while a
+    refused anywhere else, on AerieOS (whole images), and while a
     system job is in flight."""
     n = node(node_id)
     if not n:
@@ -3653,7 +3902,7 @@ def node_host_update(principal, node_id, reboot=False):
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot update its packages"}
     if rep.get("os_image"):
-        return {"error": "BuilderBot OS updates as a whole image under Controller settings, never package by package"}
+        return {"error": "AerieOS updates as a whole image under Controller settings, never package by package"}
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -3715,8 +3964,43 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     return r
 
 
+# A draft release (the operator, 1 Nov): the controller fetches its files
+# itself and the update is taken from that folder (server._draft_update);
+# None where the tag is no draft it can see. Configured by the server.
+draft_update = lambda principal, node_id, tag, os_image: None  # noqa: E731
+
+# How many pushed-out versions stay on the boot menu (R201): settings.os_keep.
+keep_versions = lambda: 3  # noqa: E731
+
+
+def node_os_kept(principal, node_id, verb, version):
+    """An older version on the boot menu (R201): `next` boots it once,
+    `remove` takes it away. A system job on the own machine's node."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    rep = n.get("reported") or {}
+    if not own_machine(n) or not (rep.get("os_image") or {}).get("version"):
+        return {"error": "older versions are AerieOS's, on this machine"}
+    if verb not in ("next", "remove"):
+        return {"error": "next or remove"}
+    if version not in {x.get("version") for x in (rep.get("os_kept") or {}).get("versions") or []}:
+        return {"error": f"{version or 'that version'} is not kept on this machine"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "os-kept", "config": {"verb": verb, "version": version}, "timeout": 120})
+    if r.get("ok"):
+        audit(principal, "os-kept", node_id, {"job": r["job"], "verb": verb, "version": version})
+    return r
+
+
 def node_os_update(principal, node_id, release="", from_dir=""):
-    """Update BuilderBot OS on the controller's own machine (R160 step 4): a
+    """Update AerieOS on the controller's own machine (R160 step 4): a
     system job on its node, whose root agent fetches the release's image
     files (or takes them from a folder on the machine), checks each against
     its sha256 and the slot against its build attestation, writes the slot
@@ -3727,7 +4011,7 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_image") or {}).get("version"):
-        return {"error": "updating the image is for a machine that runs BuilderBot OS, on its own node; "
+        return {"error": "updating the image is for a machine that runs AerieOS, on its own node; "
                          "a bare-metal install on another system updates its controller, a container install pulls its image"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot write a slot"}
@@ -3740,16 +4024,109 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
     src = str(from_dir or "").strip()
-    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+", tag):
-        return {"error": "a release is named as its tag, vX.Y.Z"}
+    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-dev\.\d+)?", tag):
+        return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
     if src and (not src.startswith("/") or ".." in src.split("/") or len(src) > 300):
         return {"error": "the folder is a path on the machine, from /"}
     if not tag and not src:
         return {"error": "name the release (vX.Y.Z), or a folder on the machine holding its files"}
+    if tag:
+        d = draft_update(principal, node_id, tag, True)
+        if d is not None:
+            return d
     r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "os-update", "config": ({"release": tag} if tag else {"from": src}), "timeout": 3600})
+                {"apply": "os-update", "config": {**({"release": tag} if tag else {"from": src}), "keep": keep_versions()}, "timeout": 3600})
     if r.get("ok"):
         audit(principal, "os-update", node_id, {"job": r["job"], "release": tag, "from": src})
+    return r
+
+
+def on_stick():
+    """Whether this controller's own machine runs AerieOS from a stick."""
+    return any(own_machine(n) and ((n.get("reported") or {}).get("os_stick") or {}).get("stick") for n in node_list())
+
+
+def workspace_held():
+    """Why no project may be made, cloned or moved in here now, or "": on a
+    stick the projects are never written to the stick (the operator, 1 Nov),
+    so until a system pool or a folder on the machine's disks holds them,
+    they are held (system-pool's hold)."""
+    for n in node_list():
+        if not own_machine(n):
+            continue
+        s = (n.get("reported") or {}).get("os_stick") or {}
+        if not s.get("stick"):
+            return ""
+        if s.get("projects_home") == "held":
+            return ("this machine runs from a stick, and the projects are never kept on it: on This machine, create or adopt "
+                    "a pool and name it the system pool, or name the folder on its disks the projects are in")
+        if s.get("projects_home") == "folder" and not s.get("projects_bound"):
+            return f"the projects folder {s.get('projects') or ''} is waiting for its disks to mount"
+        return ""
+    return ""
+
+
+def projects_folder_places(n):
+    """The places a stick's projects folder may be named in: the adopted
+    disks' merged views and mounts (writable ones alone), its pools and its
+    array, by mount point; each with whether it is writable."""
+    rep = n.get("reported") or {}
+    out = {}
+    ad = rep.get("adopted") or {}
+    for where, up in (ad.get("merged") or {}).items():
+        if up and str(where).startswith("/"):
+            out[str(where)] = bool(ad.get("writable"))
+    for m in ad.get("mounts") or []:
+        if m.get("mounted") and str(m.get("where") or "").startswith("/"):
+            out[str(m["where"])] = not m.get("ro")
+    for p in rep.get("pools") or []:
+        if isinstance(p, dict) and str(p.get("mount") or "").startswith("/"):
+            out[str(p["mount"])] = True
+    if str((rep.get("array") or {}).get("mount") or "").startswith("/"):
+        out[rep["array"]["mount"]] = True
+    return out
+
+
+def node_projects_folder(principal, node_id, path="", release=False):
+    """A folder already on a stick machine's disks named as its projects
+    folder (R163, the operator, 1 Nov): a controller moved here without its
+    repositories finds them where the disks held them, nothing copied. The
+    folder must lie inside an adopted share, a pool or the array, writable;
+    the job says which of the controller's projects it holds, hands its files
+    to the controller's account and restarts the controller on it. `release`
+    lets it go. A system job on the own machine's node."""
+    n = node(node_id)
+    if not n:
+        return {"error": "no such node"}
+    rep = n.get("reported") or {}
+    if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
+        return {"error": "a projects folder of the machine's own is a stick's: this machine does not run AerieOS from a stick"}
+    if n.get("kind") != "agent" or not rep.get("administers"):
+        return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot name a folder"}
+    cfg = {"release": True}
+    if not release:
+        path = os.path.normpath(str(path or "").strip()) if str(path or "").strip() else ""
+        if not path.startswith("/") or "\n" in path:
+            return {"error": "name the folder by its path, as /mnt/user/projects"}
+        places = projects_folder_places(n)
+        inside = [p for p in places if path != p and path.startswith(p.rstrip("/") + "/")]
+        if not inside:
+            return {"error": "name a folder inside the disks this machine adopted, a pool or the array (a share, as /mnt/user/projects)"}
+        if not any(places[p] for p in inside):
+            return {"error": "those disks were adopted read only, so the projects could not be written there: adopt them writable first"}
+        cfg = {"path": path, "names": sorted(str(x) for x in (project_names() or []))[:500]}
+    elif not (rep.get("os_stick") or {}).get("projects"):
+        return {"error": "no folder of the machine's own is the projects folder"}
+    why = node_locked(n)
+    if why:
+        return {"error": why}
+    if not n.get("live"):
+        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    if system_job_for(node_id):
+        return {"error": "a system job is already in flight on this node; one at a time"}
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "projects-folder", "config": cfg, "timeout": 6 * 3600})
+    if r.get("ok"):
+        audit(principal, "projects-folder", node_id, {"job": r["job"], **({"path": cfg["path"]} if "path" in cfg else {"release": True})})
     return r
 
 
@@ -3764,7 +4141,7 @@ def node_system_pool(principal, node_id, path=""):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
-        return {"error": "a system pool is a stick's: this machine does not run BuilderBot OS from a stick"}
+        return {"error": "a system pool is a stick's: this machine does not run AerieOS from a stick"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot move a pool"}
     path = str(path or "").strip()
@@ -3809,8 +4186,12 @@ def node_controller_update(principal, node_id, release=""):
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
-    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+", tag):
-        return {"error": "a release is named as its tag, vX.Y.Z"}
+    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-dev\.\d+)?", tag):
+        return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
+    if tag:
+        d = draft_update(principal, node_id, tag, False)
+        if d is not None:
+            return d
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "controller-update", "config": ({"release": tag} if tag else {}), "timeout": 3600})
     if r.get("ok"):
@@ -3858,7 +4239,7 @@ def node_lockdown(principal, node_id):
 
 def reset_unenroll(principal, ids, stores=False):
     """Un-enroll these nodes ahead of a Reset (the operator, 12 Oct), so
-    each machine is clean to enroll again afterwards: a node BuilderBot
+    each machine is clean to enroll again afterwards: a node AerieOS
     provisioned and can reach is uninstalled, its job retiring it when the
     machine reports done; any other is retired here, its tokens revoked.
     [{id, name, how, error}], how being "uninstall" or "retired"."""
@@ -3914,7 +4295,7 @@ def node_gpu_display(principal, node_id):
     if n.get("kind") != "agent":
         return {"error": "only an agent node has a GPU display to set up"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox is set up from here: "
+        return {"error": "only a node provisioned as an AerieOS sandbox is set up from here: "
                          "on the machine, sudo bb-sandbox gpu"}
     # The display runs on the driver and does not install it (R102): the
     # driver's card in the Library is the one place it is installed.
@@ -3945,7 +4326,7 @@ def node_gpu_display_off(principal, node_id):
     if not n:
         return {"error": "no such node"}
     if n.get("kind") != "agent" or not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as a BuilderBot sandbox is changed from here: "
+        return {"error": "only a node provisioned as an AerieOS sandbox is changed from here: "
                          "on the machine, sudo bb-sandbox gpu-off"}
     why = node_locked(n)
     if why:
@@ -4062,7 +4443,7 @@ def node_apply(principal, node_id, what):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a BuilderBot sandbox "
+        return {"error": "this node was not provisioned as an AerieOS sandbox "
                          "(no bb-sandbox on it), so system jobs are not offered to it"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; system jobs go to an online node"}
@@ -4358,6 +4739,13 @@ def token_attention():
         ru = (n.get("agent") or {}).get("token_reuse")
         if isinstance(ru, dict) and ru.get("at"):
             out.append({"kind": "token-reuse", "node": n["name"], "id": n["id"], "at": int(ru["at"])})
+    # ...and one whose agent is being turned away (B569), not merely quiet:
+    # it says why, and that enrolling it again is the way back.
+    for n in node_list():
+        rf = (n.get("agent") or {}).get("refused")
+        if n.get("state") != "retired" and isinstance(rf, dict) and rf.get("at"):
+            out.append({"kind": "node-refused", "node": n["name"], "id": n["id"], "at": int(rf["at"]),
+                        "since": int(rf.get("since") or rf["at"]), "why": str(rf.get("why") or "")})
     return out
 
 
@@ -4392,6 +4780,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     ag.update({"version": str(version)[:40], "digest": str(digest)[:80],
                "addr": addr, "last_seen": int(time.time()),
                })
+    ag.pop("refused", None)
     # Why an idle session's token was not refreshed here, said by the agent
     # that tried (B419).
     kc = keep_clean(keep)
@@ -4621,7 +5010,7 @@ def heartbeat(nid, sample, addr, running=0):
     clean["disks"] = {r: [_mb((disks.get(r) or {}).get("free_mb")), _mb((disks.get(r) or {}).get("total_mb"))]
                       for r in ("root", "docker") if isinstance(disks.get(r), dict)}
     clean["store_totals"] = totals
-    # BuilderBot's memory fence (R110 step 4), [max MB, used MB], or None
+    # AerieOS's memory fence (R110 step 4), [max MB, used MB], or None
     # from an agent that looked and found none; absent from an older one.
     if "fence" in s:
         f = s.get("fence")
@@ -5279,7 +5668,7 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
     if n["kind"] != "agent":
         return {"error": "only an agent node takes system jobs"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "this node was not provisioned as a BuilderBot sandbox, so root "
+        return {"error": "this node was not provisioned as an AerieOS sandbox, so root "
                          "there is its owner's"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; a root command goes to an online node"}
@@ -6434,7 +6823,7 @@ def jobs_restart_sweep():
         if runner_of(j["type"], j["kind"] or "local") != "controller":
             continue
         _exec("UPDATE jobs SET state = 'failed', ended = ?, step = '', error "
-              "= 'lost: BuilderBot restarted while it was running' WHERE "
+              "= 'lost: AerieOS restarted while it was running' WHERE "
               "id = ?", (now, j["id"]))
         audit("system", "job-lost", j["id"], {"why": "controller restart"})
         n += 1
@@ -6463,15 +6852,15 @@ def job_counts():
 # ship a newer agent changes only its own world's, not the copy every worker
 # of a whole run serves from (B718, B751, B510).
 AGENT_DIR = Path(os.environ.get("BB_AGENT_DIR") or HERE.parent / "agent")
-AGENT_VERSION_PY = AGENT_DIR / "builderbot_agent" / "__init__.py"
+AGENT_VERSION_PY = AGENT_DIR / "aerieos_agent" / "__init__.py"
 _agent_cache = {}
 
 
 def _agent_bundle():
-    """builderbot_agent/bundle.py, loaded by path: it makes the zip a node
+    """aerieos_agent/bundle.py, loaded by path: it makes the zip a node
     runs, and the agent itself makes the same one to know its own digest."""
     if "bundle" not in _agent_cache:
-        spec = importlib.util.spec_from_file_location("bb_agent_bundle", AGENT_DIR / "builderbot_agent" / "bundle.py")
+        spec = importlib.util.spec_from_file_location("bb_agent_bundle", AGENT_DIR / "aerieos_agent" / "bundle.py")
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         _agent_cache["bundle"] = mod
@@ -6501,7 +6890,7 @@ def agent_file():
         was = _agent_cache.get("digest")
         if was and was != digest:
             # The sources moved under a running controller (a tree edited
-            # under bb dashboard dev, a harness copy written mid-run, B718):
+            # under aerie dashboard dev, a harness copy written mid-run, B718):
             # every node enrolled on the old digest is held from here on, so
             # the file that moved is named, once, where the log is read.
             newest = max(b.sources(str(AGENT_DIR)), key=lambda t: os.stat(t[1]).st_mtime)[1]
@@ -6531,7 +6920,8 @@ no_node_advice = None    # a project with no node -> what it can still do
 turns_of = None          # a node row -> its sessions' turns: working, waiting, the limit
 working_on = None        # a node id -> how many of its sessions are mid-turn (R120 step 7)
 _VERB_PARTS = ("vmtemplate", "forges", "devapp", "runner_store",
-               "workspace", "project_prefs", "may_push", "no_node_advice", "turns_of", "working_on")
+               "workspace", "project_prefs", "may_push", "no_node_advice", "turns_of", "working_on", "project_names")
+project_names = list   # the projects the controller knows, by name (prefs.all_projects)
 
 
 def configure_verbs(**parts):
@@ -6829,11 +7219,15 @@ def verb(principal, req):
              "controller-update": lambda: node_controller_update(principal, nid, field(req, "release")),
              "os-update": lambda: node_os_update(principal, nid, field(req, "release"), field(req, "from")),
              "system-pool": lambda: node_system_pool(principal, nid, field(req, "path")),
+             "os-kept": lambda: node_os_kept(principal, nid, field(req, "verb"), field(req, "version")),
+             "projects-folder": lambda: node_projects_folder(principal, nid, field(req, "path"), req.get("release") is True),
              "machine": lambda: node_machine(principal, nid, field(req, "hostname"), field(req, "timezone"), req.get("spindown")),
              "storage-share": lambda: node_storage_share(principal, nid, req),
              "storage-pool": lambda: node_storage_pool(principal, nid, req),
              "storage-snapshot": lambda: node_storage_snapshot(principal, nid, req),
              "storage-array": lambda: node_storage_array(principal, nid, req),
+             "storage-adopt": lambda: node_storage_adopt(principal, nid, req),
+             "console": lambda: node_console(principal, nid, req.get("password"), req.get("clear") is True),
              "storage-backup": lambda: node_storage_backup(principal, nid, field(req, "name")),
              "storage-key": lambda: node_storage_key(principal, nid, req),
              "host-update": lambda: node_host_update(principal, nid, req.get("reboot") is True),
@@ -6852,7 +7246,7 @@ def verb(principal, req):
     return r if isinstance(r, tuple) else (r, 400 if r.get("error") else 200)
 
 def run_job(name, req, principal):
-    """`bb run`, `bb build` and `bb test` from the controller (docs/nodes.md
+    """`aerie run`, `aerie build` and `aerie test` from the controller (docs/nodes.md
     §6), once server.py has let an administrator queue one for this
     project: snapshot the project's working tree, dirty edits included, and
     queue an exec on the project's node, or on the node named; `emu` runs a
@@ -6929,7 +7323,7 @@ def run_job(name, req, principal):
         return r | {"node": nid}, 200
     # A build or a test held to the node's room (R110 step 7): it writes its
     # outputs and caches to the data store, and one started under the floor
-    # fills the disk partway. bb run is left alone: it is how room is made.
+    # fills the disk partway. aerie run is left alone: it is how room is made.
     if room_floor_gb() and field(req, "role") in ("build", "test"):
         took = last_took(name).get("workspace") or 0
         why = room_short(nid, room_floor_gb(), roles=("data", "cache", "root"), need_mb=took >> 20)
@@ -6955,7 +7349,7 @@ def run_job(name, req, principal):
 
 
 # The project a job belongs to when it is not the one it names: a container
-# written for a project (bb container new --for) carries the container's own
+# written for a project (aerie container new --for) carries the container's own
 # name as its project, and its owner is the record's. Set by server.py to
 # devapp.owner_of; None reads every job as its own project's.
 job_owner = None
@@ -6990,7 +7384,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         return mine is None or _job_mine(j, mine) or (system is not None and not j.get("project"))
 
     def scrub(v):
-        # Every string inside, the shape kept: bb jobs and the Jobs tab read
+        # Every string inside, the shape kept: aerie jobs and the Jobs tab read
         # a spec's fields by name.
         if isinstance(v, str):
             return system(v)
@@ -7013,7 +7407,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         n = min(500, max(1, int(q.get("n", ["100"])[0])))
     except ValueError:
         n = 100
-    # A node by its id or its name: `bb jobs --node bb-sandbox` is how a
+    # A node by its id or its name: `aerie jobs --node bb-sandbox` is how a
     # person or a session says it.
     nd = q.get("node", [""])[0] or None
     if nd and not nd.startswith("n_"):

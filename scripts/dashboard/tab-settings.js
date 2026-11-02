@@ -83,7 +83,7 @@ function openSettingsTab(){
 
 // Each section's line on the list beside it: what is in it.
 const SETTINGS_SAYS = {
-  logs: "days kept, following, downloads", reports: "what was reported about BuilderBot, and the diagnostics",
+  logs: "days kept, following, downloads", reports: "what was reported about AerieOS, and the diagnostics",
   idle: "when an idle session is ended", paths: "the shares and disks this controller uses",
   tunnel: "a hostname that reaches it from outside",
   apps: "the apps your people install, kept current",
@@ -129,7 +129,7 @@ function renderSettingsInto(i){
   d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
     ${logs || !state ? sect("logs", "Logs", "", `<div class="row stack2" data-group="Logs"><div class="grow">${withRevert(logs, "logs")
         || `<div class="sub">log settings arrive with the first poll…</div>`}</div></div>`) : ""}
-    ${sect("reports", "BuilderBot bug reports", reportsCount() === null ? "" : reportsCount() ? `${reportsCount()} report${reportsCount() === 1 ? "" : "s"}` : "none", reportsSection())}
+    ${sect("reports", "AerieOS bug reports", reportsCount() === null ? "" : reportsCount() ? `${reportsCount()} report${reportsCount() === 1 ? "" : "s"}` : "none", reportsSection())}
     ${sect("idle", "Idle sessions", idle === undefined ? "" : idle ? `${idle} min` : "never",
            `<div class="row stack2" data-group="Idle sessions"><div class="grow">${withRevert(idleSection(), "idle")}</div></div>`)}
     ${pathsSection() ? sect("paths", "Storage on this controller", `${paths.length} path${paths.length === 1 ? "" : "s"}`, withRevert(pathsSection(), "paths")) : ""}
@@ -142,9 +142,9 @@ function renderSettingsInto(i){
     ${
     // Last, apart from the settings (R218 step 32); the Nodes section that
     // only linked to the Nodes page is gone with it, the rail being the way.
-    sect("reset", "Reset BuilderBot", "", `<div class="field" data-group="Reset">
+    sect("reset", "Reset AerieOS", "", `<div class="field" data-group="Reset">
       <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but project files is moved aside, not deleted.</div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="danger" id="setReset">Reset BuilderBot</button></div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="danger" id="setReset">Reset AerieOS</button></div>
     </div>`)}`;
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
@@ -192,7 +192,7 @@ function withRevert(html, key){
   return html.replace(m[0], `${m[0]}<button type="button" class="caution" data-srevert="${esc(key)}" title="put this section's fields back to what is saved">Revert</button>`);
 }
 
-// What sessions and people reported about BuilderBot (bb report, the
+// What sessions and people reported about AerieOS (aerie report, the
 // header's Report a bug), every one listed with its delete, and the
 // diagnostics download under them, which carries what is left (the
 // operator, 26 Oct): a report taken out before the download is not in it.
@@ -216,14 +216,14 @@ function updatesSection(){
   const r = state?.release || {};
   const when = r.at ? `checked ${esc(ago(r.at))}` : "not checked yet";
   const os = r.os && r.os.version ? r.os : null;
-  // BuilderBot OS (R160 step 4): the image whole into the other slot, a
+  // AerieOS (R160 step 4): the image whole into the other slot, a
   // restart to finish; elsewhere the installer's bundle (R90 step 5).
-  const runs = os ? `BuilderBot OS ${esc(os.version)} from slot ${esc(os.slot || "?")}${os.next && os.next !== os.slot ? `, and slot ${esc(os.next)} boots next: restart to finish the update` : os.trial ? ", on trial until the health check marks it good" : ""}${os.fell_back ? `; ${esc(os.fell_back)}` : ""}`
+  const runs = os ? `AerieOS ${esc(os.version)} from slot ${esc(os.slot || "?")}${os.next && os.next !== os.slot ? `, and slot ${esc(os.next)} boots next: restart to finish the update` : os.trial ? ", on trial until the health check marks it good" : ""}${os.fell_back ? `; ${esc(os.fell_back)}` : ""}`
     : esc(r.running || "an unstamped build");
-  const how = os ? `Update fetches the release's image (its root, kernel and initrd), checks each against its sha256 and the root against its build attestation, writes the slot not in use and names it for the next boot; the restart is yours, from This machine, and the slot running now stays to fall back to. An offline machine takes the same files from a folder here (a stick, a share).`
+  const how = os ? `Update fetches the release's ISO, checks it against its sha256 and its build attestation, takes the root, kernel and initrd out of it, writes the slot not in use and names it for the next boot; the restart is yours, from This machine, and the slot running now stays to fall back to. An offline machine takes the same files from a folder here (a stick, a share): the ISO, its .sha256 and its .attestation.jsonl.`
     : `Update fetches the release's bundle, checks its sha256 and its build attestation, holds the state to its version gate, switches to it and comes back by itself if the new build does not answer.`;
   // The machine's own packages (R164 step 3), on a bare-metal install
-  // that is not BuilderBot OS: how many wait, the security ones among
+  // that is not AerieOS: how many wait, the security ones among
   // them, and Apply updates, with a restart after when ticked.
   const h = r.host && typeof r.host.pending === "number" ? r.host : null;
   const host = !h ? "" : `<div class="sub">The system's own packages: ${h.pending ? `${h.pending} update${h.pending === 1 ? "" : "s"} waiting${h.security ? `, ${h.security} of them security` : ""}` : "up to date"}${h.checked ? ` (checked ${esc(ago(h.checked))})` : ""}${h.reboot ? `; <span class="warn">a restart is needed</span> to run the new kernel or libraries` : ""}.</div>
@@ -231,20 +231,25 @@ function updatesSection(){
       <div class="actbar"><span class="sp"></span>
         ${h.reboot ? `<button type="button" data-hostreboot="${esc(r.node || "")}">Restart now</button>` : ""}
         <button type="button" data-hostupdate="${esc(r.node || "")}"${r.node && h.pending ? "" : " disabled"}>Apply updates</button></div>`;
-  // The release channel (R179): drawn only where dev may be picked (debug
-  // mode with the dev switch on); everybody else is on the normal channel
-  // and sees no pulldown.
-  const channel = r.dev_ok ? `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
+  // The release channel, on any install (the operator, 2 Nov).
+  const channel = `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}` : ""}. A dev build is not a release: it may not come up, and the slot's fallback is what brings the machine back.` : "Releases alone. The dev channel is here because this controller runs in debug mode with the dev switch on."}</div></div>` : "";
+      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? ", a draft not published yet, seen here with this controller's token for AerieOS's repository" : ""}` : ""}.${
+        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back.` : "Published releases alone. The dev channel takes every dev build as it is published, which may not come up."}</div></div>`;
+  // Debug mode alone: any version, the unpublished ones with the token
+  // (the operator, 2 Nov), older ones too, since a test goes both ways.
+  const pick = r.pick?.length ? `<div class="field"><label class="pick"><span class="pickw">Version</span><select id="relPick" aria-label="the version to install">${
+      r.pick.map(v => `<option value="${esc(v.tag)}">${esc(v.tag)}${v.draft ? " (not published)" : ""}</option>`).join("")}</select></label>
+      <div class="actbar"><span class="sp"></span><button type="button" data-relpick="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.node ? "" : " disabled"}>Install this version</button></div></div>` : "";
   return `<div class="row stack2" data-group="Updates"><div class="grow">
       <div class="sub">This install runs ${runs}; the newest ${r.channel === "dev" ? "on the dev channel" : "release"} is ${(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) ? esc(r.channel === "dev" ? r.newer || r.dev_latest || r.latest : r.latest) : "not known yet"} (${when}${r.error ? `; ${esc(r.error)}` : ""}).</div>
       <div class="sub dim">${how}</div>
       ${channel}
+      ${pick}
       ${host}
-      ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/builderbot-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
+      ${os ? `<div class="field"><label class="pick"><span class="pickw">From a folder here</span><input type="text" id="osFrom" placeholder="/mnt/stick/aerieos-os" autocomplete="off" spellcheck="false"></label></div>` : ""}
       <div class="actbar"><span class="sp"></span>
-        <button type="button" data-relcheck>Check now</button>
+        <button type="button" data-relcheck>Check for updates</button>
         ${os ? `<button type="button" data-osfrom="${esc(r.node || "")}"${r.node ? "" : " disabled"}>Update from the folder</button>` : ""}
         <button type="button" class="primary" data-relupdate="${esc(r.node || "")}" data-os="${os ? "1" : ""}"${r.newer && r.node ? "" : " disabled"}>${r.newer ? `Update to ${esc(r.newer)}` : "Update"}</button></div>
     </div></div>`;
@@ -314,10 +319,22 @@ function moveSection(){
       : ar.from ? `; the old controller is told once it answers${ar.tell_error ? ` (last: ${esc(ar.tell_error)})` : ""}` : "; the old controller named no address, so it learns by asking here"}.${
       (m.not_here || []).length ? ` ${m.not_here.length} node${m.not_here.length === 1 ? " has" : "s have"} not checked in since: the Nodes page gives each its line.` : ""}</div>` : "";
   const sizeMb = m.size ? moveSize(m.size) : "";
-  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle.</div></div>` : "";
+  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle; a USB stick takes it under Controller settings, once its disks are set up.</div></div>` : "";
   const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
+  // A move landed here instead (the operator, 1 Nov): on a fresh controller,
+  // by its owner, from Controller settings, which on a stick is the only way
+  // in, once its disks hold the projects.
+  const ld = m.land || {};
+  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
+      <div class="sub">Moving a controller here instead: give its move token with its address (it hands the bundle over) or the bundle downloaded from it. Its state takes this one's place, this setup account's with it, and you sign in with an account it had.${ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}</div>
+      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
+      <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
+        <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
+      <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
+      ${land}
       ${arrived}
       <div class="sub">To another container, to a machine of its own, or back: Prepare to move arms the move and shows a move token once; from then on every node hears where the controller is going, and follows by itself once the new home answers, however long that takes. The bundle (the state, the stores ticked, the deploy key, the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.</div>
       ${m.prepared ? `<div class="sub">Armed ${esc(ago(m.made_at))} for ${esc(m.to || "an address not named yet")}: ${m.heard} of ${m.nodes} node${m.nodes === 1 ? "" : "s"} ${m.heard === 1 ? "has" : "have"} heard it${m.packed_at ? `; last packed ${esc(ago(m.packed_at))}, ${esc(sizeMb)}` : ""}${stores.length ? `, with ${esc(stores.join(", "))}` : ""}${m.repos ? ", the repositories in it" : ""}${m.carries_key ? ", the install key in it" : ""}.${
@@ -331,6 +348,21 @@ function moveSection(){
     </div></div>`;
 }
 function wireMove(root){
+  root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const tok = ($("landTok")?.value || "").trim(), from = ($("landFrom")?.value || "").trim(), file = $("landFile")?.files?.[0];
+    if (!tok || !(file || from)) return notify("the move token is needed, with the old controller's address or the bundle", true);
+    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
+        {title: "Land the move?", verb: "Land it", danger: true})) return;
+    busy(b, "Landing");
+    const fd = new FormData();
+    fd.append("token", tok);
+    fd.append("from", file ? "" : from);
+    if (file) fd.append("bundle", file, file.name);
+    const j = await (await fetch("/api/move-land", {method: "POST", body: fd})).json().catch(() => ({error: "no answer"}));
+    if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
+    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had`);
+    setTimeout(() => location.assign("/"), 6000);
+  }));
   root.querySelectorAll("[data-moveprep]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Preparing");
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
@@ -429,18 +461,26 @@ function wireUpdates(root){
   }));
   root.querySelectorAll("[data-osfrom]").forEach(b => b.onclick = () => pressing(b, async () => {
     const from = ($("osFrom")?.value || "").trim();
-    if (!from){ notify("name the folder on this machine that holds the release's files", true); return; }
-    if (!await askYes(`Write the image in ${from} into the other slot?\n\nIts files are checked against the sha256 beside each; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
+    if (!from){ notify("name the folder on this machine that holds the release's ISO with its .sha256 and .attestation.jsonl", true); return; }
+    if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
     busy(b, "Updating");
     const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from})).json().catch(() => ({error: "no answer"}));
     notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
   }));
+  root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const tag = $("relPick")?.value;
+    if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
+    busy(b, "Installing");
+    const j = await (await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || j.said || `installing ${tag}: its job is on the Jobs page`, !!j.error);
+    unbusy(b, "Install this version");
+  }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
-      if (!await askYes(`Update this machine to BuilderBot OS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
+      if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
       busy(b, "Updating");
       const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+      notify(j.error || j.said || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
@@ -453,13 +493,13 @@ function reportsSection(){
   const rows = reportsList || [];
   const mayDelete = state?.can?.controller !== false;
   const list = reportsList === null ? `<div class="row stack2"><div class="grow"><div class="sub dim">reading the reports…</div></div></div>`
-    : !rows.length ? `<div class="empty">No reports. A session's <code>bb report</code> and Report a bug in the header land here.</div>`
+    : !rows.length ? `<div class="empty">No reports. A session's <code>aerie report</code> and Report a bug in the header land here.</div>`
     : rows.map(r => `<div class="row repline" data-report="${r.id}"><div class="grow">
         <div class="name">#${r.id} ${esc(r.project || "no project")}<span class="dim"> · ${esc(ago(r.at))} · ${esc(r.by || "")}${r.area ? ` · ${esc(r.area)}` : ""}</span></div>
         <div class="sub reptext">${esc(r.text || "")}</div></div>
         ${mayDelete ? rmIcon(`data-repdel="${r.id}"`, `Delete report ${r.id}`, {title: "take it out: it is not in the diagnostics downloaded after"}) : ""}
       </div>`).join("");
-  return `<div class="field"><div class="hint">What sessions and people reported about BuilderBot. Delete any you do not want in the diagnostics before downloading them.</div></div>
+  return `<div class="field"><div class="hint">What sessions and people reported about AerieOS. Delete any you do not want in the diagnostics before downloading them.</div></div>
     <div class="replist">${list}</div>
     <div class="field"><div class="actbar"><span class="sp"></span>
       <a class="btnish" href="/logs/download?what=diag" download title="the controller's diagnostics as one file, with the reports listed here">Download diagnostics</a>
@@ -483,7 +523,7 @@ async function clearReports(btn){
   const n = reportsList?.length || 0;
   if (!n) return notify("there are no reports to clear");
   const s = n === 1 ? "" : "s";
-  if (!await askYes(`Delete all ${n} report${s} about BuilderBot?`)) return;
+  if (!await askYes(`Delete all ${n} report${s} about AerieOS?`)) return;
   busy(btn, "Clearing");
   try{
     const j = await (await postJSON("/api/reports", {action: "clear"})).json();
@@ -501,7 +541,7 @@ async function clearReports(btn){
 // next start. Drawn from the poll's copy, so a save shows on the next poll.
 // The checks, in the order Controller settings lists them, with what each asks.
 const CHECK_KINDS = [
-  ["release", "A newer BuilderBot", "Asks the releases for a newer version than this install runs, on a bare-metal install; the Update window applies it."],
+  ["release", "A newer AerieOS", "Asks the releases for a newer version than this install runs, on a bare-metal install; the Update window applies it."],
   ["images", "Container images", "Asks each project container's registry for a newer image."],
   ["nginx", "nginx", "Asks the registry for a newer nginx image for the nodes that serve hostnames."],
   ["scanners", "Scanners", "Asks for newer versions of the scanners the nodes run over projects."],
@@ -509,21 +549,21 @@ const CHECK_KINDS = [
 const SETTING_GROUPS = [
   // The apps this controller offers its people (R272 step 3, apps.py): each
   // one on is fetched from the release matching this controller, checked
-  // against its sha256 and offered on its card in the Library (under Build); Look now asks the
+  // against its sha256 and offered on its card in the Library (under Build); Check for updates asks the
   // release again rather than waiting for the daily look.
-  // Update checks on one clock (R176, checks.py): each check BuilderBot
-  // makes by itself, how often, when it last ran, and Check now. A node's
+  // Update checks on one clock (R176, checks.py): each check AerieOS
+  // makes by itself, how often, when it last ran, and Check for updates. A node's
   // own version check is its page's.
   {key: "checks", title: "Update checks", intro: checksIntro, status: checksStatus,
    heading: () => { const c = state?.checks || {}; const off = Object.values(c).filter(x => x.cadence === "off").length;
      return off ? `${off} off` : Object.keys(c).length ? "on" : ""; },
    fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint,
-     options: [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off: only Check now"]]}))},
+     options: [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off: only Check for updates"]]}))},
   // The vetted catalog (R169): where its signed index is read, and a mirror
   // of it imported for a controller that cannot reach it (step 6).
   {key: "catalog", title: "Vetted catalog", intro: catalogIntro, status: catalogStatus,
-   heading: s => `${/aquilaelabs\/builderbot-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
-   fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/builderbot-catalog/main/",
+   heading: s => `${/aquilaelabs\/(aerieos|builderbot)-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
+   fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/",
      hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"}]},
   {key: "apps", title: "Apps", off: "apps", intro: appsIntro, status: appsStatus,
    heading: s => `${["apps_android", ...(s?.settings?.offer_unvetted?.value ? ["apps_vscode", "apps_companion"] : [])]
@@ -578,7 +618,7 @@ const SETTING_GROUPS = [
    headingCls: s => s?.settings?.smtp_host?.value ? "ok" : "",
    fields: [
     {key: "smtp_host", label: "SMTP server", type: "text", placeholder: "smtp.example.com",
-     hint: "The server BuilderBot sends mail through, for a person who asked for the bell by email on their Profile. Nothing is sent until one is set."},
+     hint: "The server AerieOS sends mail through, for a person who asked for the bell by email on their Profile. Nothing is sent until one is set."},
     {key: "smtp_port", label: "Port", type: "text", placeholder: "587",
      hint: "Empty takes 587 with STARTTLS and 465 with TLS."},
     {key: "smtp_security", label: "Security", type: "select",
@@ -588,7 +628,7 @@ const SETTING_GROUPS = [
      hint: "Empty sends without signing in, which a server on this network may allow."},
     {key: "smtp_password", label: "Password", type: "secret",
      hint: "Kept sealed under the install key, as the tokens are."},
-    {key: "smtp_from", label: "From", type: "text", placeholder: "BuilderBot <builderbot@example.com>",
+    {key: "smtp_from", label: "From", type: "text", placeholder: "AerieOS <builderbot@example.com>",
      hint: "The address the mail is from; the sign-in name when empty."}]},
   // The room a node keeps for itself (R110): the numbers the bell, the
   // build gate, a rebuild's check and the hourly prune go by, and a memory
@@ -613,6 +653,14 @@ const SETTING_GROUPS = [
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
      hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, projects, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
+  // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
+  // token that may read AerieOS's repository, with which the dev channel and
+  // the version picker see the drafts not published yet.
+  {key: "drafts", title: "Unpublished builds", debug: true,
+   heading: s => s?.settings?.release_token?.set ? "token set" : "no token",
+   fields: [
+    {key: "release_token", label: "GitHub token", type: "secret",
+     hint: "A personal access token that may read AerieOS's repository (contents, read). With it, and the dev channel picked under Updates, this controller also sees the builds not published yet, and Update on AerieOS fetches one's files with it and takes the update from them, checked as a folder's are. Kept sealed here, never shown again, and cleared at any start out of debug mode."}]},
   // The update window (R160 step 4): a newer release applied by itself at
   // the hour named, daily or one weekday; off by default, so nothing moves
   // the install without a press or this choice.
@@ -622,14 +670,16 @@ const SETTING_GROUPS = [
     {key: "update_window", label: "Apply a newer release", type: "select",
      options: [["", "never by itself: Update under Updates is the press"], ["daily", "daily, at the hour below"],
                ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]],
-     hint: "In the window the newest release is applied the way Update does it: the image into the other slot on BuilderBot OS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
-    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"}]},
+     hint: "In the window the newest release is applied the way Update does it: the image into the other slot on AerieOS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
+    {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"},
+    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number",
+     hint: "AerieOS: each version an update replaces stays on the machine, about 2 GB each, bootable from the menu's Older versions. 0 keeps none."}]},
   {key: "maint", title: "Maintenance", can: "maintenance",
    heading: s => s?.settings?.maintenance_mode?.value ? "on" : "off",
    headingCls: s => s?.settings?.maintenance_mode?.value ? "warn" : "",
    fields: [
     {key: "maintenance_mode", label: "Maintenance mode", type: "bool",
-     hint: "Only you can sign in and use BuilderBot, from the page, a phone or a session. Everybody else is told it is down for maintenance and stays signed in for after; their sessions and terminals are ended when it goes on, which it asks about first. Nodes keep running."}]},
+     hint: "Only you can sign in and use AerieOS, from the page, a phone or a session. Everybody else is told it is down for maintenance and stays signed in for after; their sessions and terminals are ended when it goes on, which it asks about first. Nodes keep running."}]},
 ];
 
 // Turning maintenance mode on: who is kept out, and the sessions and
@@ -665,12 +715,12 @@ function connectionStatus(s){
   return t.on ? (t.key_sealed ? "applies at once; the private key is sealed under the install key" : "applies at once; the private key is kept open until the install has a key") : "applies at once";
 }
 
-// What the Apps section holds, over its switches, and Look now.
+// What the Apps section holds, over its switches, and Check for updates.
 function checksIntro(){
   const c = state?.checks || {};
   return `<div class="field">${CHECK_KINDS.filter(([k]) => c[k]).map(([k, label]) =>
     `<div class="row stack2 ckrow"><div class="grow"><span class="name">${esc(label)}</span> <span class="sub dim">${c[k].at ? `checked ${esc(ago(c[k].at))}` : "not checked yet"}</span></div>
-      <button type="button" data-checknow="${esc(k)}">Check now</button></div>`).join("")}</div>`;
+      <button type="button" data-checknow="${esc(k)}">Check for updates</button></div>`).join("")}</div>`;
 }
 function checksStatus(){
   const c = state?.checks || {};
@@ -690,7 +740,7 @@ function wireChecks(root){
 // tools/catalog-mirror.py made on a machine with the network.
 function catalogIntro(s){
   const m = s?.catalog_mirror;
-  return `<div class="sub">The Library lists the packs and apps BuilderBot's maintainers reviewed, from the index at this address. A controller that cannot reach it imports a mirror instead: <code>tools/catalog-mirror.py</code> makes one on a machine with the network, and the Library then installs from it with nothing fetched.</div>
+  return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the index at this address. A controller that cannot reach it imports a mirror instead: <code>tools/catalog-mirror.py</code> makes one on a machine with the network, and the Library then installs from it with nothing fetched.</div>
     <div class="field">${m
       ? `<div class="row stack2"><div class="grow"><span class="name">Mirror</span> <span class="sub">${m.packs} entr${m.packs === 1 ? "y" : "ies"} from ${m.repos} repositor${m.repos === 1 ? "y" : "ies"}, made ${esc(m.generated || "at an unknown time")}, imported ${esc(ago(m.imported_at))}</span></div>
           <button type="button" data-mirrorforget>Forget</button></div>`
@@ -731,7 +781,7 @@ function wireCatalogMirror(root){
 function appsIntro(){
   return `<div class="sub">Each one on is fetched from the release that matches this controller, checked, and offered on the ${
     pageLink("library", "Library")}, under For you, for your people to download and keep current.</div>
-    <div class="addbar ctlrow"><button type="button" id="setAppsCheck"${devApps?.checking ? " disabled" : ""}>${devApps?.checking ? "Looking…" : "Look now"}</button></div>`;
+    <div class="addbar ctlrow"><button type="button" id="setAppsCheck"${devApps?.checking ? " disabled" : ""}>${devApps?.checking ? "Checking…" : "Check for updates"}</button></div>`;
 }
 // ...and its line: what it holds, from which release, when it looked.
 function appsStatus(){
@@ -785,7 +835,7 @@ function tunnelNodes(){
 // in a box under the button, and the red verb asleep until it matches.
 // What it moves aside is said once more here, since the thing a person
 // regrets is the thing they did not read.
-// Reset BuilderBot (the operator, 12 Oct): a dialog that offers to
+// Reset AerieOS (the operator, 12 Oct): a dialog that offers to
 // un-enroll every node first, so each machine is clean to enroll again
 // afterwards, then the typed word. The controller uninstalls each and waits
 // for every one to report before anything is moved (server._reset_after),
@@ -812,11 +862,11 @@ async function askReset(){
     </div>
     ${list.length ? `<div class="field">
       <label class="lbl">Un-enroll first</label>
-      <div class="hint">So each machine can be enrolled again afterwards. One BuilderBot set up is uninstalled from; any other is removed here only.</div>
+      <div class="hint">So each machine can be enrolled again afterwards. One AerieOS set up is uninstalled from; any other is removed here only.</div>
       ${unenrollWhat(true)}
       ${list.map(n => { const busy = resetBusy(n), clean = !!(n.live && n.reported?.sandbox); return `
         <label class="ndcap"><input type="checkbox" data-rsnode="${esc(n.id)}"${busy ? " disabled" : " checked"}> ${esc(n.name)}: ${
-          clean ? "uninstall BuilderBot from it" : "remove it here; the machine keeps BuilderBot until <code>sudo bb-sandbox uninstall</code> there"}${
+          clean ? "uninstall AerieOS from it" : "remove it here; the machine keeps AerieOS until <code>sudo bb-sandbox uninstall</code> there"}${
           busy ? `<div class="hint bad">${esc(busy)}: end and bring them down first, or it stays enrolled</div>` : ""}</label>`; }).join("")}
       <label class="ndcap"><input type="checkbox" id="resetStores"> Also delete the stores on their disks: the toolchains, the caches, the artifacts</label>
     </div>` : ""}
@@ -900,7 +950,7 @@ function settingsSections(){
   const offSect = offs.length ? [{key: "off", title: "Switched off", status: String(offs.length), cls: "",
     html: `<div class="row stack2"><div class="grow"><div class="sub">Set where this container starts (FEATURES_OFF), so nothing here turns them back on.</div>${
       offs.map(w => `<div class="setrow">${esc(w)}</div>`).join("")}</div></div>`}] : [];
-  return offSect.concat(SETTING_GROUPS.filter(g => !g.can || state?.can?.[g.can]).map(g => {
+  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)).map(g => {
     const field = f => {
             const v = s.settings[f.key]?.value;
             const id = "set_" + f.key;

@@ -1,4 +1,4 @@
-"""Behind `bb roadmap` (cmd_roadmap in bb): the shared to-do list from a
+"""Behind `aerie roadmap` (cmd_roadmap in bb): the shared to-do list from a
 session's side, read and written through dashboard/roadmap.py, the module
 the dashboard writes it with, so a list edited from a phone and a list
 edited from a terminal cannot disagree.
@@ -56,7 +56,7 @@ def held_line(r, what="it"):
     h = r["held"]
     tag = R(h["number"]) if h.get("number") is not None else "it"
     return (f"held for approval as {tag}; {what} lands on the roadmap when the "
-            "operator approves it on the notebook. `bb roadmap pending` lists "
+            "operator approves it on the notebook. `aerie roadmap pending` lists "
             "what is waiting; you are told on a later turn what they decided")
 
 
@@ -72,7 +72,7 @@ def behind(n, verb, args, summary):
         return False
     if verb is None:
         print(f"[builderbot] ERROR: {R(n)} is still waiting for the operator's "
-              "approval; there is nothing to change yet. `bb roadmap pending`",
+              "approval; there is nothing to change yet. `aerie roadmap pending`",
               file=sys.stderr)
         sys.exit(1)
     r = pending.hold(proj, "roadmap", verb, args, summary, number=n, after=rec["id"])
@@ -89,7 +89,7 @@ def R(n):
 def ident(word):
     """The item a verb was given, checked before anything is looked up.
 
-    `bb roadmap done 12` and `bb roadmap done R12` both work; `bb roadmap
+    `aerie roadmap done 12` and `aerie roadmap done R12` both work; `aerie roadmap
     done B12` stops here with a sentence saying B12 is a bug: the letter is
     a check, not decoration (ids.py). The number goes on as an int so every
     module call and every message below prints it the same way.
@@ -107,7 +107,7 @@ def ident(word):
 
 def show(target=None):
     rows = roadmap.items(proj)
-    # `bb roadmap --target 0.6.0`: the items meant for one release, and
+    # `aerie roadmap --target 0.6.0`: the items meant for one release, and
     # `--target none` the ones meant for none yet.
     # An item is for a release by its own target or by any step's (R108).
     want = None if target is None else (target.lstrip("vV") if target.lower() != "none" else "")
@@ -120,7 +120,7 @@ def show(target=None):
     if b:
         print(f"  [batch open: {b['changes']} change"
               f"{'' if b['changes'] == 1 else 's'} unrecorded across this "
-              "notebook; bb roadmap commit, or revert]")
+              "notebook; aerie roadmap commit, or revert]")
     if not rows:
         print(f"nothing on {proj}'s list")
         return
@@ -153,7 +153,7 @@ def bail(r):
 
 # Which seat this session sits in, for the two questions roadmap #26 and #27
 # both need answered: has this list moved since I last looked at it, and was
-# it me who moved it. Empty for a bb run from a plain shell, which then does
+# it me who moved it. Empty for a aerie run from a plain shell, which then does
 # no check, because there is nothing to check against.
 _who = os.environ.get("BB_ACCOUNT_UID", "")
 
@@ -173,7 +173,7 @@ def fresh():
     """
     if roadmap.stale(proj, _who):
         print("[builderbot] ERROR: the roadmap has changed since you last read "
-              "it; run `bb roadmap` and make this change against what it says "
+              "it; run `aerie roadmap` and make this change against what it says "
               "now", file=sys.stderr)
         sys.exit(2)
 
@@ -182,7 +182,7 @@ if op in ("list", "ls", "--target"):
     if op == "--target" or "--target" in rest:
         at = rest if op == "--target" else rest[rest.index("--target") + 1:]
         if not at:
-            print("usage: bb roadmap --target X.Y.Z|none", file=sys.stderr); sys.exit(1)
+            print("usage: aerie roadmap --target X.Y.Z|none", file=sys.stderr); sys.exit(1)
         if fmt != "text":
             want = at[0].lstrip("vV") if at[0].lower() != "none" else ""
             rows = roadmap.items(proj)
@@ -199,9 +199,9 @@ if op in ("list", "ls", "--target"):
 elif op == "show":
     # One item in full: its details, its steps and theirs. `list` cannot carry
     # this without becoming unreadable, and a session working item N wants
-    # exactly N, the same reason `bb bug show` exists.
+    # exactly N, the same reason `aerie bug show` exists.
     if not rest:
-        print("usage: bb roadmap show <n>[.<step>] [<step>]", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap show <n>[.<step>] [<step>]", file=sys.stderr); sys.exit(1)
     # One step by the number it was first given (R168): `show R56.9` or
     # `show R56 9` finds it wherever it is now, moved, split away or not.
     head, _, dot = rest[0].partition(".")
@@ -261,7 +261,7 @@ elif op == "show":
 elif op == "--prompt":
     sys.stdout.write(roadmap.prompt(proj))
 elif op == "add" and "--from" in rest:
-    # Records from a file (R167): `bb roadmap add --from FILE` (or `-` for
+    # Records from a file (R167): `aerie roadmap add --from FILE` (or `-` for
     # stdin) adds each as one item with its steps, details and target, in
     # any of the formats bb prints; a record's id is ignored, since a new
     # item takes the next number.
@@ -290,21 +290,28 @@ elif op == "add" and "--from" in rest:
                 bail(roadmap.set_step_target(proj, nid, i, str(st["target"]), by="claude", who=_who))
         print(f"added {R(nid)}: {r['item']['text']}" + (f" ({len(steps)} steps)" if steps else ""))
 elif op == "apply":
-    # An edited show back (R167): `bb roadmap show N --format yaml > f`,
-    # edit, `bb roadmap apply f`. Each record's words, details and target,
+    # An edited show back (R167): `aerie roadmap show N --format yaml > f`,
+    # edit, `aerie roadmap apply f`. Each record's words, details and target,
     # and each step's by its id, are written where they differ; a step
     # with no id is added; nothing is removed. Refused when the list moved
     # since the document was printed (its as_of), so an edit never lands
     # on words it did not see.
     if not rest:
-        print("usage: bb roadmap apply FILE|-", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap apply FILE|-", file=sys.stderr); sys.exit(1)
+    # Relayed, it runs on the controller: a file is the project's own, never
+    # one of the controller's (its parse error would show what it held).
+    if rest[0] != "-" and os.environ.get("BB_RELAYED"):
+        real, top = os.path.realpath(rest[0]), os.path.realpath(os.getcwd())
+        if not real.startswith(top + os.sep):
+            print(f"[builderbot] ERROR: {rest[0]} is not a file in this project: give one inside it, or - for stdin",
+                  file=sys.stderr); sys.exit(1)
     try:
         doc = records.load(sys.stdin.read() if rest[0] == "-" else open(rest[0], encoding="utf-8").read())
     except (OSError, ValueError) as e:
         print(f"[builderbot] ERROR: {rest[0]}: {e}", file=sys.stderr); sys.exit(1)
     if doc.get("as_of") is not None and int(doc["as_of"]) != int(as_of_now()):
         print("[builderbot] ERROR: the roadmap has changed since this was printed: print it again "
-              "(bb roadmap show N --format ...) and make the edit against what it says now", file=sys.stderr)
+              "(aerie roadmap show N --format ...) and make the edit against what it says now", file=sys.stderr)
         sys.exit(2)
     fresh()
     try:
@@ -324,7 +331,7 @@ elif op == "apply":
         bail(roadmap.add_step(proj, rid, text, by="claude", who=_who))
     print(f"applied: {len(changes)} field{'' if len(changes) == 1 else 's'} changed, {len(adds)} step{'' if len(adds) == 1 else 's'} added")
 elif op == "add":
-    # `bb roadmap add "title" --step "..." --step "..."`: a change that needs
+    # `aerie roadmap add "title" --step "..." --step "..."`: a change that needs
     # things done in an order is one item with steps, not several items that
     # can be handed over backwards.
     words, steps, target, i = [], [], "", 0
@@ -337,7 +344,7 @@ elif op == "add":
             target = rest[i + 1]; i += 2
         elif rest[i] == "--step":
             # A dangling --step used to fall through and become part of the
-            # title, so `bb roadmap add "x" --step` quietly made an item called
+            # title, so `aerie roadmap add "x" --step` quietly made an item called
             # "x --step" instead of saying what was missing.
             if i + 1 >= len(rest):
                 print("[builderbot] ERROR: --step needs the step after it",
@@ -359,7 +366,7 @@ elif op == "done":
     # find out what is left, so nothing finished stays on it, and the history
     # is where the words live afterwards.
     if not rest:
-        print("usage: bb roadmap done <n>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap done <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None); fresh()
     r = roadmap.tick(proj, n, by="claude", who=_who); bail(r)
     print(f"done {R(n)}: {r['item']['text']}")
@@ -369,16 +376,16 @@ elif op in ("rm", "remove"):
     # history (`restore`, or the panel's Put back), and a note saying why it
     # went is what stops that happening by mistake.
     if not rest:
-        print("usage: bb roadmap rm <n> [\"why it is going\"]", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap rm <n> [\"why it is going\"]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None); fresh()
     r = roadmap.remove(proj, n, by="claude", why=" ".join(rest[1:]),
                     who=_who); bail(r)
-    print(f"removed {R(n)}; bb roadmap restore {R(n)} puts it back")
+    print(f"removed {R(n)}; aerie roadmap restore {R(n)} puts it back")
 elif op == "restore":
     # The other half of rm: the dropped row comes back from the history as it
     # was, steps and details and all, under its own number.
     if not rest:
-        print("usage: bb roadmap restore <n>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap restore <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); fresh()
     r = roadmap.restore(proj, n, by="claude", who=_who); bail(r)
     print(f"put back {R(n)}: {r['item']['text']}")
@@ -386,7 +393,7 @@ elif op == "reopen":
     # A finished item back on the list, steps and details and all: more work
     # found on it is its own step, not a new item naming the old one.
     if not rest:
-        print("usage: bb roadmap reopen <n>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap reopen <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); fresh()
     r = roadmap.reopen(proj, n, by="claude", who=_who); bail(r)
     print(f"reopened {R(n)}: {r['item']['text']}")
@@ -418,7 +425,7 @@ elif op in ("mv", "move"):
     # item under it, and deleting and retyping to express that loses the words
     # and the record both.
     if len(rest) < 2 or rest[1] not in ("up", "down"):
-        print("usage: bb roadmap mv <n> up|down", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap mv <n> up|down", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None)
     r = roadmap.move(proj, n, dir=-1 if rest[1] == "up" else 1, by="claude",
                   who=_who)
@@ -426,10 +433,10 @@ elif op in ("mv", "move"):
     print(f"moved {R(n)} {rest[1]}")
 elif op == "target":
     # The release an item is meant to ship in (the operator, 21 Oct):
-    # `bb roadmap target N 0.6.0`, and `none` takes it off.
-    # One step's (R108): `bb roadmap target N.M X.Y.Z` or `target N M X.Y.Z`,
+    # `aerie roadmap target N 0.6.0`, and `none` takes it off.
+    # One step's (R108): `aerie roadmap target N.M X.Y.Z` or `target N M X.Y.Z`,
     # and `none` sends the step back to its item's release.
-    usage = "usage: bb roadmap target <n>[.<step>] [<step>] X.Y.Z|none"
+    usage = "usage: aerie roadmap target <n>[.<step>] [<step>] X.Y.Z|none"
     if len(rest) < 2:
         print(usage, file=sys.stderr); sys.exit(1)
     head, _, dot = rest[0].partition(".")
@@ -461,17 +468,17 @@ elif op == "shelve":
     # *off* is reversing a decision the operator made for reasons the session
     # was not told, so it is theirs, and one tap in the panel.
     if not rest:
-        print("usage: bb roadmap shelve <n>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap shelve <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None)
     r = roadmap.shelve(proj, n, True, by="claude", who=_who); bail(r)
-    print(f"shelved {R(n)}; say in your reply why. `bb roadmap unshelve {R(n)} WHY` asks for it back")
+    print(f"shelved {R(n)}; say in your reply why. `aerie roadmap unshelve {R(n)} WHY` asks for it back")
 elif op == "unshelve":
     # The other direction is a request, not a change (R78): taking one off
     # the shelf reverses a decision the operator made for reasons the session
     # was not told, so it is held with the reason for a person on the
     # project, whatever the gate says, and lands when they approve it.
     if not rest:
-        print("usage: bb roadmap unshelve <n> [WHY]", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap unshelve <n> [WHY]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0])
     r = roadmap.shelve(proj, n, False, by="claude", who=_who,
                        why=" ".join(rest[1:]).strip()); bail(r)
@@ -486,7 +493,7 @@ elif op == "edit":
     # Correcting it is better than working around it, and the history keeps
     # what it used to say.
     if len(rest) < 2:
-        print("usage: bb roadmap edit <n> \"the new wording\"", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap edit <n> \"the new wording\"", file=sys.stderr); sys.exit(1)
     n = ident(rest[0])
     if behind(n, "edit", {"item_id": n, "text": " ".join(rest[1:]), "who": _who},
               f"reword {R(n)}: {' '.join(rest[1:])}"):
@@ -496,15 +503,15 @@ elif op == "edit":
     print(f"reworded {R(n)}")
 elif op == "info":
     # The technical half, attached where the work is: which files, which
-    # functions, the approach. `bb roadmap info N "..."` for an item,
-    # `bb roadmap info N M "..."` for step M of it; "" clears. Attached is
+    # functions, the approach. `aerie roadmap info N "..."` for an item,
+    # `aerie roadmap info N M "..."` for step M of it; "" clears. Attached is
     # added to (B817): the text goes in as a new paragraph under what is
     # there, and --replace sets the details outright; replacing them was
     # how a status note wiped four items' details in one pass.
     replace = "--replace" in rest
     rest = [w for w in rest if w != "--replace"]
     if len(rest) < 2:
-        print("usage: bb roadmap info <n> [<step>] \"...\" [--replace]", file=sys.stderr)
+        print("usage: aerie roadmap info <n> [<step>] \"...\" [--replace]", file=sys.stderr)
         sys.exit(1)
     item = ident(rest[0])
 
@@ -619,7 +626,7 @@ elif op == "step":
         behind(item, None, None, None); behind(to, None, None, None); fresh()
         r = roadmap.step_mv(proj, item, step_index(srest[1]), to, position=pos, by="claude", who=_who); bail(r)
         print(f"moved step {srest[1]} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
-              f"bb roadmap show {R(item)}.{srest[1]} still finds it")
+              f"aerie roadmap show {R(item)}.{srest[1]} still finds it")
     elif sub in ("mv", "move") and len(srest) >= 2 and "." in srest[0]:
         head, _, dot = srest[0].partition(".")
         item, to = ident(head), ident(srest[1])
@@ -627,7 +634,7 @@ elif op == "step":
         behind(item, None, None, None); behind(to, None, None, None); fresh()
         r = roadmap.step_mv(proj, item, step_index(dot), to, position=pos, by="claude", who=_who); bail(r)
         print(f"moved step {dot} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
-              f"bb roadmap show {R(item)}.{dot} still finds it")
+              f"aerie roadmap show {R(item)}.{dot} still finds it")
     elif sub in ("mv", "move") and len(srest) >= 3 and srest[2] in ("up", "down"):
         # The other half of restructuring a plan. Without it a session that
         # finds two steps in the wrong order can only delete and retype them,
@@ -639,19 +646,19 @@ elif op == "step":
                       who=_who); bail(r)
         print(f"moved step {srest[1]} of {R(item)} {srest[2]}")
     else:
-        print("usage: bb roadmap step add <n> \"...\" | step edit <n> <step> \"...\""
+        print("usage: aerie roadmap step add <n> \"...\" | step edit <n> <step> \"...\""
               " | step rm <n> <step> [\"why\"] | step mv <n> <step> up|down"
               " | step mv <n> <step> <to> [<position>]"
               " | step done <n> <step> [\"note\"] | step undone <n> <step> [\"why\"]",
               file=sys.stderr)
         sys.exit(1)
 elif op == "split":
-    # An item's steps into new items, one change (R168): `bb roadmap split
+    # An item's steps into new items, one change (R168): `aerie roadmap split
     # N --into "TITLE" 3 4 5 --into "TITLE" 7`; each new item carries
     # those steps whole and points back at N's details. Under the roadmap
     # gate as an add is: a session's may be held.
     if not rest:
-        print("usage: bb roadmap split <n> --into \"TITLE\" <step>... [--target X.Y.Z] [--into ...]", file=sys.stderr)
+        print("usage: aerie roadmap split <n> --into \"TITLE\" <step>... [--target X.Y.Z] [--into ...]", file=sys.stderr)
         sys.exit(1)
     n = ident(rest[0]); groups, cur, i = [], None, 1
     while i < len(rest):
@@ -675,19 +682,19 @@ elif op == "split":
         print(f"added {R(made['id'])}: {made['text']} ({len(made['steps'])} steps)")
     left = len(r["item"].get("steps") or [])
     print(f"{R(n)} keeps {left} step{'' if left == 1 else 's'} and says where each went; "
-          f"bb roadmap show {R(n)}.N finds a step by its old number")
+          f"aerie roadmap show {R(n)}.N finds a step by its old number")
 elif op == "fold":
-    # One item into another (R168): `bb roadmap fold N INTO M` makes N a
+    # One item into another (R168): `aerie roadmap fold N INTO M` makes N a
     # step of M, its steps following; `fold N INTO M.K` adds N's words to
     # step K's details and puts its steps after it. N leaves the list with
     # where it went, and restore brings it back.
     if len(rest) < 3 or rest[1].upper() != "INTO":
-        print("usage: bb roadmap fold <n> INTO <m>[.<step>] [\"why\"]", file=sys.stderr); sys.exit(1)
+        print("usage: aerie roadmap fold <n> INTO <m>[.<step>] [\"why\"]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); head, _, dot = rest[2].partition("."); m = ident(head)
     behind(n, None, None, None); behind(m, None, None, None); fresh()
     r = roadmap.fold(proj, n, m, into_step=(int(dot) - 1 if dot.isdigit() and int(dot) >= 1 else None),
                      by="claude", who=_who, why=" ".join(rest[3:])); bail(r)
-    print(f"folded {R(n)} into {R(m)} step {r['folded'][1]}; bb roadmap restore {R(n)} undoes it")
+    print(f"folded {R(n)} into {R(m)} step {r['folded'][1]}; aerie roadmap restore {R(n)} undoes it")
 elif op == "refs":
     # The list's own words checked (R168): every R number and step they
     # name that no longer finds anything, and a moved one's place now.
@@ -741,7 +748,7 @@ elif op in ("history", "log"):
         elif a in ("--find", "-f") and i + 1 < len(rest):
             find = rest[i + 1]; i += 2
         else:
-            print("usage: bb roadmap history [-n N|--all] [--since 7d|YYYY-MM-DD] "
+            print("usage: aerie roadmap history [-n N|--all] [--since 7d|YYYY-MM-DD] "
                   "[--find TEXT]", file=sys.stderr)
             sys.exit(1)
     h = roadmap.history(proj, limit=limit, since=since, find=find)
@@ -759,13 +766,13 @@ elif op in ("history", "log"):
         if e.get("approved"):
             print(f"{'':>32}approved by the operator")
 else:
-    # `bb bug note` has a twin here under another name; a session reaching
+    # `aerie bug note` has a twin here under another name; a session reaching
     # for it met the whole usage line (MediaReducer, 7 Oct).
     if op == "note":
         print("[builderbot] ERROR: a roadmap item's notes are its details: "
-              "bb roadmap info N [STEP] TEXT", file=sys.stderr)
+              "aerie roadmap info N [STEP] TEXT", file=sys.stderr)
         sys.exit(1)
-    print("usage: bb roadmap [list|show N|add TEXT [--step ...]|edit N TEXT|"
+    print("usage: aerie roadmap [list|show N|add TEXT [--step ...]|edit N TEXT|"
           "info N [M] TEXT|step add|edit|rm|mv|done|undone|info ...|mv N up|down|done N|"
           "rm N [WHY]|restore N|reopen N|shelve N|unshelve N [WHY]|begin|commit|revert|pending|"
           "history [-n N] [--since D] [--find TEXT]]",

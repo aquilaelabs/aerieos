@@ -6,7 +6,7 @@ Markdown, and reading each back in. A document is
     {"format": 1, "kind": "roadmap", "project": NAME, "as_of": REV, "records": [...]}
 
 its `format` moving when the shape does, so a reader can tell; `as_of` is
-the list's revision when it was printed, which `bb roadmap apply` checks
+the list's revision when it was printed, which `aerie roadmap apply` checks
 before writing an edited record back. The text form each verb prints today
 is not here: that stays each verb's own, and `--format text` is it.
 
@@ -223,7 +223,7 @@ def _md_load(text):
 # ---- what each verb hands over ------------------------------------------------
 
 def apply_plan(doc, rows):
-    """What `bb roadmap apply` would change, record by record, against the
+    """What `aerie roadmap apply` would change, record by record, against the
     rows as they stand: [(id, field, step index or None, new value)], and
     the steps to add as (id, text). Nothing is ever removed by an apply."""
     changes, adds = [], []
@@ -232,7 +232,7 @@ def apply_plan(doc, rows):
         rid = rec.get("id")
         row = by_id.get(int(rid)) if rid is not None else None
         if row is None:
-            raise ValueError(f"no open item R{rid} to apply to" if rid is not None else "a record with no id: bb roadmap add --from adds new ones")
+            raise ValueError(f"no open item R{rid} to apply to" if rid is not None else "a record with no id: aerie roadmap add --from adds new ones")
         for k in ("text", "info", "target"):
             if k in rec and (rec.get(k) or "") != (row.get(k) or ""):
                 changes.append((row["id"], k, None, rec.get(k) or ""))

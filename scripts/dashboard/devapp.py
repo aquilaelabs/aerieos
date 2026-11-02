@@ -30,7 +30,7 @@ with the old values preserved in comments, and leaves Up for the operator:
 starting a service against an env it is known to be missing would just be a
 crash with extra steps.
 
-**BuilderBot itself is NOT excluded**, and the reason is worth a line: its
+**AerieOS itself is NOT excluded**, and the reason is worth a line: its
 dev instance is a second container from the same compose file, on another
 machine, so building or bouncing it never touches the container this dashboard
 is running in, whose lifecycle belongs to the host. The first cut excluded it on
@@ -46,7 +46,7 @@ State: /config/devapps.json ({project: built_rev/built_at}), the env files in
 Since 25 Sep this file is the BASE: the store, the node block, the docker
 runner, the compose-file readers, the risks and the env files. The layer that
 runs and reports an instance (up, down, rebuild, test, remove, state, the
-job runners and act) is devactions.py, and the containers BuilderBot did not
+job runners and act) is devactions.py, and the containers AerieOS did not
 build are containers.py; both import this module, which knows neither.
 """
 import contextlib
@@ -103,7 +103,7 @@ RUN_DENIED = ("running this project's containers is the operator's: rebuilding, 
               "one are handed over in the project's settings, Agents may: Run its container")
 
 MAIN = "main"
-# The owner of a container BuilderBot deploys itself (R180): the nginx tab's
+# The owner of a container AerieOS deploys itself (R180): the nginx tab's
 # container is the one today. Set by the deployment that writes it and by
 # nothing else, not a person's picker and not a session, and given every
 # bridge and every published port on its node by the containers' network
@@ -123,7 +123,7 @@ def _slug(s):
 DEVDATA = os.environ.get("BB_DEV_DATA_DIR", "/devdata")
 # Injected rather than worked out here: three readers already answer "where do
 # the logs live" and a fourth copy of that rule is how they drift. None when
-# nothing injected one: `bb doctor` loads this module on its own to ask
+# nothing injected one: `aerie doctor` loads this module on its own to ask
 # available(), and a probe should not start writing files.
 log_dir = None
 project_node = None   # the project's own node, from prefs (docs/nodes.md §13)
@@ -141,7 +141,7 @@ node_paths = None     # a node's path mapping, from its record (docs/nodes.md §
 # than half-working.
 #
 # One arrangement because the boundary is the machine: reached over ssh with a
-# key BuilderBot cannot read, holding nothing anybody minds losing. Aim the
+# key AerieOS cannot read, holding nothing anybody minds losing. Aim the
 # same feature at a daemon worth protecting and it needs a filter in front of
 # it, and a filter that can be got wrong is not a boundary.
 
@@ -214,7 +214,7 @@ def project_daemon(project):
 def container_nodes(project):
     """Every node this project's containers may be on, its own first: the
     nodes it works on (R82), the ones it hosts its containers on (R166), and
-    the node each of its instances was put on, which bb devapp new --node
+    the node each of its instances was put on, which aerie devapp new --node
     makes one of neither. The one answer a session's container list, its
     container verbs and an instance's address all read: asking the
     project's own node alone left an instance on a hosting node unlisted
@@ -441,7 +441,7 @@ _rev = 0
 # daemon addressed. What that replaced was a module-global one-slot job dict
 # that held the whole dashboard to one build at a time and died with the
 # process; the row now reads its job from the store, a second instance's
-# build waits its turn instead of being refused, and a build BuilderBot
+# build waits its turn instead of being refused, and a build AerieOS
 # restarted under is failed as lost with that written on it. `queue` is
 # nodes.py, bound by configure(); without one (a module test) the actions
 # refuse rather than invent a job.
@@ -502,6 +502,25 @@ def _published(ports, local=False):
     return sorted(set(loop)) if local else sorted(set(out) | set(loop))
 
 
+# A node's nginx routes, handed in by server.py: {host, path, port, tls, ...}.
+nginx_routes = None
+
+
+def routes_to(node_id, ports):
+    """The node's nginx routes that go to one of these published ports, as
+    "host/path" with the port and whether 443 serves it (report #130): what a
+    container's row says, and what a remove warns of."""
+    if nginx_routes is None or not node_id:
+        return []
+    want = set(ports or [])
+    out = []
+    for r in nginx_routes(node_id) or []:
+        if int(r.get("port") or 0) in want:
+            where = str(r.get("host") or "") + ("" if str(r.get("path") or "/") == "/" else str(r["path"]))
+            out.append({"where": where, "port": int(r["port"]), "tls": r.get("tls") is not False})
+    return out
+
+
 def route_view(project, instance, ports, prefer=None):
     """The instance's route as the row draws it: the mode and port on the
     record (lan on the first published port when nothing was chosen), the
@@ -517,6 +536,7 @@ def route_view(project, instance, ports, prefer=None):
     n = queue.node(nid) if queue is not None and nid else None
     out = {"mode": mode, "port": port, "ports": pub, "url": "", "ready": False, "why": "",
            "funnel_ok": False}
+    out["routes"] = routes_to(nid, _published(ports, local=True) + pub)
     if n:
         ts = ((n.get("reported") or {}).get("services") or {}).get("tailscale") or {}
         out["funnel_ok"] = bool(n["kind"] == "agent" and ts.get("installed")
@@ -528,6 +548,8 @@ def route_view(project, instance, ports, prefer=None):
         if port in _published(ports, local=True) and port not in _published([p for p in ports or [] if not (
                 isinstance(p, str) and p.split("->", 1)[0].rpartition(":")[0].startswith("127."))]):
             out["why"] = f"published on the node alone (127.0.0.1:{port}): its nginx answers for it"
+            names = ", ".join(r["where"] for r in out["routes"] if r["port"] == port)
+            out["why"] += f", at {names}" if names else ", and no route on it goes here yet"
         elif host and port:
             out["url"] = f"http://{host}:{port}/"
             out["ready"] = port in pub
@@ -932,7 +954,7 @@ def _available_agent(n):
                        "docker group"} | source()
     if not rep.get("sandbox"):
         return {"on": False,
-                "why": f"{n['name']} is not a BuilderBot sandbox: it does "
+                "why": f"{n['name']} is not an AerieOS sandbox: it does "
                        "not report the provisioner's stamp, and a container "
                        "here runs as root on that machine. Run "
                        "nodes/provision-linux.sh on it (again is fine, it "
@@ -1001,7 +1023,7 @@ def available():
                        + info["error"]} | source()
     if not is_sandbox(info["labels"]):
         return {"on": False,
-                "why": "this daemon is not a BuilderBot sandbox: it carries no "
+                "why": "this daemon is not an AerieOS sandbox: it carries no "
                        f"{SANDBOX_LABEL} label. Run nodes/provision-linux.sh on the VM "
                        "(again is fine, it only adds what is missing); see "
                        "docs/sandbox-vm.md"} | source()
@@ -1134,7 +1156,7 @@ def _mount_ok(root):
     The second used to be covered by the first by accident, because the store
     was /devdata and a one-component path is a share root. A node that reports
     /var/lib/builderbot/appdata got its own module refused by its own guard,
-    on every poll, and the refusal said so: BuilderBot asking BuilderBot for
+    on every poll, and the refusal said so: AerieOS asking AerieOS for
     something and being told no is a bug in it, which is how this was found.
 
     Worth saying plainly, because the fix looks like a loosening and is not:
@@ -1320,7 +1342,7 @@ def _run(argv, timeout=60, env_extra=None, sink=None, hold=None):
         # exception would end the job with nothing to show for it. A code and a
         # message travel the path a real docker failure already travels, and
         # say plainly that this one is a bug here, not a daemon that said no.
-        msg = "refused by BuilderBot, and this is a bug in it: " + bad
+        msg = "refused by AerieOS, and this is a bug in it: " + bad
         print("[devapp] " + msg, file=sys.stderr, flush=True)
         return {"code": 126, "out": msg}
     # A bare docker READ addressed at an agent node runs ON that node, as
@@ -1341,7 +1363,7 @@ def _run(argv, timeout=60, env_extra=None, sink=None, hold=None):
     # stop, restart) run there the same way, as one exec and never from a
     # kept answer: they fell through to DOCKER_HOST=ssh:// below, which on
     # an agent node is the path R85 names and no controller holds a key
-    # for, so a session's bb devapp log on the dev pair met "Host key
+    # for, so a session's aerie devapp log on the dev pair met "Host key
     # verification failed" from the VM (B312).
     if sink is None and hold is None and argv[:1] == [DOCKER] \
             and len(argv) > 1 and (argv[1] in _CTL_OK | {"logs", "update"}
@@ -1404,7 +1426,7 @@ def _run_streamed(argv, timeout, env, sink, hold):
     would interleave by luck rather than by time.
 
     Its own process group, so a kill reaches what the CLI is waiting on rather
-    than only the CLI: the toolchain installer learned this against a `bb` that
+    than only the CLI: the toolchain installer learned this against a `aerie` that
     was itself waiting on a curl, and a compose call waiting on a pull is the
     same shape.
     """
@@ -1712,7 +1734,7 @@ def containers():
 # Start on boot (R122, the operator 4 Oct): a container's restart policy,
 # read in one docker inspect for the whole list. unless-stopped or always is
 # on: the daemon starts it when the node (or docker) starts, unless somebody
-# stopped it. For an instance of BuilderBot's own the choice is kept on its
+# stopped it. For an instance of AerieOS's own the choice is kept on its
 # record, because a rebuild recreates its containers with the compose file's
 # policy, and the listing that finds one drifted puts the choice back.
 BOOT_ON = ("always", "unless-stopped")
@@ -1792,7 +1814,7 @@ def _boot_read(out):
 
 def remember_boot(pname, on):
     """Keep an instance's Start on boot choice, so a rebuild cannot undo it;
-    a container that is not one of BuilderBot's instances has nothing to keep."""
+    a container that is not one of AerieOS's instances has nothing to keep."""
     with _lock:
         d = _load()
         for p, insts in d.items():
@@ -2147,7 +2169,7 @@ def env_path(project, instance=MAIN):
     return ENVDIR / f"{_pname(project, instance)}.env"
 
 
-# A service's `env_file: .env` names the project's own .env, which BuilderBot
+# A service's `env_file: .env` names the project's own .env, which AerieOS
 # never writes: an instance's env is a file of its own (env_path), handed to
 # compose as --env-file, and that fills ${VAR} in the compose text and
 # nothing else. A compose file that reads its settings through env_file came
@@ -2267,7 +2289,7 @@ def _compose(project, instance, *args):
 # and loses it again at reboot, which reads as a bug in the app.
 #
 # So the operator states the mapping once, and it is checked rather than
-# trusted. Only the paths BuilderBot itself hands over can be fixed by it;
+# trusted. Only the paths AerieOS itself hands over can be fixed by it;
 # what a project's own compose file writes is the project's to get right, and
 # is named on the row when it is a path the host will not find.
 
@@ -2482,7 +2504,7 @@ def mkdir_root(path):
 
     The first component (/auxiliary for /auxiliary/plex-library) because
     that is the shape of a share, and it is what has to exist over there for
-    the rest to be creatable as BuilderBot's own uid. Deliberately NOT a
+    the rest to be creatable as AerieOS's own uid. Deliberately NOT a
     declared list: the VM's shares are the VM's business, and a field naming
     them on this container was one more thing to keep in step every time a
     share was added over there. The daemon being a sandbox is the boundary;
@@ -2510,7 +2532,7 @@ def _devdata_argv(op, *names, root=None):
     confines every one of them to it by construction rather than by checking;
     which roots may be named is mkdir_roots(), checked separately.
 
-    Owned by whoever BuilderBot runs as. That is the point of doing it this
+    Owned by whoever AerieOS runs as. That is the point of doing it this
     way rather than letting docker create a missing bind source itself: docker
     makes it as root and then chowns it, which on a share that squashes root
     fails and takes the run down.
@@ -2618,7 +2640,7 @@ def _build_env(project, instance=MAIN):
     ref = (str(_read_rec(project, instance).get("ref") or "").strip()
            if instance else "")
     # A container with no project tree behind it (nginx's, one made with
-    # bb container new) has no commit to stamp: asked anyway, git said
+    # aerie container new) has no commit to stamp: asked anyway, git said
     # "cannot change to /workspace/nginx-NODE" in the log on every
     # update (12 Oct), as _head and _dirty already knew not to.
     tree = (WORKSPACE / project).is_dir()
@@ -2943,7 +2965,7 @@ def _overview_here(picked):
                 # names a branch that may never have been built here.
                 "built_ref": rec.get("built_ref", "") if same_daemon else "",
                 "await_env": bool(rec.get("await_env")) if same_daemon else False,
-                # A build marker with no job behind it: BuilderBot restarted
+                # A build marker with no job behind it: AerieOS restarted
                 # while it was building (the Artifacts row said so until it
                 # stopped following containers, 10 Oct).
                 "interrupted": bool(same_daemon and rec.get("building_since")
@@ -3145,9 +3167,9 @@ def new_refusal(project, key):
     if not key:
         return "an instance needs a name with a letter or digit in it"
     if compose_file(project) is None:
-        # Where BuilderBot looks, said: a session that wrote its compose
+        # Where AerieOS looks, said: a session that wrote its compose
         # somewhere else read "no compose file" as not having one at all,
-        # and went to bb container new, which builds from an empty
+        # and went to aerie container new, which builds from an empty
         # directory (B329).
         return (f"{project} has no compose file at its root to make an instance of: "
                 f"{', '.join(COMPOSE_NAMES)} is where it is looked for")
@@ -3539,7 +3561,7 @@ def container_net_own(node_id):
         to = set(comps)
         for r in (reads_of(owner) if reads_of and owner != SYSTEM else []) or []:
             to |= owned.get(r, set())
-        # BuilderBot's own (R180) reaches every compose project here by
+        # AerieOS's own (R180) reaches every compose project here by
         # `all`, which covers a container nobody here knows of.
         for c in comps:
             out[c] = ({"owner": owner, "to": sorted(to)} | ({"all": True} if owner == SYSTEM else {})
@@ -3552,8 +3574,8 @@ def container_net_own(node_id):
 def row_named(name):
     """(project, instance) of the instance or written container named
     `name`, by the name the Containers page lists it under or by the
-    instance's own (bb devapp new NAME), or None. An instance renamed on
-    the page answers to both, which bb devapp --container and --instance
+    instance's own (aerie devapp new NAME), or None. An instance renamed on
+    the page answers to both, which aerie devapp --container and --instance
     each knew only one of (B338)."""
     store = _load()
     for proj, insts in store.items():
@@ -3565,7 +3587,7 @@ def row_named(name):
 
 
 def _owners():
-    """Which project each container BuilderBot did not start belongs to:
+    """Which project each container AerieOS did not start belongs to:
     {node: {container name: project}}. A file of its own, because the
     instance store is {project: {instance: record}} and _load keeps nothing
     else."""
@@ -3583,7 +3605,7 @@ def _owners():
 def lans(node_id):
     """The containers on `node_id` an administrator let onto the network
     around the node (R178): their keys, the compose project for one of
-    BuilderBot's instances and the container's name for any other, the same
+    AerieOS's instances and the container's name for any other, the same
     keys container_net_own names them by. Off for every one not listed."""
     try:
         with open(LANS) as f:
@@ -3670,7 +3692,7 @@ def send_name(project, compose=""):
     the folder or the variant of the compose file it is made from after it
     (turing-lens-site, turing-lens-prod), so two files are not offered one
     name. The project's own container while that is free, then -2, -3 and on,
-    the first no container here holds. Send to Docker opens on it and `bb
+    the first no container here holds. Send to Docker opens on it and `aerie
     devapp new` takes it, so sending again makes another container beside
     the first rather than a refusal (the operator, 26 Sep)."""
     base = _slug(label_of(project)) or _slug(project) or "container"
@@ -3852,7 +3874,7 @@ def missing_dirs(project, cfg, instance=MAIN):
     - This container mounts it. mkdir here, and the daemon sees it because the
       share is the same one.
     - It is a path under a share the daemon has. A one-shot container over
-      there makes it, as BuilderBot's uid; see _devdata_argv. The ordinary
+      there makes it, as AerieOS's uid; see _devdata_argv. The ordinary
       case with a sandbox VM: the dev-data and media shares are mounted over
       there and need not be here, and which shares those are is the VM's
       business, not a list kept on this container.
@@ -3917,7 +3939,7 @@ def ensure_dirs(project, instance=MAIN, sink=None):
     for line in r.get("failed") or []:
         say(f"could not make {line}\n")
     for d in r.get("unreachable") or []:
-        say(f"{d} is not BuilderBot's to make, so docker will try it as root\n")
+        say(f"{d} is not AerieOS's to make, so docker will try it as root\n")
     return r
 
 
@@ -3925,7 +3947,7 @@ def ensure_dirs(project, instance=MAIN, sink=None):
 def make_dirs(project, instance=MAIN):
     """Create the bind directories this container can reach. (made, failed).
 
-    Owned by whoever BuilderBot runs as, which is the same ownership the
+    Owned by whoever AerieOS runs as, which is the same ownership the
     per-instance dev-data directory gets and what a NAS host's convention
     expects. `mkdir -p` throughout, so one that already exists is left alone
     and pressing this twice is the same as pressing it once.
@@ -4086,7 +4108,7 @@ def our_paths(mapping):
 def stray_map_entries(mapping):
     """Mapped paths this container does not have.
 
-    Not an error: /auxiliary can be a share the sandbox mounts and BuilderBot
+    Not an error: /auxiliary can be a share the sandbox mounts and AerieOS
     has no business reading. But it is a line of configuration that nothing
     else here will ever act on, and saying so once beats it sitting in the
     variable looking like it does something.
@@ -4130,7 +4152,7 @@ def problems(project, cfg):
             # Identity means the daemon calls it the same thing we do, and
             # there is nothing wrong. That is the whole point of running the
             # daemon in a sandbox VM with the shares mounted at the paths
-            # BuilderBot uses: the translation table becomes /workspace to
+            # AerieOS uses: the translation table becomes /workspace to
             # /workspace, and this check has nothing left to say. Without this
             # line the parity arrangement reports every correct compose file
             # as broken, and tells it to use the path it is already using.
@@ -4141,7 +4163,7 @@ def problems(project, cfg):
             # machine's filesystem, which is the whole reason the mapping is a
             # setting. Against a sandbox VM it was usually false as well: the
             # share is mounted over there at the same path, and the honest
-            # answer is that BuilderBot has not been told so.
+            # answer is that AerieOS has not been told so.
             out.append(
                 f"{name} mounts {src}, which is this container's path. "
                 + (f"The daemon calls that {there}" if there else
@@ -4408,7 +4430,7 @@ def _beside_gate(project, instance=MAIN, yes=""):
         return ""
     return (f"the project's compose now runs {', '.join(new)} beside the app, which its last build did not "
             "ship: a person says whether that is part of the app by pressing Rebuild on its row on the "
-            "Containers page, where it is named; if it is not, it is a container of its own (bb container new), "
+            "Containers page, where it is named; if it is not, it is a container of its own (aerie container new), "
             "not a service in the project's compose file")
 
 

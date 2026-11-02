@@ -1,5 +1,5 @@
-"""Behind `bb build` and `bb test` (cmd_build_or_test in bb): the project's
-settings record on stdin, as `bb settings --json` prints it, and the one
+"""Behind `aerie build` and `aerie test` (cmd_build_or_test in bb): the project's
+settings record on stdin, as `aerie settings --json` prints it, and the one
 command they name printed as lines bb reads back: the command, whether it is
 set, where the tests run, then each output glob.
 

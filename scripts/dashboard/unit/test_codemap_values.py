@@ -1,4 +1,4 @@
-"""bb map find names a value declared in a file of the index when no
+"""aerie map find names a value declared in a file of the index when no
 function or type has the name (report #66, B527): a Kotlin table in a
 companion object, a python module's constant, a shell variable."""
 import importlib.util

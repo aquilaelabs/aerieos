@@ -4,7 +4,7 @@ block, a connection string with a password in it, an email address, an IP
 address. The added lines of the diff the push would land are scanned; a
 line that matches is a FINDING, keyed by the file and the line's text, and
 the push is held until a person has read the findings on the bell (a
-session's `bb git push`) or in a confirm (the Git view's Push). Approving
+session's `aerie git push`) or in a confirm (the Git view's Push). Approving
 pushes and okays those exact lines: the same text in the same file passes
 from then on, and a line that changes is asked about again.
 

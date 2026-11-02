@@ -1,4 +1,4 @@
-"""Behind `bb tests` (cmd_tests in bb): the test registry, read and written
+"""Behind `aerie tests` (cmd_tests in bb): the test registry, read and written
 through dashboard/testreg.py, the module the notebook's Tests tab uses.
 
 Arguments: testreg.py's path, the project, then the words of the verb
@@ -35,7 +35,7 @@ if op in ("list", "ls"):
     p = reg.payload(proj)
     if not p["n"]:
         print(f"nothing on {proj}'s test registry; "
-              "`bb tests ingest RUNLOG` after a run puts the timings in")
+              "`aerie tests ingest RUNLOG` after a run puts the timings in")
         sys.exit(0)
     print(f"{p['n']} tests · {p['total_ms'] / 1000:.0f}s measured"
           + (f" · last run {p['last_wall_ms'] / 1000:.0f}s of wall"
@@ -61,7 +61,7 @@ if op in ("list", "ls"):
 elif op == "projection":
     # When a run will finish, from what the last one took, so nobody has
     # to guess, and a run well past it is read as stuck rather than slow.
-    # `--secs` is the bare number, for `bb tests run` to hold up against
+    # `--secs` is the bare number, for `aerie tests run` to hold up against
     # the clock when the run ends.
     p = reg.payload(proj)
     want = [a for a in rest if a != "--secs"]
@@ -94,7 +94,7 @@ elif op == "projection":
 
 elif op == "show":
     if not rest:
-        print("usage: bb tests show <key>", file=sys.stderr); sys.exit(1)
+        print("usage: aerie tests show <key>", file=sys.stderr); sys.exit(1)
     p = reg.payload(proj)
     t = next((x for x in p["tests"] if x["key"] == rest[0]), None)
     if t is None:
@@ -130,9 +130,9 @@ elif op == "describe" and rest[:1] == ["--from"]:
         for k in r["unknown"][:10]:
             print(f"    {k}")
 elif op in ("note", "describe"):
-    # `bb tests note KEY "what it protects" [--how "what it exercises"]`
+    # `aerie tests note KEY "what it protects" [--how "what it exercises"]`
     if len(rest) < 2:
-        print('usage: bb tests note <key> "what it protects" [--how "fixtures, stubs"]',
+        print('usage: aerie tests note <key> "what it protects" [--how "fixtures, stubs"]',
               file=sys.stderr)
         sys.exit(1)
     words, how, i = [], None, 1
@@ -188,7 +188,7 @@ elif op == "drift":
         print(f"  ...and {n - shown} more")
     if p["undocumented"]:
         print(f"\n{p['undocumented']} of {p['n']} tests have no line saying what "
-              "they protect; `bb tests list` shows the slowest first")
+              "they protect; `aerie tests list` shows the slowest first")
 elif op == "flagged":
     p = reg.payload(proj)
     print(f"{p['suspect']} tests land on a round timeout: "
@@ -199,16 +199,16 @@ elif op == "flagged":
             print(f"   {secs(t['ms']):>8}  {t['key']:<20} {t['name'][:56]}"
                   f"  [{t['suspect']}s]")
 elif op == "accept":
-    # `bb tests accept KEY "why"`: the wait is the work (a real boot, a
+    # `aerie tests accept KEY "why"`: the wait is the work (a real boot, a
     # timeout being proved) so it stops being flagged, with the reason kept
     # beside it. `--no` takes the mark off.
     if len(rest) < 2 or (rest[1] != "--no" and not rest[1].strip()):
-        print("usage: bb tests accept <key> \"why the time is the work\"  |  bb tests accept <key> --no",
+        print("usage: aerie tests accept <key> \"why the time is the work\"  |  aerie tests accept <key> --no",
               file=sys.stderr); sys.exit(1)
     r = reg.accept(proj, rest[0], "" if rest[1] == "--no" else " ".join(rest[1:]))
     bail(r)
     print(f"{rest[0]}: " + ("no longer accepted; flagged again if it sits on a round number"
                             if rest[1] == "--no" else "accepted; it will not be flagged"))
 else:
-    print(f"[builderbot] ERROR: unknown: bb tests {op}", file=sys.stderr)
+    print(f"[builderbot] ERROR: unknown: aerie tests {op}", file=sys.stderr)
     sys.exit(1)

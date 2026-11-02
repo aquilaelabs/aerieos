@@ -36,7 +36,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_array")
+        self.agent = agentpkg.load("aerieos_agent_array")
         self.am = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".array"]
         self.d = tempfile.mkdtemp()
         self.env = {"BB_ARRAY_RECORD": os.path.join(self.d, "array.json"), "BB_ARRAY_STATE": os.path.join(self.d, "state.json"),
@@ -45,10 +45,12 @@ class TheAgent(unittest.TestCase):
         am = self.am
         ran = self.ran = []
 
+        self.fail_mkfs = ""
+
         class A(am.ArrayMixin):
-            def _sh(self, job, argv, timeout=0, **kw):
+            def _sh(inner, job, argv, timeout=0, **kw):
                 ran.append(argv)
-                return 0
+                return 1 if self.fail_mkfs and argv[0].startswith("mkfs") and argv[-1] == self.fail_mkfs else 0
 
             def hello_again(self, why):
                 self.said = why
@@ -109,8 +111,9 @@ class TheAgent(unittest.TestCase):
         self.assertEqual((state, code), ("succeeded", 0), text)
         argv = [a for a in self.ran if a[0] == "mkfs.xfs"]
         self.assertEqual([a[-1] for a in argv], ["/dev/sda", "/dev/sdb", "/dev/sdc"])
-        self.assertEqual(argv[0][2:4], ["-L", "bb-d1"])
-        self.assertEqual(argv[2][2:4], ["-L", "bb-p1"])
+        self.assertEqual(argv[0][1:3], ["-L", "bb-d1"])
+        self.assertEqual(argv[2][1:3], ["-L", "bb-p1"])
+        self.assertNotIn("-f", argv[0], "mkfs keeps its own refusal where the job did not say to wipe")
         self.assertNotIn(["wipefs", "-a", "/dev/sda"], self.ran, "nothing to wipe without the word")
         self.assertEqual([a for a in self.ran if a[0] == "mount"], [["mount", "/mnt/disks/d1"], ["mount", "/mnt/disks/d2"], ["mount", "/mnt/parity/p1"], ["mount", "/mnt/array"]])
         self.assertEqual(self.ran[-1], ["/usr/bin/snapraid", "sync"])
@@ -118,6 +121,14 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(rec["policy"], "mfs")
         self.assertIn("data d2 /mnt/disks/d2/", open(self.env["BB_SNAPRAID_CONF"]).read())
         self.assertIn("fuse.mergerfs", open(self.env["BB_ARRAY_FSTAB"]).read())
+
+    def test_a_create_that_stops_partway_says_which_disks_it_wrote(self):
+        # B529: no record holds them, so the job names them.
+        self.fail_mkfs = "/dev/sdc"
+        state, code, text, rec = self.run_job({"array": "create", "data": ["sda", "sdb"], "parity": ["sdc"], "fs": "xfs", "policy": "mfs"})
+        self.assertEqual(state, "failed", text)
+        self.assertIn("sdc did not take xfs", text)
+        self.assertIn("sda, sdb were formatted already and are in no array", text)
 
     def test_what_is_refused_runs_nothing(self):
         for cfg, rec, why in (({"array": "create", "data": ["sda"], "parity": ["sdb"]}, None, "at least as large"),
@@ -184,7 +195,10 @@ class TheController(unittest.TestCase):
             self.assertEqual(add.call_count, 0)
             r = nodes.node_storage_array("user:t", "n1", {"array": "create", "data": ["sdb", "sda"], "parity": ["sdc"], "fs": "btrfs", "policy": "lfs", "wipe": True})
             self.assertTrue(r.get("ok"), r)
-            self.assertEqual(add.call_args[0][3]["config"], {"array": "create", "data": ["sdb", "sda"], "parity": ["sdc"], "fs": "btrfs", "policy": "lfs", "wipe": True})
+            self.assertEqual(add.call_args[0][3]["config"], {"array": "create", "data": ["sdb", "sda"], "parity": ["sdc"], "fs": "btrfs", "policy": "lfs", "wipe": True,
+                             # Each disk as the person saw it, for the agent to hold its name to (B527).
+                             "ids": {"sdb": {"by_id": "", "serial": "B"}, "sda": {"by_id": "", "serial": "A"},
+                                     "sdc": {"by_id": "", "serial": "C"}}})
             self.assertEqual(add.call_args[0][3]["timeout"], 86400)
             n["reported"]["array"] = {"data": [{"slot": 1}], "parity": [{"slot": 1}]}
             self.assertIn("one of d1, p1", nodes.node_storage_array("user:t", "n1", {"array": "replace", "which": "d3", "new": "sdb"})["error"])

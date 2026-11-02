@@ -9,7 +9,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 import agentpkg  # noqa: E402
-agent = agentpkg.load("builderbot_agent_sysdeps")
+agent = agentpkg.load("aerieos_agent_sysdeps")
 CATALOG = os.path.join(HERE, "..", "..", "..", "config", "toolchains.json")
 
 

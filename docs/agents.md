@@ -4,7 +4,7 @@ A session on a project runs a coding agent in a terminal on a node: Claude
 (Anthropic's Claude Code), ChatGPT (OpenAI's Codex CLI), Copilot (GitHub's
 Copilot CLI), Grok (xAI's Grok Build) or Any model (OpenCode, through a
 node's model router), each used the same way and held to the same briefing
-and guards. This page says what each agent is to BuilderBot, where it is
+and guards. This page says what each agent is to AerieOS, where it is
 installed and signed in to, and how each is wired.
 
 ## One table of agents
@@ -138,22 +138,22 @@ sign-in there.
 ## The guards
 
 Every guard a Claude session is held by holds for Codex, Copilot and Grok too,
-through their own hooks rather than Claude Code's: BuilderBot writes them
+through their own hooks rather than Claude Code's: AerieOS writes them
 into the account's hooks file for each (Codex's `hooks.json`, Copilot's
 `hooks/builderbot.json`, Grok's `~/.grok/hooks/builderbot.json`), each calling `bb-agent-hook` with the agent and
 the event, which says the agent's payload again in Claude's shape and runs
-the same hooks in the same order: before a tool the hold while BuilderBot
+the same hooks in the same order: before a tool the hold while AerieOS
 updates, the house rules' command guard and the work note; on a prompt the
 relay, the rules and the node's turn limit; at the stop the house rules'
 checks and the turn handed back; on the agent's own permission prompt the
 asking mark. A refusal reaches Codex and Grok as Claude's does (exit 2) and Copilot
 as its own `deny`. Grok also reads Claude's hooks from `~/.claude/settings.json`
-on its own; a session turns that off, so each guard runs once. The hooks act only in a session BuilderBot started; the
+on its own; a session turns that off, so each guard runs once. The hooks act only in a session AerieOS started; the
 same agent run by hand is untouched. Codex's own hook trust is passed over
-for BuilderBot's where its version has the flag for it.
+for AerieOS's where its version has the flag for it.
 
 Not every guard has a place on every agent, and the project's settings
-(Agents may, Coding agents) say which hold for which: Copilot has no hook
+(Agents may, under How each agent is guarded) say which hold for which: Copilot has no hook
 after a summary, so the house rules are not said again then, and Codex's and
 Copilot's searches are in the shell, out of the code map's hint's reach.
 Grok has no hook for its permission prompt alone, so its dot is never
@@ -172,7 +172,7 @@ limit and Home's sessions tile alike.
 
 ## Your conversations, every agent's
 
-`bb transcripts` in a session lists the asking account's own conversations
+`aerie transcripts` in a session lists the asking account's own conversations
 on the project, from every coding agent that account uses, each marked with
 its agent, and never another account's (unless its person made one visible
 on the Sessions view): the controller looks under that account's transcripts
@@ -217,7 +217,7 @@ them), and OpenCode's own card says whether the router on that node is
 there for it, and bb-tty
 starts OpenCode with a config written for the session: the router as its
 one provider, the briefing as an instructions file, and its permissions.
-Each model is marked: one walked with OpenCode and BuilderBot's tools
+Each model is marked: one walked with OpenCode and AerieOS's tools
 (`router.WALKED_MODELS`) plain, the rest **untested** and offered all the
 same, and one whose context cannot hold the briefing and the house rules
 (the block a session is handed, counted by the server) says **too small
@@ -226,10 +226,10 @@ While an Any model session runs, its tab on the dock says what its project
 has spent through the router so far (the key is the project's, so the
 spend is) and, for a model Ollama runs on the node, its tokens per second
 as the router's log last measured it (**Read the spend** on its page
-reads both). Its guards are a plugin of BuilderBot's that bb-tty writes into the
+reads both). Its guards are a plugin of AerieOS's that bb-tty writes into the
 account's OpenCode plugins folder, calling `bb-agent-hook open` before a
 tool (a refusal throws, so the tool does not run), on a prompt, at a
 permission ask, at the turn's end and after a summary, and exporting the
 conversation into the tree's transcript folder at each turn's end, where
-bb transcripts and the Sessions view read it. A project no router allows
+aerie transcripts and the Sessions view read it. A project no router allows
 is told so at Start.

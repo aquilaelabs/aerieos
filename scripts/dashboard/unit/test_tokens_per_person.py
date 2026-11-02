@@ -116,7 +116,7 @@ class PerPerson(unittest.TestCase):
         gitcreds.link_account("web", ADA, self.ada)
         u = gitcreds.usable("web", ADA)
         self.assertEqual((u["mine"], u["live"]), (True, False))
-        self.assertIn("bb git waits for you to sign in", u["why"])
+        self.assertIn("aerie git waits for you to sign in", u["why"])
         self.assertIn("nobody who gave this project a token is signed in", gitcreds.usable("web", BOB)["why"])
         logins.mint(ADA)
         self.assertEqual(gitcreds.usable("web", ADA), {"by": ADA, "mine": True, "live": True, "given": True, "why": ""})

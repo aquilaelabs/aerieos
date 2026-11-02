@@ -1,4 +1,4 @@
-# What `bb lint` holds the python to, and CI's lint job with it: pyflakes
+# What `aerie lint` holds the python to, and CI's lint job with it: pyflakes
 # (undefined and unused names), bugbear (the mistakes that read as
 # correct), a silent except, a syntax error. Style is not in this list on
 # purpose: the point of the gate is a bug caught before a build, not a

@@ -8,7 +8,7 @@
 // list the Briefing's.
 // Every edit is staged and its section's Save (Themes or Pages) writes it at
 // once, the way the roadmap saves. Nothing here is a prompt: a session reads
-// the design piece by piece with bb design show (design.py), which is what
+// the design piece by piece with aerie design show (design.py), which is what
 // docs/design-language.md is written from too. One classic script beside
 // index.html (docs/design-language.md, Files): a factory makeNotebook calls
 // per notebook.
@@ -367,7 +367,7 @@ function nbDesignView({$, nb, project, root}){
             `<textarea id="dst-${i}-fonts" class="proseline" rows="1" maxlength="200" data-dst="fonts">${esc(t.fonts || "")}</textarea>`, true)}</div>
       ${docSection("design", `rules:t${i}`, "Rules", (t.rules || []).length ? `${t.rules.length}` : "none",
         `<div class="hint">${i === 0
-          ? "The design's rules: what holds for the whole design and the settings cannot say. A session gets one on the turn it edits a file or is asked about a word the rule names; bb design show NAME reads one."
+          ? "The design's rules: what holds for the whole design and the settings cannot say. A session gets one on the turn it edits a file or is asked about a word the rule names; aerie design show NAME reads one."
           : `What holds for ${esc(t.name.trim() || "this theme")} alone. A session meets one as ${esc(holderSlug(t.name))}/NAME.`}</div>` + rulesList(`t${i}`, t.rules || (t.rules = [])), {open: true})}
       <div class="field">${lbl("", "Colors", "each a name, a hex and what it is for; a session names them the same in the code")}
       <div class="dscolors">${(t.colors || []).map((c, j) => `
@@ -482,7 +482,7 @@ function nbDesignView({$, nb, project, root}){
   // (presets.roles), falling back to the dashboard's own scheme: the board
   // is painted in the language, and a theme with a "page" and a "surface"
   // is still a page and a surface.
-  const FALLBACK = {bg: "#1a1f26", panel: "#212730", ink: "#e6edf3", line: "#4d5c6f", accent: "#3fb950"};
+  const FALLBACK = {bg: "#0b1322", panel: "#121c30", ink: "#eaf1fc", line: "#3e5378", accent: "#2fc6ff"};
   function paint(role){
     const t = (nb.dsLang.themes || [])[0];
     const names = presets().roles?.[role] || [role];
@@ -945,7 +945,7 @@ function nbDesignView({$, nb, project, root}){
 
   // The view is passive by design (the operator, 28 Sep): nothing here
   // reaches into a session. A session meets the design on its own, through
-  // the rules the briefing names and bb design show, and a person who wants
+  // the rules the briefing names and aerie design show, and a person who wants
   // it applied now copies the prompt into one.
 
   // ---- each section's Save and Revert (the operator, 5 Oct) -------------------------

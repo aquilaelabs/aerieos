@@ -5,11 +5,13 @@ its project is linked to first; git's helper answers from it; a token kept
 as a project's own from before goes to the project owner's store (0011);
 purging it, or removing the account, unlinks those projects, each saying
 so until it is given access again."""
+import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -63,10 +65,55 @@ class Store(unittest.TestCase):
         self.assertNotEqual(other, self.fid)
         self.assertEqual(len(accountkeys.forges_of(UID)), 2)
 
+    def test_a_port_reads_as_its_remote_names_it(self):
+        # git's credential line writes a port's colon as %3a: kept from one,
+        # the entry is found by the host a remote names, and reads that way.
+        line = "http://octo:tok@192.168.1.16%3a3000"
+        got = accountkeys.link_forge(UID, "192.168.1.16%3a3000", line, "octo")[0]
+        self.assertEqual(got["host"], "192.168.1.16:3000")
+        self.assertEqual(accountkeys.forge_of(UID, got["id"])["host"], "192.168.1.16:3000")
+        self.assertEqual(accountkeys.forge_line(UID, host="192.168.1.16:3000"), line)
+        # ...and an entry already kept with the colon encoded reads the same.
+        sd = json.loads((self.d / "account-secrets.json").read_text())
+        sd[UID]["forges"][got["id"]]["host"] = "192.168.1.16%3a3000"
+        (self.d / "account-secrets.json").write_text(json.dumps(sd))
+        self.assertIn("192.168.1.16:3000", [f["host"] for f in accountkeys.forges_of(UID)])
+        self.assertEqual(accountkeys.link_forge(UID, "192.168.1.16:3000", line, "octo")[0]["id"], got["id"])
+
+    def test_a_key_that_does_not_open_is_kept_not_made_anew(self):
+        # B542: started with another install key, the account's key does not
+        # open; it is kept as it was (and nothing is opened), and with the
+        # right install key back, the token sealed under it opens again.
+        was = (self.d / "account-keys.json").read_text()
+        right = signing.MASTER
+        signing.MASTER = b"w" * 32
+        self.assertIsNone(accountkeys.key_of(UID))
+        self.assertEqual((self.d / "account-keys.json").read_text(), was, "the record untouched")
+        signing.MASTER = right
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+
     def test_a_key_change_seals_the_store_again(self):
         before = (self.d / "account-secrets.json").read_text()
         self.assertEqual(accountkeys.change(UID)[1], 200)
         self.assertNotEqual((self.d / "account-secrets.json").read_text(), before)
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+
+    def test_the_key_before_stays_while_a_token_is_under_it_alone(self):
+        # B548: a token the change could not seal again stayed under the key
+        # before, which was dropped at once, and never opened again.
+        old = accountkeys.key_of(UID)
+        real = signing.seal
+        def failing(data, key=None):
+            if key is not None and key != old:
+                raise ValueError("busy")
+            return real(data, key) if key is not None else real(data)
+        with mock.patch.object(accountkeys.signing, "seal", side_effect=failing):
+            self.assertEqual(accountkeys.change(UID)[1], 200)
+        self.assertIsNotNone(accountkeys.previous_of(UID), "kept: a token is under it alone")
+        self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
+        # The next look (Profile's status) seals it again and lets the key go.
+        accountkeys.status(UID)
+        self.assertIsNone(accountkeys.previous_of(UID))
         self.assertEqual(accountkeys.forge_line(UID, self.fid), LINE)
 
     def test_git_c_hands_any_command_the_credential(self):

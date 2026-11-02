@@ -121,7 +121,7 @@ class Controller(unittest.TestCase):
 class Agent(unittest.TestCase):
     def test_only_the_table_reaches_bb_sandbox(self):
         import agentpkg
-        agent = agentpkg.load("builderbot_agent_features")
+        agent = agentpkg.load("aerieos_agent_features")
         a = object.__new__(agent.Agent)
         a.state = {}
         ran = []
@@ -143,7 +143,7 @@ class Agent(unittest.TestCase):
             self.assertEqual(a._apply_controller_update(Job(), {"release": "main; rm -rf /"}), ("failed", 64))
             a._sh = lambda job, argv, **kw: ran.append(argv) or 0
             self.assertEqual(a._apply_controller_update(Job(), {"release": "v0.9.0"}), ("succeeded", 0))
-            self.assertEqual(ran[-1], ["bash", "/opt/builderbot/nodes/install-controller.sh", "--update", "--release", "v0.9.0"])
+            self.assertEqual(ran[-1], ["bash", "/opt/aerieos/nodes/install-controller.sh", "--update", "--release", "v0.9.0"])
 
 
 class HelperFresh(unittest.TestCase):
@@ -152,7 +152,7 @@ class HelperFresh(unittest.TestCase):
     does not run the helper from before it."""
     def test_the_bundle_is_fetched_first(self):
         import agentpkg
-        agent = agentpkg.load("builderbot_agent_fresh")
+        agent = agentpkg.load("aerieos_agent_fresh")
         cp = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".configplane"]
         a = object.__new__(agent.Agent)
         a.state = {"user": "bb", "stores": {"toolchains": "/nowhere"}}
@@ -178,7 +178,7 @@ class PowerEndsSessions(unittest.TestCase):
     open on the record."""
     def test_sessions_end_before_the_machine_goes(self):
         import agentpkg
-        agent = agentpkg.load("builderbot_agent_power")
+        agent = agentpkg.load("aerieos_agent_power")
         cp = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".configplane"]
         a = object.__new__(agent.Agent)
         order = []

@@ -1,4 +1,4 @@
-"""BuilderBot's own terminal on a node (R133, term.py on screen.py's port):
+"""AerieOS's own terminal on a node (R133, term.py on screen.py's port):
 only what the controller signed opens, and the program it runs is the one
 the session agent recorded for that kind, in a real pty. Keys typed reach
 it, a resize reaches it, a read-only terminal drops keys, and when the
@@ -16,7 +16,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
-from builderbot_agent import screen, term  # noqa: E402
+from aerieos_agent import screen, term  # noqa: E402
 
 KEY = screen.screen_key("bbn_secret")
 

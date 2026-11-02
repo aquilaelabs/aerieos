@@ -1,4 +1,4 @@
-// The Help page (R258, the operator 16 Oct): BuilderBot's own docs, read in
+// The Help page (R258, the operator 16 Oct): AerieOS's own docs, read in
 // the wiki's reader. The docs are listed beside the article in docs/README's
 // groups (a picker above it on a phone), a long one opens with its contents
 // box, a link to another doc opens it here, and the bar's search finds a

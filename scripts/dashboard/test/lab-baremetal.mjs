@@ -15,7 +15,7 @@
 //   BB_LAB_KEY         an ssh public key for each VM's own account
 //   BB_LAB_SSH         the private half's path ON THE VM HOST, readable by its
 //                      job account: the walk reaches a VM through jobs there
-//   BB_LAB_REF         the ref of github.com/aquilaelabs/builderbot to install
+//   BB_LAB_REF         the ref of github.com/aquilaelabs/aerieos to install
 //   BB_LAB_REF_NEXT    a newer ref to update to (R90 step 5), optional
 //                      (the branch under test, pushed)
 //   BB_LAB_PROJECT     a project there to make the VMs in (hello)
@@ -156,7 +156,7 @@ for (const os of SYSTEMS){
     }, 10 * 60000, 30000);
     ok(check, `[${os}] bb-session check passes there: the wall holds (${oneLine(check || await inVm(ip, '/usr/local/sbin/bb-session check 2>&1')).slice(0, 300)})`);
     const walls = await inVm(ip, 'cat /etc/bb-session.wall; nft list table inet builderbot_wall >/dev/null && echo guard-up');
-    ok(/^COVER=.*\/var\/lib\/builderbot-controller/m.test(walls) && /guard-up/.test(walls),
+    ok(/^COVER=.*\/var\/lib\/aerieos-controller/m.test(walls) && /guard-up/.test(walls),
        `[${os}] the wall names the controller's folders and its ports' table is up`);
 
     // Outside a view: the session account and the job account, each refused

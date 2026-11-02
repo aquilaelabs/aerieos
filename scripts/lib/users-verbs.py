@@ -1,4 +1,4 @@
-"""Behind `bb users` (cmd_users in bb): the dashboard's accounts
+"""Behind `aerie users` (cmd_users in bb): the dashboard's accounts
 (dashboard/users.py): list them, set a password, add one, or mint a
 session token for one project.
 

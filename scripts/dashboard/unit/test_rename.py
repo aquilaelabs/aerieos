@@ -92,7 +92,7 @@ class Rename(unittest.TestCase):
     def test_a_projects_container_takes_a_name_of_its_own(self):
         """The operator, 11 Oct: a project's container is named whatever its
         owner wants, not after the project. The record carries the name, the
-        instance keeps its key (its worktree, jobs and bb devapp --instance
+        instance keeps its key (its worktree, jobs and aerie devapp --instance
         stay), and the node carries the volumes and data under the new one."""
         write_json(devapp.FILE, devapp._load() | {"aquilaeLabs": {"main": {"node": "n1", "compose": "site/compose.yml"},
                                                                    "staging": {"node": "n1"}}})
@@ -110,7 +110,7 @@ class Rename(unittest.TestCase):
         rec = devapp._read_rec("aquilaeLabs", "main")
         self.assertEqual((rec.get("name"), rec.get("compose"), "renaming" in rec), ("turing-site", "site/compose.yml", False))
         self.assertEqual(devapp._pname("aquilaeLabs", "main"), "turing-site", "the compose name is its own now")
-        self.assertEqual(devapp.row_named("turing-site"), ("aquilaeLabs", "main"), "bb devapp --container finds it by it")
+        self.assertEqual(devapp.row_named("turing-site"), ("aquilaeLabs", "main"), "aerie devapp --container finds it by it")
         self.assertEqual(devapp.read_env("aquilaeLabs", "main"), "PORT=8080\n", "its env followed the name")
         self.assertEqual(devapp._pname("aquilaeLabs", "staging"), "staging", "the project's other container is untouched")
         # Named back to the project's own default: no name kept.
@@ -140,7 +140,7 @@ fi
 if [ "$1 $2" = "volume create" ]; then exit 0; fi
 if [ "$1 $2" = "volume rm" ]; then exit 0; fi
 if [ "$1" = run ]; then
-  for a in "$@"; do case "$a" in *:/r) root="${a%:/r}" ;; *:/v:ro) [ -n "$FAILVOL" ] && exit 1 ;; esac; done
+  for a in "$@"; do case "$a" in *:/r) root="${a%:/r}" ;; *:/v:ro) [ -n "$FAILVOL" ] && exit 1; [ "$a" = "$FAILON:/v:ro" ] && exit 1 ;; esac; done
   [ -n "$root" ] || exit 0
   shift; while [ "$1" != sh ]; do shift; done; shift; shift
   cmd="$1"; shift
@@ -174,6 +174,17 @@ exit 0
         self.assertIn("putting the data directory back", r.stdout)
         self.assertTrue((self.root / "aquilaelabs" / "site.db").is_file(), "where it was")
         self.assertFalse((self.root / "aquilaelabs-dev").exists())
+
+    def test_a_failure_on_one_volume_removes_no_old_one(self):
+        # B554: one at a time, a failure on b left a copied and removed, the
+        # instance coming back on an empty a.
+        r = self.run_script(VOLS="aquilaelabs_a aquilaelabs_b", FAILON="aquilaelabs_b")
+        self.assertNotEqual(r.returncode, 0)
+        said = self.log.read_text()
+        self.assertNotIn("volume rm aquilaelabs_a", said)
+        self.assertNotIn("volume rm aquilaelabs_b", said)
+        self.assertIn("volume rm aquilaelabs-dev_a", said, "the copy made is taken back off")
+        self.assertTrue((self.root / "aquilaelabs" / "site.db").is_file())
 
     def test_a_target_with_files_is_refused_before_anything_moves(self):
         (self.root / "aquilaelabs-dev").mkdir()

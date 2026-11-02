@@ -81,7 +81,7 @@ class Totp(Base):
 
     def test_set_up_by_a_first_code_then_each_code_once(self):
         got = mfa.totp_begin("u_1", "dev3")
-        self.assertIn("otpauth://totp/BuilderBot%3Adev3?secret=", got["uri"])
+        self.assertIn("otpauth://totp/AerieOS%3Adev3?secret=", got["uri"])
         key = mfa._secret_of(mfa.record("u_1")["totp_pending"])
         self.assertIn("error", mfa.totp_confirm("u_1", "000000" if mfa.totp_now(key) != "000000" else "111111"))
         self.assertEqual(mfa.totp_confirm("u_1", mfa.totp_now(key)), {"ok": True})

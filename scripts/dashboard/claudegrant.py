@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Which nodes each BuilderBot account is signed in to Claude on, and as whom.
+"""Which nodes each AerieOS account is signed in to Claude on, and as whom.
 
 **A Claude login belongs to one account on one node.** A person signs in on
 each node they want Claude to work on, from that node's row on the Nodes
@@ -13,15 +13,15 @@ refresh token, so two copies sign each other out (bug #64), and a node that
 was away holds one the server has retired (B100). Claude issues a grant per
 login, so a login per machine is the supported shape.
 
-**What the controller keeps is what each node reported**, per BuilderBot
+**What the controller keeps is what each node reported**, per AerieOS
 account:
 
     nodes   {node id: {email, plan, at}}: the Anthropic account that node
-            says this BuilderBot account is signed in as there
+            says this AerieOS account is signed in as there
 
 It is a report, not a rule: a person may sign one node in to one Anthropic
 account and another node in to another, and the row of each says which.
-The Users page says when two BuilderBot accounts are on one Anthropic
+The Users page says when two AerieOS accounts are on one Anthropic
 account, since Anthropic's terms allow one person per Claude account.
 
 The other coding agents (R95 step 3) keep the same record, one file per
@@ -142,14 +142,14 @@ def emails_of(home):
 
 
 def logins_of(rows):
-    """Which Anthropic accounts each BuilderBot account is signed in as, on
+    """Which Anthropic accounts each AerieOS account is signed in as, on
     any node, and whether two of them share one, for the Users page.
 
     From the record, not from a credential: no login lives on this container
     (R47), and what it keeps instead is what each node reported.
 
     Anthropic's consumer terms allow one person per Claude account, so two
-    BuilderBot accounts on one login is said on the row rather than left for
+    AerieOS accounts on one login is said on the row rather than left for
     somebody to work out.
     """
     out = []

@@ -1,4 +1,4 @@
-"""bb emu list and the default AVD read the AVDs' own files (B425), not
+"""aerie emu list and the default AVD read the AVDs' own files (B425), not
 avdmanager, which scanned the whole shared SDK first and took 105 s: names,
 the target and the image, and the newest builderbot-N as the default."""
 import os
@@ -32,7 +32,7 @@ class EmuList(unittest.TestCase):
         self.assertLess(time.time() - t, 20)
         self.assertIn("Name: builderbot-35\n  Based on: android-35 google_apis x86_64", p.stdout)
         self.assertIn("Name: builderbot-36", p.stdout)
-        self.assertIn("default for `bb emu start`: builderbot-36", p.stdout)
+        self.assertIn("default for `aerie emu start`: builderbot-36", p.stdout)
 
 
 if __name__ == "__main__":

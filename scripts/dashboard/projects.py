@@ -163,7 +163,7 @@ def _scope_to_token(dest, helper):
 def rescope_store_helpers():
     """Each checkout whose credential.helper still names git's own store on
     its project's token file, from before tokens were sealed (R135) and kept
-    in a person's store (R154), pointed at BuilderBot's helper instead: git's
+    in a person's store (R154), pointed at AerieOS's helper instead: git's
     store reads neither, so a push with the tree's own config (a release's
     tag) went with no credential. At start; returns the projects moved."""
     moved = []
@@ -618,7 +618,7 @@ def auth_options(project, dest):
 # root-only helper on stdin and is never seen here again: the helper keeps it
 # under /config/deploy-keys and loads it into the shielded agent, so a
 # session can push with it and never read it, as with the hand-placed keys.
-KEY_HELPER = "/opt/builderbot/scripts/deploy-key"
+KEY_HELPER = "/opt/aerieos/scripts/deploy-key"
 # Where each host takes a deploy key, after https://HOST/OWNER/REPO.
 _KEY_PAGES = {"github": "/settings/keys", "gitea": "/settings/keys", "forgejo": "/settings/keys",
               "codeberg": "/settings/keys", "gitlab": "/-/settings/repository",
@@ -851,7 +851,7 @@ def drop_push(project):
 
 
 HOOK = """#!/bin/sh
-# Written by BuilderBot. This working copy was cloned read-only: nobody asked
+# Written by AerieOS. This working copy was cloned read-only: nobody asked
 # for push rights on it, so pushing is refused here rather than being allowed
 # to surprise somebody.
 #
@@ -869,7 +869,7 @@ def set_push_hook(dest, allowed):
     h = Path(dest) / ".git" / "hooks" / "pre-push"
     try:
         if allowed:
-            if h.is_file() and "Written by BuilderBot" in h.read_text():
+            if h.is_file() and "Written by AerieOS" in h.read_text():
                 h.unlink()
             return
         h.parent.mkdir(parents=True, exist_ok=True)
@@ -896,7 +896,7 @@ def check_token_push(token, repo):
         f"https://api.github.com/repos/{repo}",
         headers={"Authorization": f"Bearer {token}",
                  "Accept": "application/vnd.github+json",
-                 "User-Agent": "BuilderBot"})
+                 "User-Agent": "AerieOS"})
     try:
         # The host is the literal above; only the repo path varies, and it is quoted.
         with urllib.request.urlopen(req, timeout=20) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -1253,6 +1253,9 @@ def _claim(name, shown, into=""):
         repos.add(into, name)
 
 
+# Why no project may be made here now (nodes.workspace_held), or "".
+held = lambda: ""  # noqa: E731
+
 def create(req, env=None):
     """Create a project under /workspace, as a (payload, status) pair.
     `env` is the account's git identity, for the commits a starting version
@@ -1270,6 +1273,11 @@ def create(req, env=None):
     mode = _field(req, "mode")
     if mode not in ("init", "clone"):
         return {"error": "unknown mode"}, 400
+    # Never on a stick (the operator, 1 Nov): held until the projects have
+    # a place on the machine's disks (nodes.workspace_held).
+    why = held()
+    if why:
+        return {"error": why}, 409
     url = _field(req, "url").strip()
     about, key_url = "", ""
     if mode == "clone":
@@ -2071,7 +2079,7 @@ def create_from_dialog(req, *, env, account, may_node):
     # default a project gets anyway.
     for key, dflt, label in (("sign", "ask", "Sign a build"), ("keys", "ask", "Manage signing keys"),
                              ("release", "ask", "Tag and publish a release"),
-                             ("report", "auto", "Report BuilderBot bugs")):
+                             ("report", "auto", "Report AerieOS bugs")):
         v = req.get(key)
         if v and v != dflt:
             r = set_prefs(name, **{key: str(v)})
@@ -2501,11 +2509,21 @@ def forge_target(name):
     stored = token_target(name) or {}
     tok = _stored_token(name)
     if not forge.get("kind"):
-        return {"error": f"{host or 'its host'} has no API BuilderBot knows: git alone reaches it"}
+        return {"error": f"{host or 'its host'} has no API AerieOS knows: git alone reaches it"}
     if not tok:
         return {"error": "this project has no access token: link one under its settings, Git"}
     if not repo:
         return {"error": "could not read the repository from this project's remote"}
+    # The repository the project was linked to, where it has one on record,
+    # is the one asked about: the tree's origin is a session's to rewrite,
+    # and pointed at another repository on the host it took the project's
+    # token there (B544). An origin that disagrees with it is refused.
+    rec = load_push().get(name) or {}
+    if rec.get("repo"):
+        if (str(rec.get("host") or host).lower(), str(rec["repo"]).lower()) != (str(host).lower(), str(repo).lower()):
+            return {"error": f"this project's origin names {host}/{repo}, not its repository {rec.get('host') or host}/{rec['repo']}: "
+                             "set the remote back (git remote set-url origin) before asking its git host"}
+        repo = rec["repo"]
     return {"forge": forge, "host": stored.get("host") or host, "repo": repo,
             "scheme": stored.get("scheme") or "https", "token": tok}
 

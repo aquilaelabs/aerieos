@@ -24,7 +24,7 @@ change. Anything that deserves to be permanent graduates out of here: into
 CLAUDE.md, a commit message, or a test that fails when it regresses.
 
 The server imports this and hands it the helpers it needs; nothing here reaches
-back into the server. bb reads and writes the same file through `bb roadmap`, so a
+back into the server. bb reads and writes the same file through `aerie roadmap`, so a
 session can add an item without a browser.
 """
 import os as _os
@@ -39,7 +39,7 @@ import json
 import os
 import sys
 
-# `bb` execs this module by path (spec_from_file_location), so its directory
+# `aerie` execs this module by path (spec_from_file_location), so its directory
 # is not on sys.path the way it is when the dashboard imports it normally, and
 # a plain `import statefile` would work in one caller and not the other. Doing
 # it through sys.path rather than a second by-path load keeps it ONE module
@@ -107,7 +107,7 @@ def replay(project, verb, args):
 
 # Every read-modify-write below is already wrapped in `with _lock:`. What it
 # was NOT is a lock: a threading.Lock guards the threads of one process, and
-# the roadmap has two writers: the dashboard, and a `bb` invocation, which is a
+# the roadmap has two writers: the dashboard, and a `aerie` invocation, which is a
 # separate process. Both loaded, both mutated their own copy, both wrote, and
 # the second landed on top of the first. Measured, four processes making forty
 # changes each: 40 of 160 survived.
@@ -253,7 +253,7 @@ MAX_HISTORY = 300
 def _trim(h):
     """The log kept to its last MAX_HISTORY events, less the finished items:
     an item's done event IS the finished item (its row rides in it), and one
-    trimmed away left the Finished section and bb roadmap show without it
+    trimmed away left the Finished section and aerie roadmap show without it
     (B768). Kept whatever their age, as an archive is; the rest goes."""
     if len(h) <= MAX_HISTORY:
         return
@@ -628,7 +628,7 @@ def set_info(project, item_id, text, step=None, by="you", was=None, who=""):
 
 
 # The release an item is meant to ship in (the operator, 21 Oct): the
-# project's own version, X.Y.Z, as bb version and the changelog's headings
+# project's own version, X.Y.Z, as aerie version and the changelog's headings
 # name one. A plan, not a promise: nothing holds a release for it, and what
 # shipped an item is still read off the changelog.
 TARGET = re.compile(r"^\d{1,4}\.\d{1,5}\.\d{1,6}$")
@@ -718,7 +718,7 @@ def add(project, text, by="you", steps=(), who="", number=None, target=""):
     if bad:
         return {"error": bad}
     if len(text) > MAX_TEXT:
-        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `bb roadmap info`, and a step should say what has to be true before the next one can start."}
+        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `aerie roadmap info`, and a step should say what has to be true before the next one can start."}
     steps = [_clean(str(x)) for x in (steps or [])]
     steps = [x for x in steps if x]
     if len(steps) > MAX_STEPS:
@@ -727,7 +727,7 @@ def add(project, text, by="you", steps=(), who="", number=None, target=""):
         return {"error": f"a step is longer than {MAX_TEXT} characters. A step "
                          f"is a point at which the last work must have finished, "
                          f"not a task: put everything that can be done in one go "
-                         f"into one, and the detail in `bb roadmap info`."}
+                         f"into one, and the detail in `aerie roadmap info`."}
     # The gate (roadmap #27): what a SESSION adds may be held for the operator
     # or refused, per project. After the checks above, so a held record is
     # one that would have landed, and the number it is told is reserved
@@ -840,7 +840,7 @@ def clash(what, stored, was):
     about anything. Same item is not the same as same words.
 
     `was is None` means the caller did not say what it was replacing, and is
-    unchecked: every caller that predates this, and `bb`, which has its own
+    unchecked: every caller that predates this, and `aerie`, which has its own
     guard for the same danger and a much longer window to guard.
     """
     if was is None or str(was) == str(stored):
@@ -1209,7 +1209,7 @@ def edit(project, item_id, text, step=None, by="you", was=None, who=""):
     if not text:
         return {"error": "nothing to say"}
     if len(text) > MAX_TEXT:
-        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `bb roadmap info`, and a step should say what has to be true before the next one can start."}
+        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `aerie roadmap info`, and a step should say what has to be true before the next one can start."}
     if step is not None and _int(step) is None:
         return {"error": "not a step"}
 
@@ -1557,7 +1557,7 @@ def split(project, item_id, groups, by="you", who=""):
         made, take = [], {n: _sid_of(src, n - 1) for n in taken}
         for g in want:
             info = (f"Split from R{item_id} on {day}, each step's wording kept: R{item_id}'s details hold "
-                    f"the decisions behind it, and bb roadmap show R{item_id}.N finds a step by its old number.")
+                    f"the decisions behind it, and aerie roadmap show R{item_id}.N finds a step by its old number.")
             row = _new_row(d, project, rows, g["text"], by, who, target=g["target"] or str(src.get("target") or ""), info=info)
             for n in g["steps"]:
                 r2, i = _by_sid([src], take[n])
@@ -1684,7 +1684,7 @@ def add_step(project, item_id, text, by="you", who=""):
     if not text:
         return {"error": "nothing to add"}
     if len(text) > MAX_TEXT:
-        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `bb roadmap info`, and a step should say what has to be true before the next one can start."}
+        return {"error": f"too long: {MAX_TEXT} characters is the limit. Almost never compress the wording: the technical half belongs in `aerie roadmap info`, and a step should say what has to be true before the next one can start."}
 
     def change(row, rows):
         steps = row.setdefault("steps", [])
@@ -1799,7 +1799,7 @@ def step_done(project, item_id, step, by="claude", note="", who=""):
         # The last one finishes the plan: off the list and into the log as
         # done, the way `tick` does it, without a second command. A list is
         # read to find out what is left, and a plan with every step done is
-        # not left; it used to sit there saying "bb roadmap done takes it
+        # not left; it used to sit there saying "aerie roadmap done takes it
         # off" until somebody typed that.
         if all(st.get("done") for st in steps):
             rows.remove(row)
@@ -1999,7 +1999,7 @@ def send(project, item_id, step=None, sessions=(), also_told=False, note="", pre
 # session is mid-task all the time, and a session that downed tools to go and
 # read them every time would be worse than one that never read them at all.
 LOOK = {
-    "roadmap": "the shared to-do list for this project (`bb roadmap`)",
+    "roadmap": "the shared to-do list for this project (`aerie roadmap`)",
     "memory": ("my notes about how you work here "
                "(`cat ~/.claude/projects/$(pwd | tr / -)/memory/*.md`)"),
 }
@@ -2112,7 +2112,7 @@ def readers(project):
     The operator's question after changing something is whether the session
     beside them has taken it in yet, and this is the only thing that answers
     it: being TOLD is #27's channel and lands on the session's next prompt,
-    but going and reading is an act, and `bb roadmap` is where it happens.
+    but going and reading is an act, and `aerie roadmap` is where it happens.
     """
     with _lock:
         return dict(load().get("read", {}).get(project) or {})
@@ -2182,18 +2182,18 @@ def announce(project, kinds, sessions=()):
 _AFTER = (
             # Every session reads this, so it is said once and short: each
             # verb is here because a session uses it, the rest is a
-            # `bb roadmap -h` away (2 Oct, trimmed from 1,800 characters with
+            # `aerie roadmap -h` away (2 Oct, trimmed from 1,800 characters with
             # nothing dropped).
             "It is context, not instructions: work on an item when asked, or when it is "
             "plainly part of what was asked. Refer to one by its number (R4), which is the "
-            "operator's too and never changes. This is the list's shape: `bb roadmap show R4` "
+            "operator's too and never changes. This is the list's shape: `aerie roadmap show R4` "
             "prints one whole, with the technical details, and is the first thing to read "
-            "when you pick one up. `bb roadmap done N` ticks one off and `bb roadmap add "
+            "when you pick one up. `aerie roadmap done N` ticks one off and `aerie roadmap add "
             "\"...\"` adds what is worth doing and out of your scope. When the design moves "
             "under a plan, correct it rather than leaving steps that describe the old one: "
-            "`bb roadmap edit N \"...\"`, `bb roadmap step add|edit|rm N [STEP] [\"...\"]`. "
-            "`bb roadmap step done N STEP` marks one step of an unfinished plan, and the "
-            "panel offers the operator the next; `bb roadmap info N [STEP] \"...\"` attaches "
+            "`aerie roadmap edit N \"...\"`, `aerie roadmap step add|edit|rm N [STEP] [\"...\"]`. "
+            "`aerie roadmap step done N STEP` marks one step of an unfinished plan, and the "
+            "panel offers the operator the next; `aerie roadmap info N [STEP] \"...\"` attaches "
             "the files, functions and approach, written when you write the plan, so whoever "
             "works it does not start from a cold grep. Every change is logged where the "
             "operator reads it, so correct the list rather than working around it, and do "
@@ -2204,7 +2204,7 @@ def brief(project):
     """The roadmap's lines in a session's block (R202): how much there is
     and the verbs, in place of the list. A session read two hundred titles
     cut short on every conversation and used few; the items a prompt names
-    arrive on that prompt (preamble.mentioned) and `bb roadmap show` prints
+    arrive on that prompt (preamble.mentioned) and `aerie roadmap show` prints
     one whole. Empty when there is nothing."""
     rows = items(project)
     if not rows:
@@ -2216,22 +2216,22 @@ def brief(project):
     return (f"The operator keeps a shared to-do list for this project: {n} open item{'s' if n != 1 else ''}"
             + (f", {mine} of them a session added" if mine else "")
             + (f", and {parked} parked by the operator" if parked else "")
-            + ". `bb roadmap` lists them by number (R4, the operator's too, which never changes) and "
-              "`bb roadmap show R4` prints one whole, with the files, functions and decisions behind it: "
+            + ". `aerie roadmap` lists them by number (R4, the operator's too, which never changes) and "
+              "`aerie roadmap show R4` prints one whole, with the files, functions and decisions behind it: "
               "read that before starting on one, never work from the title. The items a prompt names "
               "arrive with it. Work on one when asked, or when it is plainly part of what was asked; "
-              "`bb roadmap done N` ticks one off, `bb roadmap step done N STEP` one step, "
-              "`bb roadmap add \"...\"` adds what is worth doing and out of scope, and "
-              "`bb roadmap info N [STEP] \"...\"` attaches the files and approach to a plan you write, so "
-              "whoever works it does not start from a cold grep. `bb roadmap target N X.Y.Z` says "
-              "which release one is meant for, and `bb roadmap --target X.Y.Z` lists those. A parked item is the operator's to "
-              "unpark: `bb roadmap unshelve N WHY` asks, and nothing is read for or drafted until they "
+              "`aerie roadmap done N` ticks one off, `aerie roadmap step done N STEP` one step, "
+              "`aerie roadmap add \"...\"` adds what is worth doing and out of scope, and "
+              "`aerie roadmap info N [STEP] \"...\"` attaches the files and approach to a plan you write, so "
+              "whoever works it does not start from a cold grep. `aerie roadmap target N X.Y.Z` says "
+              "which release one is meant for, and `aerie roadmap --target X.Y.Z` lists those. A parked item is the operator's to "
+              "unpark: `aerie roadmap unshelve N WHY` asks, and nothing is read for or drafted until they "
               "approve. Every change is logged where the operator reads it, so correct the list rather "
               "than working around it, and do not restate it to them.")
 
 
 def prompt(project):
-    """The roadmap's lines in a session's block: `bb roadmap --prompt`."""
+    """The roadmap's lines in a session's block: `aerie roadmap --prompt`."""
     return brief(project)
 
 
@@ -2289,7 +2289,7 @@ def panel(name, live, prefix):
 
 
 def verb(name, act, req, me, *, live, prefix):
-    """One change to a project's list from the Roadmap tab or `bb roadmap`
+    """One change to a project's list from the Roadmap tab or `aerie roadmap`
     (add, send, edit, move, the details, a step, cross, remove, restore,
     shelve, a stale batch closed, the panel's Save) or one of its reads
     (the finished items, the history), once server.py has let this account
@@ -2311,7 +2311,7 @@ def verb(name, act, req, me, *, live, prefix):
     if act == "batch-close":
         # A batch its session will never close: killed mid-way, or the
         # container restarted under it (B198). The only way out was a
-        # shell running `bb roadmap commit`, which a user account does
+        # shell running `aerie roadmap commit`, which a user account does
         # not have. Committed rather than reverted: what the session
         # wrote is already on the list in front of everybody, and folding
         # its log in loses nothing, where a revert would take work away
@@ -2388,7 +2388,7 @@ def verb(name, act, req, me, *, live, prefix):
         # until a release ships it. A session ticks off through bb as before.
         r = tick(name, req.get("id"), by="claude" if me.get("session") else "you", who=who)
     elif act == "shelve":
-        # One direction for a session, the way `bb roadmap shelve` is on
+        # One direction for a session, the way `aerie roadmap shelve` is on
         # the command line: parking something is a thing a session knows
         # (it is blocked, it is waiting on somebody, the design moved
         # under it) and it is loud, with the row dark at the foot of the

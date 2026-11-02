@@ -1,7 +1,7 @@
-"""A session sees a release's signing and asks for it again (R134): bb sign
+"""A session sees a release's signing and asks for it again (R134): aerie sign
 status prints whether the release APK can be signed and how the newest went,
-in the Signing view's words; bb sign release asks the project's owner, under
-Sign a build, and Allow starts the look the Signing view's press starts; bb
+in the Signing view's words; aerie sign release asks the project's owner, under
+Sign a build, and Allow starts the look the Signing view's press starts; aerie
 version release is refused before the tag when the APK could not be signed,
 unless told --without-apk. The clients against a stand-in controller on a
 local port; the ask against phone.py itself."""
@@ -31,7 +31,8 @@ class Controller(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
         GOT.append((self.path, body))
-        status, got = ANSWER.get(body.get("action"), (200, {}))
+        a = ANSWER.get(body.get("action"), (200, {}))
+        status, got = a() if callable(a) else a
         data = json.dumps(got).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -80,7 +81,7 @@ class Clients(unittest.TestCase):
         self.assertIn("ready: a release's APK can be signed", r.stdout)
         self.assertIn("v0.7.0: signed 2 min ago, app-0.7.0.apk with release (DE:66:E7)", r.stdout)
         self.assertIn("v0.6.9: FAILED 2 h ago: no sideload key", r.stdout)
-        self.assertIn("bb sign release", r.stdout, "a failure says how to ask again")
+        self.assertIn("aerie sign release", r.stdout, "a failure says how to ask again")
         self.assertLess(r.stdout.index("v0.7.0"), r.stdout.index("v0.6.9"), "newest first")
 
     def test_status_of_one_tag_and_what_would_stop_one(self):
@@ -96,12 +97,26 @@ class Clients(unittest.TestCase):
         ANSWER["release"] = (200, {"release": {"wanted": False}})
         self.assertIn("signs none of its releases", self.sign("--status", "", "").stdout)
 
-    def test_release_on_auto_starts_the_look(self):
+    def test_release_on_auto_starts_the_look_and_says_what_it_found(self):
+        # R190 step 5: waited for, the look's end told by the controller's
+        # own clock (its last look's time moving on), then each run said.
         ANSWER["release-sign"] = (200, {"ok": True, "started": True, "said": "looking"})
+        ANSWER["release"] = lambda: (200, {"release": {"looking": False, "expect": ["v1.0.0-dev.9"], "last": {
+            "at": len(GOT), "asked": 4, "known_bare": 2,
+            "runs": [{"run": 77, "tag": "v1.0.0", "state": "signed", "url": "https://example.test/r"}]}}})
         r = self.sign("--release", "", "the key was added")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(GOT[0][1], {"action": "release-sign", "project": "app", "why": "the key was added"})
-        self.assertIn("bb sign status says how it went", r.stderr)
+        self.assertEqual(GOT[1][1], {"action": "release-sign", "project": "app", "why": "the key was added"})
+        self.assertIn("run 77 for v1.0.0: signed  https://example.test/r", r.stdout)
+        self.assertIn("still expected: v1.0.0-dev.9", r.stdout)
+
+    def test_a_look_that_finds_nothing_says_why(self):
+        ANSWER["release-sign"] = (200, {"ok": True, "started": True, "said": "looking"})
+        ANSWER["release"] = lambda: (200, {"release": {"looking": False, "last": {
+            "at": len(GOT), "asked": 4, "known_bare": 2, "runs": []}}})
+        r = self.sign("--release", "", "again")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("4 recent run(s) that passed were asked and none handed one over, 2 more", r.stdout)
 
     def test_release_refused_says_why(self):
         ANSWER["release-sign"] = (403, {"error": "app's settings say Claude does not sign its builds"})

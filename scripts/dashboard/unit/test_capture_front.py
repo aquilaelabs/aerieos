@@ -1,4 +1,4 @@
-"""bb capture shot --emu PKG launches PKG only when it is not on the
+"""aerie capture shot --emu PKG launches PKG only when it is not on the
 screen. An app that is also the keyboard, up over its own setup screen, read
 as not in front and the launch took the keyboard down (report #68, B529)."""
 import importlib.util

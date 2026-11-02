@@ -20,7 +20,7 @@ controller runs nothing), and on a node the agent that opens a seal is a
 process apart from the sessions, which run as their account's own user in
 a view of their own (R125, bb-session): the one separation step 6 asks for
 that the code already had. The agent does the same three things in its own
-process (builderbot_agent.base.harden).
+process (aerieos_agent.base.harden).
 """
 import ctypes
 import ctypes.util

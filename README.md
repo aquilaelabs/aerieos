@@ -1,25 +1,25 @@
 <p align="center">
-  <img src="scripts/dashboard/static/mark.svg" width="128" alt="BuilderBot's mark: the robot head in isometric line work">
+  <img src="scripts/dashboard/static/mark.svg" width="128" alt="AerieOS's mark: a raptor with its wings swept back, which is also the letter A">
 </p>
 
-<h1 align="center">BuilderBot</h1>
+<h1 align="center">AerieOS</h1>
 
 <p align="center">
-  A self-hosted workshop for coding agents (Claude Code, ChatGPT's Codex CLI,
-  GitHub's Copilot CLI and xAI's Grok Build): your projects, the machines that build them, and
-  the sessions working on them, in one dashboard.
+  Your own server, for your files, your apps and your code: your disks, shares, apps and VMs
+  and your projects in one dashboard, with coding agents (Claude Code, ChatGPT's Codex CLI,
+  GitHub's Copilot CLI and xAI's Grok Build) when you want them.
 </p>
 
 <p align="center">
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/build-image.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/build-image.yml/badge.svg" alt="build image"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/lint.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/lint.yml/badge.svg" alt="lint"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/actions/workflows/dashboard.yml"><img src="https://github.com/aquilaelabs/builderbot/actions/workflows/dashboard.yml/badge.svg" alt="dashboard tests"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/build-image.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/build-image.yml/badge.svg" alt="build image"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml/badge.svg" alt="lint"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml/badge.svg" alt="dashboard tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license"></a>
-  <a href="https://github.com/aquilaelabs/builderbot/pkgs/container/builderbot"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/pkgs/container/aerieos"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
 </p>
 
 > [!WARNING]
-> **BuilderBot is early software.** It runs coding agents' sessions that edit,
+> **AerieOS is early software.** It runs coding agents' sessions that edit,
 > commit, run and push code on your machines, and it is still changing fast.
 > Do not point it at production repositories or at anything you cannot afford
 > to lose: try it on separate repositories made for testing, and keep backups
@@ -27,12 +27,12 @@
 >
 > **Check a project's rules before you use it there.** Some open source
 > projects, employers and clients forbid AI coding tools, or contributions
-> written with them. That is their call to make, and BuilderBot does not
+> written with them. That is their call to make, and AerieOS does not
 > check it for you.
 
 ## What it is
 
-BuilderBot is a **controller** and the machines you enroll under it, the
+AerieOS is a **controller** and the machines you enroll under it, the
 **nodes**. The controller keeps the dashboard and the record of every
 project: its plan, its bugs, its rules, its design. The nodes do the work:
 the agents' sessions, builds, tests, CI, Android emulators, containers and
@@ -43,6 +43,14 @@ browser, on a desktop or a phone, and a session of Claude, ChatGPT, Copilot
 or Grok starts on its node already briefed with the project's house rules,
 roadmap and open bugs. Close the tab and the session keeps going.
 
+On a machine of its own it is a NAS as well: the disks as pools or an array
+with parity, SMB and NFS shares, snapshots and backups, media and photo apps
+from the Library, and VMs. The agents work beside it under the same dials, so
+a session can write a service's compose file or read why a container stopped,
+and nothing touches a disk without you. It works as a NAS with no AI at all: no
+coding agent is installed until you install one, and none runs until you start
+it. A session you do start talks to its provider, so you choose what it may see.
+
 ## The editions
 
 One controller, from one tree, in four shapes. They differ only where the
@@ -50,12 +58,12 @@ machine does.
 
 | Edition | Runs on | What it is for | How it installs | State |
 | --- | --- | --- | --- | --- |
-| **Container** | Any host with Docker: a NAS, a home server, a VPS | The dashboard beside everything else the host runs; nodes elsewhere | `docker compose up` with the compose file below, or the app template on a NAS | Released |
+| **Aerie Workshop** | A container on any host with Docker: a NAS, a home server, a VPS | The AI workshop alone: the dashboard beside everything else the host runs, nodes elsewhere, and no storage of its own | `docker compose up` with the compose file below, or the app template on a NAS | Released |
 | **Bare-metal install** | A Linux machine of its own (every system a node runs on) | One box that is the controller and its own node: the dashboard, the builds, the sessions and the storage on one machine | `nodes/install-controller.sh --install` on the machine, updates from the page | Released |
-| **BuilderBot OS** | A machine installed from the ISO, or a VM from the qcow2 or OVA | The bare-metal install as an appliance: a read-only root in two slots, an update that falls back by itself, the disks as pools, an array and shares | Boot the ISO and pick a disk, or import the VM image | Experimental: it boots and updates in the lab and on one machine, and it is the edition most likely to break |
-| **USB edition** | A stick in any x86-64 machine | BuilderBot OS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/builderbot-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
+| **AerieOS** | A machine or a VM installed from the ISO | The bare-metal install as an appliance: a read-only root in two slots, an update that falls back by itself, the disks as pools, an array and shares | Boot the ISO and pick a disk | Experimental: it boots and updates in the lab and on one machine, and it is the edition most likely to break |
+| **USB edition** | A stick in any x86-64 machine | AerieOS loaded into memory at boot, its configuration kept on the stick, the machine's disks its storage | `tools/aerieos-stick.py write` on Windows, a Mac or Linux | Experimental, with the OS edition |
 
-The container and bare-metal editions are what BuilderBot has shipped as
+Aerie Workshop and the bare-metal install are what AerieOS has shipped as
 since 0.6. The OS and USB editions are new in 0.9: try them on a machine or
 a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
 
@@ -82,7 +90,7 @@ a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   router, and apps as containers, as one store of cards per node; what is
   installed is managed on the Installed page, where each thing is configured
   where it lives, and a card the node cannot take is not drawn.
-- **Builds, tests and CI.** `bb build` and `bb test` run on the project's
+- **Builds, tests and CI.** `aerie build` and `aerie test` run on the project's
   node, a test run is timed and recorded, a node picked as a project's test
   node runs its suites as a job, and a node can be a self-hosted GitHub
   Actions runner.
@@ -112,14 +120,14 @@ a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   keeps. Each person has a store of their own for their agents' sign-ins
   and the git tokens they give a project, which they can hold under a key
   of their own or purge at any time. A session reaches a git host only
-  through `bb git`, which hands over the credential, so the session never
+  through `aerie git`, which hands over the credential, so the session never
   holds it.
 - **A controller that moves.** Prepare to move arms a move to another home;
   every node hears where and follows by itself once the new home answers,
   however long that takes.
 - **A tour of each page** the first time you open it, which you can skip
   once for every page and bring back from About or your Profile. About's
-  Credits name the open-source work BuilderBot is built on.
+  Credits name the open-source work AerieOS is built on.
 - **Logs you can read.** Every job's output, each node's own logs and the
   controller's diagnostics, kept for as long as the log policy says and
   readable by a session that has been granted them.
@@ -161,7 +169,7 @@ a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
 
 - **A place for the controller**: a host with Docker for the container
   edition, a Linux machine of its own for the bare-metal install, a machine
-  or a VM you can wipe for BuilderBot OS, or a stick for the USB edition.
+  or a VM you can wipe for AerieOS, or a stick for the USB edition.
 - **At least one node**, unless the controller is its own: a Linux machine
   or VM where sessions, builds and tests run, on **Ubuntu 24.04 or later**
   or **Rocky Linux 9**, the systems nodes are tested on. A separate VM keeps
@@ -174,14 +182,14 @@ a VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   themselves, on the node, from the Installed page.
 - **Repositories made for trying it** (see the warning above).
 
-### The container edition
+### Aerie Workshop, the container edition
 
 Make the folders it keeps its state in, owned by the user the container
 should run as (`id -u` and `id -g` give yours):
 
 ```bash
-mkdir -p /srv/projects /srv/builderbot/{home,config,sdk}
-chown -R 1000:1000 /srv/projects /srv/builderbot
+mkdir -p /srv/projects /srv/aerieos/{home,config,sdk}
+chown -R 1000:1000 /srv/projects /srv/aerieos
 ```
 
 Then save this as `docker-compose.yml`, changing the paths and the IDs to
@@ -189,10 +197,10 @@ match:
 
 ```yaml
 services:
-  builderbot:
-    image: ghcr.io/aquilaelabs/builderbot:0.9   # a release line; see Upgrading in docs/install.md
-    container_name: BuilderBot
-    hostname: builderbot
+  aerie-workshop:
+    image: ghcr.io/aquilaelabs/aerieos:dev   # no stable release yet; see Upgrading in docs/install.md
+    container_name: Aerie-Workshop
+    hostname: aerie-workshop
     restart: unless-stopped
     stdin_open: true
     tty: true
@@ -203,9 +211,9 @@ services:
       DASHBOARD_PORT: 7680
     volumes:
       - /srv/projects:/workspace           # your projects: one folder each
-      - /srv/builderbot/sdk:/sdk           # the controller's own toolchains
-      - /srv/builderbot/home:/home/builder # each account's home
-      - /srv/builderbot/config:/config     # accounts, settings, notebooks, logs
+      - /srv/aerieos/sdk:/sdk           # the controller's own toolchains
+      - /srv/aerieos/home:/home/builder # each account's home
+      - /srv/aerieos/config:/config     # accounts, settings, notebooks, logs
       - runner-tokens:/config/runner-tokens
     ports:
       - "7680:7680"
@@ -228,28 +236,28 @@ On a NAS, the app template does the same from its own page: the
 
 ### The bare-metal install
 
-On a Linux machine that is only BuilderBot, as root:
+On a Linux machine that is only AerieOS, as root:
 
 ```bash
-git clone https://github.com/aquilaelabs/builderbot.git && cd builderbot
+git clone https://github.com/aquilaelabs/aerieos.git && cd aerieos
 sudo bash nodes/install-controller.sh --check        # changes nothing
 sudo bash nodes/install-controller.sh --install
 ```
 
-It lays the controller out under `/opt/builderbot`, starts its service and
+It lays the controller out under `/opt/aerieos`, starts its service and
 makes the machine its own node; updates come from the page after that
 ([docs/install.md, Bare metal](docs/install.md#bare-metal)).
 
-### BuilderBot OS and the USB edition (experimental)
+### AerieOS and the USB edition (experimental)
 
-Each release carries the appliance image: `builderbot-os-VERSION.iso` to
-install on a machine, `.qcow2` and `.ova` to import as a VM, and
-`.stick.raw.xz` for a stick. Boot the ISO and pick a disk, import the VM
-with two processors and 4 GB, or write a stick:
+Each release carries the appliance image as two files:
+`aerieos-os-VERSION.iso` to install on a machine or a VM, and
+`aerieos-os-VERSION.stick.raw.xz` for a stick. Boot the ISO and pick a
+disk (a VM wants two processors and 4 GB), or write a stick:
 
 ```bash
-sudo python3 tools/builderbot-stick.py list
-sudo python3 tools/builderbot-stick.py write /dev/sdX      # the newest release
+sudo python3 tools/aerieos-stick.py list
+sudo python3 tools/aerieos-stick.py write /dev/sdX      # the newest release
 ```
 
 The machine comes up as its own controller and node at
@@ -263,7 +271,7 @@ account, so do this before anyone else can reach it. Then:
 
 1. **Your profile** (the gear, then Profile): your name, email and git
    identity, which your commits carry.
-2. **Enroll a node** (the container edition): Machines, then **Enroll
+2. **Enroll a node** (Aerie Workshop): Machines, then **Enroll
    node**. It gives you one command to run on the node machine, which sets
    it up and connects it. An installed edition is its own node already.
 3. **Install an agent on the node**: Build, then the Library, with that node
@@ -285,15 +293,15 @@ Everything else, from installing to the full command reference, is in
 
 - [Everything it does](docs/features.md), one area at a time
 - [Install](docs/install.md), with the [NAS template walkthrough](docs/unraid.md)
-- [BuilderBot OS](docs/image.md): the appliance image, the stick and the VM
+- [AerieOS](docs/image.md): the appliance image, the stick and the VM
 - [Storage](docs/nas.md): pools, the array, shares, what is built on top
-- [Start here](docs/start-here.md), for an account on somebody else's BuilderBot
+- [Start here](docs/start-here.md), for an account on somebody else's AerieOS
 - [How it works](docs/how-it-works.md), the overview, with a doc for each part
   of the dashboard: [projects](docs/projects.md), [a project's page](docs/notebook.md),
   [sessions](docs/sessions.md), [building](docs/building.md),
   [toolchains](docs/toolchains.md), [containers](docs/containers.md), [VMs](docs/vms.md),
   [machines](docs/machines.md) and [people](docs/people.md)
-- [Reference](docs/reference.md): settings, every `bb` command, Android signing
+- [Reference](docs/reference.md): settings, every `aerie` command, Android signing
 - [Versions](docs/versions.md): release lines and channels
 - [Data and privacy](docs/privacy.md): what an install keeps and contacts; nothing is sent to us
 - [Architecture](docs/architecture.md) and [Contributing](CONTRIBUTING.md)

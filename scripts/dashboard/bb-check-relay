@@ -5,7 +5,7 @@ back (roadmap R31, step 2).
     bb-check-relay PROJECT SESSION        # JSON on stdin, the way Claude Code calls a Stop hook
 
 A house rule can carry a check: the command that verifies the framework it
-names (rules.py, `bb rules check`). A session that read the rule may still
+names (rules.py, `aerie rules check`). A session that read the rule may still
 forget to run it, and a rule nobody runs is prose. So when the session is
 about to stop, this runs the checks of the rules whose files the tree has
 changed, and if one fails the stop is refused with the failure, so the
@@ -108,7 +108,7 @@ def verdict(project, stamp, out, rc):
     if rc != 0 and "another dashboard test run is going" in out:
         return None
     # ...nor are rules that could not be read, which is the controller
-    # restarting: bb rules check says so with 75, and the session was told
+    # restarting: aerie rules check says so with 75, and the session was told
     # to fix a check that never ran (B412).
     if rc == 75:
         return None
@@ -191,7 +191,7 @@ def main():
                 return                       # this exact tree already passed
     except OSError:
         pass
-    bb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bb")
+    bb = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "aerie")
     if cuts(cwd, bb):
         reason = detached(project, cwd, bb, stamp)
     else:

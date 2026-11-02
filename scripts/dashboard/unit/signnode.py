@@ -14,7 +14,7 @@ import shutil
 
 import agentpkg
 
-agent = agentpkg.load("builderbot_agent_signnode")
+agent = agentpkg.load("aerieos_agent_signnode")
 agent.log = lambda *a, **k: None
 
 

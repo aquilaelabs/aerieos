@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Install BuilderBot's controller on a machine of its own, without the
+# Install AerieOS's controller on a machine of its own, without the
 # container (R90), and make that machine a node of itself.
 #
 # The container install is the image: compose or the Unraid template, tini
 # and the entrypoint. This is the same controller laid out the way the image
-# lays it out (/opt/builderbot, from the Dockerfile's own COPY lines), with
+# lays it out (/opt/aerieos, from the Dockerfile's own COPY lines), with
 # systemd (or OpenRC, or runit) in place of tini and an env file in place of
 # compose's; the dashboard, the state, the verbs and the updates are the
 # same. It is built on the node provisioner, not beside it: it sources
@@ -18,21 +18,21 @@
 #
 #   sudo bash nodes/install-controller.sh --check      can this machine take one
 #   sudo bash nodes/install-controller.sh --install    the controller, and its own node
-#   sudo bash /opt/builderbot/nodes/install-controller.sh --update     the newest release
-#   sudo bash /opt/builderbot/nodes/install-controller.sh --remove     take it away
+#   sudo bash /opt/aerieos/nodes/install-controller.sh --update     the newest release
+#   sudo bash /opt/aerieos/nodes/install-controller.sh --remove     take it away
 #
 # What it lays down, and who owns it:
 #
-#   /opt/builderbot                  -> /opt/builderbot-releases/VERSION, root's
-#   /etc/builderbot-controller/      root:builderbot 0750
+#   /opt/aerieos                  -> /opt/aerieos-releases/VERSION, root's
+#   /etc/aerieos-controller/      root:builderbot 0750
 #     controller.env                 the settings, root:builderbot 0640
 #     secrets/                       *.env and ssh/, root's alone (0700)
-#   /var/lib/builderbot-controller/  root:builderbot 0750
+#   /var/lib/aerieos-controller/  root:builderbot 0750
 #     config/ home/ sdk/             the state, the home, the toolchain store: the account's, 0700
-#   /srv/builderbot/projects         the projects (--workspace), the account's
-#   builderbot-controller            the service: scripts/host-boot.sh, as root, which
+#   /srv/aerieos/projects         the projects (--workspace), the account's
+#   aerieos-controller            the service: scripts/host-boot.sh, as root, which
 #                                    drops to the account for good
-#   /usr/local/bin/bb                bb as the account, for anybody who may sudo
+#   /usr/local/bin/aerie                bb as the account, for anybody who may sudo
 #   /etc/bb-session.wall             what a session on this machine's node never sees
 #
 # The controller's own node (--no-node leaves it out) is provision-linux.sh
@@ -48,23 +48,23 @@ TREE="$(cd "$HERE/.." && pwd)"
 # Where everything goes. One prefix, empty on a real install, so the unit
 # tests lay a release out under a scratch folder and read what landed.
 P="${BB_INSTALL_ROOT:-}"
-OPT="$P/opt/builderbot"
-RELEASES="$P/opt/builderbot-releases"
-ETC="$P/etc/builderbot-controller"
+OPT="$P/opt/aerieos"
+RELEASES="$P/opt/aerieos-releases"
+ETC="$P/etc/aerieos-controller"
 ENV_FILE="$ETC/controller.env"
-VAR="$P/var/lib/builderbot-controller"
-SHIM="$P/usr/local/lib/builderbot-controller/bin"
+VAR="$P/var/lib/aerieos-controller"
+SHIM="$P/usr/local/lib/aerieos-controller/bin"
 WALL_FILE="$P/etc/bb-session.wall"
-SUDOERS="$P/etc/sudoers.d/builderbot-controller"
-BB_BIN="$P/usr/local/bin/bb"
-SERVICE=builderbot-controller
-REPO=aquilaelabs/builderbot
+SUDOERS="$P/etc/sudoers.d/aerieos-controller"
+BB_BIN="$P/usr/local/bin/aerie"
+SERVICE=aerieos-controller
+REPO=aquilaelabs/aerieos
 # How many releases are kept beside the one in use: the one before is what
 # an update that does not come up goes back to by itself.
 KEEP_RELEASES=3
 
-ACCOUNT=builderbot
-WORKSPACE_DIR=/srv/builderbot/projects
+ACCOUNT=aerieos
+WORKSPACE_DIR=/srv/aerieos/projects
 PORT=7680
 JOBS_USER=bb
 SESSION_USER=builder
@@ -85,7 +85,7 @@ usage() {
     cat <<'EOF'
 usage: sudo bash install-controller.sh ACTION [options]
 
-Install BuilderBot's controller on this machine, without the container, and
+Install AerieOS's controller on this machine, without the container, and
 make the machine a node of itself. With no arguments this prints the help and
 changes nothing.
 
@@ -95,7 +95,7 @@ Actions:
                  it can take a controller, 1 when not.
   --install      the controller, from the tree this script is in: the
                  packages (config/controller-packages.tsv), the account, the
-                 release under /opt/builderbot, the env file, the service,
+                 release under /opt/aerieos, the env file, the service,
                  and then this machine as a node of itself. Safe to run
                  again: what is there is kept, an env file you edited above all.
   --update       the newest release (or --release TAG, or --from DIR, a
@@ -106,7 +106,7 @@ Actions:
                  release that does not answer goes back to it by itself,
                  the state copy it took first put back. There is no going
                  back by hand: a release moves forward only.
-  --remove       stop the controller and take its release, service, bb and
+  --remove       stop the controller and take its release, service, aerie and
                  wall away, and this machine's node with them. The state,
                  the env file, the secrets, the account and the projects
                  stay; --purge takes all but the projects too. Says what
@@ -120,7 +120,7 @@ Actions:
                  this machine enrolls as its node, once.
 
 Options:
-  --workspace PATH   the projects folder (default /srv/builderbot/projects);
+  --workspace PATH   the projects folder (default /srv/aerieos/projects);
                      never /workspace, which is this machine's node's synced copy
   --port N           the dashboard's port (default 7680)
   --account NAME     the account the controller runs as (default builderbot);
@@ -205,7 +205,7 @@ copy_as_copy() {
 }
 
 # lay_out TREE DIR VERSION REV: the release in DIR, from TREE, by the
-# Dockerfile's COPY lines (every one that lands under /opt/builderbot), so
+# Dockerfile's COPY lines (every one that lands under /opt/aerieos), so
 # what the image carries and what is laid out here cannot drift; then what
 # the image's RUN lines add there (noVNC, the scripts made executable) and
 # the stamp the image carries in its ENV (build.env).
@@ -214,8 +214,8 @@ lay_out() {
     rm -rf "$dir.partial"
     install -d -m 0755 "$dir.partial"
     while read -r src dest; do
-        case "$dest" in /opt/builderbot/*|/opt/builderbot) ;; *) continue ;; esac
-        copy_as_copy "$t" "$src" "$dir.partial${dest#/opt/builderbot}"
+        case "$dest" in /opt/aerieos/*|/opt/aerieos) ;; *) continue ;; esac
+        copy_as_copy "$t" "$src" "$dir.partial${dest#/opt/aerieos}"
         n=$((n + 1))
     done < <(sed -n 's/^COPY \([^ ]*\) \([^ ]*\)$/\1 \2/p' "$t/Dockerfile")
     [ "$n" -gt 5 ] || die "the Dockerfile in $t names nothing to lay out ($n COPY lines)"
@@ -255,7 +255,7 @@ lay_out() {
 # release_name VERSION: the folder a release is laid out in.
 release_name() { printf '%s' "$1" | tr -c 'A-Za-z0-9._+-' '_'; }
 
-# flip DIR: /opt/builderbot is DIR from now, in one rename; the release it
+# flip DIR: /opt/aerieos is DIR from now, in one rename; the release it
 # was is remembered as the one before.
 flip() {
     local dir="$1" was=""
@@ -346,7 +346,7 @@ pick_python() {
 }
 
 # extras: what the image fetches from each vendor beside the packages, the
-# same way and as best it can: the linters `bb lint` runs, uv and mise,
+# same way and as best it can: the linters `aerie lint` runs, uv and mise,
 # Playwright and web-ext through npm, the home tunnel's cloudflared. Each
 # one that does not land is said, and nothing waits on it. The terminals
 # need none of them: each is a pty of the dashboard's own.
@@ -404,7 +404,7 @@ extras() {
         *) miss+=(cloudflared) ;;
     esac
     rm -rf "$t"
-    [ "${#miss[@]}" -eq 0 ] || warn "not here, which the image carries: ${miss[*]} (the dashboard runs without them; bb lint says [skip] for a missing linter)"
+    [ "${#miss[@]}" -eq 0 ] || warn "not here, which the image carries: ${miss[*]} (the dashboard runs without them; aerie lint says [skip] for a missing linter)"
 }
 
 # ---- the account and its folders ---------------------------------------------
@@ -448,7 +448,10 @@ folders() {
         setpriv --reuid="$ACCOUNT" --regid="$g" --init-groups test -w "$P$WORKSPACE_DIR" 2>/dev/null \
             || warn "$WORKSPACE_DIR is not writable by ${ACCOUNT}: new projects cannot be made there until it is"
     else
-        install -d -m 0750 -o root -g "$g" "$(dirname "$P$WORKSPACE_DIR")"
+        # The parent made if missing and never changed if it is there: install
+        # -d sets a folder's mode and owner even when it exists, and the
+        # parent of --workspace /projects is / (B498).
+        mkdir -p "$(dirname "$P$WORKSPACE_DIR")"
         install -d -m 0750 -o "$ACCOUNT" -g "$g" "$P$WORKSPACE_DIR"
     fi
 }
@@ -492,33 +495,44 @@ env_get() {
     (set -a; . "$ENV_FILE" >/dev/null 2>&1; set +a; printf '%s' "${!1:-}")
 }
 
+# state_dir: the controller's state as the service finds it, with the same
+# default host-env.sh gives when the env file names none; an empty answer
+# had the update's gate and the rollback read the current directory (B499).
+state_dir() {
+    local v; v="$(env_get DASHBOARD_STATE)"
+    v="${v:-$VAR/config}"
+    case "$v" in /?*) printf '%s' "$v" ;; *) die "DASHBOARD_STATE in ${ENV_FILE} is not a path from /: ${v}" ;; esac
+}
+
 # bb_wrapper: bb on the machine's PATH, as the controller's account, with
 # the environment the service has (scripts/lib/host-env.sh). What `docker
-# exec -it BuilderBot bb` is on a container install.
+# exec -it AerieOS bb` is on a container install.
 bb_wrapper() {
     install -d -m 0755 "$(dirname "$BB_BIN")"
     cat > "$BB_BIN" <<EOF
 #!/usr/bin/env bash
-# Written by BuilderBot's install-controller.sh: bb as the controller's
+# Written by AerieOS's install-controller.sh: bb as the controller's
 # account (${ACCOUNT}), with the controller's environment. Anybody who may
 # sudo may run it; root runs it as the account.
 set -euo pipefail
 if [ "\$(id -un)" != "${ACCOUNT}" ]; then
     exec sudo -u "${ACCOUNT}" -- "\$0" "\$@"
 fi
-. /opt/builderbot/scripts/lib/host-env.sh
+. /opt/aerieos/scripts/lib/host-env.sh
 export HOME="\$BUILDER_HOME" USER="${ACCOUNT}"
-exec /opt/builderbot/scripts/bb "\$@"
+exec /opt/aerieos/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
+    # The old name, while anything still calls it.
+    rm -f "$(dirname "$BB_BIN")/bb"   # the command's old name, on a machine that had it
 }
 
 # sudoers: the two root helpers the account may run, the image's rule.
 sudoers() {
     install -d -m 0750 "$(dirname "$SUDOERS")"
-    printf '%s\n' "# Written by BuilderBot's install-controller.sh: the two root helpers, as in the image." \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/mint-runner-token" \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/builderbot/scripts/deploy-key" > "$SUDOERS.new"
+    printf '%s\n' "# Written by AerieOS's install-controller.sh: the two root helpers, as in the image." \
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token" \
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" > "$SUDOERS.new"
     chmod 0440 "$SUDOERS.new"
     if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$SUDOERS.new" >/dev/null 2>&1; then
         rm -f "$SUDOERS.new"; die "the sudo rule did not check out (visudo -c), so it was not put in place"
@@ -531,12 +545,12 @@ sudoers() {
 # rest after it is done (KillMode=mixed), which is the order `docker stop`
 # gives the container: the terminals are saved before tmux goes.
 service() {
-    # On BuilderBot OS the boot's own settings (builderbot-os-env.service)
+    # On AerieOS the boot's own settings (aerieos-os-env.service)
     # are read beside the env file; elsewhere the file is simply not there.
-    svc_install "$SERVICE" "BuilderBot controller" "/opt/builderbot/scripts/host-boot.sh supervise" \
+    svc_install "$SERVICE" "AerieOS controller" "/opt/aerieos/scripts/host-boot.sh supervise" \
         "KillMode=mixed
 TimeoutStopSec=30
-EnvironmentFile=-/run/builderbot-os/env"
+EnvironmentFile=-/run/aerieos-os/env"
 }
 
 # wait_up: the dashboard answering on its port, or why not.
@@ -589,7 +603,7 @@ checks() {
 
 cmd_check() {
     checks
-    printf '\n   %s can take a BuilderBot controller.\n' "${PRETTY_NAME:-$ID}"
+    printf '\n   %s can take an AerieOS controller.\n' "${PRETTY_NAME:-$ID}"
 }
 
 cmd_install() {
@@ -613,7 +627,7 @@ cmd_install() {
     sudoers
     say "service: ${SERVICE}"
     service
-    wait_up || die "the controller did not answer on port ${PORT}: journalctl -u ${SERVICE} (or $(env_get DASHBOARD_STATE)/logs/builderbot.log) says why"
+    wait_up || die "the controller did not answer on port ${PORT}: journalctl -u ${SERVICE} (or $(state_dir)/logs/builderbot.log) says why"
     printf '   up: http://%s:%s\n' "$(lan_ip || echo localhost)" "$PORT"
     if [ "$NODE" = 1 ]; then
         # The wall before the node: its first hello asks bb-session whether
@@ -629,11 +643,11 @@ cmd_install() {
 The controller is at http://${stamp}:${PORT}. Open it and make the owner
 account: until somebody does, it serves that page and nothing else.
 
-  sudo bb status                  what it is running, as the container's bb says it
+  sudo aerie status                  what it is running, as the container's aerie says it
   sudo systemctl status ${SERVICE}
   ${ENV_FILE}   its settings
 
-Its state is $(env_get DASHBOARD_STATE), its projects $(env_get WORKSPACE).
+Its state is $(state_dir), its projects $(env_get WORKSPACE).
 EOF
 }
 
@@ -647,7 +661,7 @@ cmd_stage() {
     local ver rev dir py
     load_core
     [ "$(id -u)" -eq 0 ] || die "--stage runs as root inside the image's root"
-    [ -d /usr/lib/builderbot-os ] || die "--stage is for the appliance image's tree (image/), which carries /usr/lib/builderbot-os"
+    [ -d /usr/lib/aerieos-os ] || die "--stage is for the appliance image's tree (image/), which carries /usr/lib/aerieos-os"
     INIT=systemd
     py="$(pick_python)" || die "the image has no python 3.${PY_MIN} or newer: image/mkosi.conf"
     printf '   python: %s\n' "$py"
@@ -669,7 +683,7 @@ cmd_stage() {
 }
 
 # cmd_firstboot: the first boot of an appliance disk
-# (builderbot-os-firstboot.service): the controller is up by its own
+# (aerieos-os-firstboot.service): the controller is up by its own
 # service, so this is --install's last step, the wall and this machine as
 # the controller's node. own_node writes the marker the unit's condition
 # reads, so it runs once; a boot that fails it (no network yet) runs it
@@ -697,7 +711,7 @@ cmd_firstboot() {
 # printed. The newest release when no tag is named, read from the releases
 # page's redirect the way the Dockerfile reads its tools' (no API budget).
 # fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
-# release workflow publishes as builderbot-controller-X.Y.Z.tar.gz with its
+# release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
 # against the sha256, and against the attestation where gh is here to ask;
 # a release from before the bundle falls back to the tag's source archive,
@@ -707,35 +721,81 @@ fetch_tree() {
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
+        # No stable release yet: the newest dev build, which is where AerieOS is.
+        case "$tag" in
+            v[0-9]*) ;;
+            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null \
+                      | grep -o '"tag_name": *"v[0-9][^"]*"' | head -1 | sed 's/.*"\(v[^"]*\)"$/\1/' || true)" ;;
+        esac
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi
-    d="$(mktemp -d /tmp/builderbot-release.XXXXXX)"
+    d="$(mktemp -d /tmp/aerieos-release.XXXXXX)"
     ver="${tag#v}"
-    base="https://github.com/${REPO}/releases/download/${tag}/builderbot-controller-${ver}.tar.gz"
-    if curl -fsSL -o "$d/release.tar.gz" "$base" 2>/dev/null; then
+    base="https://github.com/${REPO}/releases/download/${tag}/aerieos-controller-${ver}.tar.gz"
+    local http
+    http="$(curl -sSL -o "$d/release.tar.gz" -w '%{http_code}' "$base" 2>/dev/null || true)"
+    if [ "$http" = 200 ]; then
         curl -fsSL -o "$d/release.tar.gz.sha256" "${base}.sha256" || die "the bundle has no sha256 beside it at ${base}.sha256, so it is not taken"
         sum="$(awk '{print $1}' "$d/release.tar.gz.sha256")"
         echo "${sum}  $d/release.tar.gz" | sha256sum -c - >/dev/null 2>&1 \
             || die "the bundle does not match its sha256 (${base}): not taken"
         printf '   bundle %s, sha256 %s\n' "$(basename "$base")" "${sum:0:12}" >&2
         if command -v gh >/dev/null 2>&1; then
-            if gh attestation verify "$d/release.tar.gz" --repo "$REPO" >/dev/null 2>&1; then
+            # The attestation read from GitHub's public API and verified with
+            # --bundle, which asks gh for no sign-in, where a root shell has
+            # none and every update was refused; a gh too old for --bundle
+            # asks GitHub itself, as before.
+            local att=()
+            if gh attestation verify --help 2>&1 | grep -q -- '--bundle' \
+                    && curl -fsSL -H 'Accept: application/vnd.github+json' -o "$d/att.json" \
+                        "https://api.github.com/repos/${REPO}/attestations/sha256:${sum}" 2>/dev/null \
+                    && python3 -c 'import json, sys; a = json.load(open(sys.argv[1])).get("attestations") or []; open(sys.argv[2], "w").write("".join(json.dumps(x["bundle"]) + "\n" for x in a if isinstance(x.get("bundle"), dict))); sys.exit(0 if a else 1)' \
+                        "$d/att.json" "$d/att.jsonl" 2>/dev/null; then
+                att=(--bundle "$d/att.jsonl")
+            fi
+            if gh attestation verify "$d/release.tar.gz" "${att[@]}" --repo "$REPO" >/dev/null 2>&1; then
                 printf '   build attestation: verified by gh\n' >&2
             else
-                die "gh attestation verify refused the bundle: not taken (a build not made by the release workflow)"
+                die "gh attestation verify refused the bundle: not taken (a build not made by the release workflow, or a gh that wants a sign-in: gh auth login)"
             fi
         else
             printf '   build attestation: gh is not here to check it; the sha256 is what held\n' >&2
         fi
-    else
+        # ...and signed by a release key this install already holds (R199):
+        # this tree's config/release-signers, never the download's, so who
+        # changes the repository can build and attest a bundle, not sign it.
+        local signers keys
+        signers="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/config/release-signers"
+        keys="$(grep -v '^[[:space:]]*#' "$signers" 2>/dev/null | grep -c . || true)"
+        if [ "${keys:-0}" -gt 0 ]; then
+            command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
+            local rel="https://github.com/${REPO}/releases/download/${tag}"
+            if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig"; then
+                die "${tag} carries no signature yet: it is taken once its key's holder has signed it"
+            fi
+            ssh-keygen -Y verify -f "$signers" -I aerieos-release -n aerieos-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
+                || die "${tag}'s signature does not verify against this install's release key: not taken"
+            grep -q "^${sum}  \*\?aerieos-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
+                || die "the bundle is not the one ${tag} signed: not taken"
+            printf '   signed by AerieOS'"'"'s release key\n' >&2
+        else
+            printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
+        fi
+    elif [ "$http" = 404 ] && [ "$(printf '%s\n%s\n' "${ver%%-*}" 0.9.0 | sort -V | head -1)" != 0.9.0 ]; then
+        # Only a release from before the bundle, said not to have one, falls
+        # back to its source archive: any other failure to fetch the bundle
+        # (a server error, an asset taken off) is refused, never taken
+        # unverified.
         url="https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz"
         printf '   %s publishes no controller bundle (a release from before 0.9.0); its source archive is taken instead, unverified\n' "$tag" >&2
         curl -fsSL -o "$d/release.tar.gz" "$url" || die "could not download ${url}"
+    else
+        die "the controller bundle could not be fetched (${base}: HTTP ${http:-no answer}): not taken"
     fi
     tar -xzf "$d/release.tar.gz" -C "$d"
     local top
     top="$(find "$d" -mindepth 1 -maxdepth 1 -type d | head -1)"
-    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not a BuilderBot tree that installs bare metal"
+    [ -f "$top/Dockerfile" ] && [ -f "$top/nodes/install-controller.sh" ] || die "${tag}'s archive is not an AerieOS tree that installs bare metal"
     # The commit, from the header git writes on every archive.
     python3 -c 'import sys, tarfile; print(tarfile.open(sys.argv[1]).pax_headers.get("comment", ""))' \
         "$d/release.tar.gz" > "$top/.release-rev" 2>/dev/null || true
@@ -746,7 +806,8 @@ fetch_tree() {
 # its own stateversion.py before anything is changed.
 gate() {
     local t="$1" ver="$2" state
-    state="$(env_get DASHBOARD_STATE)"
+    state="$(state_dir)"
+    [ -n "$state" ] || die "the controller's state folder could not be told: nothing changed"
     BB_VERSION="$ver" PATH="$SHIM:$PATH" python3 "$t/scripts/dashboard/stateversion.py" check "$state"
 }
 
@@ -764,7 +825,7 @@ cmd_update() {
     # The new release's own installer lays the new release out, the way the
     # new image's own entrypoint is what starts it.
     if [ "${BB_UPDATE_HANDOFF:-}" != 1 ] && [ "$(cd "$t/nodes" && pwd)" != "$HERE" ]; then
-        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not a BuilderBot tree that installs bare metal"
+        [ -f "$t/nodes/install-controller.sh" ] || die "$t is not an AerieOS tree that installs bare metal"
         if [ "$DEV" = 1 ]; then
             BB_UPDATE_HANDOFF=1 exec bash "$t/nodes/install-controller.sh" --update --from "$t" --dev
         fi
@@ -782,6 +843,11 @@ cmd_update() {
     packages
     pick_python >/dev/null || die "no python 3.${PY_MIN} or newer here"
     dir="$RELEASES/$(release_name "$ver")"
+    # The same version from another commit would be laid out over the
+    # release that is running, and leave nothing to go back to.
+    if [ "$(readlink -f "$OPT" 2>/dev/null)" = "$(readlink -f "$dir" 2>/dev/null)" ]; then
+        die "${ver} is the release running here, from another commit (${rev:-unstamped}): its folder is not laid out again under it; move to a later version"
+    fi
     lay_out "$t" "$dir" "$ver" "$rev"
     flip "$dir"
     prune
@@ -820,17 +886,26 @@ back_to_previous() {
     [ -d "$prev" ] || die "the release before ($prev) is gone"
     newver="$(sed -n 's/^BB_VERSION=//p' "$OPT/build.env" 2>/dev/null || true)"
     oldver="$(sed -n 's/^BB_VERSION=//p' "$prev/build.env" 2>/dev/null || true)"
-    state="$(env_get DASHBOARD_STATE)"
+    state="$(state_dir)"
+    [ -n "$state" ] || die "the controller's state folder could not be told: nothing changed"
     say "back: ${newver:-?} to ${oldver:-?}"
     svc_stop "$SERVICE"
+    # Stopped, or nothing is put back: the restore moves its database aside,
+    # which a controller still writing would go on writing into.
+    if svc_active "$SERVICE"; then
+        die "the controller did not stop, so its state is not put back: stop ${SERVICE}, then sudo bash $0 --update --from ${prev}"
+    fi
     # The newer build may have moved the state on, which the older one
     # refuses; then the copy the newer one took before it migrated is put
     # back, and what the state held is kept beside it.
     # The restore is the newer release's own (an older one may predate it).
     if ! gate "$prev" "$oldver" 2>/dev/null; then
-        PATH="$SHIM:$PATH" python3 "$OPT/scripts/dashboard/stateversion.py" restore "$state" "$newver" \
+        # As the controller's account, whose folder it is, never as root:
+        # root following a link the account could plant in its own state
+        # would move files where the account chose.
+        setpriv --reuid="$ACCOUNT" --regid="$(id -gn "$ACCOUNT")" --init-groups \
+            env PATH="$SHIM:$PATH" python3 "$OPT/scripts/dashboard/stateversion.py" restore "$state" "$newver" \
             || { svc_restart "$SERVICE" || true; die "the state could not be put back to what ${oldver} reads, so ${newver} is started again"; }
-        chown -R "$ACCOUNT:$(id -gn "$ACCOUNT")" "$state" 2>/dev/null || true
     fi
     flip "$prev"
     service
@@ -845,7 +920,11 @@ cmd_remove() {
     what="the ${SERVICE} service, ${OPT} and ${RELEASES}, ${BB_BIN}, the sudo rule and the wall"
     [ -f /etc/builderbot/node.json ] && [ -f "$ETC/own-node" ] && what="${what}, and this machine's node (provision-linux.sh --remove)"
     if [ "$PURGE" = 1 ]; then
-        what="${what}; and with --purge: $(env_get DASHBOARD_STATE 2>/dev/null || echo "$VAR/config"), ${VAR}, ${ETC} and the account ${ACCOUNT}. The projects in $(env_get WORKSPACE 2>/dev/null || echo "$WORKSPACE_DIR") stay"
+        # What --purge removes is the installer's own folders; a state the env
+        # file moved elsewhere is named as staying, not as gone.
+        local st; st="$(state_dir)"
+        case "$st" in "$VAR"/*) st="" ;; esac
+        what="${what}; and with --purge: ${VAR}, ${ETC} and the account ${ACCOUNT} where this installer made it. The projects in $(env_get WORKSPACE 2>/dev/null || echo "$WORKSPACE_DIR")${st:+ and the state at ${st}} stay"
     fi
     printf 'This takes away: %s.\n' "$what"
     if [ -z "$ASSUME_YES" ]; then
@@ -865,15 +944,23 @@ cmd_remove() {
         runit)   rm -f "/var/service/${SERVICE}"; rm -rf "/etc/sv/${SERVICE}" ;;
     esac
     wall_remove
-    rm -f "$BB_BIN" "$SUDOERS"
+    rm -f "$BB_BIN" "$(dirname "$BB_BIN")/bb" "$SUDOERS"
     rm -rf "$RELEASES" "$SHIM"
     rm -f "$OPT"
     if [ "$PURGE" = 1 ]; then
+        # Whether this installer made the account, read before the folder
+        # that records it goes, which made the answer always no (B500).
+        local made=""
+        grep -qx "$ACCOUNT" "$MADE" 2>/dev/null && made=1
         rm -rf "$VAR" "$ETC"
-        if grep -qx "$ACCOUNT" "$MADE" 2>/dev/null || ! id -u "$ACCOUNT" >/dev/null 2>&1; then
-            userdel "$ACCOUNT" >/dev/null 2>&1 || true
+        if [ -n "$made" ]; then
+            userdel "$ACCOUNT" >/dev/null 2>&1 || warn "the account ${ACCOUNT} could not be removed: userdel ${ACCOUNT}"
         fi
-        printf '   the state, the env file, the secrets and %s are gone; the projects stay\n' "$ACCOUNT"
+        if [ -n "$made" ] && ! id -u "$ACCOUNT" >/dev/null 2>&1; then
+            printf '   the state, the env file, the secrets and %s are gone; the projects stay\n' "$ACCOUNT"
+        else
+            printf '   the state, the env file and the secrets are gone; the account %s stays; the projects stay\n' "$ACCOUNT"
+        fi
     else
         printf '   the state (%s), the env file, the secrets and %s stay: --install puts the controller back on them\n' \
             "$VAR/config" "$ACCOUNT"
@@ -883,7 +970,7 @@ cmd_remove() {
 # ---- the controller's own node --------------------------------------------------
 # own_node: this machine as an ordinary agent node of its own controller,
 # made the way any node is: a token minted from a shell on the controller
-# (bb nodes enroll-token --own), then provision-linux.sh run as it is, from
+# (aerie nodes enroll-token --own), then provision-linux.sh run as it is, from
 # the release, with --beside-controller. It dials the controller at the
 # address a remote node would (this machine's own on its network), so a
 # session there reaches it by that address and port and by nothing else.
@@ -892,7 +979,7 @@ cmd_remove() {
 OWN_MARK="$ETC/own-node"
 # The features the installer on the ISO was asked for (R160 step 2), turned
 # on with the node at the first boot: one id per line, on the data partition.
-OS_FEATURES_FILE="$P/var/lib/builderbot-os/features"
+OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"
 declare -a OS_FEATURES=()
 own_node() {
     local ip name tok ctl prov="$OPT/nodes/provision-linux.sh"
@@ -931,7 +1018,7 @@ own_node() {
 # the port table an earlier install wrote is taken away.
 # The name of that table (bb-session's WALL_TABLE).
 WALL_TABLE=builderbot_wall
-WALL_NFT="$P/etc/builderbot-controller/wall.nft"
+WALL_NFT="$P/etc/aerieos-controller/wall.nft"
 
 # wall_cover: the folders, from the env file as the controller reads it,
 # each once and none inside another.
@@ -955,7 +1042,7 @@ wall_cover() {
 wall_write() {
     say "the wall: what a session on this machine never reaches"
     {
-        printf '# Written by BuilderBot'"'"'s install-controller.sh (R90): this machine is a BuilderBot\n'
+        printf '# Written by AerieOS'"'"'s install-controller.sh (R90): this machine is an AerieOS\n'
         printf '# controller, and a session on its node is kept out of what follows. bb-session\n'
         printf '# covers every folder in COVER in a session'"'"'s view and starts none unless the\n'
         printf '# session and job accounts reach none of it.\n'
@@ -1012,7 +1099,9 @@ boot_oneshot_remove() {
         systemd) systemctl disable "$1" >/dev/null 2>&1 || true
                  rm -f "/etc/systemd/system/$1.service" ;;
         openrc)  rm -f "/etc/local.d/$1.start" ;;
-        runit)   [ -f /etc/rc.local ] && sed -i "\\|$2|d" /etc/rc.local ;;
+        # No rc.local is nothing to remove, not a failure: under set -e the
+        # test's 1 ended an update after its flip and a --remove halfway.
+        runit)   [ ! -f /etc/rc.local ] || sed -i "\\|$2|d" /etc/rc.local ;;
     esac
 }
 
@@ -1049,7 +1138,7 @@ main() {
     case "$ACCOUNT" in [a-z_][a-z0-9_-]*) ;; *) die "--account takes an account name" ;; esac
     # An install that is here already keeps its own answers.
     if [ -f "$ENV_FILE" ]; then
-        ACCOUNT="$(env_get BB_ACCOUNT)"; ACCOUNT="${ACCOUNT:-builderbot}"
+        ACCOUNT="$(env_get BB_ACCOUNT)"; ACCOUNT="${ACCOUNT:-aerieos}"
         PORT="$(env_get DASHBOARD_PORT)"; PORT="${PORT:-7680}"
     fi
     case "$ACTION" in

@@ -99,8 +99,6 @@ def status():
     out: dict = {"where": w, "folder": str(_dir() or "") if w in ("secrets", "state") or (w == "env" and _dir()) else ""}
     if not w:
         return out
-    with _lock:
-        _drop_previous()
     a = _about()
     fp = fingerprint(signing.MASTER)
     if w == "env":
@@ -108,7 +106,7 @@ def status():
         # "yes" means INSTALL_KEY can be taken out and nothing changes.
         out["adopted"] = os.environ.get("BB_INSTALL_KEY_ADOPTED") or "no"
     out.update(fingerprint=fp, changeable=w != "env", made=a.get("made", 0), changed=a.get("changed", 0),
-               saved=a.get("saved") == fp, previous=signing.PREVIOUS is not None,
+               saved=a.get("saved") == fp, previous=signing.PREVIOUS is not None, left=list(a.get("left") or []),
                previous_on_nodes=int(on_nodes_previous() if on_nodes_previous and signing.PREVIOUS else 0))
     return out
 
@@ -161,16 +159,68 @@ def change(new=""):
         _write(d / "key-previous", signing.MASTER)
         _write(d / "key", key)
         signing.load_master()
-        moved = 0
+        moved, failed = 0, []
         for p in reseal:
-            moved += p(again=True) or 0
+            # One that fails is run again at the next start (settle), the
+            # key before kept for it; the rest go on, and the page says which.
+            try:
+                moved += p(again=True) or 0
+            except Exception:                               # noqa: BLE001 (said, and settled at the next start)
+                failed.append(p)
+        left = len(failed)
         a = _about()
         a.pop("saved", None)
+        a["left"] = [getattr(p, "__module__", "") or getattr(p, "__name__", "") for p in failed]
         a["changed"] = int(time.time())
         a.setdefault("made", a["changed"])
         _save_about(a)
-        _drop_previous()
-    return {"ok": True, "fingerprint": fingerprint(key), "resealed": moved}, 200
+        # The key before is kept until the next start has run every pass
+        # again with both keys (settle): dropped here, anything a pass
+        # skipped (a keystore it could not write a moment ago) was left
+        # under a key that was gone for good (B550).
+    return {"ok": True, "fingerprint": fingerprint(key), "resealed": moved,
+            **({"note": f"{left} of the stores could not be sealed again now; the key before is kept, "
+                        "and they are sealed again at the next start"} if left else {})}, 200
+
+
+def landed(key, state_dir=None):
+    """The install key a move carried, in place of the one this install made
+    for itself (B599), with that one kept as the one before, and loaded now:
+    what the moved state sealed opens under it. A key set in the environment
+    is the environment's, and a move does not change it."""
+    key = bytes(key).strip()
+    if len(key) < 16 or not os.environ.get("BB_INSTALL_KEY_DIR"):
+        return
+    d = _dir()
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    was = (d / "key").read_bytes().strip() if (d / "key").is_file() else b""
+    if was and was != key:
+        _write(d / "key-previous", was)
+    _write(d / "key", key)
+    with contextlib.suppress(Exception):
+        signing.MASTER = key
+        signing.PREVIOUS = was if was and was != key else None
+
+
+def settle():
+    """At start, while the key before today's is kept: every pass run again
+    under today's key, then the one before let go once nothing on the nodes
+    is sealed under it. Returns how many were sealed again."""
+    if signing.PREVIOUS is None:
+        return 0
+    moved, clean = 0, True
+    with _lock:
+        for p in reseal:
+            try:
+                moved += p(again=True) or 0
+            except Exception:                               # noqa: BLE001 (kept for the next start)
+                clean = False
+        if clean:
+            _drop_previous()
+            a = _about()
+            if a.pop("left", None) is not None:
+                _save_about(a)
+    return moved
 
 
 def note_made():

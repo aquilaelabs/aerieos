@@ -129,7 +129,7 @@ class AgentLockdown(unittest.TestCase):
     def test_every_container_stops_none_restarts_and_the_door_shuts(self):
         import tempfile
         import agentpkg
-        agent = agentpkg.load("builderbot_agent_lockdown")
+        agent = agentpkg.load("aerieos_agent_lockdown")
         d = tempfile.mkdtemp()
         with open(os.path.join(d, "docker"), "w") as f:
             f.write("#!/bin/sh\n[ \"$1\" = ps ] && printf 'c1\\nc2\\n'\nexit 0\n")

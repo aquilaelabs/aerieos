@@ -1,12 +1,12 @@
 # The scanners
 
-BuilderBot runs its own static analysis stack on each node that holds
+AerieOS runs its own static analysis stack on each node that holds
 projects, from the **Scanners** page: Configure on a node's scanners row in
 the Containers page's System section opens it.
 Nothing is scanned on the controller and nothing of the controller's is
 mounted on a node: each node runs the scanners over the projects whose node
 it is and sends what they found up to the controller over the agent's own
-API, where the Analysis page, each project's Analysis view and `bb findings`
+API, where the Analysis page, each project's Analysis view and `aerie findings`
 read it ([building.md](building.md#static-analysis-reports)).
 
 | Scanner | What it finds |
@@ -37,7 +37,7 @@ rule and vulnerability caches stay on the node between runs.
    controller was down runs once when it is back, said as late.
 3. **Read what they found.** Each run writes one SARIF per scanner on the
    node and sends it up as it finishes; the Analysis page shows it on its
-   next look, grouped by project, and `bb findings history` says what
+   next look, grouped by project, and `aerie findings history` says what
    changed between runs. A run that fails is on the bell with its log.
 
 A project is scanned on its node, never on its extra nodes, so nothing is
@@ -60,12 +60,12 @@ reports it sent.
 A finding that is not a problem is answered in the code, beside it, with
 the reason: `# nosemgrep: RULE-ID (why this is safe)` on the flagged line
 for Semgrep. The stack never runs Semgrep with its suppressions turned off,
-and BuilderBot drops a finding the code marks this way, so the reason lives
+and AerieOS drops a finding the code marks this way, so the reason lives
 with the line it is about and the Analysis page keeps to what is open.
 
 ## A scanner of your own, on the host
 
-A scanner you run yourself can still hand BuilderBot its SARIF this
+A scanner you run yourself can still hand AerieOS its SARIF this
 release: `SCANNER_REPORTS_PATH` (deprecated in 0.9.0 and removed in the
 release after) names a folder on the host, mounted read-only at `/reports`
 and read beside what the nodes send up. Reports must be SARIF 2.1.0, their

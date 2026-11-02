@@ -1,12 +1,12 @@
 # Tool packs
 
-A tool pack is a toolchain you add to BuilderBot yourself, from a git
-repository you choose. BuilderBot ships no packs and keeps no list of them:
+A tool pack is a toolchain you add to AerieOS yourself, from a git
+repository you choose. AerieOS ships no packs and keeps no list of them:
 a pack is somebody's repository, and adding one is your decision. Once
 added, it installs onto a node like any shipped toolchain, and it gives
-sessions commands of its own through `bb tool`.
+sessions commands of its own through `aerie tool`.
 
-Use one for a tool BuilderBot does not carry: a decompiler, a protocol
+Use one for a tool AerieOS does not carry: a decompiler, a protocol
 analyzer, a game engine's headless editor, your company's internal CLI.
 
 ## Adding one
@@ -26,7 +26,7 @@ at the end, shows.
      at its top beside the scripts it runs. A single top-level folder is
      dropped, as with a project's archive, and it is at most 8 MB, since
      every node carries it; a pack fetches anything bigger as it installs.
-2. Press **Look**. BuilderBot shows what it would do: what it fetches and
+2. Press **Look**. AerieOS shows what it would do: what it fetches and
    runs to install, each command a session would get and the exact words it
    runs, its license, and whether it comes with guidance.
 3. Press **Add**. A repository's pack is kept at the commit you looked at,
@@ -52,18 +52,18 @@ from the catalog leaves no row to uninstall its files from.
 
 ## Official packs and agent packs
 
-Everything BuilderBot ships is a pack in this same format too (R169): under
+Everything AerieOS ships is a pack in this same format too (R169): under
 `packs/official/` one `bbtool.json` per shipped toolchain, carrying the
 recipe `config/toolchains.json` has for it under `shipped` (where it is
 fetched from, how it is verified, the system packages it needs), and under
 `packs/agents/` one per coding agent, carrying the adapter under `agent`
 (the program sessions run, how it installs and updates, how a person signs
-in, how it takes the briefing and BuilderBot's guards, where its
+in, how it takes the briefing and AerieOS's guards, where its
 conversations are). Both carry `"tier": "official"`, which is what lets
 them stand in for install steps and verbs and take a shipped name; a pack
 you add is `url`, and a pack from the vetted catalog is `vetted`. An agent whose manifest cannot name how it takes the guards is
 not a pack and is not listed. The files are written from the tables by
-`tools/packs-export.py --write` and `bb lint` fails when they drift, so
+`tools/packs-export.py --write` and `aerie lint` fails when they drift, so
 the format is one; the installer and the agents' adapters still read
 their own tables. The same folders live in the catalog repository
 (`packs/official/NAME`, `packs/agents/NAME`, written there by
@@ -76,9 +76,9 @@ catalog's, never twice.
 ### A coding agent of your own
 
 A pack from the vetted catalog can bring a coding agent beside the five
-BuilderBot ships. Its `agent` block is an adapter of data, never code: it
-says how BuilderBot starts the agent, hands it the briefing and holds it to
-the same guards, in the shapes BuilderBot already writes for the shipped
+AerieOS ships. Its `agent` block is an adapter of data, never code: it
+says how AerieOS starts the agent, hands it the briefing and holds it to
+the same guards, in the shapes AerieOS already writes for the shipped
 agents. The pack installs the agent's program like any pack (its `install`
 steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 
@@ -104,13 +104,13 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 |---|---|
 | `name`, `product`, `provider` | What the page calls it (Start, the dock, the Library card). |
 | `command` | The program a session runs, on `PATH` from the pack's own `layout.bin`. |
-| `briefing` | How it takes BuilderBot's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file) or `none`. |
-| `hooks` | Its hooks file under the account's home, written by BuilderBot at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for BuilderBot's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary) and `asking` (its permission prompt). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. |
+| `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file) or `none`. |
+| `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary) and `asking` (its permission prompt). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. |
 | `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
 | `first_prompt` | How a new project's brief is handed over: after `--`, after a `flag`, or not at all. |
 | `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
-| `transcripts` | Where its conversations are kept, so `bb transcripts` and the Sessions view read them, and which payload field carries a session's id. |
+| `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
 
 `pre`, `prompt` and `stop` are required: an agent that cannot take the
@@ -123,11 +123,11 @@ what runs in every session of it.
 
 ## The vetted catalog
 
-The public catalog (the `builderbot-catalog` repository, R169) is an index
-of packs reviewed by BuilderBot's maintainers, each entry pinning a pack's
+The public catalog (the `aerieos-catalog` repository, R169) is an index
+of packs reviewed by AerieOS's maintainers, each entry pinning a pack's
 repository to an exact commit and the sha256 of its archive at that
 commit, never a branch or latest. The index is signed with the
-maintainers' Ed25519 key; the public half ships with BuilderBot
+maintainers' Ed25519 key; the public half ships with AerieOS
 (`config/catalog.pub`), and an install reads an entry only after the
 signature checks: an index changed on the way, or signed by another key,
 is refused and the one read before stands, with the reason said. Where it
@@ -166,7 +166,7 @@ is a pack by address.
 
 A controller that cannot reach the catalog installs from a mirror of it.
 `tools/catalog-mirror.py catalog-mirror.tar.gz`, run on a machine with the
-network (from a checkout of BuilderBot), reads the catalog's index, checks
+network (from a checkout of AerieOS), reads the catalog's index, checks
 its signature, and fetches every repository the index pins at each commit it
 pins, into one archive: the index as signed and a git bundle per repository.
 `--from-dir` reads the index from a checkout of the catalog instead.
@@ -200,9 +200,9 @@ it to everyone, and each Create makes another container of it.
 
 ### A session asking for one
 
-A session looks through the catalog with `bb tool search WORDS`: each
+A session looks through the catalog with `aerie tool search WORDS`: each
 entry's name, kind, tier and what it is, and whether it is added here, never
-its address or commit. `bb tool install NAME --why "what it is for"` asks for
+its address or commit. `aerie tool install NAME --why "what it is for"` asks for
 a tool pack from it, and the project's **Install a tool pack** setting,
 under Agents may, says what happens: **deny** refuses, **ask** (the default)
 puts it on the bell for a person who may curate the catalog, whose Allow
@@ -219,7 +219,7 @@ off. A toolchain left off is:
 
 - not on a session's `PATH` or in its environment,
 - hidden from the session's view of the toolchain store, and
-- refused by `bb`, which names this setting as the reason.
+- refused by `aerie`, which names this setting as the reason.
 
 A session started after you save takes the change.
 
@@ -253,19 +253,19 @@ the scripts it runs:
 
 | Field | What it is |
 |---|---|
-| `name` | The pack's name, 2 to 40 of `a-z`, `0-9` and `-`. It is the toolchain's name and the word after `bb tool`, and it cannot be a shipped toolchain's. |
+| `name` | The pack's name, 2 to 40 of `a-z`, `0-9` and `-`. It is the toolchain's name and the word after `aerie tool`, and it cannot be a shipped toolchain's. |
 | `label`, `about` | What the Library and the Installed page show. |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
 | `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. This is where a pack downloads its binaries. |
 | `install.verify` | One command that must succeed for the install to count. |
 | `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |
-| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets BuilderBot administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
-| `verbs` | The commands a session calls as `bb tool NAME VERB`. |
-| `works_with` | The BuilderBot release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and one held that stops fitting after an upgrade is a line on the bell saying to update or remove it (R169 step 6). |
+| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
+| `verbs` | The commands a session calls as `aerie tool NAME VERB`. |
+| `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and one held that stops fitting after an upgrade is a line on the bell saying to update or remove it (R169 step 6). |
 | `touches` | What it touches: `hosts`, up to 16 host names its install fetches from, and `root`, true when it needs root on the node to install. Look shows both before it is added, and a pack that needs root is added by an administrator alone (R169 step 4). |
 | `config` | What it asks for on each node (R172): a list of fields, each `{name, label, kind, help, required, env, scope}`, the kind one of `secret`, `text`, `choice` (with `choices`), `list` (with `fields`, rows of them), `switch` or `projects`. The Installed page draws them as Configure on the pack's row for the node picked; the answers are kept on the controller, a secret sealed and never shown again, and handed to the node, where a field with `env` reaches the pack's verbs as that environment variable (a switch as `1` or empty, a list as JSON). `scope` is `node` (the default: one answer for everybody on that node, set by whoever may Configure there) or `person`: each person's own, set under **Yours** on the same row by anyone who works on that node's projects, a secret sealed under their own key, written into their home on the node and read by their sessions' verbs over the node's answer. |
-| `guidance` | A Markdown file in the repository telling a session, whichever coding agent runs it, when and how to use the pack. It reads it with `bb help tool-NAME`. |
+| `guidance` | A Markdown file in the repository telling a session, whichever coding agent runs it, when and how to use the pack. It reads it with `aerie help tool-NAME`. |
 | `icon` | Optional: a PNG, WebP or SVG file in the repository, at most 64 KB, which its Library card shows in place of its kind's glyph. It is read at the commit the pack is kept at, and refused with the pack when it is not the image its name says. It is shown as an image and nothing else, so an SVG's scripts never run. A pack without one keeps its kind's glyph. |
 
 ### Verbs
@@ -281,7 +281,7 @@ followed by a script inside the pack. These may appear in the words:
 - `{args}`: a word on its own, replaced by whatever the caller typed after
   the verb, each word passed as one word.
 
-So `bb tool hexkit dump "a b" '$(id)'` runs `{dir}/bin/hexkit` with
+So `aerie tool hexkit dump "a b" '$(id)'` runs `{dir}/bin/hexkit` with
 exactly the arguments `dump`, `a b` and `$(id)`. Nothing is expanded.
 
 The install marks executable every file a verb, an install step or
@@ -301,7 +301,7 @@ editor commits one, still runs.
 
 ## Wrapping someone else's tool
 
-A tool's authors need never have heard of BuilderBot. To give a session a
+A tool's authors need never have heard of AerieOS. To give a session a
 decompiler, say, write the pack yourself: a `bbtool.json` whose install
 steps download the tool's own release, and whose verbs run it.
 
@@ -327,4 +327,4 @@ steps download the tool's own release, and whose verbs run it.
 pack's directory. Upload the two files as a zip, or keep them in a
 repository of your own; a pack whose install needs no script of its own
 can be pasted as its `bbtool.json` alone. A session then has
-`bb tool ghidra analyze FILE`, and nothing else of the tool's.
+`aerie tool ghidra analyze FILE`, and nothing else of the tool's.

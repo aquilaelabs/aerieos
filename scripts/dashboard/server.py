@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""BuilderBot dashboard: status, project list and bb macros over HTTP.
+"""AerieOS dashboard: status, project list and bb macros over HTTP.
 
 Deliberately stdlib-only. This runs inside a container whose whole premise is
 that it gets rebuilt often; a dashboard that drags in a web framework would be
 one more thing to keep current, and http.server is more than adequate for one
 operator on a LAN.
 
-The terminals are BuilderBot's own (R133): a websocket at /termws, a pty
+The terminals are AerieOS's own (R133): a websocket at /termws, a pty
 here (termws.local) or carried signed to a node's screen relay (termws.node).
 """
 import base64
@@ -58,7 +58,7 @@ SCREEN_PORT = 7684
 # The cookie is a signed expiry, not a server-side session: the secret lives
 # on the /config volume, so a container update does not log every phone out,
 # and there is no session table to grow, lock, or clean. Basic auth still
-# works on every request (curl, bb capture shot and the tests send it preemptively),
+# works on every request (curl, aerie capture shot and the tests send it preemptively),
 # but no response carries a WWW-Authenticate challenge any more, because the
 # challenge is precisely what made browsers pop their own dialog.
 SESSION_DAYS = 30
@@ -233,6 +233,12 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
   <button type="submit">Restore it</button>
   <p class="note"><a href="/">Not restoring one: make the first account instead</a>.</p>"""
 
+# On a stick the first run's move door is shut (the operator, 1 Nov): the
+# bundle never lands on the stick, so the disks come first.
+STICK_MOVE_FIRST = ("This machine runs from a stick, and a move never lands on the stick: make a setup account, "
+                    "then on This machine create or adopt the disks and name the system pool or the folder the projects are in, "
+                    "and land the move from Controller settings, Move a controller here. The setup account goes when the move lands.")
+
 MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move token once.
     Give the token here with its bundle, or with the old controller's address while it still
     runs (the bundle is pulled from it, packed at that moment), and this install becomes that
@@ -326,7 +332,7 @@ SETUP_2FA_FIELDS = """  <p class="note">A role of yours, <b><!--NAME--></b>, req
       const b64 = a => btoa(String.fromCharCode(...new Uint8Array(a))).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");
       b.onclick = async () => { try {
         const o = await api({action: "2fa-passkey-begin"});
-        const c = await navigator.credentials.create({publicKey: {challenge: u8(o.challenge), rp: {name: "BuilderBot", id: location.hostname},
+        const c = await navigator.credentials.create({publicKey: {challenge: u8(o.challenge), rp: {name: "AerieOS", id: location.hostname},
           user: {id: u8(o.user), name: o.name, displayName: o.name}, pubKeyCredParams: [{type: "public-key", alg: -7}],
           authenticatorSelection: {residentKey: "preferred", userVerification: "preferred"}, attestation: "none", timeout: 60000,
           excludeCredentials: (o.exclude || []).map(id => ({type: "public-key", id: u8(id)}))}});
@@ -337,26 +343,30 @@ SETUP_2FA_FIELDS = """  <p class="note">A role of yours, <b><!--NAME--></b>, req
   })();
   </script>"""
 
+# What this install calls itself where it shows its name: the container is
+# Aerie Workshop, the AI workshop alone, and a machine of its own is AerieOS.
+PRODUCT = "AerieOS" if os.environ.get("BB_INSTALL", "") == "bare-metal" else "Aerie Workshop"
+
 LOGIN_HTML = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#1a1f26">
-<title>BuilderBot: <!--TITLE--></title>
+<meta name="theme-color" content="#0b1322">
+<title><!--PRODUCT-->: <!--TITLE--></title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   /* The Default scheme's tokens, its dark half, and nothing a person picked:
-     nobody is signed in yet, so the page wears BuilderBot's own colors
+     nobody is signed in yet, so the page wears AerieOS's own colors
      whatever this browser kept (the operator, 17 Oct). Derived the way the
      dashboard derives them (index.html :root): the lit fill from the second
      color, the sunk field from the panel. */
   :root{
-    --bg:#1a1f26; --panel:#212730; --line:#4d5c6f; --ink:#e6edf3;
-    --dim:#9fa9b4; --accent:#3fb950; --bad:#f8524a; --note:#58a6ff;
-    --deep:#1a4f8f; --deep:color-mix(in srgb, var(--note), #000000 40%);
-    --deep-edge:#1f6feb; --deep-edge:color-mix(in srgb, var(--note), #000000 14%);
-    --sunk:#1d2229; --sunk:color-mix(in srgb, var(--panel), #000000 12%);
+    --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
+    --dim:#a9b7ce; --accent:#2fc6ff; --bad:#f8524a; --note:#ff8f4a;
+    --deep:#99562c; --deep:color-mix(in srgb, var(--note), #000000 40%);
+    --deep-edge:#db7b40; --deep-edge:color-mix(in srgb, var(--note), #000000 14%);
+    --sunk:#101829; --sunk:color-mix(in srgb, var(--panel), #000000 12%);
     --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --r:6px;
   }
@@ -458,17 +468,12 @@ LOGIN_HTML = """<!doctype html>
     <span class="mark"><svg viewBox="0 0 32 32" aria-hidden="true">
   
   <g fill="currentColor">
-    <path d="M3.6,9.7 L3.6,8.8 L3.9,8.0 L4.3,7.4 L4.8,7.0 L11.0,3.4 L11.7,3.1 L12.4,3.1 L13.2,3.3 L14.1,3.7 L24.2,9.5 L25.0,10.1 L25.8,10.8 L26.5,11.7 L27.2,12.7 L27.7,13.7 L28.1,14.8 L28.4,15.9 L28.4,16.9 L28.4,22.3 L28.4,23.2 L28.1,24.0 L27.7,24.6 L27.2,25.0 L21.0,28.6 L20.3,28.9 L19.6,28.9 L18.8,28.7 L17.9,28.3 L7.8,22.5 L7.0,21.9 L6.2,21.2 L5.5,20.3 L4.8,19.3 L4.3,18.3 L3.9,17.2 L3.6,16.1 L3.6,15.1 Z" opacity=".5"/>
-    <path d="M21.0,28.6 L22.2,20.5 L22.1,19.5 L21.9,18.4 L21.5,17.3 L21.0,16.3 L20.3,15.3 L19.6,14.4 L18.8,13.7 L17.9,13.1 L7.8,7.2 L7.4,7.0 L7.0,6.9 L6.6,6.8 L6.2,6.7 L5.8,6.7 L5.5,6.7 L5.1,6.8 L4.8,7.0 L11.0,3.4 L11.3,3.2 L11.7,3.1 L12.0,3.1 L12.4,3.1 L12.8,3.2 L13.2,3.3 L13.6,3.5 L14.1,3.7 L24.2,9.5 L25.0,10.1 L25.8,10.8 L26.5,11.7 L27.2,12.7 L27.7,13.7 L28.1,14.8 L28.4,15.9 L28.4,16.9 L27.2,25.0 Z" opacity=".78"/>
-    <path d="M22.2,20.5 L22.1,19.5 L21.9,18.4 L21.5,17.3 L21.0,16.3 L20.3,15.3 L19.6,14.4 L18.8,13.7 L17.9,13.1 L7.8,7.2 L7.0,6.9 L6.2,6.7 L5.5,6.7 L4.8,7.0 L4.3,7.4 L3.9,8.0 L3.6,8.8 L3.6,9.7 L3.6,15.1 L3.6,16.1 L3.9,17.2 L4.3,18.3 L4.8,19.3 L5.5,20.3 L6.2,21.2 L7.0,21.9 L7.8,22.5 L17.9,28.3 L18.8,28.7 L19.6,28.9 L20.3,28.9 L21.0,28.6 L21.5,28.2 L21.9,27.6 L22.1,26.8 L22.2,25.9 Z"/>
-    <path d="M11.1,15.3 L11.0,14.6 L10.8,13.9 L10.4,13.2 L9.9,12.7 L9.3,12.2 L8.8,12.0 L8.3,12.0 L7.9,12.2 L7.6,12.7 L7.5,13.3 L7.6,13.9 L7.9,14.7 L8.3,15.4 L8.8,15.9 L9.3,16.4 L9.9,16.6 L10.4,16.6 L10.8,16.3 L11.0,15.9 Z" fill="#000" opacity=".58"/>
-    <path d="M18.2,19.4 L18.2,18.8 L17.9,18.0 L17.5,17.4 L17.0,16.8 L16.5,16.4 L15.9,16.1 L15.4,16.1 L15.0,16.4 L14.8,16.8 L14.7,17.4 L14.8,18.1 L15.0,18.8 L15.4,19.5 L15.9,20.1 L16.5,20.5 L17.0,20.7 L17.5,20.7 L17.9,20.5 L18.2,20.0 Z" fill="#000" opacity=".58"/>
-    <path d="M16.1,24.4 L16.5,24.5 L16.9,24.5 L17.1,24.2 L17.2,23.8 L17.1,23.2 L16.9,22.7 L16.5,22.2 L16.1,21.9 L9.7,18.2 L9.3,18.1 L8.9,18.1 L8.7,18.4 L8.6,18.8 L8.7,19.4 L8.9,19.9 L9.3,20.4 L9.7,20.7 Z" fill="#000" opacity=".58"/>
-    <line x1="16.0" y1="8.4" x2="16.0" y2="4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".5"/>
-    <circle cx="16.0" cy="2.5" r="2.15"/>
+    <path d="M16 3 Q11 11 2 27 Q9 23.5 12.2 19.5 L16 23 Z"/>
+    <path d="M16 3 Q21 11 30 27 Q23 23.5 19.8 19.5 L16 23 Z" opacity=".62"/>
+    <path d="M16 23 L13.2 27.5 Q16 29.6 18.8 27.5 Z"/>
   </g>
     </svg></span>
-    <h1>BuilderBot</h1>
+    <h1><!--PRODUCT--></h1>
     <p class="said"><!--SAID--></p>
   </div>
   <!--FIELDS-->
@@ -481,6 +486,7 @@ LOGIN_HTML = """<!doctype html>
 </script>
 </body></html>
 """
+LOGIN_HTML = LOGIN_HTML.replace("<!--PRODUCT-->", PRODUCT)
 
 # Every command the UI can run and every key it can press, by name, and the
 # operator's own command lists: macros.py (R77).
@@ -526,7 +532,7 @@ import timing                                                    # noqa: E402
 
 
 # The one implementation, in statefile.py, along with the file lock that makes
-# a read-modify-write safe against the OTHER writer, a `bb` invocation, which
+# a read-modify-write safe against the OTHER writer, a `aerie` invocation, which
 # is a different process. Kept as a name here because thirty-odd call sites and
 # every configure() injection already say write_json.
 write_json = statefile.write_json
@@ -556,7 +562,7 @@ notices.configure(state=STATE, write_json=write_json)
 # image and a checkout both keep it.
 import schedules                                                 # noqa: E402
 schedules.configure(state=STATE, write_json=write_json)
-# ...and BuilderBot's own docs, read on the Help page: helpdocs.py (R258).
+# ...and AerieOS's own docs, read on the Help page: helpdocs.py (R258).
 import helpdocs                                                  # noqa: E402
 
 
@@ -566,9 +572,9 @@ import helpdocs                                                  # noqa: E402
 
 
 
-# `bb toolchains install|update|remove` refuses when CLAUDECODE is set, and the
+# `aerie toolchains install|update|remove` refuses when CLAUDECODE is set, and the
 # message it prints tells the session to ask the operator to use this page.
-# So this page must never carry that variable, and it can: `bb dashboard dev`
+# So this page must never carry that variable, and it can: `aerie dashboard dev`
 # is normally run *by* a session, and the server it starts inherits whatever
 # that session had. One line here, rather than trusting every launcher to
 # remember, because the failure looks like the dashboard refusing to obey the
@@ -624,7 +630,7 @@ def version_payload(name):
 def window_cost(name):
     """What a MINOR bump of this project would cost the others, or {}.
 
-    Only one project can answer yes: the one whose checkout IS BuilderBot,
+    Only one project can answer yes: the one whose checkout IS AerieOS,
     because its minor is the compatibility window. What that window still
     holds, now the environment block is assembled per session and cannot be
     from another one (R63 step 3), is a node's AGENT: bump the minor and every
@@ -716,7 +722,7 @@ def compat_reap_once():
     agent that keeps the window leaves every session running. Run once at
     start, which is the moment after a controller update, and on a timer
     after that for a window that moves under a running server (a bump
-    landing on a `bb dashboard dev` restart, a node enrolled behind)."""
+    landing on a `aerie dashboard dev` restart, a node enrolled behind)."""
     holds = compat_holds(reap=True)
     if not holds:
         return []
@@ -1029,7 +1035,7 @@ def _git_facts(d):
 def _listed(d, cloning):
     """Whether the walk lists directory `d` as a project: the one rule for
     the whole list and for its names alone (project_names)."""
-    # Only what BuilderBot made (R154, the operator 8 Oct): a folder made by
+    # Only what AerieOS made (R154, the operator 8 Oct): a folder made by
     # hand on the share is not a project, and Import is the way one comes in.
     if not registry.is_project(d.name):
         return False
@@ -1126,7 +1132,7 @@ def _projects_on_disk():
                                   "text": f"cannot list this directory as uid {uid}:{gid}"
                                           "; chown it to PUID:PGID on the host"}]}]
     cloning = projects.busy_name()
-    # Only what BuilderBot made (R154, the operator 8 Oct): a folder made by
+    # Only what AerieOS made (R154, the operator 8 Oct): a folder made by
     # hand on the share is not a project, and Import is the way one comes in.
     with timing.timed("projects:registry"):
         registry.sync()
@@ -1265,7 +1271,7 @@ def _project_columns(who, facts):
     # One small file for the whole list, read here rather than per row: this
     # runs on the fifteen-second poll and a per-project read would be a dozen
     # opens for a dozen values that came from the same dictionary.
-    # With the workspace, so each row also says what `bb test` would run
+    # With the workspace, so each row also says what `aerie test` would run
     # there with nothing set; the settings field offers it as what an
     # empty box means.
     project_prefs = prefs.all_projects(WORKSPACE)
@@ -1470,7 +1476,7 @@ def _project_columns(who, facts):
                     "todo_batch": roadmap_batches.get(d.name),
                     "bugs": bug_counts.get(d.name, 0),
                     "tests": test_counts.get(d.name, 0),
-                    # The test run going right now, if `bb test` said so:
+                    # The test run going right now, if `aerie test` said so:
                     # {since, cmd, by}, or null. The companion app times
                     # its turn note by it and the project's During-a-test-run
                     # setting.
@@ -1626,7 +1632,7 @@ def gpu_for(project, node_id=""):
 
 # What a Resume says to a session an outage held (R251): the gate told it to
 # write where it was and stop, so this is where it picks up.
-RESUME_LINE = ("BuilderBot is back after an update. Pick up where you stopped: read the note you "
+RESUME_LINE = ("AerieOS is back after an update. Pick up where you stopped: read the note you "
                "left on where you were and what was next, and carry on.")
 
 
@@ -1669,6 +1675,9 @@ def _att_words(a):
         return (f"Copying or moving {a.get('name', '')} did not happen", a.get("why", ""))
     if k == "release-sign":
         return (f"{a.get('tag', '')}'s APK in {label} is not signed" if a.get("bad") else f"Signing in {label}", a.get("why", ""))
+    if k == "release-files":
+        return (f"{a.get('tag', '')} of {label} is missing {len(a.get('files') or []) or 'its'} file"
+                + ("" if len(a.get("files") or []) == 1 else "s"), a.get("why", ""))
     if k == "git-unlinked":
         return (f"{label} has no git access", a.get("why", ""))
     if k == "project-leftover":
@@ -1684,6 +1693,8 @@ def _att_words(a):
         return ("A role of yours requires two-factor sign-in" if a.get("required") else "Turn on two-factor sign-in", "")
     if k == "token-read":
         return (f"A sign-in on {node} was read", f"{a.get('comm') or 'a process'} opened it")
+    if k == "node-refused":
+        return (f"{node}'s agent is turned away", f"{a.get('why') or 'its credential'}: enroll it again from the Nodes page")
     if k == "token-reuse":
         return (f"{node}'s credential was used from a copy", "every token of that node is revoked")
     if k == "acme":
@@ -1705,6 +1716,7 @@ def _ask_words(a):
             "sign-key": f"a signing key change in {label}", "release": f"release {label} {a.get('tag') or ''}",
             "release-edit": f"edit the {a.get('tag') or ''} release of {label}", "release-sign": f"sign the release APKs of {label} again",
             "release-remove": f"remove files from the {a.get('tag') or ''} release of {label}",
+            "release-withdraw": f"withdraw the {a.get('tag') or ''} release of {label} and its tag",
             "phone-use": f"your phone, from {label}", "push": f"a push from {label} looks sensitive"}.get(k, "a session") + ": needs your answer"
 
 
@@ -1827,7 +1839,7 @@ PHONE_SNAPSHOT_DAYS = 7   # a phone not started this long gives back its quick-b
 def schedule_queue(s, argv, by):
     """One run of a schedule as a job on its node (R117): an exec job as the
     node's jobs account, or a system job as root on a node provisioned as a
-    sandbox, as `bb root run` is (nodes.root_wait's gate), never waited
+    sandbox, as `aerie root run` is (nodes.root_wait's gate), never waited
     for. {job} or {error}."""
     nid = s.get("node") or ""
     n = nodes.node(nid) if nid else None
@@ -1847,7 +1859,7 @@ def schedule_queue(s, argv, by):
                            "timeout": schedules.SYSTEM_TIMEOUT.get(s["system"]["apply"], 900)})
     elif s.get("as") == "root":
         if not (n.get("reported") or {}).get("sandbox"):
-            return {"error": f"{n['name']} was not provisioned as a BuilderBot sandbox, so root there is its owner's: "
+            return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so root there is its owner's: "
                              "run it as the jobs account, or on a sandbox node"}
         if nodes.system_job_for(nid):
             return {"error": f"a system job is already running on {n['name']}; one at a time"}
@@ -1881,7 +1893,7 @@ def _schedules_loop():
 def _ci_log_text(got):
     """A CI run as a log tab shows it (R133 step 12): the run, then each job
     with how it ended and the end of its log, the lines above that a failure
-    named, as bb ci-log prints them."""
+    named, as aerie ci-log prints them."""
     r = got.get("run") or {}
     out = [f"{r.get('name', '')} #{r.get('id', '')} on {r.get('branch', '')}: {r.get('conclusion', '')}  {r.get('url', '')}", ""]
     for j in got.get("jobs") or []:
@@ -1899,7 +1911,7 @@ def _room_loop():
     """Every hour, a node whose Docker disk has fallen under twice the floor
     gets its build cache a week old and its images no container has used
     for two weeks pruned (R110 step 3), before the bell's floor is reached;
-    what Docker said it freed goes to the controller's log (bb logs), the
+    what Docker said it freed goes to the controller's log (aerie logs), the
     prune itself to the audit log. Nothing a container
     uses is touched, and a node with room is left alone. A node whose cache
     store is as short gets the projects' build caches (Gradle's, npm's,
@@ -2042,6 +2054,9 @@ def _attention(who):
     # to (releasesign.attention, R106), for whoever sees the project: said
     # before the release, not after it went out without one.
     signs = releasesign.attention([p for p in releasesign.projects_fn() if users.may_see(who, p)])
+    # ...and a release short of a file its project says it carries (R190
+    # step 4), for whoever sees the project.
+    signs += releasefiles.attention([p for p in releasesign.projects_fn() if users.may_see(who, p)])
     # ...and a project whose git access went with an account's key store
     # (R154), for whoever sees it.
     signs += gitcreds.gone_rows([p for p in gitcreds.gone_projects() if users.may_see(who, p)])
@@ -2824,7 +2839,7 @@ _IMAGE_SINCE = {}
 def session_behind(s):
     """What changed since this session started that it does not see until
     it is started again (the operator, 12 Oct): a toolchain installed on its
-    node that puts something on its PATH, and BuilderBot updated, whose
+    node that puts something on its PATH, and AerieOS updated, whose
     briefing a session reads once, at its start."""
     started = int(s.get("created") or 0)
     if not started:
@@ -2835,7 +2850,7 @@ def session_behind(s):
         why.append(f"{', '.join(tools[:3])}{' and more' if len(tools) > 3 else ''} installed on "
                    f"{s.get('node') or 'its node'} since it started")
     if _IMAGE_SINCE.setdefault("at", _image_since()) > started:
-        why.append("BuilderBot updated since it started: its briefing is the older build's")
+        why.append("AerieOS updated since it started: its briefing is the older build's")
     # A repository made in its project since (Add repository): a session
     # works in the ones its project held when it started (bb-tty's works).
     added = _repos_since(s, started)
@@ -2899,9 +2914,9 @@ def project_busy(name, verb):
 
 
 MAINT_BAND = ('<div class="banner maint" id="maintband" role="status" hidden>Maintenance mode is on: '
-              'only you can use BuilderBot. It is switched off under '
+              'only you can use AerieOS. It is switched off under '
               '<a href="#/controller/settings" data-maintgo>Controller settings, Maintenance</a>.</div>')
-MAINTENANCE_SAID = "BuilderBot is down for maintenance: only its owner can sign in until it is over."
+MAINTENANCE_SAID = "AerieOS is down for maintenance: only its owner can sign in until it is over."
 # A held start's band (R56 step 9): sent hidden on every page of a bare-metal
 # install and shown by the poll while the start is held.
 HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The start is held: nothing runs until '
@@ -3203,12 +3218,12 @@ APP_API = 9
 PHONE_WAIT_S = 45
 
 
-# BuilderBot's own repository, as a project's origin names it over https or ssh.
-SELF_REPO = re.compile(r"github\.com[:/]aquilaelabs/builderbot(?:\.git)?/?$", re.I)
+# AerieOS's own repository, as a project's origin names it over https or ssh.
+SELF_REPO = re.compile(r"github\.com[:/]aquilaelabs/(?:aerieos|builderbot)(?:\.git)?/?$", re.I)
 
 
 def self_dist():
-    """dist/ of the project whose origin is BuilderBot's own repository, or
+    """dist/ of the project whose origin is AerieOS's own repository, or
     None. Found by the remote and not by the folder (B4), since a project
     renamed on the dashboard keeps its folder. Each project's .git/config is
     read rather than git asked, since the app asks /api/meta on every start."""
@@ -3228,7 +3243,7 @@ def self_dist():
 
 
 def app_apk():
-    """The newest companion APK in BuilderBot's own dist/, if this
+    """The newest companion APK in AerieOS's own dist/, if this
     controller has the repository as a project: what the app points at when
     it finds itself behind. Its filename only; the Artifacts view serves it."""
     d = self_dist()
@@ -3352,7 +3367,7 @@ def _versioned_page(raw, tag):
 # because the question it answers is "what is the page asking for right
 # now": the adb probe that put a row a minute on the Jobs tab and the tab
 # that asked for its listing three times were both visible in one such
-# window and invisible everywhere else. /api/trace reads it; `bb dashboard
+# window and invisible everywhere else. /api/trace reads it; `aerie dashboard
 # trace` prints it. Nothing here is persisted.
 _TRACE = collections.deque(maxlen=6000)
 _trace_lock = threading.Lock()
@@ -3401,7 +3416,7 @@ def trace_since(since):
     slow = []
     sections = {}
     for t, method, path, keys, by, ua, ms, cpu, parts in rows:
-        agent = ("app" if "BuilderBot" in ua else "curl" if ua.startswith("curl")
+        agent = ("app" if "AerieOS" in ua else "curl" if ua.startswith("curl")
                  else "browser" if "Mozilla" in ua else (ua.split("/")[0] or "?"))
         key = (method, path + ("?" + keys if keys else ""), by, agent)
         g = groups.setdefault(key, {"n": 0, "first": t, "last": t, "ms_max": 0, "ms_sum": 0, "cpu_sum": 0})
@@ -3459,14 +3474,14 @@ SESSION_SEEN = "session-seen.json"
 # roadmap is roadmap.catchup's, which says which item moved; these say the
 # half. A session's own writes through the API are marked seen as they land
 # (session_mark_own), so only somebody else's move is said.
-SEEN_HALVES = (("bug", "bugs", "`bb bug`"), ("rules", "rules", "`bb rules`"),
+SEEN_HALVES = (("bug", "bugs", "`aerie bug`"), ("rules", "rules", "`aerie rules`"),
                ("mem", "memories", "the notebook's Memory view"),
-               ("prefs", "settings", "`bb settings`"),
+               ("prefs", "settings", "`aerie settings`"),
                # ...and the design, which the house rules' fingerprint does
                # not cover (B218): a session styling a page went on with the
                # old one, and docs/design-language.md was never written again.
-               ("design", "design", "`bb design show`, and write docs/design-language.md again with "
-                                    "`bb design file` before committing it"))
+               ("design", "design", "`aerie design show`, and write docs/design-language.md again with "
+                                    "`aerie design file` before committing it"))
 OWN_WRITE_ROUTES = ("/api/roadmap", "/api/rules", "/api/bugs", "/api/memory", "/api/prefs", "/api/design")
 _seen_lock = threading.Lock()
 
@@ -3568,7 +3583,7 @@ def session_mark_own(project, uid, who, since=None):
 # project that carries the rule is told on its next prompt when a report
 # newer than any it was told of is open. Keyed by the rule rather than by
 # who may read diagnostics, since every project of an administrator's on a
-# granted node may, and only BuilderBot's own work answers them.
+# granted node may, and only AerieOS's own work answers them.
 WATCH_DIAG_RULE = "watch-diagnostics"
 
 
@@ -3713,7 +3728,7 @@ def session_seen_note(project, uid, node, who=None, begin=False):
         said = []
         if build and was_build and was_build != build:
             said.append(f"The controller moved to {build} since this session began (it was on {was_build}): "
-                        "`bb catchup` says what changed, and `bb preamble` prints the briefing as "
+                        "`aerie catchup` says what changed, and `aerie preamble` prints the briefing as "
                         "it is now; this session still holds the one it started with, so where the "
                         "change touches what you are doing, a new session is briefed with it.")
         if was_revs and revs_now:
@@ -3728,7 +3743,7 @@ def session_seen_note(project, uid, node, who=None, begin=False):
         if new_stale:
             said.append(f"This project's {', '.join(stale)} changed since this session started, and "
                         "a session takes those when it starts: end it and start a new one to have "
-                        "them (a project added to Reads answers bb -p already; its tree is mounted "
+                        "them (a project added to Reads answers aerie -p already; its tree is mounted "
                         "by the new session).")
         fresh = [r for r in watched or [] if int(r.get("id") or 0) > was_diag]
         if fresh:
@@ -3736,7 +3751,7 @@ def session_seen_note(project, uid, node, who=None, begin=False):
                         + ", ".join(f"report #{r['id']} from {r.get('project') or 'the dashboard'}"
                                     for r in reversed(fresh[:5]))
                         + (f" and {len(fresh) - 5} more" if len(fresh) > 5 else "")
-                        + f". `bb diag reports` reads them (the house rule {WATCH_DIAG_RULE}).")
+                        + f". `aerie diag reports` reads them (the house rule {WATCH_DIAG_RULE}).")
         return " ".join(said)
     except Exception as e:                                                # noqa: BLE001
         print(f"[dashboard] session seen: {type(e).__name__}: {e}", flush=True)
@@ -3854,7 +3869,7 @@ import chat                                                     # noqa: E402
 chat.configure(state=STATE, write_json=write_json)
 
 # ---- what each session is changing ------------------------------------------
-# Written by the bb-work-note hook inside a session and read by `bb work`;
+# Written by the bb-work-note hook inside a session and read by `aerie work`;
 # the server touches it only for a session on a node, whose hook posts the
 # note here because the node has no /config to write (roadmap #24).
 import overlap                                                   # noqa: E402
@@ -3907,7 +3922,7 @@ import mapping                                                   # noqa: E402
 # file tools on the file. Roadmap #7.
 import rules                                                     # noqa: E402
 # The guard's reading of a shell line, from scripts/lib (rules.py put it on
-# the path): `bb rules audit` counts the account's conversations with it.
+# the path): `aerie rules audit` counts the account's conversations with it.
 import rulehook                                                  # noqa: E402
 import codebase                                                  # noqa: E402
 import pending                                                   # noqa: E402
@@ -4131,8 +4146,8 @@ def live_block():
     what = st.get("version") or (st.get("rev") or "")[:12] or "an unstamped image"
     when = f", built {st['built']}" if st.get("built") else ""
     return ("## What is live\n\n"
-            f"The controller is BuilderBot {what}{when}. A fix pushed since is not "
-            "running until the operator rebuilds; `bb status` says what is, `bb catchup` "
+            f"The controller is AerieOS {what}{when}. A fix pushed since is not "
+            "running until the operator rebuilds; `aerie status` says what is, `aerie catchup` "
             "what changed since, and this line is from the moment this session started.")
 
 
@@ -4173,7 +4188,7 @@ import cilogs                                                    # noqa: E402
 cilogs.configure(state=STATE, workspace=WORKSPACE, push_record_fn=lambda p: projects.load_push().get(p),
                  config_fn=lambda d: gitrelay.config(d), parse_fn=forges.parse)
 # ...and watched (R117): once a day per project with workflows, and at once
-# when a project is linked; the Git view, bb catchup and the bell read it.
+# when a project is linked; the Git view, aerie catchup and the bell read it.
 import ciwatch                                                   # noqa: E402
 ciwatch.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
                   projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
@@ -4520,11 +4535,15 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
                  node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
                  project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
                  job_get=lambda jid: nodes.job(jid, with_log=True))
+# Every module that seals under the install key: one left out kept its
+# secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
-                             accountkeys.seal_all, reach.seal_all, router.seal_all),
+                             accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
+                             poolkeys.seal_all, packconfig.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
+installkey.settle()
 # Every account's own key made at the start that can seal it, a fresh
 # install's first and an upgraded one's first alike, rather than when it is
 # first needed (the operator, 27 Oct); one added later has its own made then.
@@ -4604,7 +4623,7 @@ vms.configure(state=STATE, write_json=write_json, node=nodes.node, node_list=nod
               job_add=nodes.job_add, audit=db.audit, prefs_get=prefs.get, nodes_rev=nodes.rev,
               enroll_script=nodes.enroll_script,
               node_retire=lambda by, nid: nodes.node_state(by, nid, "retired"),
-              node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail)
+              node_mark=nodes.node_vm_of, node_discard=nodes.node_discard, job_tail=nodes.job_tail, job_get=nodes.job)
 nodes.on_done("vm", vms.vm_done)
 # ...run as an administrator's, since the asks go to the administrators
 # alone and Allow is theirs (R116): a device passed through lands.
@@ -4654,10 +4673,11 @@ def _vm_do(principal, project, req, session):
     return vms.act(principal, project, field(req, "name"), field(req, "action"), dict(req, _session=session))
 
 
+devapp.nginx_routes = lambda nid: nginxproxy.record(nid).get("routes") or []
 nginxproxy.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
                      node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                      taken_ports=devapp.taken_ports)
-# BuilderBot's own scanners on each node (R145, scanners.py): deployed and
+# AerieOS's own scanners on each node (R145, scanners.py): deployed and
 # run as compose and scan jobs there, their reports sent up.
 import scanners                                                  # noqa: E402
 scanners.configure(state=STATE, write_json=write_json, node_list=nodes.node_list,
@@ -4756,6 +4776,24 @@ def _release_remover(project, plan, asker_name="", principal=""):
 phone.release_remover = _release_remover
 
 
+def _release_withdrawer(project, plan, asker_name="", principal=""):
+    """A release and its tag deleted on the forge with the project's own
+    token (R190 step 3), and the tag taken out of the controller's copy
+    too, so the number can be released again from a fixed commit."""
+    r = forgerelease.withdraw(project, plan["tag"])
+    if r.get("tagged") or not r.get("error"):
+        version._git(project, "tag", "-d", plan["tag"])
+    if not NODES_OK:
+        db.audit(principal, "version-release-withdraw", project,
+                 {"tag": plan.get("tag"), "release": bool(r.get("release")), "tagged": bool(r.get("tagged")),
+                  "error": r.get("error") or ""})
+    said = forgerelease.withdraw_said(r)
+    return ({"error": said}, 400) if r.get("error") else ({"withdrawn": r, "said": said}, 200)
+
+
+phone.release_withdrawer = _release_withdrawer
+
+
 def _keymaker(action, project, args, by=""):
     """A new generated key or a package's key, for a session's auto dial and
     for Allow on its ask (R106 step 6)."""
@@ -4790,7 +4828,8 @@ nodes.configure_verbs(vmtemplate=vmtemplate, forges=forges, devapp=devapp,
                       runner_store=runners, workspace=workspace,
                       project_prefs=prefs.get, may_push=projects.may_push,
                       no_node_advice=no_node_advice, turns_of=node_turns,
-                      working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"])
+                      working_on=lambda nid: node_turns(nodes.node(nid) or {"id": nid})["working"],
+                      project_names=lambda: sorted(prefs.all_projects()))
 
 version.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
                   roadmap_mod=roadmap, bugs_mod=bugs, changelog_mod=changelog,
@@ -4809,13 +4848,19 @@ releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json
                                               if d.is_dir() and not d.name.startswith(".")))
 
 
-def _forge_release(project, tag, version_, sha, comp=""):
-    """forgerelease.publish, and the release's unsigned APK expected for
-    signing once a release was made (releasesign.expect)."""
-    r = forgerelease.publish(project, tag, version_, sha, comp)
-    if r.get("url") and not r.get("error"):
-        releasesign.expect(project, tag)
-    return r
+# The files a release must carry (R190 step 4), checked once CI has had its
+# time, a release short of one said on the bell.
+import releasefiles                                              # noqa: E402
+releasefiles.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
+
+
+def _release_made(project, tag):
+    """A release's tag pushed, dev or stable: its unsigned APK expected for
+    signing (releasesign.expect) and its files checked later
+    (releasefiles.expect). A dev release's page is CI's, so this is not the
+    forge's half, which a dev release never reached (B469)."""
+    releasesign.expect(project, tag)
+    releasefiles.expect(project, tag)
 
 
 # The briefing says what a session may move the version by, with the rest
@@ -4823,7 +4868,7 @@ def _forge_release(project, tag, version_, sha, comp=""):
 preamble.version_policy = version.policy
 version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=projects._git_env,
                         MAY_PUSH=projects.may_push, SESSIONS=sessions_anywhere,
-                        FORGE=_forge_release,
+                        FORGE=forgerelease.publish, MADE=_release_made,
                         AUDIT=lambda *row: None if NODES_OK else db.audit(*row))
 
 
@@ -4858,16 +4903,16 @@ projects.configure(run=run, workspace=WORKSPACE, agent_keys=agent_keys,
                    write_json=write_json,
                    after_create=mapping.start)
 # A checkout still pointed at git's own store, which reads neither a
-# sealed token nor one in a person's store, pointed at BuilderBot's helper.
+# sealed token nor one in a person's store, pointed at AerieOS's helper.
 try:
     if (_rescoped := projects.rescope_store_helpers()):
-        print(f"dashboard: {', '.join(_rescoped)} now ask BuilderBot's credential helper", flush=True)
+        print(f"dashboard: {', '.join(_rescoped)} now ask AerieOS's credential helper", flush=True)
 except OSError as e:
     print(f"dashboard: checkouts' credential helpers left as they were: {e}", flush=True)
 # The session network reaches the containers of the projects a project reads.
 devapp.reads_of = prefs.reads_trees
 # What an agent may do on a project's git host (R188): measured with the
-# project's own token here, and the bb forge relay, which never hands the
+# project's own token here, and the aerie forge relay, which never hands the
 # token to a node.
 import forgeaccess                                               # noqa: E402
 forgeaccess.configure(state=STATE, write_json=write_json, target=projects.forge_target, prefs_get=prefs.get)
@@ -4878,6 +4923,7 @@ devapp.reaches_of = prefs.reaches_on
 # ...and what the create dialog's follow-ups and the sidebar's pins need.
 projects.lock = _state_lock
 projects.take_on = users.take_on
+projects.held = nodes.workspace_held
 projects.set_prefs = lambda name, **kw: prefs.set_prefs(name, workspace=WORKSPACE, **kw)
 projects.brief_writer = brief.write
 # A create that never took, and a project deleted for good, leave no owner,
@@ -4907,7 +4953,7 @@ import pushscan                                                  # noqa: E402
 
 pushscan.configure(state=STATE, write_json=write_json)
 bbrelay.configure(users=users, projects=projects, prefs=prefs, gitrelay=gitrelay, registry=registry,
-                  WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan)
+                  WORKSPACE=WORKSPACE, STATE=STATE, phone=phone, pushscan=pushscan, forgeaccess=forgeaccess)
 
 
 def _push_approved(rec, by):
@@ -4916,8 +4962,11 @@ def _push_approved(rec, by):
     repository, as the session's bb would have run it."""
     pushscan.okay(rec.get("project") or "", rec.get("findings") or [], by)
     to = str(rec.get("to") or "")
-    return gitrelay.run(rec.get("project") or "", rec.get("cwd") or str(WORKSPACE / (rec.get("project") or "")),
-                        "push", rec.get("args") or [], scan=False, uid=to if to.startswith("u_") else "")
+    # Approved for its flagged lines, not for its workflow files (B559).
+    project = rec.get("project") or ""
+    return gitrelay.run(project, rec.get("cwd") or str(WORKSPACE / project),
+                        "push", rec.get("args") or [], scan=False, uid=to if to.startswith("u_") else "",
+                        workflows=forgeaccess.override(project).get("workflows") != "deny")
 
 
 phone.pusher = _push_approved
@@ -5016,7 +5065,7 @@ def wait_for_boot():
     """Hold until the container has finished starting, or give up.
 
     This dashboard is started BY hook 15 and the hooks after it are still
-    running. A `bb doctor` run inside that window does not report an early
+    running. A `aerie doctor` run inside that window does not report an early
     truth, it reports a falsehood; and doctor.EVERY is half an hour, so it
     stuck. Measured when a GPU still booted here: doctor cached at +46s and
     the thing it was asking about came up at +48s, so the card was wrong
@@ -5026,7 +5075,7 @@ def wait_for_boot():
     recurring rather than as a stale answer.
 
     It does not care whether the wait succeeded: a dashboard started outside the
-    entrypoint (`bb dashboard dev`, the test harness, an image whose entrypoint
+    entrypoint (`aerie dashboard dev`, the test harness, an image whose entrypoint
     predates the marker) has none coming, and checking anyway is the behavior
     this has always had. So the wait ends on the container's own age as well as
     on a clock: mid-boot is the only time a missing marker means anything, and
@@ -5084,7 +5133,7 @@ def client_gone(sock):
         return False
 
 
-# ---- bb doctor, cached for the Doctor card: doctor.py ----------------------
+# ---- aerie doctor, cached for the Doctor card: doctor.py ----------------------
 import doctor                                                    # noqa: E402
 
 doctor.configure(run=run, wait_for_boot=lambda: (wait_for_boot(), wait_for_nodes()),
@@ -5203,8 +5252,12 @@ import releasecheck                                              # noqa: E402
 releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_metal=lambda: BARE_METAL,
                        window=lambda: (str(settings.get("update_window") or ""), int(settings.get("update_hour") or 4)),
                        apply=lambda v: _update_in_window(v),
-                       # The release channel (R179): dev only in debug mode with the dev switch on.
-                       channel=lambda: str(settings.get("release_channel") or "normal"), dev_ok=settings.dev_channel_ok)
+                       # The release channel (R179, R193): the one picked, else a dev build
+                       # follows the dev builds; debug mode alone picks a version, and
+                       # sees the drafts with AerieOS's own repository's token.
+                       channel=lambda: settings.channel_picked() or ("dev" if "-dev." in (image_stamp().get("version") or "") else "normal"),
+                       debug=settings.debug_available,
+                       draft_token=lambda: _builderbot_repo_token())
 
 
 # Update checks on one clock (R176, checks.py): each check's cadence a
@@ -5220,7 +5273,7 @@ checks.configure(state=STATE, settings_mod=settings,
 
 
 def _own_os():
-    """What the controller's own machine says of BuilderBot OS (R160 step
+    """What the controller's own machine says of AerieOS (R160 step
     4), or {} where it runs on another system or in a container."""
     nid = _own_node_id()
     n = nodes.node(nid) if nid else None
@@ -5230,15 +5283,50 @@ def _own_os():
 def _own_host():
     """What the controller's own machine says of its own packages' updates
     (R164 step 3): {pending, security, reboot, checked}, or {} where it
-    runs on BuilderBot OS or in a container."""
+    runs on AerieOS or in a container."""
     nid = _own_node_id()
     n = nodes.node(nid) if nid else None
     return dict(((n or {}).get("reported") or {}).get("host_updates") or {})
 
 
+def _builderbot_repo_token():
+    """In debug mode, the GitHub token Controller settings' Unpublished
+    builds holds, with which the update check sees AerieOS's draft
+    releases (the operator, 1 Nov); "" otherwise."""
+    return settings.secret("release_token") if settings.debug_available() else ""
+
+
+def _draft_update(principal, nid, tag, os_image):
+    """An update to a draft (nodes.draft_update): its AerieOS files
+    fetched here with the token, then the update taken from that folder,
+    checked as any folder's is; None when `tag` is no draft seen here."""
+    if not releasecheck.is_draft(tag):
+        return None
+    if not os_image:
+        return {"error": f"{tag} is a draft: a draft reaches AerieOS alone, from its files; publish it for this install to take it"}
+    dest = Path(STATE) / "os-draft"
+    shutil.rmtree(dest, ignore_errors=True)
+
+    def go():
+        why = releasecheck.fetch_draft(tag, str(dest / tag))
+        if why:
+            print(f"[dashboard] the draft {tag}: {why}", flush=True)
+            return
+        r = nodes.node_os_update(principal, nid, "", str(dest / tag))
+        print(f"[dashboard] the draft {tag}: {r.get('job') or r.get('error')}", flush=True)
+    threading.Thread(target=go, name="draft-update", daemon=True).start()
+    return {"ok": True, "fetching": True, "said": f"{tag} is a draft: its files are fetched here first, then the update runs from them"}
+
+
+nodes.draft_update = _draft_update
+# What an earlier draft update fetched: the slot has taken it by now.
+shutil.rmtree(Path(STATE) / "os-draft", ignore_errors=True)
+nodes.keep_versions = lambda: int(settings.get("os_keep") or 0)
+
+
 def _update_in_window(version):
     """The update window's press (releasecheck.window_pass): the image on
-    BuilderBot OS, the installer elsewhere, queued on the own node under the
+    AerieOS, the installer elsewhere, queued on the own node under the
     window's own name and said on the bell by the job as any update is."""
     nid = _own_node_id()
     if not nid:
@@ -5253,6 +5341,7 @@ held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_j
 # A prepared configuration a stick's first boot handed over (R161 step 8,
 # firstboot.py): applied once, here, before anybody can sign in or claim.
 import firstboot                                                 # noqa: E402
+import adoptapps                                                 # noqa: E402
 firstboot.configure(state=STATE, write_json_fn=write_json, users_mod=users, settings_mod=settings, hold_first_fn=held.arm_first)
 if BARE_METAL:
     try:
@@ -5264,7 +5353,7 @@ if BARE_METAL:
         print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
     # The catalog's mirror the stick carries (R169 step 6), handed over by
     # the boot: imported once per mirror, as Import under Controller settings.
-    _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/builderbot-os"), "firstboot", "catalog-mirror.tar.gz")
+    _cm = os.path.join(os.environ.get("BB_OS_RUN", "/run/aerieos-os"), "firstboot", "catalog-mirror.tar.gz")
     if os.path.isfile(_cm):
         try:
             _r = catalogmirror.take_file(_cm, time.time())
@@ -5276,6 +5365,8 @@ import backup                                                    # noqa: E402
 # Moving this controller to another home (R90 step 12, move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
 import move                                                      # noqa: E402
+move.checkpoint = db.checkpoint
+move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
 move.configure(state=STATE, workspace=WORKSPACE, secrets_dir=os.environ.get("BB_SECRETS_DIR", ""), write_json_fn=write_json,
                seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=stateversion.current,
                build_version_fn=lambda: image_stamp().get("version") or "",
@@ -5309,7 +5400,7 @@ def _own_pool_mounts():
 
 # The configuration backed up onto the machine's pools and found again at a
 # first run (R161 step 4, backup.py): the move's bundle under a password's key.
-backup.configure(state=STATE, pack_fn=move.pack, seal_fn=signing.seal, restore_fn=move.restore, manifest_fn=move.read_manifest,
+backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
                  password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_own_pool_mounts,
                  version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
                  host_fn=lambda: socket.gethostname())
@@ -5322,7 +5413,7 @@ apps.unvetted_ok = channel.unvetted_ok      # the Windows companion and the VS C
 devices.configure_apps(apps)
 
 # A person's PC lent to a project (R270 step 6): the companion lends a
-# table of verbs, a session asks with bb pc under Agents may: Use a lent PC.
+# table of verbs, a session asks with aerie pc under Agents may: Use a lent PC.
 import pcwork                                                    # noqa: E402
 pcwork.configure(workspace=WORKSPACE, mode_fn=lambda p: (prefs.get(p) or {}).get("pc") or "deny",
                  notify_fn=lambda uid, text, level: notices.act(uid, {"action": "add", "text": text,
@@ -5358,7 +5449,7 @@ def _mtime(path):
 # affordable on the fifteen-second poll they were written for and is not on
 # the one-and-a-half-second one they moved to. The key is the file's mtime in
 # nanoseconds, so a second write in the same second is still a miss, and a
-# write from `bb`, in another process entirely, invalidates this the same way
+# write from `aerie`, in another process entirely, invalidates this the same way
 # the dashboard's own does, because it is the file that is being watched and
 # not a counter in here.
 _rev_cache = {}
@@ -5382,7 +5473,7 @@ def revisions(who=None, projects=None):
     the only things that watch a per-project key. Without it every project
     pays for every poll, which was affordable while the per-project half was
     three stats and stopped being when the memory stamp joined them. A client
-    that sends nothing still gets all of them: `bb` and the tests do.
+    that sends nothing still gets all of them: `aerie` and the tests do.
     """
     names = [d.name for d in WORKSPACE.iterdir()
              if d.is_dir() and not d.name.startswith(".")] \
@@ -5751,7 +5842,7 @@ def _snapshot(who):
         # a bare refusal would tell you nothing you could act on. Only for
         # projects this account can see, and never their own, which is not
         # held against them (roadmap #26).
-        # Who has a Claude session on each project: BuilderBot account names,
+        # Who has a Claude session on each project: AerieOS account names,
         # everybody including the asker. More than one may (roadmap #24), each
         # in a worktree of their own, so this is a list and it is information
         # rather than a refusal: the row says who is here and nothing is
@@ -6065,7 +6156,7 @@ class Handler(BaseHTTPRequestHandler):
         users.authenticate_pair remembers a verified credential for a minute,
         so repeat calls are a digest and a dict lookup rather than a pbkdf2.
 
-        Basic and the cookie both land here. Basic is what `bb` and the test
+        Basic and the cookie both land here. Basic is what `aerie` and the test
         suite send; the cookie is what a browser gets from the login page.
         """
         self._basic_2fa = False
@@ -6210,7 +6301,7 @@ class Handler(BaseHTTPRequestHandler):
             if getattr(self, "_basic_2fa", False):
                 self._basic_2fa = False
                 return self._json({"error": "this account has two-factor sign-in, so its password alone opens "
-                                            "nothing: use bb from a dashboard terminal, which carries its own token"}, 401)
+                                            "nothing: use aerie from a dashboard terminal, which carries its own token"}, 401)
             return self._json({"error": "not signed in"}, 401)
         nxt = urllib.parse.quote(self.path, safe="/?=&")
         self.send_response(302)
@@ -6778,7 +6869,7 @@ class Handler(BaseHTTPRequestHandler):
         # No author, no terminal: every project is a repository, a commit
         # with no name and email behind it is one git refuses halfway through
         # the work, and a shell is where git is typed. bb-tty asks the same
-        # question on the node, from the same answer (bb settings --json's
+        # question on the node, from the same answer (aerie settings --json's
         # git_ready). Asked WITH the project this terminal is for, so an
         # author set for one repository alone opens a session there.
         # claude:<project>[:r:<id>] and sh:<n>:<project> put it in different
@@ -6879,7 +6970,7 @@ class Handler(BaseHTTPRequestHandler):
     def _novnc(self, rest):
         """noVNC's files (the page and the RFB client it imports), as the
         image fetched them; nothing outside its directory."""
-        root = Path(os.environ.get("BB_NOVNC_DIR", "/opt/builderbot/novnc")).resolve()
+        root = Path(os.environ.get("BB_NOVNC_DIR", "/opt/aerieos/novnc")).resolve()
         target = (root / urllib.parse.unquote(rest)).resolve()
         if root not in target.parents or not target.is_file():
             return self._json({"error": "not part of noVNC" if root.is_dir() else
@@ -7001,7 +7092,7 @@ class Handler(BaseHTTPRequestHandler):
         return target, vmm, None
 
     def _term_own(self):
-        """/termws?arg=...&cols=&rows= (R133): BuilderBot's own terminal, a
+        """/termws?arg=...&cols=&rows= (R133): AerieOS's own terminal, a
         websocket the page, the Android app and the VS Code extension open
         directly. Decided by _term_decide and _scoped_arg; a refusal is the
         socket closing with why. On this controller bb-tty runs in a pty
@@ -7024,7 +7115,7 @@ class Handler(BaseHTTPRequestHandler):
         if no:
             return termws.close(down, no[0])
         if target["where"] == "node" and not target.get("term"):
-            return termws.close(down, f"{target['name']}'s agent is from before BuilderBot's own terminal: "
+            return termws.close(down, f"{target['name']}'s agent is from before AerieOS's own terminal: "
                                       "update it on its Nodes row, and this opens")
         node = target["where"] == "node"
         words = [v for k, v in urllib.parse.parse_qsl(urllib.parse.urlsplit(
@@ -7244,6 +7335,8 @@ class Handler(BaseHTTPRequestHandler):
         tag = f'W/"{st.st_size:x}-{st.st_mtime_ns:x}"'
         if rel == "index.html":
             raw, tag = _versioned_page(raw, tag)
+            raw = (raw.replace(b"<title>AerieOS</title>", b"<title>" + PRODUCT.encode() + b"</title>", 1)
+                   .replace(b"<h1>AerieOS</h1>", b"<h1>" + PRODUCT.encode() + b"</h1>", 1))
         body, zipped = self._gzip(raw)
         if self.headers.get("If-None-Match") == tag:
             self.send_response(304)
@@ -7329,7 +7422,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             # The other end went away mid-answer: a download canceled, a tab
             # closed. Nothing failed here and nobody is left to answer, so it
-            # is one quiet line, not a traceback that bb diag lists as a fault
+            # is one quiet line, not a traceback that aerie diag lists as a fault
             # (B429).
             print(f"[dashboard] {self.command} {self.path.partition('?')[0]}: the client left "
                   "before the answer was sent", flush=True)
@@ -7378,7 +7471,7 @@ class Handler(BaseHTTPRequestHandler):
             self._safely(lambda: self._json({"error": why}, 403))
         return bool(why)
 
-    # The favicon set, generated by `bb tool graphics favicon` from static/favicon.svg (the
+    # The favicon set, generated by `aerie tool graphics favicon` from static/favicon.svg (the
     # header robot as a standalone file) and committed. An allow-list by full
     # path (the same shape as everything else the page can ask for), so this
     # never grows into a general file server by accident.
@@ -7527,7 +7620,7 @@ class Handler(BaseHTTPRequestHandler):
         # rather than the whole share's.
         # Absent and empty are different answers: a page with no notebook
         # open sends `p=` and wants none of the per-project tokens, where
-        # `bb` and the tests send no `p` at all and want them all.
+        # `aerie` and the tests send no `p` at all and want them all.
         # keep_blank_values, or `p=` parses to nothing at all and reads
         # as the absent case, which is the opposite answer.
         q = urllib.parse.parse_qs(self.path.partition("?")[2],
@@ -7717,14 +7810,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _pc(self, req):
         """POST /api/pc: a session's word with a PC lent to its project
-        (pcwork.py, bb pc): lent (which PCs lend which verbs), run (ask
+        (pcwork.py, aerie pc): lent (which PCs lend which verbs), run (ask
         one, under the project's Agents may: Use a lent PC) and result (an
         ask's answer, held a while). A session's alone: its project is the
         one its token was minted for."""
         me = self._who() or {}
         project = me.get("session") or ""
         if not project:
-            return self._json({"error": "bb pc is a session's: a person uses their PC themselves"}, 403)
+            return self._json({"error": "aerie pc is a session's: a person uses their PC themselves"}, 403)
         act = field(req, "action")
         if act == "lent":
             return self._json({"pcs": pcwork.lent(project), "mode": (prefs.get(project) or {}).get("pc") or "deny",
@@ -7751,12 +7844,12 @@ class Handler(BaseHTTPRequestHandler):
         # What the companion app asks first: the surface number this
         # dashboard serves, the image it is, and where a newer app is: the
         # one this controller fetched from its release (R272 step 5), else
-        # the newest in BuilderBot's own dist/ as before.
+        # the newest in AerieOS's own dist/ as before.
         held = next((a["files"][0] for a in apps.view()["apps"] if a["name"] == "android" and a["files"]), None)
         apk = {"apk": held["file"], "apk_sha256": held["sha256"], "apk_url": held["url"]} if held else \
             {"apk": app_apk(), "apk_sha256": app_apk_sha(), "apk_url": ""}
         # ...and, for a session that names its node, the agent there and when
-        # it was built (R131): what bb status says beside the controller's.
+        # it was built (R131): what aerie status says beside the controller's.
         agent = {}
         nid = urllib.parse.parse_qs(self.path.partition("?")[2]).get("node", [""])[0]
         if nid and (self._who() or {}).get("session") and not NODES_OK:
@@ -7768,7 +7861,7 @@ class Handler(BaseHTTPRequestHandler):
                            **({"agent": agent} if agent else {})})
 
     def _get_welcome(self):
-        """GET /api/welcome: BuilderBot's own changelog for the welcome panel
+        """GET /api/welcome: AerieOS's own changelog for the welcome panel
         (changelog.welcome), and where this account last looked."""
         return self._json(changelog.welcome(str(users.prefs(self._who()).get("image_seen") or "")))
 
@@ -7857,7 +7950,7 @@ class Handler(BaseHTTPRequestHandler):
         if nid and nid != "local" and not NODES_OK:
             d = toolchains.payload_for_node(nid)
             # A toolchain job's output is the node's, read by a session only
-            # with its project's diagnostics grant, as bb jobs reads it (the
+            # with its project's diagnostics grant, as aerie jobs reads it (the
             # operator, 12 Oct): the rows and what failed stay, the log lines
             # and the error excerpts go, with the reason in their place.
             why = self._diag_why() if (self._who() or {}).get("session") else ""
@@ -8120,7 +8213,7 @@ class Handler(BaseHTTPRequestHandler):
         sess = me.get("session") or ""
         # A session reads its own project's node, which is where it works,
         # whatever it asks for. Anybody else naming a project and no node
-        # reads that project's (bb devapp ls outside a session).
+        # reads that project's (aerie devapp ls outside a session).
         asked = q.get("node", [""])[0]
         proj = q.get("project", [""])[0]
         if sess or (not asked and proj):
@@ -8227,7 +8320,7 @@ class Handler(BaseHTTPRequestHandler):
         take = {p: not sess and can[p] == "write" and (users.is_admin(me) or (uid and membership.owner_of(p) == uid))
                 for p in seen}
         return self._json(vms.payload(seen) | {"can": can, "take": take, "me": uid, "unowned": sorted(gone),
-                                               # The domains libvirt has that BuilderBot did not make
+                                               # The domains libvirt has that AerieOS did not make
                                                # (R165 step 1): an administrator's to read, nobody's to act on.
                                                "others": vms.others() if not sess and users.is_admin(me) else []})
 
@@ -8374,7 +8467,7 @@ class Handler(BaseHTTPRequestHandler):
         # session bb-tty starts for them.
         mine = prefs.all_for_user(users.uid_of(self._who())).get(name) or {}
         if q.get("topic"):
-            # One topic of the briefing (R202), what bb help TOPIC prints.
+            # One topic of the briefing (R202), what aerie help TOPIC prints.
             t = preamble.topic(name, q["topic"][0].strip().lower()[:40])
             if t is None:
                 return self._json({"error": "no such topic"}, 404)
@@ -8411,12 +8504,12 @@ class Handler(BaseHTTPRequestHandler):
     def _get_design(self):
         """GET /api/design: design.view, a project's design language, its
         pages and the vocabulary they are drawn from, for a project this
-        account sees; a session reads it too, through bb design."""
+        account sees; a session reads it too, through aerie design."""
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
-        # ?show= is bb design's: the words rather than the record, so a
+        # ?show= is aerie design's: the words rather than the record, so a
         # session prints what the tab shows and nothing is assembled twice.
         show = q.get("show", [""])[0]
         if show:
@@ -8439,7 +8532,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_wiki(self):
         """GET /api/wiki: the project's wiki (wiki.view), or one page of it
         with ?page=, for an account that sees the project; a session reads
-        it too, through bb wiki."""
+        it too, through aerie wiki."""
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
         if self._not_project(name):
@@ -8459,7 +8552,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/ci-runs: a project's runs on GitHub's own runners, or
         with ?run=N (0 the newest finished) that run's jobs and the end of
         each failed job's log (cilogs), for an account that sees the
-        project; a session reads it through bb ci-log."""
+        project; a session reads it through aerie ci-log."""
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
         if self._not_project(name):
@@ -8659,6 +8752,9 @@ class Handler(BaseHTTPRequestHandler):
         # ...and an installer's ISO for a VM host (R99), streamed the same way.
         if self.path.split("?")[0] == "/api/vms-iso-upload":
             return self._vms_iso_upload()
+        # ...and a move landed from Controller settings, its bundle streamed.
+        if self.path.split("?")[0] == "/api/move-land":
+            return self._move_land()
         req = self._read_json()
         if req is None:
             return None
@@ -8689,7 +8785,7 @@ class Handler(BaseHTTPRequestHandler):
                 # reply is what lets a session send its next prompt, and one
                 # that overtook the record was told about its own write as
                 # somebody else's (B290). So the reply is held until then.
-                # A design rendered from a record (bb design file --from)
+                # A design rendered from a record (aerie design file --from)
                 # writes nothing, so it marks nothing seen.
                 own = (any(path.startswith(r) for r in OWN_WRITE_ROUTES)
                        and not (path.startswith("/api/design") and req.get("action") == "render"))
@@ -8749,7 +8845,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(r)
 
     def _checks_post(self, req):
-        """POST /api/checks {kind}: Check now, for one of the update checks
+        """POST /api/checks {kind}: Check for updates, for one of the update checks
         under Controller settings (R176, checks.py). An administrator's."""
         if self._refused("controller"):
             return
@@ -8880,14 +8976,14 @@ class Handler(BaseHTTPRequestHandler):
                 if bad:
                     return self._json({"error": f"{', '.join(bad)} is not a hosting-only node: a node the "
                                                 "project works on takes its containers already, from Nodes in its settings"}, 400)
-        # Which other projects a session here may read is BuilderBot's
+        # Which other projects a session here may read is AerieOS's
         # owner's alone (the operator, 6 Oct): it hands one project's sessions
         # another's code and notebook, which no administrator or user grants
         # on their own say. Only a change is asked about.
         if req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")) \
                 and (self._who() or {}).get("role") != "owner":
             return self._json({"error": "which other projects a project's sessions may read is set by "
-                                        "BuilderBot's owner alone"}, 403)
+                                        "AerieOS's owner alone"}, 403)
         # ...and so are the places on it a session here is shown (sees): a
         # share on a node is every project's there, so naming one is for
         # whoever may set the node. Only a change is asked about.
@@ -8998,6 +9094,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(r, 400 if r.get("error") else 200)
         if act == "hold-next":
             return self._json(held.arm_next(req.get("on") is not False))
+        # The containers another system ran, made again here (R163 step 10,
+        # adoptapps.py): what each would be, made, then started with what it
+        # asks for acknowledged by the press that showed it.
+        if act == "adopt-apps":
+            own = nodes.node(_own_node_id() or "") if BARE_METAL else None
+            if not own:
+                return self._json({"error": "the containers are made on the controller's own machine (a bare-metal install)"}, 400)
+            cfg, adopted = firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {}
+            op = field(req, "op")
+            if op == "plan":
+                return self._json({"ok": True, "apps": adoptapps.plan(cfg, adopted)})
+            if op == "make":
+                names = [str(x) for x in (req.get("names") or []) if isinstance(x, str)][:128]
+                if not names:
+                    return self._json({"error": "name the containers to make"}, 400)
+                r = adoptapps.make(cfg, adopted, names, own["id"])
+                db.audit(self._principal(), "adopt-apps", own["id"], {"made": [m["slug"] for m in r["made"]], "skipped": len(r["skipped"])})
+                return self._json({"ok": True, **r})
+            if op == "start":
+                r = adoptapps.start(req.get("rows") if isinstance(req.get("rows"), list) else [])
+                db.audit(self._principal(), "adopt-apps-start", own["id"], {"started": r["started"]})
+                return self._json({"ok": True, **r})
+            return self._json({"error": "an adopt-apps op is plan, make or start"}, 400)
         got = nodes.verb(self._principal(), req)
         # A node that left is a node the Doctor's cached verdict may still
         # name, for up to its half hour: the next run starts now, on its own
@@ -9011,8 +9130,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*got)
 
     def _jobs(self, req):
-        """The Jobs page's one verb, and where `bb run`, `bb build`, `bb test`
-        and `bb emu` land from the controller (nodes.run_job). A queued job
+        """The Jobs page's one verb, and where `aerie run`, `aerie build`, `aerie test`
+        and `aerie emu` land from the controller (nodes.run_job). A queued job
         is ended; a running one is flagged and its runner told, and the row
         moves when the runner reports that it stopped, which is when it
         did."""
@@ -9028,7 +9147,7 @@ class Handler(BaseHTTPRequestHandler):
             # project on the machine and be root on it. Measured on
             # bb-dev-sandbox, 16 Sep, before this refusal.
             if (self._who() or {}).get("session"):
-                return self._json({"error": "a session runs bb run, build, test and emu where it "
+                return self._json({"error": "a session runs aerie run, build, test and emu where it "
                                             "is, on its project's node; a job would run outside "
                                             "the session's view, so a session cannot queue one"}, 403)
             # ...nor from an account without the right: the same job queued with
@@ -9175,7 +9294,7 @@ class Handler(BaseHTTPRequestHandler):
                            "sees": (prefs.get(project) or {}).get("sees") or [],
                            # Whether it may compute on its node's NVIDIA card
                            # (R102): "on", or who said no, the node or the
-                           # project, which bb gpu then says to the session.
+                           # project, which aerie gpu then says to the session.
                            "gpu": gpu_for(project, _arg_node(arg)),
                            # Whether its Gradle builds on the node's disk (B439).
                            "build_local": (prefs.get(project) or {}).get("build_local", True),
@@ -9211,7 +9330,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _bb_relay(self, req):
         """A bb verb from a session on a NODE, run here (roadmap #24). The
-        door: a signed-in caller, and the account's `bb` right on the
+        door: a signed-in caller, and the account's `aerie` right on the
         project. Which words travel, whose project a token names and what a
         session may push are bbrelay.py's."""
         me = self._who()
@@ -9222,7 +9341,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*no)
         if self._refused("bb", project):
             return None
-        # A session's bb bug add, bb rules add or bb settings set is its own
+        # A session's aerie bug add, aerie rules add or aerie settings set is its own
         # write like one through the notebook's routes, and was told to it
         # on its next prompt as somebody else's (B375): what moved across
         # the verb is marked seen for the session that ran it.
@@ -9578,7 +9697,7 @@ class Handler(BaseHTTPRequestHandler):
         """Start, stop, restart or read the log of ONE container on a node.
 
         Any container on that daemon, which is the point: the operator asked
-        for a manager rather than a list of what BuilderBot made, and what
+        for a manager rather than a list of what AerieOS made, and what
         makes that acceptable is the same thing that makes the rest of this
         acceptable, namely that the daemon belongs to a machine whose only job
         is running containers (R68 steps 1 and 2).
@@ -9687,14 +9806,14 @@ class Handler(BaseHTTPRequestHandler):
         return self._result(r)
 
     def _devapp(self, req):
-        """The dev-instance controls: the Containers page's buttons, and `bb devapp`
+        """The dev-instance controls: the Containers page's buttons, and `aerie devapp`
         from a session. Who may press which is decided below, by the verb, by
         whose the container is and by its project's Run its container."""
         me = self._who() or {}
         sess = me.get("session") or ""
         # Named as the Docker tab lists it, for one that is not the caller's
         # own project's: a container written here, or another project's
-        # instance that belongs to this one (bb devapp --container NAME).
+        # instance that belongs to this one (aerie devapp --container NAME).
         ctr = field(req, "container")
         if ctr:
             row = devapp.row_named(ctr)
@@ -9807,7 +9926,7 @@ class Handler(BaseHTTPRequestHandler):
         # The exception is one SENT there on purpose (R166): its image is
         # built on the project's own node and shipped, and the project's
         # sessions are the ones meant to rebuild it.
-        # A node named by its name (bb devapp new --node NAME) is its id here.
+        # A node named by its name (aerie devapp new --node NAME) is its id here.
         if act == "new" and req.get("node") and not NODES_OK and not nodes.node(str(req["node"])):
             hit = [n for n in nodes.node_list() if n.get("name") == str(req["node"]) and n.get("state") != "retired"]
             if hit:
@@ -9846,7 +9965,7 @@ class Handler(BaseHTTPRequestHandler):
             # a session can bring a container up by request. What a container
             # IS stays out of reach: `new` from a session is the project's own
             # compose file on its own node, never another project's and never
-            # a file it wrote, which is `bb container ask` and an
+            # a file it wrote, which is `aerie container ask` and an
             # administrator's.
             # The dial of the project it belongs to, which is the session's
             # own: the gate above let nothing else through.
@@ -9901,8 +10020,8 @@ class Handler(BaseHTTPRequestHandler):
         # the name decides a compose project and a data directory, and those
         # are not places to let an arbitrary string reach.
         # A request naming no instance means the project's only one, when
-        # it has exactly one: BuilderBot's own is called builderbot-dev, and
-        # bb devapp from a session was answering for a `main` that did not
+        # it has exactly one: AerieOS's own is called builderbot-dev, and
+        # aerie devapp from a session was answering for a `main` that did not
         # exist (15 Sep). With several, `main`; bb takes --instance for that.
         # A NEW one named by nobody takes the name Send would offer: the
         # project's own while it has none, then one beside it.
@@ -9920,7 +10039,7 @@ class Handler(BaseHTTPRequestHandler):
         """Move a project's version, or change who is allowed to:
         version.verb, behind the gates here.
 
-        A session's bump goes through `bb version bump`, which asks the same
+        A session's bump goes through `aerie version bump`, which asks the same
         policy and passes `by="claude"`.
         """
         name = field(req, "project")
@@ -9928,13 +10047,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         act = field(req, "action")
         # B173: this is the panel's, and `by="operator"` is only true of an
-        # administrator at it. A session moves its version with bb version
+        # administrator at it. A session moves its version with aerie version
         # bump, under the project's policy, and never here, where it could
         # also have loosened that policy; a plain account may ask a session
         # to bump and no more.
         who = self._who() or {}
         if who.get("session") and act == "release":
-            # bb version release (R138): its own project only, under its
+            # aerie version release (R138): its own project only, under its
             # dial. The tag and the forge's release are made here, with the
             # project's own credentials, which the session never holds.
             if name != who["session"]:
@@ -9945,26 +10064,27 @@ class Handler(BaseHTTPRequestHandler):
                                             "Tag and publish a release); a person cuts it with Release on "
                                             "the Artifacts view"}, 403)
             comp = field(req, "component") or ""
-            dev = req.get("dev") is True
-            plan = version.release_plan(name, comp, dev=dev)
+            plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True)
             if plan.get("error"):
                 return self._json(plan, 400)
+            dev = plan["dev"]
             # Said before the tag, not after it (R134 step 4): 0.7.0 was
             # tagged with no sideload key and its APK never attached.
             rs = releasesign.readiness(name, fresh=True)
             if rs["wanted"] and rs["why"] and not req.get("unsigned"):
                 return self._json({"error": f"{plan['tag']}'s Android APK could not be signed: {rs['why']}. "
-                                            "Put that right first (bb sign status says when it is), or release "
-                                            "with --without-apk and have it signed after with bb sign release "
+                                            "Put that right first (aerie sign status says when it is), or release "
+                                            "with --without-apk and have it signed after with aerie sign release "
                                             "within three days, while CI keeps the unsigned APK",
                                    "unsigned": rs["why"]}, 409)
             acct = users.account_of(who) or {}
             if mode == "auto":
-                return self._json(*_releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev))
+                got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev)
+                return self._json({**got, "channel": plan["channel"]} if isinstance(got, dict) else got, code)
             r = phone.ask_release(field(req, "why"), name, comp, plan, membership.owner_of(name),
                                   membership.owner_name(name) or "the project's owner",
                                   asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev)
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._json({**r, "channel": plan["channel"]}, 400 if r.get("error") else 200)
         if act == "release-remove":
             # Files off a published release: its own ask, never part of an
             # edit, under the release's dial (the operator, 5 Oct).
@@ -9994,8 +10114,30 @@ class Handler(BaseHTTPRequestHandler):
                                          membership.owner_name(name) or "the project's owner",
                                          asker_name=str(acct.get("name") or ""), principal=self._principal())
             return self._json(r, 400 if r.get("error") else 200)
+        if act == "release-withdraw":
+            # A release and its tag taken back together (R190 step 3):
+            # always a person's answer, whatever the dial, since nothing
+            # undoes it; a session asks, a person at the panel does it.
+            if who.get("session") and name != who["session"]:
+                return self._json({"error": "a session withdraws its own project's release and no other"}, 403)
+            if not who.get("session") and self._refused("version", name):
+                return None
+            if who.get("session") and ((prefs.get(name) or {}).get("release") or "ask") == "deny":
+                return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
+                                            "Tag and publish a release), which withdrawing one is part of; "
+                                            "a person deletes it on the forge"}, 403)
+            plan = forgerelease.withdraw_plan(name, field(req, "tag"))
+            if plan.get("error"):
+                return self._json(plan, 400)
+            acct = users.account_of(who) or {}
+            if not who.get("session"):
+                return self._json(*_release_withdrawer(name, plan, str(acct.get("name") or ""), self._principal()))
+            r = phone.ask_release_withdraw(field(req, "why"), name, plan, membership.owner_of(name),
+                                           membership.owner_name(name) or "the project's owner",
+                                           asker_name=str(acct.get("name") or ""), principal=self._principal())
+            return self._json(r, 400 if r.get("error") else 200)
         if act == "release-edit":
-            # bb version release --edit (R139): the published release's
+            # aerie version release --edit (R139): the published release's
             # notes and files, under the same dial as the release itself, a
             # session's own project only, every edit its own ask.
             if who.get("session") and name != who["session"]:
@@ -10025,9 +10167,45 @@ class Handler(BaseHTTPRequestHandler):
                                        membership.owner_name(name) or "the project's owner",
                                        asker_name=str(acct.get("name") or ""), principal=self._principal())
             return self._json(r, 400 if r.get("error") else 200)
+        if act == "release-drafts":
+            # The drafts waiting to be read and published (the operator,
+            # 1 Nov), each with the files it still lacks.
+            if who.get("session") and name != who["session"]:
+                return self._json({"error": "a session reads its own project's drafts and no other"}, 403)
+            d = forgerelease.drafts(name)
+            if d.get("error"):
+                # No release page to read (no forge, no token): no drafts,
+                # which is no error to the page that asks.
+                return self._json({"drafts": [], "why": d["error"]})
+            for x in d["drafts"]:
+                try:
+                    x["missing"] = releasefiles.missing(name, x["tag"])[0]
+                except forgerelease.Refused as e:
+                    x["missing"], x["missing_error"] = [], str(e)
+            return self._json(d)
+        if act in ("release-draft-notes", "release-publish"):
+            # Reading a draft and publishing it is a person's, whatever the
+            # dial: it is the read before anybody else sees the release.
+            if who.get("session"):
+                return self._json({"error": "a release is published by a person, once its notes are read: the Artifacts view's Drafts"}, 403)
+            if self._refused("version", name):
+                return None
+            tag = field(req, "tag")
+            notes = req.get("notes") if isinstance(req.get("notes"), str) else None
+            if act == "release-draft-notes":
+                r = forgerelease.draft_notes(name, tag, notes or "")
+            else:
+                try:
+                    miss = releasefiles.missing(name, tag)[0]
+                except forgerelease.Refused as e:
+                    return self._json({"error": str(e)}, 400)
+                r = forgerelease.publish_draft(name, tag, notes, miss)
+                if r.get("ok"):
+                    db.audit(self._principal(), "release-publish", name, {"tag": tag})
+            return self._json(r, 400 if r.get("error") else 200)
         if who.get("session"):
-            return self._json({"error": "a session moves its version with bb version bump, "
-                                        "under the project's policy, and releases with bb version release"}, 403)
+            return self._json({"error": "a session moves its version with aerie version bump, "
+                                        "under the project's policy, and releases with aerie version release"}, 403)
         if act != "ask" and self._refused("version", name):
             return None
         return self._json(*version.verb(name, act, req, self._who(), self._principal()))
@@ -10281,31 +10459,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def _signing(self, req):
         """A project's Android signing keys (signing.verb, R106). A session
-        is refused whatever it asks: it signs with bb sign, which never hands
+        is refused whatever it asks: it signs with aerie sign, which never hands
         it the key, and has no reason to learn which keys exist from here.
         Listing is for whoever sees the project (no secret is in it); adding,
         replacing and removing a key are an administrator's."""
         name = field(req, "project")
         who = self._who() or {}
         if who.get("session"):
-            # bb sign: its own project's build, under its dial (Agents may:
+            # aerie sign: its own project's build, under its dial (Agents may:
             # Sign a build). It never receives the key, the list, or a
             # backup; asking to sign is all a session does here.
             act = field(req, "action")
             if act not in ("sign", "keys", "generate", "map", "rotate", "release", "release-sign") \
                     or name != who["session"]:
-                return self._json({"error": "a session signs with bb sign, which never hands it the key; "
+                return self._json({"error": "a session signs with aerie sign, which never hands it the key; "
                                             "the keys are a person's to manage"}, 403)
             owner = membership.owner_of(name)
             acct = users.account_of(who) or {}
             if act == "release":
-                # bb sign status (R134): whether its release APKs can be
+                # aerie sign status (R134): whether its release APKs can be
                 # signed and how the newest went, in the bell's words. Read
                 # only, and no secret is in it.
                 return self._json({"release": releasesign.status(name),
                                    "attention": releasesign.attention([name])})
             if act == "release-sign":
-                # bb sign release (R134 step 5): the Signing view's retry,
+                # aerie sign release (R134 step 5): the Signing view's retry,
                 # under the Sign a build dial.
                 if not releasesign.wants(name):
                     return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
@@ -10369,7 +10547,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*signing.start(self._principal(), name, field(req, "file"), field(req, "route"),
                                              field(req, "key")))
         if field(req, "action") == "backup-password":
-            # The project's owner's alone, BuilderBot's owner included only
+            # The project's owner's alone, AerieOS's owner included only
             # when it owns the project: the point is that the dashboard's
             # accounts are not enough by themselves.
             if users.uid_of(who) != membership.owner_of(name):
@@ -10477,13 +10655,13 @@ class Handler(BaseHTTPRequestHandler):
         if self._readonly(name):
             return None
         who = self._who() or {}
-        # A session asks for a phone (bb phone run) and a person answers; it
+        # A session asks for a phone (aerie phone run) and a person answers; it
         # does not push or install by itself, and uid_of answering the
         # session's account made the owner check pass for it (the audit of
-        # 26 Sep). A capture it lets go of with bb capture prune, in the tree.
+        # 26 Sep). A capture it lets go of with aerie capture prune, in the tree.
         if who.get("session"):
-            return self._json({"error": "a session asks for the phone with bb phone run and lets a "
-                                        "capture go with bb capture prune NAME; neither is done from here, "
+            return self._json({"error": "a session asks for the phone with aerie phone run and lets a "
+                                        "capture go with aerie capture prune NAME; neither is done from here, "
                                         "and a pin is a person's"}, 403)
         if field(req, "action") == "forget-capture":
             return self._json(*artifacts.forget_capture(name, field(req, "name")))
@@ -10506,7 +10684,7 @@ class Handler(BaseHTTPRequestHandler):
         rather than taking it as given: this is one of the few places the
         page causes a program to run. Who may use which is here."""
         # NOT one gate for the whole endpoint. `ask` is what a session does
-        # (bb phone run --why ...) and `outcome` is it reading the answer;
+        # (aerie phone run --why ...) and `outcome` is it reading the answer;
         # the control on those is that a person sees the reason and decides,
         # one command at a time. Pairing, connecting, disconnecting and
         # deciding are a PERSON's, any account and not only an administrator:
@@ -10545,7 +10723,7 @@ class Handler(BaseHTTPRequestHandler):
         """The operator's house rules for one project: the whole list, saved
         (rules.verb).
 
-        A SESSION IS REFUSED HERE, by name. `bb rules` having no write verb
+        A SESSION IS REFUSED HERE, by name. `aerie rules` having no write verb
         and the file tools being denied on the file cover what a session would
         do in the ordinary course of work; they do not cover a session with a
         shell and its own token, which authenticates as a principal with user
@@ -10766,7 +10944,7 @@ class Handler(BaseHTTPRequestHandler):
         (transcripts.mine); with audit=DAYS, what they did against the
         house rules that can be counted instead (transcripts.audit). Anybody signed in, their own only, a session
         included: on its own project and on one its project reads, it
-        lists the account's conversations there for `bb transcripts`."""
+        lists the account's conversations there for `aerie transcripts`."""
         me = self._who()
         uid = users.uid_of(me) if me else ""
         if not me or not uid:
@@ -10776,7 +10954,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._not_project(name):
             return
         if q.get("audit"):
-            # `bb rules audit` (R200 step 6): the same conversations,
+            # `aerie rules audit` (R200 step 6): the same conversations,
             # counted against the guards in effect on the project.
             try:
                 days = max(1, min(90, int(q["audit"][0])))
@@ -10823,7 +11001,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/transcript?project=NAME&id=SESSION: one of the signed-in
         account's own conversations with Claude on that project as a text
         file, every command and answer in it (transcripts.render); as JSON
-        with as=json, which is what `bb transcripts show` reads, and only its
+        with as=json, which is what `aerie transcripts show` reads, and only its
         newest MB with tail=MB; as turns with as=turns, the dashboard's
         reader's (the newest 32 MB unless tail says). Anybody
         signed in, their own only, a session included on its own project
@@ -10842,7 +11020,7 @@ class Handler(BaseHTTPRequestHandler):
         # is read as its owner's; anything else of theirs is not found.
         uid = transcripts.owner_of(uid, name, q.get("id", [""])[0]) or uid
         if q.get("as", [""])[0] == "raw":
-            # The file as Claude Code wrote it, for bb transcripts fetch: a
+            # The file as Claude Code wrote it, for aerie transcripts fetch: a
             # synced node resuming a conversation it does not have (B613).
             # Nothing when it is no longer than the copy the node has.
             f = transcripts.raw(uid, name, q.get("id", [""])[0])
@@ -10879,7 +11057,7 @@ class Handler(BaseHTTPRequestHandler):
         on a project it may change."""
         me = self._who() or {}
         if me.get("session"):
-            return self._json({"error": "an account's: a session reads it with bb forge whoami"}, 403)
+            return self._json({"error": "an account's: a session reads it with aerie forge whoami"}, 403)
         name = field(req, "project")
         if self._not_project(name) or self._readonly(name):
             return None
@@ -10888,7 +11066,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(forgeaccess.view(name, measure_now=True))
 
     def _forge(self, req):
-        """POST /api/forge {project, verb, args}: one bb forge verb (R188),
+        """POST /api/forge {project, verb, args}: one aerie forge verb (R188),
         run here with the project's own token under what the token allows
         and the project's override, for a session on its own project or an
         account that may change it. Every call is audited."""
@@ -10910,14 +11088,14 @@ class Handler(BaseHTTPRequestHandler):
         """The Git view's actions (roadmap R36 step 2): fixed git commands on
         the project's tree on the controller, under the acting account's
         author and the project's own credentials (gitview.verb). An
-        account's, never a session's (a session has bb git), on a project it
+        account's, never a session's (a session has aerie git), on a project it
         may see and has taken on, and not while the project is locked.
         Switching the tree's branch is refused while the owner's Claude
         session runs in the project directory, because that session is
         standing in it (gitview.in_use)."""
         me = self._who()
         if not me or not users.uid_of(me) or me.get("session"):
-            return self._json({"error": "an account's, not a session's: a session uses bb git"}, 403)
+            return self._json({"error": "an account's, not a session's: a session uses aerie git"}, 403)
         name = field(req, "project")
         if name not in set(project_names(me)):
             return self._json({"error": "not a project"}, 400)
@@ -11025,7 +11203,7 @@ class Handler(BaseHTTPRequestHandler):
 
         The owner protections live there rather than here on purpose. A rule
         enforced at the door holds for the door; a rule enforced in the store
-        holds for `bb users` too, and that is the one an operator reaches for
+        holds for `aerie users` too, and that is the one an operator reaches for
         when they are locked out.
         """
         act = field(req, "action")
@@ -11130,18 +11308,18 @@ class Handler(BaseHTTPRequestHandler):
         archive (/api/upload-archive's id); add it as it was shown; read a
         pack made here's manifest back for Edit; or remove it (R77).
         Curate's (R174), since a pack joins every node's catalog. A session
-        asks for one from the vetted catalog by name (bb tool install, R169
+        asks for one from the vetted catalog by name (aerie tool install, R169
         step 5), as its project's Install a tool pack dial says."""
         me = self._who() or {}
         if me.get("session"):
             sess = me["session"]
             if field(req, "action") != "install":
-                return self._json({"error": "a session asks for a pack from the catalog with bb tool install NAME, nothing else"}, 403)
+                return self._json({"error": "a session asks for a pack from the catalog with aerie tool install NAME, nothing else"}, 403)
             name = field(req, "name")
             entry = next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
                           if e["name"] == name and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
             if not entry:
-                return self._json({"error": f"no tool pack called {name or 'nothing'} in the vetted catalog: bb tool search WORDS lists them"}, 400)
+                return self._json({"error": f"no tool pack called {name or 'nothing'} in the vetted catalog: aerie tool search WORDS lists them"}, 400)
             if name in toolpacks.packs():
                 return self._json({"ok": True, "note": f"{name} is added already: install it on a node from the Library"})
             mode = prefs.get(sess)["installpacks"]
@@ -11235,7 +11413,7 @@ class Handler(BaseHTTPRequestHandler):
         if (self._who() or {}).get("session"):
             return self._json({"error": "the changelog's arrangement is the "
                                         "operator's: a session writes entries with "
-                                        "`bb changelog add`, and corrects one with "
+                                        "`aerie changelog add`, and corrects one with "
                                         "`edit`, `merge`, `split` or `rm`"}, 403)
         name = req.get("project", "")
         # A role that reads the project does not rearrange its changelog
@@ -11316,7 +11494,7 @@ class Handler(BaseHTTPRequestHandler):
     def _diag_refused(self):
         """True, with the refusal written, unless this caller may read the
         controller's diagnostics: see _diag. The reports sessions make about
-        BuilderBot are read and acted on behind the same gate."""
+        AerieOS are read and acted on behind the same gate."""
         who = self._who() or {}
         if who.get("session"):
             why = self._diag_why()
@@ -11357,12 +11535,12 @@ class Handler(BaseHTTPRequestHandler):
                                       by=self._principal()))
 
     def _reports(self, req):
-        """Problems with BuilderBot itself, reported by any project's session
-        (reports.py, bb report). Anybody signed in adds one for a project they
+        """Problems with AerieOS itself, reported by any project's session
+        (reports.py, aerie report). Anybody signed in adds one for a project they
         may see, and a session only for its own. A person reads, deletes and
         clears them on Controller settings, so its gate is that page's (the
         operator, 26 Oct: not a debug feature); a session reads them behind
-        the diagnostics' own gate, since that is where it reads them (bb diag
+        the diagnostics' own gate, since that is where it reads them (aerie diag
         reports)."""
         me = self._who() or {}
         sess = me.get("session") or ""
@@ -11385,11 +11563,11 @@ class Handler(BaseHTTPRequestHandler):
             if not sess and not users.may_work(me, proj):
                 return self._json({"error": f"you are not on {proj}, so a bug from there is not yours to "
                                             "report: ask to be added, or report from a project you work on"}, 403)
-            # The dial is Claude's (Agents may: Report BuilderBot bugs): a
+            # The dial is Claude's (Agents may: Report AerieOS bugs): a
             # person reporting from a project's row is always heard.
             if sess and prefs.get(proj)["report"] == "deny":
-                return self._json({"error": f"reporting BuilderBot bugs is off for {proj}: its "
-                                            "settings, Agents may: Report BuilderBot bugs. A "
+                return self._json({"error": f"reporting AerieOS bugs is off for {proj}: its "
+                                            "settings, Agents may: Report AerieOS bugs. A "
                                             "problem goes into this project's tracker"}, 403)
             # The person's latest conversation on the project, when they
             # ticked Include it (the operator, 2 Oct): theirs only, found and
@@ -11402,7 +11580,7 @@ class Handler(BaseHTTPRequestHandler):
                     if text:
                         req["_conversation"] = {"id": rows[0]["id"], "text": text}
             # A person's report says it came from the dashboard, so the
-            # diagnostics tell it from a session's `bb report`.
+            # diagnostics tell it from a session's `aerie report`.
             return self._json(*reports.own_verb(act, proj, req, by=name if sess else f"{name} (from the dashboard)"))
         # Clearing is a person's, from Controller settings, whatever a
         # session may otherwise read here.
@@ -11420,7 +11598,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(*reports.diag_verb(act, req, by=name, principal=self._principal()))
 
     def _doctor(self, req):
-        """Re-run bb doctor now and answer with the fresh verdict.
+        """Re-run aerie doctor now and answer with the fresh verdict.
 
         Synchronous on purpose: the caller pressed a button asking for an
         answer, and the threading server keeps everything else responsive
@@ -11547,7 +11725,7 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _get_library(self):
-        """GET /api/library?node=ID (R170): everything a BuilderBot installs
+        """GET /api/library?node=ID (R170): everything an AerieOS installs
         or runs as one list for one node (library.rows): the toolchains and
         packs with what the node's store holds, the coding agents, the apps
         a NAS runs, the vetted catalog's offers and the companions a person
@@ -11559,7 +11737,7 @@ class Handler(BaseHTTPRequestHandler):
         may act on."""
         who = self._who() or {}
         if who.get("session"):
-            return self._json({"error": "the library is a person's to read here; a session has bb tool"}, 403)
+            return self._json({"error": "the library is a person's to read here; a session has aerie tool"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
@@ -11643,7 +11821,10 @@ class Handler(BaseHTTPRequestHandler):
                         if r.get("error"):
                             break
                     for p in sorted(have - want):
-                        router.disallow(nid, p)
+                        rr = router.disallow(nid, p)
+                        if rr.get("error"):
+                            r = rr
+                            break
                 if not r.get("error") and router.record(nid).get("deployed"):
                     r = router.apply(nid, containers, devactions, devapp, gpu) | {"saved": True}
             elif act == "install":
@@ -11692,7 +11873,7 @@ class Handler(BaseHTTPRequestHandler):
         never a session's."""
         who = self._who() or {}
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
-        # A search of it (R169 step 5): what bb tool search answers a
+        # A search of it (R169 step 5): what aerie tool search answers a
         # session with, and anyone signed in: names, what each is, tier and
         # platforms, never an address or a commit; each word must be found.
         if self.path.split("?")[0].rstrip("/") == "/api/catalog/search":
@@ -11705,7 +11886,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not e.get("withdrawn") and all(w in f"{e['name']} {e.get('about', '')}".lower() for w in words)]
             return self._json({"packs": rows[:50], "more": max(0, len(rows) - 50), "error": idx.get("error", "")})
         if who.get("session"):
-            return self._json({"error": "the catalog is a person's to read here; bb tool search is a session's way"}, 403)
+            return self._json({"error": "the catalog is a person's to read here; aerie tool search is a session's way"}, 403)
         why = users.may(who, "toolchains-write")
         if why:
             return self._json({"error": why}, 403)
@@ -11801,7 +11982,7 @@ class Handler(BaseHTTPRequestHandler):
         """The Storage page (storage.view, R169): every node this account
         holds the Storage area on, what its disks hold, by project where
         the account sees the project and as one line otherwise. Never a
-        session's: a session reads its node with bb node busy."""
+        session's: a session reads its node with aerie node busy."""
         who = self._who() or {}
         if who.get("session"):
             return self._json({"error": "a node's disks are a person's to read here"}, 403)
@@ -12562,6 +12743,10 @@ class Handler(BaseHTTPRequestHandler):
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
             move.ask_new()
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
+        # Whether a move may land here (_move_land): a fresh controller's,
+        # and on a stick only once the projects have a place on the disks.
+        fresh = len(users.all_users()) <= 1 and not any(not nodes.own_machine(n) for n in nodes.node_list())
+        out["land"] = {"fresh": fresh, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
         if q.get("pieces", [""])[0] == "1":
             out["pieces"] = move.pieces()
         return self._json(out)
@@ -12729,7 +12914,8 @@ class Handler(BaseHTTPRequestHandler):
             n = -1
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
-        spool = Path(STATE).parent / f".restore-upload-{os.getpid()}"
+        spool = Path(STATE) / f".move-restore-upload-{os.getpid()}"
+        file_part = spool.with_name(spool.name + ".file")
         try:
             with open(spool, "wb") as f:
                 left = n
@@ -12739,24 +12925,14 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     f.write(chunk)
                     left -= len(chunk)
-            import email.parser
-            with open(spool, "rb") as f:
-                msg = email.parser.BytesParser().parsebytes(b"Content-Type: " + self.headers.get("Content-Type", "").encode() + b"\r\n\r\n" + f.read())
-            password, found, uploaded = "", "", None
-            for part in msg.walk():
-                name = part.get_param("name", header="content-disposition")
-                if name == "password":
-                    password = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "found":
-                    found = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "bundle":
-                    uploaded = part.get_payload(decode=True) or None
+            # The form read a megabyte at a time, its file part to a file of
+            # its own (B558: never whole in memory).
+            fields, uploaded = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
+            password, found = fields.get("password", ""), fields.get("found", "")
             if not password:
                 return self._restore_page("the backup password is needed")
             if uploaded:
-                with open(spool, "wb") as f:
-                    f.write(uploaded)
-                src = str(spool)
+                src = str(file_part)
             else:
                 known = {c["path"] for c in backup.found(_own_pool_mounts())}
                 if found not in known:
@@ -12766,6 +12942,8 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, ValueError) as e:
             return self._restore_page(f"the restore did not land: {e}")
         finally:
+            with contextlib.suppress(OSError):
+                file_part.unlink()
             with contextlib.suppress(OSError):
                 spool.unlink()
         if r.get("error"):
@@ -12788,11 +12966,15 @@ class Handler(BaseHTTPRequestHandler):
     def _move_page(self, error=""):
         """GET /login/move: the first run's other way in (R90 step 12): a
         controller's bundle and its token, before anybody owns this one."""
+        # On a stick the form is not offered: the disks come first, under a
+        # setup account (STICK_MOVE_FIRST).
+        fields = (f'  <p class="note">{html_escape(STICK_MOVE_FIRST)}</p>\n  <p class="note"><a href="/">Make the setup account</a>.</p>'
+                  if nodes.on_stick() else MOVE_FIELDS)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "move a controller here")
                 .replace("<!--SAID-->", "Moving a controller here?")
                 .replace("<!--ACTION-->", "/setup/move")
-                .replace("<!--FIELDS-->", MOVE_FIELDS)
+                .replace("<!--FIELDS-->", fields)
                 .replace("<!--ERR-->", f'<p class="err">{html_escape(error)}</p>' if error else "")
                 .replace("<!--NAME-->", "").replace("<!--NEXT-->", "/")
                 .replace("<form ", '<form enctype="multipart/form-data" ', 1)
@@ -12807,56 +12989,16 @@ class Handler(BaseHTTPRequestHandler):
     def _setup_move_post(self):
         """POST /setup/move: the bundle and the token, taken before an owner
         exists (closed the moment there is one), held to the version gate,
-        restored, and the dashboard re-executed on the restored state."""
+        restored, and the dashboard re-executed on the restored state. Not on
+        a stick (the operator, 1 Nov): there the machine's disks are set up
+        first, under an account, and the move lands from Controller settings."""
         if users.all_users():
             return self._login_page("This controller already has an account; a move lands only on a fresh install.")
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
-        if not 0 < n <= 16 << 30:
-            return self._move_page("the upload is empty or past 16 GB")
-        spool = Path(STATE).parent / f".move-upload-{os.getpid()}"
-        try:
-            with open(spool, "wb") as f:
-                left = n
-                while left > 0:
-                    chunk = self.rfile.read(min(1 << 20, left))
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    left -= len(chunk)
-            import email.parser
-            with open(spool, "rb") as f:
-                msg = email.parser.BytesParser().parsebytes(b"Content-Type: " + self.headers.get("Content-Type", "").encode() + b"\r\n\r\n" + f.read())
-            token, bundle, frm = "", None, ""
-            for part in msg.walk():
-                name = part.get_param("name", header="content-disposition")
-                if name == "token":
-                    token = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "from":
-                    frm = (part.get_payload(decode=True) or b"").decode("utf-8", "replace").strip()
-                elif name == "bundle":
-                    bundle = part.get_payload(decode=True)
-            if not token or not (bundle or frm):
-                return self._move_page("the move token is needed, with the bundle file or the old controller's address")
-            if bundle:
-                with open(spool, "wb") as f:
-                    f.write(bundle)
-            else:
-                # The pull (R175 step 5): the bundle fetched from the old
-                # controller under a proof the token derives.
-                why = move.fetch_bundle(frm, token, str(spool))
-                if why:
-                    return self._move_page(why)
-            r = move.restore(str(spool), token)
-        except (OSError, ValueError) as e:
-            return self._move_page(f"the move did not land: {e}")
-        finally:
-            with contextlib.suppress(OSError):
-                spool.unlink()
-        if r.get("error"):
-            return self._move_page(r["error"])
+        if nodes.on_stick():
+            return self._move_page(STICK_MOVE_FIRST)
+        r, why = self._receive_move(Path(STATE))
+        if why:
+            return self._move_page(why)
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "moved")
@@ -12873,6 +13015,88 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
+
+    def _move_land(self):
+        """POST /api/move-land: a move landed from Controller settings by the
+        owner of a fresh controller, the form as the first run's (the token
+        with the bundle file or the old controller's address). Its state
+        replaces this one's, the setup account's with it, which is set aside
+        as a reset's is. On a stick (the operator, 1 Nov) only once the
+        projects have a place on the machine's disks, and spooled and
+        unpacked there, never on the stick."""
+        me = self._who() or {}
+        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+            return self._json({"error": "moving a controller here is its owner's"}, 403)
+        if len(users.all_users()) > 1 or any(not nodes.own_machine(n) for n in nodes.node_list()):
+            return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
+        where = Path(STATE)
+        if nodes.on_stick():
+            held = nodes.workspace_held()
+            if held:
+                return self._json({"error": held}, 409)
+            where = Path(WORKSPACE)
+        r, why = self._receive_move(where, work_root=where if where != Path(STATE) else None)
+        if why:
+            return self._json({"error": why}, 400)
+        print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
+        self._json({"ok": True, "nodes": len(r.get("nodes") or []), "from": r.get("from") or ""})
+        threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
+        return None
+
+    def _receive_move(self, where, work_root=None):
+        """The move's form taken into a spool under `where` a megabyte at a
+        time, the bundle from it or pulled from the old controller, and
+        restored: (result, "") or (None, why)."""
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            n = -1
+        if not 0 < n <= 16 << 30:
+            return None, "the upload is empty or past 16 GB"
+        # What a power loss left of a landing before this one (B601).
+        for old in Path(where).glob(".move-*"):
+            shutil.rmtree(old, ignore_errors=True) if old.is_dir() else old.unlink(missing_ok=True)
+        spool = Path(where) / f".move-upload-{os.getpid()}"
+        # Room for it and what it unpacks to, said before a byte is taken
+        # (B588).
+        no_room = move.room_for(n, spool.parent)
+        if no_room:
+            return None, no_room
+        file_part = spool.with_name(spool.name + ".file")
+        try:
+            with open(spool, "wb") as f:
+                left = n
+                while left > 0:
+                    chunk = self.rfile.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    left -= len(chunk)
+            # The form read a megabyte at a time, its file part to a file of
+            # its own (B558: never whole in memory).
+            fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
+            token, frm = fields.get("token", ""), fields.get("from", "")
+            if not token or not (bundle or frm):
+                return None, "the move token is needed, with the bundle file or the old controller's address"
+            if bundle:
+                os.replace(file_part, spool)
+            else:
+                # The pull (R175 step 5): the bundle fetched from the old
+                # controller under a proof the token derives.
+                why = move.fetch_bundle(frm, token, str(spool))
+                if why:
+                    return None, why
+            r = move.restore(str(spool), token, work_root=work_root)
+        except (OSError, ValueError) as e:
+            return None, f"the move did not land: {e}"
+        finally:
+            with contextlib.suppress(OSError):
+                file_part.unlink()
+            with contextlib.suppress(OSError):
+                spool.unlink()
+        if r.get("error"):
+            return None, r["error"]
+        return r, ""
 
     def _get_reset(self):
         """GET /api/reset: how a Reset that un-enrolls its nodes first is
@@ -13043,7 +13267,7 @@ class Server(ThreadingHTTPServer):
 
 
 # ---- function coverage (roadmap R76) ----------------------------------------
-# Under `bb tests coverage` the harness names a file, and every function of
+# Under `aerie tests coverage` the harness names a file, and every function of
 # this dashboard's own python that any thread enters is counted and written
 # there, every few seconds and on the way out. A profile hook, not a trace
 # hook: call and return events only, which is what function coverage needs
@@ -13142,6 +13366,7 @@ def main():
     threading.Thread(target=_move_loop, name="move", daemon=True).start()
     ciwatch.start()           # a project's CI, once a day (R117)
     releasesign.start()       # a release's unsigned APK, signed on its node (R106)
+    releasefiles.start()      # a release's files checked against its list (R190)
     if "tunnel" not in featuresoff.off():
         tunnel.apply()        # the home tunnel, where the settings say so (R176)
         # ...and the dashboard's own TLS as the settings say (R158 step 2),

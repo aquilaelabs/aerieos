@@ -58,7 +58,7 @@ class Job:
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_pools")
+        self.agent = agentpkg.load("aerieos_agent_pools")
         self.pm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".pools"]
         pm = self.pm
         ran = self.ran = []
@@ -127,9 +127,17 @@ class TheAgent(unittest.TestCase):
             self.assertEqual(self.ran, [], cfg)
 
     def test_a_held_disk_goes_in_when_the_job_says_wipe_and_the_rest_run_as_named(self):
+        # A single disk into a mirror pool is refused, wipe or not: it could
+        # never be taken out again (B526).
         state, code, text = self.run_job({"pool": "add", "name": "tank", "layout": "single", "disks": ["sda"], "wipe": True})
+        self.assertEqual((state, code), ("failed", 64), text)
+        self.assertIn("could not be taken out again", text)
+        # ...and the same layout goes in, its held disk's labels wiped first,
+        # zpool add itself never forced.
+        state, code, text = self.run_job({"pool": "add", "name": "tank", "layout": "mirror", "disks": ["sda", "sdb"], "wipe": True})
         self.assertEqual(state, "succeeded", text)
-        self.assertEqual(self.ran[-1][1:4], ["add", "-f", "tank"])
+        self.assertIn(["wipefs", "-a", "/dev/sda"], self.ran)
+        self.assertEqual(self.ran[-1][1:4], ["add", "tank", "mirror"])
         self.run_job({"pool": "scrub", "name": "tank"})
         self.assertEqual(self.ran[-1][1:], ["scrub", "tank"])
         self.run_job({"pool": "replace", "name": "tank", "old": "ata-WDC_WD20EFRX_WD-A", "new": "sdb"})
@@ -138,6 +146,18 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.ran[-1][1:], ["destroy", "-f", "tank"])
         self.run_job({"pool": "export", "name": "tank"})
         self.assertEqual(self.ran[-1][1:], ["export", "tank"])
+
+    def test_a_disk_whose_name_moved_since_the_pick_is_refused(self):
+        # B527: the job carries the serial the person saw under sdb; another
+        # disk under that name now is never written.
+        state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"],
+                                           "ids": {"sdb": {"serial": "Z"}, "sdc": {"serial": "C"}}})
+        self.assertEqual(state, "failed", text)
+        self.assertIn("is not the disk that was picked", text)
+        self.assertFalse([a for a in self.ran if a[1:2] == ["create"]])
+        state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"],
+                                           "ids": {"sdb": {"serial": "B"}, "sdc": {"serial": "C"}}})
+        self.assertEqual(state, "succeeded", text)
 
     def test_the_census_counts_each_pools_snapshots_by_kind_once_across_its_datasets(self):
         with mock.patch.object(self.pm, "_out", side_effect=self.fake_out), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zfs"):

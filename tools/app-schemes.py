@@ -3,7 +3,7 @@
 halves, so the app's twelve are the dashboard's by construction rather than
 a copy kept by hand (R50 step 16).
 
-    bb design json | python3 tools/app-schemes.py
+    aerie design json | python3 tools/app-schemes.py
 
 rewrites Schemes.all in apps/android/.../ui/Theme.kt in place and says how many
 it wrote. A theme without a light half is refused: the app offers Light for
@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+# A scheme that fills what is pressed apart from its second color (index.html's --lit).
+LIT = {"Default": (", lit = 0xFFFF8F4A", ", lit = 0xFFB8470F")}
 KEYS = ["bg", "panel", "ink", "dim", "line", "accent", "warn", "bad", "note"]
 THEME_KT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "apps", "android", "app", "src", "main",
                         "java", "dev", "builderbot", "app", "ui", "Theme.kt")
@@ -31,8 +33,8 @@ def main():
     rows = []
     for t in record["language"]["themes"]:
         rows.append(f'        Scheme("{t["name"]}",\n'
-                    f'            Half({half(t.get("colors"), t["name"], "dark")}),\n'
-                    f'            Half({half(t.get("light"), t["name"], "light")}, light = true)),')
+                    f'            Half({half(t.get("colors"), t["name"], "dark")}{LIT.get(t["name"], ("", ""))[0]}),\n'
+                    f'            Half({half(t.get("light"), t["name"], "light")}, light = true{LIT.get(t["name"], ("", ""))[1]})),')
     with open(THEME_KT) as f:
         src = f.read()
     start = src.index("    val all = listOf(\n") + len("    val all = listOf(\n")

@@ -1,13 +1,13 @@
 # Start here
 
-You have an account on somebody's BuilderBot. This page is the whole of what
+You have an account on somebody's AerieOS. This page is the whole of what
 you need to do something useful with it; [how-it-works.md](how-it-works.md)
 is the overview, and each part of the dashboard has a doc of its own beside
 it in Help.
 
 ## What it is
 
-A workstation for coding agents you reach in a browser. Each project on the
+A server you reach in a browser, with coding agents at work on its projects. Each project on the
 Projects page holds git repositories on a shared disk. A **session** is a coding
 agent working in them (Claude, through Claude Code; ChatGPT, through Codex
 CLI; Copilot, through Copilot CLI; Grok, through Grok Build; or any model,
@@ -95,7 +95,7 @@ account, because a tracker on a box that is down helps nobody.
 ## Two habits worth having
 
 **Ask which build is running before deciding a fix did not work.** The header's
-About control carries the build the box is on, and `bb status` in any terminal prints it.
+About control carries the build the box is on, and `aerie status` in any terminal prints it.
 
 **Let the notebook hold the plan.** Anything you want a session to pick up later
 belongs on the roadmap rather than in a message: the next session reads the

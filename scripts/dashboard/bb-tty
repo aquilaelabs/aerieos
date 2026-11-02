@@ -17,7 +17,7 @@
 #
 set -euo pipefail
 # Beside this script rather than by absolute path. In the image the two are the
-# same file (this lives at /opt/builderbot/scripts/dashboard/bb-tty), and out
+# same file (this lives at /opt/aerieos/scripts/dashboard/bb-tty), and out
 # of it, the checkout's copy runs from the checkout, which is what lets the
 # dashboard suite drive this script at all.
 . "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
@@ -143,7 +143,7 @@ if st != 200 or not isinstance(got, dict) or not got.get("uid"):
 print(json.dumps(got))
 GRANT
 )" || {
-        echo "BuilderBot: this terminal was refused: $grant" >&2
+        echo "AerieOS: this terminal was refused: $grant" >&2
         if [ -t 2 ]; then sleep 10; fi
         exit 1
     }
@@ -174,7 +174,7 @@ if on_node && [ -n "${grant:-}" ]; then
     # off on the node's row, or in the project's settings. CUDA is told
     # there is no device, so a program falls back to its CPU path with a
     # plain answer, and the view covers the device CUDA cannot start
-    # without. BB_GPU says why to bb gpu and bb status.
+    # without. BB_GPU says why to aerie gpu and aerie status.
     BB_GPU="$(printf '%s' "$grant" | jq -r '.gpu // "on"')"
     export BB_GPU
     # ...and whether its Gradle builds on the node's disk (B439, on unless
@@ -182,7 +182,7 @@ if on_node && [ -n "${grant:-}" ]; then
     BB_BUILD_LOCAL="$(printf '%s' "$grant" | jq -r 'if .build_local == false then "off" else "on" end')"
     export BB_BUILD_LOCAL
     case "$BB_GPU" in on) ;; *) export CUDA_VISIBLE_DEVICES="" ;; esac
-    # Which node this is, by the controller's id for it: what bb login
+    # Which node this is, by the controller's id for it: what aerie login
     # --check names when it says who is signed in to Claude here.
     BB_NODE_ID="$(printf '%s' "$grant" | jq -r '.node // ""')"
     export BB_NODE_ID
@@ -200,7 +200,7 @@ if on_node && [ -n "${grant:-}" ]; then
     fi
 fi
 
-# tmux_settings: BuilderBot's tmux settings (lib/tmux.conf: the status line,
+# tmux_settings: AerieOS's tmux settings (lib/tmux.conf: the status line,
 # PgUp's scrollback, the history kept) given to the tmux server this runs
 # under. The controller's own reads the copy its start writes; a node's, an
 # account's own and the docker account's have no such copy (B283).
@@ -327,13 +327,13 @@ sess() {
 LOCKS_FILE="${DASHBOARD_STATE:-/config}/locked-projects.json"
 REPOS_FILE="${DASHBOARD_STATE:-/config}/project-repos.json"
 
-# is_locked PROJECT ACCOUNT: locked against that account. `bb settings`
+# is_locked PROJECT ACCOUNT: locked against that account. `aerie settings`
 # answers it, here from the file and on a node from the controller, since it
 # knows the project's owner, who is never locked out of their own. With no
 # answer the controller reads the list alone and a node lets it through.
 is_locked() {
     local said
-    said="$(BB_PROJECT="$1" BB_ACCOUNT_UID="${2:-}" bb settings --json 2>/dev/null | jq -r '.locked // empty')"
+    said="$(BB_PROJECT="$1" BB_ACCOUNT_UID="${2:-}" aerie settings --json 2>/dev/null | jq -r '.locked // empty')"
     if [ -n "$said" ]; then
         [ "$said" = true ]
         return
@@ -419,7 +419,7 @@ tree_slug() {
     printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g'
 }
 
-# cache_project_dir PROJECT - this account's BuilderBot cache folder for one
+# cache_project_dir PROJECT - this account's AerieOS cache folder for one
 # project, made if it is missing: its launcher, its scope, its token and its
 # session's environment. A folder per project, so that a session's view can
 # keep its own and leave every other project's out (R35).
@@ -446,7 +446,7 @@ SESSION_BIN="${BB_SESSION_BIN:-/usr/local/sbin/bb-session}"
 # What only a controller installed bare metal leaves on a machine (R90, the
 # same as bb-session's CONTROLLER_MARKS): where one is, a session runs in
 # its view or not at all.
-CONTROLLER_MARKS=(/etc/bb-session.wall /etc/builderbot-controller /var/lib/builderbot-controller)
+CONTROLLER_MARKS=(/etc/bb-session.wall /etc/aerieos-controller /var/lib/aerieos-controller)
 
 # isolating - whether this node builds a session's view. Asked of the helper
 # through sudo, so it answers from what root set up and from nothing a
@@ -570,7 +570,7 @@ claude_scope() {
     # here that points INSIDE the project rather than outside it. The version
     # is the operator's claim about their own work: they move it from the
     # dashboard, and a session that may move it does so through
-    # `bb version bump`, which checks the per-project policy first. Editing the
+    # `aerie version bump`, which checks the per-project policy first. Editing the
     # file directly would walk straight past that check.
     #
     # Both forms, because a repo that ships two products has a VERSION per
@@ -578,7 +578,7 @@ claude_scope() {
     # editable and the policy walked straight past.
     #
     # Read is deliberately not denied: a session should be able to see the
-    # version it is working against, and `bb version` prints it anyway.
+    # version it is working against, and `aerie version` prints it anyway.
     #
     # Same caveat as every rule in this file: it binds the file tools, not
     # Bash. `echo 0.5.0 > VERSION` still works. This makes the sanctioned path
@@ -697,7 +697,7 @@ session_token() {
     # the safe direction: bb then says it has no credential rather than
     # reaching for anybody else's.
     if on_node; then printf '%s' "${BB_TOKEN:-}"; return 0; fi
-    local py="/opt/builderbot/scripts/dashboard/users.py"
+    local py="/opt/aerieos/scripts/dashboard/users.py"
     [ -f "$py" ] || py="$(dirname "$(readlink -f "$0")")/users.py"
     [ -f "$py" ] || return 0
     # Minted for the ACCOUNT as well as the project, the shape the controller
@@ -772,13 +772,13 @@ PY
         printf 'export BB_AGENT_WHO=%q\n' "${account:-owner}"
         local tok; tok="$(session_token "$proj")"
         [ -z "$tok" ] || printf 'export BB_TOKEN=%q\n' "$tok"
-        # ...and beside the launcher, where `bb` can read it at the moment it
+        # ...and beside the launcher, where `aerie` can read it at the moment it
         # is run rather than only at the moment the session started.
         #
         # A session outlives its token. The token is twelve hours; a
         # conversation that has been going longer than that had one in its
         # environment that no longer verifies, and every bb verb answered
-        # "not signed in" (the notebook, `bb git push` on a node, all of it),
+        # "not signed in" (the notebook, `aerie git push` on a node, all of it),
         # with no way back except ending the session. The launcher above is
         # already rewritten on every connection, but a claude that is ALREADY
         # RUNNING keeps the environment it started with, so refreshing the
@@ -793,7 +793,7 @@ PY
         fi
         printf 'extra=()\n'
         # The file where the dashboard keeps them, when it is here; on a node
-        # it is not, and `bb settings` asks the controller for the same two
+        # it is not, and `aerie settings` asks the controller for the same two
         # fields, still at exec time, so a respawn still picks up a change.
         printf 'if [ -r %q ]; then\n' "$PREFS_FILE"
         # Under the ACCOUNT, not the project: the pair is whoever is at the
@@ -813,7 +813,7 @@ PY
                 "$account" "$proj" ".users[\$u][\$n].${ag}_effort // empty" "$PREFS_FILE"
         fi
         printf 'else\n'
-        printf '  s="$(BB_PROJECT=%q bb settings --json 2>/dev/null)"\n' "$proj"
+        printf '  s="$(BB_PROJECT=%q aerie settings --json 2>/dev/null)"\n' "$proj"
         printf '  m="$(jq -r %q <<<"$s" 2>/dev/null)"\n' '.model // empty'
         printf '  e="$(jq -r %q <<<"$s" 2>/dev/null)"\n' '.effort // empty'
         if [ "$ag" != claude ]; then
@@ -862,7 +862,7 @@ PY
             printf '[ -z "${ae:-}" ] || extra+=(--reasoning-effort "$ae")\n'
         fi
         # Codex trusts a hook by its hash, after a person reviews it.
-        # BuilderBot's own are its guards: trusted for this launch by the
+        # AerieOS's own are its guards: trusted for this launch by the
         # hashes this Codex reports for them (bb-codex-trust), and only where
         # it cannot say, run under the bypass flag, which it then warns of
         # (B284). Embedded, said so (--no-daemon): a session's Codex is its
@@ -1020,12 +1020,12 @@ lasting_dir() {
     printf '%s' "$here"
 }
 
-# agent_hooks AGENT: BuilderBot's guards as the agent's own hooks (R95 step
+# agent_hooks AGENT: AerieOS's guards as the agent's own hooks (R95 step
 # 6), in the account's home for it, where its every session reads them:
 # Codex CLI's hooks.json, Copilot CLI's hooks/builderbot.json. Each hook is
 # bb-agent-hook with the agent and the event; it takes the project and the
 # account from the session's environment (BB_PROJECT, BB_AGENT_WHO, which
-# the launcher sets), so a session BuilderBot did not start runs none of
+# the launcher sets), so a session AerieOS did not start runs none of
 # them. Merged into a hooks file somebody else wrote, never replacing it.
 # The hooks by the name that outlives this bundle, as claude_scope's are.
 agent_hooks() {
@@ -1055,7 +1055,7 @@ agent_hooks() {
               {version: 1, hooks: (reduce $evs[] as [$n, $ev, $t] ({}; .[$n] = ours($ev; $t)))}' \
                 > "$f.new" 2>/dev/null && mv -f "$f.new" "$f" ;;
         # Grok Build's global hooks folder, always trusted (a project's own
-        # need the folder trusted first): a file of BuilderBot's alone.
+        # need the folder trusted first): a file of AerieOS's alone.
         grok)
             f="${GROK_HOME:-$HOME/.grok}/hooks/builderbot.json"
             ( umask 077; mkdir -p "${f%/*}" ) 2>/dev/null || return 1
@@ -1063,12 +1063,12 @@ agent_hooks() {
               def ours(ev; t): [{hooks: [{type: "command", command: "\($c) \(ev)", timeout: t}]}];
               {hooks: (reduce $evs[] as [$n, $ev, $t] ({}; .[$n] = ours($ev; $t)))}' \
                 > "$f.new" 2>/dev/null && mv -f "$f.new" "$f" ;;
-        # OpenCode's guards are a plugin of BuilderBot's (R144 step 2) in
+        # OpenCode's guards are a plugin of AerieOS's (R144 step 2) in
         # the account's global plugins folder, which every session of its
         # loads: each hook runs bb-agent-hook with the agent and the event,
         # a tool refused by exit 2 thrown so OpenCode does not run it, and
         # the conversation exported into the tree's folder at each turn's
-        # end, where bb transcripts reads it.
+        # end, where aerie transcripts reads it.
         open)
             f="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/plugins/builderbot.js"
             ( umask 077; mkdir -p "${f%/*}" ) 2>/dev/null || return 1
@@ -1079,8 +1079,8 @@ agent_hooks() {
 # opencode_plugin HOOK: the plugin's text (agent_hooks open writes it).
 opencode_plugin() {
     cat <<PLUGIN
-// Written by BuilderBot's bb-tty (R144 step 2): its guards in OpenCode, as
-// the other agents' hooks files are. A session BuilderBot did not start has
+// Written by AerieOS's bb-tty (R144 step 2): its guards in OpenCode, as
+// the other agents' hooks files are. A session AerieOS did not start has
 // no BB_PROJECT in its environment and runs none of it.
 const HOOK = $(printf '%s' "$1" | jq -Rs .);
 async function hook(ev, body){
@@ -1101,10 +1101,10 @@ async function keep(id){
     await Bun.write(dir + "/" + id + ".jsonl", JSON.stringify(JSON.parse(text)) + "\n");
   }catch(e){ /* a conversation not exported is one not listed, nothing worse */ }
 }
-export const BuilderBot = async ({ directory }) => ({
+export const AerieOS = async ({ directory }) => ({
   "tool.execute.before": async (input, output) => {
     const r = await hook("pre", {tool: input.tool, args: output.args, cwd: directory, session_id: input.sessionID || ""});
-    if (r.code === 2) throw new Error((r.err || "").trim() || "refused by a BuilderBot guard");
+    if (r.code === 2) throw new Error((r.err || "").trim() || "refused by an AerieOS guard");
   },
   "chat.message": async (input, output) => {
     const text = (output?.message?.parts || output?.parts || []).map(p => p.text || "").join("\n");
@@ -1131,7 +1131,7 @@ opencode_config() {
     models="${BB_ROUTER_MODELS:-[]}"
     ( umask 077; jq -n --arg url "${BB_ROUTER_URL:-}" --arg pref "${BB_AGENT_BRIEFING:-}" --argjson models "$models" '
         {"$schema": "https://opencode.ai/config.json",
-         provider: {builderbot: {npm: "@ai-sdk/openai-compatible", name: "BuilderBot router",
+         provider: {builderbot: {npm: "@ai-sdk/openai-compatible", name: "AerieOS router",
                                  options: {baseURL: $url, apiKey: "{env:BB_ROUTER_KEY}"},
                                  models: ($models | map({key: .id, value: ({name: .id} + (if (.context // 0) > 0 then {limit: {context: .context, output: 16384}} else {} end))}) | from_entries)}},
          instructions: (if $pref == "" then [] else [$pref] end),
@@ -1211,12 +1211,12 @@ bad() {
 # environment. GIT_AUTHOR_* and GIT_COMMITTER_* outrank any user.name a
 # repository or a home carries, which is the point: two people on one
 # project are two authors, and a repo-level identity would make them one.
-# The values come from `bb settings --json`, which answers for the seat
+# The values come from `aerie settings --json`, which answers for the seat
 # BB_ACCOUNT_UID names, right here on the controller, and over the relay
 # from a node, whose controller knows the account behind the token. A shell
 # gets them too, so a commit typed by hand is the same person's. Never
 # fatal: a session with no identity is one git asks about, not one refused.
-git_ready=""            # "false" once bb settings has said the account has no author
+git_ready=""            # "false" once aerie settings has said the account has no author
 
 # need_author WHAT: no author, no terminal. Every project is a repository,
 # and a commit with no name and email behind it is one git refuses halfway
@@ -1248,7 +1248,7 @@ no_credential_here() {
     export GIT_TERMINAL_PROMPT=0
     export GIT_CONFIG_COUNT=2
     export GIT_CONFIG_KEY_0=credential.helper
-    export GIT_CONFIG_VALUE_0='!f() { echo "[builderbot] no git credential is on this machine, by design: the controller holds the keys. Use bb git push, fetch, pull or ls-remote, which relay through it" >&2; exit 1; }; f'
+    export GIT_CONFIG_VALUE_0='!f() { echo "[builderbot] no git credential is on this machine, by design: the controller holds the keys. Use aerie git push, fetch, pull or ls-remote, which relay through it" >&2; exit 1; }; f'
     # ...and every tree taken as its own where an account is its own user
     # (R125 step 7): its view maps its trees to it, and a tree the map could
     # not reach (a share) is still another's, which git refuses as dubious.
@@ -1284,13 +1284,13 @@ git_identity() {
     # Beside the identity, because these are the two things a session's git
     # needs from us and the same six places set them up.
     no_credential_here
-    s="$(BB_PROJECT="${1:-}" BB_ACCOUNT_UID="${BB_ACCOUNT_UID:-$account}" bb settings --json 2>/dev/null)" || return 0
+    s="$(BB_PROJECT="${1:-}" BB_ACCOUNT_UID="${BB_ACCOUNT_UID:-$account}" aerie settings --json 2>/dev/null)" || return 0
     email="$(printf '%s' "$s" | jq -r '.git_email // empty' 2>/dev/null)"
     name="$(printf '%s' "$s" | jq -r '.git_name // empty' 2>/dev/null)"
     git_ready="$(printf '%s' "$s" | jq -r 'if has("git_ready") then (.git_ready | tostring) else empty end' 2>/dev/null)"
     # The toolchains this project's sessions may not use (R77): its settings'
     # Toolchains group. Out of PATH here, out of the view in in_view, and
-    # sdk_find answers "not installed" for them, so bb tool refuses them too.
+    # sdk_find answers "not installed" for them, so aerie tool refuses them too.
     BB_TOOLCHAINS_OFF="$(printf '%s' "$s" | jq -r '(.toolchains_off // []) | join(" ")' 2>/dev/null)" || BB_TOOLCHAINS_OFF=""
     export BB_TOOLCHAINS_OFF
     toolchains_off_path
@@ -1314,7 +1314,7 @@ git_identity() {
 #
 # Applied here rather than left to ~/.tmux.conf because that file lives on a
 # persistent volume: an install upgraded from an older image still has the one
-# BuilderBot used to write directly, which sets `mouse on` and never sources the
+# AerieOS used to write directly, which sets `mouse on` and never sources the
 # file we own now. Set on the session itself, this holds whatever the config
 # said, which is what a behavior the page promises has to do.
 # Which run of the container this is, by the same rule server.py uses: pid 1's
@@ -1381,14 +1381,17 @@ start() {
     # account's ~/.gradle and another project's build timed out on it. A
     # home per project keeps two projects' builds out of each other's locks;
     # a project's first build there fetches its own dependencies once. It is
-    # the project's folder in the account's BuilderBot cache, which the
+    # the project's folder in the account's AerieOS cache, which the
     # session's view trims to this project (bb-session), so one project's
     # session cannot read another's Gradle cache or its daemon's logs.
     if on_node && [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "${BB_PROJECT:-}" ] && [ -n "$account" ]; then
         GRADLE_USER_HOME="$HOME/.cache/builderbot/u/$account/project/$BB_PROJECT/gradle-home"
     fi
     gradle_local_build
-    for v in HOME BB_TOKEN BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_LOCAL_BUILD BB_WORKS BB_WORK_DIRS \
+    # BB_TREE_OWNER with them: kept out of the server's environment below as
+    # one account's, it reached no pane at all on a node (B430), so bb never
+    # knew the owner there.
+    for v in HOME BB_TOKEN BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_LOCAL_BUILD BB_WORKS BB_WORK_DIRS \
              GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL CARGO_HOME \
              GRADLE_USER_HOME ANDROID_USER_HOME XDG_DATA_HOME \
              GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1 \
@@ -1409,8 +1412,12 @@ start() {
     # list above, token included) for the life of the server, where ps
     # shows it to every account on the machine. A server started bare has
     # nothing on its command line; the -e values still land in the
-    # session's environment, which is where they were wanted.
-    tmux start-server 2>/dev/null || true
+    # session's environment, which is where they were wanted. exit-empty off
+    # holds that bare server up until new-session below: a server with no
+    # session exits as soon as the command that started it is done, so every
+    # setting made here reached nothing on an account's first terminal, and
+    # with no default-shell a pane on nologin ended at once (B608).
+    tmux start-server \; set-option -g exit-empty off 2>/dev/null || true
     # Every pane's command runs through tmux's default shell, which is the
     # login shell where nothing set it, and an account's own user has
     # nologin for one (B277): bash, whoever this runs as.
@@ -1421,9 +1428,9 @@ start() {
     # cleanly still goes, and so does its tab.
     tmux set-option -g remain-on-exit failed 2>/dev/null || true
     tmux set-option -g remain-on-exit-format \
-        "BuilderBot: this ended before it started (exit #{pane_dead_status}). Close the tab, or open it again to start afresh." \
+        "AerieOS: this ended before it started (exit #{pane_dead_status}). Close the tab, or open it again to start afresh." \
         2>/dev/null || true
-    # BuilderBot's tmux settings, which the controller's server reads from
+    # AerieOS's tmux settings, which the controller's server reads from
     # the copy its start writes (tmux_settings).
     if on_node; then
         tmux_settings
@@ -1464,6 +1471,7 @@ start() {
     # attach-session, which attached this terminal right here, before the
     # settings below were made, and with -d threw every other client off it.
     tmux new-session -d -s "$s" -c "$dir" "${envs[@]}" "$@" 2>/dev/null || true
+    tmux set-option -g exit-empty on 2>/dev/null || true
 
     # Mouse mode decides who owns a drag. Off, the browser makes an ordinary
     # selection and the terminal copies it as the button comes up. On, tmux
@@ -1703,7 +1711,7 @@ case "$target" in
         # the sign-in check reads it; none means no router allows the
         # project, said the way a missing sign-in is.
         if [ "$agent" = open ]; then
-            rk="$(BB_PROJECT="$proj" bb router-key 2>/dev/null || true)"
+            rk="$(BB_PROJECT="$proj" aerie router-key 2>/dev/null || true)"
             BB_ROUTER_URL="$(jq -r '.url // empty' <<<"$rk" 2>/dev/null || true)"
             BB_ROUTER_KEY="$(jq -r '.key // empty' <<<"$rk" 2>/dev/null || true)"
             BB_ROUTER_MODELS="$(jq -c '[.models[]? | {id, context}]' <<<"$rk" 2>/dev/null || true)"
@@ -1714,7 +1722,7 @@ case "$target" in
             export BB_ROUTER_URL BB_ROUTER_KEY BB_ROUTER_MODELS
         fi
         # EACH MACHINE KEEPS ITS OWN LOGIN, and opening a tab is when this
-        # one says so (R47). `bb login --check` carries one sentence and no
+        # one says so (R47). `aerie login --check` carries one sentence and no
         # secret: which Anthropic account this account is signed in as here.
         # Nothing is copied from another machine, because a refresh ROTATES
         # the refresh token and two machines holding one grant sign each
@@ -1726,7 +1734,7 @@ case "$target" in
         # controller that is down costs a session nothing. Every agent's
         # session says it, and the check says every agent's sign-in.
         if on_node; then
-            bb login --check >/dev/null 2>&1 || true
+            aerie login --check >/dev/null 2>&1 || true
         fi
         # Installed on purpose, from the node's Agents page, never by the
         # provisioner (R145): without it there is nothing for a session to run.
@@ -1798,7 +1806,7 @@ case "$target" in
             # and a worktree's session found nothing to resume).
             rtd="$HOME/.claude/projects/$(tree_slug "$(session_dir "$proj" "$account" "$agent" "$slot")")"
             if on_node; then
-                ( cd "$dir" 2>/dev/null && BB_PROJECT="$proj" bb transcripts fetch "$resume" \
+                ( cd "$dir" 2>/dev/null && BB_PROJECT="$proj" aerie transcripts fetch "$resume" \
                       --into "$rtd" >/dev/null 2>&1 ) || true
             fi
             # ...and from another of this account's trees when it was had
@@ -1832,7 +1840,7 @@ case "$target" in
         # starts; the else below is what says so, because an empty answer used
         # to be an ordinary state (a project with nothing on its lists) and
         # since the briefing joined it, empty means the fetch failed (B160).
-        pre="$(BB_PROJECT="$proj" BB_UID="$account" BB_AGENT="$agent" bb preamble --json 2>/dev/null || true)"
+        pre="$(BB_PROJECT="$proj" BB_UID="$account" BB_AGENT="$agent" aerie preamble --json 2>/dev/null || true)"
         roadmap_block="$(printf '%s' "$pre" | jq -r '.text // ""' 2>/dev/null || true)"
         # Named as the dashboard shows the project, with its id, not by its
         # folder: the name is what the Claude app lists the session under,
@@ -1888,7 +1896,7 @@ case "$target" in
             echo "WARNING: could not fetch this session's briefing from the" >&2
             echo "controller, so it starts with none: no house rules, no" >&2
             echo "roadmap, no open bugs, and nothing about this machine." >&2
-            echo "\`bb status\` says whether the controller is answering." >&2
+            echo "\`aerie status\` says whether the controller is answering." >&2
         fi
         # Where this session works (roadmap #24). The owner gets the project
         # directory; anybody else gets a worktree of their own on a branch of
@@ -1917,7 +1925,7 @@ case "$target" in
             kd="$HOME/.claude/projects/$(printf '%s' "$dir" | sed 's/[^A-Za-z0-9]/-/g')/$agent"
             if on_node && [ ! -f "$kd/$resume.jsonl" ]; then
                 ( umask 077; mkdir -p "$kd" ) 2>/dev/null || true
-                ( cd "$dir" 2>/dev/null && BB_PROJECT="$proj" bb transcripts fetch "$resume" \
+                ( cd "$dir" 2>/dev/null && BB_PROJECT="$proj" aerie transcripts fetch "$resume" \
                       --into "$kd" >/dev/null 2>&1 ) || true
             fi
             [ -f "$kd/$resume.jsonl" ] \
@@ -2010,12 +2018,12 @@ case "$target" in
             # A pack agent's guards are its hooks or nothing: it does not
             # start without them (R169 step 10).
             BB_HOOKS_DIR="$(lasting_dir)" python3 "$(dirname "$(readlink -f "$0")")/bb-agent-hook" --pack-hooks "$agent" \
-                || bad "Could not write ${agent_product}'s hooks, so it would run without BuilderBot's guards: it does not start."
+                || bad "Could not write ${agent_product}'s hooks, so it would run without AerieOS's guards: it does not start."
         elif [ "$agent" != claude ]; then
             # Its guards are its own hooks, holding Claude's (R95 step 6).
             if ! agent_hooks "$agent"; then
                 echo "WARNING: could not write ${agent_product}'s hooks; this session is held by" >&2
-                echo "its view and bb's own checks alone, not by BuilderBot's guards." >&2
+                echo "its view and bb's own checks alone, not by AerieOS's guards." >&2
             fi
         elif scope="$(claude_scope "$proj" "$dir")"; then
             cmd+=(--settings "$scope")
@@ -2067,7 +2075,7 @@ case "$target" in
         # Only what a take that succeeded printed: a bb too old to know the
         # verb prints its help and fails, and that is not a prompt.
         if [ -z "$resume" ] && ! tmux has-session -t "=$mysess" 2>/dev/null; then
-            first="$(BB_PROJECT="$proj" bb brief take 2>/dev/null)" || first=""
+            first="$(BB_PROJECT="$proj" aerie brief take 2>/dev/null)" || first=""
             if [ -n "$first" ]; then
                 fpf="$(cache_project_dir "$proj")/first-prompt.txt"
                 ( umask 077; printf '%s\n' "$first" > "$fpf.new" ) 2>/dev/null \

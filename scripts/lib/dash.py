@@ -1,4 +1,4 @@
-"""The dashboard's modules, for the bb verbs that read and write the notebook's
+"""The dashboard's modules, for the aerie verbs that read and write the notebook's
 files directly rather than through the API (roadmap, bug, history, findings,
 rules, tests, settings, users, nodes, jobs, work, version, changelog,
 preamble, and the doctor's and the lint's probes): each loaded by path from
@@ -44,7 +44,7 @@ def statefile(here):
 
 # Which account this session belongs to, for the notebook's logs: "claude"
 # says a session wrote it, and with two people each running one that does not
-# say whose. Read from the users file the way `bb settings` reads the commit
+# say whose. Read from the users file the way `aerie settings` reads the commit
 # identity: no configure, two fields.
 def account_name(state_dir):
     uid = os.environ.get("BB_ACCOUNT_UID", "")

@@ -1,4 +1,4 @@
-# A BuilderBot node on Proxmox VE. Run on the PVE host, as root.
+# An AerieOS node on Proxmox VE. Run on the PVE host, as root.
 #
 # Rendered by the dashboard's Create sandbox VM (vmtemplate.py); the id, the
 # uuid and the MAC are this machine's. Proxmox mints its own uuid when it

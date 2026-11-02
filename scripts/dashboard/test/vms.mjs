@@ -2,7 +2,7 @@
 // The VMs page (R91): a node with VM host installed, enrolled here by hand
 // with its census; New VM queues the node's vm job and the row says so; the
 // agent's result and its census make the row running with its address; Stop,
-// a snapshot and Remove each a vm job; a session's bb vm is held to its
+// a snapshot and Remove each a vm job; a session's aerie vm is held to its
 // project's Make VMs dial (deny refuses, ask goes to the bell, auto does it),
 // and a session never makes Windows.
 import { URL, launch, newPage, ok, done, ready, DIR } from './lib.mjs';
@@ -97,9 +97,9 @@ const row = await page.$eval('.vmtab [data-vm-key="alpha/db"]', e => ({ text: e.
 ok(/running/.test(row.text) && /ok/.test(row.pill) && /ssh builder@10\.232\.0\.12/.test(row.text) && /Debian 13/.test(row.text)
    && /kvmbox/.test(row.text) && row.stop && row.con && row.snap,
    `once made it runs: its pill, how to reach it, its OS and node, Stop, Console and its snapshot with Revert (${row.text.slice(0, 120)})`);
-// Domains the node's libvirt has that BuilderBot did not make (R165 step
-// 1): an administrator reads them under Not BuilderBot's, by name, state
-// and size, with nothing to press, and the tiles count BuilderBot's own.
+// Domains the node's libvirt has that AerieOS did not make (R165 step
+// 1): an administrator reads them under Not AerieOS's, by name, state
+// and size, with nothing to press, and the tiles count AerieOS's own.
 await agent('hello', { census: { ...CENSUS, vms: [{ name: 'bbvm-alpha-db', state: 'running', ip: '10.232.0.12', vcpus: 2, mem_mb: 2048, snapshots: ['clean'] }],
                                  vms_other: [{ name: 'win11', state: 'running', vcpus: 4, mem_mb: 8192 }, { name: 'old-box', state: 'stopped', vcpus: 1, mem_mb: 512 }] },
                        version: shipped.version, digest: shipped.digest });
@@ -111,7 +111,7 @@ const foreign = await page.evaluate(() => ({
   running: document.querySelector('.vmtab .tiles')?.textContent.replace(/\s+/g, ' ') || '',
 }));
 ok(foreign.rows.length === 2 && /win11 ?running/.test(foreign.rows[0]) && /4 vCPU · 8 GB/.test(foreign.rows[0]) && foreign.buttons === 0 && /1 running/.test(foreign.running),
-   `the domains BuilderBot did not make are listed read-only under Not BuilderBot's, and not counted (${JSON.stringify(foreign).slice(0, 200)})`);
+   `the domains AerieOS did not make are listed read-only under Not AerieOS's, and not counted (${JSON.stringify(foreign).slice(0, 200)})`);
 await hello([{ name: 'bbvm-alpha-db', state: 'running', ip: '10.232.0.12', vcpus: 2, mem_mb: 2048, snapshots: ['clean'] }]);
 await page.evaluate(async () => { await loadVms(); });
 await page.waitForFunction(() => !document.querySelector('.vmtab .vmothers'), null, { timeout: 15000 });
@@ -201,12 +201,12 @@ ok(page.dialogs.some(d => /Revert db to clean/.test(d)) && rv?.spec?.snapshot ==
    `Revert asks, then queues the revert to that snapshot (${rv?.spec?.snapshot})`);
 await call('/api/v1/jobs', { action: 'cancel', id: rv?.id });
 
-// A session's bb vm, held to its project's dial.
-const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+// A session's aerie vm, held to its project's dial.
+const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const S = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
 const denied = await call('/api/vms', { action: 'new', name: 'w1', os: 'debian', keys: [KEY], why: 'a test box' }, S);
-ok(denied.status === 403 && /Make VMs is deny/.test(denied.error || ''), `at deny a session's bb vm is refused, naming the setting (${denied.error})`);
+ok(denied.status === 403 && /Make VMs is deny/.test(denied.error || ''), `at deny a session's aerie vm is refused, naming the setting (${denied.error})`);
 await call('/api/prefs', { project: 'alpha', makevms: 'ask' });
 const asked = await call('/api/vms', { action: 'new', name: 'w1', os: 'debian', keys: [KEY], why: 'a test box' }, S);
 const bell = ((await call('/api/phone')).asks || []).find(a => a.id === asked.id);

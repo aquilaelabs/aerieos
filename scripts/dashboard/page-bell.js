@@ -212,7 +212,7 @@ function attRow(a){
   if (a.kind === "held"){
     return `<div class="bnote att warn">
       <div class="bt">A session in ${esc(projLabel(a.project))} stopped for the update</div>
-      <div class="bsum">${esc(a.who ? `${a.who}'s` : "A")} session on ${esc(a.node)}, held ${a.since ? esc(ago(a.since)) : "while BuilderBot was away"}</div>
+      <div class="bsum">${esc(a.who ? `${a.who}'s` : "A")} session on ${esc(a.node)}, held ${a.since ? esc(ago(a.since)) : "while AerieOS was away"}</div>
       <div class="bfoot"><span>it left a note of where it was</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bheld="${esc(a.node_id)}" data-session="${esc(a.session)}" data-claude="${esc(a.claude || a.session)}">Resume</a></span></div></div>`;
@@ -237,6 +237,17 @@ function attRow(a){
       <div class="bfoot"><span>${a.bad ? (a.at ? esc(ago(a.at)) : "after the release") : "before its release"}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bsign="${esc(a.project)}">Signing view</a></span></div></div>`;
+  }
+  // A release short of a file its project lists in .release-files (R190):
+  // each file and why, and the release's page.
+  if (a.kind === "release-files"){
+    const n = (a.files || []).length;
+    return `<div class="bnote att bad">
+      <div class="bt">${esc(a.tag)} of ${esc(projLabel(a.project))} is missing ${n ? `${n} file${n === 1 ? "" : "s"}` : "its files"}</div>
+      <div class="bsum">${esc(a.why)}</div>
+      <div class="bfoot"><span>${a.at ? esc(ago(a.at)) : "after the release"}</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          ${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">The release</a>` : ""}</span></div></div>`;
   }
   // A project whose git access was linked to an account's token, gone with
   // that account's key store (R154): its settings, to give it another.
@@ -320,6 +331,16 @@ function attRow(a){
   }
   // A node's retired token presented again after its grace (R135 step 4): a
   // copy of its credential is in use somewhere, and its tokens are revoked.
+  // A node whose agent is turned away (B569): it is running and asking, and
+  // the controller will not take its credential, so it is quiet for good.
+  if (a.kind === "node-refused"){
+    return `<div class="bnote att bad">
+      <div class="bt">${esc(a.node)}'s agent is turned away</div>
+      <div class="bsum">it is running and asking, and the controller refuses it (${esc(a.why || "its credential")}) since ${esc(ago(a.since))}: enroll it again from the Nodes page (Enroll script, run on that machine)</div>
+      <div class="bfoot"><span>${esc(ago(a.at))}</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
+  }
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
       <div class="bt">${esc(a.node)}'s credential was used from a copy</div>
@@ -393,11 +414,11 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bmachine="${a.kind === "power" ? "power" : "updates"}">This machine</a></span></div></div>`;
   }
-  // A newer BuilderBot release, on a controller installed bare metal (R90
+  // A newer AerieOS release, on a controller installed bare metal (R90
   // step 5): Update runs the installer through its own node's root agent.
   if (a.kind === "release"){
     return `<div class="bnote att">
-      <div class="bt">BuilderBot ${esc(a.to)} is out</div>
+      <div class="bt">AerieOS ${esc(a.to)} is out</div>
       <div class="bsum">this install runs ${esc(a.from || "an unstamped build")}; Update fetches the release's bundle, checks it, switches to it and comes back by itself if it does not answer</div>
       <div class="bfoot"><span>under Controller settings</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
@@ -477,6 +498,7 @@ function askTag(a){
           : a.kind === "release-edit" ? `edit the ${esc(a.tag || "")} release of ${esc(a.project ? projLabel(a.project) : "a project")}: needs your answer`
           : a.kind === "release-sign" ? `sign the release APKs of ${esc(a.project ? projLabel(a.project) : "a project")} again: needs your answer`
           : a.kind === "release-remove" ? `remove files from the ${esc(a.tag || "")} release of ${esc(a.project ? projLabel(a.project) : "a project")}: needs your answer`
+          : a.kind === "release-withdraw" ? `withdraw the ${esc(a.tag || "")} release of ${esc(a.project ? projLabel(a.project) : "a project")} and its tag: needs your answer`
           : a.kind === "phone-use" ? `your phone, from ${esc(a.project ? projLabel(a.project) : "a project")}: needs your answer`
           : a.kind === "push" ? `a push from ${esc(a.project ? projLabel(a.project) : "a project")} looks sensitive: needs your answer`
           : "needs your answer");
@@ -486,7 +508,7 @@ function askTag(a){
 // verbs, adb's for a phone.
 function askCmd(a){
   const pre = a.kind === "root" ? "# " : a.kind === "phone-use" ? ""
-    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-sign", "push"].includes(a.kind) ? "bb " : "adb ";
+    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push"].includes(a.kind) ? "aerie " : "adb ";
   return pre + esc((a.cmd || []).join(" "));
 }
 
@@ -603,7 +625,7 @@ function drawBell(){
     // machine, and that it is root there. `#` is the prompt root gets.
     // A removal from a release takes something away from the people
     // downloading, so it wears the destructive color, as root does.
-    ...asks.map(a => `<div class="bnote ask${a.kind === "root" || a.kind === "release-remove" ? " bad" : ""}">
+    ...asks.map(a => `<div class="bnote ask${a.kind === "root" || a.kind === "release-remove" || a.kind === "release-withdraw" ? " bad" : ""}">
         <div class="btag">${askTag(a)}</div>
         <div class="bwhy">${esc(a.why)}</div>
         <div class="bcmd">${askCmd(a)}</div>${
@@ -675,7 +697,9 @@ function drawBell(){
   panel.innerHTML = head + (answer.length + needs.length + said.length
     ? group("Waiting on you", answer) + group("Needs attention", needs)
       + group("Recent", said.slice(0, 5), `<button type="button" id="bellClear">Clear</button>`, said.length)
-    : `<div class="bempty">nothing to report</div>`) + putAway;
+    // Before the first status read nothing is known yet, which is not
+    // nothing to report.
+    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway;
   // Any press in the drawer closes it, after the press's own handler has
   // run (the operator, 7 Oct): Approve, Deny, an invitation's answer, Clear,
   // a link to where a row is about. One listener on the drawer, so a row

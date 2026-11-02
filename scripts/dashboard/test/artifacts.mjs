@@ -39,7 +39,7 @@ with zipfile.ZipFile(sys.argv[1], 'w', zipfile.ZIP_DEFLATED) as z:
     for f in sys.argv[2:]: z.write(f, f.rsplit('/', 1)[-1])`,
   `${DIR}/ws/alpha/dist/companion-0.2.0.xpi`, `${stage}/manifest.json`, `${stage}/background.js`]);
 // What a session looked with (R96): two reels and two emulator shots, each
-// with the record bb capture leaves (who, when); one reel ten days old,
+// with the record aerie capture leaves (who, when); one reel ten days old,
 // which the project's default of seven days sweeps on the tab's first read;
 // one shot with no record at all, which goes by its own time.
 const now = Math.floor(Date.now() / 1000);
@@ -259,16 +259,16 @@ ok(acts.every(a => a.dl), '...and everything can be downloaded');
   await page.waitForFunction(() => /kept until removed/.test(document.querySelector('#artCaptures summary')?.textContent || ''),
                              null, { timeout: 15000 });
   ok(true, '...and the fold says they are kept until removed');
-  // A session lets a capture go from the tree (bb capture prune), never here.
+  // A session lets a capture go from the tree (aerie capture prune), never here.
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+  const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const r = await fetch(URL.replace(/\/$/, '') + '/api/artifacts', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
     body: JSON.stringify({ project: 'alpha', action: 'forget-capture', name: 'walk' }) });
   const asSession = { status: r.status, j: await r.json().catch(() => ({})) };
-  ok(asSession.status === 403 && /bb capture prune/.test(asSession.j.error || '') && existsSync(`${DIR}/ws/alpha/dist/reel/walk`),
-     `a session is told to use bb capture prune instead (${asSession.status} ${asSession.j.error})`);
+  ok(asSession.status === 403 && /aerie capture prune/.test(asSession.j.error || '') && existsSync(`${DIR}/ws/alpha/dist/reel/walk`),
+     `a session is told to use aerie capture prune instead (${asSession.status} ${asSession.j.error})`);
   await pref({ project: 'alpha', capture_days: 7 });
 }
 

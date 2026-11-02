@@ -54,7 +54,7 @@ it in a dialog, editable, beside the model and effort that session starts
 on. **Build it** starts the session with the brief as its first prompt;
 **Start without it** starts one that was not given it. Either way the
 brief leaves the tree then, and the project page's Overview keeps it,
-as `bb brief` prints it. When nodes are
+as `aerie brief` prints it. When nodes are
 enrolled it also asks which node the project runs on (the only one is
 picked for you; *none* is an option), the same setting the project's
 settings change later, so a new project can build and start a
@@ -64,7 +64,7 @@ fill in build and test), auto unless you say otherwise, so that is a
 choice made rather than a default found later. It can
 also start from an archive you already have: zip, or tar with gzip, bzip2
 or xz, unpacked into the new directory before `git init`. However it
-arrived, the code map a session asks before grepping (`bb map`) is built
+arrived, the code map a session asks before grepping (`aerie map`) is built
 for it in the background the moment the tree is there: the dialog closes
 as usual, the card says *mapping the code* for the seconds it takes, and
 a session on that project waits for it, so its first question
@@ -225,8 +225,8 @@ Each project also has an id, P and a number (P3), shown first on its card's
 and its page's facts line: it never changes and is never given to another
 project, so it names the project for good. A Claude session is named after
 the project with its id, "builderbot (P3)", which is how the Claude app lists
-it, and `bb -p P3` names it as `bb -p builderbot` does.
-Only BuilderBot makes a project (create, clone, or start from an imported
+it, and `aerie -p P3` names it as `aerie -p builderbot` does.
+Only AerieOS makes a project (create, clone, or start from an imported
 archive): a folder made by hand on the share is not listed, and the folders
 already there when this arrived were recorded once, as they were.
 
@@ -276,7 +276,7 @@ people and roles, its owner, its Agents may dials, and each person's pin,
 group and color, and its archive and lock. One **Start agent** starts the
 project's session, which runs on the first repository and works in all of
 them: each one's tree is in its view to write, on the same branch name, and
-`bb` answers for the repository whose tree it is run in. A session asked for
+`aerie` answers for the repository whose tree it is run in. A session asked for
 on another of its repositories is refused and pointed at the first. A
 repository's page names the project, with its repositories as a switch beside
 the name when there are several, and its Roadmap and Bugs carry the other
@@ -335,7 +335,7 @@ named from that repository's `.git/config` and nowhere else, with git's
 empty-value reset ahead of it, so the globally configured helper is never
 asked and no container-wide token authenticates the fetch.
 
-The token is also what an agent works the git host with, through `bb
+The token is also what an agent works the git host with, through `aerie
 forge`: pull requests, issues, CI runs and their logs, and releases on
 GitHub, GitLab, Gitea or Forgejo, each run on the controller with the token,
 which never reaches a session. The controller measures what the token may
@@ -364,9 +364,9 @@ and sign-in: a new one for the same host and account replaces the one
 before in place, and every project using it moves to the new one. A token
 is used only while its person is
 signed in, on any browser or device (the phone app counts): your sessions'
-`bb git`, your presses in the Git view, the release you cut and the wiki
+`aerie git`, your presses in the Git view, the release you cut and the wiki
 you sync all run with yours, and signed out everywhere, a session of yours
-is told that `bb git` waits for you. The Git view's line says whose token a
+is told that `aerie git` waits for you. The Git view's line says whose token a
 press would use. Work that is nobody's in the moment (watching CI) takes
 the token of anyone on the project signed in now, and pauses, said on the
 project, while nobody who gave one is. A project's token from before 0.9.0
@@ -516,7 +516,7 @@ moves the directory, still asks for them to be closed first.
 
 ## File access over FTP
 
-A project's tree can be reached from outside BuilderBot with an FTP client
+A project's tree can be reached from outside AerieOS with an FTP client
 (R151, the operator, 7 Oct): the **File access** section of its settings
 turns it on, picks the port, and gives each account that sees the project
 **Read** or **Read and write**. Setting it up is the project owner's or an
@@ -532,7 +532,7 @@ file written over FTP is owned as a session's would be. It listens on the
 port and uses the nine after it for passive data, which is why two projects
 on one node are kept ten ports apart; the first free block from 2121 is
 offered. TLS is required on the control and the data connection (FTPS,
-explicit), because the password is the account's own BuilderBot password and
+explicit), because the password is the account's own AerieOS password and
 plain FTP would carry it as written. The certificate is made on the node the
 first time and kept in the session account's home, so a client asks to trust
 it once.

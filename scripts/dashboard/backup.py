@@ -6,7 +6,7 @@ every pool of the controller's own machine (/mnt/POOL/.builderbot/backup)
 and under the state, the five newest kept in each, and downloadable. A new
 install finds the copies on its pools at first run, takes the password and
 becomes the controller as it was (move.restore with the key). Pushing a
-copy to another BuilderBot or a node is the next piece.
+copy to another AerieOS or a node is the next piece.
 """
 import base64
 import contextlib
@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import secrets
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -25,8 +26,7 @@ QUIET_S = 15 * 60
 EVERY_S = 10 * 60
 SUFFIX = ".bbbackup"
 _lock = threading.Lock()
-_pack = lambda: (b"", {})       # noqa: E731 (configured: move.pack)
-_seal = lambda data, key: data  # noqa: E731
+_bundle = None                  # move.write_bundle: (dest, header, manifest_of, key) -> (manifest, counts)
 _restore = lambda *a, **k: {}   # noqa: E731 (move.restore)
 _manifest = lambda p: (None, "")  # noqa: E731 (move.read_manifest)
 _password = lambda: ""          # noqa: E731 (the setting, sealed)
@@ -37,8 +37,8 @@ _write_json = None
 _host = lambda: ""              # noqa: E731
 
 
-def configure(*, state, pack_fn, seal_fn, restore_fn, manifest_fn, password_fn, dirs_fn, version_fn, state_version_fn, write_json_fn, host_fn=None):
-    globals().update(STATE=Path(state), _pack=pack_fn, _seal=seal_fn, _restore=restore_fn, _manifest=manifest_fn, _password=password_fn,
+def configure(*, state, bundle_fn, restore_fn, manifest_fn, password_fn, dirs_fn, version_fn, state_version_fn, write_json_fn, host_fn=None):
+    globals().update(STATE=Path(state), _bundle=bundle_fn, _restore=restore_fn, _manifest=manifest_fn, _password=password_fn,
                      _dirs=dirs_fn, _version=version_fn, _state_version=state_version_fn, _write_json=write_json_fn, _host=host_fn or _host)
 
 
@@ -100,9 +100,7 @@ def make(principal, why="asked"):
     pw = _password() or ""
     if len(pw) < 8:
         return {"error": "no backup password set (eight characters at least): Controller settings, Backup"}
-    raw, counts = _pack()
     salt = secrets.token_bytes(16)
-    sealed = _seal(raw, key_from(pw, salt))
     made_at = int(time.time())
     base = f"builderbot-backup-{_version() or 'unstamped'}-{time.strftime('%Y%m%d-%H%M%S', time.gmtime(made_at))}"
     name = base + SUFFIX
@@ -110,31 +108,40 @@ def make(principal, why="asked"):
     while any((d / name).exists() for d in where()):
         n += 1
         name = f"{base}-{n}{SUFFIX}"
-    manifest = {"format": 1, "kind": "backup", "version": _version(), "state_version": int(_state_version() or 0), "made_at": made_at,
+
+    def manifest_of(counts):
+        return {"kind": "backup", "version": _version(), "state_version": int(_state_version() or 0), "made_at": made_at,
                 "salt": base64.b64encode(salt).decode(), "host": _host(), "counts": counts, "why": why, "by": str(principal)[:80]}
-    body = move_header() + json.dumps(manifest).encode() + b"\n" + sealed
-    written, failed = [], []
+    # Packed once, as it is sealed, into the first folder that takes it
+    # (never whole in memory, B558), and copied from there to the rest.
+    written, failed, first, size = [], [], None, 0
     for d in where():
         try:
             d.mkdir(parents=True, exist_ok=True, mode=0o700)
             tmp = d / (name + ".partial")
-            with open(tmp, "wb") as f:
-                f.write(body)
+            if first is None:
+                _bundle(tmp, move_header(), manifest_of, key_from(pw, salt))
+            else:
+                shutil.copyfile(first, tmp)
             os.chmod(tmp, 0o600)
             os.replace(tmp, d / name)
+            first = first or d / name
+            size = (d / name).stat().st_size
             olds = sorted(d.glob("*" + SUFFIX), key=lambda p: p.stat().st_mtime)
             for old in olds[:-KEEP]:
                 old.unlink(missing_ok=True)
             written.append(str(d))
         except OSError as e:
+            with contextlib.suppress(OSError):
+                (d / (name + ".partial")).unlink()
             failed.append(f"{d}: {e.strerror or e}")
     if not written:
         return {"error": "the copy was written nowhere: " + "; ".join(failed)}
     with _lock:
         d = _load()
-        d.update(made_at=made_at, name=name, size=len(body), where=written, failed=failed, why=why, by=str(principal)[:80])
+        d.update(made_at=made_at, name=name, size=size, where=written, failed=failed, why=why, by=str(principal)[:80])
         _save(d)
-    return {"ok": True, "name": name, "size": len(body), "where": written, "failed": failed, "made_at": made_at}
+    return {"ok": True, "name": name, "size": size, "where": written, "failed": failed, "made_at": made_at}
 
 
 def move_header():

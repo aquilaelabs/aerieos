@@ -8,7 +8,7 @@ import unittest
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_store")
+agent = agentpkg.load("aerieos_agent_store")
 agent.log = lambda *a, **k: None
 
 
@@ -16,7 +16,7 @@ class OwnDirectory(unittest.TestCase):
     def setUp(self):
         self.store = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.store, True)
-        self.stores = agent.stores if hasattr(agent, "stores") else __import__("builderbot_agent_store.stores", fromlist=["x"])
+        self.stores = agent.stores if hasattr(agent, "stores") else __import__("aerieos_agent_store.stores", fromlist=["x"])
         self.addCleanup(self.stores._SCOPE.update, name="")
         self.stores._SCOPE.update(name="")
 

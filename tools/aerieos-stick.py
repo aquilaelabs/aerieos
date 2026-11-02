@@ -1,0 +1,795 @@
+#!/usr/bin/env python3
+"""The AerieOS USB stick maker (R161 step 5): one tool for Windows, a Mac
+and Linux, nothing but Python's own library, that writes a release's stick
+image onto a USB stick and checks it.
+
+    aerieos-stick.py list                      the removable disks here
+    aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]
+    aerieos-stick.py verify DISK --image FILE  the stick read back against the image
+
+DISK is /dev/sdX on Linux, /dev/diskN on a Mac, \\\\.\\PhysicalDriveN or its
+number on Windows. The image is aerieos-os-VERSION.stick.raw.xz from a
+release (its sha256 beside it is fetched and checked, and its build
+attestation where gh is on the machine), the newest one when nothing else
+is named, or a file you have (checked the same way, with its .sha256 where
+it sits beside it). --set KEY=VALUE, as often as
+needed, writes a line into the stick's aerieos.env, which each boot reads:
+TZ (the machine's time zone, Europe/Berlin), BB_RELEASE_LINE (the release
+line updates follow, 0.9), BB_HOSTNAME, and a static address for the wired
+network: BB_NET_ADDRESS, BB_NET_MASK (24 or 255.255.255.0), BB_NET_GATEWAY
+and BB_NET_DNS (1.1.1.1,9.9.9.9); without BB_NET_ADDRESS it takes DHCP.
+BB_DATA_MAX (64G) caps the data partition, which grows to the stick's size. --mirror FILE puts a
+mirror of the vetted catalog (tools/catalog-mirror.py's archive, up to
+64 MiB) on the stick, which the controller imports as it starts, so a
+machine with no network installs tool packs from it.
+Everything on the stick is lost; the tool says so and takes --yes or a typed
+yes. It runs as root (sudo) on Linux and a Mac, and as an administrator on
+Windows, since a disk is written whole. A stick made this way boots the
+appliance with the slot loaded into memory and keeps its configuration on
+the stick's data partition; the dashboard's first page then makes the owner
+or restores a saved configuration (docs/image.md).
+"""
+import argparse
+import ctypes
+import hashlib
+import json
+import lzma
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+RELEASES = "https://github.com/aquilaelabs/aerieos/releases"
+API = "https://api.github.com/repos/aquilaelabs/aerieos/releases"
+CHUNK = 4 << 20
+GB = 1e9
+# The stick's aerieos.env (image/lay-disk): 4 KiB behind this line.
+ENV_MARK = b"# aerieos.env AERIE-STICK-ENV-1"
+ENV_SIZE = 4096
+# ...and its aerieos/firstboot.json, a prepared configuration: 64 KiB.
+BOOT_MARK = b"AERIE-FIRSTBOOT-1\n"
+BOOT_SIZE = 65536
+# ...and its aerieos/catalog-mirror.bin, a mirror of the vetted catalog
+# (R169 step 6): 64 MiB, the archive's length on the line after the marker.
+MIRROR_MARK = b"BB-MIRROR-1\n"
+MIRROR_SIZE = 64 << 20
+
+
+def say(s):
+    print(s, flush=True)
+
+
+def die(s):
+    print(f"aerieos-stick: {s}", file=sys.stderr, flush=True)
+    sys.exit(1)
+
+
+# ---- the disks here --------------------------------------------------------
+def disks():
+    """[{id, size, model, removable, system}] for this machine."""
+    sysname = platform.system()
+    if sysname == "Linux":
+        # The whole tree, not -d: a disk's own mount points are empty when
+        # / is on one of its partitions, and the system disk read as any
+        # other (B474).
+        out = subprocess.run(["lsblk", "-J", "-b", "-o", "NAME,SIZE,MODEL,RM,TRAN,TYPE,MOUNTPOINTS"], capture_output=True, text=True, check=False).stdout
+
+        def mounts(d):
+            return [m for m in (d.get("mountpoints") or []) if m] + [m for c in d.get("children") or [] for m in mounts(c)]
+        rows = []
+        for d in (json.loads(out or "{}").get("blockdevices") or []):
+            if d.get("type") != "disk" or str(d.get("name", "")).startswith(("loop", "zram", "ram")):
+                continue
+            mnts = mounts(d)
+            rows.append({"id": "/dev/" + d["name"], "size": int(d.get("size") or 0), "model": (d.get("model") or "").strip(),
+                         "removable": bool(d.get("rm")) or d.get("tran") == "usb",
+                         "system": any(m in ("/", "/boot", "/boot/efi", "/usr", "/var", "/home", "[SWAP]") for m in mnts)})
+        return rows
+    if sysname == "Darwin":
+        out = subprocess.run(["diskutil", "list", "-plist", "external", "physical"], capture_output=True, text=True, check=False).stdout
+        import plistlib
+        rows = []
+        for name in (plistlib.loads(out.encode()).get("WholeDisks") or []) if out else []:
+            info = subprocess.run(["diskutil", "info", "-plist", name], capture_output=True, text=True, check=False).stdout
+            i = plistlib.loads(info.encode()) if info else {}
+            rows.append({"id": "/dev/" + name, "size": int(i.get("TotalSize") or 0), "model": str(i.get("MediaName") or ""),
+                         "removable": bool(i.get("RemovableMediaOrExternalDevice", True)), "system": False})
+        return rows
+    if sysname == "Windows":
+        ps = ("Get-Disk | Select-Object Number,Size,FriendlyName,BusType,IsSystem,IsBoot | ConvertTo-Json -Compress")
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout
+        data = json.loads(out or "[]")
+        # Each disk's drive letters, which is how Windows names a stick to
+        # its person (E:), where the tool writes the disk by its number.
+        ps = ("Get-Partition | Where-Object DriveLetter | Select-Object DiskNumber,DriveLetter | ConvertTo-Json -Compress")
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout
+        parts = json.loads(out or "[]")
+        letters = {}
+        for p in (parts if isinstance(parts, list) else [parts]):
+            if str(p.get("DriveLetter") or "").strip().isalpha():
+                letters.setdefault(p.get("DiskNumber"), []).append(str(p["DriveLetter"]).strip() + ":")
+        rows = []
+        for d in (data if isinstance(data, list) else [data]):
+            rows.append({"id": f"\\\\.\\PhysicalDrive{d.get('Number')}", "size": int(d.get("Size") or 0), "model": str(d.get("FriendlyName") or ""),
+                         "removable": str(d.get("BusType") or "") in ("USB", "SD", "MMC"), "system": bool(d.get("IsSystem") or d.get("IsBoot")),
+                         "letters": sorted(letters.get(d.get("Number"), []))})
+        return rows
+    die(f"{sysname} is not a system this tool knows (Windows, a Mac, Linux)")
+
+
+def named(d):
+    """A disk as its person knows it: its model, its size and, on Windows,
+    its drive letters."""
+    lt = " ".join(d.get("letters") or [])
+    return f"{d.get('model') or 'unnamed'}, {d.get('size', 0) / GB:.1f} GB" + (f", {lt}" if lt else "")
+
+
+def cmd_list(_):
+    rows = disks()
+    if not rows:
+        say("no disk found")
+        return
+    for d in rows:
+        say(f"{d['id']:<24} {d['size'] / GB:7.1f} GB  {d['model'] or 'unnamed':<30} {'removable' if d['removable'] else 'fixed'}{'  ' + ' '.join(d['letters']) if d.get('letters') else ''}{'  (the system disk: never)' if d['system'] else ''}")
+
+
+# ---- the image ----------------------------------------------------------------
+def fetch(url, dest, say_progress=True):
+    req = urllib.request.Request(url, headers={"User-Agent": "aerieos-stick"})
+    with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:  # noqa: S310 (the release's address)
+        total = int(r.headers.get("Content-Length") or 0)
+        got, said = 0, -1
+        while True:
+            chunk = r.read(1 << 20)
+            if not chunk:
+                break
+            f.write(chunk)
+            got += len(chunk)
+            if say_progress and total and got * 20 // total > said:
+                said = got * 20 // total
+                say(f"  {os.path.basename(dest)}: {said * 5}%")
+
+
+TAG = r"v\d+\.\d+\.\d+(?:-dev\.\d+)?"
+
+
+def release_image(tag, channel="normal"):
+    """The stick image of a release, fetched beside the tool with its sha256
+    checked; the newest release when tag is 'latest', or on the dev channel
+    the newest pre-release a dev build's tag made (R179)."""
+    if tag == "latest":
+        req = urllib.request.Request(API, headers={"Accept": "application/json", "User-Agent": "aerieos-stick"})
+        with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
+            rows = json.loads(r.read())
+        dev = channel == "dev"
+        live = [x for x in rows if not x.get("draft") and bool(x.get("prerelease")) == dev
+                and re.fullmatch(TAG if dev else r"v\d+\.\d+\.\d+", str(x.get("tag_name") or ""))]
+        # The newest that carries a stick image: a release from before
+        # AerieOS, or one whose image build failed, has none.
+        withimg = [x for x in live if any(str(a.get("name", "")).endswith(".stick.raw.xz") for a in x.get("assets") or [])]
+        if not withimg:
+            die(("no dev build" if dev else "no release") + " carries an AerieOS stick image yet"
+                + ("" if dev else ": the dev builds do, so pick the newest dev build"))
+        if live and withimg[0] is not live[0]:
+            say(f"{live[0]['tag_name']} carries no stick image, so {withimg[0]['tag_name']}'s is written")
+        tag = withimg[0]["tag_name"]
+    if not re.fullmatch(TAG, tag):
+        die("a release is named by its tag, vX.Y.Z")
+    name = f"aerieos-os-{tag[1:]}.stick.raw.xz"
+    base = f"{RELEASES}/download/{tag}/{name}"
+    say(f"fetching {name} from the {tag} release")
+    try:
+        fetch(base, name)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            die(f"the {tag} release carries no stick image ({name}): pick another release")
+        raise
+    fetch(base + ".sha256", name + ".sha256", say_progress=False)
+    check_sha(name, name + ".sha256")
+    attested(name)
+    signed(tag, name)
+    return name
+
+
+ATTEST = "https://api.github.com/repos/aquilaelabs/aerieos/attestations/sha256:{digest}"
+
+
+def attested(path):
+    """The image checked against its build attestation where gh is on this
+    machine (R191 step 2): the bundle from GitHub's public API, verified by
+    gh with --bundle, which asks for no sign-in. Without gh it is said, and
+    the sha256 is what held; one that does not verify is not written."""
+    import shutil
+    import tempfile
+    gh = shutil.which("gh")
+    if not gh:
+        say("not checked against its build attestation: gh is not here (cli.github.com); the sha256 is what held")
+        return
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(CHUNK), b""):
+            h.update(chunk)
+    req = urllib.request.Request(ATTEST.format(digest=h.hexdigest()), headers={"Accept": "application/vnd.github+json",
+                                                                              "User-Agent": "aerieos-stick"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 (GitHub's API)
+            got = json.loads(r.read(4 << 20) or b"{}")
+    except (OSError, ValueError) as e:
+        die(f"the image's build attestation could not be read from GitHub ({e}): not written")
+    lines = [json.dumps(a["bundle"]) for a in got.get("attestations") or [] if isinstance(a, dict) and isinstance(a.get("bundle"), dict)]
+    if not lines:
+        die(f"GitHub has no build attestation for {os.path.basename(path)}: it is not an image AerieOS's release built, so not written")
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        f.write("\n".join(lines) + "\n")
+    try:
+        r = subprocess.run([gh, "attestation", "verify", path, "--bundle", f.name, "--repo", "aquilaelabs/aerieos"],
+                           capture_output=True, text=True, check=False)
+    finally:
+        os.unlink(f.name)
+    if r.returncode != 0:
+        die(f"{os.path.basename(path)} does not verify against its build attestation: not written\n{(r.stderr or r.stdout).strip()[-600:]}")
+    say(f"{os.path.basename(path)}: built by AerieOS's release workflow (its attestation verifies)")
+
+
+def check_sha(path, sha_file):
+    want = (open(sha_file, encoding="utf-8").read().split() or [""])[0].lower()
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(CHUNK), b""):
+            h.update(chunk)
+    if h.hexdigest() != want:
+        die(f"{path} does not match its sha256 ({h.hexdigest()[:12]} against {want[:12] or 'none'}): not written")
+    say(f"{os.path.basename(path)}: sha256 matches")
+
+
+# ---- the release's signature (R199) ------------------------------------------------
+# The keys that may sign a release, as config/release-signers holds them (a
+# lint keeps the two the same). A release's SHA256SUMS signed by one of them
+# is what says the image is AerieOS's own: the sha256 beside it is the
+# release's word for itself, and the attestation proves only which workflow
+# built it, which whoever changes the repository could run.
+RELEASE_SIGNERS = """
+"""
+SIG_NS = "aerieos-release"
+
+
+def signers():
+    return [ln for ln in RELEASE_SIGNERS.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+
+
+def tag_of(path):
+    """The release an image file names (aerieos-os-0.9.0-dev.4724.stick.raw.xz), or ""."""
+    m = re.match(r"aerieos-os-(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.", os.path.basename(path))
+    return f"v{m.group(1)}" if m else ""
+
+
+def signed(tag, path):
+    """The image is in its release's SHA256SUMS, signed by a release key;
+    stops when it is not. Said and passed over only while this tool holds no
+    key at all."""
+    keys = signers()
+    if not keys:
+        say("no release key is set in this tool yet, so the release's signature is not checked")
+        return
+    if not tag:
+        die(f"{os.path.basename(path)} does not name its release, so its signature cannot be checked: use the release's own file name")
+    tool = shutil.which("ssh-keygen")
+    if not tool:
+        die("ssh-keygen is not here to check the release's signature: install OpenSSH (on Windows: Settings, Optional features, OpenSSH Client)")
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        base = f"{RELEASES}/download/{tag}"
+        try:
+            fetch(f"{base}/SHA256SUMS", os.path.join(d, "SHA256SUMS"), say_progress=False)
+            fetch(f"{base}/SHA256SUMS.sig", os.path.join(d, "SHA256SUMS.sig"), say_progress=False)
+        except OSError as e:
+            die(f"the {tag} release carries no signature ({e}): it has not been signed yet, so it is not written")
+        with open(os.path.join(d, "signers"), "w", encoding="utf-8") as f:
+            f.write("\n".join(keys) + "\n")
+        with open(os.path.join(d, "SHA256SUMS"), "rb") as sums:
+            r = subprocess.run([tool, "-Y", "verify", "-f", os.path.join(d, "signers"), "-I", SIG_NS, "-n", SIG_NS,
+                                "-s", os.path.join(d, "SHA256SUMS.sig")], stdin=sums, capture_output=True, text=True, check=False)
+        if r.returncode != 0:
+            die(f"the {tag} release's signature does not verify against AerieOS's release key: not written")
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(CHUNK), b""):
+                h.update(chunk)
+        listed = {}
+        with open(os.path.join(d, "SHA256SUMS"), encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    listed[parts[1].lstrip("*")] = parts[0].lower()
+        if listed.get(os.path.basename(path)) != h.hexdigest():
+            die(f"{os.path.basename(path)} is not the file the {tag} release signed: not written")
+    say(f"{os.path.basename(path)}: signed by AerieOS's release key")
+
+
+# ---- the stick's aerieos.env --------------------------------------------------
+KEY = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
+VALUE = re.compile(r"[A-Za-z0-9_./:+,-]{0,200}")
+
+
+def env_block(sets):
+    """The 4 KiB the stick's aerieos.env is, with these KEY=VALUE lines:
+    the marker line first, so another write finds it again, and blank
+    padding, which the boot's reader passes over."""
+    lines = []
+    for s in sets:
+        k, sep, v = s.partition("=")
+        if not sep or not KEY.fullmatch(k) or not VALUE.fullmatch(v):
+            die(f"--set {s}: a KEY=VALUE, the key in capitals, the value letters, digits and _ . / : + , -")
+        lines.append(f"{k}={v}")
+    body = ENV_MARK + b": KEY=VALUE lines the boot reads (TZ, BB_RELEASE_LINE, BB_HOSTNAME, BB_NET_*)\n" + "".join(x + "\n" for x in lines).encode()
+    if len(body) > ENV_SIZE - 1:
+        die(f"--set: {len(body)} bytes of lines, and aerieos.env holds {ENV_SIZE}")
+    return body + b" " * (ENV_SIZE - 1 - len(body)) + b"\n"
+
+
+def boot_block(path):
+    """The 64 KiB firstboot.json is, holding the prepared configuration in
+    the JSON file at path (format 1, docs/image.md): the marker line, the
+    JSON on one line, blank padding."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, ValueError) as e:
+        die(f"--config {path}: {e}")
+    if not isinstance(cfg, dict) or cfg.get("format") != 1:
+        die(f"--config {path}: a prepared configuration is a JSON object with \"format\": 1")
+    body = BOOT_MARK + json.dumps(cfg, separators=(",", ":")).encode() + b"\n"
+    if len(body) > BOOT_SIZE - 1:
+        die(f"--config {path}: {len(body)} bytes, and firstboot.json holds {BOOT_SIZE}")
+    return body + b" " * (BOOT_SIZE - 1 - len(body)) + b"\n"
+
+
+def mirror_block(path):
+    """The 64 MiB catalog-mirror.bin is, holding the archive at path: the
+    marker line, its length in twelve digits on a line, the archive, blank
+    padding. Read as a gzip tar holding the mirror's index first."""
+    import tarfile  # noqa: PLC0415
+    try:
+        with tarfile.open(path, "r:gz") as t:
+            if not any(m.name.rstrip("/").endswith("catalog-mirror/index.json") for m in t.getmembers()):
+                die(f"--mirror {path}: not a mirror of the catalog (tools/catalog-mirror.py makes one)")
+        with open(path, "rb") as f:
+            data = f.read()
+    except (OSError, tarfile.TarError) as e:
+        die(f"--mirror {path}: {e}")
+    head = MIRROR_MARK + f"{len(data):012d}\n".encode()
+    if len(head) + len(data) > MIRROR_SIZE - 1:
+        die(f"--mirror {path}: {len(data) >> 20} MiB, and the stick holds {MIRROR_SIZE >> 20} MiB of mirror")
+    return head + data + b" " * (MIRROR_SIZE - 1 - len(head) - len(data)) + b"\n"
+
+
+def patched(src, block, boot=None, mirror=None):
+    """The image's bytes in CHUNKs, aerieos.env's 4 KiB and firstboot.json's
+    64 KiB put in place where their markers are. A chunk is held until the
+    next is read, so a file across the line between two is found and written
+    whole. A block of None passes its file as it is; a block with no marker
+    in the image stops the write before the end (an image older than the
+    file)."""
+    want = [(m, n, b) for m, n, b in ((ENV_MARK, ENV_SIZE, block), (BOOT_MARK, BOOT_SIZE, boot), (MIRROR_MARK, MIRROR_SIZE, mirror)) if b is not None]
+    hold = max((n + len(m) for m, n, _ in want), default=0)
+    held = b""
+    for chunk in iter(lambda: src.read(CHUNK), b""):
+        buf = held + chunk
+        for w in list(want):
+            mark, size, blk = w
+            at = buf.find(mark)
+            if at >= 0 and at + size <= len(buf):
+                buf = buf[:at] + blk + buf[at + size:]
+                want.remove(w)
+        keep = min(len(buf), hold) if want else 0
+        out, held = (buf[:len(buf) - keep], buf[len(buf) - keep:]) if keep else (buf, b"")
+        if out:
+            yield out
+    if want:
+        what = " and ".join({ENV_MARK: "aerieos.env to write --set into", BOOT_MARK: "firstboot.json to write --config into",
+                             MIRROR_MARK: "catalog-mirror.bin to write --mirror into"}[m] for m, _, _ in want)
+        die(f"this image has no {what} (made before 0.9.0): nothing past the start of the stick is right, so write it again without them or with a newer image")
+    if held:
+        yield held
+
+
+# ---- the write ----------------------------------------------------------------
+def clean_disk(n, tries=4):
+    """diskpart's clean on disk n: its partition table wiped, so Windows
+    lets go of every volume on it. It can be refused while Windows is still
+    looking at the disk, so it is tried again a few times."""
+    import tempfile
+    fd, script = tempfile.mkstemp(suffix=".txt")
+    with os.fdopen(fd, "w") as f:
+        f.write(f"select disk {int(n)}\nclean\n")
+    try:
+        out = ""
+        for i in range(tries):
+            r = subprocess.run(["diskpart", "/s", script], capture_output=True, text=True, check=False)
+            out = (r.stdout + r.stderr).strip()
+            if r.returncode == 0:
+                say("the stick's old partitions are cleared")
+                return
+            time.sleep(1 + i)
+        die(f"Windows would not clear the stick's partitions (diskpart: {out.splitlines()[-1] if out else 'no answer'}): "
+            "close anything showing it, unplug it and plug it in, and write again; nothing written")
+    finally:
+        os.unlink(script)
+
+
+class WinDisk:
+    """A disk opened whole on Windows, written and read with Windows' own
+    calls (WriteFile, ReadFile, FlushFileBuffers): the C runtime's file on
+    such a handle refused to write (EBADF). The volume handles are held with
+    it, and every lock goes when it is closed."""
+
+    def __init__(self, h, held=()):
+        from ctypes import wintypes
+        self.k = k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_char_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k.SetFilePointerEx.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
+        k.FlushFileBuffers.argtypes = [wintypes.HANDLE]
+        k.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.dword = wintypes.DWORD
+        self.h, self.held = h, list(held)
+
+    def _fail(self, what):
+        e = ctypes.get_last_error()
+        raise OSError(e, f"{what} the stick: {ctypes.FormatError(e).strip()} (Windows error {e})")
+
+    def write(self, b):
+        n = self.dword(0)
+        if not self.k.WriteFile(self.h, bytes(b), len(b), ctypes.byref(n), None) or n.value != len(b):
+            self._fail("could not write to")
+        return n.value
+
+    def read(self, size):
+        buf = ctypes.create_string_buffer(size)
+        n = self.dword(0)
+        if not self.k.ReadFile(self.h, buf, size, ctypes.byref(n), None):
+            self._fail("could not read")
+        return buf.raw[:n.value]
+
+    def seek(self, pos):
+        if not self.k.SetFilePointerEx(self.h, pos, None, 0):
+            self._fail("could not seek on")
+
+    def flush(self):
+        pass
+
+    def sync(self):
+        if not self.k.FlushFileBuffers(self.h):
+            self._fail("could not flush")
+
+    def close(self):
+        for h in [self.h, *self.held]:
+            self.k.CloseHandle(h)
+        self.held = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+SECTOR = 4096
+
+
+def sectors(chunks, size=1 << 20):
+    """The bytes regrouped into pieces of whole MiB, the last padded with
+    zeros to a whole 4 KiB: Windows takes a write to a disk opened whole only
+    in whole sectors (EINVAL otherwise), where patched() holds back an odd
+    number of bytes from each chunk."""
+    buf = bytearray()
+    for c in chunks:
+        buf += c
+        if len(buf) >= size:
+            n = len(buf) - len(buf) % size
+            yield bytes(buf[:n])
+            del buf[:n]
+    if buf:
+        buf += bytes(-len(buf) % SECTOR)
+        yield bytes(buf)
+
+
+def is_admin():
+    """Whether this runs with the right to write a whole disk: Administrator
+    on Windows, root elsewhere."""
+    if platform.system() == "Windows":
+        try:
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except (AttributeError, OSError):
+            return False
+    return not hasattr(os, "geteuid") or os.geteuid() == 0
+
+
+def elevate():
+    """On Windows without Administrator, start this same program again as
+    Administrator (Windows asks first) and say whether it was; the caller
+    then ends. A built .exe asks by its manifest, so this is for python."""
+    if platform.system() != "Windows" or is_admin():
+        return False
+    if getattr(sys, "frozen", False):
+        exe, args = sys.executable, sys.argv[1:]
+    else:
+        exe, args = sys.executable, [os.path.abspath(sys.argv[0]), *sys.argv[1:]]
+    return ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, subprocess.list2cmdline(args), None, 1) > 32
+
+
+def open_disk(dev):
+    """The disk opened for writing whole: on Windows every volume on it is
+    locked and dismounted first, so the write is not undone by the system
+    behind it."""
+    if platform.system() == "Windows":
+        m = re.search(r"(\d+)$", dev)
+        if not m:
+            die(f"{dev} is not a disk (\\\\.\\PhysicalDriveN, or N)")
+        n = int(m.group(1))
+        if not is_admin():
+            die("writing a whole disk on Windows needs Administrator: start this again as Administrator; nothing written")
+        # Its partitions taken away first (diskpart's clean): Windows keeps
+        # a volume mounted for each one it knows, with a drive letter or
+        # not (a stick written before carries a boot partition and slots
+        # with none), and refuses a raw write over a mounted volume.
+        clean_disk(n)
+        ps = f"Get-Partition -DiskNumber {n} -ErrorAction SilentlyContinue | Where-Object DriveLetter | Select-Object -ExpandProperty DriveLetter"
+        letters = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, check=False).stdout.split()
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        k32.CreateFileW.restype = wintypes.HANDLE
+        k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                    wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        k32.DeviceIoControl.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+                                        ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        GENERIC_RW, SHARE_RW, OPEN_EXISTING = 0xC0000000, 0x3, 3
+        FSCTL_LOCK_VOLUME, FSCTL_DISMOUNT_VOLUME = 0x00090018, 0x00090020
+        bad = wintypes.HANDLE(-1).value
+        handles = []
+
+        def let_go(why):
+            for h in handles:
+                k32.CloseHandle(h)
+            die(why)
+        # Each volume locked before it is dismounted, and the write refused
+        # when one will not lock: a volume still mounted makes Windows refuse
+        # the raw write part way, or remount it under the write.
+        for letter in letters:
+            h = k32.CreateFileW(f"\\\\.\\{letter}:", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
+            if not h or h == bad:
+                let_go(f"{letter}: on the stick would not open: nothing written")
+            handles.append(h)
+            out = wintypes.DWORD(0)
+            for _ in range(40):
+                if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
+                    break
+                time.sleep(0.25)
+            else:
+                let_go(f"{letter}: on the stick is in use (a window or a program has it open): close it and write again; nothing written")
+            k32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(out), None)
+        # The disk itself opened and locked too: the write lays down a new
+        # partition table, and Windows would mount the partitions it finds
+        # and write to them (a FAT's dirty flag) while the write and the
+        # read back go on; locked, nothing is mounted until it is let go.
+        h = k32.CreateFileW(f"\\\\.\\PhysicalDrive{n}", GENERIC_RW, SHARE_RW, None, OPEN_EXISTING, 0, None)
+        if not h or h == bad:
+            let_go(f"Windows would not open the stick for writing (error {ctypes.GetLastError()}): close anything showing it, "
+                   "unplug it and plug it in, and write again; nothing written")
+        out = wintypes.DWORD(0)
+        for _ in range(40):
+            if k32.DeviceIoControl(h, FSCTL_LOCK_VOLUME, None, 0, None, 0, ctypes.byref(out), None):
+                break
+            time.sleep(0.25)
+        else:
+            k32.CloseHandle(h)
+            let_go("the stick is in use (a window or a program has it open): close it and write again; nothing written")
+        return WinDisk(h, handles)
+    if platform.system() == "Darwin":
+        subprocess.run(["diskutil", "unmountDisk", dev], capture_output=True, check=False)
+        rdev = dev.replace("/dev/disk", "/dev/rdisk")
+        return open(rdev, "r+b", buffering=0)
+    # Every file system on it taken off first, and the write refused if one
+    # will not go; then opened exclusively, which the kernel refuses while
+    # anything still holds the disk (B474).
+    out = subprocess.run(["lsblk", "-nro", "MOUNTPOINTS", dev], capture_output=True, text=True, check=False).stdout.split()
+    for m in out:
+        r = subprocess.run(["umount", m], capture_output=True, text=True, check=False)
+        if r.returncode != 0:
+            die(f"{m} on {dev} would not unmount ({r.stderr.strip() or 'busy'}): nothing written")
+    try:
+        fd = os.open(dev, os.O_RDWR | os.O_EXCL)
+    except OSError as e:
+        die(f"{dev} is in use ({e.strerror}): nothing written")
+    return os.fdopen(fd, "r+b", buffering=0)
+
+
+def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None):
+    size_xz = os.path.getsize(image)
+    say(f"writing {os.path.basename(image)} ({size_xz / GB:.1f} GB compressed) to {dev}")
+    block = env_block(sets) if sets else None
+    boot = boot_block(config) if config else None
+    held = mirror_block(mirror) if mirror else None
+    h = hashlib.sha256()
+    parts = Parts()
+    written = 0
+    with lzma.open(image, "rb") as src, open_disk(dev) as dst:
+        for chunk in sectors(patched(src, block, boot, held)):
+            dst.write(chunk)
+            h.update(chunk)
+            parts.update(chunk)
+            written += len(chunk)
+            if written % (512 << 20) < CHUNK:
+                say(f"  {written / GB:.1f} GB written")
+        dst.flush()
+        # A stick that cannot flush did not take the image: said, never
+        # passed over (B474).
+        if hasattr(dst, "sync"):
+            dst.sync()
+        else:
+            os.fsync(dst.fileno())
+        say(f"written: {written / GB:.1f} GB")
+        # Read back through the same handle while it is still held, so
+        # nothing (Windows mounting what was written) comes between.
+        if verify_after:
+            dst.seek(0)
+            verify(dev, written, h.hexdigest(), f=dst, parts=parts.done())
+
+
+class Parts:
+    """A sha256 per PART of what was written, so a read back that differs
+    says where: near the start is the system touching the boot partition,
+    anywhere else the stick or the port."""
+    PART = 64 << 20
+
+    def __init__(self):
+        self.out, self.h, self.n = [], hashlib.sha256(), 0
+
+    def update(self, b):
+        mv = memoryview(b)
+        while len(mv):
+            take = min(len(mv), self.PART - self.n)
+            self.h.update(mv[:take])
+            self.n += take
+            mv = mv[take:]
+            if self.n == self.PART:
+                self.out.append(self.h.hexdigest())
+                self.h, self.n = hashlib.sha256(), 0
+
+    def done(self):
+        if self.n:
+            self.out.append(self.h.hexdigest())
+            self.h, self.n = hashlib.sha256(), 0
+        return self.out
+
+
+def verify(dev, length, want, f=None, parts=None):
+    say("reading the stick back")
+    h = hashlib.sha256()
+    got = Parts()
+    left = length
+    rdev = dev.replace("/dev/disk", "/dev/rdisk") if platform.system() == "Darwin" else dev
+    if platform.system() == "Windows" and re.fullmatch(r"\d+", dev):
+        rdev = f"\\\\.\\PhysicalDrive{dev}"
+    own = f is None
+    if own:
+        f = open(rdev, "rb", buffering=0)
+    try:
+        # Read from the stick, not from what Linux still holds of the write.
+        if hasattr(os, "posix_fadvise") and hasattr(f, "fileno"):
+            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        while left > 0:
+            chunk = f.read(min(CHUNK, left))
+            if not chunk:
+                break
+            h.update(chunk)
+            got.update(chunk)
+            left -= len(chunk)
+    finally:
+        if own:
+            f.close()
+    if h.hexdigest() != want:
+        where = ""
+        if parts:
+            mine = got.done()
+            bad = [i for i, d in enumerate(parts) if i >= len(mine) or mine[i] != d]
+            if bad:
+                where = (f" (it differs in {len(bad)} of {len(parts)} pieces of 64 MiB, the first at "
+                         f"{bad[0] * Parts.PART / GB:.2f} GB)")
+        die(f"the stick does not read back as what was written{where}: try another stick, or another port")
+    say("the stick reads back as written")
+
+
+def pick(dev):
+    rows = disks()
+    norm = dev if not re.fullmatch(r"\d+", dev) else f"\\\\.\\PhysicalDrive{dev}"
+    d = next((r for r in rows if r["id"].lower() == norm.lower()), None)
+    if not d:
+        die(f"{dev} is not a disk here (list says which are)")
+    if d["system"]:
+        die(f"{d['id']} is the system disk: never")
+    if not d["removable"]:
+        die(f"{d['id']} is not a removable disk (a stick, a card): the tool writes only those")
+    return d
+
+
+def cmd_write(a):
+    d = pick(a.disk)
+    if platform.system() == "Windows" and not is_admin():
+        die("writing a whole disk on Windows needs Administrator: open the command prompt as Administrator and run this again")
+    image = a.image
+    if not image:
+        image = release_image(a.release or "latest", a.channel)
+    elif not os.path.isfile(image):
+        die(f"no such image: {image}")
+    else:
+        # A file you have is checked as a fetched one is: its sha256 where it
+        # sits beside it, and its build attestation (R191 step 2).
+        if os.path.isfile(image + ".sha256"):
+            check_sha(image, image + ".sha256")
+        else:
+            say(f"no {os.path.basename(image)}.sha256 beside it: its sha256 is not checked")
+        attested(image)
+        signed(tag_of(image), image)
+    if not image.endswith(".xz"):
+        die("the image is the release's aerieos-os-VERSION.stick.raw.xz (or .raw.xz)")
+    # The disk asked about again after the download: one replugged meanwhile
+    # may be another disk under the same name (B474).
+    again = pick(a.disk)
+    if (again["size"], again["model"]) != (d["size"], d["model"]):
+        die(f"{a.disk} is not the disk it was before the download ({again['model'] or 'unnamed'}, {again['size'] / GB:.1f} GB now): nothing written")
+    say(f"{d['id']}: {named(d)}. Everything on it is lost.")
+    if not a.yes:
+        if input("Type yes to write it: ").strip().lower() != "yes":
+            die("nothing written")
+    write_image(image, d["id"], verify_after=not a.no_verify, sets=a.set or (), config=a.config, mirror=a.mirror)
+    say("Done. Boot the machine from the stick: it comes up as its own controller, and the dashboard's first page, at http://ITS-ADDRESS:7680 on the LAN, makes the owner or restores a saved configuration.")
+
+
+def cmd_verify(a):
+    d = pick(a.disk)
+    h = hashlib.sha256()
+    n = 0
+    with lzma.open(a.image, "rb") as src:
+        for chunk in sectors(patched(src, env_block(a.set) if a.set else None, boot_block(a.config) if a.config else None,
+                                     mirror_block(a.mirror) if a.mirror else None)):
+            h.update(chunk)
+            n += len(chunk)
+    verify(d["id"], n, h.hexdigest())
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="aerieos-stick", description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("list", help="the removable disks here").set_defaults(fn=cmd_list)
+    w = sub.add_parser("write", help="write a stick image to a disk")
+    w.add_argument("disk")
+    w.add_argument("--image", help="aerieos-os-VERSION.stick.raw.xz, a file you have")
+    w.add_argument("--release", help="the release's tag to fetch the image from (vX.Y.Z)")
+    w.add_argument("--latest", action="store_true", help="fetch the newest release's image (what it does when nothing else is named)")
+    w.add_argument("--set", action="append", metavar="KEY=VALUE", help="a line for the stick's aerieos.env: TZ=Region/City, BB_RELEASE_LINE=X.Y, BB_HOSTNAME=NAME, BB_NET_ADDRESS=A.B.C.D, BB_NET_MASK=24, BB_NET_GATEWAY=A.B.C.D, BB_NET_DNS=A.B.C.D,E.F.G.H, BB_DATA_MAX=64G")
+    w.add_argument("--config", metavar="FILE", help="a prepared configuration (JSON, docs/image.md) the stick's first boot applies, skipping the first-run page where it says so")
+    w.add_argument("--mirror", metavar="FILE", help="a mirror of the vetted catalog (tools/catalog-mirror.py) for a machine with no network, imported as the controller starts")
+    w.add_argument("--channel", choices=["normal", "dev"], default="normal", help=argparse.SUPPRESS)
+    w.add_argument("--yes", action="store_true", help="do not ask")
+    w.add_argument("--no-verify", action="store_true", help="skip reading the stick back")
+    w.set_defaults(fn=cmd_write)
+    v = sub.add_parser("verify", help="read a stick back against an image")
+    v.add_argument("disk")
+    v.add_argument("--image", required=True)
+    v.add_argument("--set", action="append", metavar="KEY=VALUE", help="the lines the stick was written with")
+    v.add_argument("--config", metavar="FILE", help="the prepared configuration it was written with")
+    v.add_argument("--mirror", metavar="FILE", help="the catalog's mirror it was written with")
+    v.set_defaults(fn=cmd_verify)
+    a = ap.parse_args(argv)
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    main()

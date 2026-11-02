@@ -13,7 +13,7 @@ from unittest import mock
 
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent_session_ports")
+agent = agentpkg.load("aerieos_agent_session_ports")
 agent.log = lambda *a, **k: None
 
 OLD_NFT = """table inet builderbot_session {

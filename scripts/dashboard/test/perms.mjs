@@ -34,7 +34,7 @@ await page.waitForSelector('.rolestab [data-rpick]', { timeout: 15000 });
 // its kind and who holds it, one list with nobody's account in it and no
 // field halfway down (the operator, 17 Oct).
 const names = await page.$$eval('.rolestab [data-rpick]', rs => rs.map(r => `${r.querySelector('.name').textContent.trim()} (${r.querySelector('.pill').textContent.trim()})`));
-ok(names.includes("BuilderBot's owner (built in)") && names.includes('Administrator (built in)') && !names.some(n => /^user\b/i.test(n)),
+ok(names.includes("AerieOS's owner (built in)") && names.includes('Administrator (built in)') && !names.some(n => /^user\b/i.test(n)),
    `owner and admin are built in, and there is no user role (${names.join(', ')})`);
 ok(!await page.$('.rolestab .rlist input, .rolestab [data-rwho]') && !!await page.$('.rolestab #rolesNewOpen'),
    '...no account and no field in the list, and New role at the right of the page\'s bar');
@@ -82,7 +82,7 @@ ok(/project areas only/.test((await api('/api/roles', { action: 'set', name: 'ba
 
 // Given on one project: a new account starts with nothing, then holds the
 // role on alpha alone.
-execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'dep', '--role', 'user'],
+execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'dep', '--role', 'user'],
   { input: 'deppass11\ndeppass11\n', encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const depAuth = asUser('dep', 'deppass11');
 {

@@ -20,7 +20,7 @@
   ],
   "source": {
    "after": [
-    "system images and the emulator install through it: bb toolchains install android:emulator, bb emu image add ID"
+    "system images and the emulator install through it: aerie toolchains install android:emulator, aerie emu image add ID"
    ],
    "checksum": {
     "from": "android-repo"

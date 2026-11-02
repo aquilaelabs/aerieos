@@ -1,7 +1,7 @@
 """A project's CI runs on the forge's own machines, read through the
 controller's credential (R115).
 
-A self-hosted job keeps its log where `bb ci-log` reads it; a job on
+A self-hosted job keeps its log where `aerie ci-log` reads it; a job on
 GitHub's runners keeps it on GitHub, and the API that hands it out wants a
 token even for a public repository. A session holds no token, so it asked
 the person to paste the failing part (Shebang-DevBoard, 2 Oct). The
@@ -10,7 +10,7 @@ answers with, and asks GitHub on the session's behalf. Read only: a run is
 listed and a job's log is read, nothing is re-run or stopped.
 
 GitHub only for now: a Gitea or GitLab project's runner is a node's, whose
-log bb ci-log already reads.
+log aerie ci-log already reads.
 """
 import json
 import re
@@ -88,7 +88,7 @@ def _get(path, token, raw=False):
     if not re.fullmatch(r"/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:actions/[A-Za-z0-9_/?=&.-]+"
                         r"|check-runs/\d+/annotations|releases/latest)", path):
         raise Refused("not a path this asks GitHub for")
-    req = urllib.request.Request(API + path, headers={"User-Agent": "BuilderBot",
+    req = urllib.request.Request(API + path, headers={"User-Agent": "AerieOS",
                                                       "Accept": "application/vnd.github+json"})
     # Unredirected: a job's log answers with a redirect to a storage host,
     # which must not be handed the token.

@@ -21,7 +21,7 @@
   "source": {
    "after": [
     "a Windows target also needs a linker: rustup target add x86_64-pc-windows-gnu,",
-    "then EXTRA_APT_PACKAGES=gcc-mingw-w64, or bb toolchains install zig + cargo-zigbuild"
+    "then EXTRA_APT_PACKAGES=gcc-mingw-w64, or aerie toolchains install zig + cargo-zigbuild"
    ],
    "checksum": {
     "from": "file",

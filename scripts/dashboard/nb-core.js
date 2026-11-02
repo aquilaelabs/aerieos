@@ -826,7 +826,7 @@ function makeNotebook(project){
       : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
           ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
           : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this project's settings); a person makes one with New VM."
-          : "A session makes one with bb vm new NAME --os debian, or a person with New VM."}</div></div>`;
+          : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`;
     wireVms($("nvList"));
   }
 
@@ -860,7 +860,7 @@ function makeNotebook(project){
     viewGlance($("dkHint"), blind || !n ? "" : dmTiles({running: mine.filter(d => d.running).length, all: mine.length,
       behind: mine.filter(d => (d.images_behind || []).length || d.nginx_to).length, checked: !!got.images_at}),
       blind && n ? `on ${esc(where)}: the daemon did not answer, so the rows cannot say what is running`
-        : n ? `on ${esc(where)}${imgs}` : "no node runs this project's containers yet");
+        : n ? `on ${esc(where)}${imgs}` : "no node runs this project's containers yet", "", blind && n ? "warn" : "");
     const key = JSON.stringify([mine, others, job && job.step, job && job.running, job && (job.log || "").length,
                                 dmView, got.images_at, blind]);
     if (key === dkSeen) return;
@@ -1020,7 +1020,7 @@ function projectNote(p, band = false){
   // them, and a reason a button is off is not an error, so no line is red).
   if (!p.locked_me && writeWhy(p)) return "";
   // Your session running here and behind what changed since it started (a
-  // toolchain on its node, BuilderBot updated, a repository added): said
+  // toolchain on its node, AerieOS updated, a repository added): said
   // ahead of the rest, which are about starting one.
   const behind = !here ? [] : [...new Set(((state?.claude_where || {})[tmuxName(p.name)] || (state?.claude_where || {})[p.name] || [])
     .filter(r => r.who === state?.me).flatMap(r => r.behind || []))];
@@ -1144,7 +1144,7 @@ function projectActions(p){
           p.linked ? `${esc(p.forge_name || "Remote")} settings` : "Link to a git host"}</button>` : "",
     p.phone?.mine ? `<button type="button" data-ph="${esc(name)}"${phoneWhy(p) ? " disabled" : ""}>${
         p.phone?.lease?.project === name ? "Take your phone back" : "Lend your phone"}</button>` : "",
-    p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report a BuilderBot bug</button>`,
+    p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report an AerieOS bug</button>`,
     // Archive is out of sight only (R119, the operator, 23 Oct): its card
     // folds away at the foot of the Projects page and leaves Home, and the
     // project works on. Its owner's or an administrator's.

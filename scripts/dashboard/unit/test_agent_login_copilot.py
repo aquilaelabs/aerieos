@@ -12,7 +12,7 @@ sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 agent = agentpkg.load("login_copilot")
 
-# A stand-in for `bb login --flow --agent copilot`: the link, then Copilot's
+# A stand-in for `aerie login --flow --agent copilot`: the link, then Copilot's
 # question, then what it was told, written where the test can read it.
 FAKE = """#!/bin/bash
 echo "To authenticate, visit https://github.com/login/device and enter code ABCD-1234"
@@ -45,7 +45,7 @@ class CopilotLogin(unittest.TestCase):
         answer = os.path.join(into, "answer")
         # The flow runs with the agent's own environment, so the stand-in is
         # told where to write in its text.
-        with open(os.path.join(into, "scripts", "bb"), "w") as f:
+        with open(os.path.join(into, "scripts", "aerie"), "w") as f:
             f.write(FAKE.replace("ANSWER_TO", answer))
         job = agent.Job(FakeAgent(into), {"id": "j_1", "type": "copilot-login", "spec": {}})
         job.flush = lambda keepalive=False: True

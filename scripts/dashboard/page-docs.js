@@ -135,24 +135,6 @@ function skTpl(html, {said = "loading…", live = false} = {}){
     html.replace(/ data-sect="[^"]*"/g, "")}</div>`;
 }
 
-// The bar a node's page wears (nodePick and its actions at the right) while
-// what it lists is on its way: the picker's box shimmering, the actions
-// there and dead until the page they act on has drawn. An action given as
-// [label, "primary"] is the page's main action and wears its fill.
-function skActBar(actions = []){
-  return nodeBar("", actions.map(a => [].concat(a)).map(([a, cls, short]) =>
-    `<button type="button"${cls ? ` class="${esc(cls)}"` : ""} disabled>${short ? barSaid(a, short) : esc(a)}</button>`).join(""));
-}
-function skNodeBar(actions = []){
-  return nodeBar(nodePick("", null), actions.map(a => [].concat(a)).map(([a, cls, short]) =>
-    `<button type="button"${cls ? ` class="${esc(cls)}"` : ""} disabled>${short ? barSaid(a, short) : esc(a)}</button>`).join(""));
-}
-// A node's page's bar, its order the same on every page that has one
-// (consistency pass J17): the node picker at the left, then the page's
-// buttons at the right in an action bar, or none.
-function nodeBar(pick, actions = ""){
-  return `${pick}<span class="sp"></span>${String(actions).trim() ? `<span class="actbar">${actions}</span>` : ""}`;
-}
 // A bar button's words at both widths (the operator, 18 Oct: the node
 // picker and a page's buttons on one line on a phone). On a phone the short
 // form shows; where it is the start of the long one the rest is a span a
@@ -300,8 +282,10 @@ const SKTPLS = {
     + docSection("design", "pages", "Pages", "", skRows(2))
     + docSection("design", "themes", "Themes", "", skRows(2))),
   // Its list, by the view's own titles (nb-artifacts.js ART_TITLES)...
-  artifacts: () => skTpl([["build", 1], ["files", 2]]
-    .map(([k, n]) => docSection("artifacts", k, artTitle(k), "", skRows(n))).join("")),
+  // ...with the jump bar the view draws over its three sections (sectJump:
+  // Build, Version and Files), so the page does not move down as it lands.
+  artifacts: () => skTpl(`<nav class="sectjump">${["build", "version", "files"].map(k => `<a href="#">${esc(artTitle(k))}</a>`).join("")}</nav>`
+    + [["build", 1], ["files", 2]].map(([k, n]) => docSection("artifacts", k, artTitle(k), "", skRows(n))).join("")),
   // The Overview's box of sections (nb-rules.js BRIEF_SECTS) as drawRules
   // lands it, the Brief left out, with the jump bar over them and the
   // Memories under them that the markup holds.
@@ -1057,7 +1041,7 @@ function pageHead({title = "", pills = "", facts = [], actions = "", cls = ""} =
   const grid = factGrid(facts, "pghfacts");
   if (!title && !pills && !grid && !actions) return "";
   return `<div class="field pghead${cls ? " " + esc(cls) : ""}">${
-    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? ` ${pills}` : ""}</div>` : ""}${grid}${
+    title || pills ? `<div class="name">${title === GHOST ? skv(10) : title ? esc(title) : ""}${pills ? `${title ? " " : ""}${pills}` : ""}</div>` : ""}${grid}${
     actions ? `<div class="actbar">${actions}</div>` : ""}</div>`;
 }
 
@@ -1068,7 +1052,13 @@ function pageHead({title = "", pills = "", facts = [], actions = "", cls = ""} =
 // A value or a sub given as GHOST is the page's placeholder: the tile is
 // the real one, its number shimmering until the page has it.
 function statTiles(tiles){
-  const rows = (tiles || []).filter(t => t && !t.omit);
+  // A size given whole ("11.0 TB") is its number and its unit, the unit in
+  // the small voice as a tile's unit is: at the tile's size the two parted
+  // across lines on a phone.
+  const rows = (tiles || []).filter(t => t && !t.omit).map(t => {
+    const m = !t.unit && typeof t.value === "string" && /^([\d.,]+) (B|kB|KB|MB|GB|TB)$/.exec(t.value);
+    return m ? {...t, value: m[1], unit: m[2]} : t;
+  });
   if (!rows.length) return "";
   return `<div class="field"><div class="tiles">${rows.map(t => `
     <div class="tile${t.tone ? " " + esc(t.tone) : ""}"${t.title ? ` title="${esc(t.title)}"` : ""}>
@@ -1105,11 +1095,13 @@ function glanceWaiting(el){
                + (said ? viewSaid(skel("word")) : ""));
 }
 // What a view has to say beside its tiles, in the notice voice (the operator,
-// 25 Oct: no loose words at a page's top): an error in red, a state plain,
-// its buttons on the notice's own bar.
+// 25 Oct: no loose words at a page's top): an error in red, a warning in
+// gold, a state in the note's color, its buttons on the notice's own bar. A
+// bare .notice is gold, so a state passed with no tone is a note: the
+// Artifacts view's "the code base as a zip" read as a warning.
 function viewSaid(said, actions = "", tone = ""){
   if (!said && !actions) return "";
-  return `<div class="field nbsaid"><div class="notice${tone ? " " + esc(tone) : ""}">${said}${
+  return `<div class="field nbsaid"><div class="notice ${esc(tone || "note")}">${said}${
     actions ? `<div class="actbar">${actions}</div>` : ""}</div></div>`;
 }
 function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
@@ -1123,7 +1115,7 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   let wrote;
   if (slot){
     wrote = paint(el, html);
-    wrote = paint(slot, said || actions ? `<div class="notice${tone ? " " + esc(tone) : ""}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
+    wrote = paint(slot, said || actions ? `<div class="notice ${esc(tone || "note")}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
   } else wrote = paint(el, html + viewSaid(said, actions, tone));
   // Marked once: a poll that brings nothing new writes nothing (uniform).
   if (!el.dataset.drawn) el.dataset.drawn = "1";
@@ -1478,8 +1470,10 @@ const inRelease = (v, on) => !on || (on === "none" ? !relOf(v) : relOf(v) === on
 // The chips alone, for a band that holds more than them (a list's search
 // beside them, R254 step 1): "" when fewer than two groups have anything.
 // `all` is All's count where the groups overlap (a branch both Active and
-// Yours), the groups' sum otherwise.
-function chipButtons(groups, on, attr, all){
+// Yours), the groups' sum otherwise. `allWord` names the first chip where a
+// second row under another would say All again (the Library's sources,
+// Bugs' and the Roadmap's versions).
+function chipButtons(groups, on, attr, all, allWord = "All"){
   // A group with no count to give (a disk, a key: count null) is a chip
   // with its name alone; one whose count is 0 has nothing to show.
   const gs = (groups || []).filter(g => g && (g.count || g.count === null));
@@ -1488,5 +1482,5 @@ function chipButtons(groups, on, attr, all){
   const chip = (key, label, count) => `<button type="button" class="chip${(on || "") === key ? " on" : ""}"
     ${attr}="${esc(key)}" aria-pressed="${(on || "") === key}">${esc(label)}${
       count === null || count === undefined ? "" : `<span class="pill">${count}</span>`}</button>`;
-  return chip("", "All", total) + gs.map(g => chip(g.key, g.label, g.count)).join("");
+  return chip("", allWord, total) + gs.map(g => chip(g.key, g.label, g.count)).join("");
 }

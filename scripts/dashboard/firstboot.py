@@ -1,8 +1,8 @@
 """A prepared configuration's first boot on the controller (R161 step 8).
 
-The stick's root step (image/mkosi.extra/usr/lib/builderbot-os/firstboot-take)
+The stick's root step (image/mkosi.extra/usr/lib/aerieos-os/firstboot-take)
 takes builderbot/firstboot.json off the ESP before the controller starts and
-hands it over at /run/builderbot-os/firstboot/firstboot.json with what it did
+hands it over at /run/aerieos-os/firstboot/firstboot.json with what it did
 to the machine itself (the hostname, the time zone). At start this applies
 the rest it can: the owner (a name and a password hash; none leaves the
 first-run page to ask), the people (by name and role, their SMB password's
@@ -25,7 +25,7 @@ import os
 import time
 from pathlib import Path
 
-RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/builderbot-os/firstboot/firstboot.json"))
+RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/aerieos-os/firstboot/firstboot.json"))
 STATE = None
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
@@ -96,11 +96,105 @@ def apply(path=None):
     return report
 
 
+def adopt_want(cfg):
+    """What the stick's plan names to adopt (R163 step 9), as the
+    storage-adopt request takes it: the data disks by slot and serial with
+    their filesystem, the parity disks to leave alone, the pools by name and
+    UUID; an encrypted disk is listed apart with why, since its key is not
+    asked for yet. None when the plan names no disk or pool."""
+    ar = (cfg or {}).get("array") if isinstance((cfg or {}).get("array"), dict) else {}
+    data, skipped = [], []
+    for x in ar.get("disks") or []:
+        if not isinstance(x, dict) or not x.get("id"):
+            continue
+        fs = str(x.get("fs") or "").lower()
+        if fs.startswith("luks"):
+            skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": "encrypted: its key is not asked for yet"})
+        elif fs in ("xfs", "btrfs", "zfs"):
+            data.append({"slot": str(x.get("slot") or ""), "id": str(x["id"]), "fs": fs})
+        else:
+            skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": f"its filesystem is {fs or 'not said'}"})
+    parity = [{"slot": str(x.get("slot") or "parity"), "id": str(x["id"])} for x in ar.get("parity") or [] if isinstance(x, dict) and x.get("id")]
+    pools = [{"name": str(p.get("name") or ""), "fs": str(p.get("fs") or "").lower(), "uuid": str(p.get("uuid") or "")}
+             for p in (cfg or {}).get("pools") or [] if isinstance(p, dict) and p.get("name")]
+    if not data and not pools:
+        return None
+    return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
+
+
+def share_requests(cfg):
+    """The plan's shares as storage-share's set-many takes them (R163 step
+    9), each served from the merged tree where its files were: SMB as its
+    security said (public: everybody as a guest; secure: its writers by name,
+    the guests' reading not carried and said so, or everybody as a read-only
+    guest where it names no writer; private: the people on its lists by
+    name), NFS to the hosts its export named, a Time Machine share kept one.
+    What cannot be carried is said beside each. ([rows], [notes])."""
+    rows, notes = [], []
+    for s in (cfg or {}).get("shares") or []:
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        name = str(s["name"])
+        sec = str(s.get("security") or "public")
+        people = [p for p in [*(s.get("read") or []), *(s.get("write") or [])] if isinstance(p, str) and p]
+        smb = {"on": s.get("smb") is True, "guest": False, "ro": False, "tm": s.get("time_machine") is True, "users": []}
+        if smb["on"]:
+            if sec == "public":
+                smb["guest"] = True
+            elif sec == "secure":
+                writers = [p for p in s.get("write") or [] if isinstance(p, str) and p]
+                if writers:
+                    smb["users"] = writers
+                    notes.append({"name": name, "said": "secure: its writers by name; everybody else's guest reading is not carried"})
+                else:
+                    smb.update(guest=True, ro=True)
+            else:
+                smb["users"] = sorted(set(people))
+                if not people:
+                    notes.append({"name": name, "said": "private with nobody on its lists: not served over SMB"})
+                    smb["on"] = False
+        clients, ro = [], False
+        for rule in str(s.get("nfs_clients") or "").split():
+            host = rule.split("(", 1)[0]
+            if host:
+                clients.append(host)
+                ro = ro or "(ro" in rule or ",ro" in rule
+        nfs = {"on": s.get("nfs") is True, "ro": ro, "clients": clients or (["*"] if s.get("nfs") and s.get("nfs_security") == "public" else [])}
+        if nfs["on"] and not nfs["clients"]:
+            notes.append({"name": name, "said": "NFS with no host named: not exported"})
+            nfs["on"] = False
+        if not smb["on"] and not nfs["on"]:
+            continue
+        rows.append({"name": name, "path": f"/mnt/user/{name}", "smb": smb, "nfs": nfs})
+    return rows, notes
+
+
+def kept_config():
+    """The stick's configuration as kept (no password or SMB hash in it),
+    or {}."""
+    try:
+        d = json.loads(_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d.get("config") if isinstance(d.get("config"), dict) else {}
+
+
 def view():
     """This machine's section: what the stick's prepared configuration did,
-    or None when this install had none."""
+    and what its plan names to adopt; None when this install had none."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return {k: d.get(k) for k in ("at", "done", "waiting", "failed")}
+    cfg = d.get("config") if isinstance(d.get("config"), dict) else {}
+    rows, notes = share_requests(cfg)
+    dk, vm = cfg.get("docker") if isinstance(cfg.get("docker"), dict) else {}, cfg.get("vms") if isinstance(cfg.get("vms"), dict) else {}
+    nets = {str(k): {"subnet": str(v.get("subnet") or ""), "gateway": str(v.get("gateway") or "")}
+            for k, v in (dk.get("networks") or {}).items() if isinstance(v, dict) and v.get("subnet")}
+    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(cfg),
+            "shares": {"rows": rows, "notes": notes} if rows or notes else None,
+            # Where the old system's containers and VMs are read from, and its
+            # networks of fixed addresses (R163 steps 10, 11).
+            "apps_from": {"docker": {"image": str(dk.get("image") or ""), "autostart_file": str(dk.get("autostart_file") or "")},
+                          "vms": {"image": str(vm.get("image") or "")}, "networks": nets,
+                          "containers": len(cfg.get("apps") or [])} if dk or vm or cfg.get("apps") else None}

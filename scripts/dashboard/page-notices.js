@@ -60,7 +60,7 @@ function noticesAskRows(){
     : a.kind === "release-edit" ? ["the new notes", a.detail] : ["", ""];
   return asks.map(a => {
     const [what, body] = long(a);
-    return `<div class="row stack2 ntask${a.kind === "root" || a.kind === "release-remove" ? " bad" : ""}" data-ask="${a.id}">
+    return `<div class="row stack2 ntask${a.kind === "root" || a.kind === "release-remove" || a.kind === "release-withdraw" ? " bad" : ""}" data-ask="${a.id}">
       <div class="grow">
         <div class="name">${askTag(a)}</div>
         <div class="sub">${esc(a.why || "")}</div>
@@ -106,8 +106,10 @@ function renderNoticesInto(i){
   const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows();
   const groups = [...Object.entries(NOTICE_KINDS).map(([k, label]) => ({key: k, label, count: all.filter(n => n.kind === k).length})),
                   {key: "bad", label: "Failures", count: all.filter(n => n.level === "bad").length}];
+  // In an action bar as every page's bar action is, which keeps it at the
+  // right on a phone too, where it sat at the left once the spacer folded.
   d.setBar(`<span class="sp"></span>
-    ${all.length ? `<button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear all"}</button>` : ""}`);
+    ${all.length ? `<span class="actbar"><button type="button" class="danger" id="ntClear">${noticesChip && noticesChip !== "bad" ? `Clear ${esc(NOTICE_KINDS[noticesChip].toLowerCase())}` : "Clear all"}</button></span>` : ""}`);
   const html = (noticesErr ? `<div class="hint bad">${esc(noticesErr)}</div>` : "")
     // Not drawn with nothing in it (the house rule: what has nothing to act
     // on is not shown); while something waits it opens by itself, and on a
@@ -141,7 +143,7 @@ function wireNotices(root){
     noticesAct({action: "clear", kind});
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>
-    fadeThrough(".pane .doc.on .ntlist", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () => noticesAct({action: "delete", id: b.dataset.ntdel}));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));

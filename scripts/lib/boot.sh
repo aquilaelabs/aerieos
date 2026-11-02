@@ -202,7 +202,7 @@ SED
 
     # Say plainly what was and wasn't found: a missing /secrets mount or a
     # misnamed file used to fail silently, leaving "no runner credential" in
-    # bb doctor with nothing in the log to explain it.
+    # aerie doctor with nothing in the log to explain it.
     if [ "$found" -gt 0 ]; then
         log "secrets: loaded ${found} value(s) [${names}]"
     elif [ -d "$BB_SECRETS_DIR" ]; then
@@ -249,7 +249,7 @@ setup_ssh_agent() {
         fi
     done
 
-    added=$((added + $(/opt/builderbot/scripts/deploy-key --load 2>/dev/null || echo 0)))
+    added=$((added + $(/opt/aerieos/scripts/deploy-key --load 2>/dev/null || echo 0)))
 
     # ssh-agent rejects any client whose uid differs from its own (root is the
     # sole exception), so the builder user cannot talk to it directly no matter
@@ -396,8 +396,8 @@ seed_home() {
     # Copy skeleton entries the (usually volume-mounted) home is missing.
     # -n means existing files are never clobbered, so your Claude Code
     # credentials and settings survive an image upgrade.
-    if [ -d /opt/builderbot/skel ]; then
-        cp -rn /opt/builderbot/skel/. "$BUILDER_HOME"/ 2>/dev/null || true
+    if [ -d /opt/aerieos/skel ]; then
+        cp -rn /opt/aerieos/skel/. "$BUILDER_HOME"/ 2>/dev/null || true
     fi
 
     mkdir -p \
@@ -429,7 +429,7 @@ seed_home() {
     for f in "$BUILDER_HOME"/.bashrc "$BUILDER_HOME"/.profile; do
         [ "$(stat -c %u "$f" 2>/dev/null)" = 0 ] && { chown "$PUID:$PGID" "$f" 2>/dev/null || true; }
     done
-    # /config is BuilderBot's own state, never a share: one Docker made for a
+    # /config is AerieOS's own state, never a share: one Docker made for a
     # missing host path, or a new named volume, is root's, and the dashboard,
     # which runs as the account, could keep nothing in it (B120). Only its
     # top: what root keeps in it on purpose (runner tokens, signing keys,
@@ -555,7 +555,7 @@ persist_android_downloads() {
 # come free.
 run_hooks() {
     local dir script started took name
-    for dir in /opt/builderbot/scripts/startup.d "${DASHBOARD_STATE:-/config}/startup.d"; do
+    for dir in /opt/aerieos/scripts/startup.d "${DASHBOARD_STATE:-/config}/startup.d"; do
         [ -d "$dir" ] || continue
         for script in "$dir"/*.sh; do
             [ -e "$script" ] || continue
@@ -611,14 +611,14 @@ boot_ready() {
 # here with the one sentence saying what to do, and the logs it would rotate
 # are left as they are. The dashboard asks again.
 state_gate() {
-    python3 /opt/builderbot/scripts/dashboard/stateversion.py check "${DASHBOARD_STATE:-/config}" \
+    python3 /opt/aerieos/scripts/dashboard/stateversion.py check "${DASHBOARD_STATE:-/config}" \
         || die "${DASHBOARD_STATE:-/config} is not one this build may start on; nothing was changed"
 }
 
 # Build the command the boot will exec, honoring the container CMD.
 resolve_command() {
     case "${1:-supervise}" in
-        supervise) printf '%s\0' /opt/builderbot/scripts/supervisor.sh ;;
+        supervise) printf '%s\0' /opt/aerieos/scripts/supervisor.sh ;;
         shell|bash)
             # Bare `bash`/`shell` means "give me a login shell"; anything with
             # arguments (e.g. `bash -c '...'`) must run verbatim.

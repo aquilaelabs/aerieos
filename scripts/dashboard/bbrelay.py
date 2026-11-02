@@ -11,13 +11,13 @@ of every verb.
 
 WHAT THE TOKEN DECIDES. A session token stands for one project with user
 rights; the relay refuses a request naming another, and every verb runs
-with that project pinned into the environment, so `bb roadmap` cannot be
+with that project pinned into the environment, so `aerie roadmap` cannot be
 pointed elsewhere by a working directory. A person's credential (an
 operator at a node's console) is held to the same rule the page holds them
 to: a project on their list.
 
 WHAT IT RUNS. Only the verbs bb itself relays (BB_RELAY_VERBS in
-scripts/bb, read from the same file as VERBS below): the notebook, the
+scripts/aerie, read from the same file as VERBS below): the notebook, the
 settings, the registry, the version and changelog, the findings. Not `sdk`,
 `emu`, `run`, `build`: those answer for the machine the session is on, and
 relaying them would make a node's session act on this container, which is
@@ -26,7 +26,7 @@ nothing that administers this box. The audit row at the top of POST
 records the argv with the principal, like every other mutation.
 
 The server holds the door: a signed-in caller before admit(), and the
-account's `bb` right on the project between admit() and run(). Which words
+account's `aerie` right on the project between admit() and run(). Which words
 travel, whose project a token names and what a session may push are this
 module's; both answer (payload, status).
 """
@@ -62,6 +62,7 @@ gitrelay = None
 registry = None
 phone = None          # the asks (R219): a held push waits on the bell there
 pushscan = None
+forgeaccess = None    # the project's On the git host settings (B559)
 WORKSPACE = None
 STATE = None
 
@@ -109,9 +110,9 @@ def _not_a_read(argv):
     if verb in READ_FORMS and first in forms:
         return ""
     if verb in READ_FORMS:
-        return (f"bb {verb} {first} would change it, and a session on the project "
+        return (f"aerie {verb} {first} would change it, and a session on the project "
                 f"that reads it only reads")
-    return f"bb {verb} acts on the project's own machines, and reading it does not"
+    return f"aerie {verb} acts on the project's own machines, and reading it does not"
 
 
 def admit(me, req):
@@ -121,25 +122,25 @@ def admit(me, req):
     author, a name that is not a project."""
     argv = _argv(req)
     if len(argv) > MAX_WORDS:
-        return None, ({"error": f"bb {argv[0]} sent {len(argv)} words, and a relayed command "
+        return None, ({"error": f"aerie {argv[0]} sent {len(argv)} words, and a relayed command "
                                 f"carries {MAX_WORDS} at most: split it into several"}, 400)
     if not argv or argv[0] not in VERBS:
-        return None, ({"error": f"bb {argv[0] if argv else ''} is not relayed: "
+        return None, ({"error": f"aerie {argv[0] if argv else ''} is not relayed: "
                        "it answers for the machine the session is on"}, 400)
     # A rule's check is a command, and a session may write its own rule's
     # check, so it runs on the machine the session is on and never here
     # (B152). A node's bb keeps it local; this refuses one sent anyway.
     if argv[:2] == ["rules", "check"]:
-        return None, ({"error": "bb rules check runs on the machine the session is on, "
+        return None, ({"error": "aerie rules check runs on the machine the session is on, "
                                 "not on the controller: run it there"}, 400)
     # A new install's setup from a shell (R84): an administrator's, at the
     # controller. Each verb refuses a session itself; this refuses it here as
     # well, whatever the verb does, so nothing a session sends sets a
     # project's node or mints a node's token.
     if me.get("session") and (argv[:2] in (["nodes", "enroll-token"], ["settings", "node"])):
-        return None, ({"error": f"bb {' '.join(argv[:2])} is an administrator's, from a shell on the "
+        return None, ({"error": f"aerie {' '.join(argv[:2])} is an administrator's, from a shell on the "
                                 "controller, never a session's"}, 403)
-    # `bb findings --all` means every project in the scanner's report, and
+    # `aerie findings --all` means every project in the scanner's report, and
     # the report covers the whole share. The rest of this door keeps a
     # session inside its own project; this flag walks straight out of it,
     # and the reports live on the CONTROLLER, so a node's session cannot
@@ -149,7 +150,7 @@ def admit(me, req):
     # answers for its own project, which is what a session wants anyway.
     if me.get("session") and argv[:1] == ["findings"] \
             and any(a in ("-a", "--all") for a in argv[1:]):
-        return None, ({"error": "bb findings --all reads every project in the report, "
+        return None, ({"error": "aerie findings --all reads every project in the report, "
                                 "and a session reads its own: run it without --all"}, 403)
     project = field(req, "project") or me.get("session") or ""
     # A shown name (R154) is taken for its directory (B1): the person names
@@ -198,7 +199,7 @@ def admit(me, req):
 
 def run(me, req, project):
     """Run the words for the project admit() named, once the server has
-    asked the account's `bb` right on it: a git verb's own refusals first
+    asked the account's `aerie` right on it: a git verb's own refusals first
     (no push rights, a session's push against the project's git policy),
     then git's network half through gitrelay or the verb through bb."""
     argv = _argv(req)
@@ -211,7 +212,7 @@ def run(me, req, project):
     if argv[:2] == ["git", "push"] and not projects.may_push(project):
         return {"error": "this project has no push rights: the operator grants them "
                          "in the clone dialog or with Link to a git host on its Projects page; "
-                         "bb git policy says so first"}, 403
+                         "aerie git policy says so first"}, 403
     # The tree the session is in: the project directory, or one of its
     # worktrees. Anything else (a path outside the share, a sibling
     # project) runs in the project directory instead of being trusted.
@@ -275,7 +276,7 @@ def run(me, req, project):
             elif dest not in local and (dest.startswith("refs/tags/")
                                         or dest in gitrelay.tree_tags(project, cwd)):
                 return {"error": f"{dest.removeprefix('refs/tags/')} is a tag, and a tag is a "
-                                 "release's name here: bb version release pushes it, and "
+                                 "release's name here: aerie version release pushes it, and "
                                  "releasing again finishes one whose push failed"}, 403
             elif dest not in local:
                 return {"error": f"this project's git policy lets a session push its own "
@@ -315,20 +316,23 @@ def run(me, req, project):
     # hands the tree's half back to the node's bb as `apply`.
     if argv[0] == "git" and argv[1:2] and argv[1] in gitrelay.VERBS:
         # A session's git is its person's, with their own token, while they
-        # are signed in (R159): signed out everywhere, bb git waits for them,
+        # are signed in (R159): signed out everywhere, aerie git waits for them,
         # and a project nobody signed in gave a token says so.
         u = gitcreds.usable(project, str(me.get("uid") or ""))
         # The project's git policy may turn the hold off (the Git view's
         # "Hold a push that looks sensitive"): the push then goes unread.
         hold = prefs.get(project)["gitpol"].get("scan") != "off"
+        # A session's push is held to the project's Change CI workflow files
+        # (B559): a workflow it wrote runs with the repository's secrets.
+        wf = not me.get("session") or not forgeaccess or forgeaccess.override(project).get("workflows") != "deny"
         r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=str(me.get("uid") or ""),
-                         token_why=u.get("why", ""))
+                         token_why=u.get("why", ""), workflows=wf)
         if "error" in r:
             return r, 400
         if r.get("held"):
             # Lines that look like a secret or something private (R219):
             # the push waits on a person, who reads them on the bell. The
-            # node's bb waits on the ask the way bb root run does, and the
+            # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
             a = phone.ask_push(project, str(cwd), argv[2:], r["held"],
                                asker_uid=me.get("uid") or "", asker_name=me.get("name") or "",
@@ -345,13 +349,13 @@ def run(me, req, project):
     # together, each slowing the rest (68s for what took 8). The rest wait
     # their turn in this thread; a wait that long says the box is busy.
     if not _SLOTS.acquire(timeout=120):
-        return {"error": "the controller is busy with other sessions' bb; try again",
+        return {"error": "the controller is busy with other sessions' aerie; try again",
                 "code": 75, "out": "", "err": ""}, 503
     try:
-        r = subprocess.run(["bash", str(HERE.parent / "bb"), *argv], cwd=str(cwd),
+        r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
                            env=env, capture_output=True, text=True, timeout=180)
     except subprocess.TimeoutExpired:
-        return {"error": f"bb {argv[0]} took longer than three minutes",
+        return {"error": f"aerie {argv[0]} took longer than three minutes",
                 "code": 124, "out": "", "err": ""}, 504
     except OSError as e:
         return {"error": str(e), "code": 1, "out": "", "err": ""}, 500

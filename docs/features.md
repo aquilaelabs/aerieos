@@ -1,6 +1,6 @@
-# What BuilderBot does
+# What AerieOS does
 
-Everything BuilderBot 0.5.0 offers, one area at a time, with the doc that
+Everything AerieOS 0.5.0 offers, one area at a time, with the doc that
 explains each in full.
 
 ## The dashboard
@@ -67,7 +67,7 @@ works there ([notebook.md](notebook.md)).
   a release. Each is allowed, asked of a person, or refused.
 - **A session sees only its own project** on disk, with your git identity on
   its commits. Credentials stay out of its reach: it reaches a git host only
-  through `bb git` and signs through BuilderBot, without ever holding the
+  through `aerie git` and signs through AerieOS, without ever holding the
   keys.
 - **Asking**: a session waiting on a permission prompt shows amber in the
   dock, on its project and in the bell.
@@ -75,18 +75,18 @@ works there ([notebook.md](notebook.md)).
 - Each person signs in to each agent with their own account, on each node,
   from the Installed page under Machines.
 
-## The `bb` command
+## The `aerie` command
 
-What a session (or you, in a terminal) uses to work with BuilderBot
-([bb-command.md](bb-command.md), [reference.md](reference.md)).
+What a session (or you, in a terminal) uses to work with AerieOS
+([aerie-command.md](aerie-command.md), [reference.md](reference.md)).
 
-- The notebook from the terminal: `bb roadmap`, `bb bug`, `bb rules`,
-  `bb design`, `bb changelog`.
-- `bb build`, `bb test` and `bb run` on the project's node.
-- `bb map`: where a name is defined and who calls it, across the code.
-- `bb capture`: screenshots and frame-by-frame reels of a page or the
+- The notebook from the terminal: `aerie roadmap`, `aerie bug`, `aerie rules`,
+  `aerie design`, `aerie changelog`.
+- `aerie build`, `aerie test` and `aerie run` on the project's node.
+- `aerie map`: where a name is defined and who calls it, across the code.
+- `aerie capture`: screenshots and frame-by-frame reels of a page or the
   emulator that a session can look at.
-- `bb tool`: the commands toolchains and tool packs give a session:
+- `aerie tool`: the commands toolchains and tool packs give a session:
   documents to Markdown, graphics, diagrams, sound, and your own.
 
 ## Nodes

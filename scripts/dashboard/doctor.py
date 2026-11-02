@@ -1,4 +1,4 @@
-"""bb doctor, cached, for the Doctor card.
+"""aerie doctor, cached, for the Doctor card.
 
 The checks take up to half a minute of network timeouts when something is
 down, which rules out running them on the status poll. So a background thread
@@ -23,13 +23,13 @@ EVERY = 1800
 _lock = threading.Lock()
 _verdict = {"when": 0, "checks": [], "failed": False, "running": True}
 
-# bb doctor's own line shape: "  [ok]   claude on PATH". Indented lines that
+# aerie doctor's own line shape: "  [ok]   claude on PATH". Indented lines that
 # carry no tag are elaboration on the check above them (the ssh diagnosis
 # hint, the GPU capability note) and travel with it as detail.
 LINE = re.compile(r"^\s*\[(ok|FAIL|skip|warn)\]\s+(.*\S)")
 
 
-# bb doctor's runner token line: it knows the token store's node id and
+# aerie doctor's runner token line: it knows the token store's node id and
 # slot, which name nothing a person can find on screen.
 RUNNER = re.compile(r"^runner token for (\S+) on (n_[0-9a-f]{8}): (.*)$")
 
@@ -59,7 +59,7 @@ def _runner_line(check):
 
 
 def refresh():
-    """Run bb doctor and cache the parsed result. False if one is mid-run:
+    """Run aerie doctor and cache the parsed result. False if one is mid-run:
     two at once would double every network probe for the same answer, so
     the ask is kept and that run goes again when it ends. Dropped, a node
     that dialed in while the first run after a restart was out left that
@@ -82,7 +82,7 @@ def refresh():
     return True
 
 
-# A line that names the doc its fix is in, as bb doctor writes it for a
+# A line that names the doc its fix is in, as aerie doctor writes it for a
 # terminal ("... (docs/reference.md)"): on the page, a link to that doc's
 # section in Help (the operator, 26 Oct).
 DOC_LINKS = (("the install key is kept beside the state", "#/help/reference/the-install-key", "How"),
@@ -99,7 +99,7 @@ def _doc_line(check):
 
 
 def _run_once():
-    r = run(["bb", "doctor"], timeout=180)
+    r = run(["aerie", "doctor"], timeout=180)
     checks = []
     for line in r["out"].splitlines():
         m = LINE.match(line)

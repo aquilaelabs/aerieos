@@ -13,7 +13,7 @@ import subprocess
 run = None
 nodes = None
 
-HELPER = "/opt/builderbot/scripts/mint-runner-token"
+HELPER = "/opt/aerieos/scripts/mint-runner-token"
 
 
 def configure(*, run, nodes):

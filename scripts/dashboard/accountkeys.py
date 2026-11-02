@@ -39,6 +39,7 @@ import re
 import secrets
 import threading
 import time
+import urllib.parse
 
 import signing
 import statefile
@@ -128,17 +129,21 @@ def key_of(uid, make=True):
     if own_of(uid):
         return unlocks.opened_key(uid)
     k = _open(r.get("key"))
-    if k or not make:
+    # A key that is there and does not open (sealed under an install key
+    # this start was not given) is kept for that key, never made anew: a
+    # new one in its place lost every token sealed under the old for good,
+    # at every start with a mistyped INSTALL_KEY (B542).
+    if k or not make or r.get("key"):
         return k
     with _lock:
         d = _load()
         r = d.get(uid) or {}
         k = _open(r.get("key"))
-        if k:
+        if k or r.get("key"):
             return k
         k = secrets.token_bytes(32)
         now = int(time.time())
-        d[uid] = {"key": _keep(k), "made": now, "changed": now}
+        d[uid] = {**r, "key": _keep(k), "made": now, "changed": now}
         with contextlib.suppress(OSError):
             _save(d)
             return k
@@ -155,10 +160,46 @@ def fingerprint(k):
     return f"{h[:4]} {h[4:]}"
 
 
+def _under_only(uid, prev):
+    """How many of the account's tokens open with `prev` and not with today's
+    key: what a change failed to seal again."""
+    k = _open(_entry(uid).get("key"))
+    n = 0
+    for f in _entries(uid).values():
+        raw = base64.b64decode(f.get("sealed") or "")
+        try:
+            signing.open_with(k, raw)
+            continue
+        except (signing.Locked, ValueError, TypeError):
+            pass
+        with contextlib.suppress(signing.Locked, ValueError, TypeError):
+            signing.open_with(prev, raw)
+            n += 1
+    return n
+
+
 def _drop_previous(uid):
     prev = previous_of(uid)
     if not prev or (on_nodes and on_nodes(uid, prev)):
         return False
+    # Nor while a token is still under it alone (B548): one the change could
+    # not seal again, or one given while it ran, was lost with it. Each such
+    # one is sealed again under today's key first, so a later try settles it.
+    if _under_only(uid, prev):
+        k = _open(_entry(uid).get("key"))
+        with _lock:
+            sd = _load_secrets()
+            for f in ((sd.get(uid) or {}).get("forges") or {}).values():
+                with contextlib.suppress(signing.Locked, ValueError, TypeError, KeyError):
+                    raw = base64.b64decode(f["sealed"])
+                    try:
+                        signing.open_with(k, raw)
+                    except signing.Locked:
+                        f["sealed"] = base64.b64encode(signing.seal(signing.open_with(prev, raw), k)).decode()
+            with contextlib.suppress(OSError):
+                statefile.write_json(_secrets_file(), sd, mode=0o600)
+        if _under_only(uid, prev):
+            return False
     with _lock:
         d = _load()
         if (d.get(uid) or {}).pop("prev", None) is not None:
@@ -246,12 +287,12 @@ def move_to_own(uid, secret, how, passkey=""):
 
 
 def move_back(uid):
-    """The store given back to this BuilderBot's install key, while it is
+    """The store given back to this AerieOS's install key, while it is
     unlocked: its key sealed under the install key again, the own record
     gone."""
     own = own_of(uid)
     if not own:
-        return {"error": "your store is under this BuilderBot's key already"}, 400
+        return {"error": "your store is under this AerieOS's key already"}, 400
     k = unlocks.opened_key(uid)
     if k is None:
         return {"error": "your store is locked: unlock it, then give the key back"}, 409
@@ -262,7 +303,7 @@ def move_back(uid):
         r.pop("own", None)
         d[uid] = r
         _save(d)
-    unlocks.lock(uid, why="given back to this BuilderBot")
+    unlocks.lock(uid, why="given back to this AerieOS")
     return {"ok": True, "fingerprint": fingerprint(k)}, 200
 
 
@@ -278,7 +319,7 @@ def change(uid, new=""):
     if new and not KEY_RE.fullmatch(new):
         return {"error": "an account key is 64 hex characters"}, 400
     if own_of(uid):
-        return {"error": "your store is under a key of your own: give it back to this BuilderBot first, or change what you hold"}, 409
+        return {"error": "your store is under a key of your own: give it back to this AerieOS first, or change what you hold"}, 409
     old = key_of(uid)
     if old is None:
         return {"error": "no such account"}, 404
@@ -344,9 +385,17 @@ def forget(uid):
 # An entry's id names it for good; one written before ids (keyed by its
 # host) keeps its host as its id.
 
+def _bare(host):
+    """A host as a remote's URL names it: git's credential lines write a
+    port's colon as %3a, and an entry kept from one never matched its
+    project's remote (192.168.1.16%3a3000 against 192.168.1.16:3000) and
+    read that way on the Keys page."""
+    return urllib.parse.unquote(str(host or "")).lower()
+
+
 def _entries(uid, sd=None):
     fs = ((sd if sd is not None else _load_secrets()).get(uid) or {}).get("forges") or {}
-    return {fid: dict(f, host=f.get("host") or fid) for fid, f in fs.items() if isinstance(f, dict)}
+    return {fid: dict(f, host=_bare(f.get("host") or fid)) for fid, f in fs.items() if isinstance(f, dict)}
 
 
 def forges_of(uid):
@@ -373,17 +422,19 @@ def link_forge(uid, host, line, login):
     project linked to it uses the new one; any other entry for that account
     and host is dropped, its id in `replaced` for the caller to move the
     projects linked to it. ({ok, id, host, login, replaced}, status)."""
-    k = key_of(uid)
-    if not k:
-        return {"error": "this install has no key, so nothing can be kept in an account's key store"}, 409
-    host = str(host).lower()
+    host = _bare(host)
+    # The key read under the lock a change takes (B548): read before it, a
+    # token given while the account's key changed was sealed under the old.
     with _lock:
+        k = key_of(uid)
+        if not k:
+            return {"error": "this install has no key, so nothing can be kept in an account's key store"}, 409
         sd = _load_secrets()
         fs = sd.setdefault(uid, {}).setdefault("forges", {})
         for fid, f in _entries(uid, sd).items():
             if f["host"] == host and _open_entry(k, f) == line:
                 return {"ok": True, "id": fid, "host": host, "login": f.get("login", ""), "replaced": []}, 200
-        same = sorted((fid for fid, f in fs.items() if isinstance(f, dict) and str(f.get("host", "")).lower() == host
+        same = sorted((fid for fid, f in fs.items() if isinstance(f, dict) and _bare(f.get("host", "")) == host
                        and (f.get("login") or "") == (login or "")), key=lambda i: -int(fs[i].get("at") or 0))
         fid = same[0] if same else secrets.token_hex(6)
         for old in same[1:]:
@@ -405,6 +456,10 @@ def unlink_forge(uid, fid):
         if fs.pop(str(fid), None) is None:
             return False
         statefile.write_json(_secrets_file(), sd, mode=0o600)
+    # What was opened of it goes with it, its handouts shredded (B546): a
+    # leaked token removed on Profile stayed opened and handed out until
+    # the window ended.
+    unlocks.lock(uid, why="a token removed")
     return True
 
 
@@ -412,7 +467,7 @@ def entry_for(uid, fid="", host=""):
     """The entry `fid`, or the newest for `host`, with no token; None."""
     es = _entries(uid)
     f = es.get(str(fid)) if fid else next((e for e in sorted(es.values(), key=lambda e: -int(e.get("at") or 0))
-                                           if e["host"] == str(host or "").lower()), None)
+                                           if e["host"] == _bare(host)), None)
     if not f:
         return None
     fid = str(fid) if fid else next(i for i, e in es.items() if e is f)
@@ -422,7 +477,11 @@ def entry_for(uid, fid="", host=""):
 def open_entry_with(uid, fid, k):
     """One entry opened with the account key `k`: unlocks' way in."""
     f = _entries(uid).get(str(fid))
-    return _open_entry(k, f) if f and k else ""
+    if not (f and k):
+        return ""
+    # ...or with the key before, which is kept exactly while a token is
+    # still under it alone (B548).
+    return _open_entry(k, f) or ((prev := previous_of(uid)) and _open_entry(prev, f)) or ""
 
 
 def forge_line(uid, fid="", host="", why="", project="", by=""):

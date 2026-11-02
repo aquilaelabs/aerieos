@@ -73,7 +73,7 @@ def stale_note(project, uid, agent, slot, told=()):
     if key in told:
         return "", []
     return ("Your briefing is out of date: " + "; ".join(why) + ". What it says about those may no longer "
-            "hold (what this project holds and reads, BuilderBot's own rules), so check before acting on it, "
+            "hold (what this project holds and reads, AerieOS's own rules), so check before acting on it, "
             "tell the person in your reply, and say that Restart under Manage agent starts you with a fresh one."), [key]
 
 

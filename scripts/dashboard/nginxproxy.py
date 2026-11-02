@@ -1,4 +1,4 @@
-"""One reverse proxy per node, BuilderBot's own (R171, the operator, 10 Oct).
+"""One reverse proxy per node, AerieOS's own (R171, the operator, 10 Oct).
 
 The nginx page lists every node's nginx instance: one nginx container per
 node, written here like a container from the Containers page (containers.py), its
@@ -186,7 +186,7 @@ def nginx_conf(routes, rec=None):
     by_host = {}
     for r in routes:
         by_host.setdefault(r["host"], []).append(r)
-    lines = ["# Written by BuilderBot from the nginx page: edit it there, not here.",
+    lines = ["# Written by AerieOS from the nginx page: edit it there, not here.",
              "worker_processes auto;",
              "events { worker_connections 1024; }",
              "http {",
@@ -265,7 +265,7 @@ def compose_text(nid, rec):
     own = sorted(h for h, c in (rec.get("certs") or {}).items()
                  if (c or {}).get("set") and any(cert_for(rec, r["host"], r.get("cert", "")) == h for r in routes))
     conf = nginx_conf(routes, rec)
-    out = ["# Written by BuilderBot from the nginx page (nginxproxy.py); Save there rewrites it.",
+    out = ["# Written by AerieOS from the nginx page (nginxproxy.py); Save there rewrites it.",
            "services:",
            "  nginx:",
            f"    image: {image_ref(rec)}",
@@ -764,7 +764,7 @@ def _cf_txt(token, name, value, delete=False):
         return ""
     _, err = tunnel._api("POST", f"/zones/{zone['id']}/dns_records", token,
                          {"type": "TXT", "name": name, "content": value, "ttl": 60,
-                          "comment": "BuilderBot: an ACME challenge (R150), taken off when it is answered"})
+                          "comment": "AerieOS: an ACME challenge (R150), taken off when it is answered"})
     return err
 
 
@@ -1073,7 +1073,7 @@ def deploy(nid, containers, devactions, devapp):
     # A new one is the newest line the registry listed, pinned (R192).
     pin_latest(nid)
     rec = record(nid)
-    # BuilderBot's own (R180): System's, which no picker sets.
+    # AerieOS's own (R180): System's, which no picker sets.
     r = containers.create_container(name, compose_text(nid, rec), "", node=nid, for_project=devapp.SYSTEM)
     if r.get("error"):
         return r

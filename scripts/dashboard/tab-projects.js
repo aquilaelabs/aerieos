@@ -70,7 +70,7 @@ function askPurge(name){
   if (!row || row.querySelector(".dropbox")) return;
   const box = document.createElement("div");
   box.className = "dropbox ctlown";
-  // The type-to-confirm shape Reset BuilderBot has: what goes, then the
+  // The type-to-confirm shape Reset AerieOS has: what goes, then the
   // word to type labeled over its field, then the drop box's Keep it and
   // the red verb.
   box.innerHTML = `<div class="hint bad">This deletes every file in
@@ -114,6 +114,7 @@ let pjQuery = "";
 // The group chip in force, "" for All and "none" for the projects in no
 // group: a view for the page's life, as the Containers page's chips are.
 let pjChip = "";
+let pjChipMove = false;          // a chip's redraw, whose cards chipMove moves
 function projectMatches(p, q){
   if (!q) return true;
   const hay = [p, ...(p.rows || [])].flatMap(x => [x.name, x.label, x.git, x.node_name, x.session_at])
@@ -139,7 +140,7 @@ function lockMark(p){
 // branch, that it may push, and the node it runs on.
 function projFacts(p){
   const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this project's id, which never changes: bb -p ${projId(p)} names it">${projId(p)}</span>` : "",
+  return [p.pid ? `<span class="pid" title="this project's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
           p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
           esc(node)].filter(Boolean).join(" · ");
 }
@@ -587,7 +588,11 @@ function renderProjectsInto(i){
   const cb = el.querySelector("#pjChips");
   if (paint(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
-      fadeThrough(".pane .doc.on .projtab #pjGrid > *", () => { pjChip = c.dataset.pjchip; renderProjectsInto(i); }));
+      // The cards and the groups' headings, never a group's box itself: a
+      // card in a group that moved slid twice as far, and a group left out
+      // was copied whole over the grid.
+      chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid .pjgname",
+               () => { pjChip = c.dataset.pjchip; pjChipMove = true; renderProjectsInto(i); pjChipMove = false; }));
   const inChip = p => !pjChip || (pjChip === "none" ? !p.group : p.group === pjChip);
   const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;
@@ -608,7 +613,9 @@ function renderProjectsInto(i){
   const was = [...grid.querySelectorAll(".pcard[data-pkey]")].map(c => c.dataset.pkey);
   const now = [...String(html).matchAll(/<div class="pcard [^"]*" data-pkey="([^"]*)"/g)].map(m => m[1]);
   const moved = was.length > 0 && was.join("\n") !== now.join("\n");
-  const play = moved ? flip(() => grid.querySelectorAll(".pcard[data-pkey]"), el => el.dataset.pkey, 360) : null;
+  // A chip's press moves the cards itself (chipMove): the grid's own slide
+  // on top of it played every card twice.
+  const play = moved && !pjChipMove ? flip(() => grid.querySelectorAll(".pcard[data-pkey]"), el => el.dataset.pkey, 360) : null;
   // The card a press armed, faded through once its markup has moved, and
   // only where it stays: a card that moves slides rather than fading.
   const fc = pjFade && ps.find(c => c.key === pjFade.key);
@@ -675,7 +682,7 @@ const devClaudeMode = name => {
 // ---- the new-project dialog ------------------------------------------------
 // One dialog, three modes: a new local repo, a clone, and linking a project
 // to a git host. The host catalog and the agent's keys arrive per open from
-// /api/pubkeys. Moved here from index.html with bb map sections in hand: the
+// /api/pubkeys. Moved here from index.html with aerie map sections in hand: the
 // dialog is the Projects feature's. Its fields, its submit and the name
 // that follows the address are wired from index.html.
 
@@ -896,7 +903,7 @@ const pGateNow = () => Object.fromEntries(
 // session does lands in the notebook or the settings with its history and
 // is undone in a press: the roadmap, bugs, rules, build and test, the
 // design, the wiki (each page's history is kept), and a report to
-// BuilderBot's own tracker. Ask where it reaches
+// AerieOS's own tracker. Ask where it reaches
 // past that: its container, which runs the project's code on a shared
 // machine and publishes ports (ask rather than the deny a project has
 // without a choice, so a session can propose a rebuild at all, having no

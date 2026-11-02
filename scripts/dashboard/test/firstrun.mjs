@@ -328,6 +328,94 @@ await firstRun(false);
        && st.pick.includes('/mnt/pools/fast'),
        `a stick boot's The stick says docker and the VMs wait for a system pool, what is still on the stick and what it has written, with the pools to pick (${st.text.slice(0, 160)})`);
   }
+  // The disks the stick's plan names (R163 step 9): each found here by its
+  // serial or not, the parity disk left alone, read only or writable, Check
+  // and Adopt; once adopted, what is mounted and Release.
+  {
+    const ad = await page.evaluate(() => {
+      const n = ownMachine();
+      n.reported = { ...n.reported, disks: [{ name: 'sdb', by_id: '/dev/disk/by-id/ata-WDC_X_SER111', serial: 'SER111' },
+                                            { name: 'sdc', by_id: '/dev/disk/by-id/ata-ST_P_SERPPP', serial: 'SERPPP' }] };
+      state.firstboot = { ...(state.firstboot || {}), at: Math.floor(Date.now() / 1000), done: [], waiting: [], failed: [],
+        adopt: { want: { data: [{ slot: 'disk1', id: 'WDC_X_SER111', fs: 'xfs' }, { slot: 'disk2', id: 'WDC_Y_GONE22', fs: 'btrfs' }],
+                         parity: [{ slot: 'parity', id: 'ST_P_SERPPP' }], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u-1' }] },
+                 skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
+      window.__fbPlan = state.firstboot;
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
+      return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               radios: [...(sect?.querySelectorAll('input[name="adoptMode"]') || [])].map(r => r.value + (r.checked ? '*' : '')),
+               acts: [...(sect?.querySelectorAll('[data-adopt]') || [])].map(x => x.dataset.adopt) };
+    });
+    ok(ad.there && /here as sdb/.test(ad.text) && /WDC_Y_GONE22 · not on this machine/.test(ad.text) && /here as sdc, left alone/.test(ad.text)
+       && /cache/.test(ad.text) && /encrypted/.test(ad.text) && /1 not here/.test(ad.text)
+       && ad.radios.join() === 'ro*,rw' && ad.acts.join() === 'dry,adopt',
+       `Disks from the stick lists each disk found or not, parity left alone, read only picked, Check and Adopt (${JSON.stringify({ ...ad, text: ad.text.slice(0, 200) })})`);
+    const done = await page.evaluate(() => {
+      const n = ownMachine();
+      n.reported = { ...n.reported, adopted: { from: 'adopted', writable: false, at: 1, parity: ['sdc'],
+        mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: false }],
+        merged: { '/mnt/user': true } } };
+      // The page's poll may have put the server's first boot (none) back
+      // since the step above: the plan is set again with its shares.
+      state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
+                                 notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               release: !!sect?.querySelector('[data-adopt="release"]'), serve: !!sect?.querySelector('[data-adoptshares]') };
+    });
+    ok(done.serve && /1 share \(media\) can be served from \/mnt\/user/.test(done.text) && /docs: secure/.test(done.text),
+       `...with the stick's shares to serve from /mnt/user and what of theirs is not carried (${done.text.slice(-160)})`);
+    const many = await bmApi('/api/v1/nodes', { action: 'storage-share', id: (await page.evaluate(() => ownMachine()?.id)), share: 'set-many',
+      shares: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true } }] });
+    ok(/no share to serve: media: no Samba/.test(many.error || '') && !many.job,
+       `serving the shares where no Samba is installed says so for each, with no job (${many.error})`);
+    ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
+       `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
+    // ...and what the old system ran (R163 steps 10, 11): read first, then
+    // its containers to make and start and its VMs to define and run.
+    const apps = await page.evaluate(async () => {
+      const n = ownMachine();
+      state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
+                                    networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
+      nodesRev++; drawPanes();
+      const unread = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
+      n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
+        adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
+                                                   vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
+                                                   said: ['Docker: 1 container ran, 1 started with the machine'] } } };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]');
+      return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
+               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
+    });
+    ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
+       `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
+    ok(/1 started with the machine/.test(apps.text) && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
+       && ['br0', 'make', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)),
+       `once read: the networks and Make and start, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+    // Each VM still to define is a tick, ticked; one taken off is not
+    // defined, and the button says how many are (the operator, 1 Nov).
+    const picked = await page.evaluate(() => {
+      const box = document.querySelector('.machinetab [data-adpick="v:Ubuntu"]');
+      const was = box?.checked;
+      box.checked = false; box.dispatchEvent(new Event('change'));
+      const b = document.querySelector('.machinetab [data-adoptapp="define"]');
+      const after = { was, label: b?.textContent.trim(), dead: !!b?.disabled };
+      adoptSkip.clear();
+      return after;
+    });
+    ok(picked.was === true && picked.label === 'Define the ticked' && picked.dead,
+       `a VM untaken is left out and Define waits for one ticked (${JSON.stringify(picked)})`);
+    // The verb checks before any job: a filesystem it does not take, and a
+    // Release with nothing adopted, each refused with why and no job made.
+    const own = await page.evaluate(() => ownMachine()?.id);
+    const badFs = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'dry', want: { data: [{ slot: 'disk1', id: 'WDC_X_SER111', fs: 'ext4' }] } });
+    const noneHeld = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'release' });
+    ok(/xfs, btrfs or zfs/.test(badFs.error || '') && !badFs.job && /nothing is adopted/.test(noneHeld.error || '') && !noneHeld.job,
+       `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
+  }
   // Name and time (R161 step 3): the own machine's section, Apply asleep
   // until a field moves, and the press a system job on its node.
   const nt = await page.evaluate(() => {

@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import move     # noqa: E402
@@ -43,11 +44,94 @@ class Move(unittest.TestCase):
     def configure(self, state, bare, url="https://old.example/"):
         self.audits = []
         move.configure(state=state, workspace=self.ws, secrets_dir=str(self.secrets), write_json_fn=write_json,
-                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 16, build_version_fn=lambda: "0.9.0",
+                       seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=lambda: 19, build_version_fn=lambda: "0.9.0",
                        install_key_fn=lambda: b"k" * 32, store_paths_fn=lambda: {"gitrelay": str(self.store), "logs": str(self.tmp / "logs")},
                        page_url_fn=lambda: url, node_ids_fn=lambda: ["n_1", "n_2"], bare_metal_fn=lambda: bare,
                        node_name_fn=lambda nid: {"n_1": "alpha", "n_2": "beta"}.get(nid, nid),
                        audit_fn=lambda who, what, detail: self.audits.append((what, detail)))
+
+    def _land(self, path, token):
+        return move.restore(str(path), token, state_dir=self.tmp / "new-config", workspace_dir=self.tmp / "new-ws",
+                            secrets_dir=self.tmp / "new-secrets", build_state_version=19, here_bare_metal=False)
+
+    def _pieces(self, path):
+        """The bundle's head (its two lines) and its pieces, each with its
+        length."""
+        raw = Path(path).read_bytes()
+        cut = raw.index(b"\n", len(move.HEADER)) + 1
+        head, body, out = raw[:cut], raw[cut:], []
+        while body:
+            n = int.from_bytes(body[:4], "big")
+            out.append(body[:4 + n])
+            body = body[4 + n:]
+        return head, out
+
+    def test_a_bundle_is_sealed_a_piece_at_a_time_and_every_piece_is_held_to_its_place(self):
+        # B558: never whole in memory; here pieces of 4 KiB over a
+        # repository of 64 KiB of noise, so a bundle is many pieces.
+        (self.ws / "alpha" / "big.bin").write_bytes(os.urandom(64 << 10))
+        move.PIECE, was = 4096, move.PIECE
+        self.addCleanup(setattr, move, "PIECE", was)
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        path = move.bundle_path()
+        head, pieces = self._pieces(path)
+        self.assertEqual(json.loads(head.split(b"\n")[1])["format"], 2)
+        self.assertGreater(len(pieces), 10)
+        bad = self.tmp / "bad.bbmove"
+        for why, body in (("a piece dropped", pieces[:3] + pieces[4:]), ("two pieces swapped", [pieces[1], pieces[0]] + pieces[2:]),
+                          ("the last piece missing", pieces[:-1]), ("junk after the last", pieces + [b"junk"])):
+            bad.write_bytes(head + b"".join(body))
+            got = self._land(bad, r["token"])
+            self.assertIn("error", got, why)
+            self.assertFalse((self.tmp / "new-config" / "users.json").exists(), f"{why}: nothing here changed")
+        self.assertIn("not this bundle's move token", self._land(path, "not-the-token").get("error", ""))
+        got = self._land(path, r["token"])
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((self.tmp / "new-ws" / "alpha" / "big.bin").read_bytes(), (self.ws / "alpha" / "big.bin").read_bytes())
+
+    def test_a_landings_upload_is_read_a_megabyte_at_a_time(self):
+        # The bundle part straddles the reader's megabyte edges, and its
+        # bytes hold the boundary's start (never the whole: a browser picks
+        # one its content does not hold) and line endings.
+        blob = (os.urandom((1 << 20) - 7) + b"\r\n--XY" + b"\r\n" * 9 + os.urandom(3 << 20)).replace(b"XYZ", b"XYQ") * 2
+        form = (b"--XYZ\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n tok-1 \r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.bbmove\"\r\n"
+                b"Content-Type: application/octet-stream\r\n\r\n" + blob + b"\r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"from\"\r\n\r\n\r\n--XYZ--\r\n")
+        src, dest = self.tmp / "form", self.tmp / "file"
+        src.write_bytes(form)
+        fields, got = move.split_form(src, "multipart/form-data; boundary=XYZ", "bundle", dest)
+        self.assertEqual(fields, {"token": "tok-1", "from": ""})
+        self.assertTrue(got)
+        self.assertEqual(dest.read_bytes(), blob)
+        src.write_bytes(form[:len(form) // 2])
+        with self.assertRaises(ValueError):
+            move.split_form(src, "multipart/form-data; boundary=XYZ", "bundle", dest)
+        with self.assertRaises(ValueError):
+            move.split_form(src, "application/x-www-form-urlencoded", "bundle", dest)
+
+    def test_a_landing_without_room_is_refused_before_it_takes_the_bundle(self):
+        # B588: a stick before a system pool lands on its own partition.
+        from unittest import mock
+        with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=2 << 30)):
+            why = move.room_for(5 << 30, self.tmp)
+        self.assertIn("without the repositories", why)
+        self.assertIn("projects folder on This machine", why)
+        with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=20 << 30)):
+            self.assertEqual(move.room_for(5 << 30, self.tmp), "")
+
+    def test_a_bundle_of_the_format_before_still_lands(self):
+        r = move.prepare("user:ann", "https://new.example")
+        token = r["token"]
+        raw, counts = move.pack()
+        m = {"format": 1, "version": "0.9.0", "state_version": 19, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
+             "to": "https://new.example", "repos": False, "carries_key": False, "nodes": ["n_1"], "bare_metal": False, "counts": counts,
+             "token_hash": move.token_hash(token)}
+        old = self.tmp / "old.bbmove"
+        old.write_bytes(move.HEADER + json.dumps(m).encode() + b"\n" + signing.seal(raw, move.key_of(token)))
+        got = self._land(old, token)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
 
     def test_the_bundle_moves_the_state_and_the_nodes_follow(self):
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
@@ -113,6 +197,94 @@ class Move(unittest.TestCase):
         self.assertIn("moved already", move.prepare("user:ann", "https://x.example")["error"])
         self.assertIn("not withdrawn", move.forget("user:ann")["error"])
 
+    def test_a_repositorys_links_move_as_links_and_one_leading_out_stays_behind(self):
+        # B556: links were skipped, so a moved repository showed them deleted.
+        import os
+        (self.ws / "alpha" / "README.md").write_text("hi\n")
+        os.symlink("README.md", self.ws / "alpha" / "README")
+        os.symlink("/etc/passwd", self.ws / "alpha" / "outside")
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        self.assertTrue(r.get("ok"), r)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        self.configure(new_state, bare=True)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        link = self.tmp / "new-ws" / "alpha" / "README"
+        self.assertTrue(link.is_symlink() and os.readlink(link) == "README.md", "a link inside comes back a link")
+        self.assertFalse(os.path.lexists(self.tmp / "new-ws" / "alpha" / "outside"), "one leading out is not restored")
+
+    def test_a_restore_that_fails_puts_the_state_back(self):
+        # B557: a failure after the swap left the new state half restored
+        # and the old one aside, unsaid.
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        (new_state / "fresh.json").write_text("{}")
+        self.configure(new_state, bare=True)
+        def refused(key, state_dir):
+            raise OSError("no")
+        with mock.patch.object(move, "install_landed_key", refused):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertIn("back as it was", got.get("error", ""), got)
+        self.assertTrue((new_state / "fresh.json").is_file(), "the state that was here, in its place")
+        self.assertFalse((new_state / "users.json").exists())
+        self.assertEqual([p.name for p in new_state.iterdir() if p.name.startswith(".move")], [], "nothing of the landing left")
+
+    def test_a_landing_swaps_inside_a_state_folder_it_cannot_rename(self):
+        # B594: the parent is root's on an installed machine, a mount point's
+        # in a container. Here the parent is read-only, as it is for the
+        # controller's account there.
+        r = move.prepare("user:ann", "https://new.example")
+        parent = self.tmp / "locked"
+        new_state = parent / "config"
+        new_state.mkdir(parents=True)
+        (new_state / "fresh.json").write_text("{}")
+        (new_state / "logs").mkdir()
+        (new_state / "logs" / "today").write_text("kept where it is")
+        path = str(self.tmp / "config" / "move" / r["bundle"])
+        os.chmod(parent, 0o555)
+        self.addCleanup(os.chmod, parent, 0o755)
+        got = move.restore(path, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets",
+                           build_state_version=19, here_bare_metal=False)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((new_state / "users.json").is_file())
+        self.assertTrue((Path(got["moved_aside"]) / "fresh.json").is_file(), "set aside, never deleted")
+        self.assertEqual(Path(got["moved_aside"]).parent, new_state)
+
+    def test_a_store_whose_path_cannot_be_made_lands_under_the_state(self):
+        # B598: and the record stops naming the path.
+        (self.state / "paths.json").write_text(json.dumps({"gitrelay": "/nowhere/gitrelay"}))
+        r = move.prepare("user:ann", "https://new.example")
+        new_state = self.tmp / "new-config"
+        blocker = self.tmp / "a-file"
+        blocker.write_text("not a folder")
+        with mock.patch.object(move, "store_paths", lambda: {"gitrelay": str(blocker / "gitrelay")}):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws",
+                               secrets_dir=self.tmp / "new-secrets", build_state_version=19, here_bare_metal=False)
+        self.assertTrue(got.get("ok"), got)
+        self.assertTrue((new_state / "gitrelay" / "alpha.git" / "HEAD").is_file())
+        self.assertNotIn("gitrelay", json.loads((new_state / "paths.json").read_text()))
+
+    def test_a_state_this_build_no_longer_upgrades_from_is_refused(self):
+        # B600: before it lands, not at the next start.
+        r = move.prepare("user:ann", "https://new.example")
+        with mock.patch.object(move.stateversion, "SUPPORTED_FROM", 99):
+            got = self._land(self.tmp / "config" / "move" / r["bundle"], r["token"])
+        self.assertIn("upgrades from 99 on", got.get("error", ""))
+
+    def test_what_a_landing_sets_aside_is_never_carried(self):
+        for name in (".moved-1", ".move-upload-2", ".reset-3"):
+            (self.state / name).mkdir()
+            (self.state / name / "big").write_text("x")
+        move.prepare("user:ann", "https://new.example")
+        import tarfile
+        raw, _ = move.pack()
+        with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
+            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n], [])
+
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])
         r = move.prepare("user:ann", "")
@@ -123,7 +295,7 @@ class Move(unittest.TestCase):
         self.assertIn("no move", move.forget("user:ann")["error"])
         m, why = move.read_manifest(str(self.state / "users.json"))
         self.assertIsNone(m)
-        self.assertIn("not a BuilderBot move bundle", why)
+        self.assertIn("not an AerieOS move bundle", why)
 
 
     def test_the_landing_is_told_both_ways_and_the_pull_is_proved(self):

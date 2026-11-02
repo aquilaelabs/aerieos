@@ -1,5 +1,5 @@
 // The link path against a REAL forge (roadmap R54, step 3): the lab's Gitea,
-// the `gitea` service of BuilderBot's own dev stack under its compose file's
+// the `gitea` service of AerieOS's own dev stack under its compose file's
 // `lab` profile, brought up from the Docker tab like any project's stack. Everything the harness's
 // create.mjs cannot prove with stand-ins is proved here: the token check on
 // GET /api/v1/user, a repository created under an organization and under the
@@ -8,7 +8,7 @@
 // refusal to create under somebody else's name.
 //
 // Skipped in one line without BB_LAB_GITEA: a lab suite never runs in CI and
-// never fails for the service being absent. `bb tests lab` sets it and
+// never fails for the service being absent. `aerie tests lab` sets it and
 // runs this.
 //
 // What it makes on the forge it removes again (the repositories and the
@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process';
 
 const GITEA = (process.env.BB_LAB_GITEA || '').replace(/\/$/, '');
 if (!GITEA){
-  console.log('SKIP  lab-forge: BB_LAB_GITEA is not set (bb tests lab sets it)');
+  console.log('SKIP  lab-forge: BB_LAB_GITEA is not set (aerie tests lab sets it)');
   process.exit(0);
 }
 // Which catalog entry the link names: gitea, or forgejo for the lab's

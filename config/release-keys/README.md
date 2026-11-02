@@ -1,6 +1,6 @@
 # Publishers' release keys
 
-The public keys BuilderBot checks a toolchain's download against where its
+The public keys AerieOS checks a toolchain's download against where its
 publisher signs instead of, or as well as, stating a checksum (R137):
 
 - `node.asc`: Node.js's release team, every key named in

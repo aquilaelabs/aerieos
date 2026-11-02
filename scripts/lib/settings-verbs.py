@@ -1,4 +1,4 @@
-"""Behind `bb settings` (cmd_settings in bb): a project's settings as the
+"""Behind `aerie settings` (cmd_settings in bb): a project's settings as the
 dashboard holds them (dashboard/prefs.py), read for a session or bb-tty,
 and the three a session may set (build, test, outputs), which go through
 the approval queue.
@@ -108,7 +108,7 @@ def show():
     lk = locks.get(proj) if isinstance(locks, dict) else None
     # Locked AGAINST this seat (R119): an administrator's lock holds
     # everybody, its owner's everybody but the owner. The owner as
-    # membership.owner_of reads it: the record's, or BuilderBot's owner for a
+    # membership.owner_of reads it: the record's, or AerieOS's owner for a
     # project from before there were owners, who is also the seat with no
     # uid of its own.
     rec["locked"] = isinstance(lk, dict) and (bool(lk.get("admin")) or (
@@ -202,11 +202,11 @@ def show():
                        ("Write the wiki", "wiki")):
         print(f"    Agents may: {label:<28} {gate.get(key) or 'auto'}")
     for label, key, dflt in (("Run its container", "devbuild", "deny"),
-                             # R91: its VMs, bb vm.
+                             # R91: its VMs, aerie vm.
                              ("Make VMs", "makevms", "deny"),
                              # R169 step 5: a pack from the vetted catalog.
                              ("Install a tool pack", "installpacks", "ask"),
-                             ("Report BuilderBot bugs", "report", "auto"),
+                             ("Report AerieOS bugs", "report", "auto"),
                              # R106: signing a build, and its keys and mapping.
                              ("Sign a build", "sign", "ask"),
                              ("Manage signing keys", "keys", "ask"),
@@ -257,7 +257,7 @@ def set_node():
     hit = [n for n in nodes.node_list() if n.get("kind") == "agent" and n.get("state") != "retired"
            and want in (n.get("id"), n.get("name"))]
     if not hit:
-        sys.exit(f"[builderbot] ERROR: no node called {want}: bb nodes lists them")
+        sys.exit(f"[builderbot] ERROR: no node called {want}: aerie nodes lists them")
     body, code = prefs.dialog_save(proj, {"node": hit[0]["id"]}, "")
     if body.get("error"):
         sys.exit("[builderbot] ERROR: " + body["error"])

@@ -18,7 +18,7 @@ const TOUR_SUB = `${TOUR_PANE} .bar .pseg`;
 const TOUR_FIRST = `${TOUR_PANE} .dmcard, ${TOUR_PANE} details.sect, ${TOUR_PANE} .doclist > .row, ${TOUR_PANE} .doclist .row`;
 const TOUR_STEPS = {
   home: [
-    {say: "Welcome to BuilderBot. Home is what the whole install is doing at a glance: what is running, what failed, and what wants your attention."},
+    {say: "Welcome to AerieOS. Home is what the whole install is doing at a glance: what is running, what failed, and what wants your attention."},
     {at: "#rail, .railbar", say: "Every page is here, grouped. A group with several tools opens on the first and carries the rest along its top."},
     {at: "#jump", say: "Search jumps to a page, a project, a container or a node by name. Enter opens the first match."},
     {at: "#bBell", say: "The bell holds what needs a person: updates due, failures, and anything a session is asking you to allow."},
@@ -59,7 +59,7 @@ const TOUR_STEPS = {
     {say: "Its sections are its kind's: an agent's facts, your sign-in and what you added to it; a toolchain's path and system packages; a pack's or a service's Configure, saved with Save."},
   ],
   library: [
-    {say: "The Library is everything a BuilderBot installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs you add, the apps a NAS runs, and the apps for your own machines."},
+    {say: "The Library is everything an AerieOS installs or runs on a node: the coding agents, the toolchains for builds and tests, the tool packs you add, the apps a NAS runs, and the apps for your own machines."},
     {at: TOUR_MHEAD, say: "Pick the node here; it holds across the Library, the Emulator, the Phone and the CI runner. Check for updates reads what is newer; Add your own brings in a tool pack or an app of yours, looked at before it is kept."},
     {at: `${TOUR_PANE} .lcard`, say: "Each card says its tier, what is installed and whether a newer one is out, with Install or Update on it; Details opens its own page with the whole description."},
   ],
@@ -70,7 +70,7 @@ const TOUR_STEPS = {
   ],
   emulator: [
     {say: "The Android emulator on a node: the system images it holds and the virtual devices made from them."},
-    {at: TOUR_MHEAD, say: "The node picked above is the one the images install on. A device starts from its row, and a session drives it with bb emu."},
+    {at: TOUR_MHEAD, say: "The node picked above is the one the images install on. A device starts from its row, and a session drives it with aerie emu."},
   ],
   phone: [
     {say: "A real Android phone, lent to a project by plugging it into a node: a session can install its app and look at the screen, and every command waits for the phone's owner to allow it unless they trust it."},
@@ -90,38 +90,38 @@ const TOUR_STEPS = {
   ],
   vms: [
     {say: "VMs: a project's virtual machines on the nodes with VM host installed, made from the cloud images of a dozen Linux systems."},
-    {at: TOUR_BAR, say: "Pick the node, search, and switch between cards and a list; the tiles and chips under it count the VMs and narrow them to one project's. New VM is at the right; a session can make one too, with bb vm new, where the project's Make VMs setting allows it."},
+    {at: TOUR_BAR, say: "Pick the node, search, and switch between cards and a list; the tiles and chips under it count the VMs and narrow them to one project's. New VM is at the right; a session can make one too, with aerie vm new, where the project's Make VMs setting allows it."},
     {at: `${TOUR_PANE} .vmtab [data-vm-key]`, sample: () => vmGroupsHtml([{key: "example/db", project: "example", name: "db", state: "running",
       os_name: "Debian 13", node_name: "your-node", vcpus: 2, mem_mb: 2048, disk_gb: 20, ip: "10.232.0.12", user: "builder",
       snapshots: ["clean"], screen: true}]),
      say: "Each VM says its state and how to ssh in. Snapshot keeps its state under a name, and Revert goes back to it."},
   ],
   nginx: [
-    {say: "nginx: BuilderBot's own reverse proxy on a node, putting your containers behind hostnames and certificates."},
+    {say: "nginx: AerieOS's own reverse proxy on a node, putting your containers behind hostnames and certificates."},
     {at: TOUR_MHEAD, say: "The node picked above is the one nginx runs on. Deploy puts nginx on a node that has none yet."},
     {at: TOUR_FIRST, say: "The image comes first, with an update when one is out; then hostnames, routes and certificates, each a section. A route sends a hostname to a port a container publishes."},
   ],
   settings: [
-    {say: "The controller's settings: how this BuilderBot itself behaves, the room it keeps on the nodes among them. Each section says what it changes."},
+    {say: "The controller's settings: how this AerieOS itself behaves, the room it keeps on the nodes among them. Each section says what it changes."},
     {at: `${TOUR_PANE} .snav, ${TOUR_FIRST}`, say: "Pick a section here. Its changes are saved with its own Save, never another's."},
   ],
   keys: [
-    {say: "Keys: the install key, which seals what this BuilderBot keeps, and everything kept under it. Save a copy of the key apart from /config; Change makes another and seals everything again."},
+    {say: "Keys: the install key, which seals what this AerieOS keeps, and everything kept under it. Save a copy of the key apart from /config; Change makes another and seals everything again."},
     {at: TOUR_FIRST, say: "Each person keeps a key store of their own on their Profile, for their agents' sign-ins and the forge tokens they link."},
   ],
   network: [
-    {say: "Network: how this BuilderBot is reached. Its address and port, what it is served over, where each node dials in from, and the hostname that reaches it from outside."},
+    {say: "Network: how this AerieOS is reached. Its address and port, what it is served over, where each node dials in from, and the hostname that reaches it from outside."},
     {at: `${TOUR_PANE} .snav, ${TOUR_FIRST}`, say: "Pick a section here: Connection sets http or https and its certificate; Reach from outside runs the home tunnel."},
   ],
   machine: [
-    {say: "This machine: the computer this BuilderBot runs on, installed bare metal. What it is, the release it runs and its updates, and what it runs as a node."},
+    {say: "This machine: the computer this AerieOS runs on, installed bare metal. What it is, the release it runs and its updates, and what it runs as a node."},
     {at: `${TOUR_FIRST}, ${TOUR_PANE} .empty`, say: "Its sections are a node's: health, the projects on it, its sessions, its features, storage and network, and the verbs at the end, reboot and power off among them."},
   ],
   audit: [
-    {say: "Audit: who did what to this BuilderBot, every change since the first day, newest first. Pick a person or a machine in the bar to read theirs alone."},
+    {say: "Audit: who did what to this AerieOS, every change since the first day, newest first. Pick a person or a machine in the bar to read theirs alone."},
   ],
   scanners: [
-    {say: "Scanners: BuilderBot's own static analysis (Semgrep, Trivy, mobsfscan) on each node that holds projects, run on one schedule; what they find is on the Analysis page."},
+    {say: "Scanners: AerieOS's own static analysis (Semgrep, Trivy, mobsfscan) on each node that holds projects, run on one schedule; what they find is on the Analysis page."},
     {at: TOUR_FIRST, say: "The schedule first, then a section per node with Deploy, Run now, Update and Remove, and last the projects nothing covers, each with why."},
   ],
   nodes: [
@@ -156,7 +156,7 @@ const TOUR_STEPS = {
     {say: "Your profile: your name and email for commits, your password, your theme, and the devices signed in as you."},
   ],
   help: [
-    {say: "BuilderBot's own documentation, with a search across it."},
+    {say: "AerieOS's own documentation, with a search across it."},
   ],
 };
 

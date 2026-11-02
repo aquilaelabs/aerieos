@@ -40,7 +40,7 @@ class CheckRelay(unittest.TestCase):
         os.makedirs(os.path.join(self.root, "lib"))
         for m in ("rulehook.py", "cmdmatch.py"):
             shutil.copy(os.path.join(HERE, "..", "..", "lib", m), os.path.join(self.root, "lib", m))
-        bb = os.path.join(self.root, "bb")
+        bb = os.path.join(self.root, "aerie")
         with open(bb, "w") as f:
             f.write(FAKE_BB)
         os.chmod(bb, 0o755)

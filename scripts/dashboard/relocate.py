@@ -214,6 +214,10 @@ try:
     names = subprocess.run(["docker", "volume", "ls", "-q", "--filter", "label=com.docker.compose.project=" + old],
                            check=True, capture_output=True, text=True).stdout.split()
     have = set(subprocess.run(["docker", "volume", "ls", "-q"], check=True, capture_output=True, text=True).stdout.split())
+    # Every target checked, then every volume copied, and only then the old
+    # ones removed: one at a time, a failure on the second left the first
+    # copied and removed, the instance back on an empty one (B554).
+    plan = []
     for v in sorted(names):
         key = v[len(old) + 1:] if v.startswith(old + "_") else v
         target = f"{new}_{key}" if v.startswith(old + "_") else v
@@ -221,11 +225,22 @@ try:
             continue
         if target in have:
             raise SystemExit(f"a volume called {target} is already on this node: remove it first, or pick another name")
-        print(f"carrying the volume {v} to {target}", flush=True)
-        subprocess.run(["docker", "volume", "create", "--label", "com.docker.compose.project=" + new,
-                        "--label", "com.docker.compose.volume=" + key, target], check=True, capture_output=True)
-        subprocess.run(["docker", "run", "--rm", "-v", f"{v}:/v:ro", "-v", f"{target}:/w", helper,
-                        "sh", "-c", "cp -a /v/. /w/"], check=True)
+        plan.append((v, key, target))
+    made = []
+    try:
+        for v, key, target in plan:
+            print(f"carrying the volume {v} to {target}", flush=True)
+            subprocess.run(["docker", "volume", "create", "--label", "com.docker.compose.project=" + new,
+                            "--label", "com.docker.compose.volume=" + key, target], check=True, capture_output=True)
+            made.append(target)
+            subprocess.run(["docker", "run", "--rm", "-v", f"{v}:/v:ro", "-v", f"{target}:/w", helper,
+                            "sh", "-c", "cp -a /v/. /w/"], check=True)
+    except BaseException:
+        for target in made:
+            print(f"taking off the copy {target}", flush=True)
+            subprocess.run(["docker", "volume", "rm", target], check=False, capture_output=True)
+        raise
+    for v, _key, _target in plan:
         subprocess.run(["docker", "volume", "rm", v], check=True, capture_output=True)
 except BaseException:
     if moved:
@@ -291,7 +306,7 @@ def rename_done(job, state):
 def _name_instance(project, instance, new):
     """A project's container given its own name: the record carries it
     (devapp._pname reads it), and its env file follows; the instance keeps
-    its key, so its worktree, its jobs and bb devapp --instance are where
+    its key, so its worktree, its jobs and aerie devapp --instance are where
     they were. A name that is the project's own default again is no name."""
     src = devapp.env_path(project, instance)
     with devapp._lock:
@@ -347,7 +362,27 @@ def builds_image(project, instance):
     return bool(re.search(r"^\s+build:", text, re.M))
 
 
+# The instances whose copy or move is being started now: the check that one
+# is relocating and the mark that it is were apart, with a question to the
+# old node between them, so two presses at once both started (B555).
+_starting, _starting_lock = set(), threading.Lock()
+
+
 def start(project, instance, mode, node, name="", env=None, data="unpack"):
+    """start_ (below), one at a time for an instance."""
+    key = (str(project), str(instance))
+    with _starting_lock:
+        if key in _starting:
+            return {"error": "it is already being copied or moved"}
+        _starting.add(key)
+    try:
+        return start_(project, instance, mode, node, name, env, data)
+    finally:
+        with _starting_lock:
+            _starting.discard(key)
+
+
+def start_(project, instance, mode, node, name="", env=None, data="unpack"):
     """Copy (mode "copy", into a new instance called `name`) or move (mode
     "move", the same instance) an instance to `node`, its data with it, its
     env written from `env` when one is given; `data` says whether the data

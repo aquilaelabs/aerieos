@@ -6,7 +6,7 @@
 // why, a VM holding one says so on its row on the VMs page and the section
 // offers Take back, the controllers are listed with what hangs off each and
 // what shares their IOMMU group, the Features section offers the IOMMU with
-// Install, and a session's bb vm usb is held for a person whatever the dial.
+// Install, and a session's aerie vm usb is held for a person whatever the dial.
 import { URL, launch, newPage, ok, done, ready, sleep, openSection, DIR, saveDialog, refreshUntil } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -141,16 +141,16 @@ ok(/not plugged into usbbox/.test(r2.error || ''), `a device the node does not l
 await openSection(page, 'nodes:features', ROW);
 await page.waitForSelector(`${ROW} .ndfeat[data-feat="iommu"]`, { timeout: 15000 });
 const io = await page.$eval(`${ROW} .ndfeat[data-feat="iommu"]`, e => ({ text: e.textContent.replace(/\s+/g, ' '), btn: e.querySelector('[data-nd="feature"]')?.textContent }));
-ok(/IOMMU/.test(io.text) && /not installed/.test(io.text) && /On already, set outside BuilderBot/.test(io.text) && io.btn === 'Install',
+ok(/IOMMU/.test(io.text) && /not installed/.test(io.text) && /On already, set outside AerieOS/.test(io.text) && io.btn === 'Install',
    `the Features section offers the IOMMU with Install and says it is on already (${io.text.slice(0, 140)})`);
 await hello([VM], { features: { ...CENSUS.features, iommu: { installed: true, on: false } }, vm_host: { ...VM_HOST, iommu: false } });
 await page.evaluate(async () => { await loadNodes(); });
 await page.waitForFunction(sel => /restart the machine/.test(document.querySelector(sel + ' .ndfeat[data-feat="iommu"]')?.textContent || ''), ROW, { timeout: 15000 });
 ok(true, 'installed and not on yet, the row asks for a restart');
 
-// A session's bb vm usb is held for a person whatever the dial says.
+// A session's aerie vm usb is held for a person whatever the dial says.
 await call('/api/prefs', { project: 'alpha', makevms: 'auto' });
-const tok = execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', 'alpha', 'test'],
+const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const SH = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
 const asked = await call('/api/vms', { action: 'usb-give', name: VMN, why: 'the stick', usb: { vendor: '0x0781', product: '0x5583', serial: '4C53' } }, SH);
@@ -158,7 +158,7 @@ ok(asked.id && !asked.job, `a session's usb-give is held for a person on the bel
 const bell = await call('/api/phone');
 const row = (bell.asks || []).find(a => a.id === asked.id);
 ok(row && new RegExp(`vm usb ${VMN} give 0781:5583:4C53`).test((row.argv || row.cmd || []).join ? (row.argv || row.cmd).join(' ') : JSON.stringify(row)),
-   `the bell shows it as bb vm usb would say it (${JSON.stringify(row?.argv || row?.cmd || row).slice(0, 80)})`);
+   `the bell shows it as aerie vm usb would say it (${JSON.stringify(row?.argv || row?.cmd || row).slice(0, 80)})`);
 await call('/api/prefs', { project: 'alpha', makevms: 'deny' });
 // The project's Test node (R151 step 1): the settings dialog offers the
 // project's nodes beside the session's own, and saving one writes it.

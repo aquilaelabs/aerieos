@@ -160,6 +160,46 @@ class Router(unittest.TestCase):
         self.assertFalse(router.status("n1")["providers"]["anthropic"])
         self.assertEqual(router.seal_all(again=True) >= 3, True)
 
+    def test_a_key_or_an_address_stays_inside_its_value(self):
+        # B536: written between bare quotes, a quote ended the value and a
+        # newline in an address ended the inline config, adding compose keys.
+        self.assertIn("one line", router.set_keys("n1", {"custom": [{"name": "lab", "base": "http://x\n  evil:\n    image: x"}]})["error"])
+        self.assertIn("one line", router.set_keys("n1", {"providers": {"anthropic": "sk\nevil: 1"}})["error"])
+        key = 'sk-"quoted"\\back$slash'
+        r = router.set_keys("n1", {"providers": {"anthropic": key},
+                                   "custom": [{"name": "lab", "base": 'https://lab.example/v1?a="b"', "key": key}]})
+        self.assertTrue(r.get("ok"), r)
+        rec = router.record("n1")
+        rec["port"] = self.port
+        text = router.compose_text("n1", rec)
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("no YAML reader here")
+        doc = yaml.safe_load(text)
+        self.assertEqual(sorted(doc["services"]), ["db", "litellm"], "no service but the router's own")
+        env = doc["services"]["litellm"]["environment"]
+        # compose reads $$ as one dollar: the value it hands the container is the key.
+        self.assertEqual(env["ANTHROPIC_API_KEY"].replace("$$", "$"), key)
+        conf = yaml.safe_load(doc["configs"]["litellm_conf"]["content"].replace("$$", "$"))
+        self.assertEqual([m["litellm_params"].get("api_base") for m in conf["model_list"] if m["model_name"] == "lab/*"],
+                         ['https://lab.example/v1?a="b"'])
+
+    def test_a_key_sealed_under_another_install_key_is_kept_through_a_reseal(self):
+        # After the install key changed, a value the new key cannot open (no
+        # previous key at hand) stays sealed as it was; it was sealed again
+        # as nothing, erasing the key for good.
+        signing.MASTER = b"o" * 32
+        self.assertTrue(router.set_keys("n1", {"providers": {"anthropic": "sk-ant-old"}}).get("ok"))
+        was = json.load(open(os.path.join(self.tmp, "router.json")))["n1"]["providers"]["anthropic"]
+        signing.MASTER, signing.PREVIOUS = KEY, None
+        router.seal_all(again=True)
+        self.assertEqual(json.load(open(os.path.join(self.tmp, "router.json")))["n1"]["providers"]["anthropic"], was)
+        signing.MASTER, signing.PREVIOUS = KEY, b"o" * 32
+        self.assertGreaterEqual(router.seal_all(again=True), 1)
+        signing.PREVIOUS = None
+        self.assertIn("ANTHROPIC_API_KEY: \"sk-ant-old\"", router.compose_text("n1", router.record("n1")), "opened by the previous key, sealed again under today's")
+
     def test_deploy_allow_and_the_sessions_reach_it(self):
         self.assertIn("nothing behind it", router.deploy("n1", self.containers, self.devactions, self.devapp)["error"])
         router.set_keys("n1", {"providers": {"openai": "sk-x"}})
@@ -214,6 +254,18 @@ class Router(unittest.TestCase):
         self.assertIn("ollama/qwen2.5-coder:7b", [x["id"] for x in router.refresh_models("n1")["models"]])
         router.ollama_remove("n1", "qwen2.5-coder:7b")
         self.assertEqual(router.status("n1")["ollama"]["models"], [])
+        self.assertIn("a model is named", router.ollama_pull("n1", "--insecure")["error"], "a model name is never an option")
+        # A router that does not answer keeps the project allowed and says
+        # so: its key was handed to its sessions and still works there.
+        self.assertTrue(router.allow("n1", "app")["ok"])
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.assertIn("still allowed", router.disallow("n1", "app").get("error", ""))
+        self.assertIn("app", router.status("n1")["projects"])
+        self.srv = ThreadingHTTPServer(("127.0.0.1", self.port), FakeLiteLLM)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.addCleanup(self.srv.shutdown)
+        self.assertTrue(router.disallow("n1", "app")["ok"])
         # Not allowed any more; removed altogether.
         self.assertTrue(router.disallow("n1", "web")["ok"])
         self.assertEqual(router.for_project("web"), {})

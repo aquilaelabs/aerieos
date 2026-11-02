@@ -217,10 +217,10 @@ const KS_WHY = {push: "a push", fetch: "a fetch", pull: "a pull", "ls-remote": "
                 git: "git", ci: "watching CI", release: "a release", wiki: "the wiki", unlocked: "unlocked", locked: "locked",
                 "the window ended": "the window ended", "signed out everywhere": "signed out everywhere", purged: "purged",
                 "moved to the project": "moved to the project's own keeping", "moved under your own key": "moved under your own key",
-                "given back to this BuilderBot": "given back to this BuilderBot", "the controller restarted": "the controller restarted"};
+                "given back to this AerieOS": "given back to this AerieOS", "the controller restarted": "the controller restarted"};
 
 function keyStoreHeld(m){
-  return !m.own ? "this BuilderBot (the install key)" : m.how === "passkey" ? "your passkey" : "a key you keep";
+  return !m.own ? "this AerieOS (the install key)" : m.how === "passkey" ? "your passkey" : "a key you keep";
 }
 
 function keyMineSection(){
@@ -241,7 +241,7 @@ function keyMineSection(){
       ? `<div class="notice">The key before this one is kept while ${m.previous_on_nodes} of your sign-in${
         m.previous_on_nodes === 1 ? "" : "s"} on the nodes ${m.previous_on_nodes === 1 ? "is" : "are"} still sealed under it.</div>` : ""}${locked
       ? `<div class="notice">Locked: nothing of yours opens until you unlock it, your pushes and pulls wait, and a terminal you open on a node asks for it first.</div>`
-      : m.own ? `<div class="hint">Not even this BuilderBot's owner opens what is here without ${m.how === "passkey" ? "your passkey" : "the key you keep"}. Forgetting it means signing in to every agent again and giving each project a token again; Purge still works without it.</div>` : ""}
+      : m.own ? `<div class="hint">Not even this AerieOS's owner opens what is here without ${m.how === "passkey" ? "your passkey" : "the key you keep"}. Forgetting it means signing in to every agent again and giving each project a token again; Purge still works without it.</div>` : ""}
     ${forgesHtml}
     <div class="actbar"><label class="pick"><span class="pickw">Unlock for</span>
         <select id="ksFor">${KS_FOR.map(([v, l]) => `<option value="${v}"${v === m.for ? " selected" : ""}>${l}</option>`).join("")}</select></label>
@@ -308,7 +308,7 @@ async function keyStoreOwn(b){
   if (pre.error) return;
   const prfKeys = (pre.passkeys || []).filter(k => k.prf);
   const bg = pre.projects || [];
-  const costs = "Not even this BuilderBot's owner opens your store without it. Forgetting it means signing in to every agent "
+  const costs = "Not even this AerieOS's owner opens your store without it. Forgetting it means signing in to every agent "
     + "again and giving each project a token again; Purge still works without it, an administrator's too.";
   const how = await ask({title: "Hold the key yourself?",
     text: costs + (window.PublicKeyCredential ? (prfKeys.length ? "\n\nYour passkey can hold it: the authenticator gives a secret the page only relays."
@@ -366,10 +366,10 @@ function wireKeyMine(root){
   on("bKsLock", async b => { busy(b, "Locking"); await postKeys({action: "lock"}); if (state?.store) state.store.locked = !!keyMine?.own; loadKeyMine(); });
   on("bKsOwn", keyStoreOwn);
   on("bKsOwnBack", async b => {
-    if (!await askYes("Give the key back to this BuilderBot? Its install key then opens your store again, and no passkey or key of yours is asked for.", {verb: "Give it back"})) return;
+    if (!await askYes("Give the key back to this AerieOS? Its install key then opens your store again, and no passkey or key of yours is asked for.", {verb: "Give it back"})) return;
     busy(b, "Giving back");
     const j = await postKeys({action: "own-back"});
-    if (!j.error) notify("your key store is under this BuilderBot's key again");
+    if (!j.error) notify("your key store is under this AerieOS's key again");
     loadKeyMine();
   });
   const sel = root.querySelector("#ksFor");

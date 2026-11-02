@@ -1,4 +1,4 @@
-// A walk through BuilderBot as each kind of person, on projects shared in
+// A walk through AerieOS as each kind of person, on projects shared in
 // each combination: the owner; an administrator with two projects and one
 // with one; plain users with two, with one, and with none. Each signs in in
 // a browser of their own, sees what they should and no more, opens every tab

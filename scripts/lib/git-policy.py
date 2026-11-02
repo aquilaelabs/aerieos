@@ -1,5 +1,5 @@
-"""Behind `bb git policy` (cmd_git in bb): what this project lets a session do
-with git's network half, read from the settings record on stdin, as `bb
+"""Behind `aerie git policy` (cmd_git in bb): what this project lets a session do
+with git's network half, read from the settings record on stdin, as `aerie
 settings --json` prints it.
 """
 import json
@@ -9,7 +9,7 @@ import sys
 rec = json.load(sys.stdin)
 p = rec.get("gitpol") or {}
 # Whether a push can happen at all, first (B734): a project with no rights,
-# or an https remote with no credential on the controller, has bb git push
+# or an https remote with no credential on the controller, has aerie git push
 # refused, and that is the thing to know before the policy under it.
 pu = rec.get("push") or {}
 if "rights" in pu:

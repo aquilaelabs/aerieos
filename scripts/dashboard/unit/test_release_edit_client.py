@@ -1,4 +1,4 @@
-"""bb version release --edit's client (lib/release-edit.py, report 60): it
+"""aerie version release --edit's client (lib/release-edit.py, report 60): it
 runs where it is typed, so notes in the session's own scratch directory and
 notes on stdin both reach the controller, and an attached file is named by
 its path inside the project. Against a stand-in controller on a local port."""

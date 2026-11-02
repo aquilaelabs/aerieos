@@ -1,4 +1,4 @@
-"""Behind `bb router-key` (R144): the model router's address, this project's
+"""Behind `aerie router-key` (R144): the model router's address, this project's
 own key and the models it offers, for an Any model session at its start
 (bb-tty's launcher writes OpenCode's config from it). Prints the JSON the
 controller answers, {} where no router allows the project.

@@ -1,18 +1,18 @@
 """Who a project belongs to and who joins it (the operator, 1 Oct).
 
-Every project has an OWNER, an account: whoever made it, and BuilderBot's
+Every project has an OWNER, an account: whoever made it, and AerieOS's
 owner for a project from before there were owners. The owner, and
-BuilderBot's owner, may hand it to another account, make it INVITE ONLY,
+AerieOS's owner, may hand it to another account, make it INVITE ONLY,
 and invite people.
 
 INVITE ONLY is the owner's restriction on administrators. An administrator
 sees every project and could always put any of them on any account's list,
 their own included (by a role on it, on the Roles page); on an invite-only project only its
-owner and BuilderBot's owner change who is on it, and everybody else comes
-in by accepting an invitation. BuilderBot's owner is never kept out: it can
+owner and AerieOS's owner change who is on it, and everybody else comes
+in by accepting an invitation. AerieOS's owner is never kept out: it can
 add itself to any project (the operator, 1 Oct).
 
-HANDING IT ON: BuilderBot's owner moves a project to another account at
+HANDING IT ON: AerieOS's owner moves a project to another account at
 once. The project's own owner OFFERS it instead (the operator, 1 Oct): the
 offer waits in the other person's bell like an invitation, and the project
 changes hands only when they accept, and only if the one who offered still
@@ -21,7 +21,7 @@ owns it then. One offer per project at a time; a new one replaces it.
 An INVITATION names an existing account, user or administrator. It waits in
 the invitee's bell with Accept and Decline: accepting puts the project on
 their list (users.take_on), declining drops it, and the one who invited, the
-owner, or BuilderBot's owner may withdraw it. A session does none of this.
+owner, or AerieOS's owner may withdraw it. A session does none of this.
 
 Two stores, keyed by project so a rename carries them (projects._KEYED):
 project-owners.json {"projects": {name: {owner: uid, invite_only: bool}}}
@@ -47,7 +47,7 @@ def configure(*, state, write_json):
 
 def _st():
     """The state directory: the server's, or the users store's where only
-    that is configured (bb users removes an account with users.py alone)."""
+    that is configured (aerie users removes an account with users.py alone)."""
     return STATE or users.STATE
 
 
@@ -106,7 +106,7 @@ def _name_of(uid):
 
 
 def owner_of(project):
-    """The owning account's uid: the record's, or BuilderBot's owner. Kept
+    """The owning account's uid: the record's, or AerieOS's owner. Kept
     by project (R138): a repository's owner is its project's."""
     rec = _owners()["projects"].get(users.key_of(project)) or {}
     return rec.get("owner") or users.owner_uid()
@@ -127,7 +127,7 @@ def _is_bb_owner(me):
 
 def may_manage(me, project):
     """Whether `me` may change the owner, the restriction and invitations:
-    the project's owner, and BuilderBot's owner. Never a session."""
+    the project's owner, and AerieOS's owner. Never a session."""
     if not me or me.get("session"):
         return False
     return _is_bb_owner(me) or users.uid_of(me) == owner_of(project)
@@ -144,7 +144,7 @@ def may_change_members(me, project):
 
 def member_refusal(me, project, joining=False):
     """"" when `me` may change who is on `project`, else why not. `joining`
-    is `me` adding themselves: BuilderBot's owner may join an invite-only
+    is `me` adding themselves: AerieOS's owner may join an invite-only
     project that way (R135), the one difference from an administrator,
     who waits for an invitation."""
     if may_change_members(me, project):
@@ -186,7 +186,7 @@ def adopt(key, first):
 
 def forget_account(uid):
     """An account removed: its invitations go, and a project it owned
-    falls back to BuilderBot's owner rather than to nobody."""
+    falls back to AerieOS's owner rather than to nobody."""
     with _lock:
         i = _invites()
         changed = False
@@ -254,7 +254,7 @@ def prune_gone(registry):
 
 
 def members(project):
-    """The accounts this project is on, by name, BuilderBot's owner first."""
+    """The accounts this project is on, by name, AerieOS's owner first."""
     project = users.key_of(project)
     out = []
     for u in users.all_users():
@@ -280,7 +280,7 @@ def view(me, project):
             "may_invite": invite,
             "members": sorted(on),
             # Ownership offered and not yet accepted (the project's owner
-            # hands it on; BuilderBot's owner moves it at once).
+            # hands it on; AerieOS's owner moves it at once).
             "offer": {"id": offer["id"], "name": _name_of(offer["uid"]), "at": offer.get("at", 0)} if offer else None,
             "bb_owner": _is_bb_owner(me),
             "invites": [
@@ -300,7 +300,7 @@ def set_owner(me, project, owner="", restrict=None):
     (payload, status)."""
     project = users.key_of(project)
     if not may_manage(me, project):
-        return {"error": f"only {project}'s owner, or BuilderBot's, changes who owns it "
+        return {"error": f"only {project}'s owner, or AerieOS's, changes who owns it "
                          "and whether it is invite only"}, 403
     offered = ""
     moved_to = ""

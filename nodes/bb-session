@@ -10,7 +10,7 @@ mount, PID and IPC namespace in which:
 
   * /workspace holds only the project, its worktrees and the account's Claude
     share, and in that share the other projects' transcripts are empty;
-  * the account's home is the only home, and its BuilderBot cache holds only
+  * the account's home is the only home, and its AerieOS cache holds only
     this project's folder and the account's own;
   * /tmp, /var/tmp and /dev/shm are the session's own, made new with every
     start, but for what Claude Code keeps there between the turns of one
@@ -278,9 +278,9 @@ WALL = "/etc/bb-session.wall"
 # What only a controller installed bare metal leaves on a machine: where
 # one of them is, a wall has to be too, so a missing file is never taken
 # for "no controller here".
-CONTROLLER_MARKS = ("/etc/builderbot-controller", "/var/lib/builderbot-controller",
-                    "/etc/systemd/system/builderbot-controller.service", "/etc/init.d/builderbot-controller",
-                    "/etc/sv/builderbot-controller")
+CONTROLLER_MARKS = ("/etc/aerieos-controller", "/var/lib/aerieos-controller",
+                    "/etc/systemd/system/aerieos-controller.service", "/etc/init.d/aerieos-controller",
+                    "/etc/sv/aerieos-controller")
 NFT_BINS = ("/usr/sbin/nft", "/sbin/nft", "/usr/bin/nft")
 WALL_TABLE = "builderbot_wall"
 
@@ -297,7 +297,7 @@ def wall_conf():
         st = os.stat(path)
     except OSError:
         if any(m and os.path.lexists(m) for m in marks):
-            raise Refused(f"bb-session: this machine carries a BuilderBot controller and no wall ({path}): "
+            raise Refused(f"bb-session: this machine carries an AerieOS controller and no wall ({path}): "
                           "run nodes/install-controller.sh --install again to write it") from None
         return ""
     if path == WALL and (st.st_uid != 0 or st.st_mode & 0o022):
@@ -538,7 +538,7 @@ def plan(c, a, uid, wall=None):
         raise Refused(f"bb-session: {cwd} is not inside {project}, its project's other repositories or their worktrees")
 
     base = home != home_root        # the account's home is under users; the base home is another's
-    # BuilderBot's caches, by where they really are. An account's home links
+    # AerieOS's caches, by where they really are. An account's home links
     # .cache to the base home's (common.sh shares the tool folders), so the
     # two can be one folder, and covering one folder twice buries what the
     # first cover kept. A cache that is itself a link is refused rather than
@@ -581,7 +581,7 @@ def plan(c, a, uid, wall=None):
             raise Refused(f"bb-session: '{p}' is not a place a project could be shown")
         if name in SYSTEM or _inside(p, (ws, home_root, state, data, art, store)) \
                 or _holds(p, (ws, home_root, state, data, art, store)):
-            raise Refused(f"bb-session: {p} is the machine's own or BuilderBot's, not a place a project could be shown")
+            raise Refused(f"bb-session: {p} is the machine's own or AerieOS's, not a place a project could be shown")
         if _real_dir(p) and not _inside(p, sees):
             sees = [s for s in sees if not _inside(s, (p,))] + [p]
 
@@ -650,7 +650,7 @@ def plan(c, a, uid, wall=None):
         steps.append(("bind", p, f"{STAGE}/sees{i}"))
     # The GPU display's socket (R20): /tmp is the session's own below, so
     # the X server's socket directory is staged here and bound back, and a
-    # `bb emu start` inside the session finds :0.
+    # `aerie emu start` inside the session finds :0.
     x11 = _real_dir("/tmp/.X11-unix")
     if x11:
         steps.append(("bind", "/tmp/.X11-unix", f"{STAGE}/x11"))
@@ -729,7 +729,7 @@ def plan(c, a, uid, wall=None):
         steps.append(("tmpfs", users, "mode=0755"))
         if base:
             steps.append(("bind", f"{STAGE}/home", f"{users}/{account}"))
-    # BuilderBot's caches: this project's folder, the account's and the
+    # AerieOS's caches: this project's folder, the account's and the
     # machine's; the base home's down to the machine's.
     for i, (cache, keep) in enumerate(caches):
         steps.append(("tmpfs", cache, "mode=0700,owned"))
@@ -1039,7 +1039,10 @@ def _mkdirs(path, uid, gid):
         cur += "/" + p
         if not os.path.isdir(cur):
             os.mkdir(cur, 0o755)
-            os.chown(cur, uid, gid)
+            # Never through a link: on a real home a racing session could
+            # swap the folder just made for one, and root's chown would go
+            # wherever it pointed (B511).
+            os.lchown(cur, uid, gid)
 
 
 def apply(steps, uid, gid):
@@ -1126,8 +1129,10 @@ def apply(steps, uid, gid):
         elif kind == "bindmine":
             # This project's own transcripts put back over the cover; where
             # the folder could not be made there is nothing to bind, and the
-            # session still starts.
-            if os.path.isdir(step[1]):
+            # session still starts. A folder itself, never a link: root's
+            # bind followed one into a folder the account could not reach
+            # (B518).
+            if _real_dir(step[1]):
                 _mkdirs(target, uid, gid)
                 _mount(step[1], target, None, MS_BIND | MS_REC)
         elif kind == "hidefile":
@@ -1441,9 +1446,12 @@ def worktree(c, argv):
                 os.setuid(st.st_uid)
                 env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/nonexistent", "GIT_CONFIG_NOSYSTEM": "1",
                        "GIT_CONFIG_GLOBAL": "/dev/null"}
-                has = subprocess.run(["git", "-C", src, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+                # The repository's own hooks and fsmonitor off: a session can
+                # write them, and they would run here, outside its view (B512).
+                off = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"]
+                has = subprocess.run(["git", *off, "-C", src, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
                                      env=env, check=False).returncode == 0
-                add = ["git", "-C", src, "worktree", "add"] + ([wt, branch] if has else ["-b", branch, wt])
+                add = ["git", *off, "-C", src, "worktree", "add"] + ([wt, branch] if has else ["-b", branch, wt])
                 os._exit(subprocess.run(add, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                         check=False).returncode)
             except Exception:                                  # noqa: BLE001 (the child says only how it ended)
@@ -1786,7 +1794,7 @@ def main(argv):
                 # a key so it can be read: anything else, a traceback
                 # included, scrolled past before the tab could show it (R132).
                 why = str(e) if isinstance(e, Refused) else f"bb-session failed: {type(e).__name__}: {e}"
-                sys.stdout.write(f"BuilderBot: this terminal was refused: {why}\r\n"
+                sys.stdout.write(f"AerieOS: this terminal was refused: {why}\r\n"
                                  "Close the tab, or press Enter to try again.\r\n")
                 sys.stdout.flush()
                 if sys.stdin.isatty():

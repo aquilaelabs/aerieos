@@ -1,4 +1,4 @@
-"""bb jobs names each job by what it did: a line told to a Claude session
+"""aerie jobs names each job by what it did: a line told to a Claude session
 says which session and what it said, where it read as `exec` with an empty
 command and a failed one could not be explained (B775)."""
 import http.server
@@ -15,7 +15,7 @@ LIB = os.path.join(HERE, "..", "..", "lib")
 SCRIPT = os.path.join(LIB, "jobs-verbs.py")
 JOBS = {"jobs": [{"id": "j_1a2b3c4d", "type": "tell", "state": "failed", "node": "n_1", "queued": 1, "started": 1,
                   "ended": 4, "error": "exit 3", "project": "",
-                  "spec": {"session": "u_1~claude-alpha", "text": "BuilderBot is back after an update.\nPick up"}}],
+                  "spec": {"session": "u_1~claude-alpha", "text": "AerieOS is back after an update.\nPick up"}}],
         "nodes": {"n_1": "box"}}
 
 
@@ -45,7 +45,7 @@ class JobsList(unittest.TestCase):
         env.update(BB_CONTROLLER=f"http://127.0.0.1:{port}", BB_JOBS_AUTH="Bearer x", PYTHONPATH=LIB,
                    BB_CONTROLLER_WAIT="0", BB_PROJECT="")
         out = subprocess.run([sys.executable, SCRIPT, "5"], env=env, capture_output=True, text=True, check=False).stdout
-        self.assertIn('tell u_1~claude-alpha: "BuilderBot is back after an update. Pick up"', out)
+        self.assertIn('tell u_1~claude-alpha: "AerieOS is back after an update. Pick up"', out)
         self.assertNotIn("exec", out)
 
 

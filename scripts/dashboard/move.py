@@ -33,6 +33,7 @@ token, nothing secret), a newline, then the sealed tar.gz (ChaCha20-Poly1305
 under HKDF(token)).
 """
 import base64
+import contextlib
 import hashlib
 import hmac
 import io
@@ -48,6 +49,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
+
+import stateversion
 from pathlib import Path
 
 STATE = Path("/config")
@@ -59,12 +63,26 @@ HEADER = b"BBMOVE1\n"
 BACKUP_HEADER = b"BBBACKUP1\n"
 # What the state carries that is nobody's to move: logs, CI logs, the job
 # trees, the apps fetched from the releases, this module's own output.
-LEAVE = {"logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next"}
+LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next"}
 
 _lock = threading.Lock()
 write_json = None
 seal = None
 open_with = None
+checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
+
+
+def _key_beside_state(key, state_dir):
+    """A carried install key where an install with no secrets folder keeps
+    its own: the server hands this over to installkey.landed (B599)."""
+    keydir = Path(state_dir) / ".install-key"
+    keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(keydir / "key", "wb") as f:
+        f.write(key)
+    os.chmod(keydir / "key", 0o600)
+
+
+install_landed_key = _key_beside_state
 state_version = lambda: 0           # noqa: E731
 build_version = lambda: ""          # noqa: E731
 install_key = lambda: b""           # noqa: E731
@@ -188,6 +206,11 @@ def bundle_path():
     return p if d.get("bundle") and p.is_file() else None
 
 
+# Inside the state and never carried: what a landing or a reset set aside, and
+# a landing's own spool and working folder.
+NEVER_PACKED = (".moved-", ".move-", ".reset-")
+
+
 def _tar_tree(tar, src, arc, leave=()):
     src = Path(src)
     if not src.exists():
@@ -195,9 +218,17 @@ def _tar_tree(tar, src, arc, leave=()):
     n = 0
     for p in sorted(src.rglob("*")):
         rel = p.relative_to(src)
-        if rel.parts and rel.parts[0] in leave:
+        if rel.parts and (rel.parts[0] in leave or rel.parts[0].startswith(NEVER_PACKED)):
             continue
-        if p.is_symlink() or not (p.is_file() or p.is_dir()):
+        # A link goes as a link, never followed (a repository's committed
+        # links, node_modules/.bin): skipped, a moved repository showed them
+        # deleted and a commit -a deleted them for good (B556). The restore
+        # takes back only one that stays inside what it restores.
+        if p.is_symlink():
+            tar.add(str(p), arcname=f"{arc}/{rel.as_posix()}", recursive=False)
+            n += 1
+            continue
+        if not (p.is_file() or p.is_dir()):
             continue
         if p.is_file():
             tar.add(str(p), arcname=f"{arc}/{rel.as_posix()}", recursive=False)
@@ -262,37 +293,220 @@ def pieces():
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
         out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True))
-    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when both homes mount the same share", WORKSPACE, False))
+    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the projects folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     return out
 
 
+# A bundle's body (format 2, B558): the gzipped tar sealed a PIECE at a
+# time as it is made, each piece's seal over its number and whether it is the
+# last, so no piece can be dropped, repeated, moved or cut off unseen, and
+# neither end ever holds more than a piece. Format 1, the tar sealed whole in
+# memory, is still opened.
+FORMAT = 2
+PIECE = 8 << 20
+
+
+class _Sealer:
+    """A file to write the tar into: each PIECE sealed under `key` and
+    written to `f` as its length (4 bytes) and its seal."""
+
+    def __init__(self, f, key):
+        self.f, self.key, self.buf, self.n = f, key, bytearray(), 0
+
+    def _out(self, data, last):
+        blob = seal(self.n.to_bytes(8, "big") + (b"\1" if last else b"\0") + bytes(data), self.key)
+        self.f.write(len(blob).to_bytes(4, "big") + blob)
+        self.n += 1
+
+    def write(self, b):
+        self.buf += b
+        while len(self.buf) >= PIECE:
+            self._out(self.buf[:PIECE], False)
+            del self.buf[:PIECE]
+        return len(b)
+
+    def finish(self):
+        self._out(self.buf, True)
+        self.buf = bytearray()
+
+
+class _Opener:
+    """The tar back out of a format 2 body, a piece at a time: each piece
+    opened under `key` and held to its number; the body must end on the
+    piece marked last, and nothing after it. ValueError otherwise."""
+
+    def __init__(self, f, key):
+        self.f, self.key, self.buf, self.n, self.done = f, key, b"", 0, False
+
+    def _next(self):
+        head = self.f.read(4)
+        if len(head) < 4:
+            raise ValueError("the bundle ends before its last piece")
+        size = int.from_bytes(head, "big")
+        if size > PIECE + 256:
+            raise ValueError("a piece of the bundle is larger than any written")
+        blob = self.f.read(size)
+        try:
+            data = open_with(self.key, blob)
+        except Exception as e:                                     # noqa: BLE001 (Locked, or a damaged piece)
+            raise ValueError("a piece of the bundle did not open") from e
+        if len(data) < 9 or int.from_bytes(data[:8], "big") != self.n:
+            raise ValueError("the bundle's pieces are out of order")
+        self.n += 1
+        self.done = data[8:9] == b"\1"
+        if self.done and self.f.read(1):
+            raise ValueError("the bundle goes on past its last piece")
+        self.buf += data[9:]
+
+    def close(self):
+        self.f.close()
+
+    def read(self, n=-1):
+        while not self.done and (n < 0 or len(self.buf) < n):
+            self._next()
+        if n < 0:
+            out, self.buf = self.buf, b""
+        else:
+            out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+
+def split_form(src, content_type, file_field, dest, small=64 << 10):
+    """A multipart form read from the file `src` a megabyte at a time (a
+    landing's upload, B558: never whole in memory): the `file_field` part
+    written to `dest`, each other part kept as text up to `small` bytes.
+    Returns (fields, whether the file part came with any bytes); ValueError
+    for a form it cannot read."""
+    import re as _re
+    m = _re.search(r'boundary="?([^";]+)"?', content_type or "")
+    if not m:
+        raise ValueError("the upload is not a form")
+    delim = b"\r\n--" + m.group(1).encode()
+    fields, got_file, buf = {}, False, b"\r\n"
+    name, sink, out = None, None, None
+    with open(src, "rb") as f, open(dest, "wb") as fout:
+        def more():
+            return f.read(1 << 20)
+        state = "start"
+        while True:
+            if state in ("start", "body"):
+                at = buf.find(delim)
+                if at < 0:
+                    keep = len(delim) + 4
+                    if state == "body" and len(buf) > keep:
+                        sink(buf[:-keep])
+                        buf = buf[-keep:]
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                    continue
+                if state == "body":
+                    sink(buf[:at])
+                    if out is not None:
+                        fields[name] = bytes(out).decode("utf-8", "replace").strip()
+                buf = buf[at + len(delim):]
+                while len(buf) < 2:
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                if buf[:2] == b"--":
+                    return fields, got_file
+                state = "head"
+            else:
+                at = buf.find(b"\r\n\r\n")
+                if at < 0:
+                    if len(buf) > 16 << 10:
+                        raise ValueError("a part of the form has headers past 16 KiB")
+                    chunk = more()
+                    if not chunk:
+                        raise ValueError("the upload ends inside its form")
+                    buf += chunk
+                    continue
+                head = buf[:at].decode("utf-8", "replace")
+                buf = buf[at + 4:]
+                nm = _re.search(r'name="([^"]*)"', head)
+                name = nm.group(1) if nm else ""
+                if name == file_field:
+                    out = None
+
+                    def sink(b):
+                        nonlocal got_file
+                        if b:
+                            got_file = True
+                            fout.write(b)
+                else:
+                    out = bytearray()
+
+                    def sink(b, out=out, name=name):
+                        out.extend(b)
+                        if len(out) > small:
+                            raise ValueError(f"the form's {name or 'unnamed'} field is past {small} bytes")
+                state = "body"
+
+
+def write_bundle(dest, header, manifest, key, **pack_kw):
+    """A bundle written to `dest` as it is packed, never whole in memory:
+    `header`, the manifest line (`manifest(counts)`, a dict, its format
+    set here), then the body sealed under `key` a piece at a time. The body
+    goes first to a file beside `dest`, since the manifest names its counts,
+    and is copied after it. Returns (manifest, counts)."""
+    dest = Path(dest)
+    body = dest.with_name(dest.name + ".body")
+    # The database's log folded into it first, so the copy is not torn (B601).
+    with contextlib.suppress(Exception):
+        checkpoint()
+    try:
+        with open(body, "wb") as f:
+            sealer = _Sealer(f, key)
+            with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
+                counts = _pack_into(tar, **pack_kw)
+            sealer.finish()
+        m = dict(manifest(counts), format=FORMAT)
+        with open(dest, "wb") as out, open(body, "rb") as f:
+            out.write(header)
+            out.write(json.dumps(m).encode() + b"\n")
+            shutil.copyfileobj(f, out, 1 << 20)
+    finally:
+        body.unlink(missing_ok=True)
+    return m, counts
+
+
 def pack(repos=False, carry_key=False, stores=None):
-    """The tree a move or a backup carries, as one gzipped tar in memory:
-    the state without its logs and job trees, the stores kept outside it
-    (`stores` names the kinds; None is every kind but STORES_OFF), the
-    repositories when asked, the secrets, the install key when asked.
+    """The tree a move or a backup carries, as one gzipped tar in memory (a
+    small tree, as the tests make; a bundle is write_bundle's, streamed).
     Returns (bytes, counts)."""
     buf = io.BytesIO()
-    counts = {}
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE)
-        for kind, path in (store_paths() or {}).items():
-            if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
-                counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
-        if repos:
-            counts["repos"] = _tar_tree(tar, WORKSPACE, "workspace")
-        if SECRETS and Path(SECRETS).is_dir():
-            counts["secrets"] = _tar_tree(tar, SECRETS, "secrets")
-        if carry_key:
-            k = install_key() or b""
-            if k:
-                info = tarfile.TarInfo("install-key")
-                info.size = len(k)
-                info.mtime = int(time.time())
-                tar.addfile(info, io.BytesIO(k))
-                counts["install_key"] = 1
+        counts = _pack_into(tar, repos=repos, carry_key=carry_key, stores=stores)
     return buf.getvalue(), counts
+
+
+def _pack_into(tar, repos=False, carry_key=False, stores=None):
+    """Into `tar`, the tree a move or a backup carries: the state without
+    its logs and job trees, the stores kept outside it (`stores` names the
+    kinds; None is every kind but STORES_OFF), the repositories when asked,
+    the secrets, the install key when asked. Returns the counts."""
+    counts = {}
+    counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE)
+    for kind, path in (store_paths() or {}).items():
+        if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
+            counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
+    if repos:
+        counts["repos"] = _tar_tree(tar, WORKSPACE, "workspace")
+    if SECRETS and Path(SECRETS).is_dir():
+        counts["secrets"] = _tar_tree(tar, SECRETS, "secrets")
+    if carry_key:
+        k = install_key() or b""
+        if k:
+            info = tarfile.TarInfo("install-key")
+            info.size = len(k)
+            info.mtime = int(time.time())
+            tar.addfile(info, io.BytesIO(k))
+            counts["install_key"] = 1
+    return counts
 
 
 def prepare(principal, to, repos=False, carry_key=False, stores=None):
@@ -339,18 +553,19 @@ def pack_bundle():
     # Named to the millisecond: two packs in one second are two bundles.
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
     name = f"builderbot-move-{stamp}.bbmove"
-    raw, counts = pack(repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
-                       stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
-    sealed = seal(raw, key)
-    manifest = {"format": 1, "version": build_version(), "state_version": int(state_version() or 0), "made_at": int(d["made_at"]),
+    tmp = out_dir / (name + ".partial")
+
+    def manifest_of(counts):
+        return {"version": build_version(), "state_version": int(state_version() or 0), "made_at": int(d["made_at"]),
                 "packed_at": int(time.time()), "from": page_url(), "to": d.get("to", ""), "repos": bool(d.get("repos")),
                 "carries_key": bool(d.get("carries_key") and counts.get("install_key")),
                 "nodes": list(node_ids()), "bare_metal": bool(bare_metal()), "counts": counts, "token_hash": d.get("token_hash", "")}
-    tmp = out_dir / (name + ".partial")
-    with open(tmp, "wb") as f:
-        f.write(HEADER)
-        f.write(json.dumps(manifest).encode() + b"\n")
-        f.write(sealed)
+    try:
+        manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
+                                        stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
+    except OSError as e:
+        tmp.unlink(missing_ok=True)
+        return {"error": f"the bundle could not be written: {e.strerror or e}"}
     os.replace(tmp, out_dir / name)
     with _lock:
         d = _load()
@@ -491,7 +706,7 @@ def _peer_json(url, body=None, timeout=None):
     """One call to the other controller: (status, dict)."""
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
                                  method="POST" if body is not None else "GET",
-                                 headers={"User-Agent": "BuilderBot", **({"Content-Type": "application/json"} if body is not None else {})})
+                                 headers={"User-Agent": "AerieOS", **({"Content-Type": "application/json"} if body is not None else {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout or PEER_TIMEOUT, context=_peer_ctx()) as r:
             raw = r.read()
@@ -598,6 +813,23 @@ def serve_fetch(q):
     return str(STATE / "move" / r["bundle"]), "", 200
 
 
+def room_for(size, where):
+    """"" when `where` has room for a bundle of `size` bytes and what it
+    unpacks to (twice it, and a little), or why not (B588: a stick before a
+    system pool lands on its own small partition)."""
+    try:
+        free = shutil.disk_usage(str(where)).free
+    except OSError:
+        return ""
+    need = 2 * int(size or 0) + (256 << 20)
+    if free >= need:
+        return ""
+    gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
+    return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
+            "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
+            "the folder they are in as the projects folder on This machine")
+
+
 def fetch_bundle(old_url, token, dest):
     """The new install pulling the bundle from the old controller into
     `dest`, under the proof the token derives. "" or why."""
@@ -607,10 +839,14 @@ def fetch_bundle(old_url, token, dest):
     key = key_of(token)
     nonce = secrets.token_hex(16)
     q = urllib.parse.urlencode({"hash": token_hash(token), "nonce": nonce, "proof": fetch_proof(key, nonce)})
-    req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "BuilderBot"})
+    req = urllib.request.Request(f"{old_url}/api/v1/move/bundle?{q}", headers={"User-Agent": "AerieOS"})
     try:
-        with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r, open(dest, "wb") as f:
-            shutil.copyfileobj(r, f)
+        with urllib.request.urlopen(req, timeout=3600, context=_peer_ctx()) as r:
+            why = room_for(int(r.headers.get("Content-Length") or 0), Path(dest).parent)
+            if why:
+                return why
+            with open(dest, "wb") as f:
+                shutil.copyfileobj(r, f, 1 << 20)
     except urllib.error.HTTPError as e:
         try:
             why = json.loads(e.read()).get("error") or f"answered {e.code}"
@@ -666,17 +902,18 @@ def read_manifest(path):
         with open(path, "rb") as f:
             head = f.readline()
             if head not in (HEADER, BACKUP_HEADER):
-                return None, "not a BuilderBot move bundle or backup"
+                return None, "not an AerieOS move bundle or backup"
             line = f.readline()
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:
             m["kind"] = "backup"
-        return (m, "") if isinstance(m, dict) and m.get("format") == 1 else (None, "a bundle of a format this build does not read")
+        return (m, "") if isinstance(m, dict) and m.get("format") in (1, FORMAT) else (None, "a bundle of a format this build does not read")
     except (OSError, ValueError) as e:
         return None, f"could not read the bundle: {e}"
 
 
-def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None):
+def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
+            work_root=None):
     """The bundle unsealed under the token and put in place of the state here
     (the state as it is moved aside, as a reset does), its stores where the
     records name them, the repositories into the workspace, the secrets into
@@ -684,6 +921,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     never onto a build whose state version is older than the bundle's.
     Returns {ok, moved_aside, counts} or {error}."""
     state_dir = Path(state_dir or STATE)
+    state_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir = Path(workspace_dir or WORKSPACE)
     secrets_dir = Path(secrets_dir) if secrets_dir else (Path(SECRETS) if SECRETS else None)
     here_ver = int(build_state_version if build_state_version is not None else state_version() or 0)
@@ -693,6 +931,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     if int(m.get("state_version") or 0) > here_ver:
         return {"error": f"the bundle's state is at version {m.get('state_version')} and this build reads up to {here_ver}: "
                          "a move never lands on an older build; update this install first"}
+    # ...nor a state this build no longer upgrades from: it would land, and the
+    # next start refuse it (B600).
+    if m.get("state_version") and int(m["state_version"]) < stateversion.SUPPORTED_FROM:
+        return {"error": f"the bundle's state is at version {m['state_version']}, and this build upgrades from "
+                         f"{stateversion.SUPPORTED_FROM} on: move it through a release between them first"}
     # A backup opens under the key its password derives (backup.py); a
     # move under its token's.
     if key is None:
@@ -701,53 +944,90 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         if token_hash(token) != m.get("token_hash"):
             return {"error": "that is not this bundle's move token"}
         key = key_of(token)
-    with open(path, "rb") as f:
-        f.readline(); f.readline()
-        sealed = f.read()
-    try:
-        raw = open_with(key, sealed)
-    except Exception:                                              # noqa: BLE001 (any failure to open is one answer)
-        return {"error": "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")}
-    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(state_dir.parent)))
+    wrong = "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")
+    fh = open(path, "rb")
+    fh.readline(); fh.readline()
+    if m.get("format") == 1:
+        try:
+            src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
+        except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
+            fh.close()
+            return {"error": wrong}
+        fh.close()
+    else:
+        # A piece at a time; the first opened here, so a wrong token is said
+        # as one before anything is unpacked.
+        src, mode = _Opener(fh, key), "r|gz"
+        try:
+            src._next()
+        except ValueError:
+            fh.close()
+            return {"error": wrong}
+    # Unpacked inside the state, or where the caller says (`work_root`: on a
+    # stick, the projects folder on the machine's disks, never the stick).
+    work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir)))
     counts = {}
     try:
-        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
-            for info in tar.getmembers():
-                if not info.isfile() or info.name.startswith("/") or ".." in Path(info.name).parts:
-                    continue
-                tar.extract(info, path=str(work), filter="data") if hasattr(tarfile, "data_filter") else tar.extract(info, path=str(work))
-                top = Path(info.name).parts[0]
-                counts[top] = counts.get(top, 0) + 1
+        try:
+            unpacked = _unpack(src, mode, work, counts)
+        except (ValueError, EOFError, tarfile.TarError, zlib.error) as e:
+            unpacked = f"the bundle is damaged or cut short ({e}); nothing here was changed"
+        if unpacked:
+            return {"error": unpacked}
         stamp = time.strftime("%Y%m%d-%H%M%S")
-        aside = state_dir.parent / f"{state_dir.name}.moved-{stamp}"
-        # The state: what is here moved aside whole, the bundle's put in place.
-        if state_dir.exists():
-            os.rename(state_dir, aside)
-        shutil.move(str(work / "state"), str(state_dir))
-        # The stores, where the restored records name them (their paths may
-        # not exist on this machine: then under the state, and paths.py says
-        # so on the Storage page).
-        for kind_dir in (work / "stores").iterdir() if (work / "stores").is_dir() else []:
-            dest = (store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name)
-            dest = Path(dest)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.exists():
-                shutil.copytree(str(kind_dir), str(dest), dirs_exist_ok=True)
-            else:
-                shutil.move(str(kind_dir), str(dest))
+        aside = state_dir / f".moved-{stamp}"
+        # The workspace and the secrets first, which do not need the state;
+        # the state swapped after, and anything failing from there on puts
+        # what was here back (B557): an error copying the workspace after
+        # the swap left the new state half restored, the old one aside and
+        # not said where.
         if (work / "workspace").is_dir():
             workspace_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(work / "workspace"), str(workspace_dir), dirs_exist_ok=True)
+            shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
         if (work / "secrets").is_dir() and secrets_dir:
             secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            shutil.copytree(str(work / "secrets"), str(secrets_dir), dirs_exist_ok=True)
-        if (work / "install-key").is_file():
-            k = (work / "install-key").read_bytes()
-            keydir = state_dir / ".install-key"
-            keydir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            with open(keydir / "key", "wb") as f:
-                f.write(k)
-            os.chmod(keydir / "key", 0o600)
+            shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
+        swapped = False
+        try:
+            # The state swapped inside its folder, never by renaming the folder:
+            # its parent is root's on an installed machine and a container's
+            # /config is a mount point (B594). A mountpoint under it (a stick's
+            # logs on a RAM disk) stays where it is, the bundle's merged in.
+            aside.mkdir(mode=0o700)
+            swapped = True
+            for p in sorted(state_dir.iterdir()):
+                if p.name.startswith(NEVER_PACKED) or p == work:
+                    continue
+                with contextlib.suppress(OSError):
+                    os.rename(p, aside / p.name)
+            _into(work / "state", state_dir)
+            # The stores, where the restored records name them; one whose path
+            # cannot be made on this machine lands under the state, and the
+            # record says so for the Storage page (B598).
+            for kind_dir in (work / "stores").iterdir() if (work / "stores").is_dir() else []:
+                dest = Path((store_paths() or {}).get(kind_dir.name) or (state_dir / kind_dir.name))
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    _into(kind_dir, dest)
+                except OSError:
+                    _store_here(state_dir, kind_dir.name)
+                    _into(kind_dir, state_dir / kind_dir.name)
+            if (work / "install-key").is_file():
+                install_landed_key((work / "install-key").read_bytes(), state_dir)
+        except (OSError, shutil.Error) as e:
+            if swapped:
+                for p in list(state_dir.iterdir()):
+                    if p.name.startswith(NEVER_PACKED) or p == work:
+                        continue
+                    if p.is_dir() and not p.is_symlink():
+                        shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        with contextlib.suppress(OSError):
+                            p.unlink()
+                _into(aside, state_dir)
+                shutil.rmtree(aside, ignore_errors=True)
+            return {"error": f"the restore stopped ({e}); "
+                             + ("the state that was here is back as it was" if swapped else "nothing of the state was changed")}
         # The move's own record, carried with the state: now the new home's,
         # which answers the nodes' knocks and knows where it came from.
         rec_path = state_dir / "move.json"
@@ -767,10 +1047,105 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             rec.pop(k, None)
         with open(rec_path, "w") as f:
             json.dump(rec, f)
-        return {"ok": True, "moved_aside": str(aside) if state_dir != aside else "", "counts": counts, "from": m.get("from", ""),
-                "nodes": list(m.get("nodes") or [])}
+        # A bare-metal home keeps its own node and its stick's plan (above).
+        here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
+        return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),
+                "nodes": list(m.get("nodes") or []), "kept_here": here}
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        src.close()
+
+
+def _into(src, dest):
+    """What `src` holds moved into the folder `dest`, made if missing: a name
+    there already is merged (a mountpoint stays a mountpoint)."""
+    src, dest = Path(src), Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    for p in sorted(src.iterdir()):
+        to = dest / p.name
+        if to.is_dir() and not to.is_symlink() and p.is_dir() and not p.is_symlink():
+            _into(p, to)
+        else:
+            shutil.move(str(p), str(to))
+
+
+def _store_here(state_dir, kind):
+    """A store's record back to its default, under the state (paths.json)."""
+    f = Path(state_dir) / "paths.json"
+    with contextlib.suppress(OSError, ValueError):
+        d = json.loads(f.read_text())
+        if isinstance(d, dict) and d.pop(kind, None) is not None:
+            f.write_text(json.dumps(d))
+
+
+def _unpack(src, mode, work, counts):
+    """The bundle's tar unpacked into `work`, counting each top folder's
+    files: a file, or a link where the data filter can hold it inside what
+    is restored. "" when done."""
+    with tarfile.open(fileobj=src, mode=mode) as tar:
+        safe_links = hasattr(tarfile, "data_filter")
+        for info in tar:
+            if info.name.startswith("/") or ".." in Path(info.name).parts:
+                continue
+            # A link only where the data filter can check it: it refuses
+            # one that is absolute or leads out of what is restored.
+            if not (info.isfile() or (info.issym() and safe_links)):
+                continue
+            try:
+                tar.extract(info, path=str(work), filter="data") if safe_links else tar.extract(info, path=str(work))
+            except tarfile.FilterError:
+                continue
+            top = Path(info.name).parts[0]
+            counts[top] = counts.get(top, 0) + 1
+    return ""
+
+
+def carry_here(aside, state_dir):
+    """What belongs to this machine rather than to the controller that moved
+    in, carried from the state set aside into the one put in place (the
+    operator, 1 Nov: a stick that came with a plan and a node of its own,
+    then a controller moved onto it): the machine's own node, enrolled at
+    its first boot, with its tokens, so its agent is known to the controller
+    that moved here; and the stick's prepared configuration (firstboot.json),
+    so what it names to adopt is still offered. Nothing the moved state has
+    of its own is replaced. The lines said."""
+    import sqlite3
+    said = []
+    old_db, new_db = Path(aside) / "builderbot.db", Path(state_dir) / "builderbot.db"
+    if old_db.is_file() and new_db.is_file():
+        try:
+            src, dst = sqlite3.connect(str(old_db)), sqlite3.connect(str(new_db))
+            try:
+                cols = lambda c, t: [r[1] for r in c.execute(f"PRAGMA table_info({t})")]  # noqa: E731
+                ncols = [x for x in cols(src, "nodes") if x in cols(dst, "nodes")]
+                tcols = [x for x in cols(src, "tokens") if x in cols(dst, "tokens")]
+                own = [r for r in src.execute(f"SELECT {', '.join(ncols)} FROM nodes WHERE state != 'retired'")
+                       if (json.loads(r[ncols.index("config")] or "{}") or {}).get("own")] if "config" in ncols else []
+                for r in own:
+                    nid = r[ncols.index("id")]
+                    if dst.execute("SELECT 1 FROM nodes WHERE id = ?", (nid,)).fetchone():
+                        continue
+                    # The old home's own machine, where it was bare metal, is
+                    # that machine's, not this one: retired here (step 5 of
+                    # Moving a controller in docs/install.md).
+                    for oid, ocfg in dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall():
+                        if (json.loads(ocfg or "{}") or {}).get("own"):
+                            dst.execute("UPDATE nodes SET state = 'retired' WHERE id = ?", (oid,))
+                    dst.execute(f"INSERT INTO nodes ({', '.join(ncols)}) VALUES ({', '.join('?' * len(ncols))})", r)
+                    for t in src.execute(f"SELECT {', '.join(tcols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
+                        dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(tcols)}) VALUES ({', '.join('?' * len(tcols))})", t)
+                    said.append(f"this machine's own node ({r[ncols.index('name')]}) is the moved controller's too")
+                dst.commit()
+            finally:
+                src.close()
+                dst.close()
+        except (sqlite3.Error, ValueError) as e:
+            said.append(f"this machine's own node was not carried over ({e}): enroll it again from the Nodes page")
+    fb_old, fb_new = Path(aside) / "firstboot.json", Path(state_dir) / "firstboot.json"
+    if fb_old.is_file() and not fb_new.exists():
+        shutil.copyfile(str(fb_old), str(fb_new))
+        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on This machine")
+    return said
 
 
 def restored():

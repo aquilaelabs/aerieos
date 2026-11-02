@@ -1,5 +1,5 @@
 {
- "about": "Chromium, Firefox and WebKit with the module that drives them, for bb capture shot and browser tests. Needs node.",
+ "about": "Chromium, Firefox and WebKit with the module that drives them, for aerie capture shot and browser tests. Needs node.",
  "label": "Playwright browsers",
  "layout": {
   "bin": [

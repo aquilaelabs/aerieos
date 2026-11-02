@@ -55,10 +55,12 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       {label: "in dist/", value: rows.length, sub: rows.length ? humanBytes(rows.reduce((n, a) => n + (a.size || 0), 0)) : ""},
       {label: "built on branches", value: onBranches, omit: !onBranches},
       {label: caps.length === 1 ? "capture" : "captures", value: caps.length, omit: !caps.length},
-      // What the last build took on its node, workspace and cache (R110
-      // step 7): the room the next one is checked against.
-      {label: "last build took", value: humanBytes(art.build?.took?.workspace || 0),
-       sub: art.build?.took?.cache ? `cache ${humanBytes(art.build.took.cache)}` : "", omit: !art.build?.took?.workspace}],
+      // The room the last build used on its node, workspace and cache (R110
+      // step 7), which the next one is checked against. Said as room: "last
+      // build took 2kB" read as a time; a label short enough for a phone's
+      // tile, the build it was under it.
+      {label: "build room", value: humanBytes(art.build?.took?.workspace || 0),
+       sub: art.build?.took?.cache ? `the last build's, cache ${humanBytes(art.build.took.cache)}` : "the last build's", omit: !art.build?.took?.workspace}],
       // Its status line, on the control row beside Download source (the
       // operator, 29 Oct: never a button alone on its line).
       "the code base as a zip, without build output");
@@ -191,7 +193,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
             // A build named with no version (the operator, 6 Oct): the
             // sweep cannot tell when it is out of date, so it says so, in
             // the warning color, and offers Remove.
-            a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with bb version --file</span>` : ""}${
+            a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
             // What built it, when a job did (docs/nodes.md §6): the job,
             // the node, the snapshot. A file somebody copied in says nothing.
             a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
@@ -257,7 +259,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       const days = art.capture_days ?? 7;
       capBox.innerHTML = !caps.length ? "" : docSection("artifacts", "captures", "Captures",
         `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
-        `<div class="hint">What a session looked with: a reel's sheet (<b>bb capture reel</b>) or an
+        `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
            emulator shot, not what the project ships. ${days
              ? `Each is removed ${days} day${days === 1 ? "" : "s"} after it was taken`
              : "Kept until somebody removes one"}; the project's settings say how long.</div>`
@@ -480,6 +482,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       verSection(v) + nb.sectBar(`artifacts:version${v.component ? ":" + v.component : ""}`),
       {cls: v.target ? "" : "warn"})).join("");
     wireSections(box);
+    loadDrafts();
     // A role without Releases and versions Write on the project (B101):
     // every button that moves or releases the version left out, and the
     // fields that say it read-only; without Projects Write, Send to Claude
@@ -558,7 +561,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       const done = [];
       if (policy != null){
         const j = await postVersion({action: "policy", policy}, true);
-        if (j && !j.error) done.push(`Claude access: ${POLICY_LABEL[policy] || policy}`);
+        if (j && !j.error) done.push(`Agent access: ${POLICY_LABEL[policy] || policy}`);
       }
       for (const [comp, part] of parts){
         const j = await postVersion({action: "bump", part, component: comp},
@@ -575,7 +578,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     // order, the order inside them, the words: all of it here.
     //
     // Unreleased only. Everything below it is a release somebody may have
-    // read, shown as the text it is; `bb version unroll` is how one is
+    // read, shown as the text it is; `aerie version unroll` is how one is
     // reopened, which is a gesture that says what it is.
     function drawChangelog(pane, comp, j){
       let gs = JSON.parse(JSON.stringify(j.groups || []));
@@ -745,7 +748,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
         if (j.error){ pane.textContent = `changelog: ${j.error}`; return; }
         if (j.text == null){
           // No file yet. The first line can be written here as well as by
-          // a session's `bb changelog add`: the editor used to sit dead
+          // a session's `aerie changelog add`: the editor used to sit dead
           // until Claude made the file.
           pane.innerHTML = `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
             <div class="actbar"><input id="clFirst" maxlength="300" autocomplete="off"
@@ -895,7 +898,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
     const cost = v.component ? null : ver?.window_cost;
     // Where the number here lives against the branch builds come from, and
     // where a staged bump would land: the server's sentences (version.lands),
-    // so the row and bb version say the same thing. A bump on a branch
+    // so the row and aerie version say the same thing. A bump on a branch
     // already merged, unpushed, read as the project's version here while
     // main still had the old one, and nothing on the row said so (B338).
     const lands = v.lands || {};
@@ -1003,7 +1006,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
              <b>Release</b> tags and pushes it. ${helpIcon(`Two steps. Until the release, a build reads ${
                v.target}-dev.${v.ordinal ?? "n"} rather than ${v.target}: the tag on the commit, pushed, is what says it happened.`)}`}</p>
         ${v.component ? "" : `<p class="verwhy">A bump is staged until Save, and is never pushed. ${
-          helpIcon("Save writes and commits VERSION. Claude access limits what a session may change.")}</p>
+          helpIcon("Save writes and commits VERSION. Agent access limits what a session may change.")}</p>
         ${verAddFold(v)}`}` : `
         ${v.component ? "" : verPolicyPicker(v)}
         <div class="verln"><span>start at</span>
@@ -1035,13 +1038,56 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
   // at exactly that moment.
   function verPolicyPicker(v){
     return `<label class="verpol">
-      <span>Claude access</span>
+      <span>Agent access</span>
       <select id="verPolicy" data-was="${esc(v.policy)}"
         aria-label="what a session may do with this project's version">
         ${optionList((v.policies || []).map(o => [o, POLICY_LABEL[o] || o]), verPolicyPending ?? v.policy)}
       </select>${verPolicyPending != null
         ? `<span class="vermark">staged: on Save</span>` : ""}
     </label>`;
+  }
+
+  // Drafts (the operator, 1 Nov): every release CI makes waits as a draft,
+  // seen by the repository's own people alone, its notes read and corrected
+  // here, then published. A role that may not release reads them.
+  async function loadDrafts(force){
+    const box = $("verDrafts");
+    if (!box) return;
+    // Notes being corrected are never redrawn under the person typing them.
+    if (!force && box.querySelector("textarea[data-dirty]")) return;
+    const j = await (await postJSON("/api/version", {project, action: "release-drafts"})).json().catch(() => ({drafts: []}));
+    const ds = j.drafts || [];
+    if (!ds.length){ box.innerHTML = ""; return; }
+    const may = !projReleaseWhy(project);
+    box.innerHTML = docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
+      const miss = d.missing || [];
+      return `<div class="field verdraft" data-draft="${esc(d.tag)}">
+        <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
+        ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
+        <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
+        ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${miss.length ? " disabled" : ""}>Publish</button></div>` : ""}
+      </div>`;
+    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest.</div>`, {cls: "warn"});
+    wireSections(box);
+    box.querySelectorAll("[data-draft]").forEach(row => {
+      const tag = row.dataset.draft, ta = row.querySelector("textarea");
+      const save = row.querySelector("[data-draftsave]"), pub = row.querySelector("[data-draftpub]");
+      ta.oninput = () => { ta.dataset.dirty = "1"; };
+      if (save) save.onclick = () => pressing(save, async () => {
+        const r = await (await postJSON("/api/version", {project, action: "release-draft-notes", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
+        notify(r.error || `${tag}'s notes saved; it is still a draft`, !!r.error);
+        if (!r.error) delete ta.dataset.dirty;
+      });
+      if (pub) pub.onclick = () => pressing(pub, async () => {
+        if (!await askYes(`Publish ${tag}?\n\nIts notes as they stand in the box go out with it, and everybody can see and take it from then on: ${
+            tag.includes("-dev.") ? "the dev channel and the containers following :dev" : "every install following releases, and :latest"}. A published release is taken back with Withdraw.`,
+            {title: "Publish it?", verb: "Publish"})) return;
+        busy(pub, "Publishing");
+        const r = await (await postJSON("/api/version", {project, action: "release-publish", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
+        notify(r.error || `${tag} is published`, !!r.error);
+        if (!r.error) await loadDrafts(true);
+      });
+    });
   }
 
   async function postVersion(body, quiet){

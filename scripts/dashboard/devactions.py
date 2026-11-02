@@ -1,5 +1,5 @@
 """The layer that runs and reports an instance: up, down, rebuild, test,
-remove, the row, and the verb dispatcher `bb devapp` and the Containers page's
+remove, the row, and the verb dispatcher `aerie devapp` and the Containers page's
 buttons reach through act().
 
 An action is a JOB on the queue with a plan for the node the instance is
@@ -125,6 +125,15 @@ def sync_work_tree(project, instance):
     # files and no .git, where a node shares this disk) is made again as one:
     # git cannot move what is not its own (B121).
     if at.exists() and not (at / ".git").exists():
+        # Only a build tree this made (its .bbignore says so): a project of
+        # its own that happens to carry the name (web-main-build, with no
+        # git) was removed whole (B533).
+        try:
+            ours = (at / ".bbignore").read_text().strip() == "a build tree, not a project"
+        except OSError:
+            ours = False
+        if not ours:
+            return f"{at.name} is a folder of its own here, not {instance}'s build tree: rename the instance or that folder"
         shutil.rmtree(at, ignore_errors=True)
         devapp._run(["git", "-C", str(repo), "worktree", "prune"], timeout=60)
     if not at.exists():
@@ -292,7 +301,12 @@ def _plan(project, instance, action, extra=None):
         checkout = {"name": "checking out", "timeout": 600, "env": {}, "argv": [
             # A worktree there already is the controller's own, on a disk this
             # node shares, put on the ref before the plan was sent: left alone.
-            "sh", "-c", '[ -e "$2/.git" ] && exit 0; set -e; rm -rf "$2.new"; mkdir -p "$2.new"; '
+            # ...and a folder there that is not a build tree (no .bbignore of
+            # one) is somebody's, and left whole (B533).
+            "sh", "-c", '[ -e "$2/.git" ] && exit 0; set -e; '
+            'if [ -e "$2" ] && [ "$(cat "$2/.bbignore" 2>/dev/null)" != "a build tree, not a project" ]; then '
+            'echo "$2 is a folder of its own, not this instance\'s build tree" >&2; exit 1; fi; '
+            'rm -rf "$2.new"; mkdir -p "$2.new"; '
             'git -C "$1" archive --format=tar "$3" | tar -x -C "$2.new"; '
             'rm -rf "$2"; mv "$2.new" "$2"; echo "a build tree, not a project" > "$2/.bbignore"',
             "sh", str(devapp.WORKSPACE / project), str(at), ref]}
@@ -308,7 +322,7 @@ def _plan(project, instance, action, extra=None):
     if action == "test" and extra:
         # In the project's own directory inside the container when the
         # compose file mounts it there; the image's working directory
-        # otherwise. The first run of BuilderBot's suite inside its own
+        # otherwise. The first run of AerieOS's suite inside its own
         # instance ran at / and found no scripts/ (15 Sep).
         wd = ["-w", extra["workdir"]] if extra.get("workdir") else []
         # BB_IN_INSTANCE says this run IS the container's, which is the one
@@ -567,7 +581,13 @@ def last_line(text):
     lines = [ln.strip() for ln in str(text or "").splitlines()]
     said = [ln for ln in lines if ln and not ln.startswith(skip)
             and not re.search(r"\b(Creating|Created|Starting|Started|Stopping|Stopped|Removing|Removed|Building|Built|Pulling|Pulled)\s*$", ln)]
-    return (said or [ln for ln in lines if ln] or [""])[-1][:200]
+    line = (said or [ln for ln in lines if ln] or [""])[-1]
+    # Docker's port refusal ends with what matters (B424): said whole.
+    m = re.search(r"(?:Bind for |listen tcp4? )?([0-9.:\[\]a-f]*?:)?(\d+)(?: failed)?: (?:port is already allocated|bind: address already in use)", line)
+    if m:
+        return f"port {m.group(2)} is already taken on the node (another container or program holds it): pick another port"
+    # A long line keeps its end, where the reason is, not its start.
+    return line if len(line) <= 200 else "…" + line[-199:]
 
 
 def compose_done(job, state):
@@ -1245,7 +1265,7 @@ _ARG = re.compile(r"[A-Za-z0-9._/:=@%+,-]{1,200}")
 def test(project, instance=devapp.MAIN, cmd="", args=()):
     """Run the project's recorded test command inside its dev instance
     (roadmap R48, step 1): the container is the boundary, so a suite that
-    tests BuilderBot cannot disturb the BuilderBot it is running on.
+    tests AerieOS cannot disturb the AerieOS it is running on.
 
     The command is the settings dialog's, handed in by the server, never an
     argument the caller names; the arguments a runner takes (file names) go
@@ -1257,7 +1277,7 @@ def test(project, instance=devapp.MAIN, cmd="", args=()):
         return {"error": "no compose file here, so there is no container to test in"}
     cmd = str(cmd or "").strip()
     if not cmd:
-        return {"error": f"no test command is set for {project}: bb settings set test "
+        return {"error": f"no test command is set for {project}: aerie settings set test "
                          "'...' fills it in, or the operator does on the project's "
                          "notebook Settings (Build and test)"}
     bad = [a for a in args if not _ARG.fullmatch(str(a))]
@@ -1523,7 +1543,7 @@ def make_instance(project, instance, node="", owner=None, ref="", ship=False, co
 
 
 def act(project, instance, action, req, *, test_cmd="", gate=True):
-    """One dev-instance verb, as the dashboard and `bb devapp` name them,
+    """One dev-instance verb, as the dashboard and `aerie devapp` name them,
     once server.py has decided who may ask (docker-write, the per-project
     dial, a session's own node) and which instance is meant.
 
@@ -1575,13 +1595,13 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
                 return r | {"error": w["error"]}, 400
         return r, (400 if r.get("error") else 200)
     if instance not in devapp.instances(project):
-        # ...by the name bb devapp ls shows it under, its compose project's
+        # ...by the name aerie devapp ls shows it under, its compose project's
         # (the main instance of a repository is its folder's name), as well
         # as its own (B396).
         instance = next((i for i in devapp.instances(project) if devapp._pname(project, i) == instance), instance)
     if instance not in devapp.instances(project):
         # Named, so a verb that assumed the default meets the one that
-        # exists (bb devapp rebuild with one instance called builderbot-dev).
+        # exists (aerie devapp rebuild with one instance called builderbot-dev).
         have = devapp.instances(project)
         return {"error": f"no instance {instance} of {project}"
                 + (f"; --instance names one of {', '.join(have)}" if have else "")}, 400
@@ -1627,11 +1647,11 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
     # shown, not a bare yes. A compose file that gains a mount between
     # the row rendering and the button being pressed does not inherit the
     # acknowledgement of the one before it.
-    # BuilderBot's own (System, R180) is managed: its name, compose file and
+    # AerieOS's own (System, R180) is managed: its name, compose file and
     # env are written by the surface that deployed it, never edited here
     # (the operator, 11 Oct).
     if action in ("env-set", "compose-set", "rename") and devapp.owner_of(project, instance) == devapp.SYSTEM:
-        return {"error": f"{devapp._pname(project, instance)} is BuilderBot's own and managed: change it where it was deployed from"}, 400
+        return {"error": f"{devapp._pname(project, instance)} is AerieOS's own and managed: change it where it was deployed from"}, 400
     if action == "up":
         r = up(project, instance, f(req, "ack"), f(req, "beside"))
     elif action == "down":
@@ -1701,7 +1721,7 @@ def probe(project, instance, req, principal):
     connect and an HTTP GET of `path` on each of its published ports, or on
     the one `port` names, run there by the node's agent. Read-only, so a
     session reads it as it reads the state, with no root ask: Turing Lens's
-    `bb root run` for exactly this expired unseen after 15 minutes (14 Oct).
+    `aerie root run` for exactly this expired unseen after 15 minutes (14 Oct).
     Only the instance's own ports: the node's others are not this caller's
     to scan. (payload, status)."""
     if devapp.queue is None:
@@ -1717,7 +1737,7 @@ def probe(project, instance, req, principal):
         mine = host_ports(running_ports(project, instance))
     if not mine:
         return {"error": f"{devapp.pname(project, instance)} publishes no TCP port on its node "
-                         "(is it up? bb devapp says)"}, 400
+                         "(is it up? aerie devapp says)"}, 400
     want = devapp.field(req, "port")
     if want not in (None, ""):
         try:
@@ -1736,7 +1756,7 @@ def probe(project, instance, req, principal):
 
 
 def request(project, instance, action, req, *, me, principal, dial="", test_cmd=""):
-    """One dev-instance verb as the Containers page and `bb devapp` send it, once
+    """One dev-instance verb as the Containers page and `aerie devapp` send it, once
     server.py has decided this caller may: a session whose project's Run
     its container dial is at `ask` puts a change in front of a person
     instead (a rebuild, the env, making or removing the container); any
@@ -1751,7 +1771,7 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     # request carries to Allow.
     if sess and dial == "ask" and action == "override":
         return {"error": "under ask, a container's override is set by a person in its settings on the Containers page; "
-                         "bb devapp new --override names one for a new container, which Allow makes"}, 400
+                         "aerie devapp new --override names one for a new container, which Allow makes"}, 400
     if sess and dial == "ask" and action in ("rebuild", "env-set", "new", "remove"):
         # Aborting is not asked about: it stops a build this session
         # was already allowed to start, and a running build nobody

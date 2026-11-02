@@ -44,7 +44,7 @@ def open_pdf(path):
 
 def pdftoppm(args):
     if args[:1] in (["-v"], ["-version"], ["--version"]):
-        err(f"pdftoppm version {VERSION} (PyMuPDF, installed by BuilderBot's documents toolchain)", 0)
+        err(f"pdftoppm version {VERSION} (PyMuPDF, installed by AerieOS's documents toolchain)", 0)
     fmt, dpi, first, last, rest = "ppm", 150, None, None, []
     it = iter(args)
     for a in it:
@@ -62,7 +62,7 @@ def pdftoppm(args):
                 last = int(v)
         elif a.startswith("-") and len(a) > 1:
             err(f"Command Line Error: {a} is not an option this pdftoppm has "
-                "(BuilderBot's, for -jpeg, -png, -r, -f and -l)", 99)
+                "(AerieOS's, for -jpeg, -png, -r, -f and -l)", 99)
         else:
             rest.append(a)
     if len(rest) != 2:
@@ -83,7 +83,7 @@ def pdftoppm(args):
 
 def pdfinfo(args):
     if args[:1] in (["-v"], ["--version"]):
-        err(f"pdfinfo version {VERSION} (PyMuPDF, installed by BuilderBot's documents toolchain)", 0)
+        err(f"pdfinfo version {VERSION} (PyMuPDF, installed by AerieOS's documents toolchain)", 0)
     files = [a for a in args if not a.startswith("-")]
     if len(files) != 1:
         err("Usage: pdfinfo PDF-file", 99)

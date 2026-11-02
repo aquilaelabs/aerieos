@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import toolchains  # noqa: E402
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
-agent = agentpkg.load("builderbot_agent_interrupted")
+agent = agentpkg.load("aerieos_agent_interrupted")
 agent.log = lambda *a, **k: None
 
 
@@ -37,7 +37,7 @@ class Marker(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.root, ".bb-installing.flutter")))
 
     def test_the_agent_does_not_list_a_marked_directory(self):
-        st = agent.stores if hasattr(agent, "stores") else __import__("builderbot_agent_interrupted.stores", fromlist=["x"])
+        st = agent.stores if hasattr(agent, "stores") else __import__("aerieos_agent_interrupted.stores", fromlist=["x"])
         self.addCleanup(st._SCOPE.update, name="")
         st.use_scope(self.root, "n_1234abcd")
         node = os.path.join(self.root, "n_1234abcd")
@@ -49,7 +49,7 @@ class Marker(unittest.TestCase):
 
 class Tried(unittest.TestCase):
     def test_only_what_the_log_began(self):
-        log = "toolchain\n== bb toolchains install node\nok\n== bb toolchains install flutter\n[builderbot] WARN: aborted\n"
+        log = "toolchain\n== aerie toolchains install node\nok\n== aerie toolchains install flutter\n[builderbot] WARN: aborted\n"
 
         class Nodes:
             @staticmethod

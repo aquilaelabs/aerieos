@@ -1,8 +1,8 @@
-"""Scheduled scripts (R117): an administrator's own cron in BuilderBot. Each
+"""Scheduled scripts (R117): an administrator's own cron in AerieOS. Each
 schedule is a script, a timetable in cron's
 five fields (said in words: "Sundays at 4:00"), the node it runs on, and
 whether it runs there as the node's jobs account or as root (a sandbox node
-alone, as `bb root run` is). Every run is a job, its log on the Jobs page.
+alone, as `aerie root run` is). Every run is a job, its log on the Jobs page.
 
 Kept out of every session's reach: the scripts are in the controller's own
 state (<state>/schedules.json, never the share), the API refuses a session's

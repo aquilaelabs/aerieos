@@ -1,4 +1,4 @@
-"""BuilderBot's own terminal, the controller's half (R133): the page's
+"""AerieOS's own terminal, the controller's half (R133): the page's
 websocket at /termws, answered here.
 
 server.py decides everything first: whose terminal it is, whether this
@@ -43,7 +43,7 @@ def term():
     """The node agent's term.py, loaded once by path: stdlib alone."""
     if "mod" not in _term:
         spec = importlib.util.spec_from_file_location(
-            "bb_agent_term", os.path.join(str(AGENT_DIR), "builderbot_agent", "term.py"))
+            "bb_agent_term", os.path.join(str(AGENT_DIR), "aerieos_agent", "term.py"))
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         _term["mod"] = mod

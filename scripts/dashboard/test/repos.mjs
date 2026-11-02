@@ -128,6 +128,22 @@ const browser = await launch();
     all: [...$('reportRepo').options].map(o => o.value) }));
   ok(rep.shown && rep.picked === 'gamma' && rep.all.length === 3, `Report bug picks a repository, the first by default (${JSON.stringify(rep)})`);
   await page.evaluate(() => { $('reportModal').hidden = true; });
+  // A poll that changes the page leaves a rename box alone, with what was typed
+  // in it (the operator, 2 Nov: each rename on a card's back was thrown out).
+  await page.click(`${card} .pcback [data-prn]`);
+  await page.waitForSelector(`${card} .askline input`, { timeout: 3000 });
+  await page.fill(`${card} .askline input`, 'half typed');
+  await page.evaluate(() => {
+    const was = state.projects[0].branch;
+    state.projects[0].branch = 'a-branch-the-poll-found';
+    drawProjects(state.projects);
+    state.projects[0].branch = was;
+  });
+  await page.waitForTimeout(300);
+  const stayed = await page.$eval(`${card} .askline input`, i => i.value).catch(() => null);
+  ok(stayed === 'half typed', `a redraw leaves a rename box open with what was typed in it (${stayed})`);
+  await page.press(`${card} .askline input`, 'Escape');
+  await page.waitForFunction(c => !document.querySelector(`${c} .askline`), card, { timeout: 3000 });
   // Renamed, the card takes its new name and its new place at once, from
   // the answer and not the next read (held back here), sliding there with
   // the page scrolled to keep it in sight on a phone (the operator, 26 Oct).

@@ -51,7 +51,7 @@ CAPS = {
 # Granted by name only (the operator, 6 Oct): `*` does not reach these, so
 # the built-in admin and a role that grants everything leave them out, and
 # only the owner has them until a role names them. ftp too (R151): who may
-# reach a project's files from outside BuilderBot is the owner's to hand on.
+# reach a project's files from outside AerieOS is the owner's to hand on.
 NAMED_ONLY = frozenset({"debug", "ftp"})
 # The capabilities whose scope is over NODES (step 3): every node, the
 # nodes of the account's projects, or named ones.
@@ -72,7 +72,7 @@ AREAS = (
     ("settings", "Project settings", "project", "the settings", "change them, lock, rename and delete"),
     ("releases", "Releases and versions", "project", "versions and releases", "move the version and release"),
     ("gitauth", "Git authentication", "project", "how it authenticates", "change the credential"),
-    ("files", "File access", "project", "read the files over FTP or in an editor", "save, upload, rename and delete them"),
+    ("files", "File access", "project", "the files over FTP or in an editor", "save, upload, rename and delete them"),
     ("containers", "Containers", "project", "its containers and their logs", "start, stop and rebuild them"),
     # A project's VMs (R91): Read sees them on the VMs page, Write makes,
     # starts, stops, snapshots and removes them.
@@ -145,9 +145,9 @@ CAP_AREA = {
 
 _ALL = {a: "write" for a in AREA_KEYS}
 BUILTIN = {
-    # Named for a person (R255 step 1): BuilderBot's owner is not a
+    # Named for a person (R255 step 1): AerieOS's owner is not a
     # project's, and neither is the Owner of X role a project's owner holds.
-    "owner": {"scope": "global", "perms": dict(_ALL), "builtin": True, "only": {}, "label": "BuilderBot's owner",
+    "owner": {"scope": "global", "perms": dict(_ALL), "builtin": True, "only": {}, "label": "AerieOS's owner",
               "note": "the account every other rule is a guard rail around"},
     "admin": {"scope": "global", "perms": dict(_ALL), "builtin": True, "only": {}, "label": "Administrator",
               "note": "everything the owner may do, except change the owner's account or roles"},

@@ -15,7 +15,7 @@ import devapp  # noqa: E402
 import toolchains  # noqa: E402
 import agentpkg  # noqa: E402
 
-agent = agentpkg.load("builderbot_agent")
+agent = agentpkg.load("aerieos_agent")
 
 CARD = "NVIDIA Corporation GA104 [GeForce RTX 3070 Ti] [10de:2482] (rev a1)"
 LOADED = {"installed": "610.57.04", "loaded": "610.57.04", "bound": "nvidia"}
@@ -176,7 +176,7 @@ class Error(unittest.TestCase):
         self.assertNotIn("signing key", self.why(toolchains.DRIVER))
 
     def test_the_agents_refusal_goes_to_the_row_it_names(self):
-        log = "refused: nvidia-container-toolkit is this machine's own, and this node was not provisioned as a BuilderBot sandbox\n"
+        log = "refused: nvidia-container-toolkit is this machine's own, and this node was not provisioned as an AerieOS sandbox\n"
         self.assertIn("not provisioned", self.why(toolchains.TOOLKIT, log))
         self.assertNotIn("not provisioned", self.why(toolchains.DRIVER, log))
 

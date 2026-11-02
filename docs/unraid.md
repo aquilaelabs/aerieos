@@ -1,4 +1,4 @@
-# Running BuilderBot on Unraid
+# Running AerieOS on Unraid
 
 Two ways to run it:
 
@@ -16,7 +16,7 @@ Either way, start with the two shared steps below.
 
 ## Shared step 1: credentials
 
-BuilderBot deliberately uses **separate credentials for separate jobs**, so a
+AerieOS deliberately uses **separate credentials for separate jobs**, so a
 leak of one doesn't hand over the others. Work out which you actually need
 before creating anything.
 
@@ -32,7 +32,7 @@ those rows. Nothing else.
 | Run a self-hosted runner for **one repo** | ● | | |
 | Run a self-hosted runner for the **whole org** | ● | | |
 
-Pulling the image needs none of them: `ghcr.io/aquilaelabs/builderbot` is
+Pulling the image needs none of them: `ghcr.io/aquilaelabs/aerieos` is
 public.
 
 ### What each one is, exactly
@@ -76,7 +76,7 @@ never in this container: it has no Docker socket (see the notes at the end).
 
 ## Shared step 2: the appdata directories
 
-The image is `ghcr.io/aquilaelabs/builderbot`, public, published on every
+The image is `ghcr.io/aquilaelabs/aerieos`, public, published on every
 push to `main` and every release (plus a weekly freshness rebuild); pulling
 it needs no login.
 
@@ -86,7 +86,7 @@ In the Unraid terminal:
 mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
 chown -R 99:100 /mnt/user/appdata/BuilderBot
 
-# The controller's toolchain store: the browsers `bb capture shot` uses. A node
+# The controller's toolchain store: the browsers `aerie capture shot` uses. A node
 # keeps its own toolchains, in a directory of its own on the store its Nodes
 # page names. On a normal share rather than appdata; it is bulk data, it is not
 # written constantly, and keeping it out of the image is the point.
@@ -104,11 +104,11 @@ Get the template onto the flash drive, from the Unraid terminal:
 
 ```bash
 curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-builderbot.xml \
-  https://raw.githubusercontent.com/aquilaelabs/builderbot/main/platforms/unraid/builderbot.xml
+  https://raw.githubusercontent.com/aquilaelabs/aerieos/main/platforms/unraid/aerie-workshop.xml
 ```
 
 **Or copy it over.** The flash drive is an SMB share: open
-`platforms/unraid/builderbot.xml` on GitHub → **Raw** → save, then drop it into
+`platforms/unraid/aerie-workshop.xml` on GitHub → **Raw** → save, then drop it into
 `\\<TOWER>\flash\config\plugins\dockerMan\templates-user\` as
 `my-builderbot.xml`.
 
@@ -118,7 +118,7 @@ Then in the WebUI: **Docker** tab → **Add Container** → in the *Template*
 dropdown pick **builderbot**. You get a form with everything already wired:
 
 * the projects folder (`/mnt/user/projects`) mapped to `/workspace`: one
-  mapping for all of them, so every project BuilderBot makes lands in that
+  mapping for all of them, so every project AerieOS makes lands in that
   share and adding one never means editing the container again
 * the appdata paths for home and config
 * TZ under the advanced view, which only sets the container's own clock: each
@@ -135,7 +135,7 @@ nothing to a running container until you edit that setting on it yourself.
 
 ### Stopping the container
 
-Stopping from the Docker page sends SIGTERM and then SIGKILL. BuilderBot uses
+Stopping from the Docker page sends SIGTERM and then SIGKILL. AerieOS uses
 that window to save the open terminals, so the next boot can put them
 back, and that takes milliseconds: Unraid's default ten seconds (Settings →
 Docker → Docker Stop Timeout) is plenty, and nothing in Extra Params changes
@@ -159,13 +159,15 @@ container.
 
 ### Updating: the whole point
 
-CI publishes a fresh `:latest` for any push to `main` that changes what the
-image is built from, and on a weekly schedule. On the **Docker** tab, Unraid's
+`:latest` moves to each stable release when it is published; `:main` follows
+each push to `main` that changes what the image is built from, and a weekly
+rebuild. On the **Docker** tab, Unraid's
 *Check for Updates* compares your running image's digest against GHCR and flips
 the container to **update ready**: click it and you're on the new build.
 That's the entire update procedure. Ansible not required. Most updates pull
-only the layers that changed; the Monday build is rebuilt from scratch on
-purpose (that is the one that refreshes packages) and pulls everything.
+only the layers that changed. The Monday rebuild of `:main` is from scratch on
+purpose (it is the one that refreshes packages); `:latest` takes them with the
+next release.
 
 Template edits (new paths, changed variables) are done from the container's
 own settings page (click the icon → *Edit*), and survive image updates.
@@ -187,7 +189,7 @@ container icon and only downloads when **both** are missing
 
 So keep the disk copy warm and the download never happens. Container settings →
 **Unraid icon cache** → `/var/lib/docker/unraid/images`, apply, and the
-container writes `BuilderBot-icon.png` there on every start, including right
+container writes `Aerie-Workshop-icon.png` there on every start, including right
 after an image update, which is when Unraid clears the cache and re-downloads.
 
 Two things that will silently defeat it:
@@ -198,23 +200,23 @@ Two things that will silently defeat it:
   not need to resolve.
 - **The filename comes from the container name**, and nothing inside a
   container can see its own container name. If you renamed this container from
-  `BuilderBot`, the icon is not found: the cache is keyed by that name.
+  `AerieOS`, the icon is not found: the cache is keyed by that name.
 
 The one-time equivalent, if you would rather not add a mapping: just redo it
 if you ever recreate `docker.img`:
 
 ```bash
-docker cp BuilderBot:/opt/builderbot/icon.png \
-  /var/lib/docker/unraid/images/BuilderBot-icon.png
+docker cp Aerie-Workshop:/opt/aerieos/icon.png \
+  /var/lib/docker/unraid/images/Aerie-Workshop-icon.png
 ```
 
 ### Android emulator (on a node)
 
-The controller runs no emulator, carries no SDK and claims no GPU: `bb emu`
+The controller runs no emulator, carries no SDK and claims no GPU: `aerie emu`
 on a project runs on that project's node, whose toolchain store holds the
 emulator (the Library) and its images (Emulator page) and whose own
 `/dev/kvm` and card do the work. A node is a machine you enroll from the
-Nodes page (**Enroll node**, or **Create sandbox VM**) on a VM or a spare
+Nodes page (**Enroll node**, or **New VM**) on a VM or a spare
 Linux box.
 Nothing here needs a device or a runtime flag for it.
 
@@ -234,10 +236,10 @@ notebook context.
    password in the template; it would sit there readable forever, and it is
    the one credential that opens a shell on this box. Do it straight away:
    until somebody claims the container, whoever can reach the port can. After
-   that, `bb users passwd <name>` changes a password and the Users page adds
+   that, `aerie users passwd <name>` changes a password and the Users page adds
    everyone else
 4. **Finish the setup page.** Its first step is the first node (**Enroll
-   node** or **Create sandbox VM**, in its card); then your name and email,
+   node** or **New VM**, in its card); then your name and email,
    Claude Code on the node and a first project, which can wait for Home's
    Getting started card. The rest of the dashboard opens once a node that
    runs sessions (not a hosting-only one) is enrolled and answering: nothing
@@ -256,7 +258,7 @@ People (Users, Roles), Settings (Profile) and Help. A page your account's grants
 rail is a bar of five across the foot in the same order (Home, Projects,
 Build, Containers, More), and
 every page is the one page area, with the terminals and the chat in the dock
-at its foot. `bb doctor`'s verdict is the colored dot after the bell in the
+at its foot. `aerie doctor`'s verdict is the colored dot after the bell in the
 top bar; pressing it lists the checks and offers a ↻ that runs it now.
 
 The Projects page is a card for each project in the projects share, and it
@@ -326,14 +328,14 @@ else:
 
 1. Container settings → **Scanner reports (read-only)** → your scanner's output
    directory, e.g. `/mnt/user/appdata/scanners/reports`
-2. Apply, then from a project directory: `bb findings`
+2. Apply, then from a project directory: `aerie findings`
 
 The read-only mount is the whole design. The scanner binaries stay on the host,
 so a session can read what was found but cannot run a scan, change the rules,
 or rewrite the report: the container consumes the output and has no path back
 to the tool that produced it.
 
-`bb findings` reduces SARIF to grouped markdown with repo-relative paths.
+`aerie findings` reduces SARIF to grouped markdown with repo-relative paths.
 Handing a session the raw file instead would spend most of a context window on
 metadata before it reached any code.
 
@@ -344,7 +346,7 @@ metadata before it reached any code.
    STACK=/boot/config/plugins/compose.manager/projects/builderbot
    mkdir -p "$STACK"
    cd /mnt/user/appdata
-   git clone https://github.com/aquilaelabs/builderbot.git
+   git clone https://github.com/aquilaelabs/aerieos.git
    cp builderbot/docker-compose.yml "$STACK"/
    cp builderbot/.env.example "$STACK"/.env
    nano "$STACK"/.env && chmod 600 "$STACK"/.env
@@ -429,7 +431,7 @@ field would actually punch a hole in the model (it would have to live
 somewhere a session could read). Administration happens from the Unraid side,
 where you're already root: edit the secrets folder on the host and restart
 the container, or hop in as root with
-`docker exec -it -u 0 BuilderBot bash`: a door only someone with host
+`docker exec -it -u 0 AerieOS bash`: a door only someone with host
 access can use. Inside the container, the `builder` user (what sessions run as) has no
 password to find and no sudo to escalate with.
 
@@ -452,7 +454,7 @@ What happens then:
   isn't there to do it). Git works through the shielded agent keys; run
   `gh auth login` manually if you also want the API CLI.
 
-`bb doctor` shows which mode you're in: `github ssh auth works (shielded
+`aerie doctor` shows which mode you're in: `github ssh auth works (shielded
 agent key)` vs `(key file in ~/.ssh)`, and one line per stored runner token
 saying whether its host still accepts it.
 
@@ -486,7 +488,7 @@ than a gate.
 
 ## First-run checks
 
-The first boot, what `bb doctor` checks and how each person signs in to their agent: [install.md, step 6](install.md#6-first-boot).
+The first boot, what `aerie doctor` checks and how each person signs in to their agent: [install.md, step 6](install.md#6-first-boot).
 
 ## Daily use
 
@@ -498,7 +500,7 @@ Chromium, Firefox and WebKit are pre-installed with all system deps, shared
 at `/opt/pw-browsers`:
 
 ```bash
-docker exec -it -w /workspace/FreshBoot BuilderBot bb shell
+docker exec -it -w /workspace/FreshBoot AerieOS aerie shell
 npx playwright test                 # a project pinning another version can
 npx playwright install chromium     # add its own browsers to the shared dir
 ```
@@ -513,13 +515,13 @@ the node's toolchain store, installed from the dashboard's Library
 with that node picked. From a session:
 
 ```bash
-bb build            # the project's build command, on its node
-bb emu start        # the emulator there; adb reaches it from a session on the node
-bb emu stop
+aerie build            # the project's build command, on its node
+aerie emu start        # the emulator there; adb reaches it from a session on the node
+aerie emu stop
 ```
 
 AVDs live in the node's home; the images and platforms in its store, so an
-update never re-downloads them. Need another level? `bb emu create 34` on the
+update never re-downloads them. Need another level? `aerie emu create 34` on the
 node, or add the image on the Emulator page.
 
 ### Publishing packages
@@ -545,13 +547,13 @@ not host-root.
 
 | Log | Where | Survives image updates? |
 |---|---|---|
-| Startup + supervisor | `/mnt/user/appdata/BuilderBot/config/logs/builderbot.log` (also `docker logs BuilderBot` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
+| Startup + supervisor | `/mnt/user/appdata/BuilderBot/config/logs/builderbot.log` (also `docker logs Aerie-Workshop` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
 | ...or your own location | Map the optional **Logs directory** path (template, advanced view) / the `/logs` volume (compose) to any share, e.g. on the array, and the log moves there automatically | ✅ |
 | CI job output | GitHub → repo → *Actions* → the run | ✅ (kept by GitHub) |
-| A node's own logs (its agent and its terminals, CI runner, its nginx, the system journal, the kernel ring, the previous boot) | on the node: `bb logs --node NAME` from a session granted it, or the machine's journal | ✅ |
+| A node's own logs (its agent and its terminals, CI runner, its nginx, the system journal, the kernel ring, the previous boot) | on the node: `aerie logs --node NAME` from a session granted it, or the machine's journal | ✅ |
 
-Inside the container, `bb logs` tails the persistent startup log (`bb logs -f`
-to follow, `bb logs 500` for more lines), and `bb doctor` is the first thing to
+Inside the container, `aerie logs` tails the persistent startup log (`aerie logs -f`
+to follow, `aerie logs 500` for more lines), and `aerie doctor` is the first thing to
 run when something misbehaves.
 
 The log **rotates on every container start**, so one file is one container
@@ -560,9 +562,9 @@ since the boot before it is still intact rather than blended into the same
 stream:
 
 ```bash
-bb logs --list     # kept boots, newest first
-bb logs -p         # the previous boot
-bb logs -p 3       # three boots back
+aerie logs --list     # kept boots, newest first
+aerie logs -p         # the previous boot
+aerie logs -p 3       # three boots back
 ```
 
 How long logs are kept is one policy for everything, **Days of logs kept**

@@ -9,7 +9,7 @@ import unittest
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent")
+agent = agentpkg.load("aerieos_agent")
 
 
 class FakeJob:

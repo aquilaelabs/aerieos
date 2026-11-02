@@ -15,7 +15,7 @@ function nbAnalysisView({$, nb, project}){
     if (!findings || findings.loading){ glanceWaiting(hint); list.innerHTML = skel("rows"); return; }
     if (findings.error){ viewGlance(hint, [], esc("analysis: " + findings.error), "", "bad"); return; }
     if (!findings.available){
-      viewGlance(hint, [], "no scan results: the report folder is not mounted here");
+      viewGlance(hint, [], "no scan results: the report folder is not mounted here", "", "warn");
       // What the view is for, and the way to it (docs/scanners.md).
       list.innerHTML = `<div class="field"><div class="hint nbempty">Findings from the static analysis stack land here once it runs:
         <a href="#/help/scanners">setting it up</a> says how, with the script that runs it.</div></div>`;
@@ -168,7 +168,7 @@ function nbAnalysisView({$, nb, project}){
           (d.parts || []).map(x => `${esc(x.name)} ${preSize(x.bytes)}${
             x.share ? ` of ${preSize(x.share)}` : ""}`).join(" · ")
         }</div>${(d.topics || []).length ? `<div class="sub dim" id="preTopics">pointed at, not sent: ${
-          d.topics.map(t => esc(t.slug)).join(", ")} (${preSize(d.topics.reduce((n, t) => n + t.bytes, 0))}), each read with bb help TOPIC</div>` : ""}${short.map(x => `<div class="sub warn">The ${esc(x.name)} part is over its share, so a `
+          d.topics.map(t => esc(t.slug)).join(", ")} (${preSize(d.topics.reduce((n, t) => n + t.bytes, 0))}), each read with aerie help TOPIC</div>` : ""}${short.map(x => `<div class="sub warn">The ${esc(x.name)} part is over its share, so a `
           + `session's prompt leaves out ${esc(x.left)}. Nothing is lost: the notebook keeps all of it, `
           + `and a session reads the rest when it needs it.</div>`).join("")}
       </div>`;
@@ -195,7 +195,7 @@ function nbAnalysisView({$, nb, project}){
     if (!d || (!d.pending && !k)) return "";
     const by = k?.by ? ` by ${k.by}` : "";
     const line = d.pending
-      ? "Waiting for the first Claude session: pressing Claude on this project opens it to change before it is sent."
+      ? "Waiting for the first session: Start agent on this project opens it to change before it is sent."
       : k.sent ? `Sent as the first session's first prompt ${ago(k.at)}${by}. No session after that one reads it.`
       : `Set aside ${ago(k.at)}${by}, when the first session started without it.`;
     const body = `<div class="field"><div class="hint">${esc(line)}</div>

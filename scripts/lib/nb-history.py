@@ -1,4 +1,4 @@
-"""Behind `bb history` (cmd_history in bb): one search over all of the
+"""Behind `aerie history` (cmd_history in bb): one search over all of the
 notebook's logs (the roadmap, the bugs, what the dashboard did to the
 memories, the findings and the approval queue), tagged by source and
 merged by time.
@@ -49,7 +49,7 @@ while i < len(argv):
     elif a in ("--find", "-f") and i + 1 < len(argv):
         find = argv[i + 1]; i += 2
     else:
-        print("usage: bb history [-n N|--all] [--since 7d|YYYY-MM-DD] "
+        print("usage: aerie history [-n N|--all] [--since 7d|YYYY-MM-DD] "
               "[--find TEXT]", file=sys.stderr)
         sys.exit(1)
 

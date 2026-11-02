@@ -1,4 +1,4 @@
-"""Behind `bb container` (cmd_container in bb): a container asked for with its
+"""Behind `aerie container` (cmd_container in bb): a container asked for with its
 compose file and a reason (roadmap R71), which an administrator reads on the
 bell and allows or denies; Allow hands the file to the Containers page's own New
 container path and starts the build.

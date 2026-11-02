@@ -1,5 +1,5 @@
 """A prepared configuration's first boot (R161 step 8): the stick's root
-step takes builderbot/firstboot.json off the ESP, sets the hostname and the
+step takes aerieos/firstboot.json off the ESP, sets the hostname and the
 time zone, hands the rest over under /run and blanks the file in place; the
 controller then makes the owner from a password hash and the people by name
 with their SMB hashes, skips the setup page when asked, keeps the shares,
@@ -16,7 +16,7 @@ from pathlib import Path
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-TAKE = os.path.join(ROOT, "image", "mkosi.extra", "usr", "lib", "builderbot-os", "firstboot-take")
+TAKE = os.path.join(ROOT, "image", "mkosi.extra", "usr", "lib", "aerieos-os", "firstboot-take")
 import firstboot  # noqa: E402
 import settings  # noqa: E402
 import users  # noqa: E402
@@ -35,9 +35,9 @@ def wj(p, d):
 class Take(unittest.TestCase):
     def test_the_root_step_takes_it_off_the_stick_and_blanks_it_in_place(self):
         with tempfile.TemporaryDirectory() as d:
-            esp = Path(d, "esp", "builderbot"); esp.mkdir(parents=True)
+            esp = Path(d, "esp", "aerieos"); esp.mkdir(parents=True)
             f = esp / "firstboot.json"
-            body = b"BB-FIRSTBOOT-1\n" + json.dumps(CFG).encode() + b"\n"
+            body = b"AERIE-FIRSTBOOT-1\n" + json.dumps(CFG).encode() + b"\n"
             f.write_bytes(body + b" " * (65535 - len(body)) + b"\n")
             run = Path(d, "run")
             r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
@@ -46,7 +46,7 @@ class Take(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             got = f.read_bytes()
             self.assertEqual(len(got), 65536, "its size kept, for the next write to find")
-            self.assertTrue(got.startswith(b"BB-FIRSTBOOT-1\n") and not got[15:].strip(), "blanked: no hash left on the stick")
+            self.assertTrue(got.startswith(b"AERIE-FIRSTBOOT-1\n") and not got[18:].strip(), "blanked: no hash left on the stick")
             handed = json.loads((run / "firstboot" / "firstboot.json").read_text())
             self.assertEqual(handed["config"]["owner"]["name"], "boss")
             self.assertIn("hostname", handed["machine"], "the machine's part is tried, and what it said kept")
@@ -59,21 +59,21 @@ class Take(unittest.TestCase):
 
     def test_a_static_address_becomes_the_sticks_own_network_settings(self):
         # R161 step 12: the configuration's network written into the stick's
-        # builderbot.env in its 4 KiB, for every boot's network step, and into
+        # aerieos.env in its 4 KiB, for every boot's network step, and into
         # this boot's /run file; a stick that names an address keeps its own.
         def boot(net, env_lines=""):
             with tempfile.TemporaryDirectory() as d:
-                esp = Path(d, "esp"); (esp / "builderbot").mkdir(parents=True)
-                head = "# builderbot.env BB-STICK-ENV-1: x\n" + env_lines
-                (esp / "builderbot.env").write_bytes(head.encode() + b" " * (4095 - len(head)) + b"\n")
+                esp = Path(d, "esp"); (esp / "aerieos").mkdir(parents=True)
+                head = "# aerieos.env AERIE-STICK-ENV-1: x\n" + env_lines
+                (esp / "aerieos.env").write_bytes(head.encode() + b" " * (4095 - len(head)) + b"\n")
                 cfg = dict(CFG, machine={"hostname": "", "network": net})
-                body = b"BB-FIRSTBOOT-1\n" + json.dumps(cfg).encode() + b"\n"
-                (esp / "builderbot" / "firstboot.json").write_bytes(body + b" " * (65535 - len(body)) + b"\n")
+                body = b"AERIE-FIRSTBOOT-1\n" + json.dumps(cfg).encode() + b"\n"
+                (esp / "aerieos" / "firstboot.json").write_bytes(body + b" " * (65535 - len(body)) + b"\n")
                 run = Path(d, "run")
                 r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
                                    env=dict(os.environ, BB_ESP=str(esp), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")), PATH=d))
                 self.assertEqual(r.returncode, 0, r.stderr)
-                env = (esp / "builderbot.env").read_bytes()
+                env = (esp / "aerieos.env").read_bytes()
                 self.assertEqual(len(env), 4096, "its size kept")
                 net_run = run / "net"
                 handed = json.loads((run / "firstboot" / "firstboot.json").read_text())
@@ -96,7 +96,7 @@ class Take(unittest.TestCase):
         # R169 step 6: a filled catalog-mirror.bin is copied out for the
         # controller, the stick left as it is; a blank one hands nothing.
         with tempfile.TemporaryDirectory() as d:
-            esp = Path(d, "esp", "builderbot"); esp.mkdir(parents=True)
+            esp = Path(d, "esp", "aerieos"); esp.mkdir(parents=True)
             data = b"\x1f\x8b mirror bytes"
             f = esp / "catalog-mirror.bin"
             head = b"BB-MIRROR-1\n" + f"{len(data):012d}\n".encode()

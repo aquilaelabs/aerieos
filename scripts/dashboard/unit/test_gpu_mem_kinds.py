@@ -1,4 +1,4 @@
-"""bb node busy says what holds the card's memory, by kind (B532): an
+"""aerie node busy says what holds the card's memory, by kind (B532): an
 Android 37 phone filled the card while it booted, and a session could not
 tell an emulator from a PyTorch job."""
 import os
@@ -9,7 +9,7 @@ from pathlib import Path
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent_gpu")
+agent = agentpkg.load("aerieos_agent_gpu")
 
 SMI = """
 | Processes:                                                                              |

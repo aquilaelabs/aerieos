@@ -1,4 +1,4 @@
-"""Behind `bb diag` (cmd_diag in bb): the controller's diagnostics, printed as
+"""Behind `aerie diag` (cmd_diag in bb): the controller's diagnostics, printed as
 sections or as the JSON they came as.
 
 Arguments: the sections wanted, or none for all of them. BB_DIAG_AUTH is the
@@ -58,7 +58,7 @@ for name, v in d.items():
         if not v:
             print("  none installed by anybody")
     elif name == "jobs":
-        print("  (bb jobs ID prints one's log)")
+        print("  (aerie jobs ID prints one's log)")
         print("  last 24h: " + (", ".join(f"{k} {c}" for k, c in sorted(v.get("last_24h", {}).items())) or "none"))
         for j in v.get("failed") or []:
             print(f"  {j['when']:>8}  {j.get('id', ''):<11} {j['state']:<9} {j['type']:<6} {j['project'] or '-'} on {j['node'] or '-'}"
@@ -69,7 +69,7 @@ for name, v in d.items():
         for a in v:
             print(f"  {a['when']:>8}  {a['who']:<24} {a['action']}  {a['target']}")
     elif name == "reports":
-        # What sessions said about BuilderBot, kept until a person clears
+        # What sessions said about AerieOS, kept until a person clears
         # them in Controller settings.
         if not v:
             print("  none")
@@ -82,7 +82,7 @@ for name, v in d.items():
             if r.get("conversation"):
                 c = r["conversation"]
                 print(f"      with the reporter's conversation, {round((c.get('bytes') or 0) / 1024)} KB"
-                      + (" (its last part)" if c.get("cut") else "") + ": in bb diag --json reports, and the download")
+                      + (" (its last part)" if c.get("cut") else "") + ": in aerie diag --json reports, and the download")
             if r.get("area"):
                 print(f"      area: {r['area']}")
             if r.get("repro"):

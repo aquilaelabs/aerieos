@@ -47,11 +47,11 @@ ok((p.parts || []).map(x => x.name).join(',') === 'core,rules,briefing,live'
    `a project with nothing set still gets the briefing's core and the shipped global rules (${
      (p.parts || []).map(x => x.name).join(',') || 'none'}, ${p.bytes} bytes)`);
 // The rest of the briefing is topics (R202): the block carries the index
-// and bb help TOPIC the text, so a session pays for the manual only where
+// and aerie help TOPIC the text, so a session pays for the manual only where
 // the work reaches it. A topic the tree gates out (Android, here) is not
 // in the index and still answers when asked for.
 const slugs = (p.topics || []).map(t => t.slug);
-ok(/Topics of this briefing, each read with `bb help TOPIC`/.test(p.text) && /- build: bb build, bb test and bb run/.test(p.text)
+ok(/Topics of this briefing, each read with `aerie help TOPIC`/.test(p.text) && /- build: aerie build, aerie test and aerie run/.test(p.text)
    && !/this node carries git, tmux, jq, python3 and curl by itself/.test(p.text)
    && slugs.includes('build') && slugs.includes('capture') && !slugs.includes('android')
    && p.bytes < 20000,
@@ -140,8 +140,8 @@ const hook = input => execFileSync('python3', [`${REPO}/scripts/dashboard/bb-pro
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`,
            XDG_CACHE_HOME: `${DIR}/cache-pre`, BB_ACCOUNT_UID: 'u_pre', BUILDERBOT_ROLE: '' } });
 const named = hook({ prompt: 'the picker is wrong: look at the ROADMAPMARK thing to do', session_id: 'pre-1' });
-ok(/R1 ROADMAPMARK a thing to do with the picker \(1 step open\): `bb roadmap show R1`/.test(named)
-   && /B1 \[high\] BUGMARK something is wrong with the picker: `bb bug show B1`/.test(named),
+ok(/R1 ROADMAPMARK a thing to do with the picker \(1 step open\): `aerie roadmap show R1`/.test(named)
+   && /B1 \[high\] BUGMARK something is wrong with the picker: `aerie bug show B1`/.test(named),
    `a prompt whose words an open item's or a bug's title shares is handed them, with the verb that prints each (${named.slice(0, 80)})`);
 ok(!/ROADMAPMARK/.test(hook({ prompt: 'the picker thing to do, again', session_id: 'pre-1' }))
    && /R1 ROADMAPMARK/.test(hook({ prompt: 'what about R1?', session_id: 'pre-2' }))
@@ -193,8 +193,8 @@ ok(page.errors.length === 0,
 // The suite runs server.py from the checkout, so a path that is only right in a
 // checkout passes every test here and still ships a controller whose sessions
 // get no briefing at all. That is exactly what happened: the Dockerfile copies
-// config/templates/ to /opt/builderbot/templates/ and the first version of
-// preamble.py looked in /opt/builderbot/config/templates/. This asserts the two
+// config/templates/ to /opt/aerieos/templates/ and the first version of
+// preamble.py looked in /opt/aerieos/config/templates/. This asserts the two
 // agree by reading the Dockerfile, rather than trusting either.
 {
   const root = join(import.meta.dirname, '..', '..', '..');
@@ -208,7 +208,7 @@ ok(page.errors.length === 0,
      '...and the file it ships is in the tree');
 }
 
-// ---- bb status tells a refusal from a silence (R62) --------------------------
+// ---- aerie status tells a refusal from a silence (R62) --------------------------
 // The first version reported an expired token as "the controller did not
 // answer", which is the mistake bbapi.request exists to prevent and that
 // bb-gate had already made once. A session sent chasing a network problem
@@ -217,7 +217,7 @@ ok(page.errors.length === 0,
   const root = join(import.meta.dirname, '..', '..', '..');
   const run = (env) => {
     try {
-      return execFileSync('bash', [join(root, 'scripts', 'bb'), 'status'],
+      return execFileSync('bash', [join(root, 'scripts', 'aerie'), 'status'],
         { encoding: 'utf8', cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) { return `${e.stdout || ''}${e.stderr || ''}` || `THREW ${e}`; }
   };

@@ -1,4 +1,4 @@
-"""bb proc (scripts/lib/proc-verbs.py, B736): a pattern that is on the
+"""aerie proc (scripts/lib/proc-verbs.py, B736): a pattern that is on the
 calling shell's own command line finds and ends the processes it names and
 never that shell, which is what pgrep -f and pkill -f from a tool call get
 wrong."""

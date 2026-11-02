@@ -1,4 +1,4 @@
-"""Behind `bb work` (cmd_work in bb): who else is changing this project and
+"""Behind `aerie work` (cmd_work in bb): who else is changing this project and
 where you overlap, from git's view of every working tree and the hook's
 notes (dashboard/overlap.py). Read-only.
 

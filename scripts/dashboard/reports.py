@@ -1,18 +1,18 @@
-"""Problems with BuilderBot itself, reported by a session on any project.
+"""Problems with AerieOS itself, reported by a session on any project.
 
-A session working on somebody's app meets BuilderBot's own faults along the
-way: a `bb` verb that misbehaves, a briefing that says something untrue, a
+A session working on somebody's app meets AerieOS's own faults along the
+way: a `aerie` verb that misbehaves, a briefing that says something untrue, a
 node that will not answer. Filed in that project's own tracker they were
-lost to BuilderBot: the operator read them second hand, if at all, and the
-session maintaining BuilderBot never saw them (the operator, 24 Sep, after
-another project's session filed "bb test runs inside the container" as its
-own B4). So they come here instead: `bb report "what happened"` from any
-session, one store on the controller, read where BuilderBot's own work reads
-the controller's state, the diagnostics (`bb diag reports`), and cleared
+lost to AerieOS: the operator read them second hand, if at all, and the
+session maintaining AerieOS never saw them (the operator, 24 Sep, after
+another project's session filed "aerie test runs inside the container" as its
+own B4). So they come here instead: `aerie report "what happened"` from any
+session, one store on the controller, read where AerieOS's own work reads
+the controller's state, the diagnostics (`aerie diag reports`), and cleared
 from Controller settings.
 
 A log and nothing more: no report is filed, closed or answered from here,
-and no session follows one up. That loop worked only where BuilderBot's own
+and no session follows one up. That loop worked only where AerieOS's own
 project sits on the same controller as the sessions reporting to it, which
 is this one install and no other, and a clear left sessions reading
 answers to reports that were gone (the operator, 8 Oct).
@@ -218,7 +218,7 @@ def _answer(r):
 def own_verb(act, proj, req, *, by):
     """A project's own: add a report for it, once the server has let the
     caller at the project (a session only at its own) and its Report
-    BuilderBot bugs dial. (payload, status)."""
+    AerieOS bugs dial. (payload, status)."""
     return _answer(add(proj, req.get("text"), by=by, node=node_name(proj) if proj else "",
                        area=req.get("area"), repro=req.get("repro"), reproduces=req.get("reproduces"),
                        conversation=req.get("_conversation")))
@@ -226,7 +226,7 @@ def own_verb(act, proj, req, *, by):
 
 def diag_verb(act, req, *, by, principal):
     """Every project's reports, behind the diagnostics' own gate, since that
-    is where they are read (bb diag reports): list, read one or the
+    is where they are read (aerie diag reports): list, read one or the
     conversation it carries, count, delete the ones named, or clear them
     all. (payload, status)."""
     if act == "list":
@@ -236,7 +236,7 @@ def diag_verb(act, req, *, by, principal):
         return (r, 200) if r else ({"error": "no such report"}, 400)
     if act == "conversation":
         # The reporter's conversation a report carries (the operator, 2 Oct):
-        # bb report conversation N, behind the diagnostics' gate like get.
+        # aerie report conversation N, behind the diagnostics' gate like get.
         text = conversation(req.get("id"))
         return ({"text": text}, 200) if text else ({"error": "that report carries no conversation"}, 400)
     if act == "count":

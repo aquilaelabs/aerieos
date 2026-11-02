@@ -10,7 +10,7 @@ import unittest
 import agentpkg  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-agent = agentpkg.load("builderbot_agent_tc")
+agent = agentpkg.load("aerieos_agent_tc")
 agent.log = lambda *a, **k: None
 
 

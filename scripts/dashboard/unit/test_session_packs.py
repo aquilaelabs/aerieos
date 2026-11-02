@@ -1,7 +1,7 @@
 """A session asks for a tool pack from the vetted catalog (R169 step 5): the
 project's Install a tool pack dial (ask by default) kept as the others are,
 the briefing naming the catalog and the dial, an ask held for the
-administrators with the index's pin, and bb tool's own words kept out of a
+administrators with the index's pin, and aerie tool's own words kept out of a
 pack's name."""
 import json
 import os
@@ -39,7 +39,7 @@ class SessionPacks(unittest.TestCase):
         self.addCleanup(setattr, preamble, "prefs_mod", was)
         prefs.set_prefs("alpha", installpacks="deny")
         line = preamble.packs_line("alpha")
-        self.assertIn("bb tool search WORDS", line)
+        self.assertIn("aerie tool search WORDS", line)
         self.assertIn("Install a tool pack is deny", line)
 
     def test_an_ask_is_held_with_the_pin(self):
@@ -53,7 +53,7 @@ class SessionPacks(unittest.TestCase):
     def test_bb_tools_own_words_are_not_pack_names(self):
         m, errs = toolpacks.validate({"name": "install", "label": "x", "platforms": ["linux/amd64"],
                                       "verbs": {"go": {"run": ["{dir}/x"]}}})[:2]
-        self.assertTrue(any("bb tool's own words" in e for e in errs), errs)
+        self.assertTrue(any("aerie tool's own words" in e for e in errs), errs)
 
 
 class Touches(unittest.TestCase):

@@ -56,6 +56,6 @@
     {"id": "windows-11", "name": "Windows 11", "family": "windows", "aliases": ["windows", "win11"], "person": true,
      "why": "Windows has a license to accept and a product key to enter, which are a person's to do, never a session's"},
     {"id": "macos", "name": "macOS", "family": "macos", "aliases": ["mac", "osx"], "person": true,
-     "why": "macOS is licensed to run only on Apple hardware, and its installer has a license to accept: not a VM BuilderBot makes"}
+     "why": "macOS is licensed to run only on Apple hardware, and its installer has a license to accept: not a VM AerieOS makes"}
   ]
 }

@@ -1,4 +1,4 @@
-"""Behind `bb emu` when the emulator is on a node (emu_via_node in bb): one emu
+"""Behind `aerie emu` when the emulator is on a node (emu_via_node in bb): one emu
 job queued through the controller, its log streamed here, and the exit code
 the job's.
 
@@ -23,7 +23,7 @@ r = call("/api/v1/jobs", {"action": "emu", "project": proj, "argv": argv, "files
 if r.get("error"):
     sys.exit(f"[builderbot] ERROR: {r['error']}")
 names = {n["id"]: n["name"] for n in (call("/api/v1/nodes").get("nodes") or [])}
-print(f"[builderbot] {r['job']}: bb {' '.join(argv)} on {names.get(r['node'], r['node'])}", flush=True)
+print(f"[builderbot] {r['job']}: aerie {' '.join(argv)} on {names.get(r['node'], r['node'])}", flush=True)
 j, state = waits.follow(auth, r["job"])
 arts = [o["path"] for o in (j.get("outputs") or []) if o.get("kind") == "artifact"]
 print(f"[builderbot] {r['job']} {state}" + (f": {j['error']}" if j.get("error") else "")

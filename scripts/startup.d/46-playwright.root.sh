@@ -8,7 +8,7 @@
 # there), and the bundles come here.
 #
 # PLAYWRIGHT_BROWSERS_PATH still says /opt/pw-browsers, because everything
-# from `bb capture shot` to the dashboard's tests to the project CLAUDE.md template
+# from `aerie capture shot` to the dashboard's tests to the project CLAUDE.md template
 # names that path. It is a symlink into the share now; nothing that used it
 # has to know.
 #
@@ -20,7 +20,7 @@
 # as builder, so nothing lands owned by root.
 #
 set -euo pipefail
-. /opt/builderbot/scripts/lib/common.sh
+. /opt/aerieos/scripts/lib/common.sh
 
 command -v playwright >/dev/null 2>&1 || exit 0
 BROWSERS="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"
@@ -54,22 +54,22 @@ relink_chromium() {
 
 # First boot on an empty share: fetch them. Synchronous and loud, like the
 # Android baseline: it happens once per share, and a container that comes up
-# "ready" while `bb capture shot` cannot work would be worse than a slow start.
+# "ready" while `aerie capture shot` cannot work would be worse than a slow start.
 #
 # Unless they were removed on purpose. A fresh share and one somebody just
 # cleared look exactly alike from here, so without the marker an uninstall
 # lasted until the next restart and no further, which is not an uninstall.
 if [ -e "$(sdk_removed_marker playwright)" ]; then
     log "playwright browsers: removed by the operator, leaving them out"
-    log "  put them back with: bb toolchains install playwright"
+    log "  put them back with: aerie toolchains install playwright"
 elif ! find -L "$STORE" -path '*/chrome-linux*/chrome' -type f 2>/dev/null | grep -q .; then
     log "installing playwright browsers into ${STORE} (~1.3GB, once; updates will not re-download them)"
     if run_as_builder env PLAYWRIGHT_BROWSERS_PATH="$STORE" \
            playwright install chromium firefox webkit >/dev/null 2>&1; then
         log "playwright browsers ready"
     else
-        warn "could not install the playwright browsers: bb capture shot and the dashboard"
-        warn "tests will not work until: bb toolchains install playwright"
+        warn "could not install the playwright browsers: aerie capture shot and the dashboard"
+        warn "tests will not work until: aerie toolchains install playwright"
     fi
 fi
 

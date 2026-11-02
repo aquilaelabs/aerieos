@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DASH = os.path.join(HERE, "..")
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 EXTRA = os.path.join(ROOT, "image", "mkosi.extra")
-TOOL = os.path.join(EXTRA, "usr", "lib", "builderbot-os", "system-pool")
+TOOL = os.path.join(EXTRA, "usr", "lib", "aerieos-os", "system-pool")
 sys.path.insert(0, DASH)
 import agentpkg  # noqa: E402
 
@@ -36,24 +36,24 @@ class Job:
 
 class TheImage(unittest.TestCase):
     def test_a_stick_boot_alone_keeps_the_logs_in_memory_and_holds_docker(self):
-        s = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "builderbot-os")
+        s = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
         block = s[s.index('if [ "$stick" = 1 ]; then'):]
-        self.assertIn("bbtoram=1) stick=1", s)
+        self.assertIn("aerietoram=1) stick=1", s)
         self.assertIn("commit=60", block)
         self.assertIn('tmpfs "${rootmnt}/var/log"', block)
         self.assertIn("Storage=volatile", block)
-        self.assertIn("ConditionPathExists=/run/builderbot-os/system-pool-ready", block)
+        self.assertIn("ConditionPathExists=/run/aerieos-os/system-pool-ready", block)
         self.assertIn('"${rootmnt}/usr/lib/systemd', block, "written into the root's tmpfs: this boot alone")
-        unit = read(EXTRA, "usr", "lib", "systemd", "system", "builderbot-os-system-pool.service")
-        self.assertIn("ConditionKernelCommandLine=bbtoram=1", unit)
+        unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-system-pool.service")
+        self.assertIn("ConditionKernelCommandLine=aerietoram=1", unit)
         self.assertIn("Before=containerd.service docker.service libvirtd.service", unit)
         self.assertIn("Restart=on-failure", unit)
-        self.assertIn("builderbot-os-system-pool.service", read(ROOT, "image", "mkosi.postinst"))
+        self.assertIn("aerieos-os-system-pool.service", read(ROOT, "image", "mkosi.postinst"))
         self.assertTrue(os.access(TOOL, os.X_OK))
 
     def tool(self, d, *argv, stick=True):
         with open(os.path.join(d, "cmd"), "w") as f:
-            f.write("bbslot=a bbtoram=1\n" if stick else "bbslot=a\n")
+            f.write("aerieslot=a aerietoram=1\n" if stick else "aerieslot=a\n")
         with open(os.path.join(d, "env"), "w") as f:
             f.write(f"SDK_ROOT={d}/sdk\nWORKSPACE={d}/ws\n")
         env = dict(os.environ, BB_OS_WORK=f"{d}/work", BB_OS_RUN=f"{d}/run", BB_CMDLINE=f"{d}/cmd", BB_CONTROLLER_ENV=f"{d}/env",
@@ -73,12 +73,56 @@ class TheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 2)
             self.assertIn("is not a mounted pool", r.stderr)
             self.assertEqual(json.loads(self.tool(d, "status", stick=False).stdout), {"stick": False})
+
+    def test_the_projects_are_held_until_they_have_a_place_on_the_disks(self):
+        # The operator, 1 Nov: never on the stick, on any stick.
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.dict(os.environ, {"BB_SP_NO_MOUNT": "1"}):
+                r = self.tool(d, "apply")
+                self.assertIn("the projects are held", r.stdout)
+                self.assertEqual(json.loads(self.tool(d, "status").stdout)["projects_home"], "held")
+                os.makedirs(f"{d}/share/projects")
+                self.tool(d, "projects", f"{d}/share/projects")
+                self.assertEqual(json.loads(self.tool(d, "status").stdout)["projects_home"], "folder")
+                self.assertNotIn("held", self.tool(d, "apply").stdout)
+
+    def test_a_folder_on_the_disks_is_named_the_projects_folder_and_let_go(self):
+        # R163 (the operator, 1 Nov): a controller moved here without its
+        # repositories takes the folder another system kept them in.
+        with tempfile.TemporaryDirectory() as d:
+            share = f"{d}/mnt/user/projects"
+            for p in ("alpha", "beta"):
+                os.makedirs(f"{share}/{p}")
+            os.makedirs(f"{d}/ws/left")
+            env = {"BB_SP_NO_MOUNT": "1"}
+
+            def run(*argv, stick=True):
+                with mock.patch.dict(os.environ, env):
+                    return self.tool(d, *argv, stick=stick)
+            self.assertEqual(run("projects", "relative").returncode, 2)
+            self.assertEqual(run("projects", f"{d}/mnt/user/../user/projects").returncode, 2, "no .. in the path")
+            self.assertIn("is not a folder", run("projects", f"{d}/nowhere").stderr)
+            self.assertIn("the projects folder itself", run("projects", f"{d}/ws/left").stderr)
+            self.assertEqual(run("projects", share, stick=False).returncode, 2, "a stick's alone")
+            r = run("projects", share, "alpha", "beta", "gamma")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("holds 2 of the controller's 3 projects; not there: gamma", r.stdout)
+            self.assertIn("stays underneath", r.stdout, "what the folder held before is said, never deleted")
+            self.assertTrue(os.path.isdir(f"{d}/ws/left"))
+            got = json.loads(run("status").stdout)
+            self.assertEqual(got["projects"], share)
+            self.assertNotIn("projects", got["on_stick"], "the named folder is no longer the stick's to hold")
+            self.assertIn(f"the projects are {share}", run("apply").stdout)
+            r = run("projects", "--release")
+            self.assertIn("no longer the projects folder; its files stay", r.stdout)
+            self.assertEqual(json.loads(run("status").stdout)["projects"], "")
+            self.assertTrue(os.path.isdir(f"{share}/alpha"))
             self.assertIn("not a stick boot", self.tool(d, "apply", stick=False).stdout)
 
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_stick")
+        self.agent = agentpkg.load("aerieos_agent_stick")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
 
     def test_the_census_reads_the_tool(self):
@@ -88,7 +132,8 @@ class TheAgent(unittest.TestCase):
                 f.write('echo \'{"stick": true, "pool": "/mnt/fast", "ready": true, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12}\'\n')
             with mock.patch.dict(os.environ, {"BB_OS_POOL": fake}):
                 got = self.av.stick_status()
-            self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12})
+            self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12,
+                                   "projects": "", "projects_bound": False, "projects_home": ""})
             with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "none")}):
                 self.assertEqual(self.av.stick_status(), {})
 
@@ -114,13 +159,66 @@ class TheAgent(unittest.TestCase):
                 self.assertEqual(a.ran[-2:], ["set", "/mnt/fast"])
 
 
+class TheAgentsProjectsFolder(unittest.TestCase):
+    def test_the_job_names_the_folder_and_the_projects_or_lets_it_go(self):
+        av = sys.modules[agentpkg.load("aerieos_agent_stick2").Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
+
+        class A(av.OsImageMixin):
+            def _sh(self, job, argv, **kw):
+                self.ran = argv
+                return 0
+
+            def hello_again(self, why):
+                self.said = why
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "tool"), "w"):
+                pass
+            with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "tool")}):
+                self.assertEqual(A()._apply_projects_folder(Job(), {"path": "mnt"}), ("failed", 64))
+                a = A()
+                self.assertEqual(a._apply_projects_folder(Job(), {"path": "/mnt/user/projects", "names": ["alpha", "../x", ".hidden", 3]}),
+                                 ("succeeded", 0))
+                self.assertEqual(a.ran[-3:], ["projects", "/mnt/user/projects", "alpha"], "only plain project names reach the tool")
+                a._apply_projects_folder(Job(), {"release": True})
+                self.assertEqual(a.ran[-2:], ["projects", "--release"])
+
+
 class TheController(unittest.TestCase):
+    def test_a_stick_holds_new_projects_until_they_have_a_place(self):
+        import nodes
+        import projects
+        own = {"id": "n_1", "own": True, "reported": {"os_stick": {"stick": True, "projects_home": "held"}}}
+        with mock.patch.object(nodes, "node_list", return_value=[own]), mock.patch.object(nodes, "own_machine", lambda n: n.get("own")):
+            self.assertTrue(nodes.on_stick())
+            self.assertIn("never kept on it", nodes.workspace_held())
+            with mock.patch.object(projects, "held", nodes.workspace_held):
+                body, code = projects.create({"mode": "init", "name": "x"})
+            self.assertEqual(code, 409)
+            self.assertIn("never kept on it", body["error"])
+            own["reported"]["os_stick"]["projects_home"] = "folder"
+            self.assertIn("waiting for its disks", nodes.workspace_held())
+            own["reported"]["os_stick"]["projects_bound"] = True
+            self.assertEqual(nodes.workspace_held(), "")
+            own["reported"]["os_stick"] = {"stick": False}
+            self.assertFalse(nodes.on_stick())
+            self.assertEqual(nodes.workspace_held(), "")
+
+    def test_a_projects_folder_lies_inside_the_adopted_disks_writable(self):
+        import nodes
+        n = {"reported": {"adopted": {"writable": True, "merged": {"/mnt/user": True},
+                                      "mounts": [{"where": "/mnt/disk1", "mounted": True, "ro": False}]},
+                          "pools": [{"mount": "/mnt/fast"}]}}
+        self.assertEqual(nodes.projects_folder_places(n), {"/mnt/user": True, "/mnt/disk1": True, "/mnt/fast": True})
+        n["reported"]["adopted"]["writable"] = False
+        n["reported"]["adopted"]["mounts"][0]["ro"] = True
+        self.assertEqual(nodes.projects_folder_places(n)["/mnt/user"], False)
+
     def test_the_census_keeps_the_stick_to_its_shape(self):
         import nodes
         got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "evil"],
                                           "written_kb": 2048, "boot_written_kb": -1}})
         self.assertEqual(got["os_stick"], {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"],
-                                           "written_kb": 2048, "boot_written_kb": None})
+                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": ""})
         self.assertNotIn("os_stick", nodes._census({"os_stick": {"stick": False}}))
 
     def test_the_verb_is_a_sticks(self):
@@ -132,8 +230,10 @@ class TheController(unittest.TestCase):
                              env=dict(os.environ, DASHBOARD_STATE=state), capture_output=True, text=True, check=False)
         self.assertEqual(tok.returncode, 0, tok.stderr)
         n = next(x for x in nodes.node_list() if x["name"] == "nas")
-        self.assertIn("does not run BuilderBot OS from a stick", nodes.node_system_pool("user:t", n["id"], "/mnt/fast").get("error", ""))
+        self.assertIn("does not run AerieOS from a stick", nodes.node_system_pool("user:t", n["id"], "/mnt/fast").get("error", ""))
         self.assertEqual(nodes.node_system_pool("user:t", "n_nothere", "/mnt/fast").get("error"), "no such node")
+        self.assertIn("does not run AerieOS from a stick", nodes.node_projects_folder("user:t", n["id"], "/mnt/user/projects").get("error", ""))
+        self.assertEqual(nodes.node_projects_folder("user:t", "n_nothere", "/mnt/user/projects").get("error"), "no such node")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
-"""Behind `bb rules check` (cmd_rules in bb): each rule's check command, run
+"""Behind `aerie rules check` (cmd_rules in bb): each rule's check command, run
 HERE in this tree on whichever machine the session is on (roadmap R31).
 The rules themselves arrive in the file RULES_JSON_FILE names (or in
-RULES_JSON itself, for a short list), from `bb rules --json`, which
+RULES_JSON itself, for a short list), from `aerie rules --json`, which
 a node relays; this needs neither /config nor rules.py, only git, the
 tree and the command.
 
@@ -25,7 +25,7 @@ else:
 def patch_scope(files):
     """A patch line's own rules (R112 step 5): a rule named patch, or
     patch-SOMETHING, says in its paths what a patch release may not change
-    (a migration, the API, a dependency's lock file), and bb tests preflight
+    (a migration, the API, a dependency's lock file), and aerie tests preflight
     on a branch whose line is X.Y.Z with Z above 0 fails on any of the files
     it changed under one. Returns the exit code."""
     bad = 0
@@ -41,7 +41,7 @@ def patch_scope(files):
         else:
             print(f"  PASS  {name}")
     if not bad and not any(str(r.get("name") or "") == "patch" or str(r.get("name") or "").startswith("patch-") for r in rules):
-        print("  no patch rule here: bb rules add patch \"...\" --files GLOBS says what a patch may not change")
+        print("  no patch rule here: aerie rules add patch \"...\" --files GLOBS says what a patch may not change")
     return bad
 if argv and argv[0] == "--patch":
     # The files a patch line's branch changed, judged by patch_scope once

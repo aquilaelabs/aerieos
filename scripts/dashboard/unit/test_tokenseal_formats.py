@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import signing  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location(
-    "bb_tokenseal_formats", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "builderbot_agent", "tokenseal.py"))
+    "bb_tokenseal_formats", os.path.join(os.path.dirname(__file__), "..", "..", "agent", "aerieos_agent", "tokenseal.py"))
 ts = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ts)
 KEY = bytes(range(32))
@@ -34,6 +34,12 @@ class NodeSeals(unittest.TestCase):
         bad = bytearray(blob); bad[-1] ^= 1
         with self.assertRaises(ts.Refused):
             ts.open_with(ts.key_for(a, head["R"]), bytes(bad))
+
+    def test_a_point_that_gives_no_shared_key_is_refused(self):
+        # B551: an all-zero R raised ValueError, which no caller catches.
+        a = ts.secret(KEY, "n_1", "u_1")
+        with self.assertRaises(ts.Refused):
+            ts.key_for(a, "0" * 64)
 
     def test_the_old_seal_is_still_opened(self):
         a1 = ts.secret1(KEY, "n_1", "u_1")

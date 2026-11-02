@@ -32,11 +32,11 @@ apt_waiting() {
     return "$rc"
 }
 # pkg_refresh: the package index, once, before the first install.
-# On a BuilderBot OS disk (image/, R160 step 1) the packages are the image's,
+# On an AerieOS disk (image/, R160 step 1) the packages are the image's,
 # pinned when it was built, and its root forgets at the next boot: nothing is
 # fetched, and a package the provisioner needs that the image lacks is a
 # build of the image to fix, said here by name.
-on_os_image() { [ -r "${BB_OS_RELEASE:-/usr/lib/builderbot-os/release}" ]; }
+on_os_image() { [ -r "${BB_OS_RELEASE:-/usr/lib/aerieos-os/release}" ]; }
 pkg_refresh() {
     on_os_image && return 0
     export DEBIAN_FRONTEND=noninteractive; apt_waiting apt-get update -qq
@@ -44,6 +44,9 @@ pkg_refresh() {
 # pkg NAME...: install what is named, quietly.
 pkg() {
     if on_os_image; then
+        # The image removes its package database (CleanPackageMetadata), so
+        # there is nothing to ask: what it carries was settled when it was built.
+        [ -s "${BB_DPKG_STATUS:-/var/lib/dpkg/status}" ] || return 0
         local p alt have=0 miss=()
         for p in "$@"; do
             have=0
@@ -53,7 +56,7 @@ pkg() {
             [ "$have" = 1 ] || miss+=("$p")
         done
         [ "${#miss[@]}" -eq 0 ] && return 0
-        echo "not in the BuilderBot OS image: ${miss[*]} (image/mkosi.conf lists what it carries; a package the node needs is added there)" >&2
+        echo "not in the AerieOS image: ${miss[*]} (image/mkosi.conf lists what it carries; a package the node needs is added there)" >&2
         return 1
     fi
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
@@ -78,6 +81,12 @@ pkg_names() {
 }
 # docker_install: docker, where this family gets it from.
 docker_install() {
+            # An image's packages were settled when it was built, and its root
+            # takes no repository: a missing docker is a build of the image to fix.
+            if on_os_image; then
+                echo "not in the AerieOS image: docker (image/mkosi.conf lists what it carries)" >&2
+                return 1
+            fi
 
             # Which of Docker's two Debian-family repositories, and which
             # suite in it. A derivative uses its parent's: Mint and Pop!_OS

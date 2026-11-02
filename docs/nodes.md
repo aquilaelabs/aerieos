@@ -1,6 +1,6 @@
 # Controller and nodes: a design
 
-This is the design record for the shape BuilderBot has now: a **controller**
+This is the design record for the shape AerieOS has now: a **controller**
 that keeps the dashboard, the notebook and the record, and schedules work
 onto **nodes**, where a node is any enrolled machine that can execute
 something: a VM on the same server, a spare desktop, a cloud box, a MacBook.
@@ -8,7 +8,7 @@ Sessions, builds, tests, CI and the emulator run on nodes; the controller
 runs none of them. It was written before that was true (the first sections
 describe turning one container with one remote daemon into this) and kept as
 the reasons behind each decision; what is built is described in
-[how-it-works.md](how-it-works.md) and the docs it names, with its settings and `bb` commands in
+[how-it-works.md](how-it-works.md) and the docs it names, with its settings and `aerie` commands in
 [reference.md](reference.md), and where this document differs from them, the
 code and those are right.
 
@@ -262,7 +262,7 @@ The moment a job spec grows `needs:` it has gone wrong.
 
 New in this pass, and load-bearing for both tiers: **everything is a versioned
 HTTP API (`/api/v1/…`), and the GUI is a client of it.** The homelab reason is
-`bb`: the CLI should hit the same endpoints the page does, which is already
+`aerie`: the CLI should hit the same endpoints the page does, which is already
 half true today and should become a rule. The enterprise reason is that
 integration *is* the product there: Terraform enrolling nodes, a bot draining
 one before patch night, dashboards reading `/metrics`. An API that is "whatever
@@ -287,15 +287,15 @@ Three further arguments the brief does not make:
   you learn a node is down by trying to use it, which is exactly when you
   cannot afford to find out.
 - **The credential moves to the node.** Today the controller holds a private
-  key that can run anything as `bb` on the VM. With enrollment, each node holds
+  key that can run anything as `aerie` on the VM. With enrollment, each node holds
   its own token and the controller holds nothing that logs in anywhere.
 - **One channel carries everything**: job assignment, log lines, source
   snapshots, artifact uploads, so there is one thing to authenticate, one
   thing to reconnect, and one thing to instrument.
 
 **The catch, which must be said plainly: dialing out solves NAT at the node
-and moves it to the controller.** For a cloud node to reach BuilderBot,
-BuilderBot must be reachable: a forwarded port with TLS in front of it, a
+and moves it to the controller.** For a cloud node to reach AerieOS,
+AerieOS must be reachable: a forwarded port with TLS in front of it, a
 tunnel, or Tailscale. For LAN nodes nothing changes. In the enterprise
 deployment this is a non-issue (the controller lives on a network the fleet
 can reach, behind a normal load balancer); in the homelab it is the first
@@ -346,7 +346,7 @@ moves the row.
 is always newer than or equal to its nodes; it is where the agent file comes
 from, so a digest mismatch means the node may not understand a job this
 version would send it. Job types and spec fields have been added on nearly
-every phase (`system`, `toolchain`, `cache-clear`, compose plans, `bb` verbs,
+every phase (`system`, `toolchain`, `cache-clear`, compose plans, `aerie` verbs,
 store listings), and an older agent meets an unknown one with a shrug rather
 than an error, which is the worst of the three possible answers. So
 `job_add` refuses and `fits` declines every job whose runner is the node,
@@ -380,10 +380,10 @@ queue wakes it when a job ends on the node, so the next one starts at once.
 
 **What a job runs as.** The unit runs the agent as root; that is what lets
 phase 5's system jobs (mounts, network) exist, but an `exec` job drops to
-the account the provisioner enrolled, the same `bb` that docker runs as,
+the account the provisioner enrolled, the same `aerie` that docker runs as,
 before it runs anything. That account is outside every session's view and in
 the docker group, so a session token cannot queue a job at all: a session runs
-`bb run`, `bb build`, `bb test` and `bb emu` where it is, on its project's node,
+`aerie run`, `aerie build`, `aerie test` and `aerie emu` where it is, on its project's node,
 inside the view that keeps it to its own project (R35).
 
 **Ship long-poll first.** It gives sub-second job pickup, crosses every proxy
@@ -413,13 +413,16 @@ piece at 100 nodes; the listener model is.
 token (`bbe_…`) is one use and one day; it exists to be pasted into a
 terminal, and one minted and forgotten is a standing way in, so it is
 revoked the moment enrollment succeeds. The **node** token (`bbn_…`) it
-trades for has no expiry at all: it is `0600` on the node and works until
-the operator revokes it or retires the node, so a node enrolled today is
-still working a year from now with nothing to renew. (The runner
-registration token is GitHub's and lives an hour; after registering, the
-runner holds credentials GitHub issued to it and refreshes them itself.)
-The row `expires` column and `revoke_tokens` are what a rotation policy
-would use if a deployment ever wants one: the shape is there, unbuilt.
+trades for has no expiry: it is `0600` on the node and works until the
+operator revokes it or retires the node, so a node enrolled today is still
+working a year from now with nothing to renew. An agent that rotates is
+handed a fresh one at each `hello`, held pending until its first use makes
+it the node's; the one before is still taken for three minutes, for calls
+already on their way, and presented after that means a copy of the
+credential is in use, so every token of the node is revoked and the bell
+says so. (The runner registration token is GitHub's and lives an hour;
+after registering, the runner holds credentials GitHub issued to it and
+refreshes them itself.)
 
    - **single-use** (homelab default): scoped to intended capabilities,
      short-lived; enrolling with it *is* the approval.
@@ -434,7 +437,10 @@ would use if a deployment ever wants one: the shape is there, unbuilt.
    TLS is not optional: the token is a bearer credential. On a LAN that can be
    a self-signed certificate pinned by the agent at enrollment.
 4. Rotation and revocation are rows: revoke a token and the node's next call
-   fails closed, showing offline with "credential revoked".
+   fails closed with "credential revoked". The node's row says it is turned
+   away and why, in place of quiet, and the bell carries a row for it until
+   the node's next good check-in, which after a revocation means enrolling
+   it again.
 
 **Enroll node is one script (R161, 9 Oct).** The dialog asks the name, the
 account jobs run as, which system the machine runs (R204: a pulldown of the
@@ -461,7 +467,7 @@ is a convenience; at fleet scale it is the difference between a protocol that
 can evolve and one frozen by its oldest node.
 
 **That version is `WINDOW.BUILD`, and only the first half is a promise.** The
-window is BuilderBot's own semver minor: while the project is `0.5.x`, any
+window is AerieOS's own semver minor: while the project is `0.5.x`, any
 `0.5` agent works with any `0.5` controller, in both directions. The next
 minor is where that ends, and it is therefore where a breaking change to this protocol
 and the removal of the compatibility paths carrying old ones belong. Inside a
@@ -572,7 +578,7 @@ a node enrolled again starts afresh under its new id. What no node runs
 from any more (a retired or unknown node's directory, `store_dirs.roots`)
 is offered for removal in the Library (`toolchains.cleanable`).
 This controller keeps its own toolchains (Playwright's browsers for
-`bb capture shot`) under `<store>/<os>-<arch>`, which is never offered. The census reports the scope beside the store's
+`aerie capture shot`) under `<store>/<os>-<arch>`, which is never offered. The census reports the scope beside the store's
 path, and its listing of the directory (`store_dirs`, every hello) is the
 authority on what is installed: a toolchain deleted from the store by hand
 reads as not installed within a hello, whatever the last check said
@@ -590,7 +596,7 @@ agent on every hello (`share_images()`) and by the controller at boot
 
 - **On the controller: unchanged, and canonical.** The projects share, mounted
   whole, holding every project including uncommitted work. Sessions run here;
-  the notebook is about these directories; `bb` works exactly as today. It is
+  the notebook is about these directories; `aerie` works exactly as today. It is
   the source of truth and the only writable copy.
 - **On a node: a synced copy, for sessions** (below), and nothing
   permanent for a job. A job gets
@@ -687,29 +693,29 @@ controller is.
   as the session account, and its mirror (`claudesync.py` on both sides)
   keeps the folders of the projects bound to the node in step with the
   controller's, which the Profile page, the notebook's Memories,
-  `bb transcripts` and the resume offer read. A transcript only grows, so a change goes up as
+  `aerie transcripts` and the resume offer read. A transcript only grows, so a change goes up as
   its new tail, checked against the controller's last 4 KB; a memory goes
   whole. What the controller has that the node never had comes down when it
   is a megabyte or less; a longer conversation comes down when it is
-  resumed there (bb-tty runs `bb transcripts fetch`), since every long
+  resumed there (bb-tty runs `aerie transcripts fetch`), since every long
   conversation on every node is gigabytes nobody asked for. A memory
   removed on one side goes on the other; a conversation is never removed
   across. Before this, moving a node over left the link pointing at
   nothing and its sessions saved no conversation at all.
-- **bb waits for the copy** where the controller acts on its own copy for a
-  session (R163): a relayed `bb git`, `bb version` or `bb changelog`, `bb
-  sign`, and `bb version release --edit --attach`. Before, until a tick of
+- **aerie waits for the copy** where the controller acts on its own copy for a
+  session (R163): a relayed `aerie git`, `aerie version` or `aerie changelog`, `aerie
+  sign`, and `aerie version release --edit --attach`. Before, until a tick of
   the agent that began after the command saw nothing left to send; after a
   relayed verb, until this copy has caught up to the revision the controller
   reached, which is also how a fetch's bundle in `.git/bb-relay/` arrives
   before it is unbundled. The agent keeps each project's state in
-  `.git/.bbsync-state` (or `.bbsync-state` without git) for bb to read
+  `.git/.bbsync-state` (or `.bbsync-state` without git) for aerie to read
   (`lib/syncwait.py`); sync leaves the file alone.
 - **The only way** (R163 step 6, 10 Oct). A node enrolls holding a synced
   copy, and nothing mounts the projects share on a node any more: the
   enroll dialog's choice, Move to a synced copy as a move off the share,
   the share reasons on the session gate (not mounted, refused by the
-  export, read-only), the agent's mount watcher and bb's NFS workarounds
+  export, read-only), the agent's mount watcher and aerie's NFS workarounds
   (re-reading files after a relayed verb, running a build again after an
   NFS lock) are gone. A desired mount at `/workspace` is refused on the
   Storage section and by bb-sandbox, since it would cover the copy; the
@@ -751,14 +757,14 @@ goes wrong with caches is a full disk, and at fleet scale the second thing is
 
 ### Room a node keeps for itself
 
-A node is a machine somebody also needs to keep running, so BuilderBot's
+A node is a machine somebody also needs to keep running, so AerieOS's
 work on it is held short of the whole of it. Controller settings, *Room on
 the nodes*, sets the numbers:
 
 - **Disk kept free** (10 GB by default, or a tenth of a disk smaller than
   ten times that). Under it, on the root filesystem, Docker's or a store,
   the bell names the node and what is short, and a build, a test or a
-  container's rebuild there is refused with the numbers. `bb run` is not:
+  container's rebuild there is refused with the numbers. `aerie run` is not:
   it is how room is made. A build also wants as much free as the project's
   last one took (its workspace, measured by the agent as the job ends and
   shown on the Artifacts view and the job's row).
@@ -771,7 +777,7 @@ Every hour a node under twice the floor has Docker's build cache a week old
 and its unused images two weeks old pruned, and the projects' build caches
 no job has used for two weeks cleared (a `cache-clear` job with an age).
 
-**The fence.** The provisioner puts everything BuilderBot runs on a node in
+**The fence.** The provisioner puts everything AerieOS runs on a node in
 one cgroup whose memory stops short of the machine's: on systemd,
 `builderbot.slice` (the agent's unit, and with it the sessions and jobs it
 starts, and Docker's containers through `cgroup-parent`); on OpenRC, a
@@ -788,12 +794,12 @@ Caches answered "how does a node avoid re-downloading what a build pulls";
 this answers the question above it, which the plan had not: **how do the
 toolchains themselves (a JDK, the Android SDK, Flutter) get onto a node at
 all, and where do they live?** Today the answer is the controller's toolchain
-store and `bb toolchains`, operator-gated; that has to generalize without forking.
+store and `aerie toolchains`, operator-gated; that has to generalize without forking.
 
 - **One catalog, per-node state.** `config/toolchains.json` stays the single
   description of what is installable and how. What becomes per-node is the
   *state*: the census reports which toolchains a node has and at what version
-  (`reported.toolchains`), probed by the agent the same way `bb toolchains` probes
+  (`reported.toolchains`), probed by the agent the same way `aerie toolchains` probes
   locally. The controller never guesses from what it asked for; it reads what
   the node says it has.
 - **Installing is a job.** A toolchain install on a node is an ordinary job
@@ -844,7 +850,7 @@ one is the ordinary toolchain job with `android-tools` (and its JDK) put in
 front of it, since the install is sdkmanager's.
 
 *Amended 19 September:* images are on an **Emulator** page of their own,
-not the toolchain installer's, and the toolchain job for an `image` job (`bb emu image
+not the toolchain installer's, and the toolchain job for an `image` job (`aerie emu image
 add|remove ID` on the node, through the same bundle). The two job types take
 turns on a store. An image add on a node without `android-tools` is refused
 with the reason rather than having the tools put in front of it: the Emulator
@@ -887,8 +893,8 @@ somebody remembered to set.
 dirty-tree snapshot: git's view of the tree (tracked plus untracked, minus
 ignored and minus `.git`), never `dist/`, as one uncompressed tar named by
 its sha256 under `/config/snapshots`, the last five per project kept, and
-serves it to the agent's `source?digest=` verb. A run (`bb run`, `bb build`,
-`bb test`, or the same `run` action on `/api/v1/jobs`) snapshots, then
+serves it to the agent's `source?digest=` verb. A run (`aerie run`, `aerie build`,
+`aerie test`, or the same `run` action on `/api/v1/jobs`) snapshots, then
 queues an exec carrying the digest on the node the project assigns to the
 role in its settings dialog (build, test, ci, emulator: the last two are
 settings for phases 7 and 9). The agent fetches by digest into its cache
@@ -901,12 +907,12 @@ command, sha256), and deletes the workspace; a failed job keeps it and
 replaces the previous kept failure of that project. The census reports the
 cache store's size and *Clear cache* on the row is a `cache-clear` job. A
 toolchain install on a node is a `toolchain` job: the agent fetches the
-bundle (bb, its library, the catalog) by digest into the toolchain store
-and runs `bb toolchains install` from it with `SDK_ROOT` at the store, gated on the
+bundle (aerie, its library, the catalog) by digest into the toolchain store
+and runs `aerie toolchains install` from it with `SDK_ROOT` at the store, gated on the
 store's headroom when this controller has measured the toolchain before; the
 Installed page shows what the node's census says it has. Not
 landed: the node browser is the kept-workspace path in the job's log and
-`bb run`'s last line, not a file view; and an APK has not yet compiled on a
+`aerie run`'s last line, not a file view; and an APK has not yet compiled on a
 real node: the mechanism is complete, the proof needs a node with a JDK.
 
 ### Artifacts
@@ -1042,11 +1048,11 @@ the pieces stack:
    through the tunnel.
 1a. *Its journal is kept across boots* (R185): the provisioner writes a
    journald drop-in (`Storage=persistent`), and the agent does the same on
-   a managed node enrolled before, so `bb logs --node NAME --crash` has the
+   a managed node enrolled before, so `aerie logs --node NAME --crash` has the
    boot before a crash to read; a fresh VPS keeps its journal in memory.
 2. *Make it hosting only*, ticked in the Enroll dialog or later on its page
    (`nodes.host_only`): no project may list it, so no code, synced copy or
-   session goes there, and its hello hands it no bb bundle, no session
+   session goes there, and its hello hands it no aerie bundle, no session
    tokens and no FTP; the agent stops its session half and runs no sync. At
    the agent door (`Handler._agent`, `nodes.host_refuses`) it may say hello,
    beat, take work, report its own jobs' logs and results, update its agent,
@@ -1072,7 +1078,7 @@ the pieces stack:
    hosting-only node may be ticked by whoever may set the project's node;
    the Node picker above the list never offers one, since it holds no code
    and runs no session). The project's sessions may then
-   make a container there (`bb devapp new --node NAME`, built on the
+   make a container there (`aerie devapp new --node NAME`, built on the
    project's own node and shipped) and rebuild and remove the ones there,
    under its Agents may: Run its container, as on its own node; a node not
    named stays a person's to send to.
@@ -1113,7 +1119,7 @@ the pieces stack:
    own SSH sessions read no ssh config, so a Shell session that runs `ssh
    NAME` (R179).
 5. *Put nginx in front of them* (R171, the nginx page): one reverse proxy
-   per node, BuilderBot's own, listed for every node on the nginx page,
+   per node, AerieOS's own, listed for every node on the nginx page,
    which Configure on a node's nginx row opens (the Containers page's
    System section). Its routes (a hostname or path to a port a container
    publishes on that node, with or without TLS) and its certificates (a
@@ -1228,7 +1234,7 @@ ID`, the node's own root helper: Enroll node's ticks hand the provisioner
 that install once the node has enrolled, and the node's Features section on
 the Nodes page runs the same one later as a `feature` system job
 (`node_feature`), so the two ways cannot drift. A marker in
-`/etc/builderbot/features` says BuilderBot installed it and lists the
+`/etc/builderbot/features` says AerieOS installed it and lists the
 packages it added, so a remove takes those and leaves what the machine had
 before. The census reports each (`features`), and the section reads that.
 **VM host** is KVM through libvirt, run by the jobs account in the libvirt
@@ -1242,7 +1248,7 @@ with `iommu=pt` on the kernel's command line, written as one marked block
 by whichever of grubby, GRUB's defaults, extlinux or systemd-boot boots the
 machine (the marker names the way, so the remove undoes exactly that), read
 at the next boot, which the row asks the person for; the census says both
-whether BuilderBot wrote it and whether the running kernel has groups.
+whether AerieOS wrote it and whether the running kernel has groups.
 
 **Which projects a container may go under.** The project pickers on Send,
 on a row's Project and Built from, and the project a Send, copy or move is
@@ -1477,15 +1483,15 @@ non-event.
 
 ### Leaving a machine as it was: uninstall
 
-A node is somebody's machine before it is BuilderBot's, so taking BuilderBot
+A node is somebody's machine before it is AerieOS's, so taking AerieOS
 off it is a verb of its own, in three places that do one thing: **Un-enroll**
 on the node's page (Advanced), `sudo bb-sandbox uninstall` on the machine, and
 `provision-linux.sh --remove`, which runs the machine's own bb-sandbox. None
 of the three goes through from the page while a session or a container
 runs on the node: end them first, and the refusal counts them. What always
-goes is what the provisioner put there for BuilderBot alone: the agent and
+goes is what the provisioner put there for AerieOS alone: the agent and
 its unit, the sessions' firewall rules and their own networks (every piece
-of the isolation, R79), the `bb` and `builder` accounts with their homes
+of the isolation, R79), the `aerie` and `builder` accounts with their homes
 (Claude Code, the runners' directories, caches), `/etc/builderbot` with the
 tunnel to the controller, the sandbox label in `daemon.json` (docker keeps
 running; it takes at its next restart) and bb-sandbox itself. Three rings
@@ -1493,7 +1499,7 @@ are asked for, in the Un-enroll dialog as boxes and on the machine as flags:
 `--stores` takes the stores on the machine's own disk (the toolchains, the
 caches, the artifacts, a dev instance's data, the synced project copies,
 `/var/lib/builderbot`); `--configured` undoes what was set up from the
-dashboard after enrolling (the mounts BuilderBot used, `/workspace` and
+dashboard after enrolling (the mounts AerieOS used, `/workspace` and
 whatever a store sits on, taken out of fstab; the runners' units; the GPU
 display); `--doors`, ticked by default for a hosting node, shuts what it was
 given as a host (cloudflared and its token, Tailscale's login, the port 22
@@ -1509,7 +1515,7 @@ and say so. The agent starts the removal under a transient unit of its own,
 reports the job, and is gone with it; the controller retires the row when
 that result lands. Enrolling the machine again is a fresh provisioner run.
 The Un-enroll dialog says in one box what un-enrolling takes off a machine and
-what it leaves, and Reset BuilderBot on Controller settings shows the same box
+what it leaves, and Reset AerieOS on Controller settings shows the same box
 and offers to un-enroll every node first, so each machine is clean to enroll
 again; a node with sessions or containers running cannot be ticked there
 either (the operator, 12 Oct).
@@ -1558,7 +1564,7 @@ The two are kept in step structurally rather than by matching rules:
 instead of keeping a list of its own, so a store repointed from the Nodes
 page is visible at the console on the next command with nothing to
 synchronize. `test/agent.mjs` runs the real `bb-sandbox`: pulled out of the
-provisioner the way `bb lint` pulls it out for shellcheck, against the
+provisioner the way `aerie lint` pulls it out for shellcheck, against the
 agent's `mount_covering` on the same cases, including the string-prefix
 traps (`/mnt/tan` is not a parent of `/mnt/tank/cache`), so drift between
 them fails a test rather than surfacing on someone's node.
@@ -1631,7 +1637,7 @@ session. (The same pattern RouterOS and Proxmox users know as safe mode,
 familiar for a reason.)
 
 **Validity holds through all of it, because enrollment is the recognition.**
-For an agent node, "this is a real BuilderBot sandbox" is no longer inferred
+For an agent node, "this is a real AerieOS sandbox" is no longer inferred
 per-connection from a daemon label; it is the enrollment itself: the node
 token, the stamp written at provision time, and the `disposable` marking.
 Reconfiguring storage or network changes none of those, so nothing the GUI
@@ -1683,7 +1689,7 @@ a node the agent does not administer refuses it and names them for the
 owner, as an install there does.
 Another distribution is another backend in the agent, not another job
 spec. A fourth system job, `apply: root` (roadmap R38), runs ONE command as
-root that an administrator allowed: a session asks with `bb root run --why
+root that an administrator allowed: a session asks with `aerie root run --why
 "..." -- CMD`, and the request is routed by the SESSION that asked: to
 that session's own account when it is an administrator's, and to every
 administrator when it is a user's, because a sandbox is shared and root on
@@ -1791,7 +1797,7 @@ bulk token is in play, in the same held-above-the-fold shape the Phone tab's
 asks use. *Where it stands (19 Oct):* the **Nodes page**, under Machines
 on the rail, shows one node at a time, picked in its bar, its sections
 Health, Projects, Sessions, GPU, Claude Code, Storage, Network and
-Advanced, with Create sandbox VM and Enroll node in the bar.
+Advanced, with New VM and Enroll node in the bar.
 
 **The rule for anything new:** *who has to be able to change it, and what has
 to restart for it to take?* Answer those two and the scope, and therefore
@@ -1823,8 +1829,8 @@ Docker view.
 
 - **Jobs** (phase 4): a page (Jobs on the rail), with queue, running, recent; per-job log
   tail (the dev-instance row's rendering, generalized), Cancel on a row, and
-  a filter for what is not over. `bb jobs` is the read-only form: `bb jobs
-  [--node NAME] [--type T]` lists, `bb jobs ID [--all]` reads one job's log,
+  a filter for what is not over. `aerie jobs` is the read-only form: `aerie jobs
+  [--node NAME] [--type T]` lists, `aerie jobs ID [--all]` reads one job's log,
   and a session sees its project's jobs, the nodes' own toolchain and system
   jobs only with the diagnostics grant.
 - Later, enterprise-flavored and additive: the audit view (a read of the
@@ -1954,7 +1960,7 @@ fold (a progress frame supersedes the last of its kind) and are held back at
 most two seconds, so a pull is a log that moves rather than a transcript. A
 job this process was running when it died is failed as lost at the next
 start. The Docker manager's Up, Down, Rebuild and Remove are compose jobs,
-busy per instance rather than per dashboard. The Jobs tab and `bb jobs` read
+busy per instance rather than per dashboard. The Jobs tab and `aerie jobs` read
 it; `/api/v1/healthz` answers without a credential, `/metrics` with one.
 
 **Phase 5: the node configuration plane.**
@@ -1997,16 +2003,16 @@ deregisters with a removal token first. The census reports every runner
 (`services.runners`, one per git host: its slot, registered as what, with
 which labels, listening or busy, and `services.actions-runner` as the first
 of them for a controller from before the list), the node record keeps what
-was asked for under each slot, and `bb
+was asked for under each slot, and `aerie
 ci-labels` lists every label the registry knows; this box's and every
 node runner's, with `--write` regenerating `.github/actionlint.yaml` from
-it; `bb lint` notes a declared label no runner carries. **A project's CI
+it; `aerie lint` notes a declared label no runner carries. **A project's CI
 node setting decides where its jobs land by label**: the workflow's
 `runs-on` names the node, and nothing else can, because GitHub places the
 job, not this controller. The controller's own runner was retired on 5 Sep,
 by the phase's own rule: only after a node runner had taken a real job (3 Sep,
 the smoke test on bb-sandbox) and every workflow in this repo had moved there.
-`runner.sh`, its supervision, `bb runner`, the image's install step and the
+`runner.sh`, its supervision, `aerie runner`, the image's install step and the
 five `RUNNER_*` settings all went in one change; the Runner card is a view of
 the nodes' runners now.
 
@@ -2018,24 +2024,24 @@ Modes `lan` and `funnel`; the `route` record shaped for `public`.
 
 **Phase 9: device hosts.** Required, not optional, since §18.
 
-*Where phase 9 landed it:* `bb emu` goes to the project's node when it has
+*Where phase 9 landed it:* `aerie emu` goes to the project's node when it has
 one (`BB_EMU_LOCAL=1` keeps a verb on a box that still carries its own
-emulator): the verb is an exec job whose spec carries `bb` argv instead of
-a command, and the agent runs this very `bb` from the bundle in
+emulator): the verb is an exec job whose spec carries `aerie` argv instead of
+a command, and the agent runs this very `aerie` from the bundle in
 `<data>/emu/<project>` with the node's store as its SDK, so `sdk_env()`:
 `SDK_ROOT`, `ANDROID_HOME` at the store's `android/`, `JAVA_HOME` at its
 `jdk/`, the tools on `PATH`, AVDs under the data store. Inputs come from the
 project's `dist/` by name through the new `file` agent verb (an APK for
-`bb emu install`); what the verb writes comes back through the outputs
+`aerie emu install`); what the verb writes comes back through the outputs
 globs like a build's. Two catalog rows bootstrap a node for Android:
 `jdk` (Temurin 21) and `android-tools` (sdkmanager, linked in as
 `android/cmdline-tools/latest`), after which `android:emulator` and the
-system images install through them; `bb emu create <api>` makes the AVD.
+system images install through them; `aerie emu create <api>` makes the AVD.
 New verbs on both sides: `create`, `install`, `shot` (a screenshot into
 `dist/emu/`), `gfx` (gfxinfo framestats into `dist/emu/`). The census
 reports `emulator` among the toolchains. Not proven: an emulator booting on
-a real node: the tests run `bb emu list` from the bundle against an empty
-store; the first `bb emu create` on the VM downloads a system image and is
+a real node: the tests run `aerie emu list` from the bundle against an empty
+store; the first `aerie emu create` on the VM downloads a system image and is
 worth watching. Interactive network adb was not needed for the verbs that
 exist, and is left unbuilt. Bug #17 (the headless Xorg dying) stays this
 container's until the local emulator goes with phase 10.
@@ -2053,7 +2059,7 @@ built only if the job-scoped path proves insufficient.
 **Phase 10, the lockdown.** After phases 6, 7 and 9 and never before them:
 the image drops the compile and emulation toolchains, the local node loses
 `package-build`, the session's settings file closes Bash to an allow-list,
-and every `bb` verb that ran something here submits a job or refuses with
+and every `aerie` verb that ran something here submits a job or refuses with
 the reason. §18 has the argument and the honest limit.
 
 **Running through every phase: the unhardwiring (§11).** Each phase moves the
@@ -2179,8 +2185,8 @@ it gets argued into this section first and built second.
 3. **Windows/macOS nodes?** The agent model extends (a service instead of
    systemd), the provisioner does not. Decide before the Go agent, not after.
 4. **Session `docker`:** with several nodes, does a session's environment get
-   the project's default node, or nothing, with everything through `bb`?
-   *Answered by §18: nothing, with everything through `bb`.*
+   the project's default node, or nothing, with everything through `aerie`?
+   *Answered by §18: nothing, with everything through `aerie`.*
 5. **Retention defaults** for logs, artifacts and failed workspaces: the one
    part of the design that grows without bound, at both tiers.
 
@@ -2190,13 +2196,13 @@ Decided 1 September, after phase 3, and it changes the destination rather
 than the route: **the container is the controller and nothing else.** No
 build runs here, no test, no CI job, no emulator. A project names the nodes
 its builds, tests, CI and emulation run on; a session on this container
-reaches them only through `bb` verbs that submit jobs; the artifacts come
+reaches them only through `aerie` verbs that submit jobs; the artifacts come
 back into `dist/`. A VM is therefore required for full function, and the
 sandbox VM the Docker manager already needs is the first node: `provision-linux.sh
 --controller URL --token bbe_…` enrolls it in the same run. Since 12 Oct
 (R199) a first run asks for it before anything else: after the owner
 account, the setup page's first step is the node, and it opens nothing more
-until one is enrolled and answering, made with Create sandbox VM or Enroll
+until one is enrolled and answering, made with New VM or Enroll
 node in that step's card, and one that runs sessions rather than a
 hosting-only one.
 
@@ -2207,14 +2213,14 @@ Actions runner and emulation on nodes. Only then does the image drop the
 JDK, the Android SDK and emulator, .NET, Flutter and Swift, and only then
 does the local node lose `package-build`. The other order strands every
 project between a container that cannot build and a node that cannot yet.
-`bb toolchains` shrinks to what a session and the dashboard actually use here:
-node, Python, and the Playwright browsers for `bb capture shot` against a URL.
+`aerie toolchains` shrinks to what a session and the dashboard actually use here:
+node, Python, and the Playwright browsers for `aerie capture shot` against a URL.
 
 **Then the session's tools close.** The settings file `claude_scope()`
 already passes (`scripts/dashboard/bb-tty`) denies the file tools every
 sibling project and `VERSION`. It grows a Bash rule: denied except an
-allow-list: `bb`, `git`, and read-only inspection. Every `bb` verb that used
-to run something locally (`bb emu`, a build, a test) submits a job to the
+allow-list: `aerie`, `git`, and read-only inspection. Every `aerie` verb that used
+to run something locally (`aerie emu`, a build, a test) submits a job to the
 project's node for that role, streams the log back, and refuses with the
 reason when the project has no node for it. So the job channel: audited,
 node-scoped, capability-checked on the node itself: is the one execution
@@ -2233,7 +2239,7 @@ What this does to the rest of the document: rule 2 no longer promises a
 working system with zero configuration; it promises one with one decision;
 phase 9 is required; a phase 10 exists; and open question 4 ("does a
 session's environment get the project's default node?") is answered:
-nothing, with everything through `bb`. The self-hosted runner on this
+nothing, with everything through `aerie`. The self-hosted runner on this
 container, and everything CLAUDE.md says about CI sharing the box, goes with
 phase 7.
 
@@ -2256,7 +2262,7 @@ bare metal, and its own node"). The container install is unchanged: its
 
 Decided 4 September, and it moves the destination again: further, and in a
 direction that makes §18 the halfway house rather than the end: **Claude works
-*on* the sandbox.** Not a session here reaching a node through `bb` verbs, but
+*on* the sandbox.** Not a session here reaching a node through `aerie` verbs, but
 the session itself living there, editing that machine's files with that
 machine's toolchain. The container keeps the dashboard, the notebook, the
 queue and the record; it stops being where work happens at all.
@@ -2265,7 +2271,7 @@ Why it beats §18, in one line: §18 spends a lot of machinery teaching a
 session on the wrong machine to act on the right one: a job per build, a job
 per emulator verb, snapshots in both directions, a lockdown to stop it doing
 otherwise. Put the session on the node and most of that is simply not needed.
-`bb toolchains` on the node already answers for the node. `bb build` is a build.
+`aerie toolchains` on the node already answers for the node. `aerie build` is a build.
 
 It also settles a question §18 could not. The operator hit it on 4 September:
 this box's toolchain store and bb-sandbox's are **one store under two
@@ -2301,14 +2307,14 @@ each is a real fork rather than a detail:
    dashboard has to reach across: ssh, or the agent proxying a PTY over the
    job channel. Roadmap #8 (pop-out windows) is in the same code and should
    land after this, not before.
-5. **The notebook, and `bb` itself.** `bb roadmap`, `bb bug`, `bb version`
+5. **The notebook, and `aerie` itself.** `aerie roadmap`, `aerie bug`, `aerie version`
    and the rest read `/config` directly. From the node they are API calls to
    the controller, with a credential the session holds, which is bug #16's
    problem arriving somewhere new.
 6. **The shielding.** The sibling-project deny list, the shielded ssh keys and
    the PAT stash are all mechanisms of this image. They have to exist on the
    node or the bargain quietly changes. And measured on bb-sandbox on 4 Sep:
-   a job runs as `bb`, which has no sudo and cannot read `/etc/builderbot`
+   a job runs as `aerie`, which has no sudo and cannot read `/etc/builderbot`
    (0700 root, so the node token is out of reach), but it IS in the `docker`
    group, which is root-equivalent on any machine running a daemon. That is
    acceptable while the sandbox is the blast radius and a session is only
@@ -2331,7 +2337,7 @@ above, in order:
    narrowed to *jobs*: a job's workspace is still a snapshot and never a
    mount; a session's tree is the mount, because it edits one tree for
    hours. Path parity does the rest: `/workspace/<project>` means the same
-   directory on both sides, which is what lets bb's relayed verbs run on the
+   directory on both sides, which is what lets aerie's relayed verbs run on the
    controller in the tree the session is in. *Since replaced* (R162, R163,
    9-10 Oct): the node holds a synced copy at `/workspace` and mounts
    nothing there; path parity still holds, and relayed verbs wait for the
@@ -2365,7 +2371,7 @@ above, in order:
 4. **The terminal is the same bb-tty, on the node.** The agent's screen
    relay, on the node's LAN address at port 7684, opens a pty for each
    terminal the controller carries to it (writable, the read-only twin, or a
-   container's shell as the docker account), running bb-tty from the bb
+   container's shell as the docker account), running bb-tty from the aerie
    bundle the controller ships (refetched when the bundle's digest moves in
    hello). The controller's `/termws` carries the browser's socket there
    instead of to a pty of its own (phase 10b), signed with the node's screen
@@ -2378,19 +2384,19 @@ above, in order:
    open it, a writable terminal is for an account with a shell). No answer,
    no terminal (B166). The tmux server is the node's; a dropped browser
    detaches.
-5. **bb's notebook verbs are relayed**: `POST /api/v1/bb` with the session's
+5. **aerie's notebook verbs are relayed**: `POST /api/v1/bb` with the session's
    token carries the words (`roadmap add …`, `bug show 3`, `version --file`),
-   the controller runs its own bb in that project's tree and returns what it
+   the controller runs its own aerie in that project's tree and returns what it
    printed. One implementation of every verb, kept where the state is;
    the verbs that relay are one list in `scripts/lib/relay-verbs`, read by
-   bb on the node and by the server, and a test holds both to it. `toolchains`, `emu`, `run`, `build`, `test` are NOT
+   aerie on the node and by the server, and a test holds both to it. `toolchains`, `emu`, `run`, `build`, `test` are NOT
    relayed; they answer for the machine the session is on, which is the
    point. The token's scope is the project; a session's credential is the
    same scoped token it has always had (bug #16), now with a hop.
 6. **A third account.** Sessions run as `builder` (provision-linux.sh
    `--session-user`), made with the controller's PUID:PGID so files it saves
    on the share are owned as the controller's are; in `kvm` for the
-   emulator, in **no docker group**, no sudo. Jobs stay `bb`; the agent stays
+   emulator, in **no docker group**, no sudo. Jobs stay `aerie`; the agent stays
    root and drops to each. The node token lives in `/etc/builderbot`
    (0700 root) and never enters a session's environment: the sessions get
    the controller's URL and certificate pin, and nothing else of the agent's.
@@ -2440,7 +2446,7 @@ count them, and ending one queues a kill the agent's held poll takes at
 once (`nodes.session_kill`, `{"kill_sessions": [...]}` in the work reply).
 The two hooks a session runs post from a node too: `POST /api/v1/hook`
 with the session's token takes a `note` (the file an edit is about to
-touch, answered with who else has it open: `bb work` reads the same
+touch, answered with who else has it open: `aerie work` reads the same
 record), an `asked` line for the project's feed, and `started`, which
 bb-tty sends when it is about to make the session, since the controller cannot
 see one start on a node. The account is the token's, never the request's.
@@ -2460,9 +2466,9 @@ do for a node's session is keep the one-Anthropic-account rule, which is
 the node's own. 10c landed 6 September: the image carries no JDK, no
 Android SDK, no emulator runtime and no X server, and the startup hook that
 built AVDs from `ANDROID_SYSTEM_IMAGES` is gone: an API level is what a
-store holds an image for, and `bb emu create` fetches one. A node is a
+store holds an image for, and `aerie emu create` fetches one. A node is a
 MACHINE: the toolchains, the card and `/dev/kvm` are its own, from
-`nodes/provision-linux.sh` and the toolchain store. `bb emu` on a
+`nodes/provision-linux.sh` and the toolchain store. `aerie emu` on a
 controller with no node for the project refuses and says where it runs.
 A node's sessions outlive a controller restart on purpose (the tmux is the
 node's) and, since B107, an AGENT restart too: the unit is installed with
@@ -2481,7 +2487,7 @@ out, which is what a day of node sessions produced twice (bug #64, B100).
 So a login is one account's on one node: signed in from its row on the Installed page,
 signed out there, and no business of any other node's. What crosses the
 wire is one sentence and no secret: "this account is signed in here as X",
-or that it is not. `bb login --check` sends it on every connection, the
+or that it is not. `aerie login --check` sends it on every connection, the
 agent sends the same answer for every account on the machine on its
 heartbeat so the record is true with no session running (B104), and the
 controller holds what each node reported and no credential at all.
@@ -2509,16 +2515,16 @@ checklist.
 **Credentials are set up on the controller and nowhere else.** PATs, deploy
 keys, the Claude login, the runner registration: one place. A node never
 holds a git credential. Git's network operations from a node session go
-through the controller (`bb git push|fetch|pull`, relayed, with the keys
+through the controller (`aerie git push|fetch|pull`, relayed, with the keys
 the controller already shields: the shape shelved #15 wanted, arrived at
 from the other side). The controller never runs that git in the shared
 tree, whose hooks and config a session can write: it works in a repository
-of its own that borrows the tree's objects, and the node's bb brings the
+of its own that borrows the tree's objects, and the node's aerie brings the
 result into the tree as the session (scripts/dashboard/gitrelay.py). A
 project's SSH deploy key is one of these: made or pasted in the project's
 settings beside its git access token (the operator, 12 Oct), kept where its
 sessions push with it and never read it. The Claude login was
-handed to a node's account by `bb login` with the session's token, as the
+handed to a node's account by `aerie login` with the session's token, as the
 one deliberate exception. *Since replaced* (R47, §19): the login never
 travels; each node signs an account in for itself from its row, and what
 crosses the wire is only whether it is signed in.

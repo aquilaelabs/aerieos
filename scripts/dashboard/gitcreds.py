@@ -13,10 +13,10 @@ A token a person gives a project is kept in their own key store
 (accountkeys.py, sealed under their key; the operator, 27 Oct), and the
 project's file then says `account:UID:ID`, nothing secret, one line per
 person who gave one (R159: every git action is a person's, with their own
-token). A person's own git work (their session's bb git, their presses in
+token). A person's own git work (their session's aerie git, their presses in
 the Git view, the release they cut, the wiki they sync) is handed their own
 token, while they hold a live sign-in anywhere (logins.live); signed out
-everywhere, their sessions' bb git waits for them. Work that is nobody's
+everywhere, their sessions' aerie git waits for them. Work that is nobody's
 in the moment (watching CI) takes the token of any giver signed in now and
 pauses while none is. A project keeps no token of its own; a line kept as
 the project's from before (an install with no key to seal a store with)
@@ -30,6 +30,7 @@ import contextvars
 import os
 import re
 import shlex
+import threading
 import urllib.parse
 from pathlib import Path
 
@@ -176,10 +177,11 @@ def keep_as_own(project, line):
     d = STATE / "gitcreds"
     d.mkdir(parents=True, exist_ok=True)
     os.chmod(d, 0o700)
-    rows = givers(project)
-    fd = os.open(path(project), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        fh.write(_kept(line) + "\n" + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
+    with _glock:
+        rows = givers(project)
+        fd = os.open(path(project), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(_kept(line) + "\n" + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
     return True
 
 
@@ -208,7 +210,7 @@ def usable(project, uid):
             return {"by": uid, "mine": True, "live": True, "given": True, "why": ""}
         return {"by": uid, "mine": True, "live": False, "given": True,
                 "why": "your token for this project is used only while you are signed in, and you are "
-                       "signed out everywhere: bb git waits for you to sign in to the dashboard"}
+                       "signed out everywhere: aerie git waits for you to sign in to the dashboard"}
     other = next((u for u, _ in g if _live(u) and not _locked(u)), "")
     if other:
         return {"by": other, "mine": False, "live": True, "given": False, "why": ""}
@@ -242,20 +244,29 @@ def _write_givers(project, rows, keep_own=True):
         fh.write("".join(x + "\n" for x in own) + "".join(f"{LINKED}{u}:{f}\n" for u, f in rows))
 
 
+# Each read of a project's givers and the write after it, as one: two
+# people giving a project a token at once each read the givers, and one
+# rewrite lost the other's line (B549). Re-entrant, so a writer may call
+# another.
+_glock = threading.RLock()
+
+
 def link_account(project, uid, fid):
     """The project given `uid`'s token: their line added, or theirs
     replaced when they had given one; the other givers stay."""
-    rows = [(u, f) for u, f in givers(project) if u != uid] + [(uid, fid)]
-    _write_givers(project, rows)
+    with _glock:
+        rows = [(u, f) for u, f in givers(project) if u != uid] + [(uid, fid)]
+        _write_givers(project, rows)
 
 
 def unlink_person(project, uid):
     """`uid`'s token no longer given to this project; the others stay."""
-    rows = [(u, f) for u, f in givers(project) if u != uid]
-    if len(rows) == len(givers(project)):
-        return False
-    _write_givers(project, rows)
-    return True
+    with _glock:
+        rows = [(u, f) for u, f in givers(project) if u != uid]
+        if len(rows) == len(givers(project)):
+            return False
+        _write_givers(project, rows)
+        return True
 
 
 def linked_projects(uid, fid=None):
@@ -287,16 +298,17 @@ def remap(uid, olds, new):
     olds = {str(o) for o in olds}
     d = STATE / "gitcreds"
     for f in sorted(d.iterdir()) if d.is_dir() else []:
-        rows = givers(f.name)
-        if any(u == uid and x in olds for u, x in rows):
-            moved = [(u, new if u == uid and x in olds else x) for u, x in rows]
-            _write_givers(f.name, list(dict.fromkeys(moved)))
+        with _glock:
+            rows = givers(f.name)
+            if any(u == uid and x in olds for u, x in rows):
+                moved = [(u, new if u == uid and x in olds else x) for u, x in rows]
+                _write_givers(f.name, list(dict.fromkeys(moved)))
 
 
 def adopt(owner_of):
     """Each token kept as a project's own (from before tokens were a
     person's) moved into its project owner's store, the project linked to
-    it: BuilderBot's owner where a project has none (owner_of says). Done
+    it: AerieOS's owner where a project has none (owner_of says). Done
     once a key can seal it; returns how many moved."""
     if not (seal and sealing and sealing()):
         return 0
@@ -415,10 +427,10 @@ def helpers(project, uid=None, why="git"):
 
 
 def git_c(project, uid=None, why="git"):
-    """git's -c arguments that hand a command BuilderBot's credential for this
+    """git's -c arguments that hand a command AerieOS's credential for this
     project, wherever it is kept (the account's own store, the project's),
     whatever the tree's own config names: every git that reaches a remote
-    for BuilderBot goes through these or through helpers() written into a
+    for AerieOS goes through these or through helpers() written into a
     config of its own (the operator, 27 Oct). [] where there is none."""
     hs = helpers(project, uid, why)
     return ["-c", "credential.helper=", *[x for h in hs for x in ("-c", f"credential.helper={h}")]] if hs else []
@@ -473,10 +485,13 @@ def seal_all(again=False):
             continue
         if text.startswith(LINKED):
             continue
+        # Through keep_as_own, which writes the line with the givers' lines
+        # after it: write_line kept the one line and every person who had
+        # given the project a token was gone from it (B543).
         if text and not text.startswith(SEALED):
-            write_line(f.name, text.splitlines()[0])
+            keep_as_own(f.name, text.splitlines()[0])
             n += 1
         elif again and text and (line := open_text(text)):
-            write_line(f.name, line)
+            keep_as_own(f.name, line)
             n += 1
     return n

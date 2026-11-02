@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BuilderBot's own Codex hooks, trusted for one launch (B284).
+"""AerieOS's own Codex hooks, trusted for one launch (B284).
 
 Codex CLI runs a hook a person has not reviewed only under
 --dangerously-bypass-hook-trust, which every ChatGPT session then opened on
@@ -7,7 +7,7 @@ as a warning. Codex records a reviewed hook as its key (the hooks file, the
 event, the group and the handler) and the hash of its definition, under
 hooks.state. This asks the Codex about to run for both, over its app server
 (hooks/list), so the hash is Codex's own and never a copy of how it is made,
-and prints the one -c argument that trusts BuilderBot's hooks and nothing
+and prints the one -c argument that trusts AerieOS's hooks and nothing
 else: those in the account's hooks.json that run bb-agent-hook. A -c table
 is merged into the account's own hooks.state, so a hook the person trusted
 stays trusted.

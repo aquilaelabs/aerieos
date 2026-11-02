@@ -56,11 +56,11 @@ async function loadHome(light = false){
 // The updates due across the install, each thing behind counted once: each
 // toolchain behind on a node, each container with a newer image, nginx
 // behind, an agent behind. A move (relocate) is not an update, nor a node
-// short of room (R110), nor a release's signing (R106), and a CI run has
+// short of room (R110), nor a release's signing (R106) or its files (R190), and a CI run has
 // its own tile.
 function homeUpdates(){
   return (state?.attention || []).reduce((n, a) =>
-    a.kind === "relocate" || a.kind === "room" || a.kind === "release-sign" || a.kind === "git-unlinked" || a.kind === "project-leftover" || a.kind === "acme" ? n : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
+    a.kind === "relocate" || a.kind === "room" || a.kind === "release-sign" || a.kind === "release-files" || a.kind === "git-unlinked" || a.kind === "project-leftover" || a.kind === "acme" ? n : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
       : a.kind === "image" ? (a.containers || []).length || 1 : 1), 0);
 }
 
@@ -90,9 +90,11 @@ function homeTiles(){
     {key: "jobs", label: "jobs running", value: jobs.running ?? "–",
      sub: jobs.failed_today ? `${jobs.failed_today} failed today` : jobs.waiting ? `${jobs.waiting} waiting` : "none failed today",
      subTone: jobs.failed_today ? "bad" : ""},
-    {key: "sessions", label: "sessions open", value: sessions, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
-    {key: "updates", label: updates === 1 ? "update due" : "updates due", value: updates, tone: updates ? "warn" : ""},
-    {key: "ci", label: "CI red", value: red, tone: red ? "bad" : "", sub: red === 1 ? projLabel(state.ci_red[0].project) : ""},
+    // These three are the status read's: before its first answer they wait
+    // rather than say 0 (a reload read 0 sessions open beside 24 a moment on).
+    {key: "sessions", label: "sessions open", value: sessions, wait: !state, sub: claudes ? `${claudes} of them ${agentsWord(agentSs.map(s => s.name))}` : ""},
+    {key: "updates", label: updates === 1 ? "update due" : "updates due", value: updates, wait: !state, tone: updates ? "warn" : ""},
+    {key: "ci", label: "CI red", value: red, wait: !state, tone: red ? "bad" : "", sub: red === 1 ? projLabel(state.ci_red[0].project) : ""},
     // The own machine's backups (R162 step 5): the last good run, or what
     // failed or went stale; only where a backup is recorded.
     h.backups ? {key: "backups", label: h.backups.count === 1 ? "backup" : "backups", value: h.backups.count,
@@ -187,9 +189,10 @@ function homeStartHtml(){
   ].filter(Boolean);
   const left = steps.filter(x => !x[1]).length;
   if (!left) return "";
-  return `<div class="field"><section class="hcard hstart"><h3>Getting started<span class="sst">${steps.length - left} of ${steps.length}</span></h3>
-    ${steps.map(([t, done, act]) => `<div class="hsrow${done ? " done" : ""}"><span class="setnum">${done ? "✓" : ""}</span><span class="grow">${esc(t)}</span>${done ? "" : act}</div>`).join("")}
-    <div class="bfootbar"><span class="sp"></span><button type="button" data-hstart="hide">Put away</button></div></section></div>`;
+  // Put away on the card's head, beside its count: a card's one button is
+  // on its head's row, never alone on a row over a gap (the page-head rule).
+  return `<div class="field"><section class="hcard hstart"><h3>Getting started<span class="sst">${steps.length - left} of ${steps.length}</span><button type="button" data-hstart="hide">Put away</button></h3>
+    ${steps.map(([t, done, act]) => `<div class="hsrow${done ? " done" : ""}"><span class="setnum">${done ? "✓" : ""}</span><span class="grow">${esc(t)}</span>${done ? "" : act}</div>`).join("")}</section></div>`;
 }
 
 // Attention, Last jobs and the pinned projects: the cards under the tiles,
@@ -197,13 +200,13 @@ function homeStartHtml(){
 function homeCards(jobs){
   const needs = needsRows(), hidden = state?.bell_hidden || 0;
   return `${homeStartHtml()}<div class="field"><div class="homegrid">
-        <section class="hcard hattn"><h3>Attention</h3>${needs.length ? needs.join("")
+        <section class="hcard hattn"><h3>Attention</h3>${!state ? skRows(2) : needs.length ? needs.join("")
           : `<div class="empty">nothing needs attention</div>`}${hidden
           ? `<div class="bfootbar"><span>${hidden} update${hidden === 1 ? "" : "s"} dismissed</span>
               <button type="button" data-brestore>Show again</button></div>` : ""}</section>
         <section class="hcard"><h3>Last jobs</h3>${jobs}</section>
       </div></div>
-      <div class="field"><section class="hsect"><h3>Projects at a glance</h3>${homeGlanceHtml()}</section></div>`;
+      <div class="field"><section class="hsect"><h3>Projects at a glance</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
 }
 
 // The Attention card brought into view and marked a moment: where the

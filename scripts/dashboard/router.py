@@ -71,7 +71,7 @@ def pack():
     """The router as an official pack (R172): a service a node deploys from
     its Library card, its configuration the fields the Node settings
     section asked before, written to packs/services/model-router by
-    tools/packs-export.py and held to this by bb lint."""
+    tools/packs-export.py and held to this by aerie lint."""
     return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
             "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the projects you allow: "
                      "each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
@@ -86,7 +86,7 @@ def pack():
                           "help": "on this node's card where it has one, else its CPU and memory; its models one more provider (ollama/NAME)"},
                          {"name": "projects", "label": "Projects that may use it", "kind": "projects",
                           "help": "each handed the address and its own key at a session's start; a session of any other project cannot reach it"}]}
-MODEL_RE = re.compile(r"^[A-Za-z0-9._:/-]{1,120}$")
+MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
 
 def configure(**deps):
@@ -157,6 +157,19 @@ def _url(nid, rec=None):
 
 # ---- the compose file -----------------------------------------------------------
 
+def _q(v):
+    """A string as YAML reads it back whole: a JSON string is a YAML
+    double-quoted scalar, so a quote, a backslash or a newline in a key or
+    an address is escaped rather than ending the value (B536)."""
+    return json.dumps(str(v))
+
+
+def _qc(v):
+    """...and for a value compose itself reads, a dollar doubled so it is
+    not taken as an interpolation."""
+    return _q(v).replace("$", "$$")
+
+
 def _indent(text, n):
     pad = " " * n
     return "\n".join(pad + ln if ln else ln for ln in text.splitlines())
@@ -171,11 +184,11 @@ def litellm_config(rec):
     out = ["model_list:"]
     for pid, p in PROVIDERS.items():
         if (rec.get("providers") or {}).get(pid):
-            out += [f"  - model_name: \"{p['route']}\"", "    litellm_params:", f"      model: \"{p['route']}\"",
+            out += [f"  - model_name: {_q(p['route'])}", "    litellm_params:", f"      model: {_q(p['route'])}",
                     f"      api_key: os.environ/{p['env']}"]
     for i, c in enumerate(rec.get("custom") or []):
-        out += [f"  - model_name: \"{c['name']}/*\"", "    litellm_params:", "      model: \"openai/*\"",
-                f"      api_base: \"{c['base']}\"", f"      api_key: os.environ/CUSTOM_{i}_KEY"]
+        out += [f"  - model_name: {_q(c['name'] + '/*')}", "    litellm_params:", "      model: \"openai/*\"",
+                f"      api_base: {_q(c['base'])}", f"      api_key: os.environ/CUSTOM_{i}_KEY"]
     if (rec.get("ollama") or {}).get("on"):
         out += ["  - model_name: \"ollama/*\"", "    litellm_params:", "      model: \"ollama_chat/*\"",
                 "      api_base: \"http://ollama:11434\""]
@@ -194,15 +207,15 @@ def compose_text(nid, rec, gpu=False):
     addr = node_addr(nid) if node_addr else ""
     name = container_name(nid)
     port = int(rec.get("port") or PORT)
-    env = [f"      LITELLM_MASTER_KEY: \"{_open(rec.get('master'))}\"",
-           f"      DATABASE_URL: \"postgresql://litellm:{_open(rec.get('dbpass'))}@db:5432/litellm\""]
+    env = [f"      LITELLM_MASTER_KEY: {_qc(_open(rec.get('master')))}",
+           f"      DATABASE_URL: {_qc('postgresql://litellm:' + _open(rec.get('dbpass')) + '@db:5432/litellm')}"]
     for pid, p in PROVIDERS.items():
         k = _open((rec.get("providers") or {}).get(pid))
         if k:
-            env.append(f"      {p['env']}: \"{k}\"")
+            env.append(f"      {p['env']}: {_qc(k)}")
     for i, c in enumerate(rec.get("custom") or []):
-        env.append(f"      CUSTOM_{i}_KEY: \"{_open(c.get('key')) or 'none'}\"")
-    out = ["# Written by BuilderBot from a node's Model router section (router.py); Save there rewrites it.",
+        env.append(f"      CUSTOM_{i}_KEY: {_qc(_open(c.get('key')) or 'none')}")
+    out = ["# Written by AerieOS from a node's Model router section (router.py); Save there rewrites it.",
            "services:",
            "  litellm:",
            f"    image: {IMAGE}",
@@ -222,7 +235,7 @@ def compose_text(nid, rec, gpu=False):
            "    restart: unless-stopped",
            "    environment:",
            "      POSTGRES_USER: litellm",
-           f"      POSTGRES_PASSWORD: \"{_open(rec.get('dbpass'))}\"",
+           f"      POSTGRES_PASSWORD: {_qc(_open(rec.get('dbpass')))}",
            "      POSTGRES_DB: litellm",
            "    volumes:",
            "      - router_db:/var/lib/postgresql/data"]
@@ -256,6 +269,8 @@ def set_keys(nid, req):
         prov = rec.setdefault("providers", {})
         for pid in PROVIDERS:
             v = str((req.get("providers") or {}).get(pid) or "").strip() if isinstance(req.get("providers"), dict) else ""
+            if v and not v.isprintable():
+                return {"error": f"the {pid} key must be on one line"}
             if v == "clear":
                 prov.pop(pid, None)
             elif v:
@@ -269,9 +284,12 @@ def set_keys(nid, req):
                 name, base = str(c.get("name") or "").strip().lower(), str(c.get("base") or "").strip()
                 if not NAME_RE.match(name) or name in PROVIDERS or name == "ollama":
                     return {"error": f"a custom provider's name is letters, digits and dashes, and not one of {', '.join(PROVIDERS)}: {name or 'none'}"}
-                if not base.startswith(("http://", "https://")):
-                    return {"error": f"{name}'s address must start with http:// or https://"}
+                u = urllib.parse.urlsplit(base) if base.isprintable() and " " not in base else None
+                if not u or u.scheme not in ("http", "https") or not u.netloc:
+                    return {"error": f"{name}'s address must be an http:// or https:// address, on one line"}
                 key = str(c.get("key") or "").strip()
+                if not key.isprintable():
+                    return {"error": f"{name}'s key must be on one line"}
                 was = kept.get(name) or {}
                 out.append({"name": name, "base": base.rstrip("/"), "key": _keep(key) if key else was.get("key", "")})
             rec["custom"] = out
@@ -454,8 +472,15 @@ def disallow(nid, project):
     p = (rec.get("projects") or {}).get(str(project))
     if not p:
         return {"error": "not allowed there"}
-    with contextlib.suppress(Exception):
-        _api(nid, "/key/delete", {"keys": [_open(p.get("key"))]})
+    # The key was handed to the project's sessions, so the project is let go
+    # only once the router has deleted it: dropped from the record while the
+    # router was down, the key went on working with the page saying it was
+    # gone. A router no longer deployed holds no keys to delete.
+    if rec.get("deployed"):
+        try:
+            _api(nid, "/key/delete", {"keys": [_open(p.get("key"))]})
+        except Exception as e:                              # noqa: BLE001 (said to the person)
+            return {"error": f"{project} is still allowed: the router did not delete its key ({_why(e)}); try again once it answers"}
     with _lock:
         d = _load()
         (d.get(str(nid)) or {}).get("projects", {}).pop(str(project), None)
@@ -546,7 +571,7 @@ def refresh_models(nid):
     return {"ok": True, "models": models}
 
 
-# The models walked with the open agent and BuilderBot's tools (R144 step
+# The models walked with the open agent and AerieOS's tools (R144 step
 # 3): a session on one ran the briefing, bb, the hooks and a transcript
 # end to end. One goes here when that walk is done; the picker marks the
 # rest untested rather than hiding them, since the router routes to any.
@@ -636,21 +661,26 @@ def seal_all(again=False):
     n = 0
     with _lock:
         d = _load()
+        # A value that does not open (sealed under a key this controller does
+        # not hold) stays as it is for that key to open later, never sealed
+        # again as nothing: _open's "" for it erased every key.
+        def again_(m, k):
+            nonlocal n
+            v = _open(m.get(k))
+            if v:
+                m[k] = _keep(v)
+                n += 1
         for rec in d.values():
             for k in ("master", "dbpass"):
                 if rec.get(k):
-                    rec[k] = _keep(_open(rec[k]))
-                    n += 1
+                    again_(rec, k)
             for pid in list(rec.get("providers") or {}):
-                rec["providers"][pid] = _keep(_open(rec["providers"][pid]))
-                n += 1
+                again_(rec["providers"], pid)
             for c in rec.get("custom") or []:
                 if c.get("key"):
-                    c["key"] = _keep(_open(c["key"]))
-                    n += 1
+                    again_(c, "key")
             for p in (rec.get("projects") or {}).values():
-                p["key"] = _keep(_open(p.get("key")))
-                n += 1
+                again_(p, "key")
         if n:
             _save(d)
     return n

@@ -69,7 +69,7 @@ container_maker = None
 vm_runner = None
 pack_runner = None         # (project, entry, by) -> a catalog pack added (R169 step 5)
 # signing.start(principal, project, file, route), set by the server: what
-# Allow on a session's `bb sign` runs (R106), queued as the session asked.
+# Allow on a session's `aerie sign` runs (R106), queued as the session asked.
 signer = None
 # What Allow on a session's key change runs (R106 step 6), set by the
 # server: keymaker(action, project, args) -> (payload, status), where
@@ -85,6 +85,7 @@ release_editor = None
 # (project, plan, asker_name, principal) -> (payload, status): files taken
 # off a published release, its own ask (the operator, 5 Oct).
 release_remover = None
+release_withdrawer = None
 # (project) -> (payload, status): a release's APK looked for and signed
 # again (releasesign.check, R134), what Allow on a session's ask runs.
 release_signer = None
@@ -434,7 +435,7 @@ def connect(nid, ip, port, uid, name):
     # operator, 9 Oct), whoever's phone it is.
     n = _valid_port(port)
     if not n:
-        return {"error": "the phone's connect port is needed: the BuilderBot app finds it, or read "
+        return {"error": "the phone's connect port is needed: the AerieOS app finds it, or read "
                          "it under IP address & port on Android's Wireless debugging screen (the "
                          "number after the colon) and type it in"}
     # "connected to" is a socket, not a phone: the port of something else
@@ -731,6 +732,8 @@ def _req_public(r):
     if r.get("kind") == "release-remove":
         out["tag"] = r.get("tag") or ""
         out["files"] = [{"name": x["name"], "size": x["size"]} for x in r.get("files") or []]
+    if r.get("kind") == "release-withdraw":
+        out["tag"] = r.get("tag") or ""
     if r.get("kind") == "rebuild":
         out["create"] = bool(r.get("create"))
         out["ctl"] = r.get("ctl") or ""
@@ -767,7 +770,8 @@ def _for(r, uid, admin):
         return False
     # A signing, or a key change, waits on the project's owner, whatever
     # their role.
-    if r.get("kind") in ("sign", "sign-key", "release", "release-edit", "release-remove", "release-sign"):
+    if r.get("kind") in ("sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw",
+                         "release-sign"):
         return r["to"] == uid
     # A held push (R219) is the asking account's to answer, and an
     # administrator's, since what it would send is the project's.
@@ -782,7 +786,7 @@ def requests_open(uid=None, admin=False, project=""):
     """What is waiting: everything, or only what waits on this account.
     `admin` says whether it is one, which is who a root request waits on.
     With `project`, a SESSION's read-only view instead: its own project's
-    pending requests, so `bb root` and `bb phone` in a session can say what
+    pending requests, so `aerie root` and `aerie phone` in a session can say what
     is waiting on somebody, though the session can answer none of it."""
     with _lock:
         for r in _reqs:
@@ -992,7 +996,7 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
         return {"error": f"{project or 'this project'} has no node, so there is no machine "
                          "to run anything on as root: root is asked for on the project's node"}
     if not sandbox:
-        return {"error": f"{node_name or nid} was not provisioned as a BuilderBot sandbox, so "
+        return {"error": f"{node_name or nid} was not provisioned as an AerieOS sandbox, so "
                          "root there is its owner's and not something this can ask for"}
     if locked:
         # Said now rather than after somebody pressed Allow: the lock is the
@@ -1033,7 +1037,8 @@ def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", princi
         return {"error": "say what it is for: --why \"...\" (0.5.4 for testers, the store upload ...)"}
     if not to_uid:
         return {"error": f"{project} has no owner to ask"}
-    cmd = ["version", "release", f"{plan['tag']} on {plan['sha']}"] + (["--for", comp] if comp else [])
+    cmd = ["version", "release", f"{plan['tag']} on {plan['sha']}"] + (["--for", comp] if comp else []) + (
+        [f"({plan['channel']})"] if plan.get("channel") else [])
     return _queue("release", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
                   extra={"comp": str(comp or ""), "tag": plan["tag"], "sha": plan["sha"],
                          "principal": principal, "asker_name": str(asker_name or ""), "dev": bool(dev)})
@@ -1073,6 +1078,24 @@ def ask_release_remove(why, project, plan, to_uid, to_name, asker_name="", princ
     return _queue("release-remove", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
                   extra={"tag": plan["tag"], "files": plan.get("files") or [],
                          "principal": principal, "asker_name": str(asker_name or "")})
+
+
+def ask_release_withdraw(why, project, plan, to_uid, to_name, asker_name="", principal=""):
+    """A session asking to take a published release back, its tag with it
+    (R190 step 3): always an ask, whatever the dial, since nothing undoes
+    it. The person reads which tag, whether it is a pre-release and how
+    many files go with it."""
+    why = " ".join(str(why or "").split())[:300]
+    if not why:
+        return {"error": "say why it is withdrawn: --why \"...\" (cut by mistake, a stable one meant as dev ...)"}
+    if not to_uid:
+        return {"error": f"{project} has no owner to ask"}
+    what = (("the pre-release" if plan.get("prerelease") else "the release")
+            + f" with its {plan.get('files', 0)} files" if plan.get("release") else "no release, already deleted")
+    cmd = ["version", "release", "--withdraw", plan["tag"], f"({what}, and the tag"
+           + ("" if plan.get("tagged") else ", already gone") + f", on {plan.get('forge')})"]
+    return _queue("release-withdraw", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
+                  extra={"tag": plan["tag"], "principal": principal, "asker_name": str(asker_name or "")})
 
 
 def ask_release_sign(why, project, to_uid, to_name, asker_name=""):
@@ -1136,7 +1159,7 @@ def ask_rebuild(why, project, instance, name, asker_uid="", asker_name="",
     `target` is the container's own key when it is not that project's
     instance (one written here that belongs to it). `ctl` asks instead to
     start, stop or restart the container called `name` on `node`, one that
-    belongs to the project and that BuilderBot may not have started.
+    belongs to the project and that AerieOS may not have started.
     """
     why = " ".join(str(why or "").split())[:300]
     if not why:
@@ -1218,7 +1241,7 @@ def ask_vm(why, project, req, asker_name=""):
             if req.get(k) not in (None, "")}
     if keep.get("node_agent"):
         shown.append("--node-agent")
-    # What the person allowing reads on the bell: the hardware as bb vm's
+    # What the person allowing reads on the bell: the hardware as aerie vm's
     # own words (R100), a disk's size, autostart's way.
     hw = keep.get("hw") if isinstance(keep.get("hw"), dict) else {}
     if "cpuset" in hw:
@@ -1234,7 +1257,7 @@ def ask_vm(why, project, req, asker_name=""):
         shown += [str(keep["disk"])] * bool(keep.get("disk")) + [f"{keep['gb']}G"]
     if action == "autostart":
         shown.append("on" if keep.get("on") else "off")
-    # A USB device to a VM (R116), as bb vm usb names it.
+    # A USB device to a VM (R116), as aerie vm usb names it.
     if action in ("usb-give", "usb-take") and isinstance(keep.get("usb"), dict):
         u = keep["usb"]
         shown = ["vm", "usb", name, "give" if action == "usb-give" else "take",
@@ -1417,6 +1440,15 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             r.update(state="done", code=1 if got.get("error") else 0,
                      out=str(got.get("error") or got.get("said") or "removed"))
         return {"error": got["error"]} if got.get("error") else {"ok": True}
+    if r.get("kind") == "release-withdraw":
+        res = (release_withdrawer(r["project"], {"tag": r.get("tag") or ""}, r.get("asker_name") or "",
+                                  r.get("principal") or "")
+               if release_withdrawer is not None else ({"error": "nothing here withdraws a release"}, 400))
+        got = res[0] if isinstance(res, tuple) else res
+        with _lock:
+            r.update(state="done", code=1 if got.get("error") else 0,
+                     out=str(got.get("error") or got.get("said") or "withdrawn"))
+        return {"error": got["error"]} if got.get("error") else {"ok": True}
     if r.get("kind") == "release-edit":
         plan = {"tag": r.get("tag") or "", "notes": r.get("notes"), "files": r.get("files") or []}
         res = (release_editor(r["project"], plan, r.get("asker_name") or "", r.get("principal") or "")
@@ -1487,7 +1519,7 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
             except Exception as e:                                     # noqa: BLE001 (said, not raised)
                 res, st = {"error": str(e)}, 500
             # The answer's own output is what is cut, never the JSON around
-            # it: cut at 8 KB, a layout dump stopped parsing and bb phone ui
+            # it: cut at 8 KB, a layout dump stopped parsing and aerie phone ui
             # printed its tail as an ERROR (report #56). 256 KB holds a
             # screen's whole hierarchy.
             if isinstance(res, dict) and isinstance(res.get("out"), str) and len(res["out"]) > USE_OUT_MAX:
@@ -1670,7 +1702,7 @@ def tab_view(uid, *, admin, project, node="", probe=False, scope=None, ua="", ad
     # the list carried every phone node's name, address and handset to a
     # session (the probe of 26 Sep).
     # The row's node is its `id`: filtering on a `node` key no row has
-    # emptied the list for every scoped asker, so a session's bb phone status
+    # emptied the list for every scoped asker, so a session's aerie phone status
     # said "no node carries adb" beside a phone connected on its node
     # (report #51, 4 Oct).
     if scope is not None and isinstance(out.get("nodes"), list):
@@ -1868,7 +1900,7 @@ def verb(action, req, who, fresh):
             return no
         rec = _rec(lnid) or {}
         args = req.get("args") if isinstance(req.get("args"), dict) else {}
-        shown = ["bb", "phone", str(op)[:20]] + [f"{k}={str(v)[:120]}" for k, v in sorted(args.items())][:8]
+        shown = ["aerie", "phone", str(op)[:20]] + [f"{k}={str(v)[:120]}" for k, v in sorted(args.items())][:8]
         why = " ".join(str(req.get("why") or "").split())[:300] or f"{op} on the phone lent to {proj}"
         nname = (nodes.node(lnid) or {}).get("name") if nodes is not None else lnid
         acct = users.account_of(who) or {}

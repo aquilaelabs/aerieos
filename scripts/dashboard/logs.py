@@ -32,7 +32,7 @@ import zipfile
 from pathlib import Path
 
 # What download() needs for the diagnostics, set by server.py: the report
-# bb diag prints (diag.report), and the audit row a read of it writes.
+# aerie diag prints (diag.report), and the audit row a read of it writes.
 diag_report = None
 audit = None
 conversation_text = None    # reports.conversation: a report's conversation, for the download
@@ -315,7 +315,7 @@ def archive_bytes():
 # Deliberately NOT moved in here. A CI run is not a container session: it
 # belongs to a workflow run, spans whatever session happened to be up, and is
 # already one file per run under a directory per repository, which is the
-# grouping somebody actually wants. `bb ci-log` reads them by run id.
+# grouping somebody actually wants. `aerie ci-log` reads them by run id.
 #
 # What was missing was only that the settings menu did not know they existed:
 # they were not in the archive and no retention reached them. Both now do.
@@ -353,8 +353,8 @@ def download(what, principal):
     whole log archive (`archive`), or the container's own session log.
     ((filename, bytes, content type), 200), or an error and its status."""
     if what == "diag":
-        # The controller's diagnostics whole, the report bb diag prints
-        # with what sessions have reported about BuilderBot among it, as
+        # The controller's diagnostics whole, the report aerie diag prints
+        # with what sessions have reported about AerieOS among it, as
         # one file to keep or hand over (the operator, 24 Sep). Redacted
         # as they always are, and on the audit trail as a read of them
         # through the API is.

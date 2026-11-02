@@ -1,4 +1,4 @@
-"""Behind `bb login --check` (claude_login_check in bb): is this account
+"""Behind `aerie login --check` (claude_login_check in bb): is this account
 signed in to each coding agent on this machine, and as whom, told to the
 controller.
 
@@ -8,7 +8,7 @@ for itself and is the one that signs out. Never fatal, and quiet: bb-tty
 runs this on every connection.
 
 The other coding agents' sign-ins go up beside Claude's, read by the same
-readers `bb login --list` uses (R95 step 3): the heartbeat carries them too,
+readers `aerie login --list` uses (R95 step 3): the heartbeat carries them too,
 but a sign-in made in a job or a terminal is said at once, as Claude's is.
 
 Arguments: `--loud` for the interactive verb, or nothing; then the agent
@@ -61,7 +61,7 @@ def whoami():
     Claude Code locks that file to refresh it, because a refresh rotates the
     refresh token; two sessions of one account already contend, and the loser
     is told "another Claude Code process is refreshing it" and its turn fails
-    (B112). `bb login --list` has read these same facts out of the files since
+    (B112). `aerie login --list` has read these same facts out of the files since
     it was written, for exactly this reason, and this is that reader.
 
     The rule is --list's: .claude.json carries oauthAccount.emailAddress, and

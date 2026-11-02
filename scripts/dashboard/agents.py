@@ -19,7 +19,7 @@ the agents a later step wires without anything behaving differently now.
 No imports from the rest of the dashboard, like names.py, so bb-tty, the
 node's bundle and the doctor can read it standalone. The page's copy is
 page-agents.js, held to this one by unit/test_agents.py; the node agent's
-prefixes (builderbot_agent/sessions.py AGENT_PREFIXES) by the same test.
+prefixes (aerieos_agent/sessions.py AGENT_PREFIXES) by the same test.
 """
 import re
 from dataclasses import dataclass, field
@@ -106,7 +106,7 @@ TABLE = (
     # model router (router.py) rather than signed in to anybody: its keys
     # are the router's, handed to a session at its start with the models
     # the router offers; its briefing an instructions file in its config,
-    # its guards and its state a plugin of BuilderBot's (bb-tty writes it)
+    # its guards and its state a plugin of AerieOS's (bb-tty writes it)
     # calling bb-agent-hook as the others' hooks do, its conversations
     # exported by that plugin at each turn's end. Checked against OpenCode
     # 1.x's docs on 28 Oct.

@@ -1,9 +1,9 @@
-// Problems with BuilderBot itself, reported by a session on any project
-// (reports.py, bb report; the operator, 24 Sep). A session files one instead
+// Problems with AerieOS itself, reported by a session on any project
+// (reports.py, aerie report; the operator, 24 Sep). A session files one instead
 // of putting it in its own project's tracker, as a shipped rule tells it to;
 // the report waits on the controller and is read in the diagnostics behind
 // their gate, a log a person clears. Nothing goes back to the session that
-// made it: that loop worked only where BuilderBot's own tracker sat beside
+// made it: that loop worked only where AerieOS's own tracker sat beside
 // the sessions reporting to it (the operator, 8 Oct).
 import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -18,16 +18,16 @@ const call = async (path, body, headers = ADMIN) => {
     : { method: 'POST', headers, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
-const token = project => execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'token', project, 'test'],
+const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const as = tok => ({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
 const ALPHA = as(token('alpha'));
 const BETA = as(token('beta'));
 
 // ---- a session reports one ---------------------------------------------------
-const made = await call('/api/reports', { action: 'add', text: 'bb test ran the tests inside the dev instance',
-  area: 'bb test', repro: 'the log said token=bbs_abcdefgh12345678 and found no tests' }, ALPHA);
-ok(made.status === 200 && made.ok && made.id > 0, `a session reports a problem with BuilderBot (${JSON.stringify(made)})`);
+const made = await call('/api/reports', { action: 'add', text: 'aerie test ran the tests inside the dev instance',
+  area: 'aerie test', repro: 'the log said token=bbs_abcdefgh12345678 and found no tests' }, ALPHA);
+ok(made.status === 200 && made.ok && made.id > 0, `a session reports a problem with AerieOS (${JSON.stringify(made)})`);
 const stored = JSON.parse(readFileSync(`${DIR}/state/reports.json`, 'utf8')).reports.find(r => r.id === made.id) || {};
 ok(stored.project === 'alpha' && !('state' in stored) && /redacted/.test(stored.repro)
    && !/bbs_abcdefgh/.test(JSON.stringify(stored)),
@@ -53,14 +53,14 @@ ok(gone.every(r => r.status >= 400) && (await call('/api/reports', { action: 'ge
 // As a session on a node runs it: its token, its project, the controller's address.
 const node = { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: base, BB_TOKEN: token('alpha'),
                BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-reports` };
-const bb = (args, env, cwd) => spawnSync('bash', [`${REPO}/scripts/bb`, ...args],
+const bb = (args, env, cwd) => spawnSync('bash', [`${REPO}/scripts/aerie`, ...args],
   { encoding: 'utf8', env, cwd: cwd || `${DIR}/ws/alpha`, timeout: 60000 });
-const said = bb(['report', 'bb map build wrote .bb-map into the tree unignored', '--area', 'bb map'], node);
-ok(said.status === 0 && /reported #\d+/.test(said.stdout), `bb report sends one from a session (${(said.stdout + said.stderr).trim()})`);
+const said = bb(['report', 'aerie map build wrote .bb-map into the tree unignored', '--area', 'aerie map'], node);
+ok(said.status === 0 && /reported #\d+/.test(said.stdout), `aerie report sends one from a session (${(said.stdout + said.stderr).trim()})`);
 ok(/nothing more is needed/.test(said.stdout), '...and says nothing more is needed from the session');
 const list = bb(['report'], node);
 ok(list.status !== 0 && /say what went wrong/.test(list.stderr),
-   `bb report alone asks for the words, with no listing of what became of earlier ones (${list.stderr.trim().slice(0, 100)})`);
+   `aerie report alone asks for the words, with no listing of what became of earlier ones (${list.stderr.trim().slice(0, 100)})`);
 const admin = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_AUTH: 'test:test',
                 BB_CONTROLLER: base, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
 
@@ -68,52 +68,52 @@ const admin = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DAS
 const p = await call('/api/preamble?project=alpha');
 const text = p.text || '';
 const notebook = (await call('/api/preamble?project=alpha&topic=notebook')).text || '';
-ok(/`bb report "\.\.\."` for a problem with BuilderBot itself/.test(text) && !/report-builderbot/.test(text)
-   && notebook.split('goes to `bb report').length === 2 && /nothing comes back/.test(notebook),
-   'a session is told once, by the briefing\'s core and its notebook topic and not a rule, where BuilderBot\'s problems go and what the verb does');
+ok(/`aerie report "\.\.\."` for a problem with AerieOS itself/.test(text) && !/report-builderbot/.test(text)
+   && notebook.split('goes to `aerie report').length === 2 && /nothing comes back/.test(notebook),
+   'a session is told once, by the briefing\'s core and its notebook topic and not a rule, where AerieOS\'s problems go and what the verb does');
 // ...and stopped when it files one in its own tracker anyway: asked, before
 // anything is filed, since a line said afterwards was not enough (24 Sep).
 const bugsNow = () => { try { return (JSON.parse(readFileSync(`${DIR}/state/bugs.json`, 'utf8')).projects.alpha || []).length; }
                         catch { return 0; } };   // (none filed yet: no file)
 const had = bugsNow();
-const own = bb(['bug', 'add', 'bb devapp status says the env is the operator\'s'],
+const own = bb(['bug', 'add', 'aerie devapp status says the env is the operator\'s'],
                { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
-ok(own.status !== 0 && /^\[builderbot\] not filed yet\. Send it with bb report .*or add --here/.test(own.stderr)
-   && own.stderr.indexOf('bb report') < 60 && own.stderr.indexOf('--here') < 200 && bugsNow() === had,
-   `a bug that names BuilderBot, filed in another project, is not filed there, and both ways on are in the first of what it says (${own.stderr.trim().slice(0, 110)})`);
+ok(own.status !== 0 && /^\[builderbot\] not filed yet\. Send it with aerie report .*or add --here/.test(own.stderr)
+   && own.stderr.indexOf('aerie report') < 60 && own.stderr.indexOf('--here') < 200 && bugsNow() === had,
+   `a bug that names AerieOS, filed in another project, is not filed there, and both ways on are in the first of what it says (${own.stderr.trim().slice(0, 110)})`);
 const colon = bb(['bug', 'add', 'bb: tests preflight runs every suite', '--sev', 'high'],
                  { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(colon.status !== 0 && bugsNow() === had,
-   '...however the verb is written (bb: ..., `bb`, bb-tty), and the severity is not read as words');
+   '...however the verb is written (bb: ..., `aerie`, bb-tty), and the severity is not read as words');
 // A repro that uses bb is how a project's own bug is shown, not a sign it is
-// BuilderBot's: two of MediaReducer's were stopped for one (7 Oct).
-const byRepro = bb(['bug', 'add', 'the dashboard repaints after it loads', '--repro', 'record it with bb capture reel', '--reproduces', 'once'],
+// AerieOS's: two of MediaReducer's were stopped for one (7 Oct).
+const byRepro = bb(['bug', 'add', 'the dashboard repaints after it loads', '--repro', 'record it with aerie capture reel', '--reproduces', 'once'],
                    { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(byRepro.status === 0 && /filed B\d+/.test(byRepro.stdout) && bugsNow() === had + 1,
-   `...and a repro that uses bb does not make it BuilderBot's (${(byRepro.stdout + byRepro.stderr).trim().slice(0, 80)})`);
+   `...and a repro that uses bb does not make it AerieOS's (${(byRepro.stdout + byRepro.stderr).trim().slice(0, 80)})`);
 const helped = bb(['bug', 'add', '-h'], { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
-ok(helped.status === 0 && /bb bug/.test(helped.stdout) && bugsNow() === had + 1,
-   '...and bb bug add -h prints the help rather than filing a bug called -h');
-const mine2 = bb(['bug', 'add', 'bb build fails because this project pins an old compiler', '--here'],
+ok(helped.status === 0 && /aerie bug/.test(helped.stdout) && bugsNow() === had + 1,
+   '...and aerie bug add -h prints the help rather than filing a bug called -h');
+const mine2 = bb(['bug', 'add', 'aerie build fails because this project pins an old compiler', '--here'],
                  { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(mine2.status === 0 && /filed B\d+/.test(mine2.stdout) && bugsNow() === had + 2,
    `...while --here files one that is the project's own (${mine2.stdout.trim().slice(0, 80)})`);
 // ---- off for a project, in its settings -------------------------------------------
-// Agents may: Report BuilderBot bugs. BuilderBot's own project has it off:
+// Agents may: Report AerieOS bugs. AerieOS's own project has it off:
 // its problems go into its own tracker, so its sessions are not sent to
-// bb report, not nudged toward it, and refused by it.
+// aerie report, not nudged toward it, and refused by it.
 const setReport = v => call('/api/prefs', { project: 'alpha', report: v });
 await setReport('deny');
 const refused = await call('/api/reports', { action: 'add', text: 'something about bb' }, ALPHA);
-ok(refused.status === 403 && /Agents may: Report BuilderBot bugs/.test(refused.error || ''),
-   `with it off, bb report is refused and says where the setting is (${refused.error})`);
+ok(refused.status === 403 && /Agents may: Report AerieOS bugs/.test(refused.error || ''),
+   `with it off, aerie report is refused and says where the setting is (${refused.error})`);
 const quiet = (await call('/api/preamble?project=alpha&topic=notebook')).text || '';
-ok(/setting Report BuilderBot bugs is deny/.test(quiet) && /`bb bug add --here` files it here/.test(quiet),
+ok(/setting Report AerieOS bugs is deny/.test(quiet) && /`aerie bug add --here` files it here/.test(quiet),
    '...and its sessions are told what deny means: the verb refuses, and --here files it in this tracker');
-const noNudge = bb(['bug', 'add', 'bb devapp status is wrong about the env'],
+const noNudge = bb(['bug', 'add', 'aerie devapp status is wrong about the env'],
                    { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(noNudge.status === 0 && !/not filed yet/.test(noNudge.stderr),
-   '...and a bug naming BuilderBot filed there is not pointed at it');
+   '...and a bug naming AerieOS filed there is not pointed at it');
 ok(prefsOf('alpha').report === 'deny',
    '...stored on the project as the one word that differs from the default');
 await setReport('auto');
@@ -213,7 +213,7 @@ ok(page.dialogs.length === 0, '...and with none kept, it says so rather than ask
   await page.fill('#reportRepro', 'edit, switch tabs, come back');
   await page.click('#reportSend');
   await page.waitForFunction(() => document.getElementById('reportModal').hidden, null, { timeout: 10000 });
-  // What the diagnostics hold, read as they read it (bb diag reports).
+  // What the diagnostics hold, read as they read it (aerie diag reports).
   const diag = await page.evaluate(async () => (await (await fetch('/api/reports', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list' }) })).json()));
   const rows = diag.reports || [];
@@ -285,7 +285,7 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
 // administrator shown every project but not on this one cannot start a
 // session there, so has nothing of its to report.
 {
-  execFileSync('bash', [`${REPO}/scripts/bb`, 'users', 'add', 'repadmin', '--role', 'admin'],
+  execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'repadmin', '--role', 'admin'],
     { input: 'repadminpass1\nrepadminpass1\n', encoding: 'utf8',
       env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } });
   const as = { Authorization: 'Basic ' + Buffer.from('repadmin:repadminpass1').toString('base64'), 'Content-Type': 'application/json' };

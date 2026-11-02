@@ -37,7 +37,7 @@ import posixpath
 import re
 import sys
 
-# `bb` execs this module by path, so its directory is not on sys.path the way
+# `aerie` execs this module by path, so its directory is not on sys.path the way
 # it is when the dashboard imports it. One module object per process either
 # way: the in-process half of the lock is a dict in there.
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -60,7 +60,7 @@ def configure(*, write_json, state, workspace=None):
 
 
 # The same lock the roadmap and the tracker take, and for the same reason: the
-# dashboard is one process and a `bb` invocation is another, and a threading
+# dashboard is one process and a `aerie` invocation is another, and a threading
 # lock guards the threads of one. Both would load, both mutate their own copy,
 # both write, and os.replace makes each write atomic while doing nothing about
 # the second landing on top of the first. See statefile.py.
@@ -305,7 +305,7 @@ def share_siblings():
     filesystem (root "/") says nothing about a directory name and is skipped.
     And a name that IS a valid project never enters the set, whatever it is
     mounted from: /mnt/user/appdata/BuilderBot would otherwise teach this to
-    ignore the BuilderBot project's own findings, which is the one mistake
+    ignore the AerieOS project's own findings, which is the one mistake
     here that would hide real work rather than noise.
     """
     try:

@@ -1,8 +1,8 @@
-"""Behind `bb vm` (cmd_vm in bb): a project's VMs (R91), made, listed, started,
+"""Behind `aerie vm` (cmd_vm in bb): a project's VMs (R91), made, listed, started,
 stopped, snapshotted and removed through /api/vms. A session works on its own
 project's under its Make VMs dial: deny refuses, ask waits for the
 administrators on their bell, auto does it now. A new VM is made from an OS
-in the catalog (bb vm os) and lets in the session's own ssh key, made here
+in the catalog (aerie vm os) and lets in the session's own ssh key, made here
 when the session has none.
 
 BB_VM_AUTH is the auth header and BB_VM_PROJECT the project; the rest is
@@ -19,18 +19,18 @@ import waits
 
 AUTH = os.environ.get("BB_VM_AUTH", "")
 PROJECT = os.environ.get("BB_VM_PROJECT", "")
-USAGE = """usage: bb vm [list]
-       bb vm os
-       bb vm new NAME --os OS [--vcpus N] [--mem 4G] [--disk 20] [--disks 100,500] [--node NODE] [--key FILE]
+USAGE = """usage: aerie vm [list]
+       aerie vm os
+       aerie vm new NAME --os OS [--vcpus N] [--mem 4G] [--disk 20] [--disks 100,500] [--node NODE] [--key FILE]
                  [--pin 2,3] [--mem-max 8G] [--share PATH [--ro]] [--autostart] [--node-agent] --why "what it is for"
-       bb vm start|stop|restart|rm NAME [--force]
-       bb vm snapshot NAME SNAP [--note "..."] | revert NAME SNAP | snapshot-rm NAME SNAP
-       bb vm grow NAME [vda|vdb|vdc|vdd] GB | disk-add NAME GB | eject NAME
-       bb vm hardware NAME [--pin 2,3|none] [--share-cpus] [--mem-max 8G|none] [--share PATH|none] [--ro]
-       bb vm autostart NAME on|off
-       bb vm devices [NODE]
-       bb vm usb NAME give|take VENDOR:PRODUCT[:SERIAL] [--port 1-3]
-       bb vm ip NAME | ssh NAME [COMMAND...]"""
+       aerie vm start|stop|restart|rm NAME [--force]
+       aerie vm snapshot NAME SNAP [--note "..."] | revert NAME SNAP | snapshot-rm NAME SNAP
+       aerie vm grow NAME [vda|vdb|vdc|vdd] GB | disk-add NAME GB | eject NAME
+       aerie vm hardware NAME [--pin 2,3|none] [--share-cpus] [--mem-max 8G|none] [--share PATH|none] [--ro]
+       aerie vm autostart NAME on|off
+       aerie vm devices [NODE]
+       aerie vm usb NAME give|take VENDOR:PRODUCT[:SERIAL] [--port 1-3]
+       aerie vm ip NAME | ssh NAME [COMMAND...]"""
 
 
 def die(msg):
@@ -204,9 +204,9 @@ def cmd_new(args):
             die(USAGE)
         opts[k.lstrip("-")] = rest.pop(0)
     if not opts["os"]:
-        die("bb vm new needs --os: bb vm os lists what there is")
+        die("aerie vm new needs --os: aerie vm os lists what there is")
     if not opts["why"]:
-        die('bb vm new needs --why "what it is for": a person may read it before allowing')
+        die('aerie vm new needs --why "what it is for": a person may read it before allowing')
     body = {"action": "new", "name": name, "os": opts["os"], "node": opts["node"], "why": opts["why"],
             "keys": [own_key(opts["key"])], "user": opts["user"] or "builder", "node_agent": agent}
     if opts["vcpus"]:
@@ -225,7 +225,7 @@ def cmd_new(args):
     v = wait_state(name, ("making",))
     if not v or v.get("state") == "failed":
         die(f"{name} was not made: {(v or {}).get('error') or 'its job on the Jobs page says why'}")
-    print(f"[builderbot] {name} is made on {v.get('node_name')}: bb vm ssh {name} once it has its address (bb vm list)")
+    print(f"[builderbot] {name} is made on {v.get('node_name')}: aerie vm ssh {name} once it has its address (aerie vm list)")
 
 
 def cmd_action(verb, args):
@@ -277,7 +277,7 @@ def cmd_hardware(args):
 
 def cmd_devices(args):
     """The USB devices on this project's VM hosts (R116), each with what
-    holds it, for a session to name one in bb vm usb."""
+    holds it, for a session to name one in aerie vm usb."""
     d = read()
     hosts = [h for h in d.get("hosts") or [] if not args or h.get("name") == args[0] or h.get("id") == args[0]]
     if not hosts:
@@ -302,7 +302,7 @@ def cmd_usb(args):
     name, verb, dev = args[0], args[1], args[2]
     m = re.fullmatch(r"([0-9a-f]{4}):([0-9a-f]{4})(?::([\w.:+/-]{1,64}))?", dev)
     if not m:
-        die(f"a device is VENDOR:PRODUCT[:SERIAL] in hex, as bb vm devices lists it: not {dev}")
+        die(f"a device is VENDOR:PRODUCT[:SERIAL] in hex, as aerie vm devices lists it: not {dev}")
     usb = {"vendor": "0x" + m.group(1), "product": "0x" + m.group(2), "serial": m.group(3) or ""}
     rest = list(args[3:])
     if rest[:1] == ["--port"] and len(rest) > 1:

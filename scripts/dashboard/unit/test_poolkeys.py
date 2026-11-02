@@ -56,7 +56,7 @@ class TheRecord(unittest.TestCase):
 
 class TheAgent(unittest.TestCase):
     def setUp(self):
-        self.agent = agentpkg.load("builderbot_agent_poolkeys")
+        self.agent = agentpkg.load("aerieos_agent_poolkeys")
         self.pm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".pools"]
         pm = self.pm
         ran = self.ran = []

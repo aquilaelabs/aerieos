@@ -24,13 +24,13 @@ const AGENT_MODELS = {
             efforts: ["low", "medium", "high", "xhigh", "max"]},
 };
 
-// Which of BuilderBot's guards hold for each agent, and through what (R95
+// Which of AerieOS's guards hold for each agent, and through what (R95
 // step 6), as a project's settings say it rather than implying parity.
 const AGENT_GUARDS = {
-  claude: "every guard, through Claude Code's own hooks: the hold while BuilderBot updates, the node's turn limit, the house rules' command guard and their recall after a summary, the work note, the prompt relay, the stop check and the asking mark",
+  claude: "every guard, through Claude Code's own hooks: the hold while AerieOS updates, the node's turn limit, the house rules' command guard and their recall after a summary, the work note, the prompt relay, the stop check and the asking mark",
   codex: "the same guards through Codex's own hooks (before a tool, a prompt, the stop, its permission prompt and after a summary), but for the code map's hint before a search, which it has no tool for",
   copilot: "the same guards through Copilot's own hooks (before a tool, a prompt, the stop and its permission prompt), but for the house rules' recall after a summary, which it has no hook for, and the code map's hint",
-  open: "the same guards through a plugin of BuilderBot's in OpenCode (before a tool, a prompt, the stop, its permission ask and after a summary); its keys are the router's, never a sign-in of its own",
+  open: "the same guards through a plugin of AerieOS's in OpenCode (before a tool, a prompt, the stop, its permission ask and after a summary); its keys are the router's, never a sign-in of its own",
   grok: "the same guards through Grok's own hooks (before a tool, a prompt, the stop and after a summary), but for the asking mark, which it has no permission-prompt hook for, and a house rule's words on a prompt, which it does not pass on to the model",
 };
 

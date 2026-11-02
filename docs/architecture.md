@@ -11,7 +11,7 @@ explained. Everything below is one of seven things.
    |  the notebook: roadmap, bugs, rules,  |  --->  |  jobs: build, test, emu,  |
    |    tests, memory, changelog           |  hello |    compose, tell, update  |
    |  the store: /config (SQLite + JSON)   |  work  |  sessions: bb-session,    |
-   |  the relay: a session's bb verbs      |  result|    bb-tty, tmux, agents   |
+   |  the relay: a session's aerie verbs      |  result|    bb-tty, tmux, agents   |
    |  the asks: root, phone, container,    |        |  the toolchain store      |
    |    rebuild, on the bell               |        |  docker, the emulator,    |
    +---------------------------------------+        |    a phone, an X display  |
@@ -45,8 +45,8 @@ Explained in [dashboard.md](dashboard.md), with a doc per group on the rail
 What a project's people and its sessions share: the roadmap, the bugs, the
 house rules, the test registry, the memories, the changelog. One module per
 view beside server.py (`roadmap.py`, `bugs.py`, `rules.py`, `testreg.py`,
-`memory.py`, `changelog.py`), one store each under /config, and `bb roadmap`,
-`bb bug`, `bb rules`, `bb tests`, `bb changelog` driving the same files; a
+`memory.py`, `changelog.py`), one store each under /config, and `aerie roadmap`,
+`aerie bug`, `aerie rules`, `aerie tests`, `aerie changelog` driving the same files; a
 session's writes that the project holds for approval go through
 `pending.py`. Explained in [notebook.md](notebook.md); the reasons in
 decisions.md under *The notebook*.
@@ -55,7 +55,7 @@ decisions.md under *The notebook*.
 
 A node is a machine enrolled to run work: builds, tests, the emulator, a
 project's containers, and the agents' sessions themselves. It runs the
-agent, `scripts/agent/` (the `builderbot_agent` package and its entry,
+agent, `scripts/agent/` (the `aerieos_agent` package and its entry,
 shipped as one zip that python runs as it would a script), which dials into the controller
 (`channel.py` on that side: enroll, hello, work, result) and needs no port
 of its own; the controller keeps the registry and the job queue in
@@ -69,7 +69,7 @@ A session runs on its project's node, in tmux, started by `bb-tty`
 from a dashboard terminal, inside its own view of the project
 (`bb-session`) and its own network (R79). It is briefed from
 `config/templates/briefing.md`, assembled per session by `preamble.py`
-with the project's rules, roadmap and bugs. Its `bb` verbs reach the
+with the project's rules, roadmap and bugs. Its `aerie` verbs reach the
 controller through the relay (`bbrelay.py`, `scripts/lib/relay-verbs`),
 its hooks post through `hooks.py`, and its git pushes go through
 `gitrelay.py`, since the controller holds the keys. Explained in
@@ -93,18 +93,18 @@ Some things wait on a person: root on a node, a phone, a container from a
 compose file, a session's rebuild under a project's setting. Each is a
 request on the bell and the page it belongs to, answered with Allow or
 Deny, and the session waits on the answer through the same verb
-(`phone.py` holds the queue; `bb root`, `bb phone`, `bb container`,
-`bb devapp`). Explained in
+(`phone.py` holds the queue; `aerie root`, `aerie phone`, `aerie container`,
+`aerie devapp`). Explained in
 [toolchains.md](toolchains.md#a-phone-and-asking-before-touching-it) and
 [containers.md](containers.md).
 
 ## Where the rest is
 
 - `README.md`: the front page; `docs/README.md` the index of the docs.
-- `docs/reference.md`: the configuration reference, the bb reference
-  (written from `bb help` by `tools/bb-ref.sh`), and Android signing.
+- `docs/reference.md`: the configuration reference, the aerie reference
+  (written from `aerie help` by `tools/bb-ref.sh`), and Android signing.
 - `docs/decisions.md`: the design decisions with their dates and reasons.
-- `docs/layout.md`: every file, held to the tree by `bb lint`.
+- `docs/layout.md`: every file, held to the tree by `aerie lint`.
 - `docs/users.md`: the design of accounts and roles; `docs/people.md` how
   they work on the People pages.
 - `docs/journeys.md`: what a person does with it, walked for real, dated.

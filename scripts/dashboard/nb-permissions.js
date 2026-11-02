@@ -30,6 +30,10 @@ function nbPermsView({$, nb, project, root}){
     sect.parentElement.insertBefore(document.createComment(RN_DIALS_MARK), sect);
     sect.open = true;
     host.appendChild(sect);
+    // Its edits and its Save heard here too, where they no longer bubble to
+    // the form's own box.
+    rnWireBox(host);
+    rnBars();
   }
 
   // What a session may do with the remote (roadmap R36), moved here from
@@ -112,14 +116,17 @@ function nbPermsView({$, nb, project, root}){
       const set = hostDraft[r.id] || r.set;
       const tok = r.token === true ? `<span class="ok">the token may</span>` : r.token === false
         ? `the token may not: it needs ${esc(r.needs)}` : "not measured";
-      const how = r.verbs.length ? `bb forge ${r.verbs.join(", ")}` : r.how;
-      return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how ? ` · ${esc(how)}` : ""}</div></div>
-        <label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label></div>`;
+      const how = r.verbs.length ? `aerie forge ${r.verbs.join(", ")}` : r.how;
+      // One another setting governs has no switch here, only where it is
+      // set (B559): its deny was told to sessions and enforced nowhere.
+      return `<div class="row"><div class="grow"><div>${esc(r.label)}</div><div class="sub">${tok}${how && !r.fixed ? ` · ${esc(how)}` : ""}</div></div>
+        ${r.fixed ? `<span class="state">${esc(r.fixed)}</span>`
+          : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label>`}</div>`;
     }).join("");
     const foot = rows.length ? `<div class="row"><div class="grow"><span class="state">${locked ? "this project is locked: its owner changes these"
       : "a Deny here takes an ability away whatever the token allows; the token decides what is possible"}</span></div>
       <div class="actbar"><button type="button" class="permHostApply"${dirty && !locked ? "" : " disabled"}>Apply</button></div></div>` : "";
-    const on = rows.filter(r => r.token !== false && (hostDraft[r.id] || r.set) === "allow").length;
+    const on = rows.filter(r => r.token !== false && (r.fixed || (hostDraft[r.id] || r.set) === "allow")).length;
     const html = docSection("permissions", "githost", "On the git host",
       rows.length ? `${on} of ${rows.length} allowed` : "", facts + list + foot);
     if (el.dataset.drawn === html) return;
@@ -157,7 +164,9 @@ function nbPermsView({$, nb, project, root}){
     const pol = {...((state?.projects || []).find(x => x.name === project)?.prefs?.gitpol || {})};
     viewGlance(hint, [{label: "on its own", value: n.auto}, {label: "asks first", value: n.ask},
                       {label: "may not", value: n.deny}],
-      `pushing its branches ${pol.push || "allow"}, to main ${pol.main || "deny"}`);
+      // In words, not the dials' values ("pushing its branches allow, to main deny").
+      `${{allow: "pushes its branches", ask: "asks before pushing its branches", deny: "never pushes its branches"}[pol.push || "allow"] || ""}; ${
+        {allow: "pushes to main", ask: "asks before pushing to main", deny: "never pushes to main"}[pol.main || "deny"] || ""}`);
   }
   function loadPerms(){ lendDials(); drawPush(); hostFor = ""; drawHost(); drawGlance(); }
   function leavePerms(){ rnDialsHome(); }

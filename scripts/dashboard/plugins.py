@@ -2,14 +2,14 @@
 
 A plugin is a person's choice, made with /plugin inside their own session, and
 it lives in that account's ~/.claude on the node the session ran on. Nothing
-about it is BuilderBot's to install or refuse (docs: only machine-wide managed
-settings can restrict one). What is BuilderBot's is being able to see them: a
+about it is AerieOS's to install or refuse (docs: only machine-wide managed
+settings can restrict one). What is AerieOS's is being able to see them: a
 tester whose session behaves oddly may have ten plugins adding their own hooks
-and instructions beside BuilderBot's, and "which plugins do you have" should
-have an answer on the Profile page and in bb diag rather than a trip to the
+and instructions beside AerieOS's, and "which plugins do you have" should
+have an answer on the Profile page and in aerie diag rather than a trip to the
 node.
 
-The facts arrive the way a node's logins do: the agent runs `bb login --list`
+The facts arrive the way a node's logins do: the agent runs `aerie login --list`
 as the session account every few minutes and carries its rows up on the
 heartbeat, each with the plugins that account installed there. An agent too
 old to send them sends rows without the field, which says nothing and changes
@@ -68,7 +68,7 @@ def _clean_mcp(m):
 
 
 def report(node_id, rows):
-    """What a node's `bb login --list` said about each account's plugins,
+    """What a node's `aerie login --list` said about each account's plugins,
     and its coding agents' MCP servers beside them (R95 step 15). True when
     anything was written."""
     if not isinstance(rows, list):
@@ -114,6 +114,6 @@ def of(uid, node_names=None):
 
 
 def everyone():
-    """{uid: {node id: [...]}} for bb diag: every account's, on every node."""
+    """{uid: {node id: [...]}} for aerie diag: every account's, on every node."""
     return {uid: {nid: v.get("plugins") or [] for nid, v in per.items()}
             for uid, per in _load().items()}

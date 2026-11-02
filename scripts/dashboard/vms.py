@@ -1,6 +1,6 @@
 """The VM manager (R91): a project's VMs on the nodes whose VM host feature is
 installed, made, started, stopped, snapshotted and removed as `vm` jobs the
-agent runs from its own fixed table (scripts/agent/builderbot_agent/vms.py).
+agent runs from its own fixed table (scripts/agent/aerieos_agent/vms.py).
 
 A VM's record lives here, in /config/vms.json, keyed by "PROJECT/NAME": which
 node, which OS, its size, who made it and what its last job did. What it is
@@ -67,11 +67,15 @@ _seen = {"nodes": None, "sig": 0}
 
 
 def configure(*, state, write_json, node, node_list, job_add, audit, prefs_get, nodes_rev=lambda: 0,
-              enroll_script=None, node_retire=None, node_mark=None, node_discard=None, job_tail=None):
+              enroll_script=None, node_retire=None, node_mark=None, node_discard=None, job_tail=None,
+              job_get=None):
     globals().update(STATE=Path(state), write_json=write_json, node=node, node_list=node_list,
                      job_add=job_add, audit=audit, prefs_get=prefs_get, nodes_rev=nodes_rev,
                      enroll_script=enroll_script, node_retire=node_retire, node_mark=node_mark,
-                     node_discard=node_discard, job_tail=job_tail)
+                     node_discard=node_discard, job_tail=job_tail, job_get=job_get)
+
+
+job_get = None
 
 
 def _why(job, fallback):
@@ -248,7 +252,7 @@ MACHINE = "machine"
 
 def view(projects=None):
     """Every VM record, the node's census laid over it, for the page and for
-    `bb vm list`: only the projects named, when `projects` is given."""
+    `aerie vm list`: only the projects named, when `projects` is given."""
     d = _load()
     nodes = {n["id"]: n for n in node_list()}
     out = []
@@ -302,7 +306,7 @@ def view(projects=None):
 
 
 def others():
-    """The libvirt domains on each node that BuilderBot did not make (R165
+    """The libvirt domains on each node that AerieOS did not make (R165
     step 1), as its census says: an administrator reads them on the VMs page
     by name, state and size, and nothing acts on one from here."""
     out = []
@@ -396,7 +400,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
         if not ISO_RE.fullmatch(iso):
             return {"error": f"not an ISO's name: {iso}"}
         if req.get("node_agent") is True:
-            return {"error": "a VM from an installer cannot be made a node: its system is the installer's, not one BuilderBot enrolls"}
+            return {"error": "a VM from an installer cannot be made a node: its system is the installer's, not one AerieOS enrolls"}
         img = {"id": "installer", "name": f"From {iso}", "family": "installer",
                "boot": "uefi" if req.get("boot") == "uefi" else "bios"}
     else:
@@ -427,7 +431,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     if bad:
         return {"error": f"not an ssh public key: {bad[0]}…"}
     if not keys and not iso:
-        return {"error": "a VM needs an ssh public key to let anyone in: give one (bb vm new reads ~/.ssh/id_ed25519.pub)"}
+        return {"error": "a VM needs an ssh public key to let anyone in: give one (aerie vm new reads ~/.ssh/id_ed25519.pub)"}
     # A VM made a node gets its sessions' account from the enroll script
     # (builder, without sudo): its own account, which cloud-init gives sudo,
     # is another, or every session there would be root (R97's walk).
@@ -435,7 +439,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) or user == "root":
         return {"error": f"the VM's account is a plain Linux name, not {user}"}
     if req.get("node_agent") is True and user in ("builder", "bb"):
-        return {"error": f"a VM made a node keeps {user} for BuilderBot's own accounts: name its account something else (admin, say)"}
+        return {"error": f"a VM made a node keeps {user} for AerieOS's own accounts: name its account something else (admin, say)"}
     can = [n for n in hosts() if n["id"] in nodes_allowed]
     want = str(req.get("node") or "")
     if want:
@@ -479,7 +483,7 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
                  "alpine": "alpine", "almalinux": "almalinux", "centos": "centos", "arch": "arch",
                  "opensuse": "opensuse", "gentoo": "gentoo"}.get(img.get("family") or "")
         if not sysid or enroll_script is None:
-            return {"error": f"{img['name']} has no enroll script BuilderBot makes, so it cannot be made a node"}
+            return {"error": f"{img['name']} has no enroll script AerieOS makes, so it cannot be made a node"}
         enroll = enroll_script(principal, {"name": f"{project}-{name}", "controller": str(req.get("ctl") or ""),
                                            "reach": "lan", "sessions": True, "system": sysid, "user": "bb",
                                            "script": True})
@@ -617,7 +621,7 @@ def _net_name(subnet):
 
 def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
     """A VM's hardware beyond size from what New VM, the Hardware dialog or
-    bb vm asked (R100): (record, "") or (None, why). A device passed through
+    aerie vm asked (R100): (record, "") or (None, why). A device passed through
     is an administrator's; the LAN is a person's, since it takes the VM past
     the firewall that keeps a project's VMs off it; a shared folder is one of
     the project's own; a CPU thread another VM on the node is pinned to is
@@ -709,6 +713,14 @@ def _refused(project, key, name, node_id, size, d=None):
     d = d if d is not None else _load()
     if key in d["vms"]:
         return f"{project} has a VM called {name} already"
+    # Two projects' names can make one libvirt name (foo's bar-web and
+    # foo-bar's web are both bbvm-foo-bar-web): on one node that would be
+    # one VM two projects act on, so the second name is refused there.
+    dom = domain(project, name)
+    for other in d["vms"].values():
+        if other.get("node") == node_id and other.get("domain") == dom:
+            return (f"{name} would share its machine name ({dom}) with {other.get('project')}'s {other.get('name')} "
+                    "on that node: pick another name or another node")
     why = check_caps(d, project, node_id, size)
     if why:
         return why
@@ -732,10 +744,17 @@ def act(principal, project, name, action, req=None):
             return {"error": f"{project} has no VM called {name}"}
         if rec.get("state") in ("making", "removing") and action != "remove":
             return {"error": f"{name} is {rec['state']}: wait for that to end"}
+        # Remove clears a create that stalled, but not one still going: the
+        # agent found nothing to remove, the record went, and the create
+        # then made a VM nobody had on record (B553).
+        if action == "remove" and rec.get("state") == "making" and job_get and rec.get("job"):
+            j = job_get(rec["job"], with_log=False) or {}
+            if j.get("state") in ("queued", "assigned", "running"):
+                return {"error": f"{name} is still being made (job {rec['job']}): wait for it to end, or cancel it on the Jobs page"}
         n = node(rec["node"]) or {}
         if not n.get("live"):
             return {"error": f"{n.get('name') or rec['node']}'s agent is not dialing in, so nothing from here reaches {name}"}
-        spec = {"action": action, "domain": rec["domain"], "timeout": 900}
+        spec = {"action": action, "domain": rec["domain"], "project": rec.get("project") or project, "timeout": 900}
         if action in ("snapshot", "revert", "snapshot-rm"):
             snap = str(req.get("snapshot") or "")
             if not SNAP_RE.fullmatch(snap):

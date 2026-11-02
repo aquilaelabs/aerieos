@@ -61,7 +61,7 @@ const sgb = mb => mb === null || mb === undefined ? "?"
   : mb >= 10485760 ? (mb / 1048576).toFixed(1) + " TB"
   : mb >= 1024 ? (mb / 1024).toFixed(mb >= 102400 ? 0 : 1) + " GB" : Math.round(mb) + " MB";
 
-// Everything BuilderBot holds on the node, one item each: the stores, the
+// Everything AerieOS holds on the node, one item each: the stores, the
 // synced copies (their size is the projects' workspace column, summed),
 // the accounts' homes and Docker's data root. Each names the filesystem it
 // sits on, which is what groups it under a meter below.
@@ -95,7 +95,7 @@ function storageRow(h){
         h.prune ? `: <a href="#" data-stprune="${esc(h.prune)}">prune on the Containers page</a>` : ""}</div></div></div>`;
 }
 
-// What BuilderBot could free on a filesystem (R123 step 4): its projects'
+// What AerieOS could free on a filesystem (R123 step 4): its projects'
 // phones, its build caches and Docker's reclaimable, where they sit on it.
 function storageFreeable(n, fs){
   const on = path => fs.path === path || (path || "").startsWith(fs.path === "/" ? "/" : fs.path + "/");
@@ -120,7 +120,7 @@ function andList(xs){
   return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }
 
-// One picture per filesystem (R203): its meter, then what BuilderBot holds
+// One picture per filesystem (R203): its meter, then what AerieOS holds
 // on it, largest first, with the stores holding nothing folded into one
 // line. A flat list of nine stores under a separate meter stack said 37.8
 // TB used above rows adding up to 10 GB, and left the reader to join them.
@@ -136,13 +136,13 @@ function storageDisks(n){
     const also = fs.also?.length ? `, also at ${fs.also.join(", ")}` : "";
     // Each filesystem a card of its own (R218 step 47, the operator 18 Oct):
     // its mount the heading, used of its size the status, then its meter,
-    // what of it is BuilderBot's and the rows of what that is.
+    // what of it is AerieOS's and the rows of what that is.
     return docSection("storage", `fs:${fs.path}`, fs.path, `${sgb(fs.used_mb)} of ${sgb(fs.total_mb)}`,
       `<div class="field stdisk"><div class="ndmeters">${
         // "used": the card's heading already names the filesystem.
         meter("used", pct, `${sgb(fs.used_mb)} / ${sgb(fs.total_mb)}`,
               `${fs.source} (${fs.type}${fs.ro ? ", read-only" : ""})${also}`)}</div>${
-        mine.length ? `<div class="sub">${ours ? `${sgb(ours)} of it is BuilderBot's` : "nothing of it is BuilderBot's yet"}</div>` : ""}${
+        mine.length ? `<div class="sub">${ours ? `${sgb(ours)} of it is AerieOS's` : "nothing of it is AerieOS's yet"}</div>` : ""}${
         pct >= 90 && storageFreeable(n, fs) ? `<div class="sub warn">${esc(storageFreeable(n, fs))}.</div>` : ""}</div>${
       some.map(storageRow).join("")}${
       none.length ? `<div class="empty stnone">${esc(andList(none.map(h => h.name)))} hold${none.length === 1 ? "s" : ""} nothing yet.</div>` : ""}`,
@@ -188,7 +188,7 @@ function storageMachineDisks(n){
   return docSection("storage", "disks", "Disks", disks.length ? `${disks.length}${failing ? `, ${failing} failing` : ""}` : "", body, {cls: failing ? "bad" : ""});
 }
 
-// The controller's own machine's shares (R162 step 1): each as BuilderBot's
+// The controller's own machine's shares (R162 step 1): each as AerieOS's
 // own two files say it (the path, SMB with its users or as a guest, NFS
 // with its clients), with Remove; and a form for a new one, every press a
 // system job the root agent runs, which writes the files whole and tells
@@ -634,7 +634,7 @@ function storageBackups(n){
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : []),
                   ...(n.extmounts || []).filter(m => (n.ext_mounts || []).find(x => x.id === m.id)?.mounted).map(m => [`/mnt/other/${m.name}`, `${m.name} (/mnt/other/${m.name})`]),
-                  ["/var/lib/builderbot-controller", "the controller's state"]];
+                  ["/var/lib/aerieos-controller", "the controller's state"]];
   const rows = recs.map(r => {
     const st = live.find(x => x.id === r.id || x.name === r.name) || {};
     const sch = scheds.find(x => x.backup === r.name);
@@ -769,7 +769,8 @@ function storageMeasureBtn(n){
 function storageBody(n, where){
   // Where its stores are set, a fact of the head's (the operator, 25 Oct:
   // no loose words at a page's top).
-  const setOn = [["Stores set on", `its row on the ${pageLink("nodes", "Nodes page")}`, {html: true}]];
+  // A fact's value is short, as a node's head's are, never a sentence.
+  const setOn = [["Stores set on", pageLink("nodes", "the Nodes page"), {html: true}]];
   const byProject = (count, body) => docSection("storage", "projects", "By project", count,
     `<div class="field"><div class="hint">What each project's folders hold${n ? ` on ${esc(n.name)}` : ""}.${helpIcon("Its synced copy, build cache, artifacts, dev instance data, emulators and the accounts' build caches.")}</div></div>
       ${body}`);
@@ -779,14 +780,14 @@ function storageBody(n, where){
   // A state is a pill (the voices rule); when it was measured is a fact.
   const pill = n.measured ? "" : `<span class="pill stat warn">not measured</span>`;
   // The walk as a head's facts (R218 step 27; the operator, 25 Oct), and
-  // the memory BuilderBot's work is kept to there (R110 step 4).
+  // the memory AerieOS's work is kept to there (R110 step 4).
   const fence = !("fence" in n) || !n.fence ? "" : `${humanBytes(n.fence[0] * 1048576)}, ${humanBytes(n.fence[1] * 1048576)} in use`;
   // Not fenced is a warning, said as one over the head, not as a fact.
   const unfenced = "fence" in n && !n.fence
-    ? `<div class="field"><div class="notice warn">BuilderBot's work on ${esc(n.name || "this node")} is not fenced from the system's memory: run its setup again.</div></div>` : "";
+    ? `<div class="field"><div class="notice warn">AerieOS's work on ${esc(n.name || "this node")} is not fenced from the system's memory: run its setup again.</div></div>` : "";
   const head = pageHead({pills: pill, cls: "toolstate", facts: [
     ["Measured", n.measured ? age.replace(/^measured /, "") : ""],
-    ["Walk", n.measured ? `${n.took_s ? `took ${n.took_s}s, ` : ""}every hour` : "an hour after the agent starts, then every hour"],
+    ["Walk", n.measured ? `${n.took_s ? `took ${n.took_s}s, ` : ""}every hour` : "every hour, the first an hour after start"],
     ["Its work's memory", fence], ...setOn], actions: storageMeasureBtn(n)});
   return `<div data-stnode="${esc(n.node)}">
     ${unfenced}${head}
@@ -843,9 +844,10 @@ function wireStorageTab(root){
   // Its sections fold as every page's do: one open at a time on a phone,
   // sliding, where they snapped and stood open together (B171).
   wireSections(root);
-  root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => {
+  root.querySelectorAll("[data-stdisk]").forEach(c => c.onclick = () => chipMove(
+    () => document.querySelector(".pane .doc.on .storagetab") || root, ".sect", () => {
     storageDisk = c.dataset.stdisk; storageRev++; drawPanes();
-  });
+  }));
   root.querySelectorAll("[data-stprune]").forEach(a => a.onclick = e => {
     e.preventDefault();
     sectOpen["docker:images"] = true;

@@ -1,6 +1,6 @@
 """The Containers page's prunes pass devapp's docker guard exactly as
 PRUNES spells them, and a prune spelled any other way does not (B245: two
-of the four were refused as a bug in BuilderBot)."""
+of the four were refused as a bug in AerieOS)."""
 import os
 import sys
 import unittest

@@ -32,7 +32,7 @@ login page entirely: basic auth is honored preemptively on every request
 that header is exactly what made browsers pop their own dialog.
 
 The dashboard's own API runs commands from a fixed list; it takes a macro name,
-never a command string, and the list is `bb`'s own commands rather than anything
+never a command string, and the list is `aerie`'s own commands rather than anything
 the page can compose. The one exception is a **custom command**: the operator's
 own lines, stored by one authenticated request and typed by another into a tty
 they are already sitting at with a full shell. Nothing runs in the dashboard's
@@ -67,7 +67,7 @@ container or a node as you type; it does not search inside notebooks.
 pages**, in a project's shape: the node picked once where a project's name
 is, with when it was seen, where it dials in from and its agent beside it,
 and the group's sub-nav under it with the group's own actions at its right
-(Machines: Create sandbox VM and Enroll node). Every page of the group
+(Machines: New VM and Enroll node). Every page of the group
 follows that one pick and has no picker of its own, and no page names the
 node again under the header. A sub-tab says *not here* when the picked node
 lacks what it needs (no Docker, no Android tools, no CI runner yet).
@@ -145,12 +145,12 @@ chips narrow it to what was said, answers to asks, jobs or failures, and
 Clear empties it or the chip in force, asked first. An answer to an ask is
 kept there as an answer, from the bell or from the page.
 
-**`bb doctor`'s verdict** is the dot right after the bell, green, amber or
+**`aerie doctor`'s verdict** is the dot right after the bell, green, amber or
 red for the worst check. The server runs the checks in the background every
 30 minutes. Pressing the dot opens a panel with the bell's manners (Escape
 or a press elsewhere closes it): failures and warnings as full lines, each
-with the fix hint from `bb doctor`'s own output beside it, passing checks as
-green chips, when it last ran, and a ↻ that runs `bb doctor` now. A plain
+with the fix hint from `aerie doctor`'s own output beside it, passing checks as
+green chips, when it last ran, and a ↻ that runs `aerie doctor` now. A plain
 user's panel carries only the lines that are theirs to act on (whether a
 node can run their session); the runner tokens, ssh keys and the docker
 daemon are an administrator's.
@@ -158,7 +158,7 @@ daemon are an administrator's.
 The **About** control beside it is the version, and where the header is too
 narrow for a version string it becomes a **?** rather than a truncated number
 that answers nothing: either way the popup behind it carries the whole stamp,
-and behind one switch, a **getting-started guide** and BuilderBot's
+and behind one switch, a **getting-started guide** and AerieOS's
 **changelog**. The guide is [start-here.md](start-here.md) itself, read
 through Help's docs, so the two never say different things; its last
 section, for administrators, is left out for anybody else. The
@@ -221,8 +221,8 @@ built. The two are different questions: a NAS's container keeps running
 whatever it last pulled, so "up two hours" says nothing about whether a fix
 merged an hour ago is in there, and inferring one from the other is a good
 way to spend an afternoon debugging a bug that was already fixed. `unstamped`
-means the image was built outside CI. `bb status` prints the same line first,
-and `bb drift` is the other half: what a checkout has changed that the
+means the image was built outside CI. `aerie status` prints the same line first,
+and `aerie drift` is the other half: what a checkout has changed that the
 running container is not serving.
 
 ## The dock and its terminals
@@ -407,9 +407,9 @@ The line is cleared with end-of-line then kill-line, which is readline editing
 rather than a signal: `Ctrl-C` would also interrupt whatever is running in that
 terminal, which is not something a button should be able to do.
 
-The flyout holds no `bb` commands: each has a page that does it better
+The flyout holds no `aerie` commands: each has a page that does it better
 (status on Home, the emulator on its page, the logs in Controller settings,
-an agent's sign-in on the Installed page). The Tests view sends `bb tests log -f`
+an agent's sign-in on the Installed page). The Tests view sends `aerie tests log -f`
 into the project's shell from its own button.
 
 What is there, top to bottom: **pinned**, the commands whose **thumbtack**
@@ -420,7 +420,7 @@ tab; and **git**, its commands verbatim (`git status`, log, diff, branches,
 stashes, fetch, pull), ghosting against the directory the active shell is
 *in*: outside a git repository the whole list grays out, and the verdict
 follows a `cd` on the next status poll. There is no `gh`: a node carries
-none, and a push is `bb git push`'s, under the project's policy. Pins live in
+none, and a push is `aerie git push`'s, under the project's policy. Pins live in
 `/config/pinned-commands.json`: one machine, one set, so a pin made at the
 desk is there on the phone.
 
@@ -483,14 +483,14 @@ title** and a dot on the **favicon**, which is as far as a page can go without
 asking for notification permission; that is a decision about your browser
 rather than about the dashboard, so it is not taken on your behalf.
 
-## Reporting a problem with BuilderBot
+## Reporting a problem with AerieOS
 
-A problem with BuilderBot itself goes to the **diagnostics**, where whoever
-looks after this BuilderBot reads it (`bb diag reports`). It is a log, not a
+A problem with AerieOS itself goes to the **diagnostics**, where whoever
+looks after this AerieOS reads it (`aerie diag reports`). It is a log, not a
 conversation: nothing goes back to whoever sent it, and **Clear reports**
-empties it. A session sends one with `bb report "what happened"`, under the
-project's **Agents may: Report BuilderBot bugs**. A person sends one from a
-project's menu: **Report a BuilderBot bug** opens **Report a bug**, with a category to
+empties it. A session sends one with `aerie report "what happened"`, under the
+project's **Agents may: Report AerieOS bugs**. A person sends one from a
+project's menu: **Report an AerieOS bug** opens **Report a bug**, with a category to
 pick, what happened and how to make it happen, and **Send** puts it in the
 diagnostics under that project with its node and the build it was seen on,
 marked as from the dashboard. A person's report is heard whatever that
@@ -501,6 +501,6 @@ project's report can carry the reporter's latest conversation on it,
 ticked in the dialog: its last 400 KB, redacted, kept as a file of its own
 beside the report. The diagnostics name that file, the download beside the
 logs is a zip of `diagnostics.json` with a `conversations/` folder holding
-each one, and `bb report conversation N` prints it for a session. The bug in
+each one, and `aerie report conversation N` prints it for a session. The bug in
 the header is the same dialog about no project in particular, for anybody
 signed in, and the diagnostics list it as general.
