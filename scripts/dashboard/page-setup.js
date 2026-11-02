@@ -298,7 +298,7 @@ function setupDisksCard(num){
   const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
   // The old system's disks: said whose they are, no box, nothing to press.
   const theirRow = ([d, p]) => `<div class="row setdisk theirs"><span class="grow">${facts(d)}
-      <span class="sub">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is on ${pageLink("machine", "This machine")}, under Disks from the stick; nothing here touches it</span></span></div>`;
+      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is on ${pageLink("machine", "This machine")}, under Disks from the stick; nothing here touches it</span></span></div>`;
   if (theirs.length && !free.length){
     const nd = theirs.filter(([, p]) => p.what === "data").length, np = theirs.filter(([, p]) => p.what === "parity").length, npool = theirs.length - nd - np;
     const what = [nd ? `${nd} data disk${nd === 1 ? "" : "s"}` : "", np ? `${np === 1 ? "the parity disk" : `${np} parity disks`}` : "", npool ? `${npool} pool disk${npool === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
