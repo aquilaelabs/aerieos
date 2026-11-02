@@ -35,7 +35,26 @@ find_release() {
         --jq ".[] | select(.tag_name == \"$tag\") | .id" 2>/dev/null | head -1
 }
 
+# A draft published from GitHub's form with its tag field lost goes out
+# under a name GitHub invents (untagged-ID) and a git tag of that name on the
+# default branch (2 Nov, v0.9.0-dev.4818): nothing that reads releases by
+# tag sees it, and the next job here would make a second release. One
+# titled for this tag under such a name gets the tag back and the invented
+# tag taken off, if the token may; its files and notes stay.
+mend_untagged() {
+    local row rid stray
+    row="$(gh api "repos/$repo/releases?per_page=100" --paginate \
+        --jq ".[] | select(.name == \"$tag\" and (.tag_name | startswith(\"untagged-\"))) | \"\\(.id) \\(.tag_name)\"" 2>/dev/null | head -1)"
+    [ -n "$row" ] || return 1
+    rid="${row%% *}"; stray="${row#* }"
+    gh api --method PATCH "repos/$repo/releases/$rid" -f tag_name="$tag" >/dev/null || return 1
+    gh api --method DELETE "repos/$repo/git/refs/tags/$stray" >/dev/null 2>&1 || true
+    echo "release $rid was published as $stray: its tag set back to $tag" >&2
+    echo "$rid"
+}
+
 id="$(find_release || true)"
+[ -n "$id" ] || id="$(mend_untagged || true)"
 if [ -z "$id" ]; then
     pre=(--draft)
     case "$tag" in *-dev.*) pre+=(--prerelease --latest=false) ;; esac

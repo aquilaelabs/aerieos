@@ -17,11 +17,20 @@ FAKE_GH = r'''#!/usr/bin/env bash
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
   "api repos/*/releases?per_page=100"*|"api repos/"*"/releases?per_page=100")
-    cat "$GH_RELEASES" | python3 -c '
+    case "$*" in
+      *startswith*)
+        python3 -c '
 import json,sys
-rows=json.load(sys.stdin); tag=sys.argv[1]
+rows=json.load(open(sys.argv[2])); tag=sys.argv[1]
 for r in rows:
-    if r["tag_name"]==tag: print(r["id"])' "$GH_TAG" ;;
+    if r.get("name")==tag and r["tag_name"].startswith("untagged-"): print(r["id"], r["tag_name"])' "$GH_TAG" "$GH_RELEASES" ;;
+      *)
+        python3 -c '
+import json,sys
+rows=json.load(open(sys.argv[2])); tag=sys.argv[1]
+for r in rows:
+    if r["tag_name"]==tag: print(r["id"])' "$GH_TAG" "$GH_RELEASES" ;;
+    esac ;;
   "release create")
     python3 - "$GH_RELEASES" <<EOF
 import json,sys
@@ -84,6 +93,22 @@ class ReleaseAttach(unittest.TestCase):
         self.assertIn("release 777 is v1.2.3-dev.9's", r.stdout)
         self.assertFalse([c for c in self.calls() if c.startswith("release create")], "one draft, never two")
         self.assertTrue([c for c in self.calls() if "/releases/777/assets?name=aerieos-app" in c])
+
+    def test_a_release_published_under_an_untagged_name_gets_its_tag_back(self):
+        # 2 Nov: the 4818 draft was published from GitHub's form with its tag
+        # field lost, so it went out as untagged-ID with a git tag of that
+        # name; the OS job would have made a second release.
+        with open(self.releases, "w", encoding="utf-8") as f:
+            json.dump([{"id": 55, "tag_name": "untagged-2a746c4a", "name": "v1.2.3-dev.9", "draft": False}], f)
+        r = self.run_tool(self.f)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("release 55 is v1.2.3-dev.9's", r.stdout)
+        self.assertIn("was published as untagged-2a746c4a: its tag set back to v1.2.3-dev.9", r.stderr)
+        calls = self.calls()
+        self.assertFalse([c for c in calls if c.startswith("release create")], "mended, not made again")
+        self.assertTrue([c for c in calls if "--method PATCH repos/x/y/releases/55" in c and "tag_name=v1.2.3-dev.9" in c], calls)
+        self.assertTrue([c for c in calls if "--method DELETE repos/x/y/git/refs/tags/untagged-2a746c4a" in c], calls)
+        self.assertTrue([c for c in calls if "/releases/55/assets?name=aerieos-os-1.2.3-dev.9.iso" in c])
 
     def test_a_stable_tag_is_a_draft_and_no_pre_release(self):
         with open(self.releases, "w", encoding="utf-8") as f:
