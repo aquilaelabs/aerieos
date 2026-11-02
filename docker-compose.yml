@@ -36,7 +36,7 @@ services:
     # Same name the Unraid template uses, so every `docker exec -it
     # AerieOS ...` command in the docs works under either install method.
     container_name: Aerie-Workshop
-    hostname: builderbot
+    hostname: aerie-workshop
     # What the container prints, kept by Docker on the host: bounded, since
     # the json-file driver keeps all of it by default. The same output is in
     # the logs directory under the Logs section's days (builderbot.log).

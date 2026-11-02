@@ -80,7 +80,7 @@ just see them.
 **Docker template (recommended)**: get
 [`platforms/unraid/aerie-workshop.xml`](../platforms/unraid/aerie-workshop.xml) into
 `/boot/config/plugins/dockerMan/templates-user/`, then **Docker → Add
-Container →** pick *builderbot*. From the host's terminal that is one
+Container →** pick *Aerie-Workshop*. From the host's terminal that is one
 `curl` of the raw file, in [docs/unraid.md](unraid.md#install).
 
 **Compose Manager**: copy `docker-compose.yml` + `.env.example`→`.env` into
@@ -268,7 +268,7 @@ sudo bash nodes/install-controller.sh --install
 ```
 
 It installs the packages the image carries (`config/controller-packages.tsv`,
-one list for both), makes an account for the controller (`builderbot`, no
+one list for both), makes an account for the controller (`aerieos`, no
 password, no sudo but the image's two root helpers), lays the release out,
 writes `/etc/aerieos-controller/controller.env` (yours to edit; every
 setting is in [reference.md](reference.md#a-controller-installed-bare-metal-its-env-file)),

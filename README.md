@@ -15,7 +15,7 @@
   <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/lint.yml/badge.svg" alt="lint"></a>
   <a href="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml"><img src="https://github.com/aquilaelabs/aerieos/actions/workflows/dashboard.yml/badge.svg" alt="dashboard tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0 license"></a>
-  <a href="https://github.com/aquilaelabs/aerieos/pkgs/container/builderbot"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
+  <a href="https://github.com/aquilaelabs/aerieos/pkgs/container/aerieos"><img src="https://img.shields.io/badge/image-ghcr.io-2496ed?logo=docker&logoColor=white" alt="container image on GHCR"></a>
 </p>
 
 > [!WARNING]
@@ -197,10 +197,10 @@ match:
 
 ```yaml
 services:
-  builderbot:
+  aerie-workshop:
     image: ghcr.io/aquilaelabs/aerieos:dev   # no stable release yet; see Upgrading in docs/install.md
     container_name: Aerie-Workshop
-    hostname: builderbot
+    hostname: aerie-workshop
     restart: unless-stopped
     stdin_open: true
     tty: true
