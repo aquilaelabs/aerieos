@@ -119,6 +119,8 @@
 - Serve the shares on This machine no longer refuses a share for a person who has not signed in yet: their user is made on the machine when the share names them, and they reach it over SMB once their password is set on Profile (84604c8)
 - A release is no longer refused for 'uncommitted changes' over files git does not track; a changed tracked file still refuses it, named (84604c8)
 - A dev build's files all land on one release: the apps, the controller bundle and the OS image each found the tag's draft among the drafts, where two drafts had been made for one tag (84604c8)
+- The first run's Your disks step leaves the disks a stick's plan adopts alone: each is listed as the old system's, with no box, and Make it never sees them; with every disk theirs the step points at This machine's Disks from the stick (565fc4b)
+- AerieOS carries the Realtek and Broadcom network firmware, so a board with one of those chips no longer boots saying its firmware could not be loaded (565fc4b)
 
 ### Security
 
