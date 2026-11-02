@@ -487,16 +487,16 @@ let menuTimer = null;
 function openPopup(){
   return openMenu() || document.querySelector(".actmenu:not([hidden])");
 }
-// ...and so does a box a person is answering in the list (askInline, a card's
-// pop-out): it is not in the markup, so a redraw took it and what was typed
-// (the operator, 2 Nov: every rename on a card's back was thrown out by a poll).
-const OPEN_BOX = ".askline, .pcpop";
+// ...and so does a box being answered on a card's back (askInline, a pop-out):
+// it is not in the markup, so a redraw took it and what was typed (the operator,
+// 2 Nov: every rename on a card's back was thrown out by a poll).
+function cardBox(root){ return root.querySelector(".pcback .askline, .pcpop"); }
 function menuHolds(root){
   const m = openPopup();
-  const box = root?.querySelector?.(OPEN_BOX);
+  const box = root?.querySelector && cardBox(root);
   if (!box && (!m || (root && !root.contains(m)))) return false;
   if (!menuTimer) menuTimer = setInterval(() => {
-    if (openPopup() || document.querySelector(OPEN_BOX)) return;
+    if (openPopup() || cardBox(document)) return;
     clearInterval(menuTimer); menuTimer = null;
     // Everything that was skipped, from its own source: the status poll
     // repaints the cards and the panes, the revisions poll fires the watches.
