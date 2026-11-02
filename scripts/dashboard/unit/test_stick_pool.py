@@ -74,6 +74,48 @@ class TheImage(unittest.TestCase):
             self.assertIn("is not a mounted pool", r.stderr)
             self.assertEqual(json.loads(self.tool(d, "status", stick=False).stdout), {"stick": False})
 
+    def test_set_moves_nothing_through_a_bind_that_will_not_go(self):
+        # B613 (B476's hazard): a place still a mount after the umount (two
+        # binds stacked) would carry the copy and the delete through to the
+        # old pool. Fakes stand in for findmnt and umount: the place reads
+        # as mounted as many times as the counter says, and umount counts
+        # down (or does nothing, for a bind that will not go).
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(f"{d}/docker")
+            os.makedirs(f"{d}/pool")
+            with open(f"{d}/docker/x", "w") as f:
+                f.write("x")
+            fakes = f"{d}/bin"
+            os.makedirs(fakes)
+            with open(f"{fakes}/findmnt", "w") as f:
+                f.write(f'#!/bin/sh\ncase "$*" in *--target*) exit 0;; esac\n'
+                        f'n=$(cat {d}/stacked 2>/dev/null || echo 0)\nfor a; do last=$a; done\n[ "$n" -gt 0 ] && case "$*" in *docker*) echo "$last";; esac\nexit 0\n')
+            with open(f"{fakes}/umount", "w") as f:
+                f.write(f'#!/bin/sh\n[ -e {d}/stuck ] && exit 0\nn=$(cat {d}/stacked)\necho $((n - 1)) > {d}/stacked\n')
+            with open(f"{fakes}/mount", "w") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            for p in ("findmnt", "umount", "mount"):
+                os.chmod(f"{fakes}/{p}", 0o755)
+            env = {"PATH": fakes + ":" + os.environ["PATH"], "BB_SP_MOUNTED": "1", "BB_SP_NO_MOUNT": "1"}
+            with open(f"{d}/stacked", "w") as f:
+                f.write("2\n")
+            with open(f"{d}/stuck", "w") as f:
+                f.write("")
+            with mock.patch.dict(os.environ, env):
+                r = self.tool(d, "set", f"{d}/pool")
+                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertIn("is busy and stays where it is", r.stderr)
+                self.assertTrue(os.path.isfile(f"{d}/docker/x"), "nothing deleted through the bind")
+                self.assertFalse(os.path.exists(f"{d}/pool/aerieos-system/docker/x"), "nothing copied")
+                self.assertEqual(json.loads(self.tool(d, "status").stdout)["pool"], "", "the pool is not named")
+                # Two binds stacked, each letting go: unmounted twice, then moved.
+                os.unlink(f"{d}/stuck")
+                r = self.tool(d, "set", f"{d}/pool")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(read(d, "stacked").strip(), "0")
+                self.assertTrue(os.path.isfile(f"{d}/pool/aerieos-system/docker/x"))
+                self.assertFalse(os.path.exists(f"{d}/docker/x"))
+
     def test_the_projects_are_held_until_they_have_a_place_on_the_disks(self):
         # The operator, 1 Nov: never on the stick, on any stick.
         with tempfile.TemporaryDirectory() as d:
