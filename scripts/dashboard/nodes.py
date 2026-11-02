@@ -6584,6 +6584,15 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
         spec = (job(job_id, with_log=False) or {}).get("spec") or {}
         if spec.get("apply") == "lockdown":
             node_state(f"node:{node_id}", node_id, "retired")
+        # Disks adopted or a share served change what the Storage page
+        # shows, which the agent otherwise walks at the next hour: measured
+        # now, so the page does not say 'not mounted' of a disk just mounted
+        # (B632, the VM walk of 2 Nov).
+        if state == "succeeded" and spec.get("apply") in ("storage-adopt", "storage-share"):
+            try:
+                node_storage_measure(f"node:{node_id}", node_id)
+            except Exception as e:  # noqa: BLE001 (a measure is a courtesy, never the job's verdict)
+                print(f"dashboard: nodes: measure after {job_id} skipped: {e}", file=sys.stderr, flush=True)
     # An update that installed its file is the agent this node runs from now:
     # recorded here, since the hello that says so waits on the new agent's
     # census (a minute on bb-sandbox), and meanwhile the node still read as
