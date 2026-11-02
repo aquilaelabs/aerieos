@@ -391,7 +391,13 @@ container to a machine of its own, and back.
    stop it): from then on it is read-only, saying where it went, and tells
    each node that comes to it that it moved, with that node's challenge in
    the same answer, so a node that was off while the move was armed hears
-   it then.
+   it then. **If the new home fails before you trust it:** the old
+   controller is read-only but still serves, so nothing of yours is gone,
+   and **Download the bundle** still works there; land that bundle on a fresh
+   install (or the same machine installed again) and the move finishes
+   there instead. The old controller stays marked moved: a controller never
+   goes back to taking changes once its state has gone on, so the way back
+   is a new home, not the old one.
 4. Each node whose controller goes quiet, or is told so, knocks on the new
    address with its own credential, checks the answer against the challenge
    it holds (only a holder of the move key gives it), takes the new address
