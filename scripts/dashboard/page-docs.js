@@ -410,8 +410,8 @@ function comboWire(box, inp, options){
 
 // A pointer to another page is a link to it (R256 step 2): the address that
 // page answers at, so a press goes there as the rail does and Back returns.
-const PAGE_AT = {nodes: "#/machines/nodes", installed: "#/machines/installed", docker: "#/containers", jobs: "#/jobs", library: "#/build/library",
-  users: "#/people/users", roles: "#/people/roles"};
+const PAGE_AT = {nodes: "#/machines/nodes", installed: "#/machines/installed", storage: "#/machines/storage", docker: "#/containers", jobs: "#/jobs",
+  library: "#/build/library", users: "#/people/users", roles: "#/people/roles", machine: "#/controller/machine"};
 // A page this account may not open is its words and no link (B114): the
 // address of one a grant forbids landed on the group's first page instead.
 function pageLink(page, words, hash = PAGE_AT[page]){

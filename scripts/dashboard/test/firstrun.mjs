@@ -254,6 +254,37 @@ await firstRun(false);
   });
   ok(card.second === 'Your disks' && card.rows === 5 && card.held && /A ZFS raidz1 of 3 disks/.test(card.plan) && /one disk may fail/.test(card.plan) && card.fast,
      `the first run's second step is the disks: each but the stick a row, one holding data kept unless ticked, the plan in words and the SSD a fast pool (${JSON.stringify(card)})`);
+  // The disks a stick's plan adopts are the old system's (B637): each a
+  // row with whose it is and no box, left out of the plan and of Make it;
+  // when every disk is theirs the step points at This machine and makes
+  // nothing.
+  {
+    const some = await page.evaluate(() => {
+      const keep = state.firstboot;
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [{ slot: 'parity', id: 'Seagate_SG-E' }], pools: [] }, skipped: [] } };
+      setupSig = ''; drawSetup();
+      const s = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      const theirs = [...s.querySelectorAll('.setdisk.theirs')];
+      const out = { theirs: theirs.length, boxes: theirs.filter(x => x.querySelector('input')).length,
+                    words: theirs.map(x => x.textContent.replace(/\s+/g, ' ')).join(' | '),
+                    mine: [...s.querySelectorAll('.setdisk:not(.theirs) input')].map(i => i.dataset.setdiskuse),
+                    plan: s.querySelector('.setplan')?.textContent.replace(/\s+/g, ' ') || '', make: !!s.querySelector('[data-setdisksmake]'),
+                    link: s.querySelector('.theirs a.pagelink')?.getAttribute('href') };
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B' }, { slot: 'disk2', id: 'WD_Red_WD-C' }, { slot: 'disk3', id: 'WD_Red_WD-D' }, { slot: 'disk4', id: 'Samsung_990_S-N' }],
+                                                             parity: [{ slot: 'parity', id: 'Seagate_SG-E' }], pools: [] }, skipped: [] } };
+      setupSig = ''; drawSetup();
+      const t = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      out.all = { pill: t.querySelector('.pill')?.textContent, text: t.textContent.replace(/\s+/g, ' '), make: !!t.querySelector('[data-setdisksmake]'), boxes: t.querySelectorAll('input').length };
+      state.firstboot = keep; setupSig = ''; drawSetup();
+      return out;
+    });
+    ok(some.theirs === 2 && some.boxes === 0 && /old system's disk1: adopted as it is on This machine/.test(some.words) && /old system's parity/.test(some.words)
+       && some.link === '#/controller/machine' && some.mine.join() === 'sdc,sdd,nvme0n1' && /A ZFS mirror of 2 disks/.test(some.plan) && some.make,
+       `the stick's disks are the old system's on the disks step: a row each with whose it is and no box, the plan from the rest, Make it for those alone (${JSON.stringify(some).slice(0, 400)})`);
+    ok(some.all.pill === 'on This machine' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
+       && !some.all.make && some.all.boxes === 0,
+       `...and with every disk theirs the step points at This machine and offers nothing to make (${JSON.stringify(some.all).slice(0, 300)})`);
+  }
   const sent = [];
   await page.route('**/api/v1/nodes', async r => {
     const b = r.request().postDataJSON?.() || {};
