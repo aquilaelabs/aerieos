@@ -297,8 +297,12 @@ function wireBackup(root){
 let moveData = null, moveAsked = false, moveToken = null;
 async function loadMove(){
   moveAsked = true;
+  const was = JSON.stringify(moveData);
   try{ moveData = await (await fetch("/api/move?pieces=1")).json(); }
   catch(e){ moveData = {error: "move: " + failWords(e)}; }
+  // Drawn once it has landed, as the backup copies are (B645: the section
+  // stayed its two shimmer rows after a reload, and Forget it drew nothing).
+  if (JSON.stringify(moveData) !== was){ settingsRev++; if (tabs.some(t => t.kind === "settings")) drawPanes(); }
 }
 function moveStatus(){
   const m = moveData || {};
