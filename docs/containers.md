@@ -140,6 +140,15 @@ deliberately does not do for every row at once. Lines wrap rather than scroll:
 a host path is long, and a row that scrolls sideways on a phone hides the half
 you were reading.
 
+**Edit settings**, behind a row's ⋯, opens the container's settings as one
+grid with one Apply: the project it belongs to, the node it runs on, the
+branch it builds from, a compose file from the tree laid over its own, the
+GPU it is given (none, an NVIDIA card through the container toolkit, or an
+AMD card or APU through its render devices under /dev/dri, for every service
+of it from the next build; offered on a node that reports a card), an nginx
+route, and whether it starts on boot and reaches the LAN. The pills on the
+row say every setting, so the press that changes them can wait in the menu.
+
 **A long build says what it is doing, and can be stopped.** The command's
 output is streamed into the row as it arrives rather than handed over when it
 exits, so a `compose build` spending four minutes pulling layers is not four
