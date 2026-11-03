@@ -120,6 +120,18 @@ function renderSettingsInto(i){
   const t = state?.settings?.tunnel;
   const sect = (key, title, status, html, opts = {}) =>
     docSection("settings", key, title, status, html.replace(/<h4>[^<]*<\/h4>\s*/, ""), opts);
+  // Before the first poll lands, the page's own placeholder (B647): every
+  // section it will have, shimmering, rather than the few that need no
+  // state and then the rest. Drawn whole again when the settings arrive.
+  if (!state?.settings){
+    const titles = [["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
+      ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
+      ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
+    d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
+      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`;
+    sectJump(d.list.querySelector("[data-sects]"));
+    return;
+  }
   // Reach from outside and Connection are the Network page's now (R165
   // step 4, tab-network.js), drawn from the same table.
   const groups = settingsSections().filter(g => !NETWORK_GROUPS.includes(g.key));
