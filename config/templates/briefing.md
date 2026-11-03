@@ -585,8 +585,13 @@ this project's setting), a program finds no card and takes its CPU path: say
 so in your reply rather than looking for a way round. A container gets the
 card when its compose file reserves it
 (`deploy.resources.reservations.devices` with `driver: nvidia`) and the node
-carries the NVIDIA container toolkit, which `aerie toolchains` names; the
-driver, the toolkit and the node's switches are the operator's.
+carries the NVIDIA container toolkit, which `aerie toolchains` names, or
+when a person gives it the GPU in its settings on the Containers page (an
+NVIDIA card through the toolkit, an AMD card or APU through its render
+devices); the driver, the toolkit and the node's switches are the
+operator's. On AerieOS the image carries the driver and the toolkit, and a
+card marked for a VM under the node's Features is vfio-pci's from boot: no
+program on the host finds it then, and `aerie gpu` says so.
 <!-- BUILDERBOT:END -->
 
 ## Containers
