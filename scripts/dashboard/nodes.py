@@ -1727,7 +1727,7 @@ def _census(c):
     out["sandbox"] = bool(c.get("sandbox"))
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
-    for k in ("gpu_card", "gpu_display"):
+    for k in ("gpu_card", "gpu_display", "gpu_amd"):
         if c.get(k):
             out[k] = str(c[k])[:200]
     # Where the NVIDIA driver stands (R102): installed for this kernel,

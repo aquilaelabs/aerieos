@@ -32,6 +32,7 @@ from .stores import _stores, noexec, store_dirs, tc_root
 from .backends import _have, net_backend, pkg_backend
 from .toolchains import _toolchains, sdk_images, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
+    _gpu_amd,
     _gpu_card,
     _gpu_container,
     _gpu_display,
@@ -359,6 +360,7 @@ def census(state):
         "store_noexec": bool(tc_root(state)) and noexec(tc_root(state)),
         "gpu": gpu.splitlines()[0][:80] if gpu else "",
         "gpu_card": _gpu_card(),
+        "gpu_amd": _gpu_amd(),
         "gpu_driver": _gpu_driver(),
         "gpu_container": _gpu_container(),
         "gpu_display": _gpu_display(),

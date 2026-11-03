@@ -32,6 +32,26 @@ def _gpu_card():
     return ""
 
 
+def _gpu_amd():
+    """An AMD card or APU by its PCI id (R207 step 4): a display-class
+    device of AMD's vendor id (0x1002), which the kernel's own amdgpu
+    drives, so a container is given its render devices from its row."""
+    for line in (_run(["lspci", "-nn"], timeout=10) if SYS_ROOT == "/sys" else "").splitlines():
+        low = line.lower()
+        if ("amd" in low or "ati" in low) and ("vga compatible" in low or "3d controller" in low or "display controller" in low):
+            return line.split(": ", 1)[-1].strip()[:120]
+    try:
+        for dev in sorted(os.listdir(f"{SYS_ROOT}/bus/pci/devices")):
+            base = f"{SYS_ROOT}/bus/pci/devices/{dev}"
+            with open(f"{base}/vendor") as f, open(f"{base}/class") as g, open(f"{base}/device") as h:
+                vendor, cls, did = f.read().strip(), g.read().strip(), h.read().strip()
+            if vendor == "0x1002" and cls.startswith("0x03"):
+                return f"AMD device [1002:{did[2:]}] at {dev}"
+    except OSError:
+        pass
+    return ""
+
+
 def _gpu_name():
     """The card's name as its driver gives it, or "". Only an answer that
     exited 0 is a name: nvidia-smi says why it failed on stdout, and with

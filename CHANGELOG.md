@@ -71,6 +71,8 @@
 - One manifest for everything: every shipped toolchain and every coding agent is a pack in bbtool.json's format under packs/, tagged official and bundled with the release for an install with no network, a toolchain's recipe under shipped and an agent's adapter (how it installs, updates and signs in, how it takes the briefing and AerieOS's guards, where its conversations are) under agent; an agent that cannot take the guards is not listed, and aerie lint holds the packs to the tables they are written from (3aa2613)
 - The vetted catalog's signed index: AerieOS reads the catalog's index.json and index.sig from the address under Controller settings (the public builderbot-catalog by default), checks the signature against the maintainers' public key the install ships before reading an entry, refuses a tampered or re-signed index and keeps the one before, and puts a pack the catalog withdrew on the bell for every install that holds it; each entry pins a pack to an exact commit and its archive's sha256, never latest (c9eebb7)
 - Install from the vetted catalog: the Library lists the index's packs with their tier, each Install opening the Add tool pack dialog on the commit the index pins with the archive's sha256 checked on the way in, Look before Add as always; every pack's row says its tier (vetted, or by URL), and a withdrawn pack is said and not offered (a196894)
+- A node's Features section marks an NVIDIA card for a VM: from the next boot vfio-pci holds it, one VM takes it under Hardware, and the machine and its containers do without it until it is unmarked (9a90fa8)
+- A container is given the machine's GPU from its settings on the Containers page: an NVIDIA card through the container toolkit, an AMD card or APU through its render devices, for every service of it from the next build (946f98d)
 
 ### Changed
 
@@ -121,6 +123,7 @@
 - A dev build's files all land on one release: the apps, the controller bundle and the OS image each found the tag's draft among the drafts, where two drafts had been made for one tag (84604c8)
 - The first run's Your disks step leaves the disks a stick's plan adopts alone: each is listed as the old system's, with no box, and Make it never sees them; with every disk theirs the step points at This machine's Disks from the stick (565fc4b)
 - AerieOS carries the Realtek and Broadcom network firmware, so a board with one of those chips no longer boots saying its firmware could not be loaded (565fc4b)
+- Install on IOMMU, Storage, Shares or UPS in a node's Features section lands: the agent refused every feature but VM host and the firewall as 'not a feature verb' (9a90fa8)
 
 ### Security
 
