@@ -149,7 +149,10 @@ const GIT_FLOOR = [2, 38];
 // sandbox node. The reason is on the line, in the state's own words.
 function nodeGpu(n){
   const card = n.reported?.gpu_card;
-  if (!card) return "";
+  // An AMD card or APU (R207 step 1): the kernel's own amdgpu drives it,
+  // and a container is given it from its settings; no display switch here.
+  const amd = n.reported?.gpu_amd ? `<div class="actbar ndgpu"><span class="state note">gpu: ${esc(n.reported.gpu_amd)} · amdgpu, the kernel's own; a container is given it from its settings on the Containers page</span></div>` : "";
+  if (!card) return amd;
   const st = n.reported?.gpu_display || "";
   const up = /^up/.test(st), reboot = /^reboot/.test(st);
   // The display runs on NVIDIA's driver and does not install it (R102): the
@@ -168,7 +171,7 @@ function nodeGpu(n){
     <span class="state ${cls}">gpu: ${esc(card)} · ${esc(word)}</span>
     ${nodriver ? `<button type="button" data-ndtc="${esc(n.id)}"
       title="the driver is installed from the Library">Install the driver</button>` : ""}
-  </div>`;
+  </div>${amd}`;
 }
 // The sound this node has (R107), in a line: the card ALSA sees, or a
 // virtual one, and the sound server an emulator's audio would go through.
