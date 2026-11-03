@@ -1722,8 +1722,9 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const run4 = script4.split('\n').find(l => l.startsWith('bash "$dir/provision-linux.sh"')) || '';
     const tok4 = (run4.match(/--token '(bbe_[^']+)'/) || [])[1];
     const said4 = await page.evaluate(() => document.getElementById('ndTitle').textContent);
-    ok(new RegExp(`--machine '${MACHINE}'`).test(run4) && !/DOORSECRET|WGCONF/.test(script4) && tok4 && /^enroll-shed-n_[0-9a-f]+\.sh: run it on the machine$/.test(said4),
-       `Enroll script downloads the node's script at once, bound to the machine it reported, with no secret in it (${said4}; ${run4.replace(/bbe_[^']+/, 'bbe_…').slice(0, 120)})`);
+    ok(new RegExp(`--machine '${MACHINE}'`).test(run4) && !/DOORSECRET|WGCONF/.test(script4) && tok4 && /^enroll-shed-n_[0-9a-f]+\.sh: run it on the machine$/.test(said4)
+       && /--toolchains '\/var\/lib\/builderbot\/toolchains'/.test(run4) && /--data '\/var\/lib\/builderbot\/data'/.test(run4),
+       `Enroll script downloads the node's script at once, bound to the machine it reported, its stores where they are and no secret in it (${said4}; ${run4.replace(/bbe_[^']+/, 'bbe_…').slice(0, 160)})`);
     await page.click('#ndBody #ndTokDone');
     // The system the script was built for is the one the row's census
     // names (R210), recorded on the row by that mint; the Features

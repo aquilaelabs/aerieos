@@ -1096,8 +1096,11 @@ the pieces stack:
    reaches the controller, its door, and the system it was enrolled as,
    recorded on the row at mint and read off its census for a row older
    than that, `system_of`), with no secret in it (the node keeps its
-   door's); the Features section's Enroll again opens the dialog on the
-   same answers to change one or paste a secret, which replaces the
+   door's), and with the node's stores as it reports them, as the
+   provisioner's store flags, so the node keeps them where they are (the
+   agent keeps a store the flags leave at its default where its record
+   has it, too); the Features section's Enroll again opens the dialog on
+   the same answers to change one or paste a secret, which replaces the
    node's. Either way the script is bound to the machine the node
    reported (`--machine`, the hash of its machine id, which the provisioner
    checks before it changes anything and `nodes.enroll` checks again), and

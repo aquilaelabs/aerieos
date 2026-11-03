@@ -1217,11 +1217,15 @@ def enroll_script(principal, req):
     u = urllib.parse.urlparse(ans["controller"])
     port = u.port or (443 if u.scheme == "https" else 80)
     machine = ((again or {}).get("reported") or {}).get("machine") or ""
+    # Its stores as it reports them (B658): a script run again had handed
+    # the provisioner nothing, and the node came back on the defaults.
+    stores = {role: s.get("path") for role, s in (((again or {}).get("reported") or {}).get("stores") or {}).items()
+              if isinstance(s, dict) and s.get("path")} if enrolled else {}
     fam = systems.family_file(ans.get("system") or systems.DEFAULT)
     return m | {"script": enrollscript.build(ans, name=name, user=user, token=m["token"],
                                               expires=m["expires"], provisioner=prov.read_bytes(),
                                               family=fam.read_bytes() if fam and fam.is_file() else b"",
-                                              again=enrolled, machine=machine),
+                                              again=enrolled, machine=machine, stores=stores),
                 "filename": enrollscript.filename(name, m["id"]), "reach": ans["reach"],
                 "home": enrollscript.home_rules(ans, port),
                 "tunnel_addr": ans.get("tunnel_addr", "")}

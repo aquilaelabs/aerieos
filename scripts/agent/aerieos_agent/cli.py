@@ -13,10 +13,38 @@ from .agent import Agent
 # ---------------------------------------------------------------------------
 # commands
 
+def had_state():
+    """The record this node already has, or {} on a machine enrolling for
+    the first time (load_state ends the command when it is missing)."""
+    try:
+        with open(NODE_JSON) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def stores_kept(stores, given, had):
+    """The stores an enrollment lands with (B658): a role the flags left
+    at its default keeps the path the node's record already has, so a
+    script run again on an enrolled node (which hands the provisioner
+    nothing for a store it did not name) does not move the toolchains,
+    the data and the rest back onto the defaults, with the runner's JDK,
+    bb-ftpd and every toolchain gone from where the node looks."""
+    kept = dict(had.get("stores") or {}) if isinstance(had, dict) else {}
+    out = dict(stores)
+    for role, path in kept.items():
+        if role in DEFAULT_STORES and role not in given and isinstance(path, str) and path.startswith("/") \
+                and out.get(role) == DEFAULT_STORES[role] and not store_path_ok(path):
+            out[role] = path
+    return out
+
+
 def cmd_enroll(args):
     opts = {"--controller": "", "--token": "", "--user": "bb", "--pin": "",
             "--session-user": "", "--reach": "", "--door": "", "--door-host": ""}
     stores = dict(DEFAULT_STORES)
+    given = set()
     it = iter(args)
     for a in it:
         if a == "--store":
@@ -27,10 +55,12 @@ def cmd_enroll(args):
             if why:
                 raise SystemExit(f"--store {role}: {why}")
             stores[role] = path
+            given.add(role)
         elif a in opts:
             opts[a] = next(it, "")
         else:
             raise SystemExit(f"unknown option {a}")
+    stores = stores_kept(stores, given, had_state())
     if not opts["--controller"] or not opts["--token"]:
         raise SystemExit("enroll needs --controller URL and --token bbe_…")
     if not opts["--token"].startswith("bbe_"):
