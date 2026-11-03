@@ -122,7 +122,43 @@ def expand(names):
 
 def all_members():
     """{key: [members]} for every project, an empty one with []."""
-    return {k: members(k) for k in _load()["projects"] if registry.is_repos(k)}
+    # Over a copy of the keys: the cached record is shared across the
+    # server's threads, and a delete popping a key while a status read
+    # walked it was a 500 (B643).
+    return {k: members(k) for k in list(_load()["projects"]) if registry.is_repos(k)}
+
+
+def empty_keys():
+    """The projects with no repository in them (R208): each a place to run
+    an agent that builds containers and VMs, in a folder of its own."""
+    return [k for k, ms in all_members().items() if not ms]
+
+
+def is_work(name):
+    """Whether `name` is a project with no repository (R208): its own key,
+    with nothing in it, so a session there works in its folder and has no
+    git and no notebook."""
+    name = str(name or "")
+    return bool(name) and registry.is_repos(name) and not members(name)
+
+
+def work_folder(key):
+    """The folder of a project with no repository (R208): /workspace/KEY,
+    made plain when it is missing (no git, no notebook), with its mark in
+    it so the sync carries it and a reader knows what it is. The path, or
+    None where there is no workspace to make it in."""
+    if WORKSPACE is None or not registry.is_repos(key):
+        return None
+    d = WORKSPACE / str(key)
+    try:
+        d.mkdir(exist_ok=True)
+        mark = d / MARK
+        if not mark.is_file():
+            mark.write_text(json.dumps({"id": registry.pid(key), "name": registry.label(key),
+                                        "repository": None}, indent=1) + "\n")
+    except OSError:
+        return None
+    return d
 
 
 def leftovers():
