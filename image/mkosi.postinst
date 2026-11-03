@@ -40,6 +40,12 @@ Name=en* eth*
 DHCP=yes
 NET
 
+# Docker told of the NVIDIA runtime (R207): the toolkit's own tool writes
+# /etc/docker/daemon.json, so a container asking for the card
+# (gpus: all) gets it on a machine with one; on one without, the runtime
+# is named and never used.
+mkosi-chroot nvidia-ctk runtime configure --runtime=docker >/dev/null
+
 # The initramfs again, now that the extra tree put the init-bottom script
 # and the modules list in (the kernel's own install ran before them).
 mkosi-chroot update-initramfs -u -k all

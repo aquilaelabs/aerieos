@@ -1,0 +1,8 @@
+# NVIDIA's container toolkit, which Debian does not carry (R207): the flat
+# repository the node provisioner adds on a provisioned machine, read here at
+# the image's build. It is live, not pinned to the snapshot's day, so the
+# toolkit's version is the newest at build time; the driver's is Debian's.
+Types: deb
+URIs: https://nvidia.github.io/libnvidia-container/stable/deb/amd64
+Suites: /
+Signed-By: /etc/apt/keyrings/nvidia-container-toolkit.asc
