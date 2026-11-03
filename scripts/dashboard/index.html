@@ -1019,7 +1019,11 @@ html[data-motion="reduce"] .tourring{transition:none}
    at 1cm rather than a hand-kept copy of it. */
 .sw{position:relative;display:block;padding:0;overflow:hidden;
   height:44px;border-radius:var(--r-control);cursor:pointer;
-  background:var(--bg);border:var(--hair) solid var(--line)}
+  background:var(--bg);border:var(--hair) solid var(--line);
+  /* Resolved on the tile, from its own note color: the page's --lit is
+     computed once at the root and would be inherited by every tile. The
+     default tile's copper is its own rule, which outranks this. */
+  --lit:var(--note)}
 .sw .swp{position:absolute;left:0;right:0;bottom:0;height:16px;
   background:var(--panel);border-top:var(--hair) solid var(--line)}
 .sw .swa{position:absolute;left:6px;top:7px;width:10px;height:10px;
