@@ -956,6 +956,25 @@ def matching(project, *, prompt="", path=""):
     return out
 
 
+# Whether a project has no repository (R208), from the server
+# (repos.is_work); nothing when nobody set it.
+work_of = None
+# What a session on a project with no repository is refused (R208): git,
+# since nothing there is under it; the build, test and tree verbs; and the
+# notebook's writes, since it has none. The reason is the rule's text.
+WORK_GUARD = {
+    "name": "no-repository",
+    "text": "This project has no repository: nothing here is under git, there is no code to build or test, "
+            "no map, and no notebook to write to (its roadmap, bugs, rules, wiki, design and memories do not "
+            "exist). Its folder holds what a container or a VM needs, and the work is `aerie container new` "
+            "and `aerie vm`. What you would have put on the record goes in your reply.",
+    "refuse": ["git", "aerie git", "aerie build", "aerie test", "aerie tests", "aerie map", "aerie devapp new",
+               "aerie devapp rebuild", "aerie devapp override", "aerie version", "aerie changelog",
+               "aerie roadmap", "aerie bug", "aerie rules add", "aerie rules rm", "aerie rules edit",
+               "aerie design", "aerie wiki", "aerie memory", "aerie forge", "aerie ci-log"],
+}
+
+
 def guards(project):
     """What the Bash guard refuses in this project (R200 step 3): each rule
     in effect that refuses something, then the briefing's never-do lines,
@@ -963,7 +982,13 @@ def guards(project):
     out = [{"name": r["name"], "text": r["text"], "refuse": list(r["refuse"]),
             "by": r.get("by") or "you"}
            for r in effective(project) if r.get("refuse")]
-    return out + [dict(g, by="builderbot") for g in ALWAYS]
+    always = list(ALWAYS)
+    try:
+        if work_of and work_of(project):
+            always.append(WORK_GUARD)
+    except Exception:                                            # noqa: BLE001
+        pass
+    return out + [dict(g, by="builderbot") for g in always]
 
 
 def refusing(project, command, background=False):

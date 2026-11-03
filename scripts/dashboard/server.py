@@ -1100,6 +1100,9 @@ def project_names(who):
         registry.sync()
         rows = [{"name": d.name} for d in here if _listed(d, cloning)]
         _place({r["name"] for r in rows})
+        # ...and each project with no repository (R208), whose key is what
+        # its sessions, its containers and its settings are reached by.
+        rows += [{"name": k} for k in repos.empty_keys()]
         return [p["name"] for p in _projects_seen_by(who, rows)]
 
 
@@ -1361,8 +1364,12 @@ def _project_columns(who, facts):
         with timing.timed("projects:memory"):
             mem_census = memory.census(d.name, home=home_for(users.uid_of(who)))
         # Its project's (R138): the marks and the people are kept by project.
-        pk = repos.key_of(d.name)
+        pk = d.name if f.get("work") else repos.key_of(d.name)
         out.append({"name": d.name, "project": pk, "git": branch, "git_ok": git_ok,
+                    # A project with no repository (R208): the row its card's
+                    # Start agent and its settings read, listed as no
+                    # repository, with no notebook to open.
+                    "work": bool(f.get("work")),
                     # The name people see and the project's id (R154); `name`
                     # stays the directory, which every store keys by.
                     "label": str((reg.get(d.name) or {}).get("name") or d.name),
@@ -1425,7 +1432,9 @@ def _project_columns(who, facts):
                     # the override: somebody whose Profile has no email can
                     # still set one for this project, and then a session may
                     # start and push here even though the global flag is off.
-                    "git_ready": _row_git_ready(base_git, mine_prefs.get(d.name))
+                    # ...and always on a project with no repository (R208):
+                    # nothing is committed there.
+                    "git_ready": True if f.get("work") else _row_git_ready(base_git, mine_prefs.get(d.name))
                                  if users.uid_of(who) else True,
                     "push_how": projects.push_how(d.name),
                     # Whether its settings are this account's to change (B19):
@@ -1572,7 +1581,21 @@ def _project_list(who):
     facts, fault = _projects_on_disk()
     if fault is not None:
         return fault
-    return _projects_seen_by(who, _project_columns(who, facts))
+    return _projects_seen_by(who, _project_columns(who, facts + _work_facts()))
+
+
+def _work_facts():
+    """A fact per project with no repository (R208), shaped as
+    _projects_on_disk shapes a repository's: its folder (made when it is
+    missing, so a session and a node's copy find it), no git and nothing
+    wrong with it. `work` marks it for the row."""
+    out = []
+    for k in repos.empty_keys():
+        d = repos.work_folder(k)
+        out.append({"dir": d if d is not None else WORKSPACE / k, "name": k, "issues": [], "git": None,
+                    "git_ok": False, "linked": False, "github": False, "fhost": "", "forge": forges.OTHER,
+                    "work": True})
+    return out
 
 
 def session_cwds():
@@ -3486,6 +3509,13 @@ SEEN_HALVES = (("bug", "bugs", "`aerie bug`"), ("rules", "rules", "`aerie rules`
                ("design", "design", "`aerie design show`, and write docs/design-language.md again with "
                                     "`aerie design file` before committing it"))
 OWN_WRITE_ROUTES = ("/api/roadmap", "/api/rules", "/api/bugs", "/api/memory", "/api/prefs", "/api/design")
+# The routes a project with no repository (R208) has nothing behind: its
+# notebook's and its tree's, each refused with why rather than read off a
+# folder that holds neither. The GET of the rules stays: the global ones
+# hold there and a session reads them.
+WORK_REFUSED = {"/api/roadmap", "/api/bugs", "/api/design", "/api/wiki", "/api/memory", "/api/rules",
+                "/api/git", "/api/tests", "/api/artifacts", "/api/artifact?", "/api/findings", "/api/version",
+                "/api/changelog", "/api/snapshots", "/api/forge-access", "/api/files", "/api/brief"}
 _seen_lock = threading.Lock()
 
 
@@ -4039,7 +4069,7 @@ registry.configure(state=STATE, workspace=WORKSPACE, write_json=write_json)
 # A project of several repositories (R136): which repositories are in which,
 # and prefs laying a project's settings over its repositories'.
 import repos                                                     # noqa: E402
-repos.configure(state=STATE, write_json=write_json, registry=registry)
+repos.configure(state=STATE, write_json=write_json, registry=registry, workspace=WORKSPACE)
 gitview.configure(workspace=WORKSPACE,
                   worktrees=WORKTREES,
                   tell=notify.tell, tmux_name=tmux_name, state=STATE,
@@ -4235,6 +4265,10 @@ else:
 # section (what a change asked for during a run does); prefs is imported
 # after preamble is configured, so it is handed over here.
 preamble.prefs_mod = prefs
+# A project with no repository (R208): its briefing says so, its parts
+# that need a notebook are left out, and its guard refuses git.
+preamble.work_of = repos.is_work
+rules.work_of = repos.is_work
 preamble.label_of = registry.label
 preamble.id_of = registry.pid
 preamble.packs_of = lambda: {n: {"label": (r.get("manifest") or {}).get("label") or n, "guidance": r.get("guidance") or ""}
@@ -7591,8 +7625,24 @@ class Handler(BaseHTTPRequestHandler):
         # and /api/router?node=N are the exact routes' own reads.
         for how, route, name in GET_ROUTES:
             if (path == route) if how == "exact" else self.path.startswith(route):
+                if (why := self._work_refused(route, (urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                                                     .get("project") or [""])[0])):
+                    return self._json({"error": why}, 400)
                 return getattr(self, name)()
         self._json({"error": "not found"}, 404)
+
+    def _work_refused(self, route, project):
+        """Why a route that reads or writes a repository's notebook or tree
+        is refused for a project with no repository (R208): it has no git
+        and no notebook, and a read of its folder as one would make one.
+        "" for every other route and project."""
+        if route not in WORK_REFUSED or not project or not repos.is_work(project):
+            return ""
+        if route == "/api/rules" and self.command == "GET":
+            return ""
+        return (f"{registry.label(project)} has no repository, so it has no notebook (roadmap, bugs, rules of its "
+                "own, wiki, design, memories) and no git; a session there builds containers and VMs. Add a "
+                "repository to it for those.")
 
     def _get_trace(self):
         """GET /api/trace?since=T: what this server was asked since T,
@@ -8784,6 +8834,8 @@ class Handler(BaseHTTPRequestHandler):
                             or req.get("id") or "")[:120], req)
         for how, route, name in POST_ROUTES:
             if (path == route) if how == "exact" else path.startswith(route):
+                if (why := self._work_refused(route, str(req.get("project") or ""))):
+                    return self._json({"error": why}, 400)
                 # What a write to the notebook or the settings means for the
                 # sessions is recorded before its reply goes, not after: the
                 # reply is what lets a session send its next prompt, and one

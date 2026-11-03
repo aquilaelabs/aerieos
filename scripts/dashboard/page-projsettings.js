@@ -590,7 +590,7 @@ async function unlinkProject(name){
 // rather than hides: the alternative is a project whose roadmap silently
 // stayed behind under a name nothing points at any more.
 let rnFor = null;                        // the project the dialog is open on
-let rnMode = "all";                      // "all" from the gear, "git" from the chain
+let rnMode = "all";                      // "all" from the gear, "git" from the chain, "project" from a card (R208)
 let rnOpens = 0;                         // which opening of the dialog this is
 
 // The form shown in a notebook's Settings view instead of the dialog (R119
@@ -694,13 +694,35 @@ function renameProject(name, mode = "all"){
   // is the remote's half of them, and opening it there hides everything that
   // is not about the remote rather than scrolling past it.
   const git = mode === "git";
+  // A card's door (R208): what is the project's as a whole, in a dialog.
+  // The repository's own sections (Repository, Build and test, File access,
+  // Snapshots) are each notebook's Settings view's and are not drawn; on a
+  // project with no repository the dials that need code are not either.
+  const proj = mode === "project";
+  const box = $("rnmodal").querySelector(":scope > .box");
+  box.classList.toggle("rnproject", proj);
+  box.classList.toggle("rnwork", proj && !!p?.work);
   // Named rather than assumed: a project on somebody's own Gitea should not
   // read "GitHub settings", and the host is the one fact this door is about.
   const where = p?.forge_name || "its remote";
-  $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}` : projLabel(name);
+  $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}`
+    : proj ? `${projectName(name)} settings` : projLabel(name);
   for (const id of ["rnNameField", "rnMineField",
                     "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField"])
     $(id).hidden = git;
+  // The project's name is renamed on its card's back; the field here
+  // renames a repository, which the project's door is not about.
+  $("rnNameField").hidden = git || proj;
+  const ph = $("rnProjectHead");
+  ph.hidden = !proj;
+  ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is project P${p.pid}` : ""}${
+    p?.work ? `; its folder is /workspace/${name}` : ""}. Its name is changed on its card's back.`;
+  const pn = $("rnProjectNote");
+  pn.hidden = !proj;
+  pn.firstElementChild.textContent = p?.work
+    ? "A project with no repository: its sessions build containers and VMs in its own folder, and have no git and no notebook. Add repository on its card makes it a coding project."
+    : `Git, build and test, file access and snapshots are each repository's: open its notebook's Settings. ${
+        (state?.repos?.[reposOf(name)]?.members || []).length > 1 ? "These settings are the project's as a whole." : ""}`.trim();
   // The node picker and the two credential blocks have hidden rules of their
   // own further down, and each of those consults the mode too.
   $("rnName").value = projLabel(name);
@@ -763,12 +785,14 @@ function renameProject(name, mode = "all"){
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
   // The bin, on the gear's door only: the chain's is about the remote.
   // Not drawn for a role that does not give it (the operator, 21 Oct).
-  $("rnDelete").hidden = git || !p || !!p?.trash_why;
+  $("rnDelete").hidden = git || proj || !p || !!p?.trash_why;
   $("rnKeyOut").hidden = true; $("rnKeyPaste").hidden = true; $("rnKeyPaste").value = "";
   rnLoadAuth(name);
-  rnLoadSnapshots(name);
+  // A project with no repository (R208) has no snapshots and no files over
+  // FTP: the server refuses both, so neither is asked for.
+  if (!p?.work) rnLoadSnapshots(name);
   rnLoadPeople(name);
-  rnLoadFtp(name);
+  if (!p?.work) rnLoadFtp(name);
   rnFillPrefs(p);
   // The sessions at the foot: the gear's door, and an administrator's.
   $("rnSessField").hidden = true;

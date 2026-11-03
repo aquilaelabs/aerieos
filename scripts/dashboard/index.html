@@ -2838,6 +2838,14 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* Agents may is the Permissions view's; the Settings view leaves it out of
    its page while the form is there (nb-permissions.js). */
 .nbsettings details[data-sect="rn:claude"]{display:none}
+/* A card's door on the project's settings (R208): the repository's own
+   sections are each notebook's, and a project with no repository has no
+   dial, test-run pick or commit identity that needs code. */
+#rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
+#rnmodal .box.rnwork .rncode{display:none}
+/* ...and General holds nothing to save on that door (its name is the
+   card's back's), so its bar is not drawn. */
+#rnmodal .box.rnproject details[data-sect="rn:project"] .rnbar{display:none}
 /* The lent phone's screen as a session last saw it (tab-phone.js, R113): a
    picture at a phone's proportions, never wider than a row wants. */
 .phshot{display:block;max-width:min(260px,60vw);height:auto;margin:8px 0 4px;
@@ -6307,6 +6315,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          session sees, how it builds, what an agent may
          do, what is yours, and who is in it now (the operator, 1 Oct). -->
     <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body">
+    <!-- A card's door (R208): the project's id and folder, its name the
+         card's back's to change. -->
+    <div class="field" id="rnProjectHead" hidden><div class="hint"></div></div>
     <div class="field" id="rnNameField">
       <label for="rnName">Name</label>
       <input id="rnName" maxlength="100" autocomplete="off" spellcheck="false">
@@ -6334,8 +6345,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          (the operator, 25 Sep): what a session enters, what it runs, and
          what a change asked for does while a test run is going. -->
     <div class="field" id="rnGateField">
-      <label id="rnGateLabel">While a test runs</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateLabel">
+      <label id="rnGateLabel" class="rncode">While a test runs</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateLabel">
         <label class="pick wide">A change asked for <select id="rnTestChange"
           aria-label="what a change asked for during a test run does">
           <option value="wait">waits: the ask in hand is finished and tested first</option>
@@ -6346,8 +6357,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            the groups a person looks for it under (the operator, 22 Oct: one
            grid of fifteen read as a heap). -->
       <div class="hint" id="rnGateMayLabel">Auto lands it, Ask holds it for your approval, Deny refuses it.</div>
-      <label id="rnGateNbLabel" class="rnsub">The notebook</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateNbLabel">
+      <label id="rnGateNbLabel" class="rnsub rncode">The notebook</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateNbLabel">
         <label class="pick">Add to roadmap <select id="rnGateRoadmap"
           aria-label="new roadmap items from a session"></select></label>
         <label class="pick">File bugs <select id="rnGateBugs"
@@ -6361,7 +6372,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       </div>
       <label id="rnGateRunLabel" class="rnsub">Building and running</label>
       <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateRunLabel">
-        <label class="pick">Fill in build and test <select id="rnGateSettings"
+        <label class="pick rncode">Fill in build and test <select id="rnGateSettings"
           aria-label="the build, test and outputs fields from a session"></select></label>
         <!-- The project's container: rebuild it, change its env, create it
              when there is none, remove it (devbuild; the Docker row says
@@ -6394,8 +6405,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <label class="vmcap"><input id="rnVmMem" type="number" min="0" max="1024" step="1" inputmode="numeric" aria-label="GB of memory in all"><span class="dim">GB memory</span></label>
         <label class="vmcap"><input id="rnVmDisk" type="number" min="0" max="16384" step="1" inputmode="numeric" aria-label="GB of disk in all"><span class="dim">GB disk</span></label>
       </div></div>
-      <label id="rnGateShipLabel" class="rnsub">Shipping</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateShipLabel">
+      <label id="rnGateShipLabel" class="rnsub rncode">Shipping</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateShipLabel">
         <!-- aerie sign (R106): a build signed with one of the project's keys,
              which the session never receives. Ask by default; Ask waits for
              the project's owner. -->
@@ -6494,7 +6505,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="field" id="rnTermPreviewField"><label class="lbl" for="rnTermPreview">How your terminals here look</label>
         <div id="rnTermPreview" aria-live="polite"></div></div>
       <div class="hint" id="rnPrefHint"></div>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnMineLabel">
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnMineLabel">
         <label class="pick">Commit name <input id="rnGitName" type="text"
           autocomplete="off" spellcheck="false" maxlength="120"
           aria-label="name your commits here carry"></label>
@@ -6502,7 +6513,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
           autocomplete="off" spellcheck="false" maxlength="120"
           aria-label="email your commits here carry"></label>
       </div>
-      <div class="hint" id="rnGitHint"></div>
+      <div class="hint rncode" id="rnGitHint"></div>
     </div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body">
@@ -6728,6 +6739,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     </div>
     </div></details>
     <div class="field" id="rnErrWrap" hidden><div class="hint bad" id="rnErr"></div></div>
+    <!-- A card's door (R208): where the rest of the settings are. -->
+    <div class="field" id="rnProjectNote" hidden><div class="hint"></div></div>
     <div class="foot">
       <!-- Each section saves itself (page-projsettings.js rnBars); the foot
            only closes the dialog, and is not there in the notebook. -->

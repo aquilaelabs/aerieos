@@ -96,7 +96,7 @@ const browser = await launch();
      `the card's front: its name, its repositories, Start on its first, Add repository and Edit, no menu (${JSON.stringify(front)})`);
   // The projects they left stay, empty, until somebody deletes them.
   const left = await page.$eval(`.pcard[data-pkey="${gammaWas}"]`, c => ({ repos: c.querySelectorAll('.pcfront .pcrepo').length,
-    empty: /no repository yet/.test(c.querySelector('.pcfront').textContent) }));
+    empty: /no repository: a session here builds containers and VMs/.test(c.querySelector('.pcfront').textContent) }));
   ok(left.repos === 0 && left.empty, `the project gamma left is empty, and says so (${JSON.stringify(left)})`);
   // A press on the card itself opens nothing.
   const tabs = await page.evaluate(() => tabs.length);

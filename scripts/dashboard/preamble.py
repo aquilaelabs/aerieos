@@ -84,6 +84,20 @@ def configure(*, rules_mod, roadmap_mod, bugs_mod, live=None, prefs_mod=None):
 
 
 prefs_mod = None
+# Whether the project has no repository (R208), from the server
+# (repos.is_work): a session there works in the project's own folder, with
+# no git and no notebook, and builds containers and VMs.
+work_of = None
+
+
+def is_work(project):
+    """Whether `project` is one with no repository (R208)."""
+    try:
+        return bool(work_of and work_of(project))
+    except Exception:                                            # noqa: BLE001
+        return False
+
+
 # Whether a project's node reports an NVIDIA card, from the server (R102):
 # a fact about the machine, not the tree, so the briefing's GPU section is
 # decided by it and costs a session on a node without one nothing.
@@ -190,6 +204,23 @@ def identity_line(project):
     as that project (R138), with every repository in it named as its own."""
     got = project_fn(project) if project_fn else None
     several = repos_fn(project) if (got and repos_fn) else None
+    if is_work(project):
+        lab = label_of(project) if label_of else project
+        pid = id_of(project) if id_of else ""
+        return (f"This project is shown as {lab}" + (f"; its id is {pid}, which never changes" if pid else "")
+                + f". Call it {lab} when you speak of it. It has no repository: there is no code here to write, "
+                f"nothing is under git, there is no build or test to run, and it has no notebook (no roadmap, "
+                f"bugs, rules of its own, wiki, design or memories), so `git`, `aerie git`, `aerie build`, "
+                f"`aerie test`, `aerie roadmap`, `aerie bug` and their kin are refused here, and what you would "
+                f"have put on the record goes in your reply instead. Its folder, /workspace/{project}, is "
+                f"yours for what a container or a VM needs: a compose file and its env for `aerie container "
+                f"new`, a VM's requirements for `aerie vm`, notes on what you set up. The work here is "
+                f"containers and VMs on this project's node (`aerie help containers`, `aerie help asks`): "
+                f"a stack asked for (a media server, a backup target, a database) is made with `aerie "
+                f"container new` from a compose file you write in this folder, each service's data on the "
+                f"node's own store, and a VM with `aerie vm`, under the project's Agents may dials; the "
+                f"Library's apps (`aerie tool search`) are compose files already vetted. A repository added "
+                f"to the project later makes it a coding project; until then nothing here is code.")
     if several:
         name, pid, members = several
         where = ", ".join(f"{lab} at /workspace/{d}" for d, lab in members)
@@ -221,6 +252,9 @@ DIALS = (("Add to roadmap", "gate.roadmap", "auto"), ("File bugs", "gate.bugs", 
          ("Report AerieOS bugs", "report", "auto"), ("Sign a build", "sign", "ask"),
          ("Manage signing keys", "keys", "ask"), ("Tag and publish a release", "release", "ask"),
          ("Use a lent PC", "pc", "deny"))
+# The dials a project with no repository keeps (R208): what a session may
+# run and ask for, none of what it would enter into a notebook or ship.
+WORK_DIALS = ("devbuild", "makevms", "installpacks", "report", "pc")
 # (project) -> what a session may move the version by (version.policy), set
 # where the version module is at hand.
 version_policy = None
@@ -238,10 +272,16 @@ def dials_line(project):
         return ""
     gate = rec.get("gate") if isinstance(rec.get("gate"), dict) else {}
     said = []
+    # A project with no repository (R208) has only the dials that need no
+    # code: the notebook's, the signing, release and version ones are
+    # nothing's there.
+    work = is_work(project)
     for label, key, dflt in DIALS:
+        if work and key not in WORK_DIALS:
+            continue
         v = gate.get(key[5:]) if key.startswith("gate.") else rec.get(key)
         said.append(f"{label} {v or dflt}")
-    if version_policy:
+    if version_policy and not work:
         try:
             said.append(f"Move the version {version_policy(project)}")
         except Exception:                                        # noqa: BLE001
@@ -347,6 +387,8 @@ def _design_dial(project):
 def _no_code_yet(project):
     """True when the tree holds nothing but its git, its docs and its
     notes: a project made on the dashboard and designed before it is built."""
+    if is_work(project):
+        return False
     try:
         names = [n for n in os.listdir(os.path.join(str(WORKSPACE), project)) if not n.startswith(".")]
     except OSError:
@@ -417,8 +459,11 @@ def briefing(project, gates=True):
         m = _IF.search(line)
         if m:
             bits = m.group(1).split()
-            # `node:gpu` is evidence the node gives rather than the tree.
-            skip = gates and not any((bool(node_gpu and node_gpu(project)) if g == "node:gpu" else _has(tree, g))
+            # `node:gpu` is evidence the node gives rather than the tree;
+            # `repo:any` is the project having a repository at all (R208).
+            skip = gates and not any((bool(node_gpu and node_gpu(project)) if g == "node:gpu"
+                                      else (not is_work(project)) if g == "repo:any"
+                                      else _has(tree, g))
                                      for g in bits[1:])
             continue
         if _END in line:
@@ -595,6 +640,9 @@ def parts(project, reply="", asks="", uid="", agent=""):
     """
     out = []
     whole = {}
+    # A project with no repository (R208) has no notebook and no
+    # repositories to brief on: those parts are left out, not said empty.
+    work = is_work(project)
 
     def brief(half):
         if "text" not in whole:
@@ -615,6 +663,8 @@ def parts(project, reply="", asks="", uid="", agent=""):
                      ("bugs", lambda: (bugs_mod.brief(project), "")),
                      ("repos", lambda: (repos_part(project), "")),
                      ("memory", lambda: memory_part(project, uid, agent))):
+        if work and name in ("roadmap", "bugs", "repos", "memory"):
+            continue
         try:
             text, left = fn()
             text = (text or "").strip("\n")

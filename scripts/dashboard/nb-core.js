@@ -44,6 +44,9 @@ function getNotebook(project){
 }
 
 function openNotebook(name, view){
+  // A project with no repository (R208) has no notebook: what there is to
+  // open is its settings, as its card's Settings opens them.
+  if ((state?.projects || []).find(x => x.name === name)?.work) return renameProject(name, "project");
   openTab({kind: "notebook", arg: name, label: "Notebook: " + projLabel(name)});
   // Overview is the Briefing view under the name it is shown by, as the
   // address has it; a view the notebook has no pane for opens on its first

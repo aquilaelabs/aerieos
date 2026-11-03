@@ -39,7 +39,8 @@ preamble.id_of = registry.pid
 # without it a session was briefed on its first repository alone, by that
 # repository's own name and id, its settings read where the project's are
 # kept (what it reads, its node), and never told the others are its own.
-repos.configure(state=state, write_json=statefile.write_json, registry=registry)
+repos.configure(state=state, write_json=statefile.write_json, registry=registry, workspace=os.environ.get("WORKSPACE") or "/workspace")
+preamble.work_of = repos.is_work          # a project with no repository (R208)
 prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos)
 preamble.repos_fn = lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
                                if (k := repos.project_of(p)) and len(repos.members(k)) > 1 else None)
