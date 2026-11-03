@@ -114,6 +114,7 @@
 - Configure on the card: a tool pack says in its manifest what it asks for on a node (keys, choices, a list of endpoints, a switch, the projects allowed), a new Installed page under Machines, with the node picked, lists what the Library put there and draws that form on each row, keeps the answers sealed and hands them to that node for the pack's verbs; an agent's sign-in, a toolchain's system packages and Remove live there too, the Library's cards showing the catalog's entry alone; the Model router is installed from the Library and configured on Installed, and its section leaves the node's page (5155820)
 - A person keeps one token for each git host and sign-in: a new one replaces the one before in place, every project using it moves to the new one, and the older tokens an install already kept for the same host are let go at the upgrade (fb7bd4d)
 - Controller settings' Update checks is the clocks alone: when each check last looked and how often it runs; Check for updates stays on each thing's own page (Containers, nginx, Scanners, the Library) (801c19e)
+- Move this controller reads as facts (new home, armed, nodes heard, last packed, what is in the bundle, the ask) with one line under them, and a dozen dense hints across the pages say their one thing in a line with the rest behind a help mark (1f42d65)
 
 ### Fixed
 
