@@ -167,7 +167,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     const keep = art.dev_keep ?? 3;
     const devNote = rows.some(a => /\d+\.\d+\.\d+-dev\.\d+-[0-9a-f]{7}/.test(a.name))
       ? `<div class="hint dim">${keep
-          ? `Each product keeps its newest ${keep} builds (the project's settings say how many), a signed build by its signed copy alone; older ones are removed as new ones arrive. A release is kept, and so is anything pinned.`
+          ? `Each product keeps its newest ${keep} builds; a release and anything pinned stay${
+              helpIcon("The project's settings say how many (Dev builds kept). A signed build counts by its signed copy alone, and older ones are removed as new ones arrive.")}`
           : "Every dev build is kept: this project's settings say so (Dev builds kept)."}</div>` : "";
     // Sections like the rest of the view (the operator, 6 Oct): the files
     // were a band of their own under Version, the one part of the tab that

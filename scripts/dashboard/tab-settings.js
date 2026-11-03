@@ -246,8 +246,10 @@ function updatesSection(){
   // The release channel, on any install (the operator, 2 Nov).
   const channel = `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? ", a draft not published yet, seen here with this controller's token for AerieOS's repository" : ""}` : ""}.${
-        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back.` : "Published releases alone. The dev channel takes every dev build as it is published, which may not come up."}</div></div>`;
+      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes every pre-release CI publishes${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? " (a draft, seen with this controller's token)" : ""}` : ""}${
+        r.draft_fetch?.tag ? `. ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; Update runs from them` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files`}` : ""}${
+        helpIcon("A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back. A draft not published yet is seen with this controller's token for AerieOS's repository, under Unpublished builds.")}`
+        : `Published releases alone${helpIcon("The dev channel takes every dev build as it is published, which may not come up.")}`}</div></div>`;
   // Debug mode alone: any version, the unpublished ones with the token
   // (the operator, 2 Nov), older ones too, since a test goes both ways.
   const pick = r.pick?.length ? `<div class="field"><label class="pick"><span class="pickw">Version</span><select id="relPick" aria-label="the version to install">${
@@ -333,15 +335,16 @@ function moveSection(){
   if (m.error) return `<div class="hint bad">${esc(m.error)}</div>`;
   const howWord = {pressed: "marked so here", told: "told by the new controller", asked: "learned by asking the new controller"}[m.how] || "";
   if (m.moved) return `<div class="row stack2" data-group="Move"><div class="grow">
-      <div class="sub bad">This controller moved to ${esc(m.to)} ${m.at ? esc(ago(m.at)) : ""}${howWord ? ` (${howWord}${m.landed_at ? `; the bundle landed ${esc(ago(m.landed_at))}` : ""})` : ""}: it is read-only now, and its nodes have followed. A node that comes back late is told where and knocks there by itself. What is here is a copy for a look back.</div></div></div>`;
-  // The state arrived by a move: what the old controller was told.
+      ${factGrid([["Moved to", m.to], ["When", m.at ? ago(m.at) : ""], ["How", howWord], ["Bundle landed", m.landed_at ? ago(m.landed_at) : ""]])}
+      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div></div></div>`;
+  // The state arrived by a move: what the old controller was told, as facts.
   const ar = m.arrived || {};
-  const arrived = ar.restored_at ? `<div class="sub">This state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""} ${esc(ago(ar.restored_at))}${
-      ar.told_at ? `; the old controller was told ${esc(ago(ar.told_at))}${ar.told_how && ar.told_how !== "taken" ? ` (${esc(ar.told_how)})` : ""}`
-      : ar.from ? `; the old controller is told once it answers${ar.tell_error ? ` (last: ${esc(ar.tell_error)})` : ""}` : "; the old controller named no address, so it learns by asking here"}.${
-      (m.not_here || []).length ? ` ${m.not_here.length} node${m.not_here.length === 1 ? " has" : "s have"} not checked in since: the Nodes page gives each its line.` : ""}</div>` : "";
+  const arrived = ar.restored_at ? `${factGrid([["Arrived by a move", ago(ar.restored_at)], ["From", ar.from || "no address named"],
+      ["Old controller told", ar.told_at ? `${ago(ar.told_at)}${ar.told_how && ar.told_how !== "taken" ? ` (${ar.told_how})` : ""}`
+        : ar.from ? `not yet${ar.tell_error ? `: ${ar.tell_error}` : ""}` : "it learns by asking here"],
+      ["Nodes not back since", (m.not_here || []).length ? `${m.not_here.length}: the Nodes page gives each its line` : ""]])}` : "";
   const sizeMb = m.size ? moveSize(m.size) : "";
-  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle; a USB stick takes it under Controller settings, once its disks are set up.</div></div>` : "";
+  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page with this controller's address, or with the bundle.</div></div>` : "";
   const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
   // A move landed here instead (the operator, 1 Nov): on a fresh controller,
@@ -349,18 +352,28 @@ function moveSection(){
   // in, once its disks hold the projects.
   const ld = m.land || {};
   const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
-      <div class="sub">Moving a controller here instead: give its move token with its address (it hands the bundle over) or the bundle downloaded from it. Its state takes this one's place, this setup account's with it, and you sign in with an account it had.${ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}</div>
+      <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
+        helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
+          ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
       ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
       <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>` : "";
+  // What is in the bundle, as the record says it: the state always, then
+  // what was ticked.
+  const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");
+  // Armed: the facts of the move (the operator, 3 Nov: a paragraph of them
+  // said nothing at a glance), then the one line on what happens next.
+  const armed = m.prepared ? `${factGrid([["New home", m.to || "not named yet"], ["Armed", ago(m.made_at)],
+      ["Nodes that heard it", `${m.heard} of ${m.nodes}`], ["Last packed", m.packed_at ? `${ago(m.packed_at)}, ${sizeMb}` : "not yet: Download packs it"],
+      ["In the bundle", inside], ["Asked whether it landed", m.asked_at ? `${ago(m.asked_at)}: ${m.asked_error || "not yet"}` : ""]])}
+      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
       ${land}
       ${arrived}
-      <div class="sub">To another container, to a machine of its own, or back: Prepare to move arms the move and shows a move token once; from then on every node hears where the controller is going, and follows by itself once the new home answers, however long that takes. The bundle (the state, the stores ticked, the deploy key, the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.</div>
-      ${m.prepared ? `<div class="sub">Armed ${esc(ago(m.made_at))} for ${esc(m.to || "an address not named yet")}: ${m.heard} of ${m.nodes} node${m.nodes === 1 ? "" : "s"} ${m.heard === 1 ? "has" : "have"} heard it${m.packed_at ? `; last packed ${esc(ago(m.packed_at))}, ${esc(sizeMb)}` : ""}${stores.length ? `, with ${esc(stores.join(", "))}` : ""}${m.repos ? ", the repositories in it" : ""}${m.carries_key ? ", the install key in it" : ""}.${
-          m.asked_at ? ` Asked ${esc(m.to)} ${esc(ago(m.asked_at))} whether it landed: ${m.asked_error ? esc(m.asked_error) : "not yet"}.` : ""}</div>` : ""}
+      ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once${
+        helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
       ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://builderbot.new.example" autocomplete="off" spellcheck="false"></label></div>
       ${pieces}`}
@@ -769,7 +782,8 @@ function wireChecks(root){
 // tools/catalog-mirror.py made on a machine with the network.
 function catalogIntro(s){
   const m = s?.catalog_mirror;
-  return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the index at this address. A controller that cannot reach it imports a mirror instead: <code>tools/catalog-mirror.py</code> makes one on a machine with the network, and the Library then installs from it with nothing fetched.</div>
+  return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the signed index at this address${
+    helpIcon("Another address can only mirror the same files: index.json and index.sig are checked against the maintainers' key this install ships, so no other catalog passes as vetted. A controller that cannot reach the address imports a mirror instead: tools/catalog-mirror.py makes one on a machine with the network, and the Library installs from it with nothing fetched.")}</div>
     <div class="field">${m
       ? `<div class="row stack2"><div class="grow"><span class="name">Mirror</span> <span class="sub">${m.packs} entr${m.packs === 1 ? "y" : "ies"} from ${m.repos} repositor${m.repos === 1 ? "y" : "ies"}, made ${esc(m.generated || "at an unknown time")}, imported ${esc(ago(m.imported_at))}</span></div>
           <button type="button" data-mirrorforget>Forget</button></div>`

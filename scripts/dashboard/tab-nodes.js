@@ -584,8 +584,8 @@ function nodeUsbSection(n){
         <div class="sub">${esc([p.driver || "no driver", p.group ? `IOMMU group ${p.group}` : "", on.length ? `carries ${on.join(", ")}` : "nothing on it"].filter(Boolean).join(" · "))}</div>
         ${cant ? `<div class="sub dim">${cant}</div>` : `<div class="sub dim">Given whole to a stopped VM under Hardware… on the VMs page, with everything on it; the VM must be off.</div>`}</div></div>`;
   });
-  const body = `<div class="field"><div class="sub">A device given to a running VM is attached now and kept in its definition; a stopped one has it from its next start.
-      It is found again by its serial after a replug or a reboot, by its port when two are alike. A device the host boots from, serves storage on or has in a pool stays the host's.</div></div>
+  const body = `<div class="field"><div class="sub">A device given to a VM is attached now if it runs, and from its next start if not${
+      helpIcon("It is kept in the VM's definition and found again by its serial after a replug or a reboot, by its port when two are alike. A device the host boots from, serves storage on or has in a pool stays the host's.")}</div></div>
     ${why ? `<div class="sub dim">${why}</div>` : ""}
     ${rows.length ? `<div class="rows">${rows.join("")}</div>` : `<div class="empty">No USB device on this machine${n.reported?.at ? "" : " that it has reported yet"}.</div>`}
     ${ctlRows.length ? `<div class="field"><div class="hint">Controllers</div></div><div class="rows">${ctlRows.join("")}</div>` : ""}`;
@@ -1782,7 +1782,8 @@ function ndNotHereHtml(){
   const ar = nodesMove.arrived || {};
   return `<div class="row stack2 ndnothere" data-group="Not yet here"><div class="grow">
       <div class="name">Not yet here since the move <span class="pill warn">${rows.length}</span></div>
-      <div class="sub">This controller's state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""} ${ar.restored_at ? esc(ago(ar.restored_at)) : ""}, and these nodes have not checked in since. One that heard the move follows by itself when the old address goes quiet; one that was off the whole time is told on its own console, as root, with its line, and nothing is enrolled again.</div>
+      <div class="sub">These nodes have not checked in since this controller's state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""}${ar.restored_at ? ` ${esc(ago(ar.restored_at))}` : ""}${
+        helpIcon("One that heard the move follows by itself when the old address goes quiet; one that was off the whole time is told on its own console, as root, with its line, and nothing is enrolled again.")}</div>
       ${rows.map(r => `<div class="sub" data-nothere="${esc(r.id)}"><b>${esc(r.name)}</b> <code>${esc(r.line)}</code> <button type="button" class="link" data-ndcopyline="${esc(r.id)}">Copy</button></div>`).join("")}
     </div></div>`;
 }
@@ -2365,12 +2366,12 @@ function ndDialogs(){
     boxWidth(true);
     const url = URL.createObjectURL(new Blob([r.script], {type: "text/x-shellscript"}));
     body.innerHTML = `<div class="field ndtoken">
-        <div class="hint">Copy it to the machine and run it once, as root. It ${
-          r.reach === "wireguard" ? `brings the tunnel up as ${esc(r.tunnel_addr)}, checks the controller answers through it, `
-          : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it; the row goes live when it is done.</div>
+        <div class="hint">Copy it to the machine and run it once, as root; the row goes live when it is done${
+          helpIcon(`It ${r.reach === "wireguard" ? `brings the tunnel up as ${r.tunnel_addr}, checks the controller answers through it, `
+            : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it.`)}</div>
         <pre class="ndcmd">sudo bash ${esc(r.filename)}</pre>
         <div class="hint">It holds a token good once, until ${esc(new Date(r.expires * 1000).toLocaleString())}${
-          r.reach === "wireguard" ? ", and the machine's WireGuard private key until it has run: once the node has enrolled it takes the WireGuard config out of itself and keeps the rest, to change and run again" : ""}.</div>
+          r.reach === "wireguard" ? helpIcon("It also holds the machine's WireGuard private key until it has run: once the node has enrolled it takes the WireGuard config out of itself and keeps the rest, to change and run again.") : ""}</div>
       </div>${r.home ? `
       <div class="field ndtoken">
         <label class="lbl">${r.reach === "public" ? "At home, on the tunnel" : "On your router"}</label>

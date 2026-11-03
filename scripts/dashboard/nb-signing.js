@@ -204,9 +204,8 @@ function nbSigningView({$, nb, project}){
     // would stop it, and how the newest went.
     const r = rel || {};
     const relBody = !r.wanted
-      ? `<div class="field"><div class="sub dim">This project's workflows hand over no unsigned APK, so AerieOS signs none of its releases.
-          A workflow that uploads its unsigned release APK as an artifact named <code>bb-release-apk-TAG</code> has it signed
-          on the project's node with the sideload key and attached to the release, with no key or password on GitHub.</div></div>`
+      ? `<div class="field"><div class="sub dim">This project's workflows hand over no unsigned APK, so AerieOS signs none of its releases${
+          helpIcon("A workflow that uploads its unsigned release APK as an artifact named bb-release-apk-TAG has it signed on the project's node with the sideload key and attached to the release, with no key or password on GitHub.")}</div></div>`
       : `<div class="field" id="sgRel">
           ${(r.keys || []).map(k => `<div class="rninvite" data-relkey="${esc(k.key)}">${k.package ? `<code>${esc(k.package)}</code> ` : ""}<span class="dim">releases sign with</span>
             <b>${esc(k.key)}</b> <span class="dim">${esc(signFp(k.sha256))}${k.rotated_from ? `, rotated from ${esc(k.rotated_from)}` : ""}</span></div>`).join("")}
