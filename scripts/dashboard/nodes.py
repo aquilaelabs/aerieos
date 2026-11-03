@@ -3463,9 +3463,12 @@ def _adopt_want(req):
         parity.append({"slot": str(x.get("slot") or "parity")[:16], "id": x["id"]})
     for x in w.get("pools") or []:
         if not isinstance(x, dict) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", str(x.get("name") or "")) \
-                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))):
-            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid}"
-        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or "")})
+                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))) \
+                or (x.get("disk_id") and not ok_id(x.get("disk_id"))):
+            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid, or disk_id for one the old system kept in its cache slot}"
+        # ...found by its disk where no pool record names its UUID (B625).
+        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or ""),
+                      **({"disk_id": str(x["disk_id"])} if x.get("disk_id") else {})})
     if len(data) > 30 or len(parity) > 2 or len(pools) > 8 or not (data or pools):
         return None, "name the data disks and pools to adopt (at most 30 disks, 2 parity, 8 pools)"
     return {"data": data, "parity": parity, "pools": pools, "writable": w.get("writable") is True,

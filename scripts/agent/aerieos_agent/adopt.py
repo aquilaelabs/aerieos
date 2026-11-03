@@ -213,6 +213,17 @@ def plan(want, disks, blk=blkid):
             out["zfs"].append({"pool": name, "where": where, "readonly": False, "slot": name})
             say(f"{name}: the ZFS pool imported as it is at {where}, writable")
             continue
+        # A pool the old system kept in its cache slot, with no pool record
+        # to name its UUID (B625): the disk by its id, the UUID off it.
+        if not uuid and x.get("disk_id"):
+            d0 = find_disk(disks, x.get("disk_id"))
+            for n in ([p.get("name") for p in d0.get("parts") or []] + [d0.get("name")]) if d0 else []:
+                if n and blk(n).get("TYPE") == BLK[fs] and blk(n).get("UUID"):
+                    uuid = blk(n).get("UUID")
+                    break
+            if not uuid:
+                no(f"{what}: {x.get('disk_id')} is not on this machine or holds no {fs}")
+                continue
         # A pool may span disks (btrfs), so it is found by its filesystem's
         # UUID on any of them; the plan's disk id names one of them.
         hit = None

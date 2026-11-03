@@ -135,6 +135,23 @@ def adopt_want(cfg):
             skipped.append({"slot": name, "id": uuid or name, "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
         else:
             pools.append({"name": name, "fs": fs, "uuid": uuid})
+    # A cache disk the old system kept in its array's cache slot (B625: no
+    # config/pools, as before its pools), offered as a pool named for its
+    # slot and found by its disk, since no pool record names its UUID.
+    for x in ar.get("cache") or []:
+        if not isinstance(x, dict) or not x.get("id"):
+            continue
+        name, fs = str(x.get("slot") or "cache"), str(x.get("fs") or "").lower()
+        if any(p["name"] == name for p in pools) or any(s["slot"] == name for s in skipped):
+            continue
+        if fs.startswith("luks"):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": "encrypted: its key is not asked for yet"})
+        elif fs not in ("xfs", "btrfs", "zfs"):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": f"its filesystem is {fs or 'not said'}"})
+        elif not POOL_NAME.fullmatch(name):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
+        else:
+            pools.append({"name": name, "fs": fs, "uuid": "", "disk_id": str(x["id"])})
     if not data and not pools:
         return None
     return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
