@@ -2653,6 +2653,20 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
        [...r.querySelectorAll('.ndmount .ndmwhy.bad')].some(e => /^\/devdata: mounted, but the handle is stale: .*re-export it there/.test(e.textContent))
        && [...r.querySelectorAll('.ndmount .ndmstate.bad')].some(e => e.textContent === 'mounted, but the handle is stale')),
      'the mount row carries the stale reason whole under it, and its state cell the first words');
+  if (process.env.BB_SHOTS){
+    const sect = `${ROW} details.sect[data-sect="nodes:storage"]`;
+    await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
+    await sleep(400);
+    await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-desk.png` });
+    const vp = page.viewportSize();
+    await page.setViewportSize({ width: 393, height: 900 });
+    await sleep(400);
+    await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
+    await sleep(400);
+    await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-phone.png` });
+    await page.setViewportSize(vp);
+    await sleep(300);
+  }
   await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
   await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
   // Whether a session there is kept to its own project (R35): on the
