@@ -134,6 +134,8 @@
 - A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
 - Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
 - Forge measure asks the git door whether a project's token may push, so a fine-grained token an organization has not approved no longer reads as able to push until the push itself is refused (b0be3a2)
+- Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (B645, B646) (1db8d53)
+- The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (B648) (1db8d53)
 
 ### Security
 
