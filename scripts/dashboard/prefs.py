@@ -24,6 +24,7 @@ default. Changing it for a project with a session already running is the one
 case that cannot wait for a launch, so the dialog says so and the session is
 respawned onto the same transcript.
 """
+import contextlib
 import json
 import re
 import threading
@@ -712,10 +713,8 @@ def all_projects(workspace=None):
         seen = set()
         keys = [k if _rp()[2](k) else _rp()[0](k) for k in list(d)]
         if _keys:
-            try:
+            with contextlib.suppress(Exception):                # a registry that cannot answer adds none
                 keys += list(_keys())
-            except Exception:                                    # noqa: BLE001
-                pass
         for key in keys:
             if not key or key in seen:
                 continue
