@@ -136,7 +136,8 @@ const names = await page.$$eval('.artrow b', bs => bs.map(b => b.textContent));
   ok(dev.join() === ['alpha-1.2.0-dev.3-abcdef3-debug.apk', 'alpha-1.2.0-dev.4-abcdef4-debug.apk', 'alpha-1.2.0-dev.5-abcdef5-debug.apk'].join()
      && names.includes('alpha-1.2.0-debug.apk') && !existsSync(`${DIR}/ws/alpha/dist/alpha-1.2.0-dev.1-abcdef1-debug.apk`),
      `of five dev builds of one APK the newest three are kept and the release beside them stays (${dev.join(', ')})`);
-  ok(/newest 3 builds/.test(note) && /signed copy alone/.test(note) && /A release is kept/.test(note) && /anything pinned/.test(note),
+  // One line, the rest behind its help mark (the operator, 3 Nov).
+  ok(/newest 3 builds/.test(note) && /a release and anything pinned stay/.test(note),
      `...and the tab says so (${note.replace(/\s+/g, ' ').slice(0, 120)})`);
   // A pin keeps one whatever comes after it (the operator, 30 Sep): the
   // oldest kept is pinned on its row, two newer builds arrive, and it is

@@ -125,7 +125,8 @@ await page.goto(URL);
 await ready(page);
 await page.evaluate(() => renameProject('alpha'));
 await page.waitForSelector('#rnmodal:not([hidden]) #rnGateReport', { timeout: 15000 });
-ok(await page.$eval('#rnGateReport', e => e.value === 'auto' && [...e.options].map(o => o.value).join() === 'auto,deny'),
+// A repository's door offers "as the project" first (R208 step 6); the auto set above is alpha's own.
+ok(await page.$eval('#rnGateReport', e => e.value === 'auto' && [...e.options].map(o => o.value).join() === 'inherit,auto,deny'),
    "the project's settings carry it under Agents may, on auto, with nothing to ask");
 await page.selectOption('#rnGateReport', 'deny');
 await saveDialog(page);
