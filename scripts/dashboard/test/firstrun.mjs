@@ -100,6 +100,16 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
       await page.click('.doc.on .hstart [data-hstart="hide"]');
       await page.waitForFunction(() => !document.querySelector('.doc.on .hstart'), null, { timeout: 10000 });
       ok(true, '...and Put away takes the card off Home');
+      // A node that has dialed in before is still the first node while its
+      // agent is quiet (B651): the card drawn with every node's agent not
+      // heard from lately keeps the node step done.
+      const quiet = await page.evaluate(() => {
+        const keep = nodesList, hid = homeStartHidden;
+        homeStartHidden = false;
+        nodesList = (keep || []).map(n => ({ ...n, live: false, agent: { ...(n.agent || {}), last_seen: n.agent?.last_seen || 1 } }));
+        try{ return homeStartHtml(); } finally{ nodesList = keep; homeStartHidden = hid; }
+      });
+      ok(!quiet.includes('data-hstart="node"'), `...and a node whose agent is quiet is still the first node on the card (B651)${quiet.includes('data-hstart="node"') ? ': the node step came back undone' : ''}`);
       await page.evaluate(() => { try{ localStorage.removeItem('bb.gsHidden'); }catch(e){} });
     }
   } else {

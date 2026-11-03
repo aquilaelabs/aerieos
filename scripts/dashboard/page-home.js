@@ -171,13 +171,28 @@ let homeStartHidden = (() => { try{ return localStorage.getItem("bb.gsHidden") =
 // was no node and no Claude Code until a reload (19 Oct).
 function homeStartReadsNodes(){
   return !homeStartHidden && !setupNeeded() && !!state?.can?.admin && railAllows("nodes")
-    && !(nodesList && setupSteps().claude);
+    && !(nodesList && homeStartSteps().claude);
+}
+// The card's reading of the node steps: the setup page's, with one more
+// node counted. First run waits for the first node to dial in, so its
+// reading takes a node live right now; here first run is over, and a
+// node that has dialed in before is still the first node while its agent
+// is not heard from lately (the machine off for the night, the LAN out),
+// and Claude Code on it is still installed. Read live, the card came back
+// at 2 of 4 whenever the nodes went quiet (B651, the operator, 3 Nov).
+function homeStartSteps(){
+  const s = setupSteps();
+  if (s.node) return s;
+  const own = setupOwn();
+  const known = (nodesList || []).find(n => n.kind === "agent" && n.state !== "retired" && !n.config?.host_only
+                                           && (n.agent?.last_seen || n.reported?.at) && (!own || n === own)) || null;
+  return known ? {...s, node: known, claude: known.reported?.session?.claude || ""} : s;
 }
 function homeStartHtml(){
   // First run's continuation, so the owner's and an administrator's: a
   // person without the role may have no New project to press.
   if (homeStartHidden || setupNeeded() || !state?.can?.admin) return "";
-  const s = setupSteps(), canNodes = railAllows("nodes");
+  const s = homeStartSteps(), canNodes = railAllows("nodes");
   // What the card cannot read yet it does not claim: the nodes list comes
   // once, with the Claude step's state.
   if (canNodes && nodesList === null) return "";
