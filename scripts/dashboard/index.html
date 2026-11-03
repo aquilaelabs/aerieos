@@ -1192,6 +1192,8 @@ body.firstrun #panes{display:none}
 /* The disks step (R161 step 3): each disk a row to tick, the plan in words. */
 .setstep .setdisk .grow{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 .setstep .setdisk .sub{flex:1 1 100%}
+/* The box before the disk's name, not a field's full line (B640): .row input is every field's 100%. */
+.setstep .setdisk input[type=checkbox]{width:auto;flex:0 0 auto;margin:0}
 .setstep .setplan{margin:10px 0 0}
 .setstep .setplan p{margin:2px 0}
 .setstepbody p{margin:0;color:var(--dim)}
