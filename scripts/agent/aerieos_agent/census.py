@@ -211,8 +211,13 @@ def _docker_ip():
 
 # The features bb-sandbox installs and removes (R91), as its FEATURE_IDS
 # names them; the configuration plane checks a job's id against this.
-FEATURES = ("vmhost", "firewall")
+# Every id the helper's table names: a job naming one the agent did not
+# list was refused as 'not a feature verb' before it reached the helper,
+# so IOMMU, Storage, Shares and UPS could not be installed from the page
+# (B641).
+FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups")
 FEATURES_DIR = "/etc/builderbot/features"
+
 
 
 def features_now():
