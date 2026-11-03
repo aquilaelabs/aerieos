@@ -1617,8 +1617,13 @@ page. Then, for each store:
 
 The agent never copies a store into a folder that already holds files: the
 copy would mix the two by name, so it refuses and leaves the store where it
-was. A mount point on a folder that holds files asks first too, saying the
-share covers them until it is unmounted.
+was. It asks the same question as the page's probe at apply time, on its own
+side: a target carrying the marker, holding this node's own toolchain folder
+or made by this agent for the store before is used as it is, whether or not
+the setting was saved with the store in `keep` (a setting saved before the
+probe could answer applies without a second save). A mount point on a folder
+that holds files asks first too, saying the share covers them until it is
+unmounted.
 
 **A store move waits for the node to be quiet and holds it without
 ending anything (R120 step 7).** An apply that repoints a store (anything but

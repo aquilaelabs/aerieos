@@ -79,7 +79,7 @@
 
 ### Changed
 
-- A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc)
+- A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
 - Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
 - The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
@@ -121,6 +121,7 @@
 
 ### Fixed
 
+- A mount's state on the Storage section was cut off at a desk when it carried a fix (a stale handle, a mount that did not come up): the whole reason now sits under the mount's row, and the cell keeps its first words (bdad714)
 - Enrolling a node again had moved its stores back onto the default paths, so the runner lost its JDK, the project's FTP server was not found and every toolchain read as not installed; the script carries the node's store paths and the agent keeps the ones its record has (88a2736)
 - An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (615323d)
 - Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (0b67ee1)
