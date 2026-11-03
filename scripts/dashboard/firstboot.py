@@ -196,14 +196,43 @@ def kept_config():
     return d.get("config") if isinstance(d.get("config"), dict) else {}
 
 
-def view():
+def met(waiting, done, reported):
+    """The waits the machine has met since the report was written (B634):
+    the array once a data disk the plan named is mounted, the pools once
+    one is, the shares once the machine serves any; each moves to done with
+    what is there now. The report on disk is left as written."""
+    rep = reported if isinstance(reported, dict) else {}
+    ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+    mounts = [m for m in (ad.get("mounts") or []) if isinstance(m, dict) and m.get("mounted")]
+    disks = [m for m in mounts if str(m.get("where") or "").startswith("/mnt/disk")]
+    pools = [m for m in mounts if m not in disks]
+    shares = [x for x in (rep.get("shares") or []) if isinstance(x, dict)]
+    said = {"array": f"adopted: {len(disks)} data disk{'s' if len(disks) != 1 else ''} mounted" if disks else "",
+            "pools": f"adopted: {len(pools)} mounted" if pools else "",
+            "shares": f"{len(shares)} served" if shares else ""}
+    still, now = [], list(done)
+    for w in waiting:
+        what = w.get("what") if isinstance(w, dict) else ""
+        if said.get(what):
+            now.append({"what": what, "said": said[what], "count": w.get("count")})
+        else:
+            still.append(w)
+    return still, now
+
+
+def view(reported=None):
     """This machine's section: what the stick's prepared configuration did,
-    and what its plan names to adopt; None when this install had none."""
+    and what its plan names to adopt; None when this install had none.
+    `reported` is the machine's own node's census, which says which waits
+    have been met since (B634)."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     cfg = d.get("config") if isinstance(d.get("config"), dict) else {}
+    if reported:
+        waiting, done = met(d.get("waiting") or [], d.get("done") or [], reported)
+        d = {**d, "waiting": waiting, "done": done}
     rows, notes = share_requests(cfg)
     dk, vm = cfg.get("docker") if isinstance(cfg.get("docker"), dict) else {}, cfg.get("vms") if isinstance(cfg.get("vms"), dict) else {}
     nets = {str(k): {"subnet": str(v.get("subnet") or ""), "gateway": str(v.get("gateway") or "")}

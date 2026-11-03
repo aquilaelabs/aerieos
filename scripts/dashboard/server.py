@@ -5717,7 +5717,7 @@ def _snapshot(who):
         "held": held.status(),
         # ...and what a stick's prepared configuration did (R161 step 8), an
         # administrator's to read on This machine.
-        "firstboot": firstboot.view() if BARE_METAL and users.is_admin(who) else None,
+        "firstboot": firstboot.view((nodes.node(_own_node_id() or "") or {}).get("reported")) if BARE_METAL and users.is_admin(who) else None,
         # ...and each update check's cadence and last run (R176), for
         # Controller settings' Update checks.
         "checks": _timed("status:checks", checks.view) if users.is_admin(who) else None,
