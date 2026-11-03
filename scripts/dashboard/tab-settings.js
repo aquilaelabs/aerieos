@@ -345,7 +345,11 @@ function moveSection(){
       ["Nodes not back since", (m.not_here || []).length ? `${m.not_here.length}: the Nodes page gives each its line` : ""]])}` : "";
   const sizeMb = m.size ? moveSize(m.size) : "";
   const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page with this controller's address, or with the bundle.</div></div>` : "";
-  const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
+  // Each piece: its name on the tick's line, its size and what it holds
+  // under it (the operator, 3 Nov: the name wrapped into a narrow column
+  // beside the words).
+  const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)}</label>
+      <div class="sub">${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `: ${esc(pc.about)}` : ""}</div></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
   // A move landed here instead (the operator, 1 Nov): on a fresh controller,
   // by its owner, from Controller settings, which on a stick is the only way
@@ -593,7 +597,9 @@ const SETTING_GROUPS = [
   {key: "checks", title: "Update checks", intro: checksIntro, status: checksStatus,
    heading: () => { const c = state?.checks || {}; const off = Object.values(c).filter(x => x.cadence === "off").length;
      return off ? `${off} off` : Object.keys(c).length ? "on" : ""; },
-   fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint,
+   // The release check is an install that updates itself (B648): not
+   // offered on the container edition.
+   fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint, when: k === "release" ? () => !!state?.bare_metal : undefined,
      options: [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off: only Check for updates"]]}))},
   // The vetted catalog (R169): where its signed index is read, and a mirror
   // of it imported for a controller that cannot reach it (step 6).
