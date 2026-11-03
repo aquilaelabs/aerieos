@@ -1704,6 +1704,18 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const MACHINE = 'c'.repeat(32);
     await hello({ ...CENSUS, machine: MACHINE });
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
+    // Just a token in the Features section's Enroll again lands on the row
+    // too (B656): it was refused as a second node with the row's name.
+    // Pressed before the script, whose mint revokes this token.
+    await page.click(`${ROW} .ndfeat [data-nd="reenroll"]`);
+    await page.waitForSelector('#ndBody #ndEnTok', { timeout: 10000 });
+    await page.click('#ndBody #ndEnTok');
+    const tokBox = await page.waitForFunction(() => /enroll it with one of these/.test(document.getElementById('ndTitle').textContent) && document.getElementById('ndTitle').textContent, null, { timeout: 10000 }).then(h => h.jsonValue(), () => '');
+    const sheds = (await napi('/api/v1/nodes')).nodes.filter(n => n.name === 'shed');
+    ok(/^shed: enroll it with one of these$/.test(tokBox) && sheds.length === 1 && sheds[0].id === minted.id,
+       `Just a token for a node already here mints on its row, no second row (${tokBox}; ${sheds.length} row)`);
+    await page.click('#ndBody #ndTokDone');
+    await page.evaluate(async () => { await refresh(); await loadNodes(); });
     await page.waitForSelector(`${ROW} [data-nd="reenroll-now"]`, { timeout: 10000 });
     const [dl4] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click(`${ROW} [data-nd="reenroll-now"]`)]);
     const script4 = readFileSync(await dl4.path(), 'utf8');

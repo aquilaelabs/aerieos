@@ -7069,10 +7069,13 @@ def verb(principal, req):
     def enroll():
         if req.get("script"):
             return enroll_script(principal, req)
+        # Just a token for a node already here (B656): the row's id rides
+        # as `node`, as the script's does, so the mint lands on the row
+        # rather than seeing its name as taken.
         return enroll_mint(principal, field(req, "name"),
                            req.get("capabilities"),
                            field(req, "user") or "bb", host_only=req.get("host_only") is True,
-                           nginx=req.get("nginx") is True)
+                           nginx=req.get("nginx") is True, existing=field(req, "node") or None)
 
     def power():
         return node_power(principal, nid, act)

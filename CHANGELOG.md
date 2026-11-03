@@ -120,6 +120,7 @@
 
 ### Fixed
 
+- Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (B656)
 - The USB maker and the installer take the newest published build that carries their file, by its exact name: a dev build from before the name carries builderbot-os and builderbot-controller files, and the maker took one, asked for an aerieos-os image that was not there and stopped (84604c8)
 - On Windows the USB maker's first write after the stick's partitions are cleared no longer stops at 'the device is not ready': the write waits for the stick for up to thirty seconds, and a Windows refusal is said in Windows' own words (84604c8)
 - A stick's first boot sets the hostname and the time zone its prepared configuration names; they were left at aerieos and UTC, with both under failed on This machine (84604c8)
