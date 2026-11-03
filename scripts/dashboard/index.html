@@ -5708,10 +5708,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    each row of pickers, the gap above it a band's, and the VM limits as
    number and unit pairs, two to a line on a phone. */
 .rnsub{display:block;margin-top:14px}
-.vmcaps{display:grid;grid-template-columns:repeat(4,max-content);gap:8px 16px;align-items:center}
+/* Wrapping, not a fixed grid: four fields with their units overran the
+   dialog's box at a desk and cut the last one off (B644). */
+.vmcaps{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .vmcap{display:inline-flex;align-items:center;gap:8px}
 .vmcap>input{width:6em}
-@media(max-width:600px){ .vmcaps{grid-template-columns:repeat(2,max-content)} }
 </style>
 </head>
 <body class="booting">
