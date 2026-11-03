@@ -251,6 +251,37 @@ class Move(unittest.TestCase):
         self.assertIn("INSTALL_KEY", got["said"][0])
         self.assertIn("INSTALL_KEY", json.loads((new_state / "move.json").read_text()).get("said", [""])[0]) if (new_state / "move.json").is_file() else None
 
+    def test_a_landing_cut_midway_is_marked_and_said_and_finishes_on_the_next(self):
+        # B622: the power goes between the renames; the next start finds the
+        # mark, the bell says what is where, and the same bundle lands again.
+        r = move.prepare("user:ann", "https://new.example", repos=False, carry_key=False)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        (new_state / "fresh.json").write_text("{}")
+        self.configure(new_state, bare=True)
+        bundle = str(self.tmp / "config" / "move" / r["bundle"])
+        real_into = move._into
+
+        def cut(src, dst):
+            raise KeyboardInterrupt("the power")
+        with mock.patch.object(move, "_into", cut), self.assertRaises(KeyboardInterrupt):
+            move.restore(bundle, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        c = move.cut_landing(new_state)
+        self.assertTrue(c and c["stamp"], c)
+        self.assertTrue(Path(c["aside"]).is_dir() and (Path(c["aside"]) / "fresh.json").is_file(), "what was here, kept whole aside")
+        with mock.patch.object(move, "STATE", new_state):
+            rows = move.cut_landing_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertIn("cut midway", rows[0]["why"])
+        self.assertIn(os.path.basename(c["aside"]), rows[0]["why"])
+        self.assertIn("Land the same bundle again", rows[0]["why"])
+        # The same bundle again, with its token: the landing finishes and the mark goes.
+        move._into = real_into
+        got = move.restore(bundle, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertIsNone(move.cut_landing(new_state))
+        self.assertTrue((new_state / "users.json").is_file())
+
     def test_a_landing_swaps_inside_a_state_folder_it_cannot_rename(self):
         # B594: the parent is root's on an installed machine, a mount point's
         # in a container. Here the parent is read-only, as it is for the

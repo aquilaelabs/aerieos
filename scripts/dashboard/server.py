@@ -2085,7 +2085,9 @@ def _attention(who):
                # ...and its UPS on battery or its own packages' updates (R164 step 3).
                + nodes.power_attention()
                # ...and a backup that failed or went stale (R162 step 5).
-               + nodes.backup_attention())
+               + nodes.backup_attention()
+               # ...and a move's landing cut midway (B622).
+               + move.cut_landing_rows())
             # ...and a node short of disk or memory (R110), for whoever
             # manages nodes: what is short, on the Storage page's terms.
             + ([] if users.may(who, "node") else nodes.room_attention(

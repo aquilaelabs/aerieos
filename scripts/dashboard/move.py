@@ -209,6 +209,36 @@ def bundle_path():
 # Inside the state and never carried: what a landing or a reset set aside, and
 # a landing's own spool and working folder.
 NEVER_PACKED = (".moved-", ".move-", ".reset-")
+# The landing's mark while the state is being swapped (B622), under the
+# state folder and never packed; left behind only by a landing cut midway.
+LANDING_MARK = ".move-landing.json"
+
+
+def cut_landing(state_dir=None):
+    """A landing cut midway, as its mark says: {at, stamp, aside, from}, or
+    None. The mark is written before the state is swapped and taken off
+    once the landing's record is written, so one found at a start names a
+    state that is part old and part new (B622)."""
+    try:
+        d = json.loads(((state_dir or STATE) / LANDING_MARK).read_text())
+    except (OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) and d.get("stamp") else None
+
+
+def cut_landing_rows():
+    """The bell's row for a landing cut midway (B622): what is where, and
+    that landing the same bundle with its token again finishes it."""
+    c = cut_landing()
+    if not c:
+        return []
+    when = time.strftime("%d %b %H:%M", time.localtime(int(c.get("at") or 0)))
+    aside = os.path.basename(str(c.get("aside") or ""))
+    return [{"kind": "move", "id": f"cut-{c['stamp']}", "bad": True, "key": f"movecut:{c['stamp']}",
+             "why": f"A move's landing was cut midway on {when}: what is here is part of what was and part of the bundle, "
+                    f"and what was here is kept whole in {aside} under the state folder. Land the same bundle again with its "
+                    "token from Controller settings, Move a controller here, which finishes it; a first-run page shown "
+                    "meanwhile is not a fresh install."}]
 
 
 def _tar_tree(tar, src, arc, leave=()):
@@ -983,6 +1013,13 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             return {"error": unpacked}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir / f".moved-{stamp}"
+        # A landing within the same second as one before (a retry after a
+        # cut one, B622) takes a name of its own rather than failing on it.
+        n = 1
+        while aside.exists():
+            n += 1
+            stamp = f"{time.strftime('%Y%m%d-%H%M%S')}-{n}"
+            aside = state_dir / f".moved-{stamp}"
         # The workspace and the secrets first, which do not need the state;
         # the state swapped after, and anything failing from there on puts
         # what was here back (B557): an error copying the workspace after
@@ -995,12 +1032,19 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
         swapped = False
+        # The landing marked while the state is half old and half new, so a
+        # power loss midway leaves a word of it for the next start (B622):
+        # the bell says what is where and that the same bundle lands again.
+        marker = state_dir / LANDING_MARK
         try:
             # The state swapped inside its folder, never by renaming the folder:
             # its parent is root's on an installed machine and a container's
             # /config is a mount point (B594). A mountpoint under it (a stick's
             # logs on a RAM disk) stays where it is, the bundle's merged in.
             aside.mkdir(mode=0o700)
+            with contextlib.suppress(OSError):
+                marker.write_text(json.dumps({"at": int(time.time()), "stamp": stamp, "aside": str(aside),
+                                              "from": m.get("from", ""), "kind": m.get("kind", "")}))
             swapped = True
             for p in sorted(state_dir.iterdir()):
                 if p.name.startswith(NEVER_PACKED) or p == work:
@@ -1026,6 +1070,8 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 if why:
                     said.append(str(why))
         except (OSError, shutil.Error) as e:
+            with contextlib.suppress(OSError):
+                marker.unlink()
             if swapped:
                 for p in list(state_dir.iterdir()):
                     if p.name.startswith(NEVER_PACKED) or p == work:
@@ -1054,6 +1100,8 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         if m.get("kind") == "backup":
             rec["came_from_backup"] = True
         rec["said"] = list(said)
+        with contextlib.suppress(OSError):
+            marker.unlink()
         for k in ("moved_to", "moved_at", "moved_how", "landed_at", "asked_at", "asked_error", "fetch_nonces", "told_at", "tell_tried_at",
                   "tell_error", "told_how", "told", "here"):
             rec.pop(k, None)
