@@ -973,6 +973,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     # stick, the projects folder on the machine's disks, never the stick).
     work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir)))
     counts = {}
+    said = []   # what the landing could not do as asked, said in its result (B623)
     try:
         try:
             unpacked = _unpack(src, mode, work, counts)
@@ -1019,7 +1020,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                     _store_here(state_dir, kind_dir.name)
                     _into(kind_dir, state_dir / kind_dir.name)
             if (work / "install-key").is_file():
-                install_landed_key((work / "install-key").read_bytes(), state_dir)
+                # A key the landing could not take is said in the result
+                # and kept on the record (B623), never swallowed.
+                why = install_landed_key((work / "install-key").read_bytes(), state_dir)
+                if why:
+                    said.append(str(why))
         except (OSError, shutil.Error) as e:
             if swapped:
                 for p in list(state_dir.iterdir()):
@@ -1048,6 +1053,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                    nodes=list(m.get("nodes") or []))
         if m.get("kind") == "backup":
             rec["came_from_backup"] = True
+        rec["said"] = list(said)
         for k in ("moved_to", "moved_at", "moved_how", "landed_at", "asked_at", "asked_error", "fetch_nonces", "told_at", "tell_tried_at",
                   "tell_error", "told_how", "told", "here"):
             rec.pop(k, None)
@@ -1056,7 +1062,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         # A bare-metal home keeps its own node and its stick's plan (above).
         here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
         return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),
-                "nodes": list(m.get("nodes") or []), "kept_here": here}
+                "nodes": list(m.get("nodes") or []), "kept_here": here, "said": said}
     finally:
         shutil.rmtree(work, ignore_errors=True)
         src.close()

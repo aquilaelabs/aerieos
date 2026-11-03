@@ -235,6 +235,22 @@ class Move(unittest.TestCase):
         self.assertFalse((new_state / "users.json").exists())
         self.assertEqual([p.name for p in new_state.iterdir() if p.name.startswith(".move")], [], "nothing of the landing left")
 
+    def test_a_carried_key_the_home_cannot_take_is_said(self):
+        # B623: INSTALL_KEY in the new home's environment, so the carried key
+        # is not taken; the landing reported ok and nothing said why the
+        # moved state's sealed settings answered Locked.
+        r = move.prepare("user:ann", "https://new.example", repos=False, carry_key=True)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        self.configure(new_state, bare=True)
+        with mock.patch.object(move, "install_landed_key", lambda key, state_dir: "this install's key is set in its environment (INSTALL_KEY), so the carried key was not taken"):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual(len(got["said"]), 1)
+        self.assertIn("INSTALL_KEY", got["said"][0])
+        self.assertIn("INSTALL_KEY", json.loads((new_state / "move.json").read_text()).get("said", [""])[0]) if (new_state / "move.json").is_file() else None
+
     def test_a_landing_swaps_inside_a_state_folder_it_cannot_rename(self):
         # B594: the parent is root's on an installed machine, a mount point's
         # in a container. Here the parent is read-only, as it is for the

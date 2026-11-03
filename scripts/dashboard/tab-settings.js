@@ -360,7 +360,8 @@ function wireMove(root){
     if (file) fd.append("bundle", file, file.name);
     const j = await (await fetch("/api/move-land", {method: "POST", body: fd})).json().catch(() => ({error: "no answer"}));
     if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
-    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had`);
+    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had${
+      (j.said || []).length ? `. ${j.said.join(". ")}` : ""}`, (j.said || []).length > 0);
     setTimeout(() => location.assign("/"), 6000);
   }));
   root.querySelectorAll("[data-moveprep]").forEach(b => b.onclick = () => pressing(b, async () => {

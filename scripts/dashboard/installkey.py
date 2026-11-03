@@ -189,8 +189,13 @@ def landed(key, state_dir=None):
     what the moved state sealed opens under it. A key set in the environment
     is the environment's, and a move does not change it."""
     key = bytes(key).strip()
-    if len(key) < 16 or not os.environ.get("BB_INSTALL_KEY_DIR"):
-        return
+    if len(key) < 16:
+        return "the carried install key is too short to be one: not taken"
+    if not os.environ.get("BB_INSTALL_KEY_DIR"):
+        # Said, not swallowed (B623): the landing reported ok and the
+        # moved state's sealed settings and sign-ins answered Locked.
+        return ("this install's key is set in its environment (INSTALL_KEY), so the carried key was not taken: "
+                "set INSTALL_KEY to the old install's, or its sealed settings and sign-ins stay locked")
     d = _dir()
     d.mkdir(parents=True, exist_ok=True, mode=0o700)
     was = (d / "key").read_bytes().strip() if (d / "key").is_file() else b""
