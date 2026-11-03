@@ -1039,8 +1039,16 @@ if [ "$DOOR" = cloudflared ]; then
     elif [ ! -s /etc/cloudflared/env ]; then
         warn "no tunnel token: the door's secret left the enroll script once it ran; make a new script on the Nodes page"; exit 1
     fi
-    svc_install cloudflared "AerieOS: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
-    printf '   up; in Zero Trust the tunnel'"'"'s public hostname %s goes to ssh://localhost:22, and Cloudflare Access decides who reaches it\n' "$DOOR_HOST"
+    # A run again with no new token (B657): the door is up on the token it
+    # has, and the session running this may be riding it, so it is left
+    # running; restarted, it took the session and this script with it.
+    if [ -z "$(door_secret)" ] && [ -f /etc/systemd/system/cloudflared.service ] && systemctl is-active --quiet cloudflared; then
+        printf '   already up at %s on its token, left running\n' "$DOOR_HOST"
+    else
+        [ -n "${SSH_CONNECTION:-}" ] && printf '   the door restarts now: a session connected through it drops (start the script with nohup to let it finish)\n'
+        svc_install cloudflared "AerieOS: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
+        printf '   up; in Zero Trust the tunnel'"'"'s public hostname %s goes to ssh://localhost:22, and Cloudflare Access decides who reaches it\n' "$DOOR_HOST"
+    fi
 elif [ "$DOOR" = tailscale ]; then
     say "door: Tailscale, this machine on your tailnet with ssh"
     if ! command -v tailscale >/dev/null 2>&1; then
