@@ -2923,7 +2923,8 @@ HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The st
              '<a href="#/controller/machine" data-heldgo>Start on This machine</a>. <span data-heldwhy></span></div>')
 # A moved controller's band (R90 step 12): read-only here, the new home named.
 MOVED_BAND = ('<div class="banner moved" id="movedband" role="status" hidden>This controller moved to '
-              '<a data-movedto href="#"></a>: what is here is read-only, for a look back.</div>')
+              '<a data-movedto href="#"></a>: what is here is read-only, for a look back. Should the new home be lost, '
+              'its bundle still downloads from Controller settings and lands on a fresh install.</div>')
 
 
 def kept_out(u):
@@ -8719,7 +8720,8 @@ class Handler(BaseHTTPRequestHandler):
         # Moved (R90 step 12): read-only from here on, the move's own verbs aside.
         if move.moved_to() and self.path.split("?")[0].startswith("/api/") and not self.path.split("?")[0].startswith("/api/v1/agent/") \
                 and self.path.split("?")[0] not in ("/api/move", "/api/profile"):
-            return self._json({"error": f"this controller moved to {move.moved_to()}: it is read-only now", "moved": True}, 409)
+            return self._json({"error": f"this controller moved to {move.moved_to()}: it is read-only now; should the new home be lost, "
+                                        "its bundle still downloads from Controller settings and lands on a fresh install", "moved": True}, 409)
         if self.path.split("?")[0] == "/login":
             return self._login_post()
         if self.path.split("?")[0] == "/login/2fa":
