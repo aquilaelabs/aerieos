@@ -1072,6 +1072,45 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
        && /Bring the artifacts data across from \/var\/lib\/builderbot\/artifacts/.test(asked[1])
        && after.stores.artifacts === '/srv/full/shed' && after.keep.includes('artifacts'),
        `a folder holding files gets one named for the node, the setting is that, and declining the copy starts it empty (${JSON.stringify(after.keep)}; ${asked.length} asked)`);
+    // A folder that already is a store is adopted as it is (R212): a
+    // toolchain share holding this node's own folder, the marker in it,
+    // keeps the setting as typed, nests nothing and asks no bring-across.
+    disk['/srv/sdk'] = { exists: true, dir: true, files: true, mine: true };
+    disk['/var/lib/builderbot/toolchains'] = { exists: true, dir: true, files: true };
+    const adopt = [];
+    page.answers.push(q => { adopt.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:toolchains"]`, '/srv/sdk');
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.toolchains === '/srv/sdk',
+                               minted.id, { timeout: 15000 });
+    const adopted = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
+    ok(adopt.length === 1 && /holds this node's own toolchains folder/.test(adopt[0]) && new RegExp(`/srv/sdk/${minted.id}`).test(adopt[0])
+       && adopted.stores.toolchains === '/srv/sdk' && adopted.keep.includes('toolchains'),
+       `a share holding this node's own toolchain folder is adopted as typed, nothing nested, the data left where it is (${adopt.length} asked; ${JSON.stringify(adopted.keep)})`);
+    // The node's own folder inside a toolchain store, typed itself, sets
+    // the store around it: the agent keeps each node's toolchains in a
+    // folder named for it inside the store.
+    disk[`/srv/sdk2/${minted.id}`] = { exists: true, dir: true, files: true, store: true };
+    const inner = [];
+    page.answers.push(q => { inner.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:toolchains"]`, `/srv/sdk2/${minted.id}`);
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.toolchains === '/srv/sdk2',
+                               minted.id, { timeout: 15000 });
+    ok(inner.length === 1 && /this node's own folder inside the toolchain store \/srv\/sdk2/.test(inner[0]),
+       `the node's own folder inside a toolchain store, typed itself, sets the store around it (${inner.length} asked)`);
+    // ...and so is the folder the page nested for this node before,
+    // pointed at directly.
+    disk['/srv/full2/shed'] = { exists: true, dir: true, files: true };
+    const own = [];
+    page.answers.push(q => { own.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:artifacts"]`, '/srv/full2/shed');
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.artifacts === '/srv/full2/shed',
+                               minted.id, { timeout: 15000 });
+    const ownRec = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
+    ok(own.length === 1 && /the folder AerieOS put this node's artifacts store in before/.test(own[0]) && ownRec.stores.artifacts === '/srv/full2/shed',
+       `the folder nested for the node before, typed itself, is adopted as it is (${own.length} asked; ${ownRec.stores.artifacts})`);
     // A store pointed into a mount saved here and not on the node yet is
     // told so (the operator, 23 Oct): what is on the share cannot be seen
     // until Apply mounts it, so no folder is chosen from what is there now.

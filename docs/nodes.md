@@ -1598,8 +1598,16 @@ page. Then, for each store:
 
 - a path that is empty or does not exist yet asks *are you sure*, and the
   store goes there as typed;
-- a path that already holds files asks the same, saying that a folder named
-  for the node is made inside it and the setting changes to that
+- a path that already is a store (R212) is adopted as it is: one carrying
+  AerieOS's store marker (`.bb-store-id`), a toolchain share holding this
+  node's own folder (`<path>/<node id>` with the marker; that folder typed
+  itself sets the share around it, since the agent keeps each node's
+  toolchains in a folder named for it inside the store), or the folder the
+  page nested for this node before, typed itself. The dialog says which,
+  the setting stays as typed, nothing is nested and nothing brought across:
+  the store uses what is there;
+- a path that already holds other files asks the same, saying that a folder
+  named for the node is made inside it and the setting changes to that
   (`/srv/share` becomes `/srv/share/<node>`), so a store never shares a
   folder with files that are not its own;
 - when the old store holds data, whether to bring it across is its own

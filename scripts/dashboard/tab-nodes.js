@@ -1387,6 +1387,26 @@ async function ndStoreAsk(n, c){
             ? ` (it mounts another export there now)` : ""}, so what is on the share cannot be seen until it is `
           + `mounted. Apply mounts it first and only then puts the store there; if the mount does not come up, `
           + `the apply fails and ${role} stays in ${old || "its place"}.`)) return false;
+    } else if (role === "toolchains" && st.store && want.endsWith(`/${n.id}`)){
+      // This node's own folder inside a toolchain store, typed itself
+      // (R212): the setting is the store around it, since the agent keeps
+      // each node's toolchains in a folder named for it inside the store.
+      already = true;
+      to = want.slice(0, -(n.id.length + 1));
+      if (!await askYes(`Use ${to} as the toolchains store on ${n.name}?\n\n${want} is this node's own folder inside `
+          + `the toolchain store ${to}, so the setting is ${to}: the store uses what is there, and nothing is brought `
+          + `across from ${old || "the old place"}.`)) return false;
+      d.stores[role] = to;
+    } else if (st.store || st.mine || st.own){
+      // Already a store (R212): AerieOS's marker in it, this node's own
+      // toolchain folder inside it, or the folder nested for this node
+      // before. Used as it is, nothing nested, nothing brought across.
+      already = true;
+      if (!await askYes(`Use ${want} as the ${role} store on ${n.name}?\n\n${
+          st.mine ? `${want} holds this node's own ${role} folder, ${want}/${n.id}, made by AerieOS`
+          : st.store ? `${want} is a store AerieOS made`
+          : `${want} is the folder AerieOS put this node's ${role} store in before`
+          }: the store uses what is there, and nothing is brought across from ${old || "the old place"}.`)) return false;
     } else if (st.files){
       to = st.sub; already = !!st.sub_state?.files;
       if (!await askYes(`Put the ${role} store in ${want} on ${n.name}?\n\n${want} already has files in it, so the `

@@ -5579,18 +5579,24 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
 
 
 # What node_path_state runs there: read-only, stdlib, the python every node
-# carries for its agent. One JSON line: {path: {exists, dir, files}}.
+# carries for its agent. One JSON line: {path: {exists, dir, files, store,
+# mine}}: `store` when the folder carries AerieOS's store marker (R212), and
+# `mine` when it holds this node's own toolchain folder, <path>/<node id>
+# with the marker, which is what a toolchain share looks like from the share.
 _PATH_STATE = """
 import json, os, sys
 out = {}
+nid = sys.argv[2] if len(sys.argv) > 2 else ""
 for p in json.loads(sys.argv[1]):
-    st = {"exists": os.path.exists(p), "dir": os.path.isdir(p), "files": False}
+    st = {"exists": os.path.exists(p), "dir": os.path.isdir(p), "files": False, "store": False, "mine": False}
     if st["dir"]:
         try:
             with os.scandir(p) as it:
                 st["files"] = any(True for _ in it)
         except OSError:
             st["files"] = True
+        st["store"] = os.path.isfile(os.path.join(p, ".bb-store-id"))
+        st["mine"] = bool(nid) and os.path.isfile(os.path.join(p, nid, ".bb-store-id"))
     out[p] = st
 print(json.dumps(out))
 """
@@ -5603,11 +5609,14 @@ def node_slug(name):
 
 
 def node_path_state(principal, node_id, paths):
-    """{paths: {path: {exists, dir, files, why, sub, sub_state}}} for each
-    path asked, or {error}: whether it is a place a store or a mount may go
-    at all (store_path_ok), and what is there now. A path that holds files
-    also carries the folder named for this node inside it, and what is
-    there, which is where the page offers to put the store instead."""
+    """{paths: {path: {exists, dir, files, store, mine, own, why, sub,
+    sub_state}}} for each path asked, or {error}: whether it is a place a
+    store or a mount may go at all (store_path_ok), and what is there now.
+    A path that holds files also carries the folder named for this node
+    inside it, and what is there, which is where the page offers to put
+    the store instead; one that already is a store (R212: the marker,
+    this node's own toolchain folder inside it, or the folder the page
+    nested for this node before, `own`) is adopted as it is."""
     n = node(node_id)
     if not n or n.get("kind") != "agent":
         return {"error": "only an agent node says what is at a path"}
@@ -5620,7 +5629,7 @@ def node_path_state(principal, node_id, paths):
         return {"error": "no path to look at"}
     sub = {p: f"{p}/{node_slug(n.get('name'))}" for p in want}
     ask = want + [s for s in sub.values() if s not in want]
-    r = run_wait(principal, node_id, ["python3", "-c", _PATH_STATE, json.dumps(ask)], timeout=20,
+    r = run_wait(principal, node_id, ["python3", "-c", _PATH_STATE, json.dumps(ask), str(node_id)], timeout=20,
                  forget=True, title="what is at the storage paths")
     if r.get("error"):
         return {"error": r["error"]}
@@ -5634,6 +5643,9 @@ def node_path_state(principal, node_id, paths):
         st["why"] = store_path_ok(p)
         st["sub"] = sub[p]
         st["sub_state"] = got.get(sub[p]) or {}
+        # The folder the page nested for this node before (its name or its
+        # id as the last segment), pointed at directly this time.
+        st["own"] = bool(st.get("files")) and p.rsplit("/", 1)[-1] in (node_slug(n.get("name")), str(node_id))
         out[p] = st
     return {"paths": out}
 
