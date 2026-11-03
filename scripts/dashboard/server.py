@@ -1412,7 +1412,10 @@ def _project_columns(who, facts):
                     # The project's own settings: its node, what build and
                     # test run, the gates. NOT the model, the effort or the
                     # commit author, which are whoever is asking's.
-                    "prefs": project_prefs.get(d.name, {}),
+                    # ...read on its own where the whole-list read has no
+                    # record for it or its project (R208 step 6: a dial set
+                    # in a notebook leaves the project with none).
+                    "prefs": project_prefs.get(d.name) or prefs.get(d.name),
                     # Who may move its version (version.py's policy), for the
                     # settings panel's Move the version dial.
                     "version_policy": version.policy(d.name),
@@ -4288,7 +4291,7 @@ def _project_node_gpu(project):
 preamble.node_gpu = _project_node_gpu
 
 prefs.configure(write_json=write_json, state=STATE)
-prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos)
+prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos, keys=registry.repos_keys)
 users.home_of = repos.key_of
 roles.label_of = registry.label
 projects.key_of = repos.key_of

@@ -61,9 +61,14 @@ dials that need no code (Run its container, Make VMs, Install a tool pack,
 Report AerieOS bugs, Use a lent PC). On a project with repositories the same
 dialog holds what is the project's as a whole, and says that git, build and
 test, file access and snapshots are each repository's, in its notebook's
-Settings view; the notebook's Permissions view is unchanged. Add repository
-on the card makes a project with no repository a coding project; Delete
-project removes its folder with it.
+Settings view. The dialog's Agents may dials are the project's defaults:
+every repository in it inherits each one until its own notebook's
+Permissions view sets it apart, where each dial's first choice reads "as
+the project (deny)" with the inherited word, which is what a new repository
+starts on; picking a value there is that repository's override alone, and
+picking "as the project" gives it back. Add repository on the card makes a
+project with no repository a coding project; Delete project removes its
+folder with it.
 
 A fresh local repo (`git init`) asks for a name and a free-text *Brief*: what you want
 built. The brief is not the project's `CLAUDE.md`, which every session

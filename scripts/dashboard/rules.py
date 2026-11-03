@@ -60,6 +60,7 @@ Same arrangement as roadmap.py and bugs.py: the server or the bb CLI hands over
 write_json and the state directory; nothing here reaches back.
 """
 import fnmatch
+import contextlib
 import json
 import os
 import re
@@ -983,11 +984,9 @@ def guards(project):
             "by": r.get("by") or "you"}
            for r in effective(project) if r.get("refuse")]
     always = list(ALWAYS)
-    try:
+    with contextlib.suppress(Exception):                        # a store that cannot answer refuses nothing extra
         if work_of and work_of(project):
             always.append(WORK_GUARD)
-    except Exception:                                            # noqa: BLE001
-        pass
     return out + [dict(g, by="builderbot") for g in always]
 
 

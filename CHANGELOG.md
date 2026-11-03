@@ -74,6 +74,7 @@
 - A node's Features section marks an NVIDIA card for a VM: from the next boot vfio-pci holds it, one VM takes it under Hardware, and the machine and its containers do without it until it is unmarked (9a90fa8)
 - A container is given the machine's GPU from its settings on the Containers page: an NVIDIA card through the container toolkit, an AMD card or APU through its render devices, for every service of it from the next build (946f98d)
 - A project with no repository is a place to run an agent that builds containers and VMs: Start agent on an empty project's card starts a session in a plain folder of the project's own, with no git and no notebook, briefed that its work is containers (aerie container new) and VMs (aerie vm); git, the build, test and notebook verbs are refused there with why, and the card's Settings opens the project's own settings as a dialog, with each repository's git, build, files and snapshots left to its notebook (1619322)
+- A project's Agents may dials are the defaults for every repository in it: a notebook's Permissions view starts each dial on 'as the project' and sets one apart only when picked, so a new repository takes the project's permissions until somebody says otherwise (52d4ee9)
 
 ### Changed
 

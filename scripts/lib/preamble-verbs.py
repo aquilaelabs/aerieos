@@ -41,7 +41,7 @@ preamble.id_of = registry.pid
 # kept (what it reads, its node), and never told the others are its own.
 repos.configure(state=state, write_json=statefile.write_json, registry=registry, workspace=os.environ.get("WORKSPACE") or "/workspace")
 preamble.work_of = repos.is_work          # a project with no repository (R208)
-prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos)
+prefs.configure_repos(project_of=repos.project_of, members=repos.members, is_repos=registry.is_repos, keys=registry.repos_keys)
 preamble.repos_fn = lambda p: ((registry.label(k), registry.pid(k), [(m, registry.label(m)) for m in repos.members(k)])
                                if (k := repos.project_of(p)) and len(repos.members(k)) > 1 else None)
 preamble.project_fn = lambda p: (registry.label(k), registry.pid(k)) if (k := repos.project_of(p)) else None
