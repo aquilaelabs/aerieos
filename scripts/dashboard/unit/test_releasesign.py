@@ -152,6 +152,14 @@ class Base(unittest.TestCase):
         forgerelease.configure(state=self.tmp, workspace=self.tmp / "ws", write_json_fn=wj)
         releasesign.configure(state=self.tmp, workspace=self.tmp / "ws", write_json_fn=wj, projects=lambda: ["app"])
         signing.configure(state=self.tmp / "state", project_name=re.compile(r"[A-Za-z0-9._-]+"))
+        # The token the look asks GitHub with, named here rather than read
+        # through gitcreds, whose state another module in the tier leaves
+        # pointed elsewhere: without it check() ends before the overdue
+        # expectation is marked, and attention() had no row (B642).
+        from unittest import mock
+        tok = mock.patch.object(cilogs, "_token", lambda project, uid=None: "tok")
+        tok.start()
+        self.addCleanup(tok.stop)
         # The project's node, there and ready unless a test says otherwise.
         for k in ("node_of", "node_get", "node_tools", "node_refuses"):
             self.addCleanup(setattr, signing, k, getattr(signing, k))
