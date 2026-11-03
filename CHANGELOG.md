@@ -4,6 +4,7 @@
 
 ### Added
 
+- The doctor warns while /config sits on a FUSE share (a /mnt/user path): the state database there can come back older after a restart, and the line says what to map instead (R209)
 - A project's FTP access can be kept on for an hour, a day or a week, then turns itself off
 - AerieOS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
 - A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
@@ -139,7 +140,8 @@
 - Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (B645, B646) (1db8d53)
 - The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (B648) (1db8d53)
 - The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (B649) (df0f1c7)
-- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (Unraid's /mnt/user) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (B654)
+- A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (B655)
+- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (B654)
 - Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (B651)
 
 ### Security

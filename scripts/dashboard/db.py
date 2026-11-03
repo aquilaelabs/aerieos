@@ -164,7 +164,7 @@ def fold():
     nothing, so the file alone is the state: every minute and on a clean
     stop (B654). SQLite folds on its own only at a thousand pages, and on
     a mount where the index it keeps beside the log is not trusted across
-    a restart (Unraid's /mnt/user, FUSE: a container re-created there came
+    a restart (a /mnt/user path, FUSE: a container re-created there came
     back with the state of the last fold, 25 minutes before, and both
     nodes' rotated tokens unknown, 3 Nov) that is 25 minutes gone. A reader
     half-way through leaves the fold to the next minute: (busy, frames,
