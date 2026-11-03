@@ -1503,6 +1503,13 @@ function nodeConfSections(n){
   const locked = !!n.config?.lock;
   const mounts = d.mounts.map((m, i) => {
     const [st, cls] = mountState(m, rep.mounts);
+    // A reason with a fix in it (a stale handle, a mount that did not come
+    // up) is longer than the cell at the end of the line shows, and the
+    // section's state line names the last apply's failure instead of it
+    // once one has failed (B660): the cell keeps the state up to its first
+    // colon and the whole reason goes under the row, where it can wrap.
+    const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
+    const head = cut > 0 ? st.slice(0, cut) : st;
     return `
     <div class="ndmount ctlline" data-i="${i}">
       <div class="setrow col ctlrow">${lbl("", "Source", m.type === "virtiofs" ? "the share tag" : "host:/export")}
@@ -1517,9 +1524,10 @@ function nodeConfSections(n){
           <option value="virtiofs" ${m.type === "virtiofs" ? "selected" : ""}>virtiofs</option>
         </select>
         <label class="ndcap"><input type="checkbox" data-k="ro" ${m.ro ? "checked" : ""}> read-only</label>
-        <span class="sub ndmstate ${cls}">${esc(st)}</span>
+        <span class="sub ndmstate ${cls}">${esc(head)}</span>
         <button type="button" class="eye" data-mrm title="take this mount out" aria-label="take this mount out">×</button>
-      </div>
+      </div>${cut > 0 ? `
+      <div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}
     </div>`;
   }).join("");
   const STORE_ABOUT = {

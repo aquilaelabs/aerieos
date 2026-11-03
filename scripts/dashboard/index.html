@@ -4920,7 +4920,10 @@ button[aria-busy="true"]{opacity:.75}
   grid-template-columns:minmax(0,7em) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
 /* Static routes take the network's whole width, in either mode. */
 .ndnet .ndroutes{grid-column:1 / -1}
-.ndmstate.warn{color:var(--warn)} .ndmstate.bad{color:var(--bad)}
+.ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
+/* The whole of a mount's reason, under its row (B660): the cell at the end
+   of the line keeps the state's first words. */
+.ndmount .ndmwhy{grid-column:1 / -1;white-space:normal;overflow-wrap:anywhere;margin-top:-2px}
 .ndstore{display:grid;grid-template-columns:minmax(0,7em) minmax(0,1fr);gap:6px;align-items:center}
 .ndstore label{font:var(--f-ui);color:var(--ink)}
 .ndstore .sub{grid-column:2}

@@ -2637,6 +2637,24 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`, r =>
        /\/devdata: mounted, but the handle is stale/.test(r.textContent) && /re-export it there/.test(r.textContent)),
      'the row says which mount is stale and that the fix is on the host, whether or not the desired list names it');
+  // The whole reason sits under the mount's own row (B660), where it wraps,
+  // since the cell at the end of the line shows only its first words and the
+  // section's state line names a failed apply instead of it once one failed.
+  // The desired list names /devdata for this, and is put back after.
+  const staleMounts = [{ path: '/mnt/old', source: 'nas:/mnt/user/old', type: 'nfs', ro: false },
+                       { path: '/mnt/new2', source: 'nas:/mnt/user/new2', type: 'nfs', ro: false }];
+  await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: {
+    mounts: [...staleMounts, { path: '/devdata', source: 'nas:/mnt/user/bb-sandbox/devdata', type: 'nfs', ro: false }],
+    stores: {}, network: { mode: 'dhcp' } } });
+  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.waitForFunction(id => [...document.querySelectorAll(`.nodestab .ndrow[data-node="${id}"] .ndmount .ndmwhy`)]
+                                     .some(e => /devdata/.test(e.textContent)), minted.id, { timeout: 15000 }).catch(() => {});
+  ok(await page.$eval(ROW, r =>
+       [...r.querySelectorAll('.ndmount .ndmwhy.bad')].some(e => /^\/devdata: mounted, but the handle is stale: .*re-export it there/.test(e.textContent))
+       && [...r.querySelectorAll('.ndmount .ndmstate.bad')].some(e => e.textContent === 'mounted, but the handle is stale')),
+     'the mount row carries the stale reason whole under it, and its state cell the first words');
+  await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
+  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
   // Whether a session there is kept to its own project (R35): on the
   // Sessions section's status when it is not, since a folded section shows
   // nothing else, and why; and said plainly when it is.
