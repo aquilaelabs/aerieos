@@ -124,6 +124,13 @@
 - The first run's Your disks step leaves the disks a stick's plan adopts alone: each is listed as the old system's, with no box, and Make it never sees them; with every disk theirs the step points at This machine's Disks from the stick (565fc4b)
 - AerieOS carries the Realtek and Broadcom network firmware, so a board with one of those chips no longer boots saying its firmware could not be loaded (565fc4b)
 - Install on IOMMU, Storage, Shares or UPS in a node's Features section lands: the agent refused every feature but VM host and the firewall as 'not a feature verb' (9a90fa8)
+- This machine's From the stick section marks the array, the pools and the shares done once they are adopted or served, instead of saying they are waiting for good (f0d0d47)
+- On an AerieOS machine the Nodes page says the machine is its own node and where its page is, instead of 'No node yet' (f0d0d47)
+- A move's landing cut midway (a power loss between its steps) is said on the bell, with where what was there is kept and that landing the same bundle again finishes it (f0d0d47)
+- A landing says when the carried install key could not be taken because the new home's key is set in its environment, and what to set (f0d0d47)
+- A moved controller's band says the way back: its bundle still downloads and lands on a fresh install (f0d0d47)
+- A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
+- Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
 
 ### Security
 
