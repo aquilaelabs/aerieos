@@ -96,6 +96,15 @@ class Controller(unittest.TestCase):
         nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), self.nid))
         self.assertIn("still runs sessions", nodes.node_feature("user:test", self.nid, "firewall", "install").get("error", ""))
 
+    def test_the_card_to_a_vm_wants_a_card(self):
+        # R207 step 3: refused without a card in the census; a job with one.
+        self.assertIn("no NVIDIA card", nodes.node_feature("user:test", self.nid, "gpuvm", "install").get("error", ""))
+        rep = dict(nodes.node(self.nid).get("reported") or {}, gpu_card="NVIDIA GeForce RTX 3070 Ti [10de:2482]")
+        nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), self.nid))
+        r = nodes.node_feature("user:test", self.nid, "gpuvm", "install")
+        self.assertTrue(r.get("job"), r)
+        self.assertEqual(nodes.job_next(self.nid, 0)["spec"]["config"], {"id": "gpuvm", "op": "install"})
+
     def test_an_unknown_one_is_refused(self):
         self.assertIn("no such feature", nodes.node_feature("user:test", self.nid, "warpdrive", "install").get("error", ""))
 

@@ -1471,7 +1471,12 @@ def _census(c):
                        "iommu": {"installed": io.get("installed") is True, "on": io.get("on") is True},
                        "storage": {k: sto.get(k) is True for k in ("installed", "zfs", "mergerfs", "snapraid", "smart")},
                        "shares": {k: sh.get(k) is True for k in ("installed", "smb", "nfs")},
-                       "ups": {k: (fe.get("ups") or {}).get(k) is True for k in ("installed", "nut")} if isinstance(fe.get("ups"), dict) else {}}
+                       "ups": {k: (fe.get("ups") or {}).get(k) is True for k in ("installed", "nut")} if isinstance(fe.get("ups"), dict) else {},
+                       # The NVIDIA card marked for a VM (R207 step 3): the
+                       # marker, whether vfio-pci holds it now, its ids.
+                       "gpuvm": {"installed": (fe.get("gpuvm") or {}).get("installed") is True, "bound": (fe.get("gpuvm") or {}).get("bound") is True,
+                                 "cards": int((fe.get("gpuvm") or {}).get("cards") or 0) if str((fe.get("gpuvm") or {}).get("cards") or 0).isdigit() else 0,
+                                 "ids": re.sub(r"[^0-9a-f:,]", "", str((fe.get("gpuvm") or {}).get("ids") or ""))[:200]} if isinstance(fe.get("gpuvm"), dict) else {}}
     # The machine's disks (R162 step 1), each to its shape: a name, a model,
     # a serial, a size, what each partition holds, SMART's three facts.
     if isinstance(c.get("disks"), list):
@@ -3177,8 +3182,8 @@ def lockdown_over(n):
 
 # The features a node's Features section installs and removes (R91), as
 # bb-sandbox's FEATURE_IDS and the agent's census name them.
-FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups")
-FEATURE_NAMES = {"vmhost": "VM host", "firewall": "the hosting firewall", "iommu": "the IOMMU",
+FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
+FEATURE_NAMES = {"vmhost": "VM host", "firewall": "the hosting firewall", "iommu": "the IOMMU", "gpuvm": "the NVIDIA card to a VM",
                  "storage": "storage", "shares": "shares", "ups": "the UPS"}
 # The installed edition's own (R56 step 2): on the controller's own machine alone.
 OWN_FEATURES = ("storage", "shares", "ups")
@@ -3221,6 +3226,9 @@ def node_feature(principal, node_id, fid, op):
     if op == "install" and fid == "vmhost" and not (fe.get("vmhost") or {}).get("kvm"):
         return {"error": f"{n['name']} has no /dev/kvm, so VMs would run in software, tens of times slower: on a VM, "
                          "its host passes virtualization through (CPU mode host-passthrough, nested KVM on)"}
+    # The card to a VM (R207 step 3) wants a card: the census names one.
+    if fid == "gpuvm" and op == "install" and not rep.get("gpu_card"):
+        return {"error": f"no NVIDIA card on {n['name']} (none in what it reported), so there is no card to give a VM"}
     if fid == "iommu" and not str(rep.get("arch") or "").startswith(("x86_64", "amd64")):
         return {"error": f"the IOMMU switch is for an Intel or AMD machine; {n['name']} is {rep.get('arch') or 'another architecture'}"}
     if op == "install" and fid == "firewall" and not (n.get("config") or {}).get("host_only"):

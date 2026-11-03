@@ -788,6 +788,15 @@ function nodeFeaturesSection(n){
         io.installed ? (io.on ? " On now." : " Not on yet: restart the machine; if it stays off after that, turn VT-d or AMD-Vi on in its firmware.")
           : io.on || n.reported?.vm_host?.iommu ? " On already, set outside AerieOS." : ""}`,
       ""));
+  // The NVIDIA card to a VM (R207 step 3): bound to vfio-pci from boot, so
+  // the host's driver never takes it and a VM's start finds it free; this
+  // machine and its containers do without it while it is marked so.
+  const gv = fe?.gpuvm || {};
+  if (n.reported?.gpu_card || gv.installed)
+    rows.push(row("gpuvm", "NVIDIA card to a VM", !!gv.installed,
+      `Gives the card${n.reported?.gpu_card ? ` (${esc(n.reported.gpu_card)})` : ""} to vfio-pci from boot, so one VM takes it under Hardware… on the VMs page; this machine and its containers do without it meanwhile.${
+        gv.installed ? (gv.bound ? " Held by vfio-pci now." : " Not yet: restart the machine.") : " This machine's now."}`,
+      ""));
   // The features installed elsewhere on the page (R91 step 1): each said as
   // the machine reports it, with the press that installs or removes it where
   // it already lives, since those take a license to accept (Google's, NVIDIA's)
@@ -819,7 +828,7 @@ function nodeFeaturesSection(n){
   const runs = ((r.services || {}).runners || []).length;
   others.push(elsewhere("runner", "CI runner", runs > 0, runs ? `${runs} runner${runs === 1 ? "" : "s"} registered here.` : "A forge's runner, registered with a token from the forge on the CI runner page.", ""));
   rows.push(...others);
-  const have = fe ? [fe.vmhost?.installed, n.config?.host_only && fe.firewall?.installed, fe.iommu?.installed].filter(Boolean).length
+  const have = fe ? [fe.vmhost?.installed, n.config?.host_only && fe.firewall?.installed, fe.iommu?.installed, fe.gpuvm?.installed].filter(Boolean).length
     + others.filter(h => / ok">installed/.test(h)).length : 0;
   return docSection("nodes", "features", ndTitle("features"), fe ? (have ? `${have} installed` : "none installed") : "",
     `${why ? `<div class="sub dim ndfeatwhy">${why}</div>` : ""}${rows.join("")}`);
