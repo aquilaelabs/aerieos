@@ -569,7 +569,9 @@ function groupHeader(t, g){
   const from = n?.agent?.addr ? `dials in from ${n.agent.addr}` : "";
   const ag = n?.agent?.version ? `agent ${n.agent.version}` : "";
   const facts = [seen, from, ag].filter(Boolean).join(" · ");
-  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.name, live: x.live})), cur) : `<span class="pname">No node yet</span>`;
+  // The machine's own node is This machine's, not this list's (B635).
+  const ownHere = state?.bare_metal && (nodesList || []).some(x => x.config?.own && x.state !== "retired");
+  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.name, live: x.live})), cur) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
   return `<span class="phead mchead">${pick}${facts ? `<span class="pfacts">${esc(facts)}</span>` : ""}<span class="sp"></span></span>`;
 }
 // The Machines group's actions, on the sub-nav's line: dead with the enroll

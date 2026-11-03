@@ -1995,8 +1995,13 @@ function renderNodesInto(i){
   // Nothing enrolled. Said where the rows would be, rather than an empty
   // picker over an empty page: the Enroll button above is the whole of what
   // there is to do here.
+  // On AerieOS the machine is its own node, drawn on This machine and kept
+  // off this list, so an empty list is not "no node yet" (B635).
+  const ownHere = state?.bare_metal ? (nodesList || []).find(x => x.config?.own && x.state !== "retired") : null;
   const none = live.length ? "" : state?.can?.admin === false
     ? `<div class="empty ndnone">None of your projects is on a node yet. An administrator sets a project's node.</div>`
+    : ownHere ? `<div class="empty ndnone">This machine is its own node: ${pageLink("machine", "This machine")} under Controller is its page.
+      Press <b>Enroll node</b> to get the command that adds another machine for builds, tests and sessions.</div>`
     : `<div class="empty ndnone">No node yet. Press <b>Enroll node</b> to get the command
       that adds a machine for builds, tests and sessions.</div>`;
   // Enrolling is a dialog now (#ndmodal), not two panels appended here; see
