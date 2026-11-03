@@ -216,6 +216,29 @@ def store_id(path):
         return ""
 
 
+def store_here(path, role, node_id, made=()):
+    """Why `path` already is a store, said before anything is copied into
+    it (B661): "marked" when it carries the controller's marker, "mine"
+    when it is a toolchain store holding this node's own folder, "own"
+    when this agent made it for the store before (the folder the page nested
+    for the node), and "" when none of those. The page asks the same of the
+    controller's probe when a store is saved; the agent asks again at apply
+    time, so an apply of a setting saved before the probe could answer is
+    not refused for the files the store itself put there.
+    """
+    try:
+        if store_id(path):
+            return "marked"
+        if role == "toolchains" and node_id and os.path.isdir(os.path.join(path, str(node_id))):
+            return "mine"
+    except (OSError, TypeError):
+        return ""
+    want = os.path.abspath(str(path)).rstrip("/")
+    if any(os.path.abspath(str(d)).rstrip("/") == want for d in (made or ())):
+        return "own"
+    return ""
+
+
 def _stores(stores, used=False):
     out = {}
     for role, path in (stores or {}).items():
