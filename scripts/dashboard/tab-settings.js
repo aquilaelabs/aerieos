@@ -675,7 +675,10 @@ const SETTING_GROUPS = [
   // The update window (R160 step 4): a newer release applied by itself at
   // the hour named, daily or one weekday; off by default, so nothing moves
   // the install without a press or this choice.
-  {key: "updwin", title: "Update window",
+  // An install that updates itself alone (B648): the container is pulled
+  // by whatever runs it, so the window is not offered there, and the boot
+  // menu's older versions are AerieOS's own.
+  {key: "updwin", title: "Update window", bare: true,
    heading: s => s?.settings?.update_window?.value ? `${s.settings.update_window.value} at ${String(s.settings.update_hour?.value ?? 4).padStart(2, "0")}:00` : "off",
    fields: [
     {key: "update_window", label: "Apply a newer release", type: "select",
@@ -683,7 +686,7 @@ const SETTING_GROUPS = [
                ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]],
      hint: "In the window the newest release is applied the way Update does it: the image into the other slot on AerieOS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
     {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"},
-    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number",
+    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number", when: () => !!state?.release?.os?.version,
      hint: "AerieOS: each version an update replaces stays on the machine, about 2 GB each, bootable from the menu's Older versions. 0 keeps none."}]},
   {key: "maint", title: "Maintenance", can: "maintenance",
    heading: s => s?.settings?.maintenance_mode?.value ? "on" : "off",
@@ -961,7 +964,8 @@ function settingsSections(){
   const offSect = offs.length ? [{key: "off", title: "Switched off", status: String(offs.length), cls: "",
     html: `<div class="row stack2"><div class="grow"><div class="sub">Set where this container starts (FEATURES_OFF), so nothing here turns them back on.</div>${
       offs.map(w => `<div class="setrow">${esc(w)}</div>`).join("")}</div></div>`}] : [];
-  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)).map(g => {
+  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)
+                                                && (!g.bare || state?.bare_metal)).map(g => {
     const field = f => {
             const v = s.settings[f.key]?.value;
             const id = "set_" + f.key;
@@ -1012,7 +1016,7 @@ function settingsSections(){
       <div class="grow">
         <div class="logset">
           ${g.intro ? g.intro(s) : ""}
-          ${g.fields.filter(f => !f.dev || s.settings.offer_unvetted?.value).map(field).join("")}
+          ${g.fields.filter(f => (!f.dev || s.settings.offer_unvetted?.value) && (!f.when || f.when(s))).map(field).join("")}
           <div class="actbar">
             <span class="state">${g.status ? g.status(s) : "applies at once"}</span>
             <button type="button" class="setApply" title="save">Apply</button>
