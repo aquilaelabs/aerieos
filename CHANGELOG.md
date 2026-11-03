@@ -131,6 +131,7 @@
 - A moved controller's band says the way back: its bundle still downloads and lands on a fresh install (f0d0d47)
 - A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
 - Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
+- Forge measure asks the git door whether a project's token may push, so a fine-grained token an organization has not approved no longer reads as able to push until the push itself is refused (b0be3a2)
 
 ### Security
 
