@@ -4,7 +4,7 @@
 
 ### Added
 
-- The doctor warns while /config sits on a FUSE share (a /mnt/user path): the state database there can come back older after a restart, and the line says what to map instead (R209)
+- The doctor warns while /config sits on a FUSE share (a /mnt/user path): the state database there can come back older after a restart, and the line says what to map instead (25b29f0)
 - A project's FTP access can be kept on for an hour, a day or a week, then turns itself off
 - AerieOS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
 - A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
@@ -32,7 +32,7 @@
 - A bare-metal install updates from the page: a newer release is a line on the bell and an Updates section under Controller settings, Update runs the installer through the machine's own node (its root agent, never the controller's account), the release's controller bundle is fetched from the release and checked against its sha256 and its build attestation, and a new release that does not answer is rolled back by itself; each release now publishes builderbot-controller-X.Y.Z.tar.gz with its sha256 and attestation (2df7ee8)
 - Tests run on a node picked for them: a project's settings gain a Test node beside its nodes, and with one named aerie tests run, aerie dashboard test and the gate's suites run there as a job (this tree snapshotted, as a build travels), with as many workers as that node's cores and memory allow, the lines streamed back, the run recorded and a covered run's counters merged here as a local run's are; a run behind another there says how many jobs are ahead (725635f)
 - USB devices to VMs: a VM host's node page gains a USB section listing each device the machine has (name, vendor and product, serial, port, speed, the driver holding it) with what holds it, Give to a VM attaches it live to a running VM and writes it into its definition (a stopped one has it from its next start), Take back detaches it, a device is found again by its serial after a replug or a reboot and by its port when two are alike, a device the host boots from, serves storage on or has in a pool stays the host's with why, the VM's row names what it holds, and aerie vm devices and aerie vm usb let a session list and ask, held for an administrator on the bell; the section's Controllers list each USB controller with what hangs off it and its IOMMU group, given whole through the VM's Hardware dialog unless something the host needs shares the group; the Features section's IOMMU puts intel_iommu=on or amd_iommu=on with iommu=pt on the kernel's command line and asks for a restart (afbb962)
-- The roadmap's steps move between items without losing anything: aerie roadmap step mv takes a step to another item whole, split makes new items from an item's steps, fold makes an item a step of another, and each step keeps the number it was first given, so aerie roadmap show R56.9 finds it wherever it is now; on the page a step has Move to, an item Split and Fold into, and in reorder mode a step drags onto another item (3b4d293)
+- The roadmap's steps move between items without losing anything: aerie roadmap step mv takes a step to another item whole, split makes new items from an item's steps, fold makes an item a step of another, and each step keeps the number it was first given, so aerie roadmap show finds it by that number wherever it is now; on the page a step has Move to, an item Split and Fold into, and in reorder mode a step drags onto another item (3b4d293)
 - Every notebook record prints whole as JSON, YAML or Markdown (--format, or --json) on aerie roadmap, bug, rules, wiki, design and map, from one serializer with a format number in each document, and the same formats come back in: aerie roadmap add --from FILE and aerie bug add --from FILE add the records in a file, and aerie roadmap apply FILE writes an edited show back, refused when the list moved since it was printed; the code map reads data files too, so aerie map find DASHBOARD_PORT names every file a setting lands in and aerie map who-calls DASHBOARD_PORT where the code reads it (3b4d293)
 - A model router on a node: a node's page gains a Model router section that deploys LiteLLM there with the provider keys you give it (Anthropic, OpenAI, Google, OpenRouter, xAI, and any OpenAI-compatible endpoint under a name of its own), kept sealed on the controller and never in a session's view, Ollama beside it where you turn it on with its models pulled and removed from the section, and the projects allowed to use it, each handed the router's address and a key of its own at a session's start so its spend is its own; the models the router knows, with their context and price, and each project's spend are read from the section (a82d20e)
 - Any model as a fifth coding agent: OpenCode, pointed at a node's model router rather than signed in to anybody, offered by Start as Any model with the router's models (their context and price where known) and started with a config of its own (the router as its provider, the briefing as its instructions), its guards a plugin of AerieOS's calling the same hooks as the other agents', its conversations exported into the transcripts; the Library installs and updates it as the others; the picker marks the models walked with it and says when one's context cannot hold the briefing, and its tab on the dock says the project's spend through the router and a local model's tokens per second (a196894)
@@ -79,7 +79,7 @@
 
 ### Changed
 
-- Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (R210)
+- Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
 - The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
@@ -120,8 +120,8 @@
 
 ### Fixed
 
-- An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (B657)
-- Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (B656)
+- An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (615323d)
+- Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (0b67ee1)
 - The USB maker and the installer take the newest published build that carries their file, by its exact name: a dev build from before the name carries builderbot-os and builderbot-controller files, and the maker took one, asked for an aerieos-os image that was not there and stopped (84604c8)
 - On Windows the USB maker's first write after the stick's partitions are cleared no longer stops at 'the device is not ready': the write waits for the stick for up to thirty seconds, and a Windows refusal is said in Windows' own words (84604c8)
 - A stick's first boot sets the hostname and the time zone its prepared configuration names; they were left at aerieos and UTC, with both under failed on This machine (84604c8)
@@ -140,12 +140,12 @@
 - A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
 - Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
 - Forge measure asks the git door whether a project's token may push, so a fine-grained token an organization has not approved no longer reads as able to push until the push itself is refused (b0be3a2)
-- Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (B645, B646) (1db8d53)
-- The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (B648) (1db8d53)
-- The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (B649) (df0f1c7)
-- A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (B655)
-- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (B654)
-- Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (B651)
+- Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (68851b8, be70d12) (1db8d53)
+- The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (5f020a1) (1db8d53)
+- The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (df0f1c7) (df0f1c7)
+- A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (ef2656d)
+- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (f80e647)
+- Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (46119a7)
 
 ### Security
 

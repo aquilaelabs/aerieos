@@ -354,6 +354,22 @@ def unraid():
     sys.exit(1 if bad else 0)
 
 
+def changelog():
+    """The changelog names no bug or roadmap number (the operator, 3 Nov):
+    B655 and R209 are the notebook's, which a reader of the public
+    repository cannot open; a line points at the commit it landed in, as
+    the others do, and at nothing otherwise."""
+    bad = []
+    for i, ln in enumerate(pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if re.search(r"\b[BR]\d{2,}(\.\d+)?\b", ln):
+            bad.append(f"CHANGELOG.md:{i}: {ln.strip()[:100]}")
+    for b in bad:
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print("  [ok]   the changelog names commits, never a bug's or a roadmap item's number")
+    sys.exit(1 if bad else 0)
+
+
 def packs():
     """The official packs under packs/ are the shipped tables in bbtool.json's
     format (R169 step 1): tools/packs-export.py --check holds them to it."""
@@ -363,4 +379,4 @@ def packs():
 
 
 {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
- "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid}[verb]()
+ "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid, "changelog": changelog}[verb]()

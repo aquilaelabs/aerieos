@@ -4748,6 +4748,11 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         echo "== unraid: the word only where its XML files are the subject"
         python3 "$BB_LIB/lint-checks.py" unraid || rc=1
     fi
+    # The changelog names commits, never a notebook number (the operator, 3 Nov).
+    if [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
+        echo "== changelog: commits named, never a bug's or an item's number"
+        python3 "$BB_LIB/lint-checks.py" changelog || rc=1
+    fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
         python3 "$BB_LIB/lint-checks.py" packs || rc=1
