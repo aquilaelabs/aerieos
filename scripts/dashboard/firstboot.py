@@ -89,7 +89,8 @@ def apply(path=None):
         kept["people"] = [{"name": p.get("name", ""), "role": p.get("role", "user")} for p in cfg.get("people") or [] if isinstance(p, dict)]
     else:
         kept = None
-        failed.append({"what": "file", "said": "the prepared configuration could not be read"})
+        failed.append({"what": "file", "said": "the prepared configuration could not be read: make the stick again with the USB maker, which writes it, "
+                                               "or set this machine up on its first-run page without one"})
     report = {"at": int(time.time()), "done": done, "waiting": waiting, "failed": failed, "config": kept}
     write_json(_file(), report)
     try:

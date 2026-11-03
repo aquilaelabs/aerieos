@@ -178,7 +178,8 @@ def plan(want, disks, blk=blkid):
         else:
             uuid = row.get("UUID", "")
             if not uuid:
-                no(f"{what}: {part} gives no filesystem UUID to mount it by")
+                no(f"{what}: {part} gives no filesystem UUID to mount it by: its filesystem is not one blkid reads (unformatted, encrypted and locked, or damaged); "
+                   "unlock or repair it on the old system, or leave it out of the plan")
                 continue
             out["mounts"].append({"what": f"UUID={uuid}", "where": where, "fs": fs, "ro": not writable, "dev": part})
             say(f"{slot}: {d['name']} ({d.get('model') or 'disk'}), its {fs} on {part} at {where}, {'read-only' if not writable else 'writable'}")
@@ -198,7 +199,8 @@ def plan(want, disks, blk=blkid):
         name, fs, uuid = str(x.get("name") or ""), str(x.get("fs") or ""), str(x.get("uuid") or "")
         what = f"the pool {name or '(no name)'}"
         if not POOL_RE.fullmatch(name) or name in NOT_POOLS or DATA_RE.fullmatch(name):
-            no(f"{what}: not a name a pool can be mounted under here")
+            no(f"{what}: not a name a pool can be mounted under here (letters, digits, - and _, not one of /mnt's own like user, disks or parity): "
+               "rename the pool on the old system, or leave it out of the plan")
             continue
         if fs not in FS:
             no(f"{what}: its filesystem is {fs or 'not said'}; XFS, btrfs and ZFS are taken")
