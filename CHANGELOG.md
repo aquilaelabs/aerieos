@@ -79,6 +79,7 @@
 
 ### Changed
 
+- Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (R210)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
 - The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A

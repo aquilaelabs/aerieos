@@ -9,6 +9,7 @@ hosts' and hypervisors' (forges.py, vmtemplate.py): a walk on Rocky vets
 Rocky and not AlmaLinux until Alma is walked. An entry without a vetted
 line is offered only behind Offer dev features, tagged dev.
 """
+import re
 from pathlib import Path
 
 import forges
@@ -63,6 +64,17 @@ def offered():
     return [{"id": s["id"], "name": s["name"], "family": s["family"], "vetted": bool(s["vetted"]),
              **({"why": s["why"]} if s.get("why") and not s["vetted"] else {})}
             for s in SYSTEMS if allowed(s["id"])]
+
+
+def of_os(text):
+    """The system whose ids name what the census says of the machine's OS
+    ("linux x86_64 Ubuntu 24.04.2 LTS", "linux x86_64 Rocky Linux 9.4"),
+    or "" when none does: a row enrolled before the system was recorded
+    on it (R210) gets its script built for the system it reports."""
+    words = re.findall(r"[a-z]+", str(text or "").lower())
+    if "red" in words and "hat" in words:
+        return "rhel"
+    return next((s["id"] for s in SYSTEMS if any(i.replace("-", "") in words or i in words for i in s["ids"])), "")
 
 
 def family_file(sid):

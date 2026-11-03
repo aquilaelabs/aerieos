@@ -1038,7 +1038,7 @@ def own_machine(n):
 
 
 def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host_only=False, nginx=False, door=None,
-                existing=None, own=False):
+                existing=None, own=False, system=""):
     """Add node, agent kind: a pending row and the one token that fills it.
     With `existing` (R177), no row: a node already here gets a new enroll
     token, its config brought to the answers, and the row's id and state
@@ -1071,7 +1071,7 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
         cfg = dict(n.get("config") or {})
         cfg["user"] = user
         for key, val in (("tunnel", tunnel), ("host_only", True if host_only else None),
-                         ("nginx", True if nginx else None), ("door", door)):
+                         ("nginx", True if nginx else None), ("door", door), ("system", system or None)):
             if val:
                 cfg[key] = val
             else:
@@ -1115,6 +1115,9 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
                    # The door in for SSH the script sets up (R174): its kind
                    # and name, so the row knows before the machine reports.
                    **({"door": door} if door else {}),
+                   # The system its script was built for (R210): what a
+                   # script made again for the row is built for too.
+                   **({"system": system} if system else {}),
                    # The controller's own machine (R90).
                    **({"own": True, "session_net": True} if own else {})},
     })
@@ -1122,6 +1125,35 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
     _touch(nid, principal, "node-enroll-mint", {"token": tid, "caps": caps})
     return {"ok": True, "id": nid, "token": secret,
             "expires": int(time.time()) + ENROLL_TTL}
+
+
+def system_of(n):
+    """The system a node's script is built for (R210): the one recorded on
+    its row at mint, else the one its census names, else the default."""
+    import systems
+    cfg = n.get("config") or {}
+    if systems.get(cfg.get("system") or ""):
+        return cfg["system"]
+    return systems.of_os((n.get("reported") or {}).get("os")) or systems.DEFAULT
+
+
+def row_answers(n, origin=""):
+    """Enroll node's questions as the row answers them (R210): what an
+    enrolled node's Enroll script builds from, with no dialog. The
+    controller's address is the browser's own, as the dialog fills it,
+    unless the node reaches a public hostname, which the row names; the
+    secrets are the node's (enrollscript.check with again)."""
+    cfg = n.get("config") or {}
+    t = cfg.get("tunnel") if isinstance(cfg.get("tunnel"), dict) else {}
+    reach = t.get("kind") if t.get("kind") in ("public", "wireguard") else "lan"
+    door = cfg.get("door") if isinstance(cfg.get("door"), dict) else {}
+    return {"node": n["id"], "name": n.get("name") or "", "script": True,
+            "user": cfg.get("user") or "bb", "system": system_of(n),
+            "sessions": not cfg.get("host_only"), "host_only": bool(cfg.get("host_only")),
+            "nginx": bool(cfg.get("nginx")), "reach": reach,
+            "controller": f"https://{t['host']}" if reach == "public" and t.get("host") else origin,
+            "tunnel_addr": str(t.get("addr") or "") if reach == "wireguard" else "",
+            "door": str(door.get("kind") or ""), "door_host": str(door.get("host") or "")}
 
 
 def enroll_script(principal, req):
@@ -1141,6 +1173,16 @@ def enroll_script(principal, req):
     # its secrets asked for and carried, and its words those of a first
     # (B637: it said "run it again on the same machine", "no secret").
     enrolled = bool(again) and again.get("state") != "pending"
+    # The row's own answers (R210): Enroll script on an enrolled node's row
+    # sends `as_row` and the address the browser reached the controller by,
+    # and the script is built from what the row was enrolled with, the
+    # Features section's Enroll again being where an answer is changed.
+    if enrolled and req.get("as_row") is True:
+        req = row_answers(again, str(req.get("controller") or ""))
+        ho = req["host_only"]
+    import systems
+    if enrolled and not req.get("system"):
+        req = req | {"system": system_of(again)}
     ans = enrollscript.check(req | ({"sessions": False} if ho else {}), again=enrolled)
     if ans.get("error"):
         return ans
@@ -1167,7 +1209,7 @@ def enroll_script(principal, req):
     m = enroll_mint(principal, field(req, "name"), req.get("capabilities"), user, tunnel=tunnel, host_only=ho,
                     nginx=req.get("nginx") is True,
                     door={"kind": ans["door"], "host": ans.get("door_host", "")} if ans.get("door") else None,
-                    existing=again["id"] if again else None)
+                    existing=again["id"] if again else None, system=ans["system"])
     _synced["at"] = 0.0
     if m.get("error"):
         return m
@@ -1175,7 +1217,6 @@ def enroll_script(principal, req):
     u = urllib.parse.urlparse(ans["controller"])
     port = u.port or (443 if u.scheme == "https" else 80)
     machine = ((again or {}).get("reported") or {}).get("machine") or ""
-    import systems
     fam = systems.family_file(ans.get("system") or systems.DEFAULT)
     return m | {"script": enrollscript.build(ans, name=name, user=user, token=m["token"],
                                               expires=m["expires"], provisioner=prov.read_bytes(),

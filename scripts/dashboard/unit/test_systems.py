@@ -26,3 +26,15 @@ class Offered(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OfOs(unittest.TestCase):
+    """The system a census names (R210): what a row enrolled before the
+    system was recorded on it gets its script built for."""
+    def test_the_census_names_the_system(self):
+        for text, want in (("linux x86_64 Ubuntu 24.04.2 LTS", "ubuntu"), ("linux x86_64 Rocky Linux 9.4", "rocky"),
+                           ("linux aarch64 Debian GNU/Linux 12 (bookworm)", "debian"), ("linux x86_64 AlmaLinux 9.4", "almalinux"),
+                           ("linux x86_64 Red Hat Enterprise Linux 9.4", "rhel"), ("linux x86_64 openSUSE Leap 15.6", "opensuse"),
+                           ("linux x86_64 Arch Linux", "arch"), ("linux x86_64 Raspbian GNU/Linux 12", "debian"),
+                           ("linux x86_64", ""), ("", "")):
+            self.assertEqual(systems.of_os(text), want, text)

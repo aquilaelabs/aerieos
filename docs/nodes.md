@@ -1090,10 +1090,15 @@ the pieces stack:
    a new token, since a token is good once and never kept) and Discard,
    which takes a row that never enrolled off outright (`node_discard`);
    an enrolled node is retired, its history kept.
-4a. *Enroll it again* (R177): Enroll script on the node's page makes a new
-   script for a node already here, opened on its own answers, with no
-   secret in it (the node keeps its door's; a
-   secret pasted replaces the node's), bound to the machine the node
+4a. *Enroll it again* (R177, R210): Enroll script on the node's page makes
+   a new script for a node already here in one press, built from the
+   answers on its row (`row_answers`: its account, its ticks, how it
+   reaches the controller, its door, and the system it was enrolled as,
+   recorded on the row at mint and read off its census for a row older
+   than that, `system_of`), with no secret in it (the node keeps its
+   door's); the Features section's Enroll again opens the dialog on the
+   same answers to change one or paste a secret, which replaces the
+   node's. Either way the script is bound to the machine the node
    reported (`--machine`, the hash of its machine id, which the provisioner
    checks before it changes anything and `nodes.enroll` checks again), and
    enrolling under the same id, every earlier token of the node revoked so

@@ -1800,10 +1800,13 @@ function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
 }
 // Test and Enroll script, the head's two buttons about the machine itself.
+// Enroll script is one press (R210): the node's script again, built from
+// what the row was enrolled with, downloaded the moment it arrives; the
+// Features section's Enroll again opens the dialog to change an answer.
 function ndAgentButtons(dead){
   const off = dead ? " disabled" : "";
   return `<button type="button"${dead ? "" : ` data-nd="test"`} title="check that this node answers"${off}>Test</button>
-          <button type="button"${dead ? "" : ` data-nd="reenroll"`} title="a new enroll script for this node, to run again on the same machine"${off}>Enroll script</button>`;
+          <button type="button"${dead ? "" : ` data-nd="reenroll-now"`} title="this node's enroll script again, with the answers it was enrolled with, to run again on the same machine"${off}>Enroll script</button>`;
 }
 
 // One node's row: its name, facts and agent bar, then its sections (R218
@@ -2234,7 +2237,7 @@ function ndDialogs(){
     const $b = sel => body.querySelector(sel);
     if (again){
       const c = again.config || {};
-      was = {"#ndEnName": again.name, "#ndEnUser": c.user || "bb",
+      was = {"#ndEnName": again.name, "#ndEnUser": c.user || "bb", "#ndEnSystem": c.system,
              "#ndEnSess": !c.host_only, "#ndEnHost": !!c.host_only, "#ndEnNginx": !!c.nginx,
              "#ndEnReach": c.tunnel?.kind === "public" ? "public" : c.tunnel?.kind === "wireguard" ? "wireguard" : "lan",
              "#ndEnCtl": c.tunnel?.kind === "public" && c.tunnel.host ? `https://${c.tunnel.host}` : location.origin,
@@ -2532,7 +2535,7 @@ builderbot-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
   modal.onclick = e => {
     if (e.target === modal && !body.querySelector(".ndtoken")) shut();
   };
-  return {modal, body, shut, mintForm, vmForm, openVm, openEnroll};
+  return {modal, body, shut, mintForm, mintScript, vmForm, openVm, openEnroll};
 }
 
 function wireNodesTab(root){
@@ -2558,7 +2561,7 @@ function wireNodesTab(root){
     phFetch({action: "deny", id: Number(b.dataset.rdeny)}));
   // New VM and Enroll node are the group's header's (R177, wired
   // by page-shell.js wireGroupHeader); the dialogs stay the page's.
-  const {modal, body, shut, mintForm, vmForm} = ndDialogs();
+  const {modal, body, shut, mintForm, mintScript, vmForm} = ndDialogs();
   wireSections(root);
   root.querySelectorAll(".ndrow").forEach(box => {
     const id = box.dataset.node;
@@ -2666,6 +2669,16 @@ function wireNodesTab(root){
       if (act === "reenroll"){
         const n = (nodesList || []).find(x => x.id === id);
         if (n){ modal.hidden = false; mintForm({}, n); }
+        return;
+      }
+      if (act === "reenroll-now"){
+        // The row's own script (R210): built on the controller from what
+        // the node was enrolled with, saved the moment it arrives.
+        busy(b, "Making");
+        const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
+        if (r.error) return;
+        modal.hidden = false; mintScript(r);
+        nodesRev++; drawPanes();
         return;
       }
       if (act === "door" && b.dataset.on === "0"){
