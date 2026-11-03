@@ -927,13 +927,19 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
 {
   await page.evaluate(p => { [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`).classList.add('ro');
     getNotebook(p).view('memory'); getNotebook(p).view('design'); }, P);
-  await page.waitForSelector(`${NB} .nbview[data-view="design"]:not([hidden]) #dsHint`, { timeout: 10000 }).catch(() => {});
+  // The view drawn again as read-only: its Write the file hides with the
+  // draw, which comes after the view's read, so the read before it saw the
+  // editing buttons still up (3 Nov: failed three runs of four).
+  const roDrawn = hidden => page.waitForFunction(({ p, hidden }) => [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`)
+    ?.querySelector('.nbview[data-view="design"]:not([hidden]) #dsWrite')?.hidden === hidden, { p: P, hidden }, { timeout: 10000 }).catch(() => {});
+  await roDrawn(true);
   const ro = await page.$eval(`${NB} .nbview[data-view="design"]`, v => ({
     shown: [...v.querySelectorAll('button')].filter(b => b.checkVisibility() && !b.closest('summary') && !b.hasAttribute('aria-expanded')).map(b => b.textContent.trim()),
     fields: v.querySelectorAll('input:disabled, textarea:disabled').length,
     hint: [...v.querySelectorAll('#dsHint, .nbsaidslot')].map(e => e.textContent).join(' ') }));
   await page.evaluate(p => { [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`).classList.remove('ro');
     getNotebook(p).view('memory'); getNotebook(p).view('design'); }, P);
+  await roDrawn(false);
   ok(ro.shown.length === 0 && ro.fields > 0 && !/Write the file/.test(ro.hint),
      `a read-only design draws no press that would change it, its fields there to read (${JSON.stringify({ ...ro, hint: ro.hint.slice(0, 50) })})`);
 }

@@ -216,11 +216,20 @@ const said = await t.text();
 ok(t.status === 403 && /whose sessions start on gamma/.test(said),
    `a session on the project's second repository is refused, naming where it starts (${t.status} ${said.slice(0, 160)})`);
 
-// A dial set through one repository is the project's.
+// A dial set through one repository is that repository's own override
+// (R208 step 6); from the project's door it is the project's, the default
+// for every repository in it.
 const dial = await post('/api/prefs', { project: 'ep.silon', devbuild: 'auto' });
-ok(dial.status === 200 && prefsFile()[key]?.devbuild === 'auto' && !prefsFile()['ep.silon']?.devbuild,
-   `a project's dial set from one repository's settings is the project's (${JSON.stringify(prefsFile()[key])})`);
-await post('/api/prefs', { project: 'ep.silon', devbuild: 'deny' });
+ok(dial.status === 200 && prefsFile()['ep.silon']?.devbuild === 'auto' && (prefsFile()['ep.silon']?.overrides || []).includes('devbuild')
+   && prefsFile()[key]?.devbuild !== 'auto',
+   `a dial set from one repository's settings is that repository's override (${JSON.stringify({ repo: prefsFile()['ep.silon'], project: prefsFile()[key] })})`);
+const lifted = await post('/api/prefs', { project: 'ep.silon', devbuild: 'inherit' });
+ok(lifted.status === 200 && !(prefsFile()['ep.silon']?.overrides || []).includes('devbuild'),
+   `...and inherit lifts it (${JSON.stringify(prefsFile()['ep.silon']?.overrides || {})})`);
+const pdial = await post('/api/prefs', { project: 'ep.silon', scope: 'project', devbuild: 'auto' });
+ok(pdial.status === 200 && prefsFile()[key]?.devbuild === 'auto' && !prefsFile()['ep.silon']?.devbuild,
+   `a dial set from the project's door is the project's (${JSON.stringify(prefsFile()[key])})`);
+await post('/api/prefs', { project: 'ep.silon', scope: 'project', devbuild: 'deny' });
 
 // Renamed; not to another project's name.
 const rn = await post('/api/repos', { action: 'rename', key, to: 'Shop' });
