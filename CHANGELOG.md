@@ -139,6 +139,7 @@
 - Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (B645, B646) (1db8d53)
 - The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (B648) (1db8d53)
 - The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (B649) (df0f1c7)
+- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (Unraid's /mnt/user) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (B654)
 - Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (B651)
 
 ### Security

@@ -13423,6 +13423,7 @@ def main():
         threading.Thread(target=_schedules_loop, name="schedules", daemon=True).start()
         threading.Thread(target=_reach_loop, name="reach", daemon=True).start()
     threading.Thread(target=_move_loop, name="move", daemon=True).start()
+    db.start_folding()        # the write-ahead log folded into the database every minute (B654)
     ciwatch.start()           # a project's CI, once a day (R117)
     releasesign.start()       # a release's unsigned APK, signed on its node (R106)
     releasefiles.start()      # a release's files checked against its list (R190)
@@ -13466,6 +13467,10 @@ def main():
 
         def _on_term(signum, frame):
             del signum, frame
+            # The log folded first (B654): a stop leaves the database file
+            # whole, with nothing for the next start to recover.
+            with contextlib.suppress(Exception):
+                db.fold()
             held.shutdown_clean()
             raise SystemExit(0)
         signal.signal(signal.SIGTERM, _on_term)
