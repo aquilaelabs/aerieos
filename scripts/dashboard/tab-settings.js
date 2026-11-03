@@ -742,11 +742,14 @@ function connectionStatus(s){
 }
 
 // What the Apps section holds, over its switches, and Check for updates.
+// The clocks alone (the operator, 3 Nov): Check for updates is on each
+// thing's own page (Containers, nginx, Scanners, the Library, Updates), so
+// this section says when each last looked and sets how often.
 function checksIntro(){
   const c = state?.checks || {};
-  return `<div class="field">${CHECK_KINDS.filter(([k]) => c[k]).map(([k, label]) =>
-    `<div class="row stack2 ckrow"><div class="grow"><span class="name">${esc(label)}</span> <span class="sub dim">${c[k].at ? `checked ${esc(ago(c[k].at))}` : "not checked yet"}</span></div>
-      <button type="button" data-checknow="${esc(k)}">Check for updates</button></div>`).join("")}</div>`;
+  const said = CHECK_KINDS.filter(([k]) => c[k]).map(([k, label]) =>
+    `${esc(label)} ${c[k].at ? esc(ago(c[k].at)) : "never"}`);
+  return said.length ? `<div class="sub">Last checked: ${said.join(" · ")}. Check for updates is on each one's own page.</div>` : "";
 }
 function checksStatus(){
   const c = state?.checks || {};
