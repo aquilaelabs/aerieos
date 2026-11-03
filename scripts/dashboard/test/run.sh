@@ -1753,6 +1753,13 @@ run_file() {
     # only the server's log carried, and that went with the world.
     [ "$rc" = 0 ] || grep -h "the agent's sources changed on disk" "$S/server.log" 2>/dev/null \
         | tail -3 | while IFS= read -r l; do log "server: $l"; done
+    # ...and the last traceback the server wrote, whole: a status read that
+    # answered 500 under the harness lost its cause with the world (B591),
+    # so the run's own log carries it where the failure is read.
+    if [ "$rc" != 0 ] && grep -q "^Traceback (most recent call last)" "$S/server.log" 2>/dev/null; then
+        awk '/^Traceback \(most recent call last\)/{buf=""; on=1} on{buf=buf $0 "\n"} on && /^[A-Za-z_.]*(Error|Exception)[:]?/ && !/^  /{last=buf; on=0} END{printf "%s", last}' "$S/server.log" \
+            | tail -40 | while IFS= read -r l; do log "server: $l"; done
+    fi
     # What the suite cost, world and all, for the next run's worker plan
     # (the queue's order): a pass in a whole run only, since a failure can stop
     # early or wait out a timeout, and a rerun runs on an idle box. One
