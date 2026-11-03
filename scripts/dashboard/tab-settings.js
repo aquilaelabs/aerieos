@@ -303,7 +303,13 @@ async function loadMove(){
   // Drawn once it has landed, as the backup copies are (B645: the section
   // stayed its two shimmer rows after a reload, and Forget it drew nothing).
   if (JSON.stringify(moveData) !== was){ settingsRev++; if (tabs.some(t => t.kind === "settings")) drawPanes(); }
+  // ...and read again every poll while a move is armed (B646): how many
+  // nodes have heard it, the last packing and the ask's answer move on
+  // their own, while the page is open and only then.
+  clearTimeout(moveTimer); moveTimer = null;
+  if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
 }
+let moveTimer = null;
 function moveStatus(){
   const m = moveData || {};
   return m.moved ? "moved" : m.prepared ? "armed" : m.arrived?.restored_at ? "arrived" : "";
