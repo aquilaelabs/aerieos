@@ -2019,9 +2019,9 @@ def create_from_dialog(req, *, env, account, may_node):
         # is already in a project of its own: that one, not a second (B402).
         key = repos.project_of(name)
         if not key:
-            made = repos.create(registry.label(name))
+            made = repos.create(registry.label(name), folder=False)
             if made.get("error"):
-                made = repos.create(f"{registry.label(name)} ({registry.pid(name)})")
+                made = repos.create(f"{registry.label(name)} ({registry.pid(name)})", folder=False)
             if made.get("ok"):
                 repos.add(made["key"], name)
                 key = made["key"]

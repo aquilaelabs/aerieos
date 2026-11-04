@@ -199,9 +199,10 @@ def made_since(dirname, started):
             if m != dirname and max(int(registry.get(m).get("at") or 0), int(added.get(m) or 0)) > started]
 
 
-def create(name):
+def create(name, folder=True):
     """A new project with no repository in it yet (R138). {ok, key, name,
-    id} or {error}."""
+    id} or {error}. `folder` False where a repository goes into it at once,
+    which needs no folder of the project's own."""
     with _lock:
         rec = registry.claim_repos(name)
         if rec.get("error"):
@@ -211,7 +212,8 @@ def create(name):
         _save(d)
         # Its folder from the start (R208): a session on it before any
         # repository works there, and a node's synced copy needs it to be.
-        work_folder(rec["key"])
+        if folder:
+            work_folder(rec["key"])
         return {"ok": True, "key": rec["key"], "name": rec["name"], "id": f"P{rec['id']}"}
 
 
