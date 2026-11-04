@@ -312,7 +312,7 @@ await firstRun(false);
       const words = t => step(t)?.textContent.replace(/\s+/g, ' ') || '';
       const stick = { stick: true, pool: '', ready: false, on_stick: [], written_kb: 1, boot_written_kb: 1 };
       const redraw = rep => { n.reported = { ...was, os_stick: stick, ...rep }; setupSig = ''; drawSetup(); };
-      setupWalk = ''; setupLand = { fresh: true, stick: true, held: 'the projects need a place first' };
+      setupWalk = ''; setupLand = { fresh: true, owner: true, stick: true, held: 'the projects need a place first' };
       state.firstboot = { ...(keep || {}), at: 1, done: [], waiting: [], failed: [], apps_from: { docker: { image: 'x' }, vms: {} },
         adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u' }] }, skipped: [] } };
       redraw({});
@@ -331,20 +331,13 @@ await firstRun(false);
       redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.pick = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
       out.backRw = words('If you go back');
-      stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
+      stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.placed = pill('Where the projects and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
-      setupLand = { fresh: false, stick: true, held: '' }; setupSig = ''; drawSetup();
+      setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       out.notFresh = words('Land the controller');
       // Typing survives a poll that moved nothing.
-      setupLand = { fresh: true, stick: true, held: '' }; setupSig = ''; drawSetup();
-      out.owner = state?.owner;
-      // Controller settings draws the same form for its owner, and the backup
-      // its owner's button (B664: both read a role the page never had).
-      { const was = moveData; moveData = { land: { fresh: true, stick: true, held: '' }, pieces: [] };
-        out.settingsForm = moveSection().includes('data-movelandbox'); moveData = was;
-        const bk = backupData; backupData = { on: true, where: ['/x'], copies: [] };
-        out.backupLive = !/data-backupnow disabled/.test(backupSection()); backupData = bk; }
+      setupLand = { fresh: true, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       const tok = document.getElementById('landTok');
       if (tok){ tok.value = 'typed'; drawSetup(); }
       out.typed = document.getElementById('landTok')?.value;
@@ -377,8 +370,6 @@ await firstRun(false);
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
-    ok(walk.owner === true && walk.settingsForm === true && walk.backupLive === true,
-       `the status read says who owns this controller, so Controller settings draws Move a controller here and Back up now is live for them (B664) (${JSON.stringify([walk.owner, walk.settingsForm, walk.backupLive])})`);
     ok(walk.fresh.head === 'Set up AerieOS' && walk.fresh.kept === 'fresh' && walk.fresh.ask === 'Walk me through it' && walk.backIn === 'Moving here',
        `...and either way is a press from the other, remembered in this browser (${JSON.stringify(walk.fresh)})`);
   }
@@ -581,6 +572,14 @@ await firstRun(false);
     const src = await controller('src');
     const sH = { Authorization: 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toString('base64'), 'Content-Type': 'application/json' };
     const sApi = async (path, body) => (await fetch(src.base + path, body === undefined ? { headers: sH } : { method: 'POST', headers: sH, body: JSON.stringify(body) })).json();
+    // Settings' Move a controller here is drawn on what the server says of
+    // the account: the poll's state.me is a name, never a role, so a box
+    // keyed on that was drawn for nobody.
+    const land = (await sApi('/api/move')).land || {};
+    ok(land.owner === true, `the move's status tells the owner it is theirs to land (${JSON.stringify(land)})`);
+    // Backup copies' Back up now and Download likewise.
+    const bk = await sApi('/api/backup');
+    ok(bk.owner === true, `the backup's status tells the owner Back up now is theirs (${JSON.stringify({owner: bk.owner, error: bk.error})})`);
     const mover = await src.enroll('mover', false);
     const en = await mover.go();
     ok(en.ok && en.token, `the source has a node (${en.error || 'enrolled'})`);

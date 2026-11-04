@@ -5901,9 +5901,6 @@ def _snapshot(who):
         # an empty Projects card for a user with nothing granted rather than
         # telling them the share is not mounted (16 Sep).
         "admin": bool(who) and users.is_admin(who),
-        # ...and whether it owns it, as the owner's own routes ask (_move_land,
-        # the backup's): `me` is the account's name alone (B664).
-        "owner": bool(who) and not who.get("session") and (users.account_of(who) or {}).get("role") == "owner",
         # A controller installed bare metal (R90): its own machine is the
         # first node, which the setup page shows being set up.
         "bare_metal": BARE_METAL,
@@ -12808,7 +12805,10 @@ class Handler(BaseHTTPRequestHandler):
         # Whether a move may land here (_move_land): a fresh controller's,
         # and on a stick only once the projects have a place on the disks.
         fresh = len(users.all_users()) <= 1 and not any(not nodes.own_machine(n) for n in nodes.node_list())
-        out["land"] = {"fresh": fresh, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
+        # ...and whether this account may land it (_move_land's own test):
+        # the page's poll carries the name alone, never the role.
+        owner = (users.account_of(me) or {}).get("role") == "owner"
+        out["land"] = {"fresh": fresh, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
         if q.get("pieces", [""])[0] == "1":
             out["pieces"] = move.pieces()
         return self._json(out)
@@ -12902,7 +12902,9 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if not users.is_admin(me) or me.get("session"):
             return self._json({"error": "the backup is an administrator's"}, 403)
-        return self._json(backup.status())
+        # ...with whether this account is the owner, whose Back up now and
+        # Download are (_backup's own test): the poll carries the name alone.
+        return self._json(backup.status() | {"owner": (users.account_of(me) or {}).get("role") == "owner"})
 
     def _backup(self, req):
         """POST /api/backup {action: now}: a copy written now, the owner's."""

@@ -282,7 +282,7 @@ function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
   const b = backupData;
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
-  const owner = state?.owner === true;
+  const owner = !!b.owner;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
       <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
@@ -355,7 +355,7 @@ function moveSection(){
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
-  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.owner === true ? moveLandBox(ld) : "";
+  const land = ld.fresh && ld.owner && !m.prepared && !ar.restored_at ? moveLandBox(ld) : "";
   // What is in the bundle, as the record says it: the state always, then
   // what was ticked.
   const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");

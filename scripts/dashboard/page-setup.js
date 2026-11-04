@@ -277,7 +277,7 @@ function setupWalkHtml(s){
   }
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
-    : state?.owner !== true ? `<div class="sub warn">A move here is the owner's to land.</div>`
+    : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
     : `<p>The moved controller's accounts, nodes, projects and settings take this one's place, and this setup account goes with what was here, set aside and not deleted.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
   cards.push(setupCard(++i, "After it lands", false, false,
