@@ -282,7 +282,7 @@ function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
   const b = backupData;
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
-  const owner = state?.me?.role === "owner";
+  const owner = !!b.owner;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
       <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
@@ -355,7 +355,7 @@ function moveSection(){
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
-  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
+  const land = ld.fresh && ld.owner && !m.prepared && !ar.restored_at ? `<div class="field" data-movelandbox>
       <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
           ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
