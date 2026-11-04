@@ -756,13 +756,17 @@ function nodeFeaturesSection(n){
   // machine alone: storage for the Storage page's pools and array, shares
   // for the ones it makes; each says which of its tools answer.
   const sto = fe?.storage || {}, sh = fe?.shares || {};
+  // The image carries these, so there is no marker and nothing to install or
+  // take away: a machine with working pools does not read "not installed".
+  const imaged = !!n.reported?.os_image?.version;
+  const stoBuilt = imaged && sto.zfs && sto.mergerfs && sto.snapraid && sto.smart, shBuilt = imaged && sh.smb && sh.nfs;
   const ownRows = !n.config?.own ? [] : [
-    row("storage", "Storage", !!sto.installed,
+    row("storage", "Storage", !!sto.installed || !!stoBuilt,
       `ZFS, mergerfs, SnapRAID and SMART, for the pools, the array and the disks' health on the ${pageLink("storage", "Storage page")}.`,
-      "", fe ? `<div class="sub dim">${["zfs", "mergerfs", "snapraid", "smart"].map(k => `${k}: ${sto[k] ? "here" : "not here"}`).join(" · ")}</div>` : ""),
-    row("shares", "Shares", !!sh.installed,
+      stoBuilt ? "Part of AerieOS: nothing to install." : "", fe ? `<div class="sub dim">${["zfs", "mergerfs", "snapraid", "smart"].map(k => `${k}: ${sto[k] ? "here" : "not here"}`).join(" · ")}</div>` : ""),
+    row("shares", "Shares", !!sh.installed || !!shBuilt,
       `Samba and NFS, serving the shares the ${pageLink("storage", "Storage page")} makes, given to accounts there.`,
-      "", fe ? `<div class="sub dim">${["smb", "nfs"].map(k => `${k}: ${sh[k] ? "here" : "not here"}`).join(" · ")}</div>` : ""),
+      shBuilt ? "Part of AerieOS: nothing to install." : "", fe ? `<div class="sub dim">${["smb", "nfs"].map(k => `${k}: ${sh[k] ? "here" : "not here"}`).join(" · ")}</div>` : ""),
     row("ups", "UPS", !!(fe?.ups || {}).installed,
       "NUT on a USB UPS: its charge and the minutes left in the Power section, the bell when the machine runs on battery, and a clean shutdown when the battery is low.",
       "", fe ? `<div class="sub dim">nut: ${(fe.ups || {}).nut ? "here" : "not here"}</div>` : "")];
