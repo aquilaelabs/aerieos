@@ -72,17 +72,17 @@ controller's own logs and the journal are kept in memory, so they start
 again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
 containers, the VMs, the toolchains and the projects, lives on a **system
-pool**: picked under This machine's **The stick** from the pools and the
+pool**: picked under This machine's **Pool and projects** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
 picked, docker and the VMs wait, and the projects are held: the projects
 folder is an empty read-only mount of its own, no project is made, cloned
-or moved in, and they are never written to the stick. **The stick**
+or moved in, and they are never written to the stick. **Pool and projects**
 also says what still lives on the stick and how much has been written to it,
 in its life and since this boot. An installed disk has none of this: its
 data partition is the machine's disk.
 
-**The projects where they already are.** Under **The stick**, the
+**The projects where they already are.** Under **Pool and projects**, the
 **Projects folder** names a folder already on the machine's disks as the
 projects folder: a share of the disks the machine adopted, a pool or the
 array, never the stick, and never a disk adopted read only. It is bound
@@ -220,7 +220,7 @@ holds that first start, so the disks are on This machine before anything
 mounts; without an
 owner's hash the first-run page makes the owner as on any stick. The shares,
 pools, array and apps wait until their disks are adopted. This machine's
-**From the stick** section says what was applied, what waits and what could
+**First boot** section says what was applied, what waits and what could
 not be, and nothing of a hash is kept on the controller beyond the accounts
 themselves. It runs as root (sudo) on Linux and a
 Mac and as an administrator on Windows, where it locks and dismounts the
@@ -259,7 +259,7 @@ Backups and Projects shares on it. The Storage page does all of this too,
 later, the same way. On a stick made with a prepared configuration that
 names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
-they are in the first-run page's walk, and later on This machine under Disks from the stick.
+they are in the first-run page's walk, and later on This machine under The old system's disks.
 
 ## At the console
 

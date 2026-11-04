@@ -25,23 +25,20 @@ function ownMachine(){
 function machineHead(n){
   const r = n.reported || {};
   const img = state?.image || {};
-  const mem = r.mem_mb ? `${Math.round(r.mem_mb / 1024)} GB` : "";
-  const wall = r.session?.up ? "in force" : r.session?.why ? `down: ${r.session.why}` : n.live ? "not reported yet" : "";
+    const wall = r.session?.up ? "in force" : r.session?.why ? `down: ${r.session.why}` : n.live ? "not reported yet" : "";
   // A held start (R56 step 9): Start lifts it. Holding the next one is the
   // checkbox beside Reboot and Shut down (R161 step 11).
   const h = state?.held || {};
   const actions = h.held ? `<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
   return pageHead({title: n.name, pills: `<span class="tag ndown">this machine</span> ${nodeStatePill(n)}${h.held ? ` <span class="pill bad">held</span>` : ""}`, actions, facts: [
     ["System", [r.os, r.hostname && r.hostname !== n.name ? r.hostname : ""].filter(Boolean).join(" · ")],
-    ["Cores and memory", [r.cpu ? `${r.cpu} cpu` : "", mem].filter(Boolean).join(" · ")],
     ["Release", `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`],
     // AerieOS (R160 step 4): the image, the slot this boot came from
     // and the one that boots next when an update has been written.
     ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
     ...(r.timezone ? [["Time zone", r.timezone]] : []),
-    ["Agent", n.agent?.version || ""],
-    ["Wall", wall]]});
+    ["Sessions kept apart", wall]]});
 }
 
 function renderMachineInto(i){
@@ -64,15 +61,14 @@ function renderMachineInto(i){
     return;
   }
   const inflight = t => (n.jobs || []).some(j => j.type === t || j.apply === t);
-  d.list.innerHTML = machineHead(n)
+  d.list.innerHTML = machineHead(n) + ndRowHtml(n, ""
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
     + olderVersionsSection(n)
     + stickSection(n)
     + machineConsoleSection(n)
     + firstbootSection()
     + adoptSection(n)
-    + adoptAppsSection(n)
-    + ndRowHtml(n);
+    + adoptAppsSection(n));
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);
@@ -169,8 +165,8 @@ function stickSection(n){
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
   ];
   const pick = stickPoolPick(n, s);
-  return docSection("nodes", "stick", "The stick", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, no project can be made, and the logs and the journal are kept in memory.</div></div>${projectsFolderField(n, s, admin)}`,
+  return docSection("nodes", "stick", "Pool and projects", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. Until one is picked, Docker and the VMs wait and no project can be made.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -194,7 +190,7 @@ function projectsFolderField(n, s, admin){
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
       <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="hint">The folder another system kept the projects in on these disks: the controller works there in place, nothing copied${
+    <div class="hint">Only if the projects already sit on these disks: the controller works there, and nothing is copied${
       helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
 }
 function wireStick(root){
@@ -261,8 +257,8 @@ function firstbootSection(){
   const line = (x, cls) => [x.what, `${x.said}${x.count ? ` (${x.count})` : ""}`, {cls}];
   const rows = [...(f.done || []).map(x => line(x, "ok")), ...(f.waiting || []).map(x => line(x, "")), ...(f.failed || []).map(x => line(x, "warn"))];
   const status = (f.failed || []).length ? `${f.failed.length} not applied` : (f.waiting || []).length ? `${f.waiting.length} waiting` : "applied";
-  return docSection("nodes", "firstboot", "From the stick", status,
-    `<div class="field">${factGrid(rows, "fbfacts")}<div class="hint">Taken off the stick at the first boot ${esc(ago(f.at))} and blanked there; what waits is applied once its disks are adopted.</div></div>`);
+  return docSection("nodes", "firstboot", "First boot", status,
+    `<div class="field">${factGrid(rows, "fbfacts")}<div class="hint">What the stick's prepared settings did ${esc(ago(f.at))}. What waits comes once its disks are adopted.</div></div>`);
 }
 
 // The disks and pools the stick's plan names, adopted as they are (R163
@@ -307,13 +303,13 @@ function adoptParts(n){
     ...(w.pools || []).map(p => [p.name, `${p.fs} pool, writable`]),
     ...(a.skipped || []).map(x => [x.slot || "disk", `${x.id} · ${x.why}`, {cls: "warn"}])];
   const missing = (w.data || []).filter(x => !found(x.id)).length;
-  return {id: "adopt", title: "Disks from the stick", status: missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
+  return {id: "adopt", title: "The old system's disks", status: missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
     body: `<div class="field">${factGrid(rows, "adfacts")}
       <div class="adpick">
         <label class="ndcap"><input type="radio" name="adoptMode" value="ro"${adoptWritable ? "" : " checked"}> Read only: the old system's parity stays good, and new files land on a pool</label>
         <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}> Writable: going back to the old system then takes a parity sync</label>
       </div>
-      <div class="hint">Each disk is mounted as it is, never formatted or partitioned, at the path it had, and the merged folders are made again, so what pointed at them finds its files.</div>
+      <div class="hint">Each disk is mounted as it is, at the path it had, and never formatted.</div>
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, opts: {open: true}};
 }
 

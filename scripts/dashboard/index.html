@@ -4870,19 +4870,40 @@ button[aria-busy="true"]{opacity:.75}
    draws nothing either. */
 @media(min-width:901px){
   .doctab.nodestab>.doclist>.row.stack2.ndrow,
+  .doctab.machinetab>.doclist>.row.stack2.ndrow,
   .doctab.nodestab>.doclist>.skt>.row.stack2.ndrow{background:none;border:0;border-radius:0;padding:0;margin:0 var(--row-x)}
-  .nodestab .ndrow>.grow{margin:var(--card-gap) 0 0;padding:var(--row-y) var(--row-x);background:var(--panel);
+  .nodestab .ndrow>.grow,
+  .machinetab .ndrow>.grow{margin:var(--card-gap) 0 0;padding:var(--row-y) var(--row-x);background:var(--panel);
     border:var(--hair) solid var(--line);border-radius:var(--r-surface)}
-  .nodestab .ndrow>.ndsections{margin:0;width:100%}
+  .nodestab .ndrow>.ndsections,
+  .machinetab .ndrow>.ndsections{margin:0;width:100%}
   .nodestab .ndrow>.ndsections>details.sect,
-  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect{margin:var(--card-gap) 0 0;background:var(--panel);
+  .machinetab .ndrow>.ndsections>details.sect,
+  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect,
+  .machinetab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect{margin:var(--card-gap) 0 0;background:var(--panel);
     border:var(--hair) solid var(--line);border-radius:var(--r-surface);overflow:hidden}
   .nodestab .ndrow>.ndsections>details.sect[open]>summary,
-  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect[open]>summary{border-bottom:var(--hair) solid var(--line)}
-  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>.ndguest{margin:var(--card-gap) var(--row-x) 0}
-  .nodestab .ndrow>.ndsections>.sectjump{margin:var(--card-gap) 0 0;padding-left:0;padding-right:0;border:0}
+  .machinetab .ndrow>.ndsections>details.sect[open]>summary,
+  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect[open]>summary,
+  .machinetab .ndrow>.ndsections>.ndconf>.ndconfbody>details.sect[open]>summary{border-bottom:var(--hair) solid var(--line)}
+  .nodestab .ndrow>.ndsections>.ndconf>.ndconfbody>.ndguest,
+  .machinetab .ndrow>.ndsections>.ndconf>.ndconfbody>.ndguest{margin:var(--card-gap) var(--row-x) 0}
+  .nodestab .ndrow>.ndsections>.sectjump,
+  .machinetab .ndrow>.ndsections>.sectjump{margin:var(--card-gap) 0 0;padding-left:0;padding-right:0;border:0}
 }
 .ndrow .actbar.ndagent{margin-top:4px}
+/* This machine's head says the name and the state: the node row's second copy
+   is not drawn. A label beside its field, each field starting at one edge,
+   and what a section says in the prose voice, not the facts' mono (the
+   operator, 4 Nov). */
+.machinetab .ndrow>.grow>.name{display:none}
+:is(.machinetab,.nodestab) .field>label.pick{display:flex;align-items:center;gap:var(--field-gap);flex-wrap:wrap}
+:is(.machinetab,.nodestab) .field>label.pick>.pickw{flex:0 0 9.5em;font:var(--f-ui);color:var(--ink)}
+:is(.machinetab,.setstepbody) .actbar>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap)}
+:is(.machinetab,.nodestab) .field>label.pick>:is(input,select){flex:0 1 26em;min-width:0;width:auto}
+:is(.machinetab,.nodestab) .ndsections .sub:not(.warn,.bad,.note),.machinetab .doclist>.row>.grow>.sub{font:var(--f-note)}
+.holdnext{white-space:nowrap;flex:0 0 auto}
+.holdnext input[type=checkbox]{width:15px;height:15px;min-height:0;margin:0}
 /* The controller's own machine (R90): a reference, in the reference's color. */
 .ndrow .name .tag.ndown{color:var(--purple);border-color:var(--purple-edge)}
 /* A node's Advanced actions (the operator, 18 Oct): a row each, its name and

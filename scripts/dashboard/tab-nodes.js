@@ -605,13 +605,13 @@ function nodeMachineSection(n){
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   let zones = [];
   try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ zones = []; }
-  const body = `<div class="field"><div class="sub">The name the machine goes by on the network and in its prompt, and the time zone its clock, logs and schedules read. Each is set on the machine itself by its root agent, and the dashboard's own stamps follow the time zone from the next start.</div></div>
+  const body = `<div class="field"><div class="sub">What the machine is called on the network, and the time zone its clock, logs and schedules read.</div></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" data-k="machinename" value="${esc(r.hostname || n.name || "")}" maxlength="63" autocomplete="off" spellcheck="false"${admin && !why ? "" : " disabled"}></label></div>
     <div class="field"><label class="pick"><span class="pickw">Time zone</span><input type="text" data-k="machinetz" list="ndZones" value="${esc(r.timezone || "")}" placeholder="Region/City" autocomplete="off" spellcheck="false"${admin && !why ? "" : " disabled"}></label>
       <datalist id="ndZones">${zones.map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
     <div class="field"><label class="pick"><span class="pickw">Spin down disks</span><select data-k="machinespin"${admin && !why ? "" : " disabled"}>${optionList(SPINDOWN_WORDS, String(r.spindown ?? 0))}</select></label>
-      <div class="hint">Spinning disks but the system's stop after that long idle (hdparm); a solid-state disk is left alone. A spun-down disk takes a few seconds to answer the next read.</div></div>
+      <div class="hint">Hard disks stop after this long idle, and take a few seconds to answer the next read.</div></div>
     ${admin && !why ? `<div class="actbar"><span class="sp"></span><button type="button" class="primary" data-nd="machine-apply" disabled>Apply</button></div>` : ""}`;
   return docSection("nodes", "machine", ndTitle("machine"), [r.hostname || "", r.timezone || "", r.spindown ? `disks spin down after ${r.spindown} min` : ""].filter(Boolean).join(" · "), body);
 }
@@ -636,8 +636,8 @@ function nodeReportSection(n){
     const f = h.data.fields || [], pts = h.data.points || [];
     const series = key => { const i = f.indexOf(key); return i < 0 ? [] : pts.map(p => [p[0], p[1 + i]]).filter(x => typeof x[1] === "number"); };
     const drawn = ND_REPORT.map(([key, title, fmt, max]) => { const s = series(key); return s.length ? hourChart(`rep:${key}:${n.id}`, title, s, fmt, max, h.span) : ""; }).filter(Boolean);
-    body = `${picker}${drawn.length ? `<div class="charts ndcharts">${drawn.join("")}</div>` : `<div class="empty">Nothing kept yet: the first point lands five minutes after the agent's first sample.</div>`}
-      <div class="hint">Five-minute means for two days, hourly means for two months; the hour's charts above are the samples themselves.</div>`;
+    body = `${picker}${drawn.length ? `<div class="charts ndcharts">${drawn.join("")}</div>` : `<div class="empty">Nothing yet: the first point lands five minutes after the agent's first sample.</div>`}
+      <div class="hint">Kept as five-minute means for two days, then hourly for two months.</div>`;
   }
   return docSection("nodes", "report", ndTitle("report"), ND_SPANS.find(x => x[0] === h.span)?.[1] || "", body);
 }
@@ -963,7 +963,7 @@ function nodeProjectsSection(n){
   }).join("");
   // Stop syncing, where the copies it stops are listed (R164).
   const conf = n.config || {};
-  const stop = n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
+  const stop = rows && n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
     ? `<div class="field"><div class="actbar"><span class="sp"></span><button type="button" data-nd="sync-stop" ${n.live ? "" : "disabled"}>Stop syncing</button></div></div>` : "";
   const body = (rows || `<div class="empty">No repository you can see is on this node. A project's settings add one.</div>`) + stop;
   return docSection("nodes", "projects", ndTitle("projects"), list.length ? `${list.length}` : "none", body);
@@ -1137,19 +1137,19 @@ function nodeSessNetRow(n){
   // agents' sign-ins are sealed (R126): on wherever sessions run since
   // 0.9.0, the boxes gone with it; the rows say whether each is in force.
   const sealed = Object.values(n.reported?.tokseal?.sealed || {}).reduce((t, a) => t + Object.keys(a).length, 0);
-  const sealLine = !n.reported?.tokseal ? `<div class="sub dim">The node has not reported it yet.</div>`
+  const sealLine = !n.reported?.tokseal ? ""
     : !sealed ? `<div class="sub dim">Nothing is signed in here yet: a sign-in made here is sealed as the login writes it.</div>`
     : `<div class="sub">${sealed} sign-in${sealed === 1 ? "" : "s"} sealed here. Each opens only while its person has a terminal open on this node, so a copy of its disk signs in to nothing.</div>`
       + (n.tokseal_stale ? `<div class="sub">${n.tokseal_stale} still sealed under an older key: ${n.tokseal_stale === 1 ? "it moves" : "each moves"} to its account's own key when ${n.tokseal_stale === 1 ? "its person opens" : "their people open"} a terminal here.</div>` : "");
   const ac = n.reported?.session?.accounts || {};
   const acctLine = ac.error ? `<div class="sub bad">Not in force: ${esc(ac.error)}.</div>`
-    : ac.users === undefined ? `<div class="sub dim">The node has not reported it yet.</div>`
+    : ac.users === undefined ? ""
     : ac.waiting ? `<div class="sub dim">${ac.moved} of ${ac.users} homes moved; ${ac.waiting} wait${ac.waiting === 1 ? "s" : ""} for ${ac.waiting === 1 ? "its" : "their"} sessions started before to end.</div>`
     : `<div class="sub">Every account here runs as a user of its own: its home, its sign-ins and its terminals are its alone, and only root reaches them.</div>`;
   const sn = n.reported?.session_net || {};
   const told = Object.keys(sn).length > 0;
   const line = !told
-      ? (on ? `<div class="sub dim">The node has not reported it yet.</div>` : "")
+      ? ""
     : on && !sn.can ? `<div class="sub bad">Not in force: ${esc(sn.why || "this node cannot do it")}.</div>`
     : on && sn.error ? `<div class="sub bad">Not in force, so no session starts here until it is: ${esc(sn.error)}.</div>`
     : on && sn.active ? `<div class="sub">Sessions started here reach the internet, the controller and their own project's containers at this node's address, and nothing else.</div>`
@@ -1239,7 +1239,7 @@ function nodeAdvancedSection(n, stale, inflight){
       <div class="sub">${say}</div></div><div class="acts actbar">${btn}</div></div>`;
   const body = `
     <div class="ndname actbar ctlrow">
-      <div class="setrow col grow ctlrow">${lbl("", "Name", "its name in the pickers, on the project cards and as a runner label")}
+      <div class="setrow col grow ctlrow">${lbl("", "Name in AerieOS", "its name in the pickers, on the project cards and as a runner label; its name on the network is under Name and time")}
       <input data-k="name" value="${esc(c.draft.nameText)}" spellcheck="false" autocomplete="off"
         maxlength="60" aria-label="node name"></div>
       <button type="button" data-nd="rename"${!String(c.draft.nameText || "").trim() || String(c.draft.nameText).trim() === n.name ? " disabled" : ""}
@@ -1593,7 +1593,7 @@ function nodeConfSections(n){
       ? [`applying ${busyNow.what}${busyNow.what === "network" ? ": waiting for it to dial back in" : "…"}`, "note"]
       : stale ? [staleWhy(n), windowGap(n) ? "bad" : "warn"]
       : c.dirty ? ["Unsaved: press Save, then Apply.", "warn"]
-      : !drift ? ["nothing configured yet: the node runs on whatever it was set up with", ""]
+      : !drift ? ["Nothing saved here yet: it runs as it was set up.", ""]
       : pending.length ? [`${pending.length} change${pending.length === 1 ? "" : "s"} to apply: ${
           pending.slice(0, 3).join("; ")}${pending.length > 3 ? "; …" : ""}`, "warn"]
       // The dhcp caveat is Network's; under Storage it read as a storage fault.
@@ -1610,7 +1610,7 @@ function nodeConfSections(n){
     <button type="button" class="caution" data-nrevert ${c.dirty ? "" : "disabled"}
       title="put the fields back to what is saved">Revert</button>`;
   const storage = `
-      <div class="sub">Mounts at boot.${
+      <div class="sub">Shares mounted at boot.${
         d.fromNode ? ` <span class="dim">As the node reports them; save to manage them from here.</span>` : ""}</div>
       ${mounts}
       <div class="addbar ctlrow"><button type="button" data-madd>Add a mount</button></div>
@@ -1643,7 +1643,7 @@ function nodeConfSections(n){
     : ` <b class="warn">This node reports no network backend the agent drives${
         dist.pretty ? " (" + esc(dist.pretty) + ")" : ""}; a change would be refused.</b>`;
   const network = `
-      <div class="sub">Applied with a three-minute dial-back, or reverted.${via}</div>
+      <div class="sub">A change is tried for three minutes, and undone unless the machine dials back in.${via}</div>
       <div class="ndnet ctlline${isStatic ? "" : " dhcp"}">
         <select data-k="net:mode" aria-label="mode">
           <option value="dhcp" ${isStatic ? "" : "selected"}>dhcp</option>
@@ -1840,7 +1840,7 @@ function ndAgentButtons(dead){
 // One node's row: its name, facts and agent bar, then its sections (R218
 // step 26). Its own function so This machine (tab-machine.js, R90 step 8)
 // draws the controller's own machine with it.
-function ndRowHtml(n){
+function ndRowHtml(n, lead = ""){
     const labels = Object.entries(n.labels || {})
       .map(([k, v]) => `<span class="pill">${esc(k)}=${esc(v)}</span>`).join(" ");
     const seen = n.agent?.last_seen
@@ -1963,7 +1963,7 @@ function ndRowHtml(n){
         ${agentBar}${pendingBar}
       </div>
       <div class="ndsections">
-        ${health}
+        ${lead}${health}
         ${n.kind === "agent" && !pending ? nodeProjectsSection(n) : ""}
         ${n.kind === "agent" && !pending ? nodeSessionsSection(n) : ""}
         ${n.kind === "agent" && !pending ? nodeGpuSection(n) : ""}

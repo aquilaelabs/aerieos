@@ -6,7 +6,7 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, closePage, ok, done, sleep, DIR, patience } from './lib.mjs';
+import { URL, launch, newPage, ok, done, sleep, DIR, patience } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, rmSync, openSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -427,7 +427,7 @@ await firstRun(false);
     tag: !!document.querySelector('.machinetab .ndrow .tag.ndown'),
     updates: !!document.querySelector('.machinetab details[data-sect="nodes:updates"]'),
     sects: [...document.querySelectorAll('.machinetab .ndsections details.sect')].map(d => d.dataset.sect) }));
-  ok(/Release/.test(mp.head) && /Wall/.test(mp.head) && mp.tag && mp.updates && mp.sects.includes('nodes:health') && mp.sects.includes('nodes:advanced'),
+  ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.tag && mp.updates && mp.sects.includes('nodes:health') && mp.sects.includes('nodes:advanced'),
      `This machine draws the machine's head, the Updates section and the own node's row with its sections (${mp.sects.join(',')})`);
   // A held start (R56 step 9): not held on this first boot, armed for the
   // next by its press, and Start says there was nothing to lift.
@@ -604,7 +604,11 @@ await firstRun(false);
     // new start; yes opens the next page on the walk, on any install.
     {
       const lan = await controller('landing', { noOwner: true });
-      const lp = await newPage(browser, { viewport: { width: 1280, height: 900 } });
+      // A browser of nobody's: the suite's newPage signs in as its own account,
+      // which this controller has never heard of.
+      const lctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      await lctx.addInitScript(() => { window.BB_NO_TOUR = true; });
+      const lp = await lctx.newPage();
       await lp.goto(lan.base);
       await lp.waitForSelector('input[name="walk"]', { timeout: 15000 });
       const ask = await lp.evaluate(() => ({ legend: document.querySelector('.moveask legend')?.textContent,
@@ -621,7 +625,7 @@ await firstRun(false);
         titles: [...document.querySelectorAll('#setupPanel .setstep h3')].map(h => h.textContent) }));
       ok(arrived.search === '' && arrived.kept === 'move' && arrived.titles.join(' | ') === 'Have these with you | Land the controller | After it lands | If you go back',
          `...yes opens the next page on the walk, with the steps a container install has, the answer kept and off the address (${JSON.stringify(arrived)})`);
-      await closePage(lp);
+      await lctx.close();
       lan.stop();
     }
     const dst = await controller('dst', { noOwner: true });

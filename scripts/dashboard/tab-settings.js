@@ -232,8 +232,8 @@ function updatesSection(){
   // restart to finish; elsewhere the installer's bundle (R90 step 5).
   const runs = os ? `AerieOS ${esc(os.version)} from slot ${esc(os.slot || "?")}${os.next && os.next !== os.slot ? `, and slot ${esc(os.next)} boots next: restart to finish the update` : os.trial ? ", on trial until the health check marks it good" : ""}${os.fell_back ? `; ${esc(os.fell_back)}` : ""}`
     : esc(r.running || "an unstamped build");
-  const how = os ? `Update fetches the release's ISO, checks it against its sha256 and its build attestation, takes the root, kernel and initrd out of it, writes the slot not in use and names it for the next boot; the restart is yours, from This machine, and the slot running now stays to fall back to. An offline machine takes the same files from a folder here (a stick, a share): the ISO, its .sha256 and its .attestation.jsonl.`
-    : `Update fetches the release's bundle, checks its sha256 and its build attestation, holds the state to its version gate, switches to it and comes back by itself if the new build does not answer.`;
+  const how = os ? `Update checks the release is genuine and writes it to the slot not in use. Restart to boot it; the slot running now stays to fall back to. An offline machine takes the same files from a folder here.`
+    : `Update checks the release is genuine, switches to it, and comes back by itself if it does not answer.`;
   // The machine's own packages (R164 step 3), on a bare-metal install
   // that is not AerieOS: how many wait, the security ones among
   // them, and Apply updates, with a restart after when ticked.
