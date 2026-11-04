@@ -326,7 +326,7 @@ function moveSection(){
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
-  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
+  const land = ld.fresh && ld.owner && !m.prepared && !ar.restored_at ? `<div class="field" data-movelandbox>
       <div class="sub">Moving a controller here instead: give its move token with its address (it hands the bundle over) or the bundle downloaded from it. Its state takes this one's place, this setup account's with it, and you sign in with an account it had.${ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}</div>
       ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>

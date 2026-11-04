@@ -453,6 +453,11 @@ await firstRun(false);
     const src = await controller('src');
     const sH = { Authorization: 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toString('base64'), 'Content-Type': 'application/json' };
     const sApi = async (path, body) => (await fetch(src.base + path, body === undefined ? { headers: sH } : { method: 'POST', headers: sH, body: JSON.stringify(body) })).json();
+    // Settings' Move a controller here is drawn on what the server says of
+    // the account: the poll's state.me is a name, never a role, so a box
+    // keyed on that was drawn for nobody.
+    const land = (await sApi('/api/move')).land || {};
+    ok(land.owner === true, `the move's status tells the owner it is theirs to land (${JSON.stringify(land)})`);
     const mover = await src.enroll('mover', false);
     const en = await mover.go();
     ok(en.ok && en.token, `the source has a node (${en.error || 'enrolled'})`);
