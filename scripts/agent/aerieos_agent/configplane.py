@@ -31,6 +31,7 @@ from .stores import (
     mount_covering,
     prune_made,
     save_state,
+    store_here,
     store_path_ok,
     tc_root,
 )
@@ -1001,6 +1002,23 @@ class ConfigPlaneMixin:
                             + f". {role} stays where it was until that mount is right.\n")
                     bad += 1
                     continue
+                # A target that already is this node's store is used as it
+                # is, whether or not the setting was saved with it in the
+                # keep list (B661): the marker, this node's own toolchain
+                # folder, or the folder this agent made for the store before
+                # says so, and what the store itself put there is not "files
+                # a copy would mix with". Asked before make_store, which
+                # would make the folder the second test looks for.
+                was = str(mine.get(role) or "")
+                if was and was.rstrip("/") != str(path).rstrip("/") and role not in keep:
+                    why = store_here(path, role, self.state.get("node_id"), marks.get(role) or [])
+                    if why:
+                        keep.add(role)
+                        job.say(f"{role}: {path} is already a store ("
+                                + {"marked": "it carries AerieOS's marker",
+                                   "mine": f"it holds this node's own folder, {os.path.join(path, str(self.state.get('node_id')))}",
+                                   "own": "AerieOS made it for this store before"}[why]
+                                + "), so it is used as it is\n")
                 try:
                     made = make_store(path)
                 except OSError as e:
@@ -1009,7 +1027,6 @@ class ConfigPlaneMixin:
                     continue
                 if made:
                     job.say(f"{role}: made {', '.join(made)}\n")
-                was = str(mine.get(role) or "")
                 if was and was.rstrip("/") != str(path).rstrip("/") and role in keep:
                     try:
                         with os.scandir(path) as it:

@@ -295,7 +295,8 @@ function storagePools(n){
           <label class="pick"><span class="pickw">Passphrase</span><input type="password" id="stPoolPass" autocomplete="new-password"></label>
           <label class="pick"><span class="pickw">Again</span><input type="password" id="stPoolPass2" autocomplete="new-password"></label>
           <label class="ndcap"><input type="checkbox" id="stPoolKeepKey" checked> keep the key on this machine, sealed under its install key, so the pool unlocks at every boot</label>
-          <div class="hint">Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the passphrase is asked for on this page after every boot and the pool and its shares wait until then; that also protects against the whole machine taken. Write the passphrase down: nothing here can recover a pool without it.</div>
+          <div class="hint">Kept here, the pool opens at boot; not kept, it waits for the passphrase on this page after every boot. Write it down: nothing here recovers a pool without it${
+            helpIcon("Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the pool and its shares wait after every boot until the passphrase is typed here, which also protects against the whole machine taken.")}</div>
         </div></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stpool="create">Make the pool</button></div></div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${form}`;

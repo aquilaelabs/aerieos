@@ -160,7 +160,11 @@ function nbPermsView({$, nb, project, root}){
     const v = view(), hint = v?.querySelector(".nbglance");
     if (!hint) return;
     const n = {auto: 0, ask: 0, deny: 0};
-    v.querySelectorAll('details[data-sect="rn:claude"] select').forEach(s => { if (s.value in n) n[s.value]++; });
+    // A dial on "as the project" counts as what it inherits (R208 step 6).
+    v.querySelectorAll('details[data-sect="rn:claude"] select').forEach(s => {
+      const w = s.value === "inherit" ? (s.dataset.inherit || "").replace(/ me$/, "") : s.value;
+      if (w in n) n[w]++;
+    });
     const pol = {...((state?.projects || []).find(x => x.name === project)?.prefs?.gitpol || {})};
     viewGlance(hint, [{label: "on its own", value: n.auto}, {label: "asks first", value: n.ask},
                       {label: "may not", value: n.deny}],

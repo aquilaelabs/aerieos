@@ -2058,6 +2058,75 @@ def override_ok(project, rel, instance=MAIN):
     return ""
 
 
+# A container given the machine's GPU (R207 step 4): a setting of the
+# instance, "nvidia" or "amd", laid over its compose as a small file AerieOS
+# writes beside the instance's env copies, naming every service of the
+# compose: NVIDIA through the container toolkit (a device reservation of
+# driver nvidia, which gpu_asks sees and gpu_gate judges), AMD through the
+# render devices under /dev/dri, which is how a media server transcodes on
+# an APU. Never kept as text a person edits: the setting is the record.
+GPU_KINDS = ("nvidia", "amd")
+
+
+def gpu_of(project, instance=MAIN):
+    return str(_read_rec(project, instance).get("gpu") or "")
+
+
+def set_gpu(project, instance, kind):
+    """Give the instance the GPU ("nvidia" or "amd"), or none with ""."""
+    kind = str(kind or "").strip()
+    if kind and kind not in GPU_KINDS:
+        return {"error": f"a container's GPU is nvidia or amd, not {kind}"}
+    with _lock:
+        store = _load()
+        rec = _rec(store, project, instance)
+        if kind:
+            rec["gpu"] = kind
+        else:
+            rec.pop("gpu", None)
+        write_json(FILE, store)
+    _bump()
+    return {"ok": True, "gpu": kind}
+
+
+def gpu_text(kind, services):
+    """The compose laid over the instance's for its GPU, naming `services`."""
+    if kind == "nvidia":
+        body = "    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: all\n              capabilities: [gpu]\n"
+    else:
+        body = "    devices:\n      - /dev/dri:/dev/dri\n"
+    return "# Written by AerieOS: this container's GPU setting; change it on the Containers page.\nservices:\n" + "".join(f"  {n}:\n{body}" for n in services)
+
+
+def _service_names(project, instance=MAIN):
+    """The compose's service names as compose resolves them (include and
+    extends seen), with no GPU file laid over it, since that file needs them."""
+    r = _run(_compose(project, instance, "config", "--services", gpu=False), timeout=30, env_extra=_node_env(project, instance))
+    if not r or r.get("code") not in (0, None):
+        return []
+    return [ln.strip() for ln in str(r.get("out") or "").splitlines() if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", ln.strip())]
+
+
+def gpu_file(project, instance=MAIN):
+    """The GPU file to lay over the instance's compose, written fresh, or
+    None when the instance has no GPU setting or no service to name."""
+    kind = gpu_of(project, instance)
+    if kind not in GPU_KINDS or ENVDIR is None:
+        return None
+    names = _service_names(project, instance)
+    if not names:
+        return None
+    path = ENVDIR / f"{_pname(project, instance)}.gpu.yml"
+    text = gpu_text(kind, names)
+    try:
+        ENVDIR.mkdir(parents=True, exist_ok=True)
+        if not path.is_file() or path.read_text(encoding="utf-8") != text:
+            path.write_text(text, encoding="utf-8")
+    except OSError:
+        return None
+    return path
+
+
 def set_override(project, instance, rel):
     """Name the instance's override, or none with ""."""
     rel = str(rel or "").strip()
@@ -2206,7 +2275,7 @@ def env_to_instance(text, target):
     return "\n".join(out)
 
 
-def _compose(project, instance, *args):
+def _compose(project, instance, *args, gpu=True):
     """The one shape every action runs: compose, pinned to this instance's
     name and env and to its project's file. A table of verbs, not a command
     string.
@@ -2272,6 +2341,10 @@ def _compose(project, instance, *args):
                         copy.write_text(new, encoding="utf-8")
                     ov = copy
         argv += ["-f", str(ov)]
+    # ...and the GPU it was given (R207 step 4), last, over both.
+    gf = gpu_file(project, instance) if gpu else None
+    if gf is not None:
+        argv += ["-f", str(gf)]
     if ep.is_file():
         argv += ["--env-file", str(ep)]
     return argv + list(args)
@@ -2975,6 +3048,8 @@ def _overview_here(picked):
                 "compose_path": str(rec.get("compose") or ""),
                 # ...and the one laid over it, when it has one.
                 "override": str(rec.get("override") or ""),
+                # ...and the GPU it was given (R207 step 4).
+                "gpu": str(rec.get("gpu") or ""),
                 "source": "file" if filed else "project",
                 # A file read and one git call. risks/problems stay out:
                 # those are judgements to put in front of somebody about to

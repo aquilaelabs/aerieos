@@ -245,17 +245,27 @@ def filename(name, nid=""):
     return f"enroll-{base}-{_NAME.sub('-', str(nid))}.sh" if nid else f"enroll-{base}.sh"
 
 
-def build(ans, *, name, user, token, expires, provisioner, family=b"", again=False, machine=""):
+STORE_FLAGS = ("data", "toolchains", "cache", "artifacts", "appdata")
+
+
+def build(ans, *, name, user, token, expires, provisioner, family=b"", again=False, machine="", stores=None):
     """The script, as text. `ans` is check()'s answer. With `again` (R177)
     the secrets are the node's own (its WireGuard config installed from
     /etc/wireguard, its door left as it is), and `machine` binds the
     script to the machine the node enrolled from: the provisioner refuses
-    to run elsewhere, and the controller refuses the enrollment too."""
+    to run elsewhere, and the controller refuses the enrollment too.
+    `stores` ({role: path}, the node's own as it reports them) rides as
+    the provisioner's store flags, so a node enrolled again keeps its
+    stores where they are rather than coming back on the defaults."""
     flags = [f"--controller {_q(ans['controller'])}", f"--token {_q(token)}"]
     if machine:
         flags.append(f"--machine {_q(machine)}")
     if user and user != "bb":
         flags.append(f"--user {_q(user)}")
+    for role in STORE_FLAGS:
+        path = str((stores or {}).get(role) or "")
+        if path.startswith("/") and not re.search(r"\s", path):
+            flags.append(f"--{role} {_q(path)}")
     if not ans["sessions"]:
         flags.append("--session-user none")
     if ans["reach"] == "public":

@@ -183,6 +183,9 @@ says what it was given.
   administrator's alone, and a PCI device needs the IOMMU on in the node's
   firmware and kernel (`intel_iommu=on` or `amd_iommu=on`, which the node's
   Features section turns on); the dialog says when it is off. A card the
+  host's own driver holds is this machine's: the node's Features section
+  marks it for a VM, which binds it to vfio-pci from the next boot, and only
+  then is it offered. A card the
   node's own display runs on is refused, and so is a device that shares its
   IOMMU group with something the host needs (its LAN interface, the
   controller of a mounted disk), with what shares it. A USB device is

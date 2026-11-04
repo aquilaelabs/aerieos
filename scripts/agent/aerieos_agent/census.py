@@ -32,6 +32,7 @@ from .stores import _stores, noexec, store_dirs, tc_root
 from .backends import _have, net_backend, pkg_backend
 from .toolchains import _toolchains, sdk_images, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
+    _gpu_amd,
     _gpu_card,
     _gpu_container,
     _gpu_display,
@@ -211,8 +212,37 @@ def _docker_ip():
 
 # The features bb-sandbox installs and removes (R91), as its FEATURE_IDS
 # names them; the configuration plane checks a job's id against this.
-FEATURES = ("vmhost", "firewall")
+# Every id the helper's table names: a job naming one the agent did not
+# list was refused as 'not a feature verb' before it reached the helper,
+# so IOMMU, Storage, Shares and UPS could not be installed from the page
+# (B641).
+FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
 FEATURES_DIR = "/etc/builderbot/features"
+
+
+def _gpuvm_now():
+    """The NVIDIA card marked for a VM (R207 step 3): the marker written by
+    the helper with the card's ids, and whether vfio-pci holds every NVIDIA
+    device now, which the restart after it decides."""
+    marker = os.path.join(FEATURES_DIR, "gpuvm")
+    installed, ids, drivers = os.path.exists(marker), "", []
+    if installed:
+        try:
+            with open(marker, encoding="utf-8") as f:
+                ids = next((ln.split("=", 1)[1].strip() for ln in f if ln.startswith("ids=")), "")
+        except OSError:
+            pass
+    try:
+        for dev in sorted(os.listdir("/sys/bus/pci/devices")):
+            base = f"/sys/bus/pci/devices/{dev}"
+            with open(f"{base}/vendor", encoding="utf-8") as f:
+                if f.read().strip() != "0x10de":
+                    continue
+            drivers.append(os.path.basename(os.readlink(f"{base}/driver")) if os.path.islink(f"{base}/driver") else "")
+    except OSError:
+        pass
+    return {"installed": installed, "ids": ids[:200], "cards": len(drivers),
+            "bound": bool(drivers) and all(d == "vfio-pci" for d in drivers)}
 
 
 def features_now():
@@ -250,6 +280,7 @@ def features_now():
                     "snapraid": bool(shutil.which("snapraid")), "smart": bool(shutil.which("smartctl"))},
         "shares": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "shares")),
                    "smb": bool(shutil.which("smbd")), "nfs": bool(shutil.which("exportfs"))},
+        "gpuvm": _gpuvm_now(),
         # ...and a UPS through NUT (R164 step 3), with whether upsc is here.
         "ups": {"installed": os.path.exists(os.path.join(FEATURES_DIR, "ups")), "nut": bool(shutil.which("upsc"))},
     }
@@ -329,6 +360,7 @@ def census(state):
         "store_noexec": bool(tc_root(state)) and noexec(tc_root(state)),
         "gpu": gpu.splitlines()[0][:80] if gpu else "",
         "gpu_card": _gpu_card(),
+        "gpu_amd": _gpu_amd(),
         "gpu_driver": _gpu_driver(),
         "gpu_container": _gpu_container(),
         "gpu_display": _gpu_display(),

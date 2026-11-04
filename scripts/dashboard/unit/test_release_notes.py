@@ -23,6 +23,8 @@ class Notes(unittest.TestCase):
 
     def test_nothing_new_is_said_and_no_tag_before_is_all(self):
         self.assertIn("Nothing a person would see", rn.notes(OLD, OLD, "v1"))
+        # ...and where the commits are read, since the build is not empty.
+        self.assertIn("[the commits](https://x/compare/v1...v2) say what moved", rn.notes(OLD, OLD, "v1", "https://x/compare/v1...v2"))
         self.assertIn("- One", rn.notes(OLD, "", ""))
 
     def test_from_the_tags_in_git(self):

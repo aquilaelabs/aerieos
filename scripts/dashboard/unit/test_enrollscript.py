@@ -370,3 +370,22 @@ class RetiredTunnel(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+class StoreFlags(unittest.TestCase):
+    """A node's stores ride in a script made again for it (B658), as the
+    provisioner's flags; a first enrollment names none."""
+    def test_the_nodes_stores_ride_as_flags(self):
+        ans = es.check({"reach": "lan", "controller": "http://192.168.1.16:7680", "name": "shed"}, again=True)
+        prov = b"#!/bin/sh\necho provisioner\n"
+        text = es.build(ans, name="shed", user="bb", token="bbe_x", expires=1, provisioner=prov, again=True, machine="a" * 32,
+                        stores={"toolchains": "/mnt/SDK/n_1", "data": "/var/lib/builderbot/data", "cache": "", "odd": "/x",
+                                "artifacts": "/srv/with space"})
+        run = next(ln for ln in text.splitlines() if ln.startswith('bash "$dir/provision-linux.sh"'))
+        self.assertIn("--toolchains '/mnt/SDK/n_1'", run)
+        self.assertIn("--data '/var/lib/builderbot/data'", run)
+        self.assertNotIn("--cache", run)
+        self.assertNotIn("--artifacts", run)
+        self.assertNotIn("odd", run)
+        plain = es.build(ans, name="shed", user="bb", token="bbe_x", expires=1, provisioner=prov)
+        self.assertNotIn("--toolchains", plain)
+

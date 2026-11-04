@@ -143,6 +143,9 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 - **nginx** per node puts a hostname and a certificate in front of what runs
   there.
 - Image updates checked and applied from the Containers page.
+- A container given the machine's GPU from its settings: an NVIDIA card
+  through the container toolkit, an AMD card or APU through its render
+  devices.
 
 ## Builds, CI and releases
 

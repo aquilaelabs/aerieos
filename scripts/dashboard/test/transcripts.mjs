@@ -158,10 +158,14 @@ const rowOf = id => `${SESS} .artrow:has([data-cvresume="${id}"])`;
 // A row's ⋯ opened until its item shows (B384): a redraw landing between
 // the press and the menu replaced the row, and the menu opened on the one
 // taken away.
+// The press itself is inside the loop too (3 Nov): the menu shut by a
+// redraw between its item showing and the press left the press waiting
+// a minute on an item no longer visible.
 const pressInMenu = async (id, item) => {
   for (let i = 0; i < 4; i++){
     await page.click(`${rowOf(id)} .more > button`);
-    if (await page.waitForSelector(`${rowOf(id)} ${item}`, { state: 'visible', timeout: 3000 }).then(() => true, () => false)) break;
+    if (!await page.waitForSelector(`${rowOf(id)} ${item}`, { state: 'visible', timeout: 3000 }).then(() => true, () => false)) continue;
+    if (await page.click(`${rowOf(id)} ${item}`, { timeout: 3000 }).then(() => true, () => false)) return;
   }
   await page.click(`${rowOf(id)} ${item}`);
 };

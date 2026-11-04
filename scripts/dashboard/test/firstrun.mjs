@@ -100,6 +100,16 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
       await page.click('.doc.on .hstart [data-hstart="hide"]');
       await page.waitForFunction(() => !document.querySelector('.doc.on .hstart'), null, { timeout: 10000 });
       ok(true, '...and Put away takes the card off Home');
+      // A node that has dialed in before is still the first node while its
+      // agent is quiet (B651): the card drawn with every node's agent not
+      // heard from lately keeps the node step done.
+      const quiet = await page.evaluate(() => {
+        const keep = nodesList, hid = homeStartHidden;
+        homeStartHidden = false;
+        nodesList = (keep || []).map(n => ({ ...n, live: false, agent: { ...(n.agent || {}), last_seen: n.agent?.last_seen || 1 } }));
+        try{ return homeStartHtml(); } finally{ nodesList = keep; homeStartHidden = hid; }
+      });
+      ok(!quiet.includes('data-hstart="node"'), `...and a node whose agent is quiet is still the first node on the card (B651)${quiet.includes('data-hstart="node"') ? ': the node step came back undone' : ''}`);
       await page.evaluate(() => { try{ localStorage.removeItem('bb.gsHidden'); }catch(e){} });
     }
   } else {
@@ -254,6 +264,37 @@ await firstRun(false);
   });
   ok(card.second === 'Your disks' && card.rows === 5 && card.held && /A ZFS raidz1 of 3 disks/.test(card.plan) && /one disk may fail/.test(card.plan) && card.fast,
      `the first run's second step is the disks: each but the stick a row, one holding data kept unless ticked, the plan in words and the SSD a fast pool (${JSON.stringify(card)})`);
+  // The disks a stick's plan adopts are the old system's (B637): each a
+  // row with whose it is and no box, left out of the plan and of Make it;
+  // when every disk is theirs the step points at This machine and makes
+  // nothing.
+  {
+    const some = await page.evaluate(() => {
+      const keep = state.firstboot;
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [{ slot: 'parity', id: 'Seagate_SG-E' }], pools: [] }, skipped: [] } };
+      setupSig = ''; drawSetup();
+      const s = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      const theirs = [...s.querySelectorAll('.setdisk.theirs')];
+      const out = { theirs: theirs.length, boxes: theirs.filter(x => x.querySelector('input')).length,
+                    words: theirs.map(x => x.textContent.replace(/\s+/g, ' ')).join(' | '),
+                    mine: [...s.querySelectorAll('.setdisk:not(.theirs) input')].map(i => i.dataset.setdiskuse),
+                    plan: s.querySelector('.setplan')?.textContent.replace(/\s+/g, ' ') || '', make: !!s.querySelector('[data-setdisksmake]'),
+                    link: s.querySelector('.theirs a.pagelink')?.getAttribute('href') };
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B' }, { slot: 'disk2', id: 'WD_Red_WD-C' }, { slot: 'disk3', id: 'WD_Red_WD-D' }, { slot: 'disk4', id: 'Samsung_990_S-N' }],
+                                                             parity: [{ slot: 'parity', id: 'Seagate_SG-E' }], pools: [] }, skipped: [] } };
+      setupSig = ''; drawSetup();
+      const t = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      out.all = { pill: t.querySelector('.pill')?.textContent, text: t.textContent.replace(/\s+/g, ' '), make: !!t.querySelector('[data-setdisksmake]'), boxes: t.querySelectorAll('input').length };
+      state.firstboot = keep; setupSig = ''; drawSetup();
+      return out;
+    });
+    ok(some.theirs === 2 && some.boxes === 0 && /old system's disk1: adopted as it is on This machine/.test(some.words) && /old system's parity/.test(some.words)
+       && some.link === '#/controller/machine' && some.mine.join() === 'sdc,sdd,nvme0n1' && /A ZFS mirror of 2 disks/.test(some.plan) && some.make,
+       `the stick's disks are the old system's on the disks step: a row each with whose it is and no box, the plan from the rest, Make it for those alone (${JSON.stringify(some).slice(0, 400)})`);
+    ok(some.all.pill === 'on This machine' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
+       && !some.all.make && some.all.boxes === 0,
+       `...and with every disk theirs the step points at This machine and offers nothing to make (${JSON.stringify(some.all).slice(0, 300)})`);
+  }
   const sent = [];
   await page.route('**/api/v1/nodes', async r => {
     const b = r.request().postDataJSON?.() || {};
@@ -458,6 +499,9 @@ await firstRun(false);
     // keyed on that was drawn for nobody.
     const land = (await sApi('/api/move')).land || {};
     ok(land.owner === true, `the move's status tells the owner it is theirs to land (${JSON.stringify(land)})`);
+    // Backup copies' Back up now and Download likewise.
+    const bk = await sApi('/api/backup');
+    ok(bk.owner === true, `the backup's status tells the owner Back up now is theirs (${JSON.stringify({owner: bk.owner, error: bk.error})})`);
     const mover = await src.enroll('mover', false);
     const en = await mover.go();
     ok(en.ok && en.token, `the source has a node (${en.error || 'enrolled'})`);

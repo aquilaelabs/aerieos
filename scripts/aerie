@@ -4748,6 +4748,11 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         echo "== unraid: the word only where its XML files are the subject"
         python3 "$BB_LIB/lint-checks.py" unraid || rc=1
     fi
+    # The changelog names commits, never a notebook number (the operator, 3 Nov).
+    if [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
+        echo "== changelog: commits named, never a bug's or an item's number"
+        python3 "$BB_LIB/lint-checks.py" changelog || rc=1
+    fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
         python3 "$BB_LIB/lint-checks.py" packs || rc=1
@@ -5792,6 +5797,15 @@ cmd_doctor() {
         else
             printf '  [warn] no install key: the settings'"'"' tokens, the signing keys and the git credentials are kept open in /config; one is made at the next start (docs/reference.md)\n'
         fi
+        # Where /config sits (R209): on a FUSE share (Unraid's /mnt/user,
+        # shfs) the state database can come back older after a restart,
+        # since the index SQLite keeps beside its log is not trusted across
+        # one there (3 Nov: 25 minutes gone, every node turned away).
+        fs=$(awk '$2 == "/config" { t = $3 } END { print t }' /proc/mounts 2>/dev/null)
+        case "$fs" in
+            fuse.shfs|fuse*)
+                printf '  [warn] /config is on a FUSE share (%s): the state database there can come back older after a restart; give the appdata share exclusive access, or map every AerieOS path from its pool (docs/unraid.md)\n' "$fs" ;;
+        esac
         # What the dashboard is served over (R158 step 2): https where it
         # can be had, said here until it is on.
         case "$(DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 - <<'PY' 2>/dev/null

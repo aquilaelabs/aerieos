@@ -24,6 +24,7 @@ default. Changing it for a project with a session already running is the one
 case that cannot wait for a launch, so the dialog says so and the session is
 respawned onto the same transcript.
 """
+import contextlib
 import json
 import re
 import threading
@@ -159,13 +160,47 @@ def configure(*, write_json, state):
 GROUP_FIELDS = ("node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "test_node",
                 "agents_off", "agent_default", "agent_slots", "gitpol", "forgepol", "color", "devbuild", "makevms", "vm_caps", "installpacks",
                 "test_change", "gpu", "report", "sign", "keys", "release", "pc", "log_from", "diag")
+# The dials a repository may set apart from its project (R208 step 6, the
+# operator, 3 Nov): the project's Agents may holds the defaults, and a
+# repository inherits each unless its record names the dial in `overrides`,
+# the notebook's own choice. A gate is named gate.KIND. "inherit" written
+# to one takes the override away.
+OVERRIDABLE = ("devbuild", "makevms", "installpacks", "report", "sign", "keys", "release", "pc", "test_change")
+INHERIT = "inherit"
+
+
+# What each dial reads as when nothing is set.
+DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "installpacks": "ask", "report": "auto", "sign": "ask",
+                 "keys": "ask", "release": "ask", "pc": "deny", "test_change": "wait"}
+
+
+def _overrides_of(rec):
+    """The dials this repository sets apart from its project, as names: the
+    record's own list, or, for a record from before there was one (every
+    released install's), each dial it stores a value for, so what a
+    repository's notebook had set before stays its own."""
+    ok = set(OVERRIDABLE) | {f"gate.{k}" for k in GATE_KINDS}
+    if isinstance(rec.get("overrides"), list):
+        return sorted({str(x) for x in rec["overrides"] if str(x) in ok})
+    # A value at its default is nothing somebody chose: a record written
+    # whole carries every field, chosen or not.
+    got = {f for f in OVERRIDABLE if rec.get(f) not in (None, DIAL_DEFAULTS[f])}
+    gate = rec.get("gate") if isinstance(rec.get("gate"), dict) else {}
+    got |= {f"gate.{k}" for k in GATE_KINDS if gate.get(k) not in (None, "auto") and gate_ok(k, gate.get(k))}
+    return sorted(got)
 # repos.py's answers, handed over by the server: (project_of, members,
 # is_repos). Unset (bb loading this by path), _rp reads the same from the files.
 _repos = None
 
 
-def configure_repos(*, project_of, members, is_repos):
+def configure_repos(*, project_of, members, is_repos, keys=None):
     globals()["_repos"] = (project_of, members, is_repos)
+    # Every project's key (registry.repos_keys), so the whole-list read
+    # names a repository whose project has no record yet (R208 step 6).
+    globals()["_keys"] = keys
+
+
+_keys = None
 
 
 def _rp():
@@ -204,11 +239,18 @@ def _file_repos():
 
 
 def _over(project, rec, raw):
-    """`rec`, a repository's settings, with its project's laid over them."""
+    """`rec`, a repository's settings, with its project's laid over them:
+    every project-wide field, and each dial the repository does not
+    override (OVERRIDABLE, the gates). `project_dials` carries the
+    project's own values beside them, for the notebook's "as the project"
+    choice to say what it inherits."""
     key = _rp()[0](project) if _rp() else ""
     if key:
         g = _clean(raw.get(key))
-        rec.update({f: g[f] for f in GROUP_FIELDS})
+        own = set(rec.get("overrides") or [])
+        rec.update({f: g[f] for f in GROUP_FIELDS if not (f in OVERRIDABLE and f in own)})
+        rec["gate"] = {k: rec["gate"][k] if f"gate.{k}" in own else g["gate"][k] for k in GATE_KINDS}
+        rec["project_dials"] = {f: g[f] for f in OVERRIDABLE} | {"gate": dict(g["gate"])}
         rec["repos_of"] = key
     return rec
 
@@ -238,9 +280,16 @@ def adopt(key, first):
     with _lock:
         d = _load()
         was = d["projects"].get(first) if isinstance(d["projects"].get(first), dict) else {}
-        rec = {f: was[f] for f in GROUP_FIELDS if f in was}
+        # ...the gates too, which are a project's defaults now (R208 step
+        # 6), and each moves rather than copies, so the repository inherits
+        # them instead of reading as having set each apart.
+        moved = tuple(GROUP_FIELDS) + ("gate",)
+        rec = {f: was[f] for f in moved if f in was}
         if rec:
             d["projects"][key] = rec
+            for f in moved:
+                was.pop(f, None)
+            was.pop("overrides", None)
             write_json(FILE, d)
 
 
@@ -493,6 +542,9 @@ def _clean(rec):
                          if isinstance(rec.get("gate"), dict)
                          and gate_ok(k, (rec.get("gate") or {}).get(k)) else "auto")
                      for k in GATE_KINDS},
+            # The dials this repository sets apart from its project (R208
+            # step 6); every other reads the project's.
+            "overrides": _overrides_of(rec),
             "color": rec.get("color") if rec.get("color") in COLORS else "",
             # Whether a SESSION may rebuild this project's dev instance,
             # and it is a real grant rather than a nicety: a rebuild runs the
@@ -655,11 +707,21 @@ def all_projects(workspace=None):
     # ...and every repository of a project with no record of its own yet (one
     # made into it, R138), which reads the project's settings all the same.
     if _rp():
-        for k in list(d):
-            if _rp()[2](k):
-                for m in _rp()[1](k):
-                    if m not in out:
-                        out[m] = _over(m, _clean({}), d)
+        # ...reached through a project's record or any of its repositories'
+        # (R208 step 6: a dial set in a notebook leaves the project with no
+        # record of its own).
+        seen = set()
+        keys = [k if _rp()[2](k) else _rp()[0](k) for k in list(d)]
+        if _keys:
+            with contextlib.suppress(Exception):                # a registry that cannot answer adds none
+                keys += list(_keys())
+        for key in keys:
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            for m in _rp()[1](key):
+                if m not in out:
+                    out[m] = _over(m, _clean({}), d)
     return out
 
 
@@ -876,22 +938,65 @@ def reaches_on(project, node):
             if not e["nodes"] or node in e["nodes"]]
 
 
-def set_prefs(project, **kw):
+def set_prefs(project, scope=None, **kw):
     """Change any of one project's settings; None leaves it, "" clears it.
-    For a repository in a project of several, what the project holds
-    (GROUP_FIELDS) is written to the project and the rest to the
-    repository (R136)."""
+    For a repository in a project, what the project holds (GROUP_FIELDS) is
+    written to the project and the rest to the repository (R136), but for
+    the dials (OVERRIDABLE and the gates, R208 step 6): from a notebook
+    (no `scope`, or "repository") a dial lands on the repository as its
+    own override, and "inherit" takes the override away; from the
+    project's own door (`scope` "project") the dials land on the project,
+    as its defaults for every repository."""
     key = _rp()[0](project) if _rp() and project else ""
     if not key:
-        return _set_prefs(project, **kw)
-    mine = {k: v for k, v in kw.items() if k not in GROUP_FIELDS}
-    theirs = {k: v for k, v in kw.items() if k in GROUP_FIELDS and v is not None}
+        return _set_prefs(project, **_no_inherit(kw))
+    to_project = scope == "project"
+    dial = lambda k: k in OVERRIDABLE or k == "gate"                   # noqa: E731
+    mine = {k: v for k, v in kw.items() if (k not in GROUP_FIELDS or dial(k)) and not (to_project and dial(k))}
+    theirs = {k: v for k, v in kw.items() if v is not None and ((k in GROUP_FIELDS and not dial(k)) or (to_project and dial(k)))}
     if theirs:
-        got = _set_prefs(key, **theirs)
+        got = _set_prefs(key, **_no_inherit(theirs))
         if got.get("error"):
             return got
+    if not to_project:
+        # The repository's own: a value is its override, inherit lifts it.
+        over = {}
+        for k in OVERRIDABLE:
+            v = mine.pop(k, None)
+            if v is None:
+                continue
+            if v == INHERIT:
+                over[k] = False
+            else:
+                mine[k] = v
+                over[k] = True
+        gate = mine.get("gate")
+        if isinstance(gate, dict):
+            kept = {}
+            for k, v in gate.items():
+                if v == INHERIT:
+                    over[f"gate.{k}"] = False
+                else:
+                    kept[k] = v
+                    over[f"gate.{k}"] = True
+            mine["gate"] = kept
+        if over:
+            mine["overrides"] = over
     got = _set_prefs(project, **mine)
     return got if got.get("error") else get(project) | {"ok": True, "project": project}
+
+
+def _no_inherit(kw):
+    """`kw` with "inherit" read as nothing to change: a project, or a
+    repository in none, has nothing to inherit from."""
+    out = {}
+    for k, v in kw.items():
+        if k in OVERRIDABLE and v == INHERIT:
+            continue
+        if k == "gate" and isinstance(v, dict):
+            v = {gk: gv for gk, gv in v.items() if gv != INHERIT}
+        out[k] = v
+    return out
 
 
 def _set_prefs(project, node=None, nodes=None, build=None, test=None,
@@ -901,13 +1006,33 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
               snapshot_days=None, snapshots_on=None,
               release=None, log_from=None, diag=None, build_local=None, reaches=None, hosts=None,
               pc=None, tc_off=None, packs_on=None, makevms=None, vm_caps=None, installpacks=None, agents_off=None,
-              agent_default=None, agent_slots=None):
-    """Change any of one project's settings; None leaves it, "" clears it."""
+              agent_default=None, agent_slots=None, overrides=None):
+    """Change any of one project's settings; None leaves it, "" clears it.
+    `overrides` is {dial name: True to set it apart from the project,
+    False to inherit again} (R208 step 6)."""
     if not project:
         return {"error": "no project"}
     with _lock:
         d = _load()
         cur = _clean(d["projects"].get(project))
+        if overrides is not None:
+            if not isinstance(overrides, dict):
+                return {"error": "overrides is {dial: true|false}"}
+            have = set(cur["overrides"])
+            ok = set(OVERRIDABLE) | {f"gate.{k}" for k in GATE_KINDS}
+            for k, on in overrides.items():
+                if k not in ok:
+                    return {"error": f"not a dial a repository may set apart: {k}"}
+                (have.add if on else have.discard)(k)
+                # Lifted, the value goes back to its default too, so a
+                # record read as one from before the list (the stored
+                # value alone) does not bring the override back.
+                if not on:
+                    if k.startswith("gate."):
+                        cur["gate"][k[5:]] = "auto"
+                    else:
+                        cur[k] = DIAL_DEFAULTS[k]
+            cur["overrides"] = sorted(have)
         if color is not None:
             if color not in COLORS and color != "":
                 return {"error": f"color is one of {', '.join(COLORS)}, or none: not {color}"}
@@ -1132,11 +1257,14 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
                 or cur["sign"] != "ask" or cur["keys"] != "ask" or cur["release"] != "ask"
                 or cur["pc"] != "deny" or cur["installpacks"] != "ask"
                 or cur["dev_keep"] != DEV_KEEP
+                or cur["overrides"]
                 or cur["gitpol"] != GITPOL_DEFAULT or cur["forgepol"] != FORGEPOL_DEFAULT):
             # Stored without the all-auto gate or the default policy, so the
             # file says only what somebody chose; _clean puts the defaults
             # back on the way out.
             rec = dict(cur)
+            if not cur["overrides"]:
+                rec.pop("overrides", None)
             if all(v == "auto" for v in cur["gate"].values()):
                 rec.pop("gate", None)
             if cur["gitpol"] == GITPOL_DEFAULT:
@@ -1322,7 +1450,8 @@ def dialog_save(name, req, uid):
     if "node" in req and str(req.get("node") or "") != (get(name) or {}).get("node", ""):
         moved = pin_instances(name)
         moved_node = True
-    r = set_prefs(name, node=req.get("node"), nodes=req.get("nodes"),
+    r = set_prefs(name, scope=req.get("scope") if req.get("scope") in ("project", "repository") else None,
+                  node=req.get("node"), nodes=req.get("nodes"),
                   build=req.get("build"),
                   test=req.get("test"), outputs=req.get("outputs"),
                   gate=req.get("gate"), gitpol=req.get("gitpol"), forgepol=req.get("forgepol"),

@@ -1667,6 +1667,10 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
         # The compose file laid over this one, or none: the next build
         # takes it, and what it adds meets the gates as the base file's does.
         r = devapp.set_override(project, instance, f(req, "file"))
+    elif action == "gpu":
+        # The machine's GPU given to it, nvidia or amd, or none (R207 step
+        # 4): the next build takes it, through a file laid over its compose.
+        r = devapp.set_gpu(project, instance, f(req, "kind"))
     elif action == "env-get":
         # An empty env opens on the example rather than on nothing. The
         # `missing` list still answers about what is STORED, so the hint
@@ -1772,6 +1776,8 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     if sess and dial == "ask" and action == "override":
         return {"error": "under ask, a container's override is set by a person in its settings on the Containers page; "
                          "aerie devapp new --override names one for a new container, which Allow makes"}, 400
+    if sess and dial == "ask" and action == "gpu":
+        return {"error": "under ask, a container's GPU is given by a person in its settings on the Containers page"}, 400
     if sess and dial == "ask" and action in ("rebuild", "env-set", "new", "remove"):
         # Aborting is not asked about: it stops a build this session
         # was already allowed to start, and a running build nobody

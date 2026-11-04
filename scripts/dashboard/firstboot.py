@@ -89,7 +89,8 @@ def apply(path=None):
         kept["people"] = [{"name": p.get("name", ""), "role": p.get("role", "user")} for p in cfg.get("people") or [] if isinstance(p, dict)]
     else:
         kept = None
-        failed.append({"what": "file", "said": "the prepared configuration could not be read"})
+        failed.append({"what": "file", "said": "the prepared configuration could not be read: make the stick again with the USB maker, which writes it, "
+                                               "or set this machine up on its first-run page without one"})
     report = {"at": int(time.time()), "done": done, "waiting": waiting, "failed": failed, "config": kept}
     write_json(_file(), report)
     try:
@@ -134,6 +135,23 @@ def adopt_want(cfg):
             skipped.append({"slot": name, "id": uuid or name, "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
         else:
             pools.append({"name": name, "fs": fs, "uuid": uuid})
+    # A cache disk the old system kept in its array's cache slot (B625: no
+    # config/pools, as before its pools), offered as a pool named for its
+    # slot and found by its disk, since no pool record names its UUID.
+    for x in ar.get("cache") or []:
+        if not isinstance(x, dict) or not x.get("id"):
+            continue
+        name, fs = str(x.get("slot") or "cache"), str(x.get("fs") or "").lower()
+        if any(p["name"] == name for p in pools) or any(s["slot"] == name for s in skipped):
+            continue
+        if fs.startswith("luks"):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": "encrypted: its key is not asked for yet"})
+        elif fs not in ("xfs", "btrfs", "zfs"):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": f"its filesystem is {fs or 'not said'}"})
+        elif not POOL_NAME.fullmatch(name):
+            skipped.append({"slot": name, "id": str(x["id"]), "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
+        else:
+            pools.append({"name": name, "fs": fs, "uuid": "", "disk_id": str(x["id"])})
     if not data and not pools:
         return None
     return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
@@ -196,14 +214,43 @@ def kept_config():
     return d.get("config") if isinstance(d.get("config"), dict) else {}
 
 
-def view():
+def met(waiting, done, reported):
+    """The waits the machine has met since the report was written (B634):
+    the array once a data disk the plan named is mounted, the pools once
+    one is, the shares once the machine serves any; each moves to done with
+    what is there now. The report on disk is left as written."""
+    rep = reported if isinstance(reported, dict) else {}
+    ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+    mounts = [m for m in (ad.get("mounts") or []) if isinstance(m, dict) and m.get("mounted")]
+    disks = [m for m in mounts if str(m.get("where") or "").startswith("/mnt/disk")]
+    pools = [m for m in mounts if m not in disks]
+    shares = [x for x in (rep.get("shares") or []) if isinstance(x, dict)]
+    said = {"array": f"adopted: {len(disks)} data disk{'s' if len(disks) != 1 else ''} mounted" if disks else "",
+            "pools": f"adopted: {len(pools)} mounted" if pools else "",
+            "shares": f"{len(shares)} served" if shares else ""}
+    still, now = [], list(done)
+    for w in waiting:
+        what = w.get("what") if isinstance(w, dict) else ""
+        if said.get(what):
+            now.append({"what": what, "said": said[what], "count": w.get("count")})
+        else:
+            still.append(w)
+    return still, now
+
+
+def view(reported=None):
     """This machine's section: what the stick's prepared configuration did,
-    and what its plan names to adopt; None when this install had none."""
+    and what its plan names to adopt; None when this install had none.
+    `reported` is the machine's own node's census, which says which waits
+    have been met since (B634)."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     cfg = d.get("config") if isinstance(d.get("config"), dict) else {}
+    if reported:
+        waiting, done = met(d.get("waiting") or [], d.get("done") or [], reported)
+        d = {**d, "waiting": waiting, "done": done}
     rows, notes = share_requests(cfg)
     dk, vm = cfg.get("docker") if isinstance(cfg.get("docker"), dict) else {}, cfg.get("vms") if isinstance(cfg.get("vms"), dict) else {}
     nets = {str(k): {"subnet": str(v.get("subnet") or ""), "gateway": str(v.get("gateway") or "")}

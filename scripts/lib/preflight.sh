@@ -38,6 +38,13 @@ cmd_tests_preflight() {
             [ -n "$defaulted" ] && [ "${#files[@]}" -gt 20 ] && printf '%s' "; --base HEAD measures the working tree alone, --base HEAD~1 the last commit with it")"
     fi
     [ "${#files[@]}" -gt 0 ] || { log "nothing changed: nothing to run"; return 0; }
+    # A branch with commits and no changelog line: a dev build's notes would
+    # say nothing a person would see (v0.9.0-dev.4818, 2 Nov), so it is
+    # said here, where the push is decided, not on the release page.
+    if [ -n "${mb:-}" ] && [ "$(git rev-list --count "${mb:-}..HEAD" 2>/dev/null || echo 0)" -gt 0 ] \
+            && git diff --quiet "${mb:-}" HEAD -- CHANGELOG.md 2>/dev/null; then
+        log "preflight: no changelog line since $base: a dev build cut from this would say nothing a person would see (aerie changelog add \"...\" --cat NAME)"
+    fi
     # The suites, from the map. The harness's own lib.mjs and run.sh are
     # every suite, which every suite runs on. A changed SUITE is itself
     # and nothing more: what it names is what it asks of the page and the

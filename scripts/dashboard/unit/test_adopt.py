@@ -41,6 +41,16 @@ def plan(want=WANT, disks=DISKS, blk=BLK):
 
 
 class Plan(unittest.TestCase):
+    def test_a_pool_with_no_uuid_is_found_by_its_disk(self):
+        # B625: a cache disk the old system kept in its array's cache slot
+        # has no pool record to name its UUID; its disk id finds it.
+        p = plan({"data": [], "pools": [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_970_CCC333"}]})
+        self.assertEqual([m["where"] for m in p["mounts"]], ["/mnt/cache"], p)
+        self.assertIn("UUID=u-cache", p["mounts"][0]["what"])
+        p = plan({"data": [], "pools": [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_970_GONE"}]})
+        self.assertEqual(p["mounts"], [])
+        self.assertTrue(any("Samsung_970_GONE is not on this machine" in r for r in p["refused"]), p["refused"])
+
     def test_disks_by_serial_read_only_with_their_paths(self):
         p = plan()
         self.assertEqual(p["refused"], [])
@@ -145,6 +155,14 @@ class Request(unittest.TestCase):
         self.assertTrue(w["writable"])
         self.assertEqual(w["pools"][0]["name"], "cache")
 
+    def test_a_pools_disk_id_is_kept_and_checked(self):
+        w, why = self.want({"want": WANT})
+        self.assertEqual(why, "")
+        self.assertEqual(w["pools"][0].get("disk_id"), "Samsung_970_CCC333")
+        w, why = self.want({"want": {"pools": [{"name": "cache", "fs": "btrfs", "disk_id": "a b;rm"}]}})
+        self.assertIsNone(w)
+        self.assertIn("disk_id", why)
+
     def test_a_bad_shape_is_refused_before_any_job(self):
         for bad in ({"data": [{"slot": "disk0", "id": "X", "fs": "xfs"}]},
                     {"data": [{"slot": "disk1", "id": "a b;rm", "fs": "xfs"}]},
@@ -181,6 +199,18 @@ class FromTheStick(unittest.TestCase):
         import nodes
         w, why = nodes._adopt_want({"want": got["want"]})
         self.assertEqual(why, "")
+
+    def test_a_cache_in_the_arrays_slot_is_offered_as_a_pool_by_its_disk(self):
+        # B625: an old system with no pool records kept its cache in the
+        # array's cache slot; the plan offers it as the pool cache.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}],
+                         "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "btrfs"}, {"slot": "cache2", "id": "Crucial_Y", "fs": "LUKS:btrfs"}]}}
+        got = self.want(cfg)
+        self.assertEqual(got["want"]["pools"], [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_X"}])
+        self.assertEqual([(s["slot"], s["why"]) for s in got["skipped"]], [("cache2", "encrypted: its key is not asked for yet")])
+        # ...and not twice when a pool record names it already.
+        cfg["pools"] = [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}]
+        self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache"])
 
     def test_a_pool_the_adopt_cannot_take_is_set_apart_not_the_whole_request(self):
         # B612: an encrypted pool, one with no filesystem the adopt takes, or

@@ -582,6 +582,22 @@ any project it cannot read, write or enter.
 
 **`/mnt/user` vs `/mnt/cache`.** Mount through `/mnt/user` (the FUSE layer).
 Mixing direct-disk and user-share paths for the same data corrupts files.
+The one exception is below: the config path.
+
+### The config path
+
+`/config` holds the controller's state, and part of it is a SQLite database
+with a write-ahead log beside it. Through the FUSE layer (`/mnt/user`, the
+`shfs` filesystem) that log is not reliably taken up when the container is
+re-created: the state comes back as of the last time the log was folded, and
+every node's agent, whose token rotated since, is turned away as unknown.
+The controller folds its log every minute and on a clean stop, which bounds
+the loss, and the doctor warns while `/config` is on `shfs`. To take the
+hazard away, give the `appdata` share **exclusive access** (Settings, Shares:
+primary storage on one pool, secondary none, exclusive access yes), which makes
+`/mnt/user/appdata` a direct path with no FUSE layer in it; or map every
+AerieOS path (home, config, secrets) from the pool itself, `/mnt/cache/appdata/...`,
+never one of them from `/mnt/user` and another from `/mnt/cache`.
 
 **Public repos.** Don't point a node's runner at a public repository: anyone
 who can open a PR could run code on that machine.

@@ -120,6 +120,18 @@ function renderSettingsInto(i){
   const t = state?.settings?.tunnel;
   const sect = (key, title, status, html, opts = {}) =>
     docSection("settings", key, title, status, html.replace(/<h4>[^<]*<\/h4>\s*/, ""), opts);
+  // Before the first poll lands, the page's own placeholder (B647): every
+  // section it will have, shimmering, rather than the few that need no
+  // state and then the rest. Drawn whole again when the settings arrive.
+  if (!state?.settings){
+    const titles = [["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
+      ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
+      ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
+    d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
+      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`;
+    sectJump(d.list.querySelector("[data-sects]"));
+    return;
+  }
   // Reach from outside and Connection are the Network page's now (R165
   // step 4, tab-network.js), drawn from the same table.
   const groups = settingsSections().filter(g => !NETWORK_GROUPS.includes(g.key));
@@ -234,8 +246,10 @@ function updatesSection(){
   // The release channel, on any install (the operator, 2 Nov).
   const channel = `<div class="field"><label class="pick"><span class="pickw">Channel</span><select id="relChannel" data-relchannel aria-label="release channel">
         <option value="normal"${r.channel !== "dev" ? " selected" : ""}>Releases</option><option value="dev"${r.channel === "dev" ? " selected" : ""}>Dev builds</option></select></label>
-      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes the pre-releases CI publishes from a dev build${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? ", a draft not published yet, seen here with this controller's token for AerieOS's repository" : ""}` : ""}.${
-        r.draft_fetch?.tag ? ` ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}.` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; the update runs from them.` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files.`}` : ""} A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back.` : "Published releases alone. The dev channel takes every dev build as it is published, which may not come up."}</div></div>`;
+      <div class="sub dim">${r.channel === "dev" ? `The dev channel takes every pre-release CI publishes${r.dev_latest ? `; the newest is ${esc(r.dev_latest)}${r.dev_draft ? " (a draft, seen with this controller's token)" : ""}` : ""}${
+        r.draft_fetch?.tag ? `. ${r.draft_fetch.error ? `The draft ${esc(r.draft_fetch.tag)}: ${esc(r.draft_fetch.error)}` : r.draft_fetch.done ? `The draft ${esc(r.draft_fetch.tag)}'s files are here; Update runs from them` : `Fetching the draft ${esc(r.draft_fetch.tag)}'s files`}` : ""}${
+        helpIcon("A dev build is not a release: it may not come up, and on AerieOS the other slot's fallback is what brings the machine back. A draft not published yet is seen with this controller's token for AerieOS's repository, under Unpublished builds.")}`
+        : `Published releases alone${helpIcon("The dev channel takes every dev build as it is published, which may not come up.")}`}</div></div>`;
   // Debug mode alone: any version, the unpublished ones with the token
   // (the operator, 2 Nov), older ones too, since a test goes both ways.
   const pick = r.pick?.length ? `<div class="field"><label class="pick"><span class="pickw">Version</span><select id="relPick" aria-label="the version to install">${
@@ -268,7 +282,7 @@ function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
   const b = backupData;
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
-  const owner = state?.me?.role === "owner";
+  const owner = !!b.owner;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
       <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
@@ -297,9 +311,19 @@ function wireBackup(root){
 let moveData = null, moveAsked = false, moveToken = null;
 async function loadMove(){
   moveAsked = true;
+  const was = JSON.stringify(moveData);
   try{ moveData = await (await fetch("/api/move?pieces=1")).json(); }
   catch(e){ moveData = {error: "move: " + failWords(e)}; }
+  // Drawn once it has landed, as the backup copies are (B645: the section
+  // stayed its two shimmer rows after a reload, and Forget it drew nothing).
+  if (JSON.stringify(moveData) !== was){ settingsRev++; if (tabs.some(t => t.kind === "settings")) drawPanes(); }
+  // ...and read again every poll while a move is armed (B646): how many
+  // nodes have heard it, the last packing and the ask's answer move on
+  // their own, while the page is open and only then.
+  clearTimeout(moveTimer); moveTimer = null;
+  if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
 }
+let moveTimer = null;
 function moveStatus(){
   const m = moveData || {};
   return m.moved ? "moved" : m.prepared ? "armed" : m.arrived?.restored_at ? "arrived" : "";
@@ -311,34 +335,49 @@ function moveSection(){
   if (m.error) return `<div class="hint bad">${esc(m.error)}</div>`;
   const howWord = {pressed: "marked so here", told: "told by the new controller", asked: "learned by asking the new controller"}[m.how] || "";
   if (m.moved) return `<div class="row stack2" data-group="Move"><div class="grow">
-      <div class="sub bad">This controller moved to ${esc(m.to)} ${m.at ? esc(ago(m.at)) : ""}${howWord ? ` (${howWord}${m.landed_at ? `; the bundle landed ${esc(ago(m.landed_at))}` : ""})` : ""}: it is read-only now, and its nodes have followed. A node that comes back late is told where and knocks there by itself. What is here is a copy for a look back.</div></div></div>`;
-  // The state arrived by a move: what the old controller was told.
+      ${factGrid([["Moved to", m.to], ["When", m.at ? ago(m.at) : ""], ["How", howWord], ["Bundle landed", m.landed_at ? ago(m.landed_at) : ""]])}
+      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div></div></div>`;
+  // The state arrived by a move: what the old controller was told, as facts.
   const ar = m.arrived || {};
-  const arrived = ar.restored_at ? `<div class="sub">This state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""} ${esc(ago(ar.restored_at))}${
-      ar.told_at ? `; the old controller was told ${esc(ago(ar.told_at))}${ar.told_how && ar.told_how !== "taken" ? ` (${esc(ar.told_how)})` : ""}`
-      : ar.from ? `; the old controller is told once it answers${ar.tell_error ? ` (last: ${esc(ar.tell_error)})` : ""}` : "; the old controller named no address, so it learns by asking here"}.${
-      (m.not_here || []).length ? ` ${m.not_here.length} node${m.not_here.length === 1 ? " has" : "s have"} not checked in since: the Nodes page gives each its line.` : ""}</div>` : "";
+  const arrived = ar.restored_at ? `${factGrid([["Arrived by a move", ago(ar.restored_at)], ["From", ar.from || "no address named"],
+      ["Old controller told", ar.told_at ? `${ago(ar.told_at)}${ar.told_how && ar.told_how !== "taken" ? ` (${ar.told_how})` : ""}`
+        : ar.from ? `not yet${ar.tell_error ? `: ${ar.tell_error}` : ""}` : "it learns by asking here"],
+      ["Nodes not back since", (m.not_here || []).length ? `${m.not_here.length}: the Nodes page gives each its line` : ""]])}` : "";
   const sizeMb = m.size ? moveSize(m.size) : "";
-  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page (Moving a controller here?) with this controller's address, or with the bundle; a USB stick takes it under Controller settings, once its disks are set up.</div></div>` : "";
-  const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)} <span class="dim">(${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `; ${esc(pc.about)}` : ""})</span></label></div>`).join("");
+  const token = moveToken ? `<div class="field"><div class="hint warn">The move token, shown once and never kept here: <code>${esc(moveToken)}</code>. Give it on the new install's first page with this controller's address, or with the bundle.</div></div>` : "";
+  // Each piece: its name on the tick's line, its size and what it holds
+  // under it (the operator, 3 Nov: the name wrapped into a narrow column
+  // beside the words).
+  const pieces = (m.pieces || []).map(pc => `<div class="field"><label class="ndcap"><input type="checkbox" data-movepiece="${esc(pc.key)}"${pc.on ? " checked" : ""}${pc.fixed ? " disabled" : ""}> ${esc(pc.label)}</label>
+      <div class="sub">${pc.over ? "at least " : ""}${moveSize(pc.size || 0)}${pc.about ? `: ${esc(pc.about)}` : ""}</div></div>`).join("");
   const stores = Array.isArray(m.stores) ? m.stores : [];
   // A move landed here instead (the operator, 1 Nov): on a fresh controller,
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
   const land = ld.fresh && ld.owner && !m.prepared && !ar.restored_at ? `<div class="field" data-movelandbox>
-      <div class="sub">Moving a controller here instead: give its move token with its address (it hands the bundle over) or the bundle downloaded from it. Its state takes this one's place, this setup account's with it, and you sign in with an account it had.${ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}</div>
+      <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
+        helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
+          ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
       ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
       <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>` : "";
+  // What is in the bundle, as the record says it: the state always, then
+  // what was ticked.
+  const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");
+  // Armed: the facts of the move (the operator, 3 Nov: a paragraph of them
+  // said nothing at a glance), then the one line on what happens next.
+  const armed = m.prepared ? `${factGrid([["New home", m.to || "not named yet"], ["Armed", ago(m.made_at)],
+      ["Nodes that heard it", `${m.heard} of ${m.nodes}`], ["Last packed", m.packed_at ? `${ago(m.packed_at)}, ${sizeMb}` : "not yet: Download packs it"],
+      ["In the bundle", inside], ["Asked whether it landed", m.asked_at ? `${ago(m.asked_at)}: ${m.asked_error || "not yet"}` : ""]])}
+      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
       ${land}
       ${arrived}
-      <div class="sub">To another container, to a machine of its own, or back: Prepare to move arms the move and shows a move token once; from then on every node hears where the controller is going, and follows by itself once the new home answers, however long that takes. The bundle (the state, the stores ticked, the deploy key, the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.</div>
-      ${m.prepared ? `<div class="sub">Armed ${esc(ago(m.made_at))} for ${esc(m.to || "an address not named yet")}: ${m.heard} of ${m.nodes} node${m.nodes === 1 ? "" : "s"} ${m.heard === 1 ? "has" : "have"} heard it${m.packed_at ? `; last packed ${esc(ago(m.packed_at))}, ${esc(sizeMb)}` : ""}${stores.length ? `, with ${esc(stores.join(", "))}` : ""}${m.repos ? ", the repositories in it" : ""}${m.carries_key ? ", the install key in it" : ""}.${
-          m.asked_at ? ` Asked ${esc(m.to)} ${esc(ago(m.asked_at))} whether it landed: ${m.asked_error ? esc(m.asked_error) : "not yet"}.` : ""}</div>` : ""}
+      ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once${
+        helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
       ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://builderbot.new.example" autocomplete="off" spellcheck="false"></label></div>
       ${pieces}`}
@@ -360,7 +399,8 @@ function wireMove(root){
     if (file) fd.append("bundle", file, file.name);
     const j = await (await fetch("/api/move-land", {method: "POST", body: fd})).json().catch(() => ({error: "no answer"}));
     if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
-    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had`);
+    notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had${
+      (j.said || []).length ? `. ${j.said.join(". ")}` : ""}`, (j.said || []).length > 0);
     setTimeout(() => location.assign("/"), 6000);
   }));
   root.querySelectorAll("[data-moveprep]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -557,7 +597,9 @@ const SETTING_GROUPS = [
   {key: "checks", title: "Update checks", intro: checksIntro, status: checksStatus,
    heading: () => { const c = state?.checks || {}; const off = Object.values(c).filter(x => x.cadence === "off").length;
      return off ? `${off} off` : Object.keys(c).length ? "on" : ""; },
-   fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint,
+   // The release check is an install that updates itself (B648): not
+   // offered on the container edition.
+   fields: CHECK_KINDS.map(([k, label, hint]) => ({key: `check_${k}`, label, type: "select", hint, when: k === "release" ? () => !!state?.bare_metal : undefined,
      options: [["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off: only Check for updates"]]}))},
   // The vetted catalog (R169): where its signed index is read, and a mirror
   // of it imported for a controller that cannot reach it (step 6).
@@ -664,7 +706,10 @@ const SETTING_GROUPS = [
   // The update window (R160 step 4): a newer release applied by itself at
   // the hour named, daily or one weekday; off by default, so nothing moves
   // the install without a press or this choice.
-  {key: "updwin", title: "Update window",
+  // An install that updates itself alone (B648): the container is pulled
+  // by whatever runs it, so the window is not offered there, and the boot
+  // menu's older versions are AerieOS's own.
+  {key: "updwin", title: "Update window", bare: true,
    heading: s => s?.settings?.update_window?.value ? `${s.settings.update_window.value} at ${String(s.settings.update_hour?.value ?? 4).padStart(2, "0")}:00` : "off",
    fields: [
     {key: "update_window", label: "Apply a newer release", type: "select",
@@ -672,7 +717,7 @@ const SETTING_GROUPS = [
                ["mon", "Mondays"], ["tue", "Tuesdays"], ["wed", "Wednesdays"], ["thu", "Thursdays"], ["fri", "Fridays"], ["sat", "Saturdays"], ["sun", "Sundays"]],
      hint: "In the window the newest release is applied the way Update does it: the image into the other slot on AerieOS (a restart still waits for you), the installer's bundle elsewhere. One window applies one release once."},
     {key: "update_hour", label: "At (hour, 0 to 23, this controller's time)", type: "number"},
-    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number",
+    {key: "os_keep", label: "Older versions kept on the boot menu", type: "number", when: () => !!state?.release?.os?.version,
      hint: "AerieOS: each version an update replaces stays on the machine, about 2 GB each, bootable from the menu's Older versions. 0 keeps none."}]},
   {key: "maint", title: "Maintenance", can: "maintenance",
    heading: s => s?.settings?.maintenance_mode?.value ? "on" : "off",
@@ -716,11 +761,14 @@ function connectionStatus(s){
 }
 
 // What the Apps section holds, over its switches, and Check for updates.
+// The clocks alone (the operator, 3 Nov): Check for updates is on each
+// thing's own page (Containers, nginx, Scanners, the Library, Updates), so
+// this section says when each last looked and sets how often.
 function checksIntro(){
   const c = state?.checks || {};
-  return `<div class="field">${CHECK_KINDS.filter(([k]) => c[k]).map(([k, label]) =>
-    `<div class="row stack2 ckrow"><div class="grow"><span class="name">${esc(label)}</span> <span class="sub dim">${c[k].at ? `checked ${esc(ago(c[k].at))}` : "not checked yet"}</span></div>
-      <button type="button" data-checknow="${esc(k)}">Check for updates</button></div>`).join("")}</div>`;
+  const said = CHECK_KINDS.filter(([k]) => c[k]).map(([k, label]) =>
+    `${esc(label)} ${c[k].at ? esc(ago(c[k].at)) : "never"}`);
+  return said.length ? `<div class="sub">Last checked: ${said.join(" · ")}. Check for updates is on each one's own page.</div>` : "";
 }
 function checksStatus(){
   const c = state?.checks || {};
@@ -740,7 +788,8 @@ function wireChecks(root){
 // tools/catalog-mirror.py made on a machine with the network.
 function catalogIntro(s){
   const m = s?.catalog_mirror;
-  return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the index at this address. A controller that cannot reach it imports a mirror instead: <code>tools/catalog-mirror.py</code> makes one on a machine with the network, and the Library then installs from it with nothing fetched.</div>
+  return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the signed index at this address${
+    helpIcon("Another address can only mirror the same files: index.json and index.sig are checked against the maintainers' key this install ships, so no other catalog passes as vetted. A controller that cannot reach the address imports a mirror instead: tools/catalog-mirror.py makes one on a machine with the network, and the Library installs from it with nothing fetched.")}</div>
     <div class="field">${m
       ? `<div class="row stack2"><div class="grow"><span class="name">Mirror</span> <span class="sub">${m.packs} entr${m.packs === 1 ? "y" : "ies"} from ${m.repos} repositor${m.repos === 1 ? "y" : "ies"}, made ${esc(m.generated || "at an unknown time")}, imported ${esc(ago(m.imported_at))}</span></div>
           <button type="button" data-mirrorforget>Forget</button></div>`
@@ -950,7 +999,8 @@ function settingsSections(){
   const offSect = offs.length ? [{key: "off", title: "Switched off", status: String(offs.length), cls: "",
     html: `<div class="row stack2"><div class="grow"><div class="sub">Set where this container starts (FEATURES_OFF), so nothing here turns them back on.</div>${
       offs.map(w => `<div class="setrow">${esc(w)}</div>`).join("")}</div></div>`}] : [];
-  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)).map(g => {
+  return offSect.concat(SETTING_GROUPS.filter(g => (!g.can || state?.can?.[g.can]) && (!g.debug || state?.release?.dev_ok)
+                                                && (!g.bare || state?.bare_metal)).map(g => {
     const field = f => {
             const v = s.settings[f.key]?.value;
             const id = "set_" + f.key;
@@ -1001,7 +1051,7 @@ function settingsSections(){
       <div class="grow">
         <div class="logset">
           ${g.intro ? g.intro(s) : ""}
-          ${g.fields.filter(f => !f.dev || s.settings.offer_unvetted?.value).map(field).join("")}
+          ${g.fields.filter(f => (!f.dev || s.settings.offer_unvetted?.value) && (!f.when || f.when(s))).map(field).join("")}
           <div class="actbar">
             <span class="state">${g.status ? g.status(s) : "applies at once"}</span>
             <button type="button" class="setApply" title="save">Apply</button>

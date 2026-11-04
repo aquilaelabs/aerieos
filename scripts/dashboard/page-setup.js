@@ -195,6 +195,25 @@ async function setupFinish(){
 
 // A disk this step may use: not the one the system runs from, not a stick.
 const setupDiskFree = d => !d.system && !d.removable;
+// The disks a stick's plan adopts (R163 step 9): the old system's array,
+// its parity and its pools, taken as they are on This machine under Disks
+// from the stick and never offered here to erase (B637: a person moving
+// off their NAS saw every disk of it listed under Make it). A plan's id is
+// the old system's name for the disk (MODEL_SERIAL), met by the serial or
+// the by-id name.
+function setupPlanned(){
+  const w = state?.firstboot?.adopt?.want || {};
+  return [...(w.data || []).map(x => ({...x, what: "data"})), ...(w.parity || []).map(x => ({...x, what: "parity"})),
+          ...(w.pools || []).map(x => ({...x, what: "pool"}))].filter(x => x.id);
+}
+const setupDiskPlanned = (d, rows) => rows.find(x => x.id === d.serial || (d.serial && x.id.endsWith("_" + d.serial)) || (d.by_id && d.by_id.includes(x.id))) || null;
+// The machine's free disks split: theirs (the plan's, each with its row of
+// the plan) and mine (this step's to make something of).
+function setupDiskSplit(n){
+  const free = (n.disks || []).filter(setupDiskFree), planned = setupPlanned();
+  const theirs = free.map(d => [d, setupDiskPlanned(d, planned)]).filter(([, p]) => p);
+  return {theirs, mine: free.filter(d => !theirs.some(([x]) => x === d))};
+}
 // One that holds something now (a filesystem, a partition with one).
 const setupDiskHeld = d => !!(d.holds || (d.parts || []).some(p => p.holds));
 
@@ -275,13 +294,24 @@ function setupDisksCard(num){
       <p>This machine stores on ${where}. ${shares ? `${shares} share${shares === 1 ? "" : "s"} made.` : "Make the shares your files go in:"}</p></div>
       ${shares ? "" : `<div class="actbar"><button type="button" class="primary" data-setshares>Make Media, Backups and Projects</button></div>`}</section>`;
   }
-  const free = (n.disks || []).filter(setupDiskFree);
+  const {theirs, mine: free} = setupDiskSplit(n);
+  const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
+  // The old system's disks: said whose they are, no box, nothing to press.
+  const theirRow = ([d, p]) => `<div class="row setdisk theirs"><span class="grow">${facts(d)}
+      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is on ${pageLink("machine", "This machine")}, under Disks from the stick; nothing here touches it</span></span></div>`;
+  if (theirs.length && !free.length){
+    const nd = theirs.filter(([, p]) => p.what === "data").length, np = theirs.filter(([, p]) => p.what === "parity").length, npool = theirs.length - nd - np;
+    const what = [nd ? `${nd} data disk${nd === 1 ? "" : "s"}` : "", np ? `${np === 1 ? "the parity disk" : `${np} parity disks`}` : "", npool ? `${npool} pool disk${npool === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
+    return `<section class="setstep">${head(false, `<span class="pill note">on This machine</span>`)}<div class="setstepbody">
+    <p>Every disk here belongs to the system the stick's plan came from: ${esc(what)}. They are adopted as they are, nothing erased, on ${pageLink("machine", "This machine")} under Disks from the stick: Check, then Adopt. Nothing is made here.</p>
+    <div class="rows">${theirs.map(theirRow).join("")}</div></div></section>`;
+  }
   if (!free.length) return `<section class="setstep">${head(false, `<span class="pill">later</span>`)}<div class="setstepbody">
     <p>No disk here but the one AerieOS runs from. Add disks and set them up on ${pageLink("storage", "the Storage page")}.</p></div></section>`;
   const use = d => !setupDiskHeld(d) || setupDisks.use.has(d.name);
   const plan = setupDiskPlan(free.filter(use), setupDisks);
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
-      <b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>
+      ${facts(d)}
       ${d.smart && d.smart.ok === false ? `<span class="pill bad">failing</span>` : ""}
       ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(d.holds || "data")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
   const says = p => !p ? "" : `<div class="setplan"><p><b>${p.kind === "array" ? "An array" : p.layout === "single" ? "One pool" : `A ZFS ${esc(p.layout)}`}</b> of ${p.disks.length} disk${p.disks.length === 1 ? "" : "s"}${
@@ -290,8 +320,9 @@ function setupDisksCard(num){
   const lose = [[0, "No copy: all the space"], [1, "One disk may fail"], [2, "Two disks may fail"]];
   const lays = [["", "As recommended"], ["mirror", "ZFS mirror"], ["raidz1", "ZFS raidz1"], ["raidz2", "ZFS raidz2"], ["single", "ZFS, one group"], ["array", "Array with parity"]];
   return `<section class="setstep">${head(false, `<span class="pill">to do</span>`)}<div class="setstepbody">
-    <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.</p>
-    <div class="rows">${free.map(row).join("")}</div>
+    <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.${
+      theirs.length ? ` The old system's disks are adopted on ${pageLink("machine", "This machine")}, not made into anything here.` : ""}</p>
+    <div class="rows">${theirs.map(theirRow).join("")}${free.map(row).join("")}</div>
     <div class="setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
       ${setupDisks.adv ? `<div class="setrow col ctlrow">${lbl("setLayout", "Layout")}<select id="setLayout">${optionList(lays, setupDisks.layout)}</select></div>` : ""}</div>
     ${says(plan.main)}${plan.fast ? says(plan.fast).replace("<b>A ZFS mirror</b>", "<b>A fast ZFS mirror</b>").replace("<b>One pool</b>", "<b>A fast pool</b>") : ""}
@@ -313,7 +344,7 @@ function wireSetupDisks(el){
   if (adv) adv.onclick = () => { setupDisks.adv = true; setupSig = ""; drawSetup(); };
   const make = el.querySelector("[data-setdisksmake]");
   if (make) make.onclick = () => pressing(make, async () => {
-    const free = (n.disks || []).filter(setupDiskFree).filter(d => !setupDiskHeld(d) || setupDisks.use.has(d.name));
+    const free = setupDiskSplit(n).mine.filter(d => !setupDiskHeld(d) || setupDisks.use.has(d.name));
     const plan = setupDiskPlan(free, setupDisks);
     const said = names => names.map(x => { const d = (n.disks || []).find(y => y.name === x); return d ? `${x} (${d.model || "unnamed"}, ${setupGB(d.size_mb || 0)}, serial ${d.serial || "none"})` : x; });
     const all = [...plan.main.disks, ...(plan.fast?.disks || [])];

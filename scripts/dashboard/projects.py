@@ -2035,7 +2035,7 @@ def create_from_dialog(req, *, env, account, may_node):
             take_on(account, name)
         gate = req.get("gate")
         if isinstance(gate, dict) and gate:
-            r = set_prefs(name, gate=gate)
+            r = set_prefs(name, scope="project", gate=gate)
             if r.get("error"):
                 body["note"] = f"{body.get('note') or 'ready'}; gates not set: {r['error']}"
         return body, code
@@ -2062,17 +2062,19 @@ def create_from_dialog(req, *, env, account, may_node):
             body["note"] = f"{body.get('note') or 'ready'}; node not set: {r['error']}"
     # ...and the gates (roadmap #27), the design's among them, when the dialog offered them:
     # the same write the settings dialog makes, so what a session may
-    # enter into the notebook is decided where the project is made.
+    # enter into the notebook is decided where the project is made. As the
+    # project's defaults (R208 step 6): a project made around its
+    # repository takes what the dialog set as its own.
     gate = req.get("gate")
     if isinstance(gate, dict) and gate:
-        r = set_prefs(name, gate=gate)
+        r = set_prefs(name, scope="project", gate=gate)
         if r.get("error"):
             body["note"] = f"{body.get('note') or 'ready'}; gates not set: {r['error']}"
     # ...and whether a session may run its container, the fifth of them
     # on the dialog, so a session can create the first one by request.
     devbuild = req.get("devbuild")
     if devbuild and devbuild != "deny":
-        r = set_prefs(name, devbuild=str(devbuild))
+        r = set_prefs(name, scope="project", devbuild=str(devbuild))
         if r.get("error"):
             body["note"] = f"{body.get('note') or 'ready'}; Run its container not set: {r['error']}"
     # ...and the rest of Agents may, each only where it differs from the
@@ -2082,7 +2084,7 @@ def create_from_dialog(req, *, env, account, may_node):
                              ("report", "auto", "Report AerieOS bugs")):
         v = req.get(key)
         if v and v != dflt:
-            r = set_prefs(name, **{key: str(v)})
+            r = set_prefs(name, scope="project", **{key: str(v)})
             if r.get("error"):
                 body["note"] = f"{body.get('note') or 'ready'}; {label} not set: {r['error']}"
     # Not pinned: what Home shows is each person's to choose (the operator,

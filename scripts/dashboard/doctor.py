@@ -86,7 +86,8 @@ def refresh():
 # terminal ("... (docs/reference.md)"): on the page, a link to that doc's
 # section in Help (the operator, 26 Oct).
 DOC_LINKS = (("the install key is kept beside the state", "#/help/reference/the-install-key", "How"),
-             ("no install key:", "#/help/reference/the-install-key", "How it works"))
+             ("no install key:", "#/help/reference/the-install-key", "How it works"),
+             ("/config is on a FUSE share", "#/help/unraid/the-config-path", "How"))   # docs/unraid.md, The config path
 
 
 def _doc_line(check):

@@ -524,11 +524,16 @@ function vmHwFields(host, hw, admin){
   const devs = admin ? [
     ...(host?.hw?.usb || []).map(u => `<label class="ndcap"><input type="checkbox" data-usb="${esc(u.vendor)}:${esc(u.product)}"${
       (hw?.devices || []).some(d => d.type === "usb" && d.vendor === u.vendor && d.product === u.product) ? " checked" : ""}> USB: ${esc(u.name)}</label>`),
-    ...(host?.hw?.pci || []).map(p => `<label class="ndcap"><input type="checkbox" data-pci="${esc(p.addr)}"${
-      (hw?.devices || []).some(d => d.type === "pci" && d.addr === p.addr) ? " checked" : ""}${host?.hw?.iommu ? "" : " disabled"}> PCI ${esc(p.addr)} (${
+    // A display card the host's own driver holds is this machine's (R207
+    // step 3): the node's Features section marks it for a VM, which binds
+    // it to vfio-pci from the next boot; only then is it offered.
+    ...(host?.hw?.pci || []).map(p => { const mine = p.class.startsWith("0x03") && /^(nvidia|nouveau|amdgpu)$/.test(p.driver || "");
+      return `<label class="ndcap"><input type="checkbox" data-pci="${esc(p.addr)}"${
+      (hw?.devices || []).some(d => d.type === "pci" && d.addr === p.addr) ? " checked" : ""}${host?.hw?.iommu && !mine ? "" : " disabled"}> PCI ${esc(p.addr)} (${
       esc(p.class.startsWith("0x03") ? "display" : p.class.startsWith("0x04") ? "sound" : p.class.startsWith("0x0c03") ? "USB controller" : p.class.startsWith("0x02") ? "network" : "storage")}, ${esc(p.driver || "no driver")}${p.group ? `, group ${esc(p.group)}` : ""})${
       p.class.startsWith("0x0300") ? ` <button type="button" data-vbios="${esc(p.addr)}" title="read this card's vBIOS, which passing a GPU through may need">Dump vBIOS</button>
-        <button type="button" data-vbiosgive="${esc(p.addr)}" title="the card maker's .rom, or one from a collection, used instead of a dump">Give a .rom…</button>` : ""}</label>`)] : [];
+        <button type="button" data-vbiosgive="${esc(p.addr)}" title="the card maker's .rom, or one from a collection, used instead of a dump">Give a .rom…</button>` : ""}${
+      mine ? `<span class="sub dim">this machine's: Features on its node marks it for a VM</span>` : ""}</label>`; })] : [];
   return `<div class="field">${lbl("vmHwCpus", "CPU threads", "pin its vCPUs to these host threads, each core's pair together; none ticked leaves the host to schedule it")}
       <div class="vmcpus" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
       <label class="ndcap"><input type="checkbox" id="vmHwShareCpus"> Share them with another VM pinned there</label></div>

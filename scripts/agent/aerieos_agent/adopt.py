@@ -178,7 +178,8 @@ def plan(want, disks, blk=blkid):
         else:
             uuid = row.get("UUID", "")
             if not uuid:
-                no(f"{what}: {part} gives no filesystem UUID to mount it by")
+                no(f"{what}: {part} gives no filesystem UUID to mount it by: its filesystem is not one blkid reads (unformatted, encrypted and locked, or damaged); "
+                   "unlock or repair it on the old system, or leave it out of the plan")
                 continue
             out["mounts"].append({"what": f"UUID={uuid}", "where": where, "fs": fs, "ro": not writable, "dev": part})
             say(f"{slot}: {d['name']} ({d.get('model') or 'disk'}), its {fs} on {part} at {where}, {'read-only' if not writable else 'writable'}")
@@ -198,7 +199,8 @@ def plan(want, disks, blk=blkid):
         name, fs, uuid = str(x.get("name") or ""), str(x.get("fs") or ""), str(x.get("uuid") or "")
         what = f"the pool {name or '(no name)'}"
         if not POOL_RE.fullmatch(name) or name in NOT_POOLS or DATA_RE.fullmatch(name):
-            no(f"{what}: not a name a pool can be mounted under here")
+            no(f"{what}: not a name a pool can be mounted under here (letters, digits, - and _, not one of /mnt's own like user, disks or parity): "
+               "rename the pool on the old system, or leave it out of the plan")
             continue
         if fs not in FS:
             no(f"{what}: its filesystem is {fs or 'not said'}; XFS, btrfs and ZFS are taken")
@@ -211,6 +213,17 @@ def plan(want, disks, blk=blkid):
             out["zfs"].append({"pool": name, "where": where, "readonly": False, "slot": name})
             say(f"{name}: the ZFS pool imported as it is at {where}, writable")
             continue
+        # A pool the old system kept in its cache slot, with no pool record
+        # to name its UUID (B625): the disk by its id, the UUID off it.
+        if not uuid and x.get("disk_id"):
+            d0 = find_disk(disks, x.get("disk_id"))
+            for n in ([p.get("name") for p in d0.get("parts") or []] + [d0.get("name")]) if d0 else []:
+                if n and blk(n).get("TYPE") == BLK[fs] and blk(n).get("UUID"):
+                    uuid = blk(n).get("UUID")
+                    break
+            if not uuid:
+                no(f"{what}: {x.get('disk_id')} is not on this machine or holds no {fs}")
+                continue
         # A pool may span disks (btrfs), so it is found by its filesystem's
         # UUID on any of them; the plan's disk id names one of them.
         hit = None

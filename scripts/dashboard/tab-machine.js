@@ -112,7 +112,8 @@ function olderVersionsSection(n){
   return docSection("nodes", "older", "Older versions", k.booted ? `visiting ${k.booted}` : String(k.versions.length), `<div class="field">
       ${k.booted ? `<div class="hint warn">This boot is a visit to ${esc(k.booted)}. Restart to go back to the version it came from; updates wait until then.</div>` : ""}
       ${rows}${busy ? `<div class="sub dim">Working on it now.</div>` : !n.live ? `<div class="sub dim">Its agent is not dialing in.</div>` : ""}</div>
-      <div class="field"><div class="hint">Each version an update replaced, also under Older versions on the boot menu. A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. Your projects, shares and VMs are not part of it. How many are kept is under Update window.</div></div>`);
+      <div class="field"><div class="hint">Each version an update replaced, kept to boot once from the boot menu's Older versions; your projects, shares and VMs are not part of it${
+        helpIcon("A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. How many are kept is under Update window.")}</div></div>`);
 }
 function wireOlderVersions(root){
   root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -181,7 +182,8 @@ function projectsFolderField(n, s, admin){
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
       <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="hint">Where the projects already are on these disks, as another system kept them (its share for the projects): the controller works in that folder in place, nothing copied, so a move here can leave its repositories out. Its files become AerieOS's own; nothing in them changes.</div></div>`;
+    <div class="hint">The folder another system kept the projects in on these disks: the controller works there in place, nothing copied${
+      helpIcon("Its files become AerieOS's own and nothing in them changes, and a move here can then leave its repositories out of the bundle.")}</div></div>`;
 }
 function wireStick(root){
   root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {
@@ -217,7 +219,8 @@ function machineConsoleSection(n){
   const c = n.reported?.console;
   if (!c?.os) return "";
   return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
-      <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with the console password; <code>sudo</code> gives root. It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.</div>
+      <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with this password; <code>sudo</code> gives root${
+        helpIcon("It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.")}</div>
       <div class="fx"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
         <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>
       <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);

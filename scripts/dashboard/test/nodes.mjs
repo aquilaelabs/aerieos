@@ -1072,6 +1072,45 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
        && /Bring the artifacts data across from \/var\/lib\/builderbot\/artifacts/.test(asked[1])
        && after.stores.artifacts === '/srv/full/shed' && after.keep.includes('artifacts'),
        `a folder holding files gets one named for the node, the setting is that, and declining the copy starts it empty (${JSON.stringify(after.keep)}; ${asked.length} asked)`);
+    // A folder that already is a store is adopted as it is (R212): a
+    // toolchain share holding this node's own folder, the marker in it,
+    // keeps the setting as typed, nests nothing and asks no bring-across.
+    disk['/srv/sdk'] = { exists: true, dir: true, files: true, mine: true };
+    disk['/var/lib/builderbot/toolchains'] = { exists: true, dir: true, files: true };
+    const adopt = [];
+    page.answers.push(q => { adopt.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:toolchains"]`, '/srv/sdk');
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.toolchains === '/srv/sdk',
+                               minted.id, { timeout: 15000 });
+    const adopted = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
+    ok(adopt.length === 1 && /holds this node's own toolchains folder/.test(adopt[0]) && new RegExp(`/srv/sdk/${minted.id}`).test(adopt[0])
+       && adopted.stores.toolchains === '/srv/sdk' && adopted.keep.includes('toolchains'),
+       `a share holding this node's own toolchain folder is adopted as typed, nothing nested, the data left where it is (${adopt.length} asked; ${JSON.stringify(adopted.keep)})`);
+    // The node's own folder inside a toolchain store, typed itself, sets
+    // the store around it: the agent keeps each node's toolchains in a
+    // folder named for it inside the store.
+    disk[`/srv/sdk2/${minted.id}`] = { exists: true, dir: true, files: true, store: true };
+    const inner = [];
+    page.answers.push(q => { inner.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:toolchains"]`, `/srv/sdk2/${minted.id}`);
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.toolchains === '/srv/sdk2',
+                               minted.id, { timeout: 15000 });
+    ok(inner.length === 1 && /this node's own folder inside the toolchain store \/srv\/sdk2/.test(inner[0]),
+       `the node's own folder inside a toolchain store, typed itself, sets the store around it (${inner.length} asked)`);
+    // ...and so is the folder the page nested for this node before,
+    // pointed at directly.
+    disk['/srv/full2/shed'] = { exists: true, dir: true, files: true };
+    const own = [];
+    page.answers.push(q => { own.push(q.text); return 0; });
+    await page.fill(`${ROW} [data-k="store:artifacts"]`, '/srv/full2/shed');
+    await page.click(`${ROW} [data-nsave]`);
+    await page.waitForFunction(id => nodesList.find(n => n.id === id)?.config?.desired?.stores?.artifacts === '/srv/full2/shed',
+                               minted.id, { timeout: 15000 });
+    const ownRec = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
+    ok(own.length === 1 && /the folder AerieOS put this node's artifacts store in before/.test(own[0]) && ownRec.stores.artifacts === '/srv/full2/shed',
+       `the folder nested for the node before, typed itself, is adopted as it is (${own.length} asked; ${ownRec.stores.artifacts})`);
     // A store pointed into a mount saved here and not on the node yet is
     // told so (the operator, 23 Oct): what is on the share cannot be seen
     // until Apply mounts it, so no folder is chosen from what is there now.
@@ -1695,28 +1734,51 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       minted.id, { timeout: 10000 }).then(h => h.jsonValue(), () => null);
     ok(logTab && /^Log: shed's agent$/.test(logTab.label), `Agent log opens the node's agent journal in the dock (${logTab?.label})`);
     await page.evaluate(id => { const t = tabs.find(x => x.arg === `log:node:${id}:agent`); if (t) dropTab(t.id); dockToggle(false); openNodesTab(); }, minted.id);
-    await page.waitForSelector(`${ROW} [data-nd="reenroll"]`, { timeout: 10000 });
-    // Enroll script on the row (R177): a new script for this node, bound
-    // to the machine it reported, with no secret in it; run on another
+    await page.waitForSelector(`${ROW} [data-nd="reenroll-now"]`, { timeout: 10000 });
+    // Enroll script on the row (R177, R210): the node's script again, one
+    // press and no dialog, built from the row's own answers and bound to
+    // the machine it reported, with no secret in it; run on another
     // machine the controller refuses it, on the same it enrolls again
     // under the same id, and the old agent's token is dead.
     const MACHINE = 'c'.repeat(32);
     await hello({ ...CENSUS, machine: MACHINE });
     await page.evaluate(async () => { await refresh(); await loadNodes(); });
-    await page.waitForSelector(`${ROW} [data-nd="reenroll"]`, { timeout: 10000 });
-    await page.click(`${ROW} [data-nd="reenroll"]`);
-    await page.waitForSelector('#ndBody #ndEnReach', { timeout: 10000 });
-    const again = await page.evaluate(() => ({ title: document.getElementById('ndTitle').textContent,
-      name: $('ndEnName').value, fixed: $('ndEnName').disabled, user: $('ndEnUser').value }));
-    ok(/Enroll shed again/.test(again.title) && again.name === 'shed' && again.fixed && again.user === 'bb',
-       `Enroll script opens the dialog on the node's own answers, its name fixed (${JSON.stringify(again)})`);
-    const [dl4] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('#ndBody #ndEnGo')]);
+    // Just a token in the Features section's Enroll again lands on the row
+    // too (B656): it was refused as a second node with the row's name.
+    // Pressed before the script, whose mint revokes this token.
+    await page.click(`${ROW} .ndfeat [data-nd="reenroll"]`);
+    await page.waitForSelector('#ndBody #ndEnTok', { timeout: 10000 });
+    await page.click('#ndBody #ndEnTok');
+    const tokBox = await page.waitForFunction(() => /enroll it with one of these/.test(document.getElementById('ndTitle').textContent) && document.getElementById('ndTitle').textContent, null, { timeout: 10000 }).then(h => h.jsonValue(), () => '');
+    const sheds = (await napi('/api/v1/nodes')).nodes.filter(n => n.name === 'shed');
+    ok(/^shed: enroll it with one of these$/.test(tokBox) && sheds.length === 1 && sheds[0].id === minted.id,
+       `Just a token for a node already here mints on its row, no second row (${tokBox}; ${sheds.length} row)`);
+    await page.click('#ndBody #ndTokDone');
+    await page.evaluate(async () => { await refresh(); await loadNodes(); });
+    await page.waitForSelector(`${ROW} [data-nd="reenroll-now"]`, { timeout: 10000 });
+    const [dl4] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click(`${ROW} [data-nd="reenroll-now"]`)]);
     const script4 = readFileSync(await dl4.path(), 'utf8');
     const run4 = script4.split('\n').find(l => l.startsWith('bash "$dir/provision-linux.sh"')) || '';
     const tok4 = (run4.match(/--token '(bbe_[^']+)'/) || [])[1];
-    ok(new RegExp(`--machine '${MACHINE}'`).test(run4) && !/DOORSECRET|WGCONF/.test(script4) && tok4,
-       `...and the script is bound to the machine the node reported, with no secret in it (${run4.replace(/bbe_[^']+/, 'bbe_…').slice(0, 120)})`);
+    const said4 = await page.evaluate(() => document.getElementById('ndTitle').textContent);
+    ok(new RegExp(`--machine '${MACHINE}'`).test(run4) && !/DOORSECRET|WGCONF/.test(script4) && tok4 && /^enroll-shed-n_[0-9a-f]+\.sh: run it on the machine$/.test(said4)
+       && /--toolchains '\/var\/lib\/builderbot\/toolchains'/.test(run4) && /--data '\/var\/lib\/builderbot\/data'/.test(run4),
+       `Enroll script downloads the node's script at once, bound to the machine it reported, its stores where they are and no secret in it (${said4}; ${run4.replace(/bbe_[^']+/, 'bbe_…').slice(0, 160)})`);
     await page.click('#ndBody #ndTokDone');
+    // The system the script was built for is the one the row's census
+    // names (R210), recorded on the row by that mint; the Features
+    // section's Enroll again opens the dialog on the row's answers, the
+    // system among them, its name fixed.
+    const recorded = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config?.system;
+    await page.evaluate(async () => { await refresh(); await loadNodes(); });
+    await page.waitForSelector(`${ROW} .ndfeat [data-nd="reenroll"]`, { timeout: 10000 });
+    await page.click(`${ROW} .ndfeat [data-nd="reenroll"]`);
+    await page.waitForSelector('#ndBody #ndEnReach', { timeout: 10000 });
+    const again = await page.evaluate(() => ({ title: document.getElementById('ndTitle').textContent, system: $('ndEnSystem').value,
+      name: $('ndEnName').value, fixed: $('ndEnName').disabled, user: $('ndEnUser').value }));
+    ok(recorded === 'ubuntu' && /Enroll shed again/.test(again.title) && again.name === 'shed' && again.fixed && again.user === 'bb' && again.system === 'ubuntu',
+       `the row records the system its script was built for, and Enroll again opens the dialog on the node's own answers, its name fixed (${recorded}; ${JSON.stringify(again)})`);
+    await page.click('#ndBody #ndEnCancel');
     const rowsNow = (await napi('/api/v1/nodes')).nodes.filter(n => n.name === 'shed');
     ok(rowsNow.length === 1 && rowsNow[0].id === minted.id && rowsNow[0].state === 'online',
        'no second row: the node keeps its id and stays online while the script waits to run');
@@ -2575,6 +2637,38 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`, r =>
        /\/devdata: mounted, but the handle is stale/.test(r.textContent) && /re-export it there/.test(r.textContent)),
      'the row says which mount is stale and that the fix is on the host, whether or not the desired list names it');
+  // The whole reason sits under the mount's own row (B660), where it wraps,
+  // since the cell at the end of the line shows only its first words and the
+  // section's state line names a failed apply instead of it once one failed.
+  // The desired list names /devdata for this, and is put back after.
+  const staleMounts = [{ path: '/mnt/old', source: 'nas:/mnt/user/old', type: 'nfs', ro: false },
+                       { path: '/mnt/new2', source: 'nas:/mnt/user/new2', type: 'nfs', ro: false }];
+  await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: {
+    mounts: [...staleMounts, { path: '/devdata', source: 'nas:/mnt/user/bb-sandbox/devdata', type: 'nfs', ro: false }],
+    stores: {}, network: { mode: 'dhcp' } } });
+  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.waitForFunction(id => [...document.querySelectorAll(`.nodestab .ndrow[data-node="${id}"] .ndmount .ndmwhy`)]
+                                     .some(e => /devdata/.test(e.textContent)), minted.id, { timeout: 15000 }).catch(() => {});
+  ok(await page.$eval(ROW, r =>
+       [...r.querySelectorAll('.ndmount .ndmwhy.bad')].some(e => /^\/devdata: mounted, but the handle is stale: .*re-export it there/.test(e.textContent))
+       && [...r.querySelectorAll('.ndmount .ndmstate.bad')].some(e => e.textContent === 'mounted, but the handle is stale')),
+     'the mount row carries the stale reason whole under it, and its state cell the first words');
+  if (process.env.BB_SHOTS){
+    const sect = `${ROW} details.sect[data-sect="nodes:storage"]`;
+    await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
+    await sleep(400);
+    await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-desk.png` });
+    const vp = page.viewportSize();
+    await page.setViewportSize({ width: 393, height: 900 });
+    await sleep(400);
+    await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
+    await sleep(400);
+    await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-phone.png` });
+    await page.setViewportSize(vp);
+    await sleep(300);
+  }
+  await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
+  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
   // Whether a session there is kept to its own project (R35): on the
   // Sessions section's status when it is not, since a folded section shows
   // nothing else, and why; and said plainly when it is.

@@ -11,6 +11,7 @@ tag with no release, showed nobody its lines, so they come with this one. A line
 is the same line whatever commit it names at its end. Python's own library, git
 and gh, for CI; without gh, the tag before.
 """
+import os
 import re
 import shutil
 import subprocess
@@ -43,13 +44,18 @@ def key(line):
     return HASH.sub("", line)
 
 
-def notes(now, before, since=""):
-    """The markdown: what `now` holds of Unreleased that `before` did not."""
+def notes(now, before, since="", compare=""):
+    """The markdown: what `now` holds of Unreleased that `before` did not.
+    With nothing new, the build says so and points at the commits
+    (`compare`, the forge's view of them), since a build with no changelog
+    line is not an empty build (v0.9.0-dev.4818, 2 Nov: six fixes and the
+    notes said nothing a person would see)."""
     had = {key(line) for _, line in unreleased(before)}
     new = [(h, line) for h, line in unreleased(now) if key(line) not in had]
     lead = f"What changed since {since}." if since else ""
     if not new:
-        return (lead + "\n\n" if lead else "") + "Nothing a person would see.\n"
+        return (lead + "\n\n" if lead else "") + "Nothing a person would see: the changelog gained no line" \
+            + (f" since {since}" if since else "") + (f"; [the commits]({compare}) say what moved." if compare else ".") + "\n"
     blocks, head = [lead] if lead else [], None
     for h, line in new:
         if h != head or not blocks:
@@ -84,7 +90,9 @@ def main(argv):
         return 1
     since = since_of(tag, published())
     before = git("show", f"{since}:CHANGELOG.md") if since else ""
-    sys.stdout.write(notes(now, before or "", since))
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    compare = f"https://github.com/{repo}/compare/{since}...{tag}" if repo and since else ""
+    sys.stdout.write(notes(now, before or "", since, compare))
     return 0
 
 

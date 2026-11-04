@@ -867,6 +867,28 @@ function dmOverrideLine(d){
       ${optionList([["", "none"], ...new Set([...files, ...(saved ? [saved] : [])])], pick || "")}</select></div>`;
 }
 
+// The machine's GPU given to the container (R207 step 4): NVIDIA through
+// the container toolkit, AMD through its render devices; offered only on
+// a node that reports a card, staged and written by the grid's Apply, and
+// taken by the next build.
+const dmGpuDraft = {};
+function dmGpuLine(d){
+  if (!mayDocker()) return "";
+  const node = (nodesList || []).find(x => x.id === d.node);
+  const r = node?.reported || {};
+  if (!r.gpu_card && !r.gpu_amd && !d.gpu) return "";
+  const key = `${d.project}|${d.instance}`;
+  const saved = d.gpu || "";
+  const pick = dmGpuDraft[key] ?? saved;
+  const opts = [["", "none"],
+    ...(r.gpu_card || saved === "nvidia" ? [["nvidia", `NVIDIA card${r.gpu_card ? ` (${r.gpu_card})` : ""}, through the container toolkit`]] : []),
+    ...(r.gpu_amd || saved === "amd" ? [["amd", `AMD card or APU${r.gpu_amd ? ` (${r.gpu_amd})` : ""}, its render devices (/dev/dri)`]] : [])];
+  const held = node?.reported?.features?.gpuvm?.installed ? `<div class="sub dim">The NVIDIA card is marked for a VM under its node's Features: a container does not get it while it is.</div>` : "";
+  return `<div class="setcell dmgpu">${lbl("dmg-" + key, "GPU",
+      "The machine's card, given to every service of this container from the next build: an NVIDIA card through the container toolkit, an AMD card or APU through /dev/dri, which is how a media server transcodes.")}
+    <select id="${esc("dmg-" + key)}" data-dmgpu="${esc(key)}" aria-label="which GPU the container gets">${optionList(opts, pick || "")}</select>${held}</div>`;
+}
+
 function dmClaudeSaid(d, other = false){
   // What a Claude session may do with it, in a pill's few words: the
   // setting of the PROJECT it belongs to (Agents may: Run its container),
@@ -891,7 +913,7 @@ function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
   if (!body) return "";
   // ...or the grid alone, for a dialog whose foot carries the buttons.
   if (bare) return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", "")}</div>`;
-  const settable = /data-(dmown|dmmove|dmref|dmov|dmboot|dmlan|route)=/.test(body);
+  const settable = /data-(dmown|dmmove|dmref|dmov|dmgpu|dmboot|dmlan|route)=/.test(body);
   // ...with Cancel before it where Edit settings opened them: it drops what
   // was staged and puts the fields away (rows-you-open).
   const apply = `${cancel ? `<button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>` : ""}<button type="button" class="primary" data-dmapply="${esc(key)}"${
@@ -927,7 +949,7 @@ function dmDropDrafts(key){
   const inst = key.startsWith("inst:") ? key.slice(5) : "";
   const name = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
   delete dmOwnDraft[key];
-  if (inst){ delete dmMoveDraft[inst]; delete dmRefDraft[inst]; delete dmOvDraft[inst]; delete dmRouteDraft[inst]; delete dmNginxDraft[inst]; }
+  if (inst){ delete dmMoveDraft[inst]; delete dmRefDraft[inst]; delete dmOvDraft[inst]; delete dmGpuDraft[inst]; delete dmRouteDraft[inst]; delete dmNginxDraft[inst]; }
   if (name){ delete dmBootDraft[name]; delete dmLanDraft[name]; }
 }
 // Whether a row has a setting staged and not yet applied: the drafts each
@@ -937,7 +959,7 @@ function dmRowDirty(key){
   const name = key.startsWith("ctr:") ? key.slice(4) : "";
   const rowName = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : name;
   return dmOwnDraft[key] !== undefined
-    || (inst && (dmMoveDraft[inst] !== undefined || dmRefDraft[inst] !== undefined || dmOvDraft[inst] !== undefined
+    || (inst && (dmMoveDraft[inst] !== undefined || dmRefDraft[inst] !== undefined || dmOvDraft[inst] !== undefined || dmGpuDraft[inst] !== undefined
                  || dmRouteDraft[inst] !== undefined))
     || (rowName && (dmBootDraft[rowName] !== undefined || dmLanDraft[rowName] !== undefined));
 }
@@ -1020,6 +1042,7 @@ function dmInstPills(d, managed){
     d.source !== "file" && d.owner && d.project !== d.owner ? ["Built from", esc(projLabel(d.project))] : null,
     d.source !== "file" && refs.length ? ["Branch", d.ref ? esc(d.ref) : "follows project"] : null,
     d.override ? ["Override", esc(d.override)] : null,
+    d.gpu ? ["GPU", d.gpu === "nvidia" ? "NVIDIA card" : "AMD card or APU"] : null,
     r && (mode || url) ? ["Reached via", [esc(mode), url].filter(Boolean).join(" · ")] : null,
     dmRoutesOf(d).length ? ["nginx", dmRoutesOf(d).map(dmRouteLink).join(" · ")] : null,
     d.exists && !managed ? ["", d.boot ? "✓ Starts on boot" : "not on boot", d.boot ? "ok" : ""] : null,
@@ -1902,7 +1925,7 @@ function dmRowsHtml(ins, job, blind){
         // with a setting staged keeps it open.
         dmSetPills(dmInstPills(d, managed))}
         ${dmEditing.has(key) || dmRowDirty(key)
-          ? dmSetDialog(d.name, key, [dmOwnerLine(d, key), dmMoveLine(d), dmRefLine(d), dmOverrideLine(d), dmRouteLine(d),
+          ? dmSetDialog(d.name, key, [dmOwnerLine(d, key), dmMoveLine(d), dmRefLine(d), dmOverrideLine(d), dmGpuLine(d), dmRouteLine(d),
                        dmNginxLine(d), d.exists ? dmBootLine(d.name, !!d.boot) : "", d.exists ? dmLanLine(d.name, !!d.lan) : ""]) : ""}
       </div>
       ${docSection("docker", `wire:${d.project}|${d.instance}`,
@@ -2233,6 +2256,23 @@ function dmWireRows(el, list = dockerList){
     else dmOvDraft[key] = sel.value;
     wake(sel.closest(".row"));
   });
+  el.querySelectorAll("[data-dmgpu]").forEach(sel => sel.onchange = () => {
+    const key = sel.dataset.dmgpu;
+    const saved = (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.gpu || "";
+    if (sel.value === saved) delete dmGpuDraft[key];
+    else dmGpuDraft[key] = sel.value;
+    wake(sel.closest(".row"));
+  });
+  const applyGpu = async key => {
+    const [project, instance] = key.split("|");
+    const kind = dmGpuDraft[key];
+    if (kind === undefined) return;
+    const j = await (await postJSON("/api/devapp", {project, instance, action: "gpu", kind})).json().catch(() => ({error: "no answer"}));
+    if (j.error){ notify(j.error, true); return; }
+    delete dmGpuDraft[key];
+    notify(kind ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
+                : `${dmCalled(project, instance)} gets no GPU from the next build`);
+  };
   const applyOverride = async key => {
     const [project, instance] = key.split("|");
     const file = dmOvDraft[key];
@@ -2414,7 +2454,7 @@ function dmWireRows(el, list = dockerList){
     busy(btn, "Applying");
     try{
       await applyOwner(key);
-      if (inst){ await applyMove(inst); await applyRef(inst); await applyOverride(inst); if (row?.dataset.inst) await applyRoute(row); }
+      if (inst){ await applyMove(inst); await applyRef(inst); await applyOverride(inst); await applyGpu(inst); if (row?.dataset.inst) await applyRoute(row); }
       if (name){ await applyBoot(name); await applyLan(name); }
     }catch(e){ notify("apply: " + failWords(e), true); }
     finally{ if (btn.isConnected) unbusy(btn, "Apply"); }

@@ -151,8 +151,41 @@ def migrate():
 def checkpoint():
     """The write-ahead log folded into the database, so a copy of the file
     alone is whole (a move's bundle, B601)."""
+    fold()
+
+
+# How often the log is folded on its own (B654). A minute: what a hard kill
+# can lose at most, and a fold of a minute's frames is milliseconds.
+FOLD_S = 60
+
+
+def fold():
+    """The write-ahead log folded into the database file and cut back to
+    nothing, so the file alone is the state: every minute and on a clean
+    stop (B654). SQLite folds on its own only at a thousand pages, and on
+    a mount where the index it keeps beside the log is not trusted across
+    a restart (a /mnt/user path, FUSE: a container re-created there came
+    back with the state of the last fold, 25 minutes before, and both
+    nodes' rotated tokens unknown, 3 Nov) that is 25 minutes gone. A reader
+    half-way through leaves the fold to the next minute: (busy, frames,
+    folded) as SQLite says it, or (0, 0, 0) with no store open."""
+    if _db is None:
+        return (0, 0, 0)
     with _lock:
-        _db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        row = _db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+    return tuple(row) if row else (0, 0, 0)
+
+
+def start_folding(every=FOLD_S):
+    """The minute loop that folds (B654), a daemon thread beside the server's others."""
+    def loop():
+        while True:
+            time.sleep(every)
+            try:
+                fold()
+            except sqlite3.Error as e:                               # the loop outlives one bad pass
+                print(f"[dashboard] db: the log was not folded: {e}", flush=True)
+    threading.Thread(target=loop, name="fold", daemon=True).start()
 
 
 def _statements(text):

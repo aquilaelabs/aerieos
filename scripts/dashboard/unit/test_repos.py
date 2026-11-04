@@ -162,16 +162,25 @@ class Repos(unittest.TestCase):
         prefs.set_prefs("app", node="n1", devbuild="auto", reads=["reader"])
         prefs.set_prefs("server", build="make server")
         s = prefs.get("server")
-        self.assertEqual((s["node"], s["devbuild"], s["repos_of"]), ("n1", "auto", key),
-                         "the project's node and dials, set from any of its repositories")
+        # The node is the project's, set from any of its repositories; a dial
+        # set from a repository's notebook is that repository's own override
+        # (R208 step 6), and the project's default is set on its own door.
+        self.assertEqual((s["node"], s["devbuild"], s["repos_of"]), ("n1", "deny", key),
+                         "the project's node from any repository; a dial set there is that repository's alone")
+        self.assertEqual((prefs.get("app")["devbuild"], prefs.get("app")["overrides"]), ("auto", ["devbuild"]))
+        prefs.set_prefs("app", scope="project", devbuild="ask")
+        self.assertEqual((prefs.get("app")["devbuild"], prefs.get("server")["devbuild"]), ("auto", "ask"),
+                         "the project's default reaches the repository that inherits, not the one that overrides")
         self.assertEqual((s["build"], prefs.get("app")["build"]), ("make server", "make app"),
                          "a repository's own build stays its own")
 
     def test_a_repository_with_no_record_of_its_own_lists_its_projects_settings(self):
         key = self.project("Shop", "app")
-        prefs.set_prefs("app", devbuild="auto")
+        prefs.set_prefs("app", scope="project", devbuild="auto")
         repos.add(key, "docs")
         self.assertEqual(prefs.all_projects()["docs"]["devbuild"], "auto", "the status row reads the project's dial")
+        prefs.set_prefs("app", makevms="auto")             # app's own override: the project keeps no record of it
+        self.assertEqual(prefs.all_projects()["docs"]["makevms"], "deny", "...and a repository's override is not the project's")
 
     def test_reads_go_by_the_project_and_take_in_a_repository_added_later(self):
         prefs.set_prefs("reader", reads=["app"])

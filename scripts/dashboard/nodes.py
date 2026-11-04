@@ -1038,7 +1038,7 @@ def own_machine(n):
 
 
 def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host_only=False, nginx=False, door=None,
-                existing=None, own=False):
+                existing=None, own=False, system=""):
     """Add node, agent kind: a pending row and the one token that fills it.
     With `existing` (R177), no row: a node already here gets a new enroll
     token, its config brought to the answers, and the row's id and state
@@ -1071,7 +1071,7 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
         cfg = dict(n.get("config") or {})
         cfg["user"] = user
         for key, val in (("tunnel", tunnel), ("host_only", True if host_only else None),
-                         ("nginx", True if nginx else None), ("door", door)):
+                         ("nginx", True if nginx else None), ("door", door), ("system", system or None)):
             if val:
                 cfg[key] = val
             else:
@@ -1115,6 +1115,9 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
                    # The door in for SSH the script sets up (R174): its kind
                    # and name, so the row knows before the machine reports.
                    **({"door": door} if door else {}),
+                   # The system its script was built for (R210): what a
+                   # script made again for the row is built for too.
+                   **({"system": system} if system else {}),
                    # The controller's own machine (R90).
                    **({"own": True, "session_net": True} if own else {})},
     })
@@ -1122,6 +1125,35 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
     _touch(nid, principal, "node-enroll-mint", {"token": tid, "caps": caps})
     return {"ok": True, "id": nid, "token": secret,
             "expires": int(time.time()) + ENROLL_TTL}
+
+
+def system_of(n):
+    """The system a node's script is built for (R210): the one recorded on
+    its row at mint, else the one its census names, else the default."""
+    import systems
+    cfg = n.get("config") or {}
+    if systems.get(cfg.get("system") or ""):
+        return cfg["system"]
+    return systems.of_os((n.get("reported") or {}).get("os")) or systems.DEFAULT
+
+
+def row_answers(n, origin=""):
+    """Enroll node's questions as the row answers them (R210): what an
+    enrolled node's Enroll script builds from, with no dialog. The
+    controller's address is the browser's own, as the dialog fills it,
+    unless the node reaches a public hostname, which the row names; the
+    secrets are the node's (enrollscript.check with again)."""
+    cfg = n.get("config") or {}
+    t = cfg.get("tunnel") if isinstance(cfg.get("tunnel"), dict) else {}
+    reach = t.get("kind") if t.get("kind") in ("public", "wireguard") else "lan"
+    door = cfg.get("door") if isinstance(cfg.get("door"), dict) else {}
+    return {"node": n["id"], "name": n.get("name") or "", "script": True,
+            "user": cfg.get("user") or "bb", "system": system_of(n),
+            "sessions": not cfg.get("host_only"), "host_only": bool(cfg.get("host_only")),
+            "nginx": bool(cfg.get("nginx")), "reach": reach,
+            "controller": f"https://{t['host']}" if reach == "public" and t.get("host") else origin,
+            "tunnel_addr": str(t.get("addr") or "") if reach == "wireguard" else "",
+            "door": str(door.get("kind") or ""), "door_host": str(door.get("host") or "")}
 
 
 def enroll_script(principal, req):
@@ -1141,6 +1173,16 @@ def enroll_script(principal, req):
     # its secrets asked for and carried, and its words those of a first
     # (B637: it said "run it again on the same machine", "no secret").
     enrolled = bool(again) and again.get("state") != "pending"
+    # The row's own answers (R210): Enroll script on an enrolled node's row
+    # sends `as_row` and the address the browser reached the controller by,
+    # and the script is built from what the row was enrolled with, the
+    # Features section's Enroll again being where an answer is changed.
+    if enrolled and req.get("as_row") is True:
+        req = row_answers(again, str(req.get("controller") or ""))
+        ho = req["host_only"]
+    import systems
+    if enrolled and not req.get("system"):
+        req = req | {"system": system_of(again)}
     ans = enrollscript.check(req | ({"sessions": False} if ho else {}), again=enrolled)
     if ans.get("error"):
         return ans
@@ -1167,7 +1209,7 @@ def enroll_script(principal, req):
     m = enroll_mint(principal, field(req, "name"), req.get("capabilities"), user, tunnel=tunnel, host_only=ho,
                     nginx=req.get("nginx") is True,
                     door={"kind": ans["door"], "host": ans.get("door_host", "")} if ans.get("door") else None,
-                    existing=again["id"] if again else None)
+                    existing=again["id"] if again else None, system=ans["system"])
     _synced["at"] = 0.0
     if m.get("error"):
         return m
@@ -1175,12 +1217,15 @@ def enroll_script(principal, req):
     u = urllib.parse.urlparse(ans["controller"])
     port = u.port or (443 if u.scheme == "https" else 80)
     machine = ((again or {}).get("reported") or {}).get("machine") or ""
-    import systems
+    # Its stores as it reports them (B658): a script run again had handed
+    # the provisioner nothing, and the node came back on the defaults.
+    stores = {role: s.get("path") for role, s in (((again or {}).get("reported") or {}).get("stores") or {}).items()
+              if isinstance(s, dict) and s.get("path")} if enrolled else {}
     fam = systems.family_file(ans.get("system") or systems.DEFAULT)
     return m | {"script": enrollscript.build(ans, name=name, user=user, token=m["token"],
                                               expires=m["expires"], provisioner=prov.read_bytes(),
                                               family=fam.read_bytes() if fam and fam.is_file() else b"",
-                                              again=enrolled, machine=machine),
+                                              again=enrolled, machine=machine, stores=stores),
                 "filename": enrollscript.filename(name, m["id"]), "reach": ans["reach"],
                 "home": enrollscript.home_rules(ans, port),
                 "tunnel_addr": ans.get("tunnel_addr", "")}
@@ -1471,7 +1516,12 @@ def _census(c):
                        "iommu": {"installed": io.get("installed") is True, "on": io.get("on") is True},
                        "storage": {k: sto.get(k) is True for k in ("installed", "zfs", "mergerfs", "snapraid", "smart")},
                        "shares": {k: sh.get(k) is True for k in ("installed", "smb", "nfs")},
-                       "ups": {k: (fe.get("ups") or {}).get(k) is True for k in ("installed", "nut")} if isinstance(fe.get("ups"), dict) else {}}
+                       "ups": {k: (fe.get("ups") or {}).get(k) is True for k in ("installed", "nut")} if isinstance(fe.get("ups"), dict) else {},
+                       # The NVIDIA card marked for a VM (R207 step 3): the
+                       # marker, whether vfio-pci holds it now, its ids.
+                       "gpuvm": {"installed": (fe.get("gpuvm") or {}).get("installed") is True, "bound": (fe.get("gpuvm") or {}).get("bound") is True,
+                                 "cards": int((fe.get("gpuvm") or {}).get("cards") or 0) if str((fe.get("gpuvm") or {}).get("cards") or 0).isdigit() else 0,
+                                 "ids": re.sub(r"[^0-9a-f:,]", "", str((fe.get("gpuvm") or {}).get("ids") or ""))[:200]} if isinstance(fe.get("gpuvm"), dict) else {}}
     # The machine's disks (R162 step 1), each to its shape: a name, a model,
     # a serial, a size, what each partition holds, SMART's three facts.
     if isinstance(c.get("disks"), list):
@@ -1722,7 +1772,7 @@ def _census(c):
     out["sandbox"] = bool(c.get("sandbox"))
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
-    for k in ("gpu_card", "gpu_display"):
+    for k in ("gpu_card", "gpu_display", "gpu_amd"):
         if c.get(k):
             out[k] = str(c[k])[:200]
     # Where the NVIDIA driver stands (R102): installed for this kernel,
@@ -3177,8 +3227,8 @@ def lockdown_over(n):
 
 # The features a node's Features section installs and removes (R91), as
 # bb-sandbox's FEATURE_IDS and the agent's census name them.
-FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups")
-FEATURE_NAMES = {"vmhost": "VM host", "firewall": "the hosting firewall", "iommu": "the IOMMU",
+FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
+FEATURE_NAMES = {"vmhost": "VM host", "firewall": "the hosting firewall", "iommu": "the IOMMU", "gpuvm": "the NVIDIA card to a VM",
                  "storage": "storage", "shares": "shares", "ups": "the UPS"}
 # The installed edition's own (R56 step 2): on the controller's own machine alone.
 OWN_FEATURES = ("storage", "shares", "ups")
@@ -3221,6 +3271,9 @@ def node_feature(principal, node_id, fid, op):
     if op == "install" and fid == "vmhost" and not (fe.get("vmhost") or {}).get("kvm"):
         return {"error": f"{n['name']} has no /dev/kvm, so VMs would run in software, tens of times slower: on a VM, "
                          "its host passes virtualization through (CPU mode host-passthrough, nested KVM on)"}
+    # The card to a VM (R207 step 3) wants a card: the census names one.
+    if fid == "gpuvm" and op == "install" and not rep.get("gpu_card"):
+        return {"error": f"no NVIDIA card on {n['name']} (none in what it reported), so there is no card to give a VM"}
     if fid == "iommu" and not str(rep.get("arch") or "").startswith(("x86_64", "amd64")):
         return {"error": f"the IOMMU switch is for an Intel or AMD machine; {n['name']} is {rep.get('arch') or 'another architecture'}"}
     if op == "install" and fid == "firewall" and not (n.get("config") or {}).get("host_only"):
@@ -3455,9 +3508,12 @@ def _adopt_want(req):
         parity.append({"slot": str(x.get("slot") or "parity")[:16], "id": x["id"]})
     for x in w.get("pools") or []:
         if not isinstance(x, dict) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", str(x.get("name") or "")) \
-                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))):
-            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid}"
-        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or "")})
+                or str(x.get("fs") or "") not in ADOPT_FS or (x.get("uuid") and not ok_id(x.get("uuid"))) \
+                or (x.get("disk_id") and not ok_id(x.get("disk_id"))):
+            return None, "a pool is {name, fs: xfs, btrfs or zfs, uuid, or disk_id for one the old system kept in its cache slot}"
+        # ...found by its disk where no pool record names its UUID (B625).
+        pools.append({"name": x["name"], "fs": x["fs"], "uuid": str(x.get("uuid") or ""),
+                      **({"disk_id": str(x["disk_id"])} if x.get("disk_id") else {})})
     if len(data) > 30 or len(parity) > 2 or len(pools) > 8 or not (data or pools):
         return None, "name the data disks and pools to adopt (at most 30 disks, 2 parity, 8 pools)"
     return {"data": data, "parity": parity, "pools": pools, "writable": w.get("writable") is True,
@@ -5523,18 +5579,24 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
 
 
 # What node_path_state runs there: read-only, stdlib, the python every node
-# carries for its agent. One JSON line: {path: {exists, dir, files}}.
+# carries for its agent. One JSON line: {path: {exists, dir, files, store,
+# mine}}: `store` when the folder carries AerieOS's store marker (R212), and
+# `mine` when it holds this node's own toolchain folder, <path>/<node id>
+# with the marker, which is what a toolchain share looks like from the share.
 _PATH_STATE = """
 import json, os, sys
 out = {}
+nid = sys.argv[2] if len(sys.argv) > 2 else ""
 for p in json.loads(sys.argv[1]):
-    st = {"exists": os.path.exists(p), "dir": os.path.isdir(p), "files": False}
+    st = {"exists": os.path.exists(p), "dir": os.path.isdir(p), "files": False, "store": False, "mine": False}
     if st["dir"]:
         try:
             with os.scandir(p) as it:
                 st["files"] = any(True for _ in it)
         except OSError:
             st["files"] = True
+        st["store"] = os.path.isfile(os.path.join(p, ".bb-store-id"))
+        st["mine"] = bool(nid) and os.path.isfile(os.path.join(p, nid, ".bb-store-id"))
     out[p] = st
 print(json.dumps(out))
 """
@@ -5547,11 +5609,14 @@ def node_slug(name):
 
 
 def node_path_state(principal, node_id, paths):
-    """{paths: {path: {exists, dir, files, why, sub, sub_state}}} for each
-    path asked, or {error}: whether it is a place a store or a mount may go
-    at all (store_path_ok), and what is there now. A path that holds files
-    also carries the folder named for this node inside it, and what is
-    there, which is where the page offers to put the store instead."""
+    """{paths: {path: {exists, dir, files, store, mine, own, why, sub,
+    sub_state}}} for each path asked, or {error}: whether it is a place a
+    store or a mount may go at all (store_path_ok), and what is there now.
+    A path that holds files also carries the folder named for this node
+    inside it, and what is there, which is where the page offers to put
+    the store instead; one that already is a store (R212: the marker,
+    this node's own toolchain folder inside it, or the folder the page
+    nested for this node before, `own`) is adopted as it is."""
     n = node(node_id)
     if not n or n.get("kind") != "agent":
         return {"error": "only an agent node says what is at a path"}
@@ -5564,7 +5629,7 @@ def node_path_state(principal, node_id, paths):
         return {"error": "no path to look at"}
     sub = {p: f"{p}/{node_slug(n.get('name'))}" for p in want}
     ask = want + [s for s in sub.values() if s not in want]
-    r = run_wait(principal, node_id, ["python3", "-c", _PATH_STATE, json.dumps(ask)], timeout=20,
+    r = run_wait(principal, node_id, ["python3", "-c", _PATH_STATE, json.dumps(ask), str(node_id)], timeout=20,
                  forget=True, title="what is at the storage paths")
     if r.get("error"):
         return {"error": r["error"]}
@@ -5578,6 +5643,9 @@ def node_path_state(principal, node_id, paths):
         st["why"] = store_path_ok(p)
         st["sub"] = sub[p]
         st["sub_state"] = got.get(sub[p]) or {}
+        # The folder the page nested for this node before (its name or its
+        # id as the last segment), pointed at directly this time.
+        st["own"] = bool(st.get("files")) and p.rsplit("/", 1)[-1] in (node_slug(n.get("name")), str(node_id))
         out[p] = st
     return {"paths": out}
 
@@ -7017,10 +7085,13 @@ def verb(principal, req):
     def enroll():
         if req.get("script"):
             return enroll_script(principal, req)
+        # Just a token for a node already here (B656): the row's id rides
+        # as `node`, as the script's does, so the mint lands on the row
+        # rather than seeing its name as taken.
         return enroll_mint(principal, field(req, "name"),
                            req.get("capabilities"),
                            field(req, "user") or "bb", host_only=req.get("host_only") is True,
-                           nginx=req.get("nginx") is True)
+                           nginx=req.get("nginx") is True, existing=field(req, "node") or None)
 
     def power():
         return node_power(principal, nid, act)

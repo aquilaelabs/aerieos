@@ -210,6 +210,17 @@ slot loaded into memory and keeps its configuration on the stick's data
 partition. Its network settings are the `BB_NET_` lines in `aerieos.env`;
 without them the stick takes DHCP.
 
+## A graphics card
+
+The image carries the NVIDIA driver (Debian's, its kernel module built
+into the image) and NVIDIA's container toolkit, registered with Docker, so
+a machine with an NVIDIA card has the driver on it from the first boot and
+a container that asks for the card gets it; nouveau is kept off the card.
+On a machine without a card the modules stay unloaded. An AMD card or APU
+runs on the kernel's own amdgpu driver with the firmware the image carries.
+Which way a card is used, by this machine and its containers or by one VM
+through vfio, is a choice under This machine's Features (R207).
+
 ## Its disks at the first run
 
 A machine that is its own controller has a disks step in its first run,
@@ -226,7 +237,10 @@ how much you can use, how many disks may fail and how it grows, and
 Advanced picks another layout. **Make it** names every disk it erases by
 serial before anything is written, and then one press makes the Media,
 Backups and Projects shares on it. The Storage page does all of this too,
-later, the same way.
+later, the same way. On a stick made with a prepared configuration that
+names disks to adopt, those disks are the old system's: each is listed as
+such, with no box, and the step makes nothing of them; they are taken as
+they are on This machine, under Disks from the stick.
 
 ## At the console
 

@@ -2293,15 +2293,18 @@ ok(true, '...and none takes it off again');
 // Back to the projects tab, which the notebook pushed out of the pane.
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
-// B82: alpha's page was open a moment ago, and its card's Settings still
-// goes there, to the Settings view, rather than turning the notebook behind
-// the Projects page.
+// A card's Settings is the project's own dialog (R208, the operator, 3 Nov),
+// over the Projects page, whether or not its notebook was open a moment ago
+// (B82 was the Settings view turning the notebook behind the page): the form
+// comes back from the notebook's view to the dialog for it.
 await pjMenu('alpha');
 await page.click('.doc .projtab .pcard[data-row="alpha"] [data-rn]');
-const toSettings = await page.waitForSelector('.nb .nbview[data-view="settings"]:not([hidden]) .nbsettings #rnName', { timeout: 10000 })
-  .then(() => true, () => false);
-ok(toSettings && !(await page.evaluate(() => !!document.querySelector('.doc.on .projtab'))),
-   `a card's Settings goes to the project's Settings view after its page was opened once (${await page.evaluate(() => location.hash)})`);
+await page.waitForSelector('#rnmodal:not([hidden]) > .box.rnproject', { timeout: 10000 });
+ok(await page.evaluate(() => !!document.querySelector('.doc.on .projtab') && $('rnTitle').textContent === 'alpha settings'
+     && !document.querySelector('#rnmodal .rnwork') && !$('rnProjectNote').hidden),
+   `a card's Settings opens the project's dialog over the Projects page, its notebook opened before or not (${await page.evaluate(() => location.hash)})`);
+await page.click('#rnCancel');
+await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
 await page.evaluate(n => renameProject(n), 'alpha');  // the settings form (the row's gear went in R119 step 3)

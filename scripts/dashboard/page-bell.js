@@ -414,6 +414,16 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bmachine="${a.kind === "power" ? "power" : "updates"}">This machine</a></span></div></div>`;
   }
+  // A move's landing cut midway (B622): what is where, and the press that
+  // finishes it, under Controller settings.
+  if (a.kind === "move"){
+    return `<div class="bnote att bad">
+      <div class="bt">A move's landing was cut midway</div>
+      <div class="bsum">${esc(a.why)}</div>
+      <div class="bfoot"><span>until the same bundle lands again</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bsettings="move">Controller settings</a></span></div></div>`;
+  }
   // A newer AerieOS release, on a controller installed bare metal (R90
   // step 5): Update runs the installer through its own node's root agent.
   if (a.kind === "release"){
@@ -820,6 +830,9 @@ function wireNeeds(root, after = () => {}){
   // ...and a release's signing to the project's Signing view (R106).
   root.querySelectorAll("[data-bschedjob]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); openJob(a.dataset.bschedjob);
+  });
+  root.querySelectorAll("[data-bsettings]").forEach(a => a.onclick = e => {
+    e.preventDefault(); after(); openSettingsTab();
   });
   root.querySelectorAll("[data-bsched]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); openSchedulesTab();

@@ -22,6 +22,7 @@ speak with a few differences, and GitLab's own words for the same things
 (a merge request, a pipeline, a note).
 """
 
+import base64
 import json
 import re
 import threading
@@ -171,6 +172,25 @@ def _h(headers, name):
     return {k.lower(): v for k, v in (headers or {}).items()}.get(name.lower())
 
 
+def _receive_pack_probe(t, r):
+    """Whether the host lets the token push, asked the way git asks before
+    a push (GET REPO.git/info/refs?service=git-receive-pack, nothing
+    written): a fine-grained token an organization has not approved passes
+    the API's write probes (a 422 for a missing field) and is refused here,
+    as the push itself is (B462). True, False, or None where the host did
+    not say either way."""
+    url = f"{t['scheme']}://{t['host']}/{r}.git/info/refs?service=git-receive-pack"
+    cred = base64.b64encode(f"x-access-token:{t['token']}".encode()).decode()
+    req = urllib.request.Request(url, headers={"User-Agent": "git/2.43.0", "Authorization": f"Basic {cred}"})
+    try:
+        with forges._OPENER.open(req, timeout=30) as resp:
+            return resp.status == 200
+    except urllib.error.HTTPError as e:
+        return False if e.code in (401, 403) else None
+    except (OSError, urllib.error.URLError):
+        return None
+
+
 def _write_probe(code):
     """A write probe's answer read: a 422 (or a 404 for a thing that is not
     there) means the token was let through to the content; 401 and 403 mean
@@ -266,6 +286,12 @@ def measure(project, t=None):
             write("issues_write", "POST", f"/repos/{r}/issues", {})
             write("releases_write", "POST", f"/repos/{r}/releases", {})
             write("actions_write", "POST", f"/repos/{r}/actions/workflows/builderbot-access-probe.yml/dispatches", {})
+            # ...and the push asked of the git door itself (B462): a token
+            # the organization has not approved reads as allowed above.
+            if has["push"] and _receive_pack_probe(t, r) is False:
+                has["push"] = False
+                notes.append("GitHub refuses the token at the git door (git-receive-pack), so a push is refused however its "
+                             "permissions read: an organization's fine-grained token not approved yet, or a repository read-only to it.")
             has["merge"] = bool(has["pr_write"] and has["push"]) if None not in (has["pr_write"], has["push"]) else None
     elif kind == "gitlab":
         code, proj, _h2 = _call(t, "GET", f"/projects/{rq}")

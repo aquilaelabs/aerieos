@@ -1090,10 +1090,18 @@ the pieces stack:
    a new token, since a token is good once and never kept) and Discard,
    which takes a row that never enrolled off outright (`node_discard`);
    an enrolled node is retired, its history kept.
-4a. *Enroll it again* (R177): Enroll script on the node's page makes a new
-   script for a node already here, opened on its own answers, with no
-   secret in it (the node keeps its door's; a
-   secret pasted replaces the node's), bound to the machine the node
+4a. *Enroll it again* (R177, R210): Enroll script on the node's page makes
+   a new script for a node already here in one press, built from the
+   answers on its row (`row_answers`: its account, its ticks, how it
+   reaches the controller, its door, and the system it was enrolled as,
+   recorded on the row at mint and read off its census for a row older
+   than that, `system_of`), with no secret in it (the node keeps its
+   door's), and with the node's stores as it reports them, as the
+   provisioner's store flags, so the node keeps them where they are (the
+   agent keeps a store the flags leave at its default where its record
+   has it, too); the Features section's Enroll again opens the dialog on
+   the same answers to change one or paste a secret, which replaces the
+   node's. Either way the script is bound to the machine the node
    reported (`--machine`, the hash of its machine id, which the provisioner
    checks before it changes anything and `nodes.enroll` checks again), and
    enrolling under the same id, every earlier token of the node revoked so
@@ -1590,8 +1598,16 @@ page. Then, for each store:
 
 - a path that is empty or does not exist yet asks *are you sure*, and the
   store goes there as typed;
-- a path that already holds files asks the same, saying that a folder named
-  for the node is made inside it and the setting changes to that
+- a path that already is a store (R212) is adopted as it is: one carrying
+  AerieOS's store marker (`.bb-store-id`), a toolchain share holding this
+  node's own folder (`<path>/<node id>` with the marker; that folder typed
+  itself sets the share around it, since the agent keeps each node's
+  toolchains in a folder named for it inside the store), or the folder the
+  page nested for this node before, typed itself. The dialog says which,
+  the setting stays as typed, nothing is nested and nothing brought across:
+  the store uses what is there;
+- a path that already holds other files asks the same, saying that a folder
+  named for the node is made inside it and the setting changes to that
   (`/srv/share` becomes `/srv/share/<node>`), so a store never shares a
   folder with files that are not its own;
 - when the old store holds data, whether to bring it across is its own
@@ -1601,8 +1617,13 @@ page. Then, for each store:
 
 The agent never copies a store into a folder that already holds files: the
 copy would mix the two by name, so it refuses and leaves the store where it
-was. A mount point on a folder that holds files asks first too, saying the
-share covers them until it is unmounted.
+was. It asks the same question as the page's probe at apply time, on its own
+side: a target carrying the marker, holding this node's own toolchain folder
+or made by this agent for the store before is used as it is, whether or not
+the setting was saved with the store in `keep` (a setting saved before the
+probe could answer applies without a second save). A mount point on a folder
+that holds files asks first too, saying the share covers them until it is
+unmounted.
 
 **A store move waits for the node to be quiet and holds it without
 ending anything (R120 step 7).** An apply that repoints a store (anything but

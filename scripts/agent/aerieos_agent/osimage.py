@@ -212,7 +212,7 @@ def write_kept_menu(esp=None):
             v = r["version"]
             at = f"$aerie_data/lib/aerieos-os/kept/{v}"
             text += (f'    menuentry "AerieOS {v}" --id kept-{v} {{\n'
-                     f"        linux {at}/vmlinuz root=/dev/loop0 aeriekept={v} $aerie_keptram rootfstype=squashfs ro overlayroot=tmpfs "
+                     f"        linux {at}/vmlinuz root=/dev/loop0 aeriekept={v} $aerie_keptram rootfstype=squashfs overlayroot=tmpfs "
                      "aerieslot=$aerie_slot panic=15 console=ttyS0,115200 console=tty0 quiet systemd.show_status=auto $aerie_args\n"
                      f"        initrd {at}/initrd\n    }}\n")
         text += "}\n"

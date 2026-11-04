@@ -32,6 +32,28 @@ def wj(p, d):
     Path(p).write_text(json.dumps(d))
 
 
+class Met(unittest.TestCase):
+    def test_the_waits_the_machine_has_met_move_to_done(self):
+        # B634: the From the stick section kept saying the array and the
+        # shares were waiting after both had landed.
+        import firstboot
+        waiting = [{"what": "shares", "said": "a share is served once they are adopted", "count": 2},
+                   {"what": "array", "said": "adopted on This machine", "count": 1},
+                   {"what": "pools", "said": "adopted on This machine", "count": 1}]
+        rep = {"adopted": {"mounts": [{"where": "/mnt/disk1", "mounted": True}, {"where": "/mnt/disk2", "mounted": True},
+                                      {"where": "/mnt/cache", "mounted": False}]}, "shares": []}
+        still, done = firstboot.met(waiting, [{"what": "accounts", "said": "admin"}], rep)
+        self.assertEqual([w["what"] for w in still], ["shares", "pools"])
+        self.assertEqual(done[-1], {"what": "array", "said": "adopted: 2 data disks mounted", "count": 1})
+        rep["shares"] = [{"name": "media"}, {"name": "backups"}]
+        rep["adopted"]["mounts"][2]["mounted"] = True
+        still, done = firstboot.met(waiting, [], rep)
+        self.assertEqual(still, [])
+        self.assertEqual([(d["what"], d["said"]) for d in done], [("shares", "2 served"), ("array", "adopted: 2 data disks mounted"), ("pools", "adopted: 1 mounted")])
+        # Nothing reported: nothing moves.
+        self.assertEqual(firstboot.met(waiting, [], None), (waiting, []))
+
+
 class Take(unittest.TestCase):
     def test_the_root_step_takes_it_off_the_stick_and_blanks_it_in_place(self):
         with tempfile.TemporaryDirectory() as d:

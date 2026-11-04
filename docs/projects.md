@@ -44,6 +44,32 @@ may dials, since those are the project's. First run and Home's Getting
 started open the same dialog on its own, and the project is made around the
 repository, named as it is.
 
+A project needs no repository at all. Press **Start agent** on an empty
+project's card and a session starts in a plain folder of the project's own
+(`/workspace/KEY`, with no git and no notebook), told that there is no code
+here: its work is containers and VMs on the project's node, made with
+`aerie container new` from a compose file it writes in that folder, or
+`aerie vm`, under the project's Agents may dials. Name a project "Media
+server" and ask its session for a media server stack, or for a VM set up to
+your requirements, and nothing about code is ever on the screen: the card
+lists no repository, Report bug is not offered, git and the build, test and
+notebook verbs are refused with why, and the briefing leaves the code topics
+out. The card's **Settings** opens the project's settings as a dialog: its
+name's hint, its people, where it runs, what its sessions reach, its
+toolchains, what is yours there, its running sessions and the Agents may
+dials that need no code (Run its container, Make VMs, Install a tool pack,
+Report AerieOS bugs, Use a lent PC). On a project with repositories the same
+dialog holds what is the project's as a whole, and says that git, build and
+test, file access and snapshots are each repository's, in its notebook's
+Settings view. The dialog's Agents may dials are the project's defaults:
+every repository in it inherits each one until its own notebook's
+Permissions view sets it apart, where each dial's first choice reads "as
+the project (deny)" with the inherited word, which is what a new repository
+starts on; picking a value there is that repository's override alone, and
+picking "as the project" gives it back. Add repository on the card makes a
+project with no repository a coding project; Delete project removes its
+folder with it.
+
 A fresh local repo (`git init`) asks for a name and a free-text *Brief*: what you want
 built. The brief is not the project's `CLAUDE.md`, which every session
 reads as standing instructions and which would go on asserting the first

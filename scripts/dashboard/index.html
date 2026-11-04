@@ -1019,19 +1019,29 @@ html[data-motion="reduce"] .tourring{transition:none}
    at 1cm rather than a hand-kept copy of it. */
 .sw{position:relative;display:block;padding:0;overflow:hidden;
   height:44px;border-radius:var(--r-control);cursor:pointer;
-  background:var(--bg);border:var(--hair) solid var(--line)}
+  background:var(--bg);border:var(--hair) solid var(--line);
+  /* Resolved on the tile, from its own note color: the page's --lit is
+     computed once at the root and would be inherited by every tile. The
+     default tile's copper is its own rule, which outranks this. */
+  --lit:var(--note)}
 .sw .swp{position:absolute;left:0;right:0;bottom:0;height:16px;
   background:var(--panel);border-top:var(--hair) solid var(--line)}
 .sw .swa{position:absolute;left:6px;top:7px;width:10px;height:10px;
   border-radius:50%;background:var(--accent)}
+/* The second circle is the fill a pressed control wears (--lit), which is
+   what a person sees as the scheme's second color: copper on Default,
+   the note color on every other scheme (B649). */
 .sw .swb{position:absolute;left:19px;top:7px;width:10px;height:10px;
-  border-radius:50%;background:var(--note)}
+  border-radius:50%;background:var(--lit)}
 .sw .swi{position:absolute;left:34px;top:10px;right:6px;height:4px;
   border-radius:2px;background:var(--ink);opacity:.55}
 .sw .swn{position:absolute;left:0;right:0;bottom:0;height:16px;z-index:1;
   font:var(--f-tag);letter-spacing:.3px;color:var(--ink);
   display:flex;align-items:center;justify-content:center}
-.sw.on{outline:2px solid var(--accent);outline-offset:1px}
+/* The chosen tile keeps its scheme's own ground (B649): it is a button, and
+   the page's pressed-button fill (the lit color) painted the Default tile
+   copper, which read as the scheme's accent. The outline says it is on. */
+button.sw.on,button.sw.on:hover{background:var(--bg);border-color:var(--line);color:var(--ink);outline:2px solid var(--accent);outline-offset:1px}
 @media(hover:hover){ .sw:hover{border-color:var(--ink)} }
 .bnote{padding:8px 12px;border-bottom:var(--hair) solid var(--line);font:var(--f-ui)}
 .bnote:last-of-type{border-bottom:0}
@@ -1190,8 +1200,10 @@ body.firstrun #panes{display:none}
   font:var(--f-pill);color:var(--dim);border:var(--hair) solid var(--line)}
 .setstep.done .setnum{color:var(--pass);border-color:var(--green2-edge)}
 /* The disks step (R161 step 3): each disk a row to tick, the plan in words. */
-.setstep .setdisk label{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.setstep .setdisk .grow{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 .setstep .setdisk .sub{flex:1 1 100%}
+/* The box before the disk's name, not a field's full line (B640): .row input is every field's 100%. */
+.setstep .setdisk input[type=checkbox]{width:auto;flex:0 0 auto;margin:0}
 .setstep .setplan{margin:10px 0 0}
 .setstep .setplan p{margin:2px 0}
 .setstepbody p{margin:0;color:var(--dim)}
@@ -2836,6 +2848,14 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* Agents may is the Permissions view's; the Settings view leaves it out of
    its page while the form is there (nb-permissions.js). */
 .nbsettings details[data-sect="rn:claude"]{display:none}
+/* A card's door on the project's settings (R208): the repository's own
+   sections are each notebook's, and a project with no repository has no
+   dial, test-run pick or commit identity that needs code. */
+#rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
+#rnmodal .box.rnwork .rncode{display:none}
+/* ...and General holds nothing to save on that door (its name is the
+   card's back's), so its bar is not drawn. */
+#rnmodal .box.rnproject details[data-sect="rn:project"] .rnbar{display:none}
 /* The lent phone's screen as a session last saw it (tab-phone.js, R113): a
    picture at a phone's proportions, never wider than a row wants. */
 .phshot{display:block;max-width:min(260px,60vw);height:auto;margin:8px 0 4px;
@@ -4900,7 +4920,10 @@ button[aria-busy="true"]{opacity:.75}
   grid-template-columns:minmax(0,7em) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
 /* Static routes take the network's whole width, in either mode. */
 .ndnet .ndroutes{grid-column:1 / -1}
-.ndmstate.warn{color:var(--warn)} .ndmstate.bad{color:var(--bad)}
+.ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
+/* The whole of a mount's reason, under its row (B660): the cell at the end
+   of the line keeps the state's first words. */
+.ndmount .ndmwhy{grid-column:1 / -1;white-space:normal;overflow-wrap:anywhere;margin-top:-2px}
 .ndstore{display:grid;grid-template-columns:minmax(0,7em) minmax(0,1fr);gap:6px;align-items:center}
 .ndstore label{font:var(--f-ui);color:var(--ink)}
 .ndstore .sub{grid-column:2}
@@ -5698,10 +5721,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    each row of pickers, the gap above it a band's, and the VM limits as
    number and unit pairs, two to a line on a phone. */
 .rnsub{display:block;margin-top:14px}
-.vmcaps{display:grid;grid-template-columns:repeat(4,max-content);gap:8px 16px;align-items:center}
+/* Wrapping, not a fixed grid: four fields with their units overran the
+   dialog's box at a desk and cut the last one off (B644). */
+.vmcaps{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .vmcap{display:inline-flex;align-items:center;gap:8px}
 .vmcap>input{width:6em}
-@media(max-width:600px){ .vmcaps{grid-template-columns:repeat(2,max-content)} }
 </style>
 </head>
 <body class="booting">
@@ -6305,6 +6329,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          session sees, how it builds, what an agent may
          do, what is yours, and who is in it now (the operator, 1 Oct). -->
     <details class="sect rngroup" data-sect="rn:project"><summary><span class="t">General</span></summary><div class="body">
+    <!-- A card's door (R208): the project's id and folder, its name the
+         card's back's to change. -->
+    <div class="field" id="rnProjectHead" hidden><div class="hint"></div></div>
     <div class="field" id="rnNameField">
       <label for="rnName">Name</label>
       <input id="rnName" maxlength="100" autocomplete="off" spellcheck="false">
@@ -6332,8 +6359,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          (the operator, 25 Sep): what a session enters, what it runs, and
          what a change asked for does while a test run is going. -->
     <div class="field" id="rnGateField">
-      <label id="rnGateLabel">While a test runs</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateLabel">
+      <label id="rnGateLabel" class="rncode">While a test runs</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateLabel">
         <label class="pick wide">A change asked for <select id="rnTestChange"
           aria-label="what a change asked for during a test run does">
           <option value="wait">waits: the ask in hand is finished and tested first</option>
@@ -6344,8 +6371,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            the groups a person looks for it under (the operator, 22 Oct: one
            grid of fifteen read as a heap). -->
       <div class="hint" id="rnGateMayLabel">Auto lands it, Ask holds it for your approval, Deny refuses it.</div>
-      <label id="rnGateNbLabel" class="rnsub">The notebook</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateNbLabel">
+      <label id="rnGateNbLabel" class="rnsub rncode">The notebook</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateNbLabel">
         <label class="pick">Add to roadmap <select id="rnGateRoadmap"
           aria-label="new roadmap items from a session"></select></label>
         <label class="pick">File bugs <select id="rnGateBugs"
@@ -6359,7 +6386,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       </div>
       <label id="rnGateRunLabel" class="rnsub">Building and running</label>
       <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateRunLabel">
-        <label class="pick">Fill in build and test <select id="rnGateSettings"
+        <label class="pick rncode">Fill in build and test <select id="rnGateSettings"
           aria-label="the build, test and outputs fields from a session"></select></label>
         <!-- The project's container: rebuild it, change its env, create it
              when there is none, remove it (devbuild; the Docker row says
@@ -6392,8 +6419,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <label class="vmcap"><input id="rnVmMem" type="number" min="0" max="1024" step="1" inputmode="numeric" aria-label="GB of memory in all"><span class="dim">GB memory</span></label>
         <label class="vmcap"><input id="rnVmDisk" type="number" min="0" max="16384" step="1" inputmode="numeric" aria-label="GB of disk in all"><span class="dim">GB disk</span></label>
       </div></div>
-      <label id="rnGateShipLabel" class="rnsub">Shipping</label>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateShipLabel">
+      <label id="rnGateShipLabel" class="rnsub rncode">Shipping</label>
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnGateShipLabel">
         <!-- aerie sign (R106): a build signed with one of the project's keys,
              which the session never receives. Ask by default; Ask waits for
              the project's owner. -->
@@ -6492,7 +6519,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="field" id="rnTermPreviewField"><label class="lbl" for="rnTermPreview">How your terminals here look</label>
         <div id="rnTermPreview" aria-live="polite"></div></div>
       <div class="hint" id="rnPrefHint"></div>
-      <div class="prefrow ctlrow" role="group" aria-labelledby="rnMineLabel">
+      <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnMineLabel">
         <label class="pick">Commit name <input id="rnGitName" type="text"
           autocomplete="off" spellcheck="false" maxlength="120"
           aria-label="name your commits here carry"></label>
@@ -6500,7 +6527,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
           autocomplete="off" spellcheck="false" maxlength="120"
           aria-label="email your commits here carry"></label>
       </div>
-      <div class="hint" id="rnGitHint"></div>
+      <div class="hint rncode" id="rnGitHint"></div>
     </div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:repo"><summary><span class="t">Repository</span></summary><div class="body">
@@ -6726,6 +6753,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     </div>
     </div></details>
     <div class="field" id="rnErrWrap" hidden><div class="hint bad" id="rnErr"></div></div>
+    <!-- A card's door (R208): where the rest of the settings are. -->
+    <div class="field" id="rnProjectNote" hidden><div class="hint"></div></div>
     <div class="foot">
       <!-- Each section saves itself (page-projsettings.js rnBars); the foot
            only closes the dialog, and is not there in the notebook. -->

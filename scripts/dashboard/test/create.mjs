@@ -95,8 +95,78 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New project')),
   ok(fresh.ring && fresh.seen, `a new project's card is scrolled into sight and wears the new ring (${JSON.stringify(fresh)})`);
   await page.waitForFunction(c => !document.querySelector(c).classList.contains('pjnew'), card, { timeout: 5000 }).catch(() => {});
   ok(!await page.$eval(card, c => c.classList.contains('pjnew')), '...which goes after a moment');
-  ok(await page.$eval(card, c => /no repository yet/.test(c.querySelector('.pcfront').textContent) && !c.querySelector('.pcfront [data-c]')),
-     '...a card with no repository in it says so, and has no agent to start');
+  // A project with no repository is a place to run an agent that builds
+  // containers and VMs (R208): its card says so and its Start agent is live.
+  // Start agent is drawn as on any card: in this fixture, with no node to
+  // run on, it is dead for that reason and no other (never "Add a
+  // repository first").
+  const start = await page.$eval(card, c => { const b = c.querySelector('.pcfront [data-c]');
+    return b && { disabled: b.disabled, title: b.title, note: c.querySelector('.pcfront').textContent }; });
+  ok(/no repository: a session here builds containers and VMs/.test(start?.note || '') && start
+       && (!start.disabled || /no node/.test(start.note)) && !/Add a repository first/.test(start.title + start.note),
+     `...a card with no repository in it says a session there builds containers and VMs, and offers Start agent (${JSON.stringify(start && {disabled: start.disabled, title: start.title})})`);
+  const workRow = await page.evaluate(k => { const p = (state?.projects || []).find(x => x.name === k);
+    return p && { work: p.work, git: p.git, label: p.label, issues: p.issues.length }; }, key);
+  ok(workRow?.work === true && workRow.git === null && workRow.label === 'Web shop, v2' && workRow.issues === 0,
+     `the list carries a row for it: no git, nothing wrong, named as the project (${JSON.stringify(workRow)})`);
+  const nb = await page.evaluate(async k => (await (await fetch('/api/roadmap?project=' + encodeURIComponent(k))).json()).error || '', key);
+  ok(/has no repository, so it has no notebook/.test(nb), `its notebook routes are refused with why (${nb})`);
+  const tabsWas = await page.evaluate(() => tabs.length);
+  await page.evaluate(k => openNotebook(k), key);
+  await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
+  ok(await page.evaluate(() => tabs.length) === tabsWas, 'opening its notebook opens its settings dialog instead, no tab');
+  await page.click('#rnCancel');
+  await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
+  // The card's Settings is the project's own dialog (R208): on a project
+  // with no repository the sections and dials that need code are not drawn.
+  await page.click(`${card} .pcfront [data-pedit]`);
+  await page.waitForSelector(`${card}.flipped .pcback [data-rn]`, { timeout: 5000 });
+  ok(!await page.$(`${card} .pcback [data-bug]`), 'its back offers no Report bug: there is no tracker');
+  await page.click(`${card} .pcback [data-rn]`);
+  await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  const dlg = await page.evaluate(() => {
+    const vis = sel => !!document.querySelector(sel)?.offsetParent;
+    const box = document.querySelector('#rnmodal > .box');
+    return { title: $('rnTitle').textContent, cls: [box.classList.contains('rnproject'), box.classList.contains('rnwork')],
+      note: $('rnProjectNote').textContent.trim(), name: vis('#rnNameField'), del: vis('#rnDelete'),
+      repo: vis('details[data-sect="rn:repo"]'), build: vis('details[data-sect="rn:build"]'), files: vis('details[data-sect="rn:files"]'),
+      snaps: vis('details[data-sect="rn:snapshots"]'), runs: vis('details[data-sect="rn:runs"]'), people: vis('details[data-sect="rn:people"]'),
+      roadmapDial: vis('#rnGateRoadmap'), signDial: vis('#rnGateSign'), dockerDial: vis('#rnGateDocker'), vmsDial: vis('#rnGateVms'),
+      commit: vis('#rnGitName'), jump: [...document.querySelectorAll('#rnmodal .sectjump a')].map(a => a.textContent) };
+  });
+  ok(dlg.title === 'Web shop, v2 settings' && dlg.cls[0] && dlg.cls[1] && /no repository/.test(dlg.note) && !dlg.name && !dlg.del
+     && !dlg.repo && !dlg.build && !dlg.files && !dlg.snaps && dlg.runs
+     && !dlg.roadmapDial && !dlg.signDial && dlg.dockerDial && dlg.vmsDial && !dlg.commit
+     && !dlg.jump.includes('Repository') && !dlg.jump.includes('Build and test'),
+     `Settings opens the project's dialog: no repository, build, files or snapshots, no notebook or shipping dial, no commit identity (${JSON.stringify(dlg)})`);
+  await page.click('#rnCancel');
+  await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
+  await page.click(`${card} .pcback [data-pedit]`);
+  await page.waitForFunction(c => !document.querySelector(c).classList.contains('flipped'), card, { timeout: 5000 });
+  // ...and on a project with a repository the same door holds what is the
+  // project's as a whole, the dials included, and says where the rest is.
+  const alpha = '.pgrid .pcard[data-row="alpha"]';
+  await page.click(`${alpha} .pcfront [data-pedit]`);
+  await page.waitForSelector(`${alpha}.flipped .pcback [data-rn]`, { timeout: 5000 });
+  await page.click(`${alpha} .pcback [data-rn]`);
+  await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  const adlg = await page.evaluate(() => {
+    const vis = sel => !!document.querySelector(sel)?.offsetParent;
+    const box = document.querySelector('#rnmodal > .box');
+    return { cls: [box.classList.contains('rnproject'), box.classList.contains('rnwork')], note: $('rnProjectNote').textContent.trim(),
+      repo: vis('details[data-sect="rn:repo"]'), build: vis('details[data-sect="rn:build"]'), roadmapDial: vis('#rnGateRoadmap'),
+      signDial: vis('#rnGateSign'), commit: vis('#rnGitName'), runs: vis('details[data-sect="rn:runs"]'),
+      inherit: !!document.querySelector('#rnGateDocker option[value="inherit"]') };
+  });
+  ok(adlg.cls[0] && !adlg.cls[1] && /each repository's/.test(adlg.note) && !adlg.repo && !adlg.build && adlg.roadmapDial && adlg.signDial
+     && adlg.commit && adlg.runs && !adlg.inherit,
+     `on alpha the dialog keeps every dial and the project's sections, and says the repository's are in its notebook (${JSON.stringify(adlg)})`);
+  await page.click('#rnCancel');
+  await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
+  await page.click(`${alpha} .pcback [data-pedit]`);
+  await page.waitForFunction(c => !document.querySelector(c).classList.contains('flipped'), alpha, { timeout: 5000 });
   await page.click(`${card} .pcfront [data-repadd]`);
   await page.waitForSelector('#pmodal:not([hidden])', { timeout: 5000 });
   const into = await page.evaluate(() => ({ title: $('pTitle').textContent, node: $('pNodeField').hidden, gate: $('pGateField').hidden }));
@@ -107,6 +177,28 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New project')),
   await page.waitForFunction(k => JSON.stringify(state?.repos?.[k]?.members) === '["webshop"]', key, { timeout: 15000 });
   ok(await page.$eval(card, c => [...c.querySelectorAll('.pcfront .pcrepo > .namelink')].map(b => b.textContent.trim()).join() === 'webshop'),
      '...and the repository made is on the project\'s card');
+  // A new repository's dials start on "as the project" (R208 step 6): its
+  // notebook's Permissions view inherits the project's defaults until it
+  // sets one apart, and the project's door draws no such choice.
+  await page.evaluate(() => openNotebook('webshop', 'permissions'));
+  await page.waitForFunction(() => document.querySelector('.nb[data-project="webshop"] .nbview[data-view="permissions"]:not([hidden]) #rnGateDocker option'), null, { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const inh = await page.evaluate(() => ({ first: $('rnGateDocker').options[0].value, word: $('rnGateDocker').options[0].textContent,
+    value: $('rnGateDocker').value, gate: $('rnGateRoadmap').value, tc: $('rnTestChange').value }));
+  ok(inh.first === 'inherit' && /^as the project \(deny\)$/.test(inh.word) && inh.value === 'inherit' && inh.gate === 'inherit' && inh.tc === 'inherit',
+     `a new repository's Permissions start on "as the project" with the project's word beside it (${JSON.stringify(inh)})`);
+  // Set one apart, and the project's default stays what it was.
+  const over = await page.evaluate(async () => {
+    const a = await (await postJSON('/api/prefs', { project: 'webshop', makevms: 'auto' })).json();
+    const b = await (await postJSON('/api/prefs', { project: 'webshop', scope: 'project', makevms: 'deny', installpacks: 'auto' })).json();
+    await refresh();
+    const p = state.projects.find(x => x.name === 'webshop');
+    return { a: a.error || a.overrides, b: b.error || b.makevms, makevms: p.prefs.makevms, over: p.prefs.overrides, dflt: p.prefs.project_dials.makevms, packs: p.prefs.installpacks };
+  });
+  ok(JSON.stringify(over.a) === '["makevms"]' && over.makevms === 'auto' && over.dflt === 'deny' && over.packs === 'auto',
+     `a dial set in the notebook is that repository's override; the door's scope sets the project's defaults (${JSON.stringify(over)})`);
+  await page.evaluate(() => openProjectsTab());
+  await page.waitForSelector(card, { timeout: 15000 });
   // A project with something in it offers no Delete project; empty, it does.
   await page.evaluate(k => postJSON('/api/trash', { name: 'webshop' }).then(() => refresh()), key);
   await page.waitForFunction(k => !state?.repos?.[k]?.members.length, key, { timeout: 15000 });

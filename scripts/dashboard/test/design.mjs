@@ -923,19 +923,30 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
 }
 // A project read-only to you reads its design with nothing to press that
 // would change it: the editing buttons are not drawn, the fields are there
-// to read, dead (B293).
+// to read, dead (B293). Read-only the way the view reads it (its project's
+// write_why, as a role that reads and does not write sets it; the account
+// here owns the project, so a lock would not hold it), put on the page's
+// record and the view drawn again until the draw is the read-only one: a
+// status read landing between the two put the record back (3 Nov).
 {
-  await page.evaluate(p => { [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`).classList.add('ro');
-    getNotebook(p).view('memory'); getNotebook(p).view('design'); }, P);
-  await page.waitForSelector(`${NB} .nbview[data-view="design"]:not([hidden]) #dsHint`, { timeout: 10000 }).catch(() => {});
+  const roDrawn = hidden => page.waitForFunction(({ p, hidden }) => [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`)
+    ?.querySelector('.nbview[data-view="design"]:not([hidden]) #dsWrite')?.hidden === hidden, { p: P, hidden }, { timeout: 3000 }).then(() => true, () => false);
+  const drawAs = async why => {
+    for (let i = 0; i < 5; i++){
+      await page.evaluate(({ p, why }) => { const r = (state?.projects || []).find(x => x.name === p); if (r) r.write_why = why;
+        getNotebook(p).view('memory'); getNotebook(p).view('design'); }, { p: P, why });
+      if (await roDrawn(!!why)) return true;
+    }
+    return false;
+  };
+  const drawn = await drawAs('a role that reads this project and does not write it');
   const ro = await page.$eval(`${NB} .nbview[data-view="design"]`, v => ({
     shown: [...v.querySelectorAll('button')].filter(b => b.checkVisibility() && !b.closest('summary') && !b.hasAttribute('aria-expanded')).map(b => b.textContent.trim()),
     fields: v.querySelectorAll('input:disabled, textarea:disabled').length,
     hint: [...v.querySelectorAll('#dsHint, .nbsaidslot')].map(e => e.textContent).join(' ') }));
-  await page.evaluate(p => { [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`).classList.remove('ro');
-    getNotebook(p).view('memory'); getNotebook(p).view('design'); }, P);
-  ok(ro.shown.length === 0 && ro.fields > 0 && !/Write the file/.test(ro.hint),
-     `a read-only design draws no press that would change it, its fields there to read (${JSON.stringify({ ...ro, hint: ro.hint.slice(0, 50) })})`);
+  await drawAs('');
+  ok(drawn && ro.shown.length === 0 && ro.fields > 0 && !/Write the file/.test(ro.hint),
+     `a read-only design draws no press that would change it, its fields there to read (${JSON.stringify({ drawn, ...ro, hint: ro.hint.slice(0, 50) })})`);
 }
 rmSync(`${DIR}/ws/${P}/docs`, { recursive: true, force: true });
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);

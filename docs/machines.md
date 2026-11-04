@@ -47,7 +47,9 @@ in), GPU (where it has a card), USB (on a VM host: each USB device with
 what holds it, **Give to a VM** and **Take back**, and its controllers;
 [vms.md](vms.md#usb-devices)), Features (what the machine has beyond the
 base, each with **Install** or **Uninstall**: VM host, the IOMMU on a VM
-host's kernel command line, and the hosting firewall on a hosting-only
+host's kernel command line, the NVIDIA card to a VM (bound to vfio-pci
+from boot, so one VM may take it while this machine and its containers do
+without it), and the hosting firewall on a hosting-only
 node; and a row each for what the Library installs, the GPU driver, the
 Android emulator and the model router, pointing there), Storage (mounts and stores), Network, and Advanced, which
 holds the node's **name** (Rename changes what it is called everywhere here:

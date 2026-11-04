@@ -55,13 +55,16 @@ const firstId = first.match(/added R(\d+)/)[1];
 // ---- the setting, in the project's settings dialog -------------------------
 await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
 await page.waitForSelector('#rnmodal:not([hidden])');
+// A repository's door (R208 step 6): each dial offers "as the project
+// (auto)" first, which is what it reads until something is set here.
 const opts = await page.$$eval('#rnGateRoadmap option', os => os.map(o => o.value));
-ok(opts.join(',') === 'auto,ask,deny'
-   && await page.$eval('#rnGateRoadmap', e => e.value) === 'auto'
-   && await page.$eval('#rnGateRules', e => e.value) === 'auto'
-   && await page.$eval('#rnGateSettings', e => e.value) === 'auto'
-   && await page.$eval('#rnGateDesign', e => e.value) === 'auto',
-   'the dialog offers auto, ask and deny per tab, for build and test and for the design, and reads auto until something is set');
+const inh = await page.$eval('#rnGateRoadmap option', o => o.textContent);
+ok(opts.join(',') === 'inherit,auto,ask,deny' && inh === 'as the project (auto)'
+   && await page.$eval('#rnGateRoadmap', e => e.value) === 'inherit'
+   && await page.$eval('#rnGateRules', e => e.value) === 'inherit'
+   && await page.$eval('#rnGateSettings', e => e.value) === 'inherit'
+   && await page.$eval('#rnGateDesign', e => e.value) === 'inherit',
+   `the dialog offers as the project, auto, ask and deny per tab, for build and test and for the design, and reads as the project (auto) until something is set (${opts.join(',')}; ${inh})`);
 await page.selectOption('#rnGateRoadmap', 'ask');
 await page.selectOption('#rnGateBugs', 'ask');
 await page.selectOption('#rnGateRules', 'deny');

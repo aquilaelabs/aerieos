@@ -99,6 +99,7 @@ and why. Work in this project only: never look for context in another
 project under /workspace beyond the ones it reads, and when something seems
 to be missing, ask.
 
+<!-- BUILDERBOT:IF code repo:any -->
 ## Finding your way
 <!-- BUILDERBOT:TOPIC map: aerie map: find, who-calls, draws, suites, and when grep is the tool -->
 
@@ -119,7 +120,9 @@ design: braces, not scope, and an anonymous callback is attributed to the
 nearest named function around it. When you grep because the map answered
 wrong or not at all for something it indexes, report that with `aerie report`
 and carry on with grep.
+<!-- BUILDERBOT:END -->
 
+<!-- BUILDERBOT:IF code repo:any -->
 ## Building and testing
 <!-- BUILDERBOT:TOPIC build: aerie build, aerie test and aerie run, the toolchains, documents and sound, BB_TEST_WORKERS, and reading what ran: aerie jobs, aerie diag, aerie logs -->
 
@@ -193,6 +196,7 @@ NAME --agent|--runner|--nginx|--system|--kernel|--crash [N]`) are read only
 with debug mode on, the project granted them and your account holding the
 debug grant, each the operator's; a refusal names which is missing, so say
 which in your reply.
+<!-- BUILDERBOT:END -->
 
 ## Cleaning up after a task
 <!-- BUILDERBOT:TOPIC tidy: aerie tidy, what it ends and what it keeps -->
@@ -318,6 +322,7 @@ interface) and waits for what it did, its paths written as the project's
 are in step already: the companion keeps its folder synced both ways, so a
 change you commit reaches the editor there in seconds.
 
+<!-- BUILDERBOT:IF code repo:any -->
 ## The notebook
 <!-- BUILDERBOT:TOPIC notebook: the record's verbs in full, aerie design, the wiki, aerie transcripts, aerie memory, aerie rules, aerie report -->
 
@@ -382,7 +387,9 @@ Report every way AerieOS does not work as this briefing says, even when
 you found a way round it: the way round is what the report should say. Where
 the project's setting Report AerieOS bugs is deny (AerieOS's own
 tree), the verb refuses and `aerie bug add --here` files it here.
+<!-- BUILDERBOT:END -->
 
+<!-- BUILDERBOT:IF code repo:any -->
 ## Versions and the changelog
 <!-- BUILDERBOT:TOPIC versions: aerie version, aerie changelog, releases and their edits, what goes in dist/ -->
 
@@ -429,7 +436,9 @@ project's rules named patch say what it may not change, which `aerie tests
 preflight` holds. `aerie version forward BRANCH` merges a released patch line
 into this later one (its changelog stitched), and `aerie version backport
 COMMIT` carries a later line's fix onto the patch line (docs/versions.md).
+<!-- BUILDERBOT:END -->
 
+<!-- BUILDERBOT:IF code repo:any -->
 ## Git
 <!-- BUILDERBOT:TOPIC git: aerie git push and its policy, credentials, aerie forge on the git host, aerie ci-log, what the controller watches in CI -->
 
@@ -466,6 +475,7 @@ host, `aerie forge whoami` prints it whole, and a verb either refuses is
 refused with the permission to ask the person for. Merging starts off.
 The same list holds `aerie git push`: a push that changes a file under
 `.github/workflows` is refused where Change CI workflow files is Deny.
+<!-- BUILDERBOT:END -->
 
 <!-- BUILDERBOT:IF android *.gradle *.gradle.kts android AndroidManifest.xml -->
 ## Android
@@ -585,8 +595,13 @@ this project's setting), a program finds no card and takes its CPU path: say
 so in your reply rather than looking for a way round. A container gets the
 card when its compose file reserves it
 (`deploy.resources.reservations.devices` with `driver: nvidia`) and the node
-carries the NVIDIA container toolkit, which `aerie toolchains` names; the
-driver, the toolkit and the node's switches are the operator's.
+carries the NVIDIA container toolkit, which `aerie toolchains` names, or
+when a person gives it the GPU in its settings on the Containers page (an
+NVIDIA card through the toolkit, an AMD card or APU through its render
+devices); the driver, the toolkit and the node's switches are the
+operator's. On AerieOS the image carries the driver and the toolkit, and a
+card marked for a VM under the node's Features is vfio-pci's from boot: no
+program on the host finds it then, and `aerie gpu` says so.
 <!-- BUILDERBOT:END -->
 
 ## Containers

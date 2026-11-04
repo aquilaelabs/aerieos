@@ -155,7 +155,11 @@ function projectList(){
   const rows = state?.projects || [];
   return Object.entries(state?.repos || {}).map(([key, r]) => {
     const reps = r.members.map(m => rows.find(p => p.name === m)).filter(Boolean);
-    return {...r, key, label: r.name, rows: reps, first: reps[0] || null};
+    // A project with no repository (R208) has a row of its own in the
+    // list (work: true), which its card's Start agent, notes and Settings
+    // read; it is never listed as a repository.
+    const work = reps.length ? null : rows.find(p => p.work && p.name === key) || null;
+    return {...r, key, label: r.name, rows: reps, first: reps[0] || work};
   });
 }
 // The project a repository is in, or the key itself when it is one: what a
@@ -212,6 +216,7 @@ function cardFront(c){
       <button type="button" class="namelink" data-open="${esc(p.name)}" title="open ${esc(p.label || p.name)}'s notebook">${esc(p.label || p.name)}</button>
       <span class="pcfacts">${p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git"}</span>
     </div>${p.issues.map(i => `<div class="pnote ${cls[i.level] || ""}">${many ? esc(p.label || p.name) + ": " : ""}${esc(i.text)}</div>`).join("")}`).join("")
+      : first?.work ? `<div class="pnote dim">no repository: a session here builds containers and VMs${c.may ? "; Add repository makes it a coding project" : ""}</div>`
       : `<div class="pnote dim">no repository yet${c.may ? ": Add repository makes or clones one" : ""}</div>`}</div>
     ${first ? cardNotes(c) : ""}
     <div class="pcacts actbar">${first ? agentButton(first)
@@ -259,7 +264,8 @@ function cardBack(c){
     fb("data-pcolor", c.key, c.color ? `Color: ${c.color}` : "Color", SWATCH, tone ? ` data-sw data-style="--sw:${tone}"` : ""),
     c.archived ? "" : fb("data-pgroup", c.key, c.group ? `Group: ${c.group}` : "Group", TAG),
     c.may_lock ? fb("data-lock", c.key, lockLabel(c), c.locked ? LOCK : LOCK_OPEN, ` data-on="${c.locked ? "0" : "1"}" aria-pressed="${!!c.locked}"`) : "",
-    first && first.mine !== false ? fb("data-bug", first.name, "Report bug", BUG) : "",
+    // No bug tracker on a project with no repository (R208).
+    first && first.mine !== false && !first.work ? fb("data-bug", first.name, "Report bug", BUG) : "",
     first ? fb("data-rn", first.name, "Settings", GEAR) : "",
     may && !c.rows.length ? fb("data-pdel", c.key, "Delete project", BIN, ' data-danger="1"') : "",
   ].filter(Boolean).join("");
@@ -1023,7 +1029,9 @@ function pNameShow(){
   const eff = ghName(typed);
   // Since R154 a name in use is no refusal: the new project gets a
   // directory of its own and is shown as Name-2 beside the first.
-  const shown = new Set((state?.projects || []).map(p => String(p.label || p.name).toLowerCase()));
+  // Repositories' names: a project with no repository (R208) has a row
+  // too, and the server numbers a repository against repositories.
+  const shown = new Set((state?.projects || []).filter(p => !p.work).map(p => String(p.label || p.name).toLowerCase()));
   let as = eff, n = 2;
   while (as && shown.has(as.toLowerCase())) as = `${eff}-${n++}`;
   // ...and the folder it gets, numbered when any project ever had it,

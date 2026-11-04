@@ -1039,8 +1039,16 @@ if [ "$DOOR" = cloudflared ]; then
     elif [ ! -s /etc/cloudflared/env ]; then
         warn "no tunnel token: the door's secret left the enroll script once it ran; make a new script on the Nodes page"; exit 1
     fi
-    svc_install cloudflared "AerieOS: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
-    printf '   up; in Zero Trust the tunnel'"'"'s public hostname %s goes to ssh://localhost:22, and Cloudflare Access decides who reaches it\n' "$DOOR_HOST"
+    # A run again with no new token (B657): the door is up on the token it
+    # has, and the session running this may be riding it, so it is left
+    # running; restarted, it took the session and this script with it.
+    if [ -z "$(door_secret)" ] && [ -f /etc/systemd/system/cloudflared.service ] && systemctl is-active --quiet cloudflared; then
+        printf '   already up at %s on its token, left running\n' "$DOOR_HOST"
+    else
+        [ -n "${SSH_CONNECTION:-}" ] && printf '   the door restarts now: a session connected through it drops (start the script with nohup to let it finish)\n'
+        svc_install cloudflared "AerieOS: the door in for SSH (cloudflared)" "${cfbin} --no-autoupdate tunnel run" "EnvironmentFile=/etc/cloudflared/env"
+        printf '   up; in Zero Trust the tunnel'"'"'s public hostname %s goes to ssh://localhost:22, and Cloudflare Access decides who reaches it\n' "$DOOR_HOST"
+    fi
 elif [ "$DOOR" = tailscale ]; then
     say "door: Tailscale, this machine on your tailnet with ssh"
     if ! command -v tailscale >/dev/null 2>&1; then
@@ -3131,6 +3139,32 @@ feature_iommu() {
             say "IOMMU off at the next restart" ;;
     esac
 }
+# The NVIDIA card to a VM (R207 step 3): bound to vfio-pci from boot by its
+# ids, so the host's driver never takes it and a VM's start finds it free;
+# every function of the card (its sound beside it) goes with it. A file in
+# modprobe.d, which AerieOS's /etc overlay keeps across boots; nvidia and
+# nouveau wait on vfio-pci (softdep), so load order never decides. Takes a
+# restart either way, said so.
+feature_gpuvm() {
+    local marker="$FEATURES_DIR/gpuvm" conf=/etc/modprobe.d/aerieos-gpu-vm.conf ids="" dev vendor did
+    case "$1" in
+        state) [ -f "$marker" ] && echo installed || echo absent ;;
+        install)
+            for dev in /sys/bus/pci/devices/*; do
+                vendor="$(cat "$dev/vendor" 2>/dev/null)"; [ "$vendor" = "0x10de" ] || continue
+                did="$(cut -c3- "$dev/device" 2>/dev/null)"; [ -n "$did" ] || continue
+                case ",$ids," in *",10de:$did,"*) ;; *) ids="${ids:+$ids,}10de:$did" ;; esac
+            done
+            [ -n "$ids" ] || die "no NVIDIA device on this machine (no PCI device of vendor 10de), so there is no card to give a VM"
+            install -d -m 0755 "$FEATURES_DIR" /etc/modprobe.d
+            printf '# Written by AerieOS (the NVIDIA card to a VM): vfio-pci takes these before nvidia or nouveau can.\noptions vfio-pci ids=%s\nsoftdep nvidia pre: vfio-pci\nsoftdep nouveau pre: vfio-pci\n' "$ids" > "$conf"
+            printf 'ids=%s\n' "$ids" > "$marker"
+            say "the NVIDIA card ($ids) is vfio-pci's from the next restart: this machine and its containers will do without it, and one VM may take it" ;;
+        remove)
+            rm -f "$conf" "$marker"
+            say "the NVIDIA card is this machine's again from the next restart" ;;
+    esac
+}
 # GRUB's configuration written again from its defaults, by whichever
 # command and path this family has.
 grub_regen() {
@@ -3268,7 +3302,7 @@ feature_ups() {
             feature_pkgs ups remove "" "ups" ;;
     esac
 }
-FEATURE_IDS="vmhost firewall iommu storage shares ups"
+FEATURE_IDS="vmhost firewall iommu storage shares ups gpuvm"
 cmd_feature() {
     local op="${1-}" id="${2-}"
     case "$op" in install|remove|state) ;; *) die "usage: bb-sandbox feature install|remove|state ID (one of: ${FEATURE_IDS})" ;; esac

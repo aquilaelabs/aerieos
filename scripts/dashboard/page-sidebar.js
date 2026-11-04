@@ -61,8 +61,11 @@ function wireProjectRows(root){
     setProjectPinned(b.dataset.p, b.dataset.on === "1"));
   root.querySelectorAll("[data-pgroup]").forEach(b => b.onclick = () => askProjectGroup(b));
   root.querySelectorAll("[data-pcolor]").forEach(b => b.onclick = () => pickProjectColor(b));
+  // On a card, the project's own settings as a dialog (R208, the operator,
+  // 3 Nov): what is the project's as a whole, with each repository's own
+  // left to its notebook's Settings view.
   root.querySelectorAll("[data-rn]").forEach(b => b.onclick = () =>
-    openProjectSettings(b.dataset.rn));
+    b.closest(".pcard") ? renameProject(b.dataset.rn, "project") : openProjectSettings(b.dataset.rn));
   // From any of a project's repositories, with the others to pick from.
   root.querySelectorAll("[data-bug]").forEach(b => b.onclick = () =>
     openReport(b.dataset.bug, state?.repos?.[reposOf(b.dataset.bug)]?.members || []));

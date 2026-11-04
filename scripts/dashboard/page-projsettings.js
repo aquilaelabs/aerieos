@@ -90,6 +90,35 @@ const rnGateNow = () => Object.fromEntries(
   Object.entries(GATE_IDS).map(([k, id]) => [k, $(id).value || "auto"]));
 const gateKey = g => Object.keys(GATE_IDS).map(k => g?.[k] || "auto").join(",");
 
+// How the form holds a dial (R208 step 6): on the project's own door its
+// defaults; in a repository's notebook that repository's override, or "as
+// the project" where it sets none, which is what a new repository starts
+// on; on a repository in no project, and on a project with no repository,
+// plainly the value.
+const rnDialMode = p => rnMode === "project" ? "project"
+  : p?.project && p.project !== p.name && p?.prefs?.project_dials ? "inherit" : "plain";
+// A dial's value as the form holds it: a gate is "gate.KIND".
+function rnDialVal(p, f, dflt){
+  const gate = f.startsWith("gate.") ? f.slice(5) : "";
+  const own = gate ? p?.prefs?.gate?.[gate] : p?.prefs?.[f];
+  const mode = rnDialMode(p);
+  if (mode === "project"){
+    const pd = p?.prefs?.project_dials;
+    return (gate ? pd?.gate?.[gate] : pd?.[f]) || own || dflt;
+  }
+  if (mode === "inherit") return (p?.prefs?.overrides || []).includes(f) ? own || dflt : "inherit";
+  return own || dflt;
+}
+// ...and its choices: the modes, with "as the project (word)" first where
+// the dial can be inherited.
+function rnDialChoices(p, f, modes, dflt){
+  if (rnDialMode(p) !== "inherit") return modes;
+  const gate = f.startsWith("gate.") ? f.slice(5) : "";
+  const pd = p?.prefs?.project_dials, v = (gate ? pd?.gate?.[gate] : pd?.[f]) || dflt;
+  const word = (modes.find(([m]) => m === v) || [v, v])[1];
+  return [["inherit", `as the project (${word})`], ...modes];
+}
+
 // A project's settings as the form holds them, from its row: what the form
 // opens on, and what a section's Save compares with what is saved now.
 function rnPrefsOf(p){
@@ -110,20 +139,20 @@ function rnPrefsOf(p){
                snapshot_days: String(p?.prefs?.snapshot_days ?? 14),
                snapshots_on: p?.prefs?.snapshots_on === false ? "0" : "1",
                dev_keep: String(p?.prefs?.dev_keep ?? 3),
-               gate: gateKey(p?.prefs?.gate),
+               gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
                tests_in: p?.prefs?.tests_in || "node", test_node: p?.prefs?.test_node || "",
-               test_change: p?.prefs?.test_change || "wait",
+               test_change: rnDialVal(p, "test_change", "wait"),
                gpu: p?.prefs?.gpu || "on",
                reply: p?.yours?.reply || "", asks: p?.yours?.asks || "", term_scheme: p?.yours?.term_scheme || "",
-               devbuild: devClaudeMode(p?.name || rnFor),
-               makevms: p?.prefs?.makevms || "deny",
-               installpacks: p?.prefs?.installpacks || "ask",
+               devbuild: rnDialVal(p, "devbuild", "deny"),
+               makevms: rnDialVal(p, "makevms", "deny"),
+               installpacks: rnDialVal(p, "installpacks", "ask"),
                vm_caps: rnVmCapsOf(p),
-               report: p?.prefs?.report || "auto",
-               sign: p?.prefs?.sign || "ask",
-               release: p?.prefs?.release || "ask",
-               keys: p?.prefs?.keys || "ask",
-               pc: p?.prefs?.pc || "deny",
+               report: rnDialVal(p, "report", "auto"),
+               sign: rnDialVal(p, "sign", "ask"),
+               release: rnDialVal(p, "release", "ask"),
+               keys: rnDialVal(p, "keys", "ask"),
+               pc: rnDialVal(p, "pc", "deny"),
                version: p?.version_policy || "locked"};
 }
 
@@ -484,7 +513,17 @@ function rnFillPrefsRest(p){
   $("rnTestWhere").hidden = !canDevTest;
   $("rnDevTest").value = p?.prefs?.tests_in || "node";
   rnFillTestNode(p);
-  $("rnTestChange").value = p?.prefs?.test_change || "wait";
+  // The test-run pick inherits too (R208 step 6): its "as the project"
+  // option is drawn here, the two words being the markup's own.
+  {
+    const el = $("rnTestChange"), inh = rnDialMode(p) === "inherit", opt = el.querySelector('option[value="inherit"]');
+    const pv = p?.prefs?.project_dials?.test_change || "wait";
+    if (inh && !opt) el.insertAdjacentHTML("afterbegin", `<option value="inherit"></option>`);
+    else if (!inh && opt) opt.remove();
+    if (inh) el.querySelector('option[value="inherit"]').textContent = `as the project (${pv === "restart" ? "interrupts" : "waits"})`;
+    el.dataset.inherit = inh ? pv : "";
+    el.value = rnDialVal(p, "test_change", "wait");
+  }
   $("rnGpu").value = p?.prefs?.gpu || "on";
   $("rnReply").value = p?.yours?.reply || "";
   $("rnAsks").value = p?.yours?.asks || "";
@@ -500,28 +539,35 @@ function rnFillPrefsRest(p){
   // project's value: one helper for all of them (consistency pass), where
   // each was a copy of the same eight lines.
   const pick = (id, choices, value) => {
-    const el = $(id);
-    if (el.dataset.built !== "1"){
+    const el = $(id), sig = JSON.stringify(choices);
+    // Built again when its words change: "as the project (deny)" names
+    // the project's value, which another project's door may differ on.
+    if (el.dataset.built !== sig){
       el.innerHTML = optionList(choices);
-      el.dataset.built = "1";
+      el.dataset.built = sig;
     }
     el.value = value;
+    // What "as the project" stands for, for the glance to count it as.
+    el.dataset.inherit = choices[0]?.[0] === "inherit" ? (choices[0][1].match(/\(([^)]*)\)/) || [])[1] || "" : "";
     return el;
   };
-  for (const [k, id] of Object.entries(GATE_IDS)) pick(id, gateChoices(k), p?.prefs?.gate?.[k] || "auto");
+  // Each dial (R208 step 6): the project's default on its own door, this
+  // repository's override or "as the project" in its notebook.
+  const dial = (id, f, modes, dflt) => pick(id, rnDialChoices(p, f, modes, dflt), rnDialVal(p, f, dflt));
+  for (const [k, id] of Object.entries(GATE_IDS)) dial(id, "gate." + k, gateChoices(k), "auto");
   // Auto and deny only: a report has nothing to hold for approval.
-  pick("rnGateReport", GATE_MODES.filter(([v]) => v !== "ask"), p?.prefs?.report || "auto");
-  pick("rnGateSign", GATE_MODES, p?.prefs?.sign || "ask");
-  pick("rnGateRelease", GATE_MODES, p?.prefs?.release || "ask");
-  pick("rnGateKeys", GATE_MODES, p?.prefs?.keys || "ask");
+  dial("rnGateReport", "report", GATE_MODES.filter(([v]) => v !== "ask"), "auto");
+  dial("rnGateSign", "sign", GATE_MODES, "ask");
+  dial("rnGateRelease", "release", GATE_MODES, "ask");
+  dial("rnGateKeys", "keys", GATE_MODES, "ask");
   // A lent PC (R270 step 6): deny by default, it is somebody's own machine.
-  pick("rnGatePc", GATE_MODES, p?.prefs?.pc || "deny");
+  dial("rnGatePc", "pc", GATE_MODES, "deny");
   pick("rnGateVersion", Object.entries(POLICY_LABEL), p?.version_policy || "locked");
   // docker-write's to change (the grant, R137 step 4), so not offered otherwise.
-  pick("rnGateDocker", GATE_MODES, devClaudeMode(rnFor)).closest("label").hidden = state?.can?.["docker-write"] === false;
+  dial("rnGateDocker", "devbuild", GATE_MODES, "deny").closest("label").hidden = state?.can?.["docker-write"] === false;
   // ...and its VMs' (R91), the VMs area's to change, deny unless set.
-  pick("rnGateVms", GATE_MODES, p?.prefs?.makevms || "deny").closest("label").hidden = state?.can?.["vms-write"] === false;
-  pick("rnGatePacks", GATE_MODES, p?.prefs?.installpacks || "ask").closest("label").hidden = state?.can?.curate === false;
+  dial("rnGateVms", "makevms", GATE_MODES, "deny").closest("label").hidden = state?.can?.["vms-write"] === false;
+  dial("rnGatePacks", "installpacks", GATE_MODES, "ask").closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   $("rnVmCapsRow").hidden = state?.can?.["vms-write"] === false;
   rnDrawPrefs();
@@ -590,7 +636,7 @@ async function unlinkProject(name){
 // rather than hides: the alternative is a project whose roadmap silently
 // stayed behind under a name nothing points at any more.
 let rnFor = null;                        // the project the dialog is open on
-let rnMode = "all";                      // "all" from the gear, "git" from the chain
+let rnMode = "all";                      // "all" from the gear, "git" from the chain, "project" from a card (R208)
 let rnOpens = 0;                         // which opening of the dialog this is
 
 // The form shown in a notebook's Settings view instead of the dialog (R119
@@ -694,13 +740,35 @@ function renameProject(name, mode = "all"){
   // is the remote's half of them, and opening it there hides everything that
   // is not about the remote rather than scrolling past it.
   const git = mode === "git";
+  // A card's door (R208): what is the project's as a whole, in a dialog.
+  // The repository's own sections (Repository, Build and test, File access,
+  // Snapshots) are each notebook's Settings view's and are not drawn; on a
+  // project with no repository the dials that need code are not either.
+  const proj = mode === "project";
+  const box = $("rnmodal").querySelector(":scope > .box");
+  box.classList.toggle("rnproject", proj);
+  box.classList.toggle("rnwork", proj && !!p?.work);
   // Named rather than assumed: a project on somebody's own Gitea should not
   // read "GitHub settings", and the host is the one fact this door is about.
   const where = p?.forge_name || "its remote";
-  $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}` : projLabel(name);
+  $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}`
+    : proj ? `${projectName(name)} settings` : projLabel(name);
   for (const id of ["rnNameField", "rnMineField",
                     "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField"])
     $(id).hidden = git;
+  // The project's name is renamed on its card's back; the field here
+  // renames a repository, which the project's door is not about.
+  $("rnNameField").hidden = git || proj;
+  const ph = $("rnProjectHead");
+  ph.hidden = !proj;
+  ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is project P${p.pid}` : ""}${
+    p?.work ? `; its folder is /workspace/${name}` : ""}. Its name is changed on its card's back.`;
+  const pn = $("rnProjectNote");
+  pn.hidden = !proj;
+  pn.firstElementChild.textContent = p?.work
+    ? "A project with no repository: its sessions build containers and VMs in its own folder, and have no git and no notebook. Add repository on its card makes it a coding project."
+    : `Git, build and test, file access and snapshots are each repository's: open its notebook's Settings. ${
+        (state?.repos?.[reposOf(name)]?.members || []).length > 1 ? "These settings are the project's as a whole." : ""}`.trim();
   // The node picker and the two credential blocks have hidden rules of their
   // own further down, and each of those consults the mode too.
   $("rnName").value = projLabel(name);
@@ -763,12 +831,14 @@ function renameProject(name, mode = "all"){
   unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`);
   // The bin, on the gear's door only: the chain's is about the remote.
   // Not drawn for a role that does not give it (the operator, 21 Oct).
-  $("rnDelete").hidden = git || !p || !!p?.trash_why;
+  $("rnDelete").hidden = git || proj || !p || !!p?.trash_why;
   $("rnKeyOut").hidden = true; $("rnKeyPaste").hidden = true; $("rnKeyPaste").value = "";
   rnLoadAuth(name);
-  rnLoadSnapshots(name);
+  // A project with no repository (R208) has no snapshots and no files over
+  // FTP: the server refuses both, so neither is asked for.
+  if (!p?.work) rnLoadSnapshots(name);
   rnLoadPeople(name);
-  rnLoadFtp(name);
+  if (!p?.work) rnLoadFtp(name);
   rnFillPrefs(p);
   // The sessions at the foot: the gear's door, and an administrator's.
   $("rnSessField").hidden = true;
@@ -1647,7 +1717,11 @@ async function rnSubmit(sect, end = false){
       const only = new Set(mine);
       const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => only.has(k)));
       const r = await fetch("/api/prefs", {method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project: name, restart: restartNow, ...pick({git_name: v.git_name, git_email: v.git_email,
+        body: JSON.stringify({project: name, restart: restartNow,
+                              // The project's own door writes the project's defaults (R208 step 6);
+                              // a notebook writes this repository's overrides.
+                              scope: rnMode === "project" ? "project" : "repository",
+                              ...pick({git_name: v.git_name, git_email: v.git_email,
                               node: v.node, nodes: v.nodes, hosts: v.hosts, reads: v.reads, sees: v.sees, reaches: v.reaches,
                               tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default, agent_slots: v.agent_slots,
                               build: v.build, test: v.test, gate: v.gate,

@@ -48,6 +48,9 @@ class Base(unittest.TestCase):
                               target=lambda project: self.t, prefs_get=lambda project: {"forgepol": self.pol})
         self.was = forgeaccess._call
         self.addCleanup(setattr, forgeaccess, "_call", self.was)
+        # The git door's answer (B462): none unless a test says.
+        self.addCleanup(setattr, forgeaccess, "_receive_pack_probe", forgeaccess._receive_pack_probe)
+        forgeaccess._receive_pack_probe = lambda t, r: None
 
     def host(self, answers, default=(404, {}, {})):
         h = Host(answers, default)
@@ -104,6 +107,19 @@ class Measure(Base):
                 self.assertFalse((data or {}).get("title") or (data or {}).get("sha") or (data or {}).get("tag_name"),
                                  f"{path} carried what would land")
         self.assertEqual(forgeaccess.kept("app")["has"], has, "the measure is kept")
+
+    def test_the_git_door_has_the_last_word_on_push(self):
+        # B462: an organization's fine-grained token not approved yet passed
+        # every API probe and was refused at the push itself with 403.
+        github(self)
+        forgeaccess._receive_pack_probe = lambda t, r: False
+        m = forgeaccess.measure("app")
+        self.assertFalse(m["has"]["push"])
+        self.assertFalse(m["has"]["merge"])
+        self.assertTrue(any("git door" in n for n in m["notes"]), m["notes"])
+        forgeaccess._receive_pack_probe = lambda t, r: True
+        self.assertTrue(forgeaccess.measure("app")["has"]["push"])
+        self.assertFalse(any("git door" in n for n in forgeaccess.measure("app")["notes"]))
 
     def test_an_account_that_cannot_push_writes_nothing_and_nothing_is_probed(self):
         h = github(self, role_push=False)

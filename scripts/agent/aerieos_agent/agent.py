@@ -192,6 +192,30 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.state["token"] = new
         self.ctl.token = new
 
+    def token_back(self):
+        """The token before the last rotation tried again when the
+        controller says it does not know the newest (B655): a controller
+        back from a restart with a record older than its last hello (3 Nov:
+        25 minutes of its write-ahead log dropped on a FUSE share) still
+        holds the one it handed out before, live there until the newer one
+        is used. A token this node was handed is what it presents on every
+        call, so a controller that retired it answers as it would have, and
+        nothing is weaker. Once per rotation; written first, as take_token
+        writes. True when there was one to go back to."""
+        prev, _ = getattr(self, "prev_token", None) or ("", 0)
+        if not prev or prev == self.state.get("token"):
+            return False
+        try:
+            save_state(dict(self.state, token=prev))
+        except OSError as e:
+            log(f"the token before was not kept, so the newest stays: {e}")
+            return False
+        log("the controller does not know this node's newest token; the one it handed out before is tried")
+        self.state["token"] = prev
+        self.ctl.token = prev
+        self.prev_token = None
+        return True
+
     # -- the channel -------------------------------------------------------
     def census_take(self):
         """The census a hello carries. The layout's one standing rule first,
@@ -712,6 +736,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 else:
                     self.quiet = 0
                 if st == 401:
+                    if self.token_back():
+                        self.hello_again("the token before is tried")
+                        continue
                     log(f"refused: {r.get('error')}; this node's credential "
                         "is no longer good. Re-enroll with a new token.")
                     time.sleep(300)
@@ -833,6 +860,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 self.take(r)
                 continue
             if st == 401:
+                if self.token_back():
+                    self.hello_again("the token before is tried")
+                    continue
                 log(f"refused: {r.get('error')}; re-enroll with a new token")
                 self.hello_again("the work poll was refused")
                 time.sleep(300)

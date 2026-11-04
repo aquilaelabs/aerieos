@@ -149,7 +149,10 @@ const GIT_FLOOR = [2, 38];
 // sandbox node. The reason is on the line, in the state's own words.
 function nodeGpu(n){
   const card = n.reported?.gpu_card;
-  if (!card) return "";
+  // An AMD card or APU (R207 step 1): the kernel's own amdgpu drives it,
+  // and a container is given it from its settings; no display switch here.
+  const amd = n.reported?.gpu_amd ? `<div class="actbar ndgpu"><span class="state note">gpu: ${esc(n.reported.gpu_amd)} · amdgpu, the kernel's own; a container is given it from its settings on the Containers page</span></div>` : "";
+  if (!card) return amd;
   const st = n.reported?.gpu_display || "";
   const up = /^up/.test(st), reboot = /^reboot/.test(st);
   // The display runs on NVIDIA's driver and does not install it (R102): the
@@ -168,7 +171,7 @@ function nodeGpu(n){
     <span class="state ${cls}">gpu: ${esc(card)} · ${esc(word)}</span>
     ${nodriver ? `<button type="button" data-ndtc="${esc(n.id)}"
       title="the driver is installed from the Library">Install the driver</button>` : ""}
-  </div>`;
+  </div>${amd}`;
 }
 // The sound this node has (R107), in a line: the card ALSA sees, or a
 // virtual one, and the sound server an emulator's audio would go through.
@@ -581,8 +584,8 @@ function nodeUsbSection(n){
         <div class="sub">${esc([p.driver || "no driver", p.group ? `IOMMU group ${p.group}` : "", on.length ? `carries ${on.join(", ")}` : "nothing on it"].filter(Boolean).join(" · "))}</div>
         ${cant ? `<div class="sub dim">${cant}</div>` : `<div class="sub dim">Given whole to a stopped VM under Hardware… on the VMs page, with everything on it; the VM must be off.</div>`}</div></div>`;
   });
-  const body = `<div class="field"><div class="sub">A device given to a running VM is attached now and kept in its definition; a stopped one has it from its next start.
-      It is found again by its serial after a replug or a reboot, by its port when two are alike. A device the host boots from, serves storage on or has in a pool stays the host's.</div></div>
+  const body = `<div class="field"><div class="sub">A device given to a VM is attached now if it runs, and from its next start if not${
+      helpIcon("It is kept in the VM's definition and found again by its serial after a replug or a reboot, by its port when two are alike. A device the host boots from, serves storage on or has in a pool stays the host's.")}</div></div>
     ${why ? `<div class="sub dim">${why}</div>` : ""}
     ${rows.length ? `<div class="rows">${rows.join("")}</div>` : `<div class="empty">No USB device on this machine${n.reported?.at ? "" : " that it has reported yet"}.</div>`}
     ${ctlRows.length ? `<div class="field"><div class="hint">Controllers</div></div><div class="rows">${ctlRows.join("")}</div>` : ""}`;
@@ -788,6 +791,15 @@ function nodeFeaturesSection(n){
         io.installed ? (io.on ? " On now." : " Not on yet: restart the machine; if it stays off after that, turn VT-d or AMD-Vi on in its firmware.")
           : io.on || n.reported?.vm_host?.iommu ? " On already, set outside AerieOS." : ""}`,
       ""));
+  // The NVIDIA card to a VM (R207 step 3): bound to vfio-pci from boot, so
+  // the host's driver never takes it and a VM's start finds it free; this
+  // machine and its containers do without it while it is marked so.
+  const gv = fe?.gpuvm || {};
+  if (n.reported?.gpu_card || gv.installed)
+    rows.push(row("gpuvm", "NVIDIA card to a VM", !!gv.installed,
+      `Gives the card${n.reported?.gpu_card ? ` (${esc(n.reported.gpu_card)})` : ""} to vfio-pci from boot, so one VM takes it under Hardware… on the VMs page; this machine and its containers do without it meanwhile.${
+        gv.installed ? (gv.bound ? " Held by vfio-pci now." : " Not yet: restart the machine.") : " This machine's now."}`,
+      ""));
   // The features installed elsewhere on the page (R91 step 1): each said as
   // the machine reports it, with the press that installs or removes it where
   // it already lives, since those take a license to accept (Google's, NVIDIA's)
@@ -819,7 +831,7 @@ function nodeFeaturesSection(n){
   const runs = ((r.services || {}).runners || []).length;
   others.push(elsewhere("runner", "CI runner", runs > 0, runs ? `${runs} runner${runs === 1 ? "" : "s"} registered here.` : "A forge's runner, registered with a token from the forge on the CI runner page.", ""));
   rows.push(...others);
-  const have = fe ? [fe.vmhost?.installed, n.config?.host_only && fe.firewall?.installed, fe.iommu?.installed].filter(Boolean).length
+  const have = fe ? [fe.vmhost?.installed, n.config?.host_only && fe.firewall?.installed, fe.iommu?.installed, fe.gpuvm?.installed].filter(Boolean).length
     + others.filter(h => / ok">installed/.test(h)).length : 0;
   return docSection("nodes", "features", ndTitle("features"), fe ? (have ? `${have} installed` : "none installed") : "",
     `${why ? `<div class="sub dim ndfeatwhy">${why}</div>` : ""}${rows.join("")}`);
@@ -1375,6 +1387,26 @@ async function ndStoreAsk(n, c){
             ? ` (it mounts another export there now)` : ""}, so what is on the share cannot be seen until it is `
           + `mounted. Apply mounts it first and only then puts the store there; if the mount does not come up, `
           + `the apply fails and ${role} stays in ${old || "its place"}.`)) return false;
+    } else if (role === "toolchains" && st.store && want.endsWith(`/${n.id}`)){
+      // This node's own folder inside a toolchain store, typed itself
+      // (R212): the setting is the store around it, since the agent keeps
+      // each node's toolchains in a folder named for it inside the store.
+      already = true;
+      to = want.slice(0, -(n.id.length + 1));
+      if (!await askYes(`Use ${to} as the toolchains store on ${n.name}?\n\n${want} is this node's own folder inside `
+          + `the toolchain store ${to}, so the setting is ${to}: the store uses what is there, and nothing is brought `
+          + `across from ${old || "the old place"}.`)) return false;
+      d.stores[role] = to;
+    } else if (st.store || st.mine || st.own){
+      // Already a store (R212): AerieOS's marker in it, this node's own
+      // toolchain folder inside it, or the folder nested for this node
+      // before. Used as it is, nothing nested, nothing brought across.
+      already = true;
+      if (!await askYes(`Use ${want} as the ${role} store on ${n.name}?\n\n${
+          st.mine ? `${want} holds this node's own ${role} folder, ${want}/${n.id}, made by AerieOS`
+          : st.store ? `${want} is a store AerieOS made`
+          : `${want} is the folder AerieOS put this node's ${role} store in before`
+          }: the store uses what is there, and nothing is brought across from ${old || "the old place"}.`)) return false;
     } else if (st.files){
       to = st.sub; already = !!st.sub_state?.files;
       if (!await askYes(`Put the ${role} store in ${want} on ${n.name}?\n\n${want} already has files in it, so the `
@@ -1471,6 +1503,13 @@ function nodeConfSections(n){
   const locked = !!n.config?.lock;
   const mounts = d.mounts.map((m, i) => {
     const [st, cls] = mountState(m, rep.mounts);
+    // A reason with a fix in it (a stale handle, a mount that did not come
+    // up) is longer than the cell at the end of the line shows, and the
+    // section's state line names the last apply's failure instead of it
+    // once one has failed (B660): the cell keeps the state up to its first
+    // colon and the whole reason goes under the row, where it can wrap.
+    const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
+    const head = cut > 0 ? st.slice(0, cut) : st;
     return `
     <div class="ndmount ctlline" data-i="${i}">
       <div class="setrow col ctlrow">${lbl("", "Source", m.type === "virtiofs" ? "the share tag" : "host:/export")}
@@ -1485,9 +1524,10 @@ function nodeConfSections(n){
           <option value="virtiofs" ${m.type === "virtiofs" ? "selected" : ""}>virtiofs</option>
         </select>
         <label class="ndcap"><input type="checkbox" data-k="ro" ${m.ro ? "checked" : ""}> read-only</label>
-        <span class="sub ndmstate ${cls}">${esc(st)}</span>
+        <span class="sub ndmstate ${cls}">${esc(head)}</span>
         <button type="button" class="eye" data-mrm title="take this mount out" aria-label="take this mount out">×</button>
-      </div>
+      </div>${cut > 0 ? `
+      <div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}
     </div>`;
   }).join("");
   const STORE_ABOUT = {
@@ -1770,7 +1810,8 @@ function ndNotHereHtml(){
   const ar = nodesMove.arrived || {};
   return `<div class="row stack2 ndnothere" data-group="Not yet here"><div class="grow">
       <div class="name">Not yet here since the move <span class="pill warn">${rows.length}</span></div>
-      <div class="sub">This controller's state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""} ${ar.restored_at ? esc(ago(ar.restored_at)) : ""}, and these nodes have not checked in since. One that heard the move follows by itself when the old address goes quiet; one that was off the whole time is told on its own console, as root, with its line, and nothing is enrolled again.</div>
+      <div class="sub">These nodes have not checked in since this controller's state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""}${ar.restored_at ? ` ${esc(ago(ar.restored_at))}` : ""}${
+        helpIcon("One that heard the move follows by itself when the old address goes quiet; one that was off the whole time is told on its own console, as root, with its line, and nothing is enrolled again.")}</div>
       ${rows.map(r => `<div class="sub" data-nothere="${esc(r.id)}"><b>${esc(r.name)}</b> <code>${esc(r.line)}</code> <button type="button" class="link" data-ndcopyline="${esc(r.id)}">Copy</button></div>`).join("")}
     </div></div>`;
 }
@@ -1787,10 +1828,13 @@ function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
 }
 // Test and Enroll script, the head's two buttons about the machine itself.
+// Enroll script is one press (R210): the node's script again, built from
+// what the row was enrolled with, downloaded the moment it arrives; the
+// Features section's Enroll again opens the dialog to change an answer.
 function ndAgentButtons(dead){
   const off = dead ? " disabled" : "";
   return `<button type="button"${dead ? "" : ` data-nd="test"`} title="check that this node answers"${off}>Test</button>
-          <button type="button"${dead ? "" : ` data-nd="reenroll"`} title="a new enroll script for this node, to run again on the same machine"${off}>Enroll script</button>`;
+          <button type="button"${dead ? "" : ` data-nd="reenroll-now"`} title="this node's enroll script again, with the answers it was enrolled with, to run again on the same machine"${off}>Enroll script</button>`;
 }
 
 // One node's row: its name, facts and agent bar, then its sections (R218
@@ -1986,8 +2030,13 @@ function renderNodesInto(i){
   // Nothing enrolled. Said where the rows would be, rather than an empty
   // picker over an empty page: the Enroll button above is the whole of what
   // there is to do here.
+  // On AerieOS the machine is its own node, drawn on This machine and kept
+  // off this list, so an empty list is not "no node yet" (B635).
+  const ownHere = state?.bare_metal ? (nodesList || []).find(x => x.config?.own && x.state !== "retired") : null;
   const none = live.length ? "" : state?.can?.admin === false
     ? `<div class="empty ndnone">None of your projects is on a node yet. An administrator sets a project's node.</div>`
+    : ownHere ? `<div class="empty ndnone">This machine is its own node: ${pageLink("machine", "This machine")} under Controller is its page.
+      Press <b>Enroll node</b> to get the command that adds another machine for builds, tests and sessions.</div>`
     : `<div class="empty ndnone">No node yet. Press <b>Enroll node</b> to get the command
       that adds a machine for builds, tests and sessions.</div>`;
   // Enrolling is a dialog now (#ndmodal), not two panels appended here; see
@@ -2216,7 +2265,7 @@ function ndDialogs(){
     const $b = sel => body.querySelector(sel);
     if (again){
       const c = again.config || {};
-      was = {"#ndEnName": again.name, "#ndEnUser": c.user || "bb",
+      was = {"#ndEnName": again.name, "#ndEnUser": c.user || "bb", "#ndEnSystem": c.system,
              "#ndEnSess": !c.host_only, "#ndEnHost": !!c.host_only, "#ndEnNginx": !!c.nginx,
              "#ndEnReach": c.tunnel?.kind === "public" ? "public" : c.tunnel?.kind === "wireguard" ? "wireguard" : "lan",
              "#ndEnCtl": c.tunnel?.kind === "public" && c.tunnel.host ? `https://${c.tunnel.host}` : location.origin,
@@ -2348,12 +2397,12 @@ function ndDialogs(){
     boxWidth(true);
     const url = URL.createObjectURL(new Blob([r.script], {type: "text/x-shellscript"}));
     body.innerHTML = `<div class="field ndtoken">
-        <div class="hint">Copy it to the machine and run it once, as root. It ${
-          r.reach === "wireguard" ? `brings the tunnel up as ${esc(r.tunnel_addr)}, checks the controller answers through it, `
-          : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it; the row goes live when it is done.</div>
+        <div class="hint">Copy it to the machine and run it once, as root; the row goes live when it is done${
+          helpIcon(`It ${r.reach === "wireguard" ? `brings the tunnel up as ${r.tunnel_addr}, checks the controller answers through it, `
+            : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it.`)}</div>
         <pre class="ndcmd">sudo bash ${esc(r.filename)}</pre>
         <div class="hint">It holds a token good once, until ${esc(new Date(r.expires * 1000).toLocaleString())}${
-          r.reach === "wireguard" ? ", and the machine's WireGuard private key until it has run: once the node has enrolled it takes the WireGuard config out of itself and keeps the rest, to change and run again" : ""}.</div>
+          r.reach === "wireguard" ? helpIcon("It also holds the machine's WireGuard private key until it has run: once the node has enrolled it takes the WireGuard config out of itself and keeps the rest, to change and run again.") : ""}</div>
       </div>${r.home ? `
       <div class="field ndtoken">
         <label class="lbl">${r.reach === "public" ? "At home, on the tunnel" : "On your router"}</label>
@@ -2514,7 +2563,7 @@ builderbot-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
   modal.onclick = e => {
     if (e.target === modal && !body.querySelector(".ndtoken")) shut();
   };
-  return {modal, body, shut, mintForm, vmForm, openVm, openEnroll};
+  return {modal, body, shut, mintForm, mintScript, vmForm, openVm, openEnroll};
 }
 
 function wireNodesTab(root){
@@ -2540,7 +2589,7 @@ function wireNodesTab(root){
     phFetch({action: "deny", id: Number(b.dataset.rdeny)}));
   // New VM and Enroll node are the group's header's (R177, wired
   // by page-shell.js wireGroupHeader); the dialogs stay the page's.
-  const {modal, body, shut, mintForm, vmForm} = ndDialogs();
+  const {modal, body, shut, mintForm, mintScript, vmForm} = ndDialogs();
   wireSections(root);
   root.querySelectorAll(".ndrow").forEach(box => {
     const id = box.dataset.node;
@@ -2648,6 +2697,16 @@ function wireNodesTab(root){
       if (act === "reenroll"){
         const n = (nodesList || []).find(x => x.id === id);
         if (n){ modal.hidden = false; mintForm({}, n); }
+        return;
+      }
+      if (act === "reenroll-now"){
+        // The row's own script (R210): built on the controller from what
+        // the node was enrolled with, saved the moment it arrives.
+        busy(b, "Making");
+        const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
+        if (r.error) return;
+        modal.hidden = false; mintScript(r);
+        nodesRev++; drawPanes();
         return;
       }
       if (act === "door" && b.dataset.on === "0"){

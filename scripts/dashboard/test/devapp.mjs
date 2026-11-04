@@ -4239,15 +4239,17 @@ ok(await page.$('#devSend'),
      'the docker row says what a session may do with it and links to the setting, carrying no control');
   await page.evaluate(() => renameProject('ep.silon'));
   await page.waitForSelector('#rnmodal:not([hidden]) #rnGateDocker', { timeout: 15000 });
+  // A repository's door offers "as the project" first (R208 step 6); the
+  // auto set through the API above is this repository's own.
   ok(await page.$eval('#rnGateDocker', e => e.value === 'auto' && !e.closest('label').hidden
-                        && [...e.options].map(o => o.value).join() === 'auto,ask,deny'),
+                        && [...e.options].map(o => o.value).join() === 'inherit,auto,ask,deny'),
      "the project's settings carry it, on auto, with the other Agents may dials");
   // The Claude section holds the test-run setting too (25 Sep): what a
   // change asked for during a run does, saved with the rest of the dialog,
   // under the section's heading since the dialog was put in sections (1 Oct).
   ok(await page.$eval('#rnGateField', e => e.closest('.rngroup').querySelector('summary .t').textContent) === 'Agents may'
      && await page.$eval('#rnGateLabel', e => e.textContent) === 'While a test runs'
-     && await page.$eval('#rnTestChange', e => e.value === 'wait' && [...e.options].map(o => o.value).join() === 'wait,restart')
+     && await page.$eval('#rnTestChange', e => e.value === 'inherit' && [...e.options].map(o => o.value).join() === 'inherit,wait,restart')
      && await page.$eval('#rnReply', e => e.value === ''),
      'the dialog groups what an agent may do under its Agents may heading, with what a change does during a test run; replies are the person\'s own pick');
   await page.selectOption('#rnTestChange', 'restart');
