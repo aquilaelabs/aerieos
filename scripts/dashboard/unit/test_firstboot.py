@@ -201,6 +201,15 @@ class Apply(unittest.TestCase):
         self.assertIn("accounts", [x["what"] for x in r["failed"]])
         self.assertNotIn("boss", users.load()["users"])
 
+    def test_a_plan_that_names_disks_keeps_the_setup_page_which_walks_them(self):
+        settings.set_many({"setup_done": False})
+        wj(self.handed, {**json.loads(self.handed.read_text()),
+                         "config": {**CFG, "array": {"disks": [{"slot": "disk1", "id": "WD_1", "fs": "xfs"}]}}})
+        r = firstboot.apply(self.handed)
+        self.assertEqual(users.load()["users"]["boss"]["role"], "owner", "the owner is still made")
+        self.assertFalse(settings.get("setup_done"))
+        self.assertNotIn("first run", [x["what"] for x in r["done"]])
+
     def test_no_password_leaves_the_owner_to_the_first_run_page(self):
         cfg = dict(CFG, owner={"name": "boss"})
         self.handed.write_text(json.dumps({"config": cfg, "machine": {}}))

@@ -621,7 +621,9 @@ function drawHeldBand(){
   const said = (h.why || []).length ? `Held because ${h.why.join("; ")}.` : "";
   if (why && why.textContent !== said) why.textContent = said;
   const go = b.querySelector("[data-heldgo]");
-  if (go && !go.onclick) go.onclick = e => { e.preventDefault(); openMachineTab(); };
+  // While the first-run page stands, no page shows behind it (B662): the
+  // walk holds Start.
+  if (go && !go.onclick) go.onclick = e => { e.preventDefault(); setupNeeded() ? setupWalkPick("move") : openMachineTab(); };
 }
 
 // ---- a moved controller's band (R90 step 12) ---------------------------------

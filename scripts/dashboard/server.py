@@ -235,9 +235,9 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
 
 # On a stick the first run's move door is shut (the operator, 1 Nov): the
 # bundle never lands on the stick, so the disks come first.
-STICK_MOVE_FIRST = ("This machine runs from a stick, and a move never lands on the stick: make a setup account, "
-                    "then on This machine create or adopt the disks and name the system pool or the folder the projects are in, "
-                    "and land the move from Controller settings, Move a controller here. The setup account goes when the move lands.")
+STICK_MOVE_FIRST = ("This machine runs from a stick, and a move lands on its disks, never on the stick. Make a setup account: "
+                    "the next page walks you through the disks, where the projects go and landing the move, in that order. "
+                    "Have the old controller's move token and its bundle with you. The setup account goes when the move lands.")
 
 MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move token once.
     Give the token here with its bundle, or with the old controller's address while it still

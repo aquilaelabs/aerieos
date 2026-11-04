@@ -201,6 +201,9 @@ function homeStartHtml(){
     ["Your name and email", s.git, `<button type="button" data-hstart="git">Profile</button>`],
     canNodes ? ["Claude Code on your node", !!s.claude, `<button type="button" data-hstart="claude"${s.node ? "" : " disabled"}>Library</button>`] : null,
     ["A first project", s.project, `<button type="button" data-hstart="project">New project</button>`],
+    // What a move from an old system leaves for after it lands.
+    state?.held?.held ? ["Start this machine: nothing runs until then", false, `<button type="button" data-hstart="machine">This machine</button>`] : null,
+    state?.firstboot?.apps_from ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="machine">This machine</button>`] : null,
   ].filter(Boolean);
   const left = steps.filter(x => !x[1]).length;
   if (!left) return "";
@@ -270,6 +273,7 @@ function renderHomeInto(i){
     else if (k === "git") openProfileTab();
     else if (k === "claude" && s.node) openNodeClaude(s.node.id);
     else if (k === "project") openNewProject();
+    else if (k === "machine") openMachineTab();
     else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ } drawPanes(); }
   });
   // The Claude step's state is the nodes list's, read on open and again

@@ -1190,6 +1190,10 @@ body.firstrun #panes{display:none}
 .setuppage{max-width:var(--doc-w);margin:0 auto;padding:20px var(--row-x) 32px;display:flex;flex-direction:column;gap:12px}
 .setuphead h2{margin:0 0 6px;font:var(--f-sect);font-size:20px;color:var(--ink)}
 .setuphead p{margin:0;color:var(--dim)}
+/* The way between a new start and the walk: a line under the head, its one
+   button on the line. */
+.setwalkask{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-top:10px;color:var(--dim)}
+.setwalkask .grow{flex:1 1 12em;min-width:0}
 /* A step: its number, its title and its state on one line, what it is under
    them, and its actions at the card's foot on the right. */
 .setstep{background:var(--bg);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
@@ -1208,6 +1212,12 @@ body.firstrun #panes{display:none}
 .setstep .setplan p{margin:2px 0}
 .setstepbody p{margin:0;color:var(--dim)}
 .setstepbody p b{color:var(--ink)}
+/* The walk's steps hold This machine's own fields: a space between what is said
+   and what is pressed, and no gutter of their own inside the card. */
+.setstepbody>p+p,.setstepbody>p+.facts,.setstepbody>.facts+p,.setstepbody>.field{margin-top:8px}
+.setstepbody>.field{padding:0}
+.setstepbody>.actbar{padding:0;margin-top:8px}
+.setstepbody .pick{gap:8px}
 .setstep>.actbar{justify-content:flex-end;flex-wrap:wrap}
 .setfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--field-gap);margin-top:8px}
 .setfields input{width:100%;box-sizing:border-box;min-height:var(--ctl);padding:8px 9px;font:var(--f-field)}

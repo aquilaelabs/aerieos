@@ -271,6 +271,8 @@ await firstRun(false);
   {
     const some = await page.evaluate(() => {
       const keep = state.firstboot;
+      // The new start's page, picked: a plan with disks opens on the walk.
+      setupWalk = 'fresh';
       state.firstboot = { ...(keep || {}), adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [{ slot: 'parity', id: 'Seagate_SG-E' }], pools: [] }, skipped: [] } };
       setupSig = ''; drawSetup();
       const s = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
@@ -285,15 +287,100 @@ await firstRun(false);
       setupSig = ''; drawSetup();
       const t = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
       out.all = { pill: t.querySelector('.pill')?.textContent, text: t.textContent.replace(/\s+/g, ' '), make: !!t.querySelector('[data-setdisksmake]'), boxes: t.querySelectorAll('input').length };
-      state.firstboot = keep; setupSig = ''; drawSetup();
+      out.all.walk = t.querySelector('[data-setwalk="move"]')?.textContent;
+      out.anyLink = document.querySelectorAll('#setupPanel a.pagelink').length;
+      state.firstboot = keep; setupWalk = ''; setupSig = ''; drawSetup();
       return out;
     });
-    ok(some.theirs === 2 && some.boxes === 0 && /old system's disk1: adopted as it is on This machine/.test(some.words) && /old system's parity/.test(some.words)
-       && some.link === '#/controller/machine' && some.mine.join() === 'sdc,sdd,nvme0n1' && /A ZFS mirror of 2 disks/.test(some.plan) && some.make,
+    ok(some.theirs === 2 && some.boxes === 0 && /old system's disk1: adopted as it is, in the walk/.test(some.words) && /old system's parity/.test(some.words)
+       && !some.link && some.mine.join() === 'sdc,sdd,nvme0n1' && /A ZFS mirror of 2 disks/.test(some.plan) && some.make,
        `the stick's disks are the old system's on the disks step: a row each with whose it is and no box, the plan from the rest, Make it for those alone (${JSON.stringify(some).slice(0, 400)})`);
-    ok(some.all.pill === 'on This machine' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
-       && !some.all.make && some.all.boxes === 0,
-       `...and with every disk theirs the step points at This machine and offers nothing to make (${JSON.stringify(some.all).slice(0, 300)})`);
+    ok(some.all.pill === 'in the walk' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
+       && !some.all.make && some.all.boxes === 0 && some.all.walk === 'Walk me through it' && some.anyLink === 0,
+       `...and with every disk theirs the step leads into the walk, offers nothing to make, and no link on the page leads where nothing can show (B662) (${JSON.stringify(some.all).slice(0, 300)})`);
+  }
+  // Moving here (R214): a stick whose plan names disks opens on the walk, its
+  // steps in the order they have to happen, each done in place with This
+  // machine's and Controller settings' own controls, read from the machine.
+  {
+    const walk = await page.evaluate(() => {
+      const keep = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported;
+      const panel = () => document.getElementById('setupPanel');
+      const titles = () => [...panel().querySelectorAll('.setstep h3')].map(h => h.textContent);
+      const step = t => [...panel().querySelectorAll('.setstep')].find(x => x.querySelector('h3')?.textContent === t);
+      const pill = t => step(t)?.querySelector('.pill')?.textContent;
+      const words = t => step(t)?.textContent.replace(/\s+/g, ' ') || '';
+      const stick = { stick: true, pool: '', ready: false, on_stick: [], written_kb: 1, boot_written_kb: 1 };
+      const redraw = rep => { n.reported = { ...was, os_stick: stick, ...rep }; setupSig = ''; drawSetup(); };
+      setupWalk = ''; setupLand = { fresh: true, stick: true, held: 'the projects need a place first' };
+      state.firstboot = { ...(keep || {}), at: 1, done: [], waiting: [], failed: [], apps_from: { docker: { image: 'x' }, vms: {} },
+        adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u' }] }, skipped: [] } };
+      redraw({});
+      const out = { walking: setupWalking(), head: panel().querySelector('h2')?.textContent, titles: titles(),
+        first: words('Have these with you'), firstPill: pill('Have these with you'),
+        adopt: !!step("The old system's disks")?.querySelector('[data-adopt="adopt"]') && !!step("The old system's disks")?.querySelector('input[name="adoptMode"]'),
+        toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
+        heldWhy: /the projects need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
+        back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
+      // Adopted read only with the pool not mounted: nowhere to put anything
+      // is said, in the step that is stuck.
+      redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
+      out.stuck = words('Where the projects and containers go'); out.doneDisks = pill("The old system's disks");
+      out.pick0 = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
+      // A btrfs cache adopted writable is a pool to pick (B663); a data disk is not.
+      redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
+      out.pick = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
+      out.backRw = words('If you go back');
+      stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
+      out.placed = pill('Where the projects and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
+      out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
+      setupLand = { fresh: false, stick: true, held: '' }; setupSig = ''; drawSetup();
+      out.notFresh = words('Land the controller');
+      // Typing survives a poll that moved nothing.
+      setupLand = { fresh: true, stick: true, held: '' }; setupSig = ''; drawSetup();
+      out.owner = state?.owner;
+      // Controller settings draws the same form for its owner, and the backup
+      // its owner's button (B664: both read a role the page never had).
+      { const was = moveData; moveData = { land: { fresh: true, stick: true, held: '' }, pieces: [] };
+        out.settingsForm = moveSection().includes('data-movelandbox'); moveData = was;
+        const bk = backupData; backupData = { on: true, where: ['/x'], copies: [] };
+        out.backupLive = !/data-backupnow disabled/.test(backupSection()); backupData = bk; }
+      const tok = document.getElementById('landTok');
+      if (tok){ tok.value = 'typed'; drawSetup(); }
+      out.typed = document.getElementById('landTok')?.value;
+      // Either way, from either page.
+      panel().querySelector('[data-setwalk="fresh"]').click();
+      out.fresh = { head: panel().querySelector('h2')?.textContent, kept: localStorage.getItem('bb.setupWalk'), ask: panel().querySelector('[data-setwalk="move"]')?.textContent };
+      panel().querySelector('[data-setwalk="move"]').click();
+      out.backIn = panel().querySelector('h2')?.textContent;
+      return out;
+    });
+    if (process.env.BB_SHOTS){
+      await page.setViewportSize({ width: 1440, height: 2100 }); await sleep(300);
+      await page.screenshot({ path: `${process.env.BB_SHOTS}/walk-desk.png`, fullPage: true });
+      await page.setViewportSize({ width: 393, height: 3000 }); await sleep(300);
+      await page.screenshot({ path: `${process.env.BB_SHOTS}/walk-phone.png`, fullPage: true });
+      await page.setViewportSize({ width: 1280, height: 720 }); await sleep(200);
+    }
+    await page.evaluate(() => { try{ localStorage.removeItem('bb.setupWalk'); }catch(e){} setupWalk = ''; setupLand = null; state.firstboot = null; loadNodes(); setupSig = ''; drawSetup(); });
+    ok(walk.walking && walk.head === 'Moving here' && walk.titles.join(' | ') === "Have these with you | This machine | The old system's disks | Where the projects and containers go | Land the controller | After it lands | If you go back",
+       `a stick whose plan names disks opens on the walk, its steps in the order they have to happen (${walk.titles.join(' | ')})`);
+    ok(walk.firstPill === 'read first' && /Move token/.test(walk.first) && /The bundle/.test(walk.first) && /off now/.test(walk.first) && /boot the old system's stick/.test(walk.first),
+       `...the token and the bundle said first, that the old controller may be off, and how to go and make them (${walk.first.slice(0, 200)})`);
+    ok(walk.adopt && walk.toDo === 'to do' && walk.links === 0, `...the disks adopted in place, with no link leading away (${JSON.stringify([walk.adopt, walk.toDo, walk.links])})`);
+    ok(walk.landHeld === true && walk.heldWhy, '...Land waiting on the disks, saying why');
+    ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
+       `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);
+    ok(walk.pick.includes('/mnt/cache') && !walk.pick.includes('/mnt/disk1'), `...a btrfs pool it adopted is a system pool to pick, a data disk is not (B663) (${walk.pick.join()})`);
+    ok(/Its disks are as they were/.test(walk.back) && /parity sync/.test(walk.backRw) && /Forget it/.test(walk.back),
+       `...the way back says what it costs as it stands, and to forget a prepared move (${walk.backRw.slice(0, 200)})`);
+    ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
+    ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
+    ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
+    ok(walk.owner === true && walk.settingsForm === true && walk.backupLive === true,
+       `the status read says who owns this controller, so Controller settings draws Move a controller here and Back up now is live for them (B664) (${JSON.stringify([walk.owner, walk.settingsForm, walk.backupLive])})`);
+    ok(walk.fresh.head === 'Set up AerieOS' && walk.fresh.kept === 'fresh' && walk.fresh.ask === 'Walk me through it' && walk.backIn === 'Moving here',
+       `...and either way is a press from the other, remembered in this browser (${JSON.stringify(walk.fresh)})`);
   }
   const sent = [];
   await page.route('**/api/v1/nodes', async r => {

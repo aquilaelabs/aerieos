@@ -6,7 +6,8 @@ hands it over at /run/aerieos-os/firstboot/firstboot.json with what it did
 to the machine itself (the hostname, the time zone). At start this applies
 the rest it can: the owner (a name and a password hash; none leaves the
 first-run page to ask), the people (by name and role, their SMB password's
-NT hash with them), and first_run: skip marks the setup page finished. What
+NT hash with them), and first_run: skip marks the setup page finished unless
+the plan names disks, which that page walks through. What
 needs disks adopted first (the shares, the pools, the array) and the apps
 are kept for the piece that adopts them, said as waiting. The handed file is
 removed; what is kept in /config/firstboot.json never holds the password
@@ -69,7 +70,9 @@ def apply(path=None):
             else:
                 done.append({"what": "accounts", "said": ", ".join(r["made"])})
                 failed += [{"what": f"account {n or '(no name)'}", "said": why} for n, why in r["skipped"]]
-                if cfg.get("first_run") == "skip":
+                # A plan that names disks keeps the setup page: it is where
+                # they are walked through, in the order they have to happen.
+                if cfg.get("first_run") == "skip" and not adopt_want(cfg):
                     settings.set_many({"setup_done": True})
                     done.append({"what": "first run", "said": "skipped: the owner signs in"})
         else:

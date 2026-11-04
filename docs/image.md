@@ -99,11 +99,22 @@ binds the pool's again.
 
 **A move onto a stick lands last.** The first page's **Moving a controller
 here?** does not take a bundle on a stick, since it would land on the stick.
-Make a setup account instead, create or adopt the disks on This machine,
-name the system pool or the projects folder, and land the move from
-Controller settings, **Move a controller here** (the token with the old
-controller's address, or the bundle). It is spooled and unpacked in the
-projects folder on the disks, and its state takes the setup account's place.
+Make a setup account instead: the next page is **Moving here**, a walk of the
+steps in the order they have to happen, each done on that page. What to have
+with you (the move token and the bundle), the old system's disks, where the
+projects and containers go, landing the controller, what comes after it, and
+the way back. A stick whose plan names disks opens on it; on any other first
+run **Walk me through it** does, and **Set up a new one instead** leaves it. A
+pool the machine adopted can be the system pool whatever its filesystem; a
+data disk cannot, since it carries the old system's parity. **Read only**
+writes nothing to the data disks, so with no writable pool nothing new has
+anywhere to go: moving for good takes **Writable**, or a spare disk made into
+a pool. The move is the same one Controller settings lands, under **Move a
+controller here** (the token with the old controller's address, or the
+bundle). An old controller that ran on this machine is off by now, so its
+address does not answer and the bundle is the only way. It is spooled and
+unpacked in the projects folder on the disks, and its state takes the setup
+account's place.
 A controller whose projects already sit on these disks needs no repositories
 in its bundle: name their folder first, and they are found where they are.
 
@@ -196,7 +207,7 @@ password hash is never left there. The controller makes the owner from the
 hash (the dashboard's own scheme, so a tool that writes the file hashes what
 was typed) and each person by name and role, with their SMB password where
 it came with them and no dashboard password until the owner sets one on the
-Users page. `"first_run": "skip"` marks the setup page done, and `"hold_first_start": true`
+Users page. `"first_run": "skip"` marks the setup page done unless the plan names disks, which that page walks through, and `"hold_first_start": true`
 holds that first start, so the disks are on This machine before anything
 mounts; without an
 owner's hash the first-run page makes the owner as on any stick. The shares,
@@ -240,7 +251,7 @@ Backups and Projects shares on it. The Storage page does all of this too,
 later, the same way. On a stick made with a prepared configuration that
 names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
-they are on This machine, under Disks from the stick.
+they are in the first-run page's walk, and later on This machine under Disks from the stick.
 
 ## At the console
 

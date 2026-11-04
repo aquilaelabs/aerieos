@@ -70,6 +70,7 @@ function drawSetup(){
   if (Date.now() - setupNodesAt > 5000){
     setupNodesAt = Date.now();
     loadNodes().then(() => drawSetup());
+    if (setupWalking()) setupLandLoad();
   }
   const s = setupSteps();
   // On a machine that is its own controller, its disks are a step (R161
@@ -78,24 +79,26 @@ function drawSetup(){
   const dk = setupDisks.own;
   // Drawn again only when what it shows has moved: a poll landing mid-type
   // would otherwise take what was typed with it.
-  const sig = JSON.stringify([s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
+  const sig = JSON.stringify([setupWalkSig(s), s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
                               s.git, s.claude, s.project, !!s.own && [JSON.stringify(dk?.disks || []), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
-  const pill = (done, wait) => done ? `<span class="pill ok">done</span>`
-    : wait ? `<span class="pill note">waiting</span>` : `<span class="pill">to do</span>`;
-  const card = (n, title, done, wait, body, acts = "") => `<section class="setstep${done ? " done" : ""}">
-      <div class="setstephead"><span class="setnum">${n}</span><h3>${esc(title)}</h3>${pill(done, wait)}</div>
-      <div class="setstepbody">${body}</div>${acts ? `<div class="actbar">${acts}</div>` : ""}</section>`;
+  if (setupWalking()){
+    el.innerHTML = setupWalkHtml(s);
+    wireSetup(el, s);
+    return;
+  }
+  const card = setupCard;
   const nodeName = s.node ? esc(s.node.name) : "";
   el.innerHTML = `<div class="setuppage">
     <div class="setuphead">
       <h2>Set up AerieOS</h2>
       <p>AerieOS works on nodes: machines you enroll, where projects are kept, built and worked on. One is all it needs to start.</p>
+      <div class="setwalkask"><span class="grow">Moving a controller or an old system here?</span><button type="button" data-setwalk="move">Walk me through it</button></div>
     </div>
     ${s.own ? card(1, "This machine", !!s.node, !s.node, s.node
       ? `<p><b>${nodeName}</b>, the machine this controller runs on, is enrolled and answering: it is your first node${
-          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on ${pageLink("machine", "This machine")}.</p>`
+          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on This machine, after Finish.</p>`
       : `<p>The machine this controller runs on is its first node, set up by the installer: ${
           s.own.state === "pending" ? "its agent is being installed and enrolled"
           : s.own.live === false ? "enrolled, and waiting for it to answer"
@@ -135,6 +138,10 @@ function drawSetup(){
 }
 
 function wireSetup(el, s){
+  el.querySelectorAll("[data-setwalk]").forEach(b => b.onclick = () => setupWalkPick(b.dataset.setwalk));
+  // The walk's steps are This machine's and Controller settings' own, so
+  // their own wiring serves them; nothing here sends anything else.
+  if (setupWalking()){ wireHeld(el); wireMove(el); }
   const vm = el.querySelector("[data-setvm]"), en = el.querySelector("[data-setenroll]");
   if (vm) vm.onclick = () => ndDialogs().openVm();
   if (en) en.onclick = () => ndDialogs().openEnroll();
@@ -182,6 +189,117 @@ async function setupFinish(){
   // Home, where what is left of the four waits in its Getting started card.
   location.hash = "#/home";
   refresh();
+}
+
+// A step of the setup page: its number, its title and its state as a pill, what
+// it is, and its own action at the card's foot. `said` is a pill's word where
+// a step has no state to read.
+function setupCard(n, title, done, wait, body, acts = "", said = ""){
+  const pill = said ? `<span class="pill note">${esc(said)}</span>`
+    : done ? `<span class="pill ok">done</span>` : wait ? `<span class="pill note">waiting</span>` : `<span class="pill">to do</span>`;
+  return `<section class="setstep${done ? " done" : ""}">
+      <div class="setstephead"><span class="setnum">${n}</span><h3>${esc(title)}</h3>${pill}</div>
+      <div class="setstepbody">${body}</div>${acts ? `<div class="actbar">${acts}</div>` : ""}</section>`;
+}
+
+// ---- moving here: the walk (R214, the operator, 4 Nov) -----------------------
+//
+// A person switching a machine over met a page that spoke only of a new start,
+// a door that named three pages it hid, and the order of things nowhere. So
+// the first-run page has a second shape: what moving here takes, step by step,
+// in the order it has to happen, each done in place with the same controls and
+// the same wiring This machine and Controller settings have, each one's state
+// read from the machine. On by itself where the stick's plan names disks;
+// otherwise a press away. Which one is showing is this browser's.
+let setupWalk = (() => { try{ return localStorage.getItem("bb.setupWalk") || ""; }catch(e){ return ""; } })();
+let setupLand = null;
+function setupWalking(){
+  return setupWalk ? setupWalk === "move" : !!state?.firstboot?.adopt;
+}
+function setupWalkPick(to){
+  setupWalk = to;
+  try{ localStorage.setItem("bb.setupWalk", to); }catch(e){ /* a private window: this page's memory is enough */ }
+  if (to === "move") setupLandLoad();
+  setupSig = ""; drawSetup();
+}
+async function setupLandLoad(){
+  try{ setupLand = (await (await fetch("/api/move")).json()).land || null; }
+  catch(e){ /* the step says it is waiting */ }
+  drawSetup();
+}
+// What the walk's steps show, for the page's own redraw test: a poll that moved
+// none of it leaves what was typed alone.
+function setupWalkSig(s){
+  if (!setupWalking()) return "";
+  const r = (s.node || s.own)?.reported || {}, st = r.os_stick || {};
+  return JSON.stringify([setupWalk, setupLand, r.adopted?.writable, (r.adopted?.mounts || []).map(m => [m.where, m.mounted, m.ro]), r.pools?.length, r.array?.mount,
+                         st.pool, st.ready, st.projects, st.projects_bound, state?.held?.held, (r.disks || []).length, ((s.node || s.own)?.jobs || []).map(j => j.apply),
+                         state?.firstboot?.adopt ? 1 : 0, (s.node || s.own)?.live]);
+}
+function setupBootBack(had){
+  return `Shut this machine down and boot the old system's stick. ${had?.writable
+    ? "These disks were adopted writable, so the old system then takes a parity sync, which leaves its array unprotected until it ends."
+    : "Its disks are as they were."}`;
+}
+function setupWalkHtml(s){
+  const n = s.node || s.own, rep = n?.reported || {}, stick = rep.os_stick?.stick ? rep.os_stick : null;
+  const had = rep.adopted, plan = state?.firstboot?.adopt;
+  const adopted = (had?.mounts || []).length > 0 && had.mounts.every(m => m.mounted);
+  const placed = !stick || stick.ready || !!stick.projects_bound;
+  const ld = setupLand;
+  let i = 0;
+  const cards = [];
+  cards.push(setupCard(++i, "Have these with you", false, false,
+    `<p>A controller moves with two things from the old one, both under Controller settings, Move this controller.</p>
+     ${factGrid([["Move token", "shown once, when you press Prepare to move"],
+                 ["The bundle", "Download the bundle, kept on the computer you are using now"]], "stickfacts")}
+     <p>If the old controller ran on this machine it is off now: its address does not answer, and the bundle is the only way.</p>
+     <p>Missing either one? ${esc(setupBootBack(had))} Make them there, then come back.</p>
+     <p>Not moving a controller, only the disks? Leave the controller step and press Finish at the foot of this page.</p>`,
+    "", "read first"));
+  if (s.own) cards.push(setupCard(++i, "This machine", !!s.node, !s.node, s.node
+    ? `<p><b>${esc(s.node.name)}</b> is answering${s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}.</p>`
+    : `<p>Its agent is coming up. The steps below need it, and this turns to done by itself.</p>`));
+  const parts = n && (plan || had?.mounts?.length) ? adoptParts(n) : null;
+  if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
+    `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, so what is new needs a writable pool. Moving for good, or with no pool, adopt Writable.</p>`}${parts.body}`));
+  else if (s.own && !plan) cards.push(setupDisksCard(++i));
+  if (n && stick){
+    const pick = stickPoolPick(n, stick, adopted || setupDisksDone(setupDisks.own) ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk." : "Nothing to pick yet: the step before gives this one its disks.");
+    const roOnly = adopted && !had.writable && !(had.mounts || []).some(m => !m.ro);
+    cards.push(setupCard(++i, "Where the projects and containers go", placed, false,
+      `<p>They write all day, so they live on the disks and never on the stick. The move lands there too.</p>
+       ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
+                   ["The projects", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
+                    {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
+       ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
+       ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`));
+  }
+  const landing = !ld ? skRows(1)
+    : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
+    : state?.owner !== true ? `<div class="sub warn">A move here is the owner's to land.</div>`
+    : `<p>The moved controller's accounts, nodes, projects and settings take this one's place, and this setup account goes with what was here, set aside and not deleted.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld)}`;
+  cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
+  cards.push(setupCard(++i, "After it lands", false, false,
+    `${factGrid([["Sign in", "with an account the old controller had"],
+                 ["Your nodes", "follow by themselves. Any that does not is listed on the Nodes page, with the one line to run on it"],
+                 ...(state?.firstboot?.apps_from ? [["Containers and VMs", "This machine reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
+                 ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
+    state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
+  cards.push(setupCard(++i, "If you go back", false, false, `<p>${esc(setupBootBack(had))}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home.</p>`, "", "any time"));
+  return `<div class="setuppage">
+    <div class="setuphead">
+      <h2>Moving here</h2>
+      <p>The steps in the order they have to happen, each done on this page. Nothing on the old system's disks changes until a step says so.</p>
+      <div class="setwalkask"><span class="grow">Starting new, with nothing to bring?</span><button type="button" data-setwalk="fresh">Set up a new one instead</button></div>
+    </div>
+    ${cards.join("")}
+    <div class="setfinish">
+      <p class="dim">${s.node ? "Not landing a controller: Finish keeps this setup account as the owner and opens Home. This machine holds all of the above." : "Finish opens once this machine answers."}</p>
+      <div class="actbar"><button type="button" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
+      <div class="hint bad" id="setupWhy" hidden></div>
+    </div>
+  </div>`;
 }
 
 // ---- the disks step (R161 step 3) -------------------------------------------
@@ -298,16 +416,17 @@ function setupDisksCard(num){
   const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
   // The old system's disks: said whose they are, no box, nothing to press.
   const theirRow = ([d, p]) => `<div class="row setdisk theirs"><span class="grow">${facts(d)}
-      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is on ${pageLink("machine", "This machine")}, under Disks from the stick; nothing here touches it</span></span></div>`;
+      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is, in the walk; nothing here touches it</span></span></div>`;
   if (theirs.length && !free.length){
     const nd = theirs.filter(([, p]) => p.what === "data").length, np = theirs.filter(([, p]) => p.what === "parity").length, npool = theirs.length - nd - np;
     const what = [nd ? `${nd} data disk${nd === 1 ? "" : "s"}` : "", np ? `${np === 1 ? "the parity disk" : `${np} parity disks`}` : "", npool ? `${npool} pool disk${npool === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
-    return `<section class="setstep">${head(false, `<span class="pill note">on This machine</span>`)}<div class="setstepbody">
-    <p>Every disk here belongs to the system the stick's plan came from: ${esc(what)}. They are adopted as they are, nothing erased, on ${pageLink("machine", "This machine")} under Disks from the stick: Check, then Adopt. Nothing is made here.</p>
-    <div class="rows">${theirs.map(theirRow).join("")}</div></div></section>`;
+    return `<section class="setstep">${head(false, `<span class="pill note">in the walk</span>`)}<div class="setstepbody">
+    <p>Every disk here belongs to the system the stick's plan came from: ${esc(what)}. They are adopted as they are, nothing erased, and the walk does it. Nothing is made here.</p>
+    <div class="rows">${theirs.map(theirRow).join("")}</div></div>
+    <div class="actbar"><button type="button" class="primary" data-setwalk="move">Walk me through it</button></div></section>`;
   }
   if (!free.length) return `<section class="setstep">${head(false, `<span class="pill">later</span>`)}<div class="setstepbody">
-    <p>No disk here but the one AerieOS runs from. Add disks and set them up on ${pageLink("storage", "the Storage page")}.</p></div></section>`;
+    <p>No disk here but the one AerieOS runs from. Add disks and set them up on the Storage page, after Finish.</p></div></section>`;
   const use = d => !setupDiskHeld(d) || setupDisks.use.has(d.name);
   const plan = setupDiskPlan(free.filter(use), setupDisks);
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
@@ -321,13 +440,13 @@ function setupDisksCard(num){
   const lays = [["", "As recommended"], ["mirror", "ZFS mirror"], ["raidz1", "ZFS raidz1"], ["raidz2", "ZFS raidz2"], ["single", "ZFS, one group"], ["array", "Array with parity"]];
   return `<section class="setstep">${head(false, `<span class="pill">to do</span>`)}<div class="setstepbody">
     <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.${
-      theirs.length ? ` The old system's disks are adopted on ${pageLink("machine", "This machine")}, not made into anything here.` : ""}</p>
+      theirs.length ? " The old system's disks are adopted in the walk, not made into anything here." : ""}</p>
     <div class="rows">${theirs.map(theirRow).join("")}${free.map(row).join("")}</div>
     <div class="setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
       ${setupDisks.adv ? `<div class="setrow col ctlrow">${lbl("setLayout", "Layout")}<select id="setLayout">${optionList(lays, setupDisks.layout)}</select></div>` : ""}</div>
     ${says(plan.main)}${plan.fast ? says(plan.fast).replace("<b>A ZFS mirror</b>", "<b>A fast ZFS mirror</b>").replace("<b>One pool</b>", "<b>A fast pool</b>") : ""}
     ${plan.notes.map(t => `<div class="sub warn">${esc(t)}</div>`).join("")}
-    <p class="dim">Encryption, snapshots and moving writes between pools are on ${pageLink("storage", "the Storage page")} once these are made.</p></div>
+    <p class="dim">Encryption, snapshots and moving writes between pools are on the Storage page, after Finish.</p></div>
     <div class="actbar">${setupDisks.adv ? "" : `<button type="button" data-setdiskadv>Advanced</button>`}<button type="button" class="primary" data-setdisksmake${plan.main ? "" : " disabled"}>Make it</button></div></section>`;
 }
 
