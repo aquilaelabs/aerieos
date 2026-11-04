@@ -4186,6 +4186,17 @@ def node_projects_folder(principal, node_id, path="", release=False):
     return r
 
 
+def adopted_pools(rep):
+    """The mount points of the pools this machine adopted, mounted and
+    writable, whatever their filesystem: the census's pools are zpools alone,
+    so a btrfs or XFS cache from the old system was no pool to pick (B663).
+    A data disk is not one: its slot is /mnt/diskN, and it carries the old
+    system's parity."""
+    rows = ((rep or {}).get("adopted") or {}).get("mounts") or []
+    return [str(m["where"]) for m in rows if isinstance(m, dict) and m.get("where") and m.get("mounted") and not m.get("ro")
+            and not re.search(r"/disk\d+$", str(m["where"]))]
+
+
 def node_system_pool(principal, node_id, path=""):
     """A stick's system pool (R161 step 10): the pool, by its mount point,
     where docker, containerd, libvirt, the toolchains and the projects write
@@ -4204,6 +4215,7 @@ def node_system_pool(principal, node_id, path=""):
     mounts = {p.get("mount") for p in (rep.get("pools") or []) if isinstance(p, dict) and p.get("mount")}
     if (rep.get("array") or {}).get("mount"):
         mounts.add(rep["array"]["mount"])
+    mounts |= set(adopted_pools(rep))
     if path not in mounts:
         return {"error": "name a pool or the array this machine has mounted (the Storage page makes one)"}
     why = node_locked(n)

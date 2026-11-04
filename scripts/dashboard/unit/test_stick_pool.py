@@ -277,6 +277,19 @@ class TheController(unittest.TestCase):
         self.assertIn("does not run AerieOS from a stick", nodes.node_projects_folder("user:t", n["id"], "/mnt/user/projects").get("error", ""))
         self.assertEqual(nodes.node_projects_folder("user:t", "n_nothere", "/mnt/user/projects").get("error"), "no such node")
 
+    def test_an_adopted_pool_is_a_system_pool_whatever_its_filesystem(self):
+        import nodes
+        rep = {"adopted": {"mounts": [{"where": "/mnt/cache", "fs": "btrfs", "ro": False, "mounted": True},
+                                      {"where": "/mnt/fast", "fs": "xfs", "ro": False, "mounted": False},
+                                      {"where": "/mnt/ro", "fs": "xfs", "ro": True, "mounted": True},
+                                      {"where": "/mnt/disk1", "fs": "xfs", "ro": False, "mounted": True},
+                                      {"where": "/mnt/disk12", "fs": "btrfs", "ro": False, "mounted": True}]}}
+        # Not one not mounted, not one read only, and not a data disk, which
+        # carries the old system's parity.
+        self.assertEqual(nodes.adopted_pools(rep), ["/mnt/cache"])
+        self.assertEqual(nodes.adopted_pools({}), [])
+        self.assertEqual(nodes.adopted_pools(None), [])
+
 
 if __name__ == "__main__":
     unittest.main()

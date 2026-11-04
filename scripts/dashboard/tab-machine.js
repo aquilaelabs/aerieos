@@ -135,13 +135,30 @@ function wireOlderVersions(root){
 // the system pool picked here, or waits for one. What still lives on the
 // stick and what it has written, in the facts voice.
 const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the projects"};
+// The system pool's picker: The stick's own, and the first-run walk's.
+function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
+  // An adopted pool counts whatever its filesystem (B663): the census's
+  // pools are zpools alone. A data disk does not: it carries the old parity.
+  const seen = new Set((n.reported?.pools || []).map(p => p.mount));
+  const adopted = (n.reported?.adopted?.mounts || []).filter(m => m.mounted && !m.ro && !/\/disk\d+$/.test(m.where) && !seen.has(m.where));
+  const mounts = [...(n.reported?.pools || []).filter(p => p.mount).map(p => [p.mount, `${p.name} (${p.mount})`]),
+                  ...adopted.map(m => [m.where, `${m.where.split("/").pop()} (${m.where}, adopted)`]),
+                  ...(n.reported?.array?.mount ? [[n.reported.array.mount, `the array (${n.reported.array.mount})`]] : [])];
+  const busy = (n.jobs || []).some(j => j.apply === "system-pool");
+  const admin = !!state?.can?.admin;
+  const why = !mounts.length ? none
+    : !n.live ? "Its agent is not dialing in." : busy ? "Moving to the pool now: docker and the VMs are stopped until it ends." : "";
+  const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
+      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
+      <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
+      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
+  return pick;
+}
+
 function stickSection(n){
   const s = n?.reported?.os_stick;
   if (!s?.stick) return "";
   const gb = kb => kb === null || kb === undefined ? "" : kb >= 1048576 ? `${(kb / 1048576).toFixed(1)} GB` : `${Math.round(kb / 1024)} MB`;
-  const mounts = [...(n.reported?.pools || []).filter(p => p.mount).map(p => [p.mount, `${p.name} (${p.mount})`]),
-                  ...(n.reported?.array?.mount ? [[n.reported.array.mount, `the array (${n.reported.array.mount})`]] : [])];
-  const busy = (n.jobs || []).some(j => j.apply === "system-pool");
   const admin = !!state?.can?.admin;
   const rows = [
     ["Runs from", "memory: the stick is read at boot"],
@@ -151,12 +168,7 @@ function stickSection(n){
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
   ];
-  const why = !mounts.length ? "No pool or array here yet: make one on the Storage page, then pick it here."
-    : !n.live ? "Its agent is not dialing in." : busy ? "Moving to the pool now: docker and the VMs are stopped until it ends." : "";
-  const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
-      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
-      <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
-      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
+  const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "The stick", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
     `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">Docker, the VMs, the toolchains and the projects write all day, so they live on a pool, never on the stick; until one is picked, docker and the VMs wait, no project can be made, and the logs and the journal are kept in memory.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
@@ -264,21 +276,27 @@ function adoptFound(n, id){
     return link === id || link.endsWith("-" + id) || link.endsWith("_" + id) || (d.serial && String(d.serial).length >= 4 && (id === d.serial || id.endsWith("_" + d.serial))); });
 }
 function adoptSection(n){
+  const p = adoptParts(n);
+  return p ? docSection("nodes", p.id, p.title, p.status, p.body, p.opts) : "";
+}
+// What the section says, apart from its fold: the first-run walk draws the
+// same body in its own card.
+function adoptParts(n){
   const had = n.reported?.adopted;
   if (had && (had.mounts || []).length){
     const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
       ...Object.entries(had.merged || {}).map(([w, up]) => [w, up ? "merged" : "merged, not mounted yet", {cls: up ? "" : "warn"}]),
       ...(had.parity || []).map(p => ["parity", `${p}, left alone`])];
-    return docSection("nodes", "adopted", "Adopted disks", had.writable ? "writable" : "read-only",
-      `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.writable
+    return {id: "adopted", title: "Adopted disks", status: had.writable ? "writable" : "read-only",
+      body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.writable
         ? "Writable: going back to the old system takes a parity sync, which leaves its array unprotected until it ends."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
         <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button>${
-          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>`);
+          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>`};
   }
   const a = state?.firstboot?.adopt;
-  if (!a) return "";
+  if (!a) return null;
   const w = a.want || {};
   const found = id => adoptFound(n, id);
   const rows = [
@@ -289,14 +307,14 @@ function adoptSection(n){
     ...(w.pools || []).map(p => [p.name, `${p.fs} pool, writable`]),
     ...(a.skipped || []).map(x => [x.slot || "disk", `${x.id} · ${x.why}`, {cls: "warn"}])];
   const missing = (w.data || []).filter(x => !found(x.id)).length;
-  return docSection("nodes", "adopt", "Disks from the stick", missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
-    `<div class="field">${factGrid(rows, "adfacts")}
+  return {id: "adopt", title: "Disks from the stick", status: missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
+    body: `<div class="field">${factGrid(rows, "adfacts")}
       <div class="adpick">
         <label class="ndcap"><input type="radio" name="adoptMode" value="ro"${adoptWritable ? "" : " checked"}> Read only: the old system's parity stays good, and new files land on a pool</label>
         <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}> Writable: going back to the old system then takes a parity sync</label>
       </div>
       <div class="hint">Each disk is mounted as it is, never formatted or partitioned, at the path it had, and the merged folders are made again, so what pointed at them finds its files.</div>
-      <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, {open: true});
+      <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, opts: {open: true}};
 }
 
 // The containers and VMs the old system ran (R163 steps 10 and 11): read
