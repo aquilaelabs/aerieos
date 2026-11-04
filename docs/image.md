@@ -254,9 +254,13 @@ disk and grows one at a time; an SSD beside hard disks becomes a fast pool
 of its own for apps, VMs and projects, never a cache. As you choose it says
 how much you can use, how many disks may fail and how it grows, and
 Advanced picks another layout. **Make it** names every disk it erases by
-serial before anything is written, and then one press makes the Media,
-Backups and Projects shares on it. The Storage page does all of this too,
-later, the same way. On a stick made with a prepared configuration that
+serial before anything is written. On a stick the first pool made becomes the
+system pool by itself, a fast one where there is one, and a later step says so.
+**Shares** is the next step and is optional. A share is a folder on a pool, Media
+and Backups to begin with, and stays on this machine until you export it; then
+other computers open it over the network, signing in with the same name and
+password as the dashboard. The Storage page does all of this too, later, the same
+way, with each share's security and each person's access. On a stick made with a prepared configuration that
 names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
 they are in the first-run page's walk, and later on This machine under The old system's disks.
@@ -314,10 +318,10 @@ taken up at the next one.
 ## What persists
 
 The root is read-only, with a tmpfs over it (`overlayroot`): anything
-written anywhere in it lives until the next boot. Two places are made to
-last, both on the data partition and both mounted by the initramfs
+written anywhere in it lives until the next boot. What is made to last is on
+the data partition and mounted by the initramfs
 (`image/mkosi.extra/etc/initramfs-tools/scripts/init-bottom/aerieos-os`)
-before the system starts, so PID 1 sees them from its first read:
+before the system starts, so PID 1 sees it from its first read:
 
 - **`/var`**, the data partition itself: the controller's state and
   secrets' home, the projects, docker, libvirt, the logs.
@@ -325,6 +329,11 @@ before the system starts, so PID 1 sees them from its first read:
   an account made, a hostname set, a unit enabled or a share written is kept
   across boots, and every file the next image brings still shows through
   unless a changed copy sits over it.
+- **`/usr/local`**, an overlay the same way: the machine's own node, its agent,
+  `bb-sandbox` and `bb-session`, which first boot installs there.
+- **`/srv`, `/home` and `/workspace`**, bound from the data partition: the
+  projects, each account's home and sign-ins, and the node's workspace. A
+  system pool takes them off a stick, with Docker and the VMs.
 
 Nothing else persists, which is what makes an update a whole image.
 

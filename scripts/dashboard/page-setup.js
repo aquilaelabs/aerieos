@@ -80,7 +80,8 @@ function drawSetup(){
   const dk = setupDisks.own;
   // Drawn again only when what it shows has moved: a poll landing mid-type
   // would otherwise take what was typed with it.
-  const sig = JSON.stringify([setupWalkSig(s), s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
+  setupPlaceAuto(s);
+  const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
                               s.git, s.claude, s.project, !!s.own && [JSON.stringify(dk?.disks || []), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
@@ -91,6 +92,9 @@ function drawSetup(){
   }
   const card = setupCard;
   const nodeName = s.node ? esc(s.node.name) : "";
+  const stick = setupStickOf(s);
+  const placed = !stick || !!stick.ready || !!stick.projects_bound;
+  let next = 2;
   el.innerHTML = `<div class="setuppage">
     <div class="setuphead">
       <h2>Set up AerieOS</h2>
@@ -103,7 +107,8 @@ function drawSetup(){
       : `<p>The machine this controller runs on is its first node, set up by the installer: ${
           s.own.state === "pending" ? "its agent is being installed and enrolled"
           : s.own.live === false ? "enrolled, and waiting for it to answer"
-          : "enrolled, and setting up its sessions"}. This turns to done by itself.</p>`,
+          : "enrolled, and setting up its sessions"}. This turns to done by itself.${
+          s.own.live === false ? " If it stays here for more than a few minutes, restart the machine." : ""}</p>`,
       `<button type="button" data-setenroll${featureOff("enroll") ? " disabled" : ""}>Enroll another machine</button>`)
     : card(1, "Your first node", !!s.node, !!s.waiting, s.node
       ? `<p><b>${nodeName}</b> is enrolled and answering.</p>`
@@ -111,25 +116,27 @@ function drawSetup(){
       ? `<p>Waiting for <b>${esc(s.waiting.name)}</b> to dial in: run its enroll script on the machine. This turns to done by itself.</p>`
       : `<p>A sandbox VM made for it, or a machine you already have, on this network or reached over the internet.</p>${deadWhy(featureOff("enroll"))}`,
       s.node ? "" : `<button type="button" data-setvm${featureOff("enroll") ? " disabled" : ""}>New VM</button><button type="button" class="primary" data-setenroll${featureOff("enroll") ? " disabled" : ""}>Enroll node</button>`)}
-    ${s.own ? setupDisksCard(2) : ""}
-    ${card(s.own ? 3 : 2, "Your name and email", s.git, false, s.git
+    ${s.own ? setupDisksCard(next++) : ""}
+    ${stick ? setupPlaceCard(next++, s, false) : ""}
+    ${s.own && setupDisksDone(setupDisks.own) ? setupSharesCard(next++) : ""}
+    ${card(next++, "Your name and email", s.git, false, s.git
       ? `<p>Your commits carry them. Your profile, in the gear, changes them.</p>`
       : `<p>Every commit carries an author, and no Claude session starts without one.</p>
-         <div class="setfields"><div class="setrow col ctlrow">${lbl("setName", "Your name")}<input id="setName" type="text" autocomplete="name" placeholder="Ada Lovelace"></div>
+         <div class="fgrid setfields"><div class="setrow col ctlrow">${lbl("setName", "Your name")}<input id="setName" type="text" autocomplete="name" placeholder="Ada Lovelace"></div>
            <div class="setrow col ctlrow">${lbl("setEmail", "Your email")}<input id="setEmail" type="email" autocomplete="email" placeholder="ada@example.com"></div></div>`,
       s.git ? "" : `<button type="button" class="primary" data-setgit disabled>Save</button>`)}
-    ${card(s.own ? 4 : 3, "Claude Code on your node", !!s.claude, false, s.claude
+    ${card(next++, "Claude Code on your node", !!s.claude, false, s.claude
       ? `<p>${esc(s.claude)} on ${nodeName}. A project's Start agent signs you in there the first time.</p>`
       : s.node
       ? `<p>What a Claude session on ${nodeName} runs. It installs as a job on the node, a minute or two.</p>`
       : `<p>What a Claude session runs, installed on the node.</p><div class="sub bad setwhy">Once your node answers.</div>`,
       s.claude ? "" : `<button type="button" class="primary" data-setclaude${s.node ? "" : " disabled"}>Install</button>`)}
-    ${card(s.own ? 5 : 4, "A first project", s.project, false, s.project
+    ${card(next++, "A first project", s.project, false, s.project
       ? `<p>The Projects page holds it, and every one after it.</p>`
-      : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>`,
-      s.project ? "" : `<button type="button" data-setproject>New project</button>`)}
+      : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the projects have a place, in step 3.</div>`}`,
+      s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New project</button>`)}
     <div class="setfinish">
-      <p class="dim">${s.node ? `Steps 2 to ${s.own ? 5 : 4} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
+      <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
       <div class="actbar"><button type="button" class="primary" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
       <div class="hint bad" id="setupWhy" hidden></div>
@@ -201,6 +208,81 @@ function setupCard(n, title, done, wait, body, acts = "", said = ""){
   return `<section class="setstep${done ? " done" : ""}">
       <div class="setstephead"><span class="setnum">${n}</span><h3>${esc(title)}</h3>${pill}</div>
       <div class="setstepbody">${body}</div>${acts ? `<div class="actbar">${acts}</div>` : ""}</section>`;
+}
+
+// ---- where the projects and containers go ---------------------------------
+//
+// A stick keeps them off itself, so until a pool or a folder on the disks is
+// named Docker and the VMs wait and no project can be made (B666): a step of
+// the first run of any stick, on a new start and on a move. On a new start the
+// first pool made is named by itself, the fast one where there is one, since
+// there is nothing to decide; the step says so, and offers the rest.
+const setupStickOf = s => { const r = (s.node || s.own)?.reported?.os_stick; return r?.stick ? r : null; };
+function setupPlaceSig(s){
+  const n = s.node || s.own, st = setupStickOf(s);
+  return st ? JSON.stringify([st.pool, st.ready, st.projects, st.projects_bound, (n?.reported?.pools || []).map(p => p.mount), n?.reported?.array?.mount,
+                              (n?.reported?.adopted?.mounts || []).map(m => [m.where, m.mounted, m.ro]), (n?.jobs || []).map(j => j.apply)]) : "";
+}
+function setupPlaceCard(num, s, moving){
+  const n = s.node || s.own, stick = setupStickOf(s), had = n?.reported?.adopted, old = !!(state?.firstboot?.adopt || had?.mounts?.length);
+  const adopted = (had?.mounts || []).length > 0 && had.mounts.every(m => m.mounted);
+  const placed = !!stick.ready || !!stick.projects_bound;
+  const pick = stickPoolPick(n, stick, old && adopted ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk."
+    : "Nothing to pick yet: the step before gives this one its disks.");
+  const roOnly = adopted && !had.writable && !(had.mounts || []).some(m => !m.ro);
+  const moved = (n?.jobs || []).some(j => j.apply === "system-pool");
+  if (!moving && !old) return setupCard(num, "Where the projects and containers go", placed, moved || (!!stick.pool && !placed),
+    placed ? `<p>Docker, the VMs, the toolchains and your projects live on <b>${esc(stick.pool || stick.projects)}</b>, not on the stick.</p>`
+    : moved ? `<p>Moving them to the pool. Docker and the VMs are stopped until it ends.</p>`
+    : `<p>They write all day, so they live on a pool and never on the stick. This is done by itself when your first pool is made.</p>${
+       (n?.reported?.pools || []).length ? pick : ""}`);
+  return setupCard(num, "Where the projects and containers go", placed, false,
+    `<p>They write all day, so they live on the disks and never on the stick. There are two choices here.</p>
+     ${factGrid([["System pool", `where Docker, the VMs and the toolchains write: ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}`],
+                 ["Projects folder", `only if your projects already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
+     <p>${moving ? "The Projects page stays empty until the controller lands: its list comes with the move. " : ""}Where they are now:</p>
+     ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
+                 ["The projects", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
+                  {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
+     ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
+     ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`);
+}
+// The first pool of a new start named, once a press, so nobody has to know what
+// a system pool is. Not on a move or with another system's disks: there it is
+// the person's to pick.
+let setupPlaceTried = "";
+function setupPlaceAuto(s){
+  const n = s.node, stick = setupStickOf(s);
+  if (!n || !stick || stick.pool || stick.projects || setupWalking() || setupDisks.making || state?.firstboot?.adopt || !state?.can?.admin) return;
+  if ((n.jobs || []).some(j => j.apply)) return;
+  const pools = (n.reported?.pools || []).filter(p => p.mount);
+  const mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || n.reported?.array?.mount || "";
+  if (!mount || setupPlaceTried === mount) return;
+  setupPlaceTried = mount;
+  postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))
+    .then(j => { if (j.error) notify(j.error, true); loadNodes().then(() => drawSetup()); });
+}
+// One machine's system jobs run one at a time, and a second asked for while the
+// first runs is refused (B670): each is sent when the last has ended, the button
+// saying how far along. The error to say, or "".
+async function setupInTurn(calls, btn, word){
+  for (const [i, c] of calls.entries()){
+    if (calls.length > 1) busy(btn, `${word} ${i + 1} of ${calls.length}`);
+    let j;
+    for (let tries = 0; tries < 200; tries++){
+      j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
+      if (!/already in flight/.test(j.error || "")) break;
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    if (j.error) return j.error;
+    for (let tries = 0; j.job && tries < 900; tries++){
+      const d = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`)).json().catch(() => ({}));
+      if (d.state === "failed" || d.state === "canceled") return `${d.error || "that job failed"}: its log is on the Jobs page, after Finish`;
+      if (!d.state || d.state === "succeeded") break;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  return "";
 }
 
 // ---- moving here: the walk (R214, the operator, 4 Nov) -----------------------
@@ -280,20 +362,7 @@ function setupWalkHtml(s){
   if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your projects are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the projects folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
-  if (n && stick){
-    const pick = stickPoolPick(n, stick, old && adopted ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk." : "Nothing to pick yet: the step before gives this one its disks.");
-    const roOnly = adopted && !had.writable && !(had.mounts || []).some(m => !m.ro);
-    cards.push(setupCard(++i, "Where the projects and containers go", placed, false,
-      `<p>They write all day, so they live on the disks and never on the stick. There are two choices here.</p>
-       ${factGrid([["System pool", `where Docker, the VMs and the toolchains write: ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}`],
-                   ["Projects folder", `only if your projects already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
-       <p>The Projects page stays empty until the controller lands: its list comes with the move. Where they are now:</p>
-       ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
-                   ["The projects", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
-                    {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
-       ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
-       ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`));
-  }
+  if (n && stick) cards.push(setupPlaceCard(++i, s, true));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
@@ -354,7 +423,10 @@ function setupDiskSplit(n){
   return {theirs, mine: free.filter(d => !theirs.some(([x]) => x === d))};
 }
 // One that holds something now (a filesystem, a partition with one).
-const setupDiskHeld = d => !!(d.holds || (d.parts || []).some(p => p.holds));
+// What a disk or partition holds, in the agent's words: "nothing" is its word
+// for nothing, as the Storage page and the pool and array jobs read it.
+const setupHolds = x => !!x && x !== "nothing";
+const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).some(p => setupHolds(p.holds));
 
 // The plan for these disks: {main, fast, notes}. `main` is where the shares
 // live, {kind: "zfs"|"array", layout, disks, parity, usable_mb, may_fail,
@@ -428,10 +500,7 @@ function setupDisksCard(num){
   const head = (done, pill) => `<div class="setstephead"><span class="setnum">${num}</span><h3>Your disks</h3>${pill}</div>`;
   if (setupDisksDone(n)){
     const where = [...(n.pools || []).map(p => `the pool ${esc(p.name)}`), ...(n.array?.mount ? ["the array"] : [])].join(" and ");
-    const shares = (n.shares || []).length;
-    return `<section class="setstep done">${head(true, `<span class="pill ok">done</span>`)}<div class="setstepbody">
-      <p>This machine stores on ${where}. ${shares ? `${shares} share${shares === 1 ? "" : "s"} made.` : "Make the shares your files go in:"}</p></div>
-      ${shares ? "" : `<div class="actbar"><button type="button" class="primary" data-setshares>Make Media, Backups and Projects</button></div>`}</section>`;
+    return `<section class="setstep done">${head(true, `<span class="pill ok">done</span>`)}<div class="setstepbody"><p>This machine stores on ${where}.</p></div></section>`;
   }
   const {theirs, mine: free} = setupDiskSplit(n);
   const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
@@ -463,12 +532,33 @@ function setupDisksCard(num){
     <p>Where your files and AerieOS's own data will live. Nothing is written until you press Make it, which names every disk it erases first.${
       theirs.length ? " The old system's disks are adopted in the walk, not made into anything here." : ""}</p>
     <div class="rows">${theirs.map(theirRow).join("")}${free.map(row).join("")}</div>
-    <div class="setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
+    <div class="fgrid setfields"><div class="setrow col ctlrow">${lbl("setLose", "How safe")}<select id="setLose">${optionList(lose.map(([v, w]) => [String(v), w]), String(setupDisks.lose))}</select></div>
       ${setupDisks.adv ? `<div class="setrow col ctlrow">${lbl("setLayout", "Layout")}<select id="setLayout">${optionList(lays, setupDisks.layout)}</select></div>` : ""}</div>
     ${says(plan.main)}${plan.fast ? says(plan.fast).replace("<b>A ZFS mirror</b>", "<b>A fast ZFS mirror</b>").replace("<b>One pool</b>", "<b>A fast pool</b>") : ""}
     ${plan.notes.map(t => `<div class="sub warn">${esc(t)}</div>`).join("")}
     <p class="dim">Encryption, snapshots and moving writes between pools are on the Storage page, after Finish.</p></div>
     <div class="actbar">${setupDisks.adv ? "" : `<button type="button" data-setdiskadv>Advanced</button>`}<button type="button" class="primary" data-setdisksmake${plan.main ? "" : " disabled"}>Make it</button></div></section>`;
+}
+
+// Shares, as a NAS has them (the operator, 4 Nov): a folder on a pool, internal
+// until it is exported, and an export lists people; it has no password of its
+// own. Each person signs in as they do here. All optional.
+function setupSharesCard(num){
+  const n = setupDisks.own;
+  if (!n || !setupDisksDone(n)) return "";
+  const rows = n.shares || [], host = location.hostname, me = state?.me || "";
+  if (rows.length){
+    const out = rows.filter(x => x.smb?.on);
+    return setupCard(num, "Shares", true, false,
+      `${factGrid(rows.slice(0, 6).map(x => [x.name, x.smb?.on ? `\\\\${host}\\${x.name}  or  smb://${host}/${x.name}` : "internal: only on this machine"]), "stickfacts")}
+       <p>${out.length ? `Open an exported one from another computer as <b>${esc(me)}</b>, with your password here. ` : ""}Exports and who may reach each are on the Storage page, after Finish.</p>`);
+  }
+  return setupCard(num, "Shares", false, false,
+    `<p>A share is a folder on your pool. It stays on this machine until you export it, and then other computers open it over the network, like a NAS's. Skip this if you do not want any: the Storage page makes them any time.</p>
+     <div class="setshares"><label class="ndcap"><input type="checkbox" data-setsharename="Media" checked> Media</label>
+       <label class="ndcap"><input type="checkbox" data-setsharename="Backups" checked> Backups</label></div>
+     <label class="ndcap"><input type="checkbox" id="setShareExport"> Export them, so <b>${esc(me)}</b> can open them, with the same name and password as here</label>`,
+    `<button type="button" data-setshares>Make these shares</button>`, "optional");
 }
 
 function wireSetupDisks(el){
@@ -497,22 +587,27 @@ function wireSetupDisks(el){
       : {action: "storage-pool", id: n.node, pool: "create", name: "tank", layout: m.layout, disks: m.disks, wipe: held};
     const calls = [body];
     if (plan.fast) calls.push({action: "storage-pool", id: n.node, pool: "create", name: "fast", layout: plan.fast.layout, disks: plan.fast.disks, wipe: held});
-    for (const c of calls){
-      const j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
-      if (j.error){ notify(j.error, true); unbusy(make, "Make it"); return; }
-    }
-    notify("the disks are being made: a job on this machine, a minute or two; this card turns to done when they are");
+    setupDisks.making = "disks";
+    const why = await setupInTurn(calls, make, "Making");
+    setupDisks.making = "";
+    if (why){ notify(why, true); unbusy(make, "Make it"); return; }
     setupDisks.made = true;
+    await setupDisksLoad();
+    await loadNodes();
+    drawSetup();
   });
   const sh = el.querySelector("[data-setshares]");
   if (sh) sh.onclick = () => pressing(sh, async () => {
     busy(sh, "Sharing");
     const base = n.array?.mount || ((n.pools || []).find(p => p.name !== "fast") || (n.pools || [])[0])?.mount || "";
-    for (const name of ["Media", "Backups", "Projects"]){
-      const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.node, share: "set", name, path: `${base}/${name.toLowerCase()}`,
-        smb: {on: true, guest: false, ro: false, tm: false, users: []}, nfs: {on: false, ro: false, clients: []}})).json().catch(() => ({error: "no answer"}));
-      if (j.error){ notify(j.error, true); unbusy(sh, "Make Media, Backups and Projects"); return; }
-    }
-    notify("Media, Backups and Projects are being shared: who may use each is on the Storage page");
+    const names = [...el.querySelectorAll("[data-setsharename]:checked")].map(c => c.dataset.setsharename);
+    const exported = !!el.querySelector("#setShareExport")?.checked;
+    if (!names.length){ unbusy(sh, "Make these shares"); return notify("tick a share to make, or leave this step", true); }
+    const why = await setupInTurn(names.map(name => ({action: "storage-share", id: n.node, share: "set", name, path: `${base}/${name.toLowerCase()}`,
+      smb: exported ? {on: true, guest: false, ro: false, tm: false, users: [state?.me || ""]} : {on: false},
+      nfs: {on: false, ro: false, clients: []}})), sh, "Making");
+    if (why){ notify(why, true); unbusy(sh, "Make these shares"); return; }
+    await setupDisksLoad();
+    setupSig = ""; drawSetup();
   });
 }

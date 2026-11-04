@@ -181,12 +181,12 @@ await firstRun(false);
   // hard disks of one size, a larger one holding something, and an SSD.
   const TB = 1048576 * 4;
   var OWN_DISKS = [
-    { name: 'sda', model: 'Cruzer', serial: 'STICK1', size_mb: 30000, ssd: false, removable: true, system: true, holds: '', parts: [] },
-    { name: 'sdb', model: 'WD Red', serial: 'WD-B', size_mb: TB, ssd: false, removable: false, system: false, holds: '', parts: [] },
-    { name: 'sdc', model: 'WD Red', serial: 'WD-C', size_mb: TB, ssd: false, removable: false, system: false, holds: '', parts: [] },
-    { name: 'sdd', model: 'WD Red', serial: 'WD-D', size_mb: TB, ssd: false, removable: false, system: false, holds: '', parts: [] },
+    { name: 'sda', model: 'Cruzer', serial: 'STICK1', size_mb: 30000, ssd: false, removable: true, system: true, holds: 'nothing', parts: [] },
+    { name: 'sdb', model: 'WD Red', serial: 'WD-B', size_mb: TB, ssd: false, removable: false, system: false, holds: 'nothing', parts: [] },
+    { name: 'sdc', model: 'WD Red', serial: 'WD-C', size_mb: TB, ssd: false, removable: false, system: false, holds: 'nothing', parts: [] },
+    { name: 'sdd', model: 'WD Red', serial: 'WD-D', size_mb: TB, ssd: false, removable: false, system: false, holds: 'nothing', parts: [] },
     { name: 'sde', model: 'Seagate', serial: 'SG-E', size_mb: TB * 2, ssd: false, removable: false, system: false, holds: 'ext4', parts: [] },
-    { name: 'nvme0n1', model: 'Samsung 990', serial: 'S-N', size_mb: 1048576, ssd: true, removable: false, system: false, holds: '', parts: [] }];
+    { name: 'nvme0n1', model: 'Samsung 990', serial: 'S-N', size_mb: 1048576, ssd: true, removable: false, system: false, holds: 'nothing', parts: [] }];
 
   const ctr = await controller('container');
   const none = await ctr.finish();
@@ -299,6 +299,64 @@ await firstRun(false);
        && !some.all.make && some.all.boxes === 0 && some.all.walk === 'Walk me through it' && some.anyLink === 0,
        `...and with every disk theirs the step leads into the walk, offers nothing to make, and no link on the page leads where nothing can show (B662) (${JSON.stringify(some.all).slice(0, 300)})`);
   }
+  // A new start on a stick (B666, B671; the operator, 4 Nov): the place for the
+  // projects is a step, named by itself once a pool is made; a project waits for
+  // it; a share is a folder, internal until it is exported.
+  {
+    const posted = [];
+    await page.route('**/api/v1/nodes', async r => {
+      const b = r.request().postDataJSON?.() || {};
+      if (r.request().method() === 'POST' && (b.action === 'system-pool' || b.action === 'storage-share')){ posted.push(b); return r.fulfill({ json: { ok: true, job: 'j_y' } }); }
+      return r.fallback();
+    });
+    await page.route('**/api/v1/jobs?id=j_y', r => r.fulfill({ json: { id: 'j_y', state: 'succeeded' } }));
+    const fresh = await page.evaluate(async () => {
+      const keepFb = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported, keepD = setupDisks.own;
+      // What is drawn here is said here: no read from the server lands under it.
+      const keepLoads = [loadNodes, setupDisksLoad];
+      loadNodes = async () => {}; setupDisksLoad = async () => {}; setupNodesAt = Date.now() + 60000; setupDisks.at = Date.now() + 60000;
+      const panel = () => document.getElementById('setupPanel');
+      const step = t => [...panel().querySelectorAll('.setstep')].find(x => x.querySelector('h3')?.textContent === t);
+      setupWalk = 'fresh'; state.firstboot = null; setupPlaceTried = '';
+      n.reported = { ...was, os_stick: { stick: true, pool: '', ready: false, on_stick: [], written_kb: 1, boot_written_kb: 1 }, pools: [] };
+      setupDisks.own = { ...keepD, node: n.id, pools: [], array: null, shares: [] };
+      setupSig = ''; drawSetup();
+      const out = { titles: [...panel().querySelectorAll('.setstep h3')].map(h => h.textContent),
+        projectDead: step('A first project')?.querySelector('[data-setproject]')?.disabled, why: step('A first project')?.innerText.replace(/\s+/g, ' ') };
+      // The pools are made: the fast one is the place, by itself, once.
+      n.reported = { ...n.reported, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
+      setupDisks.own = { ...setupDisks.own, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
+      setupSig = ''; drawSetup(); setupSig = ''; drawSetup();
+      await sleep_(400);
+      out.card = step('Shares')?.innerText.replace(/\s+/g, ' '); out.pill = step('Shares')?.querySelector('.pill')?.textContent;
+      out.exportOn = document.getElementById('setShareExport')?.checked;
+      n.reported = { ...n.reported, os_stick: { ...n.reported.os_stick, pool: '/mnt/fast', ready: true } };
+      setupSig = ''; drawSetup();
+      out.placed = step('Where the projects and containers go')?.querySelector('.pill')?.textContent; out.projectLive = !step('A first project')?.querySelector('[data-setproject]')?.disabled;
+      // Left unticked, a share is made and not exported.
+      step('Shares').querySelector('[data-setshares]').click();
+      await sleep_(500);
+      setupDisks.own = { ...setupDisks.own, shares: [{ name: 'Media', path: '/mnt/tank/media', smb: { on: false }, nfs: { on: false } }] };
+      setupSig = ''; drawSetup();
+      out.madeCard = step('Shares')?.innerText.replace(/\s+/g, ' ');
+      [loadNodes, setupDisksLoad] = keepLoads; setupNodesAt = 0; setupDisks.at = 0;
+      n.reported = was; setupDisks.own = keepD; state.firstboot = keepFb; setupWalk = ''; setupSig = ''; drawSetup();
+      return out;
+      function sleep_(ms){ return new Promise(r => setTimeout(r, ms)); }
+    });
+    await page.unroute('**/api/v1/nodes'); await page.unroute('**/api/v1/jobs?id=j_y');
+    ok(fresh.titles.includes('Where the projects and containers go') && fresh.projectDead === true && /Once the projects have a place/.test(fresh.why),
+       `a new start on a stick has a step for where the projects go, and a project waits for it (B666) (${fresh.titles.join(' | ')})`);
+    const named = posted.filter(b => b.action === 'system-pool');
+    ok(named.length === 1 && named[0].path === '/mnt/fast', `...and the fast pool is named by itself, once (${JSON.stringify(named)})`);
+    ok(fresh.pill === 'optional' && fresh.exportOn === false && /stays on this machine until you export it/.test(fresh.card),
+       `a share says what it is, is optional, and is not exported unless asked (${fresh.card?.slice(0, 160)})`);
+    ok(fresh.placed === 'done' && fresh.projectLive, '...the step turns done and a project can be made');
+    const shares = posted.filter(b => b.action === 'storage-share');
+    ok(shares.length === 2 && shares.every(b => b.smb.on === false) && shares[0].path.startsWith('/mnt/tank/'),
+       `...and left unticked, the shares are made on the main pool, one at a time, and not served (${JSON.stringify(shares).slice(0, 200)})`);
+    ok(/internal: only on this machine/.test(fresh.madeCard), `...and it says so once made (${fresh.madeCard?.slice(0, 120)})`);
+  }
   // Moving here (R214): a stick whose plan names disks opens on the walk, its
   // steps in the order they have to happen, each done in place with This
   // machine's and Controller settings' own controls, read from the machine.
@@ -394,16 +452,26 @@ await firstRun(false);
        `...and either way is a press from the other, remembered in this browser (${JSON.stringify(walk.fresh)})`);
   }
   const sent = [];
+  let inFlight = false, refused = 0;
+  await page.route('**/api/v1/jobs?id=j_x', async r => { inFlight = false; return r.fulfill({ json: { id: 'j_x', state: 'succeeded' } }); });
   await page.route('**/api/v1/nodes', async r => {
     const b = r.request().postDataJSON?.() || {};
-    if (r.request().method() === 'POST' && /^storage-/.test(b.action || '')){ sent.push(b); return r.fulfill({ json: { ok: true, job: 'j_x' } }); }
+    // As the server answers: one system job at a time on a node, a second
+    // refused while the first runs (B670), until the job read says it ended.
+    if (r.request().method() === 'POST' && /^storage-/.test(b.action || '')){
+      if (inFlight) { refused++; return r.fulfill({ status: 400, json: { error: 'a system job is already in flight on this node; one at a time' } }); }
+      sent.push(b); inFlight = true; return r.fulfill({ json: { ok: true, job: 'j_x' } });
+    }
     return r.fallback();
   });
   const asked = page.dialogs.length;
   await page.click('#setupPanel [data-setdisksmake]');
   await page.waitForFunction(() => document.querySelector('#setupPanel [data-setdisksmake]')?.textContent.includes('Making') || false, null, { timeout: 10000 }).catch(() => {});
   await sleep(500);
+  await page.waitForFunction(() => !setupDisks.making, null, { timeout: 20000 });
   await page.unroute('**/api/v1/nodes');
+  await page.unroute('**/api/v1/jobs?id=j_x');
+  ok(refused === 0, `Make it sends its pools one at a time, so neither is refused for the other (${refused} refused) (B670)`);
   const ask = page.dialogs.slice(asked).join(' ');
   ok(/WD-B/.test(ask) && /WD-C/.test(ask) && /WD-D/.test(ask) && /S-N/.test(ask) && !/SG-E/.test(ask) && !/STICK1/.test(ask) && /erased/.test(ask),
      `Make it names every disk it erases by serial first, and none it keeps (${ask.slice(0, 160)})`);
@@ -574,7 +642,7 @@ await firstRun(false);
     const b = sect?.querySelector('[data-nd="machine-apply"]'), tz = sect?.querySelector('[data-k="machinetz"]');
     const before = b?.disabled;
     if (tz){ tz.value = 'Europe/Paris'; tz.dispatchEvent(new Event('input')); }
-    return { there: !!sect, before, after: b?.disabled, zones: document.querySelectorAll('#ndZones option').length };
+    return { there: !!sect, before, after: b?.disabled, zones: tz?.options?.length || 0 };
   });
   ok(nt.there && nt.before === true && nt.after === false && nt.zones > 100,
      `This machine carries Name and time, Apply waking when the zone is typed, the browser's zones offered (${JSON.stringify(nt)})`);
