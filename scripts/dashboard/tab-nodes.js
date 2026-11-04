@@ -835,8 +835,8 @@ function nodeFeaturesSection(n){
   const runs = ((r.services || {}).runners || []).length;
   others.push(elsewhere("runner", "CI runner", runs > 0, runs ? `${runs} runner${runs === 1 ? "" : "s"} registered here.` : "A forge's runner, registered with a token from the forge on the CI runner page.", ""));
   rows.push(...others);
-  const have = fe ? [fe.vmhost?.installed, n.config?.host_only && fe.firewall?.installed, fe.iommu?.installed, fe.gpuvm?.installed].filter(Boolean).length
-    + others.filter(h => / ok">installed/.test(h)).length : 0;
+  // Every row's own pill, so the count cannot say other than the rows do.
+  const have = fe ? [...new Set([...rows, ...others])].filter(h => / ok">installed/.test(h)).length : 0;
   return docSection("nodes", "features", ndTitle("features"), fe ? (have ? `${have} installed` : "none installed") : "",
     `${why ? `<div class="sub dim ndfeatwhy">${why}</div>` : ""}${rows.join("")}`);
 }
