@@ -282,7 +282,7 @@ function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
   const b = backupData;
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
-  const owner = state?.me?.role === "owner";
+  const owner = state?.owner === true;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
       <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
@@ -355,15 +355,7 @@ function moveSection(){
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
-  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.me?.role === "owner" ? `<div class="field" data-movelandbox>
-      <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
-        helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
-          ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
-      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
-      <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
-      <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>` : "";
+  const land = ld.fresh && !m.prepared && !ar.restored_at && state?.owner === true ? moveLandBox(ld) : "";
   // What is in the bundle, as the record says it: the state always, then
   // what was ticked.
   const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");
@@ -385,6 +377,19 @@ function moveSection(){
         ${m.prepared ? `<a class="btn" href="/api/move-bundle" download>Download the bundle</a>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button>`
                      : `<button type="button" class="primary" data-moveprep>Prepare to move</button>`}</div>
     </div></div>`;
+}
+// The form that lands a move here: Controller settings' on a fresh controller,
+// and the first-run walk's last step.
+function moveLandBox(ld){
+  return `<div class="field" data-movelandbox>
+      <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
+        helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
+          ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
+      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
+      <div class="fx"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
+        <label class="pick grow"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label></div>
+      <div class="fx"><label class="pick grow"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>`;
 }
 function wireMove(root){
   root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {

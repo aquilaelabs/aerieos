@@ -5901,6 +5901,9 @@ def _snapshot(who):
         # an empty Projects card for a user with nothing granted rather than
         # telling them the share is not mounted (16 Sep).
         "admin": bool(who) and users.is_admin(who),
+        # ...and whether it owns it, as the owner's own routes ask (_move_land,
+        # the backup's): `me` is the account's name alone (B664).
+        "owner": bool(who) and not who.get("session") and (users.account_of(who) or {}).get("role") == "owner",
         # A controller installed bare metal (R90): its own machine is the
         # first node, which the setup page shows being set up.
         "bare_metal": BARE_METAL,
