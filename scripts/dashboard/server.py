@@ -203,13 +203,15 @@ def token_user(tok):
 # container's environment: until somebody claims the box, whoever reaches the
 # port can. Which is why the page says to do it now rather than leaving it to
 # be inferred, and why the dashboard refuses everything else until it is done.
-SETUP_FIELDS = """  <p class="note">Nobody owns this container yet. The first account you make
-    here is the <b>owner</b>: it cannot be deleted, and it is how you add
-    everyone else. Do it now: until you do, anyone who can reach this page
-    can claim it.</p>
-  <!--ERR-->
-  <p class="note"><a href="/login/move">Moving a controller here?</a> Its bundle and token land its whole state on this install instead.
-    <a href="/login/restore">Restoring a saved configuration?</a> A copy on this machine's disks, or one you kept, and its backup password.</p>
+SETUP_FIELDS = """  <!--ERR-->
+  <fieldset class="moveask">
+    <legend>Are you moving a controller here from somewhere else?</legend>
+    <label><input type="radio" name="walk" value="fresh"<!--WALKNEW-->> No, this is a new start</label>
+    <label><input type="radio" name="walk" value="move"<!--WALKMOVE-->> Yes: the next page walks you through it. This account is for setting up, and goes when the move lands</label>
+    <!--MOVENOW-->
+  </fieldset>
+  <p class="note">Nobody owns this install yet, and until you make the first account anyone who can reach this page can claim it.
+    <a href="/login/restore">Restoring a saved configuration?</a></p>
   <label for="u">Username</label>
   <input id="u" name="username" autocomplete="username" autocapitalize="none"
     required autofocus>
@@ -219,7 +221,7 @@ SETUP_FIELDS = """  <p class="note">Nobody owns this container yet. The first ac
   <label for="p2">Password again</label>
   <input id="p2" name="password2" type="password" autocomplete="new-password"
     minlength="8" required>
-  <button type="submit">Create the owner</button>"""
+  <button type="submit">Create the account</button>"""
 
 RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps a sealed copy of its configuration on
     its disks and lets you download one. Pick a copy and give the password, and this install becomes
@@ -370,6 +372,11 @@ LOGIN_HTML = """<!doctype html>
     --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --r:6px;
   }
+  .moveask{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;gap:8px}
+  .moveask legend{padding:0 6px;color:var(--ink);font-weight:600}
+  .moveask label{display:flex;gap:8px;align-items:baseline;margin:0;color:var(--ink);font-weight:400}
+  .moveask input{width:auto;margin:0;flex:0 0 auto;min-height:0}
+  .moveask .note{margin:0}
   *{box-sizing:border-box}
   /* dvh, not vh: on a phone `vh` resolves against the LARGE viewport (the
      page as it would be with the URL bar retracted), so min-height:100vh
@@ -6359,11 +6366,20 @@ class Handler(BaseHTTPRequestHandler):
         if not error and not setup and settings.get("maintenance_mode"):
             error = MAINTENANCE_SAID
         err = f'<p class="err">{error}</p>' if error else ""
+        # The first page asks (the operator, 4 Nov): moving here, or a new
+        # start. A stick's plan that names disks has answered it already, and
+        # an install that takes a move with no account says that it can.
+        moving = bool(setup and ((firstboot.view() or {}).get("adopt")))
+        move_now = "" if nodes.on_stick() else ('<p class="note"><a href="/login/move">Already have the token and the bundle?'
+                                                 ' Land it now, with no account</a>.</p>')
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "set up" if setup else "sign in")
                 .replace("<!--SAID-->", "Make the first account" if setup else "Sign in to continue")
                 .replace("<!--ACTION-->", "/setup" if setup else "/login")
                 .replace("<!--FIELDS-->", SETUP_FIELDS if setup else LOGIN_FIELDS)
+                .replace("<!--WALKNEW-->", "" if moving else " checked")
+                .replace("<!--WALKMOVE-->", " checked" if moving else "")
+                .replace("<!--MOVENOW-->", move_now)
                 .replace("<!--ERR-->", err)
                 # What was typed comes back with a refusal: a wrong password
                 # keeps the username and where it was going (B38).
@@ -6416,9 +6432,11 @@ class Handler(BaseHTTPRequestHandler):
         # Then the rest of the setup page, which ends with a node (R199).
         settings.set_many({"setup_done": False})
         # Straight in, rather than back to a sign-in they just proved: they
-        # typed the password twice thirty seconds ago.
+        # typed the password twice thirty seconds ago. What they answered goes
+        # with them, for the setup page's walk.
+        walk = form.get("walk", [""])[0]
         self.send_response(303)
-        self.send_header("Location", "/")
+        self.send_header("Location", f"/?walk={walk}" if walk in ("move", "fresh") else "/")
         self.send_header("Set-Cookie",
                          f"bb_session={make_token(users.get(name), self._mint_lid(users.get(name)))}; Path=/; "
                          f"Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Strict"

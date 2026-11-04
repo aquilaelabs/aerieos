@@ -102,14 +102,17 @@ before going back. Who had it is written in the folder first, as
 `.aerieos-give-back.sh`, and **Let it go** runs that. It stays with the disks, so
 from the old system, as root, the same is `bash FOLDER/.aerieos-give-back.sh`.
 
-**A move onto a stick lands last.** The first page's **Moving a controller
-here?** does not take a bundle on a stick, since it would land on the stick.
-Make a setup account instead: the next page is **Moving here**, a walk of the
-steps in the order they have to happen, each done on that page. What to have
-with you (the move token and the bundle), the old system's disks, where the
-projects and containers go, landing the controller, what comes after it, and
-the way back. A stick whose plan names disks opens on it; on any other first
-run **Walk me through it** does, and **Set up a new one instead** leaves it. A
+**A move onto a stick lands last,** since it would otherwise land on the stick.
+The first page asks whether you are moving a controller here. Say yes and make
+a setup account, and the next page is **Moving here**, a walk of the steps in
+the order they have to happen, each done on that page: what to have with you
+(the move token and the bundle), the disks, where the projects and containers
+go, landing the controller, what comes after it, and the way back. Every install
+takes the same walk with the steps it has: a stick made from another system's
+backup adopts that system's disks in it and says what going back costs, any
+other stick makes its own, and an install with no stick goes straight to
+landing. **Walk me through it** and **Set up a new one instead** go between the
+walk and a new start. A
 pool the machine adopted can be the system pool whatever its filesystem; a
 data disk cannot, since it carries the old system's parity. **Read only**
 writes nothing to the data disks, so with no writable pool nothing new has

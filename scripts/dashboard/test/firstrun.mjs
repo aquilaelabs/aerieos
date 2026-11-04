@@ -6,7 +6,7 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, ok, done, sleep, DIR, patience } from './lib.mjs';
+import { URL, launch, newPage, closePage, ok, done, sleep, DIR, patience } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, rmSync, openSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -342,6 +342,13 @@ await firstRun(false);
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
       setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       out.notFresh = words('Land the controller');
+      // A plain stick, with no plan: the same walk with the steps it has, its own
+      // disks made, and not a word of an old system (the operator, 4 Nov).
+      { const fb = state.firstboot; state.firstboot = null; setupWalk = 'move'; n.reported = { ...was, os_stick: { ...stick, pool: '', ready: false } };
+        setupSig = ''; drawSetup();
+        out.plain = { titles: titles(), text: panel().textContent.replace(/\s+/g, ' ') };
+        state.firstboot = fb; setupWalk = ''; }
+      redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       // Typing survives a poll that moved nothing.
       setupLand = { fresh: true, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       const tok = document.getElementById('landTok');
@@ -380,7 +387,10 @@ await firstRun(false);
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
-    ok(walk.fresh.head === 'Set up AerieOS' && walk.fresh.kept === 'fresh' && walk.fresh.ask === 'Walk me through it' && walk.backIn === 'Moving here',
+    ok(walk.plain.titles.join(' | ') === "Have these with you | This machine | Your disks | Where the projects and containers go | Land the controller | After it lands | If you go back"
+       && !/old system/.test(walk.plain.text) && /its address is enough/.test(walk.plain.text) && /Nothing here has touched the old controller/.test(walk.plain.text),
+       `...a plain stick takes the same walk with its own disks and no word of an old system (${walk.plain.titles.join(' | ')}; ${(walk.plain.text.match(/.{40}old system.{40}/) || [''])[0]})`);
+        ok(walk.fresh.head === 'Set up AerieOS' && walk.fresh.kept === 'fresh' && walk.fresh.ask === 'Walk me through it' && walk.backIn === 'Moving here',
        `...and either way is a press from the other, remembered in this browser (${JSON.stringify(walk.fresh)})`);
   }
   const sent = [];
@@ -472,10 +482,22 @@ await firstRun(false);
       window.__fbPlan = state.firstboot;
       nodesRev++; drawPanes();
       const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
+      window.__machineSections = [...document.querySelectorAll('.machinetab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                radios: [...(sect?.querySelectorAll('input[name="adoptMode"]') || [])].map(r => r.value + (r.checked ? '*' : '')),
                acts: [...(sect?.querySelectorAll('[data-adopt]') || [])].map(x => x.dataset.adopt) };
     });
+    if (process.env.BB_SHOTS){
+      console.log('[machine sections] ' + (await page.evaluate(() => window.__machineSections.join(' | '))));
+      const vp = page.viewportSize();
+      const openAll = () => page.evaluate(() => document.querySelectorAll('.machinetab details.sect').forEach(d => { d.open = true; }));
+      await openAll();
+      await page.setViewportSize({ width: 1440, height: 7000 }); await sleep(500);
+      await page.screenshot({ path: `${process.env.BB_SHOTS}/machine-desk.png` });
+      await page.setViewportSize({ width: 393, height: 16000 }); await sleep(500);
+      await page.screenshot({ path: `${process.env.BB_SHOTS}/machine-phone.png` });
+      await page.setViewportSize(vp); await sleep(300);
+    }
     ok(ad.there && /here as sdb/.test(ad.text) && /WDC_Y_GONE22 · not on this machine/.test(ad.text) && /here as sdc, left alone/.test(ad.text)
        && /cache/.test(ad.text) && /encrypted/.test(ad.text) && /1 not here/.test(ad.text)
        && ad.radios.join() === 'ro*,rw' && ad.acts.join() === 'dry,adopt',
@@ -578,6 +600,30 @@ await firstRun(false);
   // with its challenge in the moved answer; the destination's Nodes page
   // lists the node not yet here with its follow line until it says hello.
   {
+    // The first page asks (the operator, 4 Nov): moving a controller here, or a
+    // new start; yes opens the next page on the walk, on any install.
+    {
+      const lan = await controller('landing', { noOwner: true });
+      const lp = await newPage(browser, { viewport: { width: 1280, height: 900 } });
+      await lp.goto(lan.base);
+      await lp.waitForSelector('input[name="walk"]', { timeout: 15000 });
+      const ask = await lp.evaluate(() => ({ legend: document.querySelector('.moveask legend')?.textContent,
+        checked: document.querySelector('input[name="walk"]:checked')?.value, now: document.querySelector('.moveask a')?.getAttribute('href'),
+        nobody: /Nobody owns this install yet/.test(document.body.textContent) }));
+      ok(/moving a controller here from somewhere else/.test(ask.legend || '') && ask.checked === 'fresh' && ask.now === '/login/move' && ask.nobody,
+         `the first page asks whether a controller is moving here, and anywhere but a stick can land it at once (${JSON.stringify(ask)})`);
+      if (process.env.BB_SHOTS) await lp.screenshot({ path: `${process.env.BB_SHOTS}/landing-desk.png` });
+      await lp.check('input[name="walk"][value="move"]');
+      await lp.fill('#u', 'setupper'); await lp.fill('#p', 'longenough1'); await lp.fill('#p2', 'longenough1');
+      await Promise.all([lp.waitForNavigation(), lp.click('button[type=submit]')]);
+      await lp.waitForFunction(() => document.querySelector('#setupPanel h2')?.textContent === 'Moving here', null, { timeout: 20000 });
+      const arrived = await lp.evaluate(() => ({ search: location.search, kept: localStorage.getItem('bb.setupWalk'),
+        titles: [...document.querySelectorAll('#setupPanel .setstep h3')].map(h => h.textContent) }));
+      ok(arrived.search === '' && arrived.kept === 'move' && arrived.titles.join(' | ') === 'Have these with you | Land the controller | After it lands | If you go back',
+         `...yes opens the next page on the walk, with the steps a container install has, the answer kept and off the address (${JSON.stringify(arrived)})`);
+      await closePage(lp);
+      lan.stop();
+    }
     const dst = await controller('dst', { noOwner: true });
     const src = await controller('src');
     const sH = { Authorization: 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toString('base64'), 'Content-Type': 'application/json' };

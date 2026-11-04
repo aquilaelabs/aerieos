@@ -368,16 +368,16 @@ container to a machine of its own, and back.
    keeps. The move stays armed until it lands or you press **Forget it**,
    so a controller can be prepared days ahead, and the section says how
    many nodes have heard it.
-2. Install the new home (the image, or bare metal) and open its page: on
-   the first-run card press **Moving a controller here?** and give the
-   token with the old controller's address, while it still runs: the new
-   home pulls the bundle from it, packed at that moment, under a proof
-   derived from the token. An AerieOS stick takes the move later
-   instead, once its disks hold the projects: make a setup account, and
-   the page after it walks through the disks and landing the move, with the
-   same token and address or bundle, in that order (see [image.md](image.md)).
-   If the old controller ran on the same machine it is off by then, so have
-   the bundle with you before you shut it down. An old home that is already off is moved from
+2. Install the new home (the image, an AerieOS stick or disk, or bare metal)
+   and open its page. It asks whether you are moving a controller here: say yes
+   and make a setup account, and the next page, **Moving here**, walks through
+   what the move takes, in order and on that page: on a stick its disks and where
+   the projects go, then the token with the old controller's address, while it
+   still runs (the new home pulls the bundle from it, packed at that moment,
+   under a proof derived from the token). The setup account goes when the move
+   lands. Anywhere but a stick, the first page also lands it at once with no
+   account. If the old controller ran on the same machine it is off by then, so
+   have the bundle with you before you shut it down. An old home that is already off is moved from
    a bundle instead: **Download the bundle** on the old controller (packed
    fresh each time it is pressed, with what was ticked) and give the file
    with the token. Either way the bundle is held to the version gate (a
