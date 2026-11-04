@@ -79,7 +79,8 @@
 
 ### Changed
 
-- Moving a machine here is walked through on the first-run page: what to have with you, the old system's disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page; a stick whose plan names disks opens on it, and any other first run reaches it from a line under the head (b3d345a)
+- The first page asks whether you are moving a controller here, and yes opens a walk through it on the next page: what to have with you, the disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page. Every install takes it with the steps it has (b3d345a, ce7cd9e)
+- This machine reads as one page: every section a card, each fact said once, labels lined up and the words cut down. Its sections about the stick are now Pool and projects, First boot and The old system's disks (d83bc4e)
 - A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
 - Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
