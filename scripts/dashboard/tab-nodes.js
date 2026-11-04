@@ -963,9 +963,12 @@ function nodeProjectsSection(n){
   }).join("");
   // Stop syncing, where the copies it stops are listed (R164).
   const conf = n.config || {};
-  const stop = rows && n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
-    ? `<div class="field"><div class="actbar"><span class="sp"></span><button type="button" data-nd="sync-stop" ${n.live ? "" : "disabled"}>Stop syncing</button></div></div>` : "";
-  const body = (rows || `<div class="empty">No repository you can see is on this node. A project's settings add one.</div>`) + stop;
+  const stop = n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
+    ? `<button type="button" data-nd="sync-stop" ${n.live ? "" : "disabled"}>Stop syncing</button>` : "";
+  // The sentence and the button on one line: copies you cannot see may still
+  // be here, so the button stands whether or not any row does.
+  const body = rows ? `${rows}${stop ? `<div class="field"><div class="actbar"><span class="sp"></span>${stop}</div></div>` : ""}`
+    : `<div class="field"><div class="actbar"><span class="grow sub">No repository you can see is on this node. A project's settings add one.</span>${stop}</div></div>`;
   return docSection("nodes", "projects", ndTitle("projects"), list.length ? `${list.length}` : "none", body);
 }
 
