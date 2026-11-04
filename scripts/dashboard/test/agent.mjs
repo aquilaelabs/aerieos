@@ -1982,33 +1982,46 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       ok(existsSync(`${DIR}/pre/operators-file`) && existsSync(`${DIR}/pre`),
          '...and stops at the one it did not make, whatever is in it');
 
-      // Put it back, so what follows runs against the stores it expects.
-      // The old place still holds the copy the move left, so a copy back
-      // would mix the two by name, and the agent refuses it (R120); going
-      // back is a move that starts on what is there (`keep`), as the Nodes
-      // page asks it.
+      // Put it back, so what follows runs against the stores it expects,
+      // proving the three rules on the way. A folder of files that are not
+      // the store's own (the operator's `pre`) is never copied into (R120):
+      // the agent refuses and the store stays where it was.
       const backCfg = { mounts: [{ type: 'nfs', source: 'nas:/mnt/user/appdata', path: '/mnt/appdata' },
                                  { type: 'virtiofs', source: 'projects', path: '/srv/projects', ro: true }],
                         stores: { cache: `${DIR}/agentcache`, toolchains: `${DIR}/agenttoolchains`,
                                   artifacts: `${DIR}/agentartifacts` },
                         network: { mode: 'static', address: '10.9.9.9/24', gateway: '10.9.9.1', dns: ['10.9.9.1'] } };
-      await api('/api/v1/nodes', { action: 'config', id: minted.id, config: backCfg });
-      const merge = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const mr = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${merge.job}`);
+      const finished = async job => until(async () => {
+        const x = await api(`/api/v1/jobs?id=${job}`);
         return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
       }, 60000);
+      await api('/api/v1/nodes', { action: 'config', id: minted.id,
+        config: { ...backCfg, stores: { ...backCfg.stores, toolchains: `${DIR}/pre` } } });
+      const mr = await finished((await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' })).job);
       ok(mr?.state === 'failed' && /already holds files/.test(mr.log || '')
          && (await nodeById(minted.id)).reported.stores.toolchains.path === `${DIR}/agenttoolchains2`,
          `a store is never copied into a folder that holds files: refused, and it stays where it was (${mr?.state})`);
+      // Going back is a move that starts on what is there (`keep`), as the
+      // Nodes page asks it: no copy, and the old place's data is what it uses.
       await api('/api/v1/nodes', { action: 'config', id: minted.id, config: { ...backCfg, keep: ['toolchains'] } });
-      const back = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
-      const br = await until(async () => {
-        const x = await api(`/api/v1/jobs?id=${back.job}`);
-        return ['succeeded', 'failed', 'canceled'].includes(x.state) ? x : null;
-      }, 60000);
+      const br = await finished((await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' })).job);
       ok(br?.state === 'succeeded' && /using what is already there as asked/.test(br.log || ''),
          `...while a move asked to keep its data where it is repoints without a copy (${br?.state})`);
+      // And a target that already is this node's store is used as it is
+      // with no keep saved (B661): the copy made agenttoolchains2 a toolchain
+      // store holding this node's own folder, so the agent says so itself
+      // at apply time instead of refusing the files the store put there.
+      await api('/api/v1/nodes', { action: 'config', id: minted.id,
+        config: { ...backCfg, stores: { ...backCfg.stores, toolchains: `${DIR}/agenttoolchains2` } } });
+      const own = await finished((await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' })).job);
+      ok(own?.state === 'succeeded' && /is already a store \(it holds this node's own folder/.test(own.log || '')
+         && (await nodeById(minted.id)).reported.stores.toolchains.path === `${DIR}/agenttoolchains2`,
+         `...and a folder that already holds this node's own toolchains is used as it is with no keep saved (${
+           own?.state}: ${(own?.log || '').split('\n').find(l => /already a store/.test(l)) || ''})`);
+      await api('/api/v1/nodes', { action: 'config', id: minted.id, config: backCfg });
+      const home = await finished((await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' })).job);
+      ok(home?.state === 'succeeded' && (await nodeById(minted.id)).reported.stores.toolchains.path === `${DIR}/agenttoolchains`,
+         `...and so is the first store, going back to it (${home?.state})`);
     }
 
     // network: written, applied, dialed back, with the stub controller still here
