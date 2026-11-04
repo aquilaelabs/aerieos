@@ -888,6 +888,7 @@ def claim(name, password):
                             "password": hash_password(password),
                             "created": int(time.time()), "seen": 0,
                             "prefs": {}, "pins_empty": True}
+        _smb_follow(d["users"][name], password)
         _save(d)
     return {"ok": True, "name": name}
 
@@ -914,6 +915,7 @@ def add(name, password, role="user", projects=None):
                             # Starts with nothing pinned, and pins what it
                             # wants (the operator, 7 Oct): see starts_unpinned.
                             "prefs": {}, "pins_empty": True}
+        _smb_follow(d["users"][name], password)
         _save(d)
     # Its own key made now, as every account's is at the start (R154).
     import accountkeys
@@ -969,8 +971,11 @@ def adopt(owner, people):
 
 # ---- SMB passwords (R164 step 1) ----
 # A share on the controller's own machine is reached as the account's own
-# Unix user there (bbu- and the id's hex, accounts.py), with an SMB password
-# the person sets on Profile. Samba wants the NT hash (MD4 of the password
+# Unix user there (bbu- and the id's hex, accounts.py), by the account's name
+# and password: a share lists people, and has no password of its own (the
+# operator, 4 Nov). On a machine that serves shares the hash is kept as the
+# account's password is set, unless the person set one apart on Profile
+# (smb_follows is absent then). Samba wants the NT hash (MD4 of the password
 # in UTF-16LE), which is what is kept here and handed to the own machine's
 # agent in its hello; the password itself is never stored. The hash opens
 # the shares as the password does, so it is in the users file and nowhere
@@ -1007,6 +1012,32 @@ def nt_hash(password):
     return _md4(str(password).encode("utf-16-le")).hex().upper()
 
 
+def _serves_shares():
+    """Only a controller on its own machine serves shares, so only there is the
+    NT hash, weaker than the password's own, kept at all."""
+    return os.environ.get("BB_INSTALL", "") == "bare-metal"
+
+
+def _smb_follow(u, password):
+    """The account's share password follows its sign-in, where one was not set
+    apart. Called with the store's lock held, with the password in hand."""
+    if _serves_shares() and (u.get("smb_follows") or not u.get("smb_nt")):
+        u["smb_nt"], u["smb_at"], u["smb_follows"] = nt_hash(password), int(time.time()), True
+
+
+def smb_take_up(name, password):
+    """A person signing in whose account has no share password yet (it came by a
+    move, or from before this): the one they just proved, once."""
+    if not _serves_shares():
+        return
+    with _lock:
+        d = load()
+        u = d["users"].get(str(name))
+        if u and not u.get("smb_nt"):
+            _smb_follow(u, password)
+            _save(d)
+
+
 def smb_user_of(uid):
     """The Unix user an account is on a node (accounts.py's user_of)."""
     return "bbu-" + uid[2:] if re.fullmatch(r"u_[0-9a-f]{8}", str(uid or "")) else ""
@@ -1023,6 +1054,7 @@ def set_smb_password(name, password):
         u = d["users"].get(name)
         if not u:
             return {"error": f"no account called {name}"}
+        u.pop("smb_follows", None)
         if password:
             u["smb_nt"], u["smb_at"] = nt_hash(password), int(time.time())
         else:
@@ -1032,13 +1064,13 @@ def set_smb_password(name, password):
 
 
 def smb_users():
-    """Every account with an SMB password: [{user, nt}] for the own
-    machine's hello, the Unix user and the hash and nothing else."""
+    """Every account with an SMB password: [{user, nt, name}] for the own
+    machine's hello, the Unix user, the hash and the name it signs in by."""
     out = []
     for _name, u in sorted(load()["users"].items()):
         user = smb_user_of(u.get("uid") or "")
         if user and u.get("smb_nt"):
-            out.append({"user": user, "nt": str(u["smb_nt"])})
+            out.append({"user": user, "nt": str(u["smb_nt"]), "name": str(_name)})
     return out
 
 
@@ -1082,6 +1114,7 @@ def set_password(name, password):
         if name not in d["users"]:
             return {"error": f"no account called {name}"}
         d["users"][name]["password"] = hash_password(password)
+        _smb_follow(d["users"][name], password)
         uid = d["users"][name].get("uid") or ""
         _save(d)
     # Every browser's cookie stops verifying with the stamp; the sign-ins

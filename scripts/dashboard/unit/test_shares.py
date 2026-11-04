@@ -3,6 +3,7 @@ agent reads its two files whole into the census and writes them whole from
 the storage-share job, each argument held to its shape, each user to the
 machine's and the path to a folder under a pool; the controller keeps the
 census's shares to their shape and queues the job for the own machine alone."""
+import json
 import os
 import sys
 import tempfile
@@ -56,7 +57,8 @@ class TheAgent(unittest.TestCase):
         self.nfs = os.path.join(self.d, "exports.d", "builderbot.exports")
         os.makedirs(os.path.dirname(self.smb)); os.makedirs(os.path.dirname(self.nfs))
         open(self.smb, "w").write(SMB); open(self.nfs, "w").write(NFS)
-        self.env = {"BB_SMB_FILE": self.smb, "BB_NFS_FILE": self.nfs}
+        self.internal = os.path.join(self.d, "internal.json")
+        self.env = {"BB_SMB_FILE": self.smb, "BB_NFS_FILE": self.nfs, "BB_SMB_MAIN": os.path.join(self.d, "smb.conf"), "BB_SHARES_INTERNAL": self.internal}
         sm = self.sm
         ran = self.ran = []
 
@@ -74,7 +76,7 @@ class TheAgent(unittest.TestCase):
             got = self.sm.shares_now()
         by = {s["name"]: s for s in got}
         self.assertEqual(set(by), {"media", "docs", "backup"})
-        self.assertEqual(by["media"]["smb"], {"on": True, "guest": True, "ro": False, "tm": False, "users": []})
+        self.assertEqual(by["media"]["smb"], {"on": True, "guest": True, "ro": False, "tm": False, "users": [], "readers": []})
         self.assertEqual(by["media"]["nfs"], {"on": True, "ro": True, "clients": ["192.168.1.0/24", "nas2"]})
         self.assertEqual(by["docs"]["smb"]["users"], ["bbu-0a1b2c3d", "ada"])
         self.assertFalse(by["docs"]["nfs"]["on"])
@@ -116,7 +118,7 @@ class TheAgent(unittest.TestCase):
         with mock.patch.dict(os.environ, self.env):
             got = self.sm.shares_now()
         self.assertEqual((got[0]["name"], got[0]["smb"]["tm"]), ("tm", True))
-        smb, _nfs = self.sm.render([{"name": "plain", "path": "/mnt/tank/p", "smb": {"on": True, "guest": True, "ro": False, "tm": False, "users": []},
+        smb, _nfs = self.sm.render([{"name": "plain", "path": "/mnt/tank/p", "smb": {"on": True, "guest": True, "ro": False, "tm": False, "users": [], "readers": []},
                                      "nfs": {"on": False, "ro": False, "clients": []}}])
         self.assertNotIn("time machine", smb)
 
@@ -153,8 +155,11 @@ class TheAgent(unittest.TestCase):
         self.assertEqual([r for r in runs if r[0] == "useradd"][0][-1], "bbu-deadbeef")
         self.assertIn(["/usr/bin/pdbedit", "-x", "-u", "bbu-feedface"], runs)
         text = [r[1] for r in runs if isinstance(r, tuple)][0]
-        self.assertEqual(text, "bbu-0a1b2c3d:1001:" + "X" * 32 + ":8846F7EAEE8FB117AD06BDD830B7586C:[U          ]:LCT-00000000:\n"
-                               "bbu-deadbeef:1002:" + "X" * 32 + ":31D6CFE0D16AE931B73C59D7E0C089C0:[U          ]:LCT-00000000:\n")
+        # X and a real time: LCT-00000000 tells Samba the password must change
+        # first, which no share client can do (B672).
+        self.assertRegex(text, r"\Abbu-0a1b2c3d:1001:X{32}:8846F7EAEE8FB117AD06BDD830B7586C:\[UX {9}\]:LCT-[0-9A-F]{8}:\n")
+        self.assertRegex(text, r"\nbbu-deadbeef:1002:X{32}:31D6CFE0D16AE931B73C59D7E0C089C0:\[UX {9}\]:LCT-[0-9A-F]{8}:\n\Z")
+        self.assertNotIn("LCT-00000000", text)
         self.assertFalse(os.path.exists(users_file))
         self.assertTrue(a.state.get("smb_users_sig"))
 
@@ -183,12 +188,78 @@ class TheAgent(unittest.TestCase):
         self.assertIn("could not be made: useradd: UID range exhausted", text)
         self.assertEqual(open(self.smb).read(), before)
 
+    def test_samba_is_told_of_the_shares_file_and_the_names_map_once(self):
+        # B672: the image's smb.conf includes neither.
+        main = os.path.join(self.d, "smb.conf")
+        with open(main, "w") as f:
+            f.write("[global]\n   workgroup = WORKGROUP\n\n[printers]\n   path = /x\n")
+        with mock.patch.dict(os.environ, {"BB_SMB_MAP": "/m/map", "BB_SMB_FILE": "/s/file"}):
+            self.assertTrue(self.sm._samba_hooks(main))
+            once = open(main).read()
+            self.assertTrue(self.sm._samba_hooks(main))
+        self.assertEqual(open(main).read(), once, "a second time writes nothing more")
+        lines = once.split("\n")
+        self.assertEqual(lines[1], "   username map = /m/map", "the map is [global]'s")
+        self.assertEqual(lines[-2], "   include = /s/file", "the include comes last, since it starts sections of its own")
+
+    def test_a_shares_missing_folder_is_made_only_on_a_disk_the_machine_has(self):
+        # B672: the Storage page says it is made; never on the root's tmpfs.
+        sm = self.sm
+        base = os.path.join(self.d, "pool")
+        os.makedirs(base)
+        with mock.patch.object(sm.os.path, "ismount", lambda p: False):
+            self.assertIn("not on a disk", sm._make_folder(os.path.join(base, "media")))
+        self.assertFalse(os.path.exists(os.path.join(base, "media")))
+        me = mock.Mock(pw_uid=os.getuid()); grp = mock.Mock(gr_gid=os.getgid())
+        with mock.patch.object(sm.os.path, "ismount", lambda p: p == base), mock.patch("pwd.getpwnam", return_value=me), mock.patch("grp.getgrnam", return_value=grp):
+            self.assertEqual(sm._make_folder(os.path.join(base, "media")), "")
+        self.assertEqual(os.stat(os.path.join(base, "media")).st_mode & 0o777, 0o770)
+
+    def test_a_share_with_no_export_is_a_share_samba_never_hears_of(self):
+        # The operator, 4 Nov: internal until it is exported.
+        state, code, text = self.run_job({"share": "set", "name": "photos", "path": "/mnt/tank/photos", "smb": {"on": False}, "nfs": {"on": False}})
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertIn("internal, not exported", text)
+        self.assertNotIn("[photos]", open(self.smb).read())
+        self.assertNotIn("/mnt/tank/photos", open(self.nfs).read())
+        with mock.patch.dict(os.environ, self.env):
+            by = {x["name"]: x for x in self.sm.shares_now()}
+        self.assertEqual(by["photos"]["path"], "/mnt/tank/photos")
+        self.assertFalse(by["photos"]["smb"]["on"] or by["photos"]["nfs"]["on"])
+        # Exported later, it is one share, and no longer the internal list's.
+        state, _, text = self.run_job({"share": "set", "name": "photos", "path": "/mnt/tank/photos", "smb": {"on": True, "guest": True}})
+        self.assertEqual(state, "succeeded", text)
+        self.assertIn("[photos]", open(self.smb).read())
+        self.assertEqual(json.load(open(self.internal)), [])
+        state, _, _ = self.run_job({"share": "remove", "name": "photos"})
+        self.assertEqual(state, "succeeded")
+        with mock.patch.dict(os.environ, self.env):
+            self.assertNotIn("photos", [x["name"] for x in self.sm.shares_now()])
+
+    def test_private_says_each_person_and_secure_lets_everybody_read(self):
+        state, _, text = self.run_job({"share": "set", "name": "fam", "path": "/mnt/tank/photos",
+                                       "smb": {"on": True, "guest": False, "users": ["ada"], "readers": ["bob"]}}, users=("ada", "bob"))
+        self.assertEqual(state, "succeeded", text)
+        smb = open(self.smb).read()
+        self.assertIn("valid users = ada bob", smb)
+        self.assertIn("read list = bob", smb)
+        with mock.patch.dict(os.environ, self.env):
+            got = {x["name"]: x for x in self.sm.shares_now()}["fam"]["smb"]
+        self.assertEqual((got["users"], got["readers"], got["guest"]), (["ada"], ["bob"], False), "read back as it was asked")
+        state, _, text = self.run_job({"share": "set", "name": "fam", "path": "/mnt/tank/photos",
+                                       "smb": {"on": True, "guest": True, "users": ["ada"]}}, users=("ada", "bob"))
+        self.assertEqual(state, "succeeded", text)
+        smb = open(self.smb).read()
+        self.assertIn("write list = ada", smb)
+        with mock.patch.dict(os.environ, self.env):
+            got = {x["name"]: x for x in self.sm.shares_now()}["fam"]["smb"]
+        self.assertEqual((got["users"], got["guest"]), (["ada"], True))
+
     def test_what_is_refused_writes_nothing(self):
         before = open(self.smb).read()
         for cfg, why in (({"share": "set", "name": "x", "path": "/home/ada", "smb": {"on": True, "guest": True}}, "under /mnt or /srv"),
-                         ({"share": "set", "name": "x", "path": "/mnt/tank/nope", "smb": {"on": True, "guest": True}}, "that is here"),
-                         ({"share": "set", "name": "x", "path": "/mnt/tank/photos"}, "SMB, NFS or both"),
-                         ({"share": "set", "name": "x", "path": "/mnt/tank/photos", "smb": {"on": True, "users": ["zed"]}}, "not a user this machine has"),
+                         ({"share": "set", "name": "x", "path": "/mnt/tank/nope", "smb": {"on": True, "guest": True}}, "not on a disk"),
+                                                  ({"share": "set", "name": "x", "path": "/mnt/tank/photos", "smb": {"on": True, "users": ["zed"]}}, "not a user this machine has"),
                          ({"share": "set", "name": "x", "path": "/mnt/tank/photos", "smb": {"on": True, "users": []}}, "takes the users"),
                          ({"share": "set", "name": "x", "path": "/mnt/tank/photos", "nfs": {"on": True, "clients": ["bad client"]}}, "not a client"),
                          ({"share": "set", "name": "x", "path": "/mnt/tank/media", "smb": {"on": True, "guest": True}}, "shared already under another name"),
@@ -207,7 +278,7 @@ class TheController(unittest.TestCase):
         import nodes
         got = nodes._census({"shares": [{"name": "media", "path": "/mnt/tank/media<b>", "smb": {"on": True, "guest": "yes", "ro": False, "users": ["ada", 7]},
                                          "nfs": {"on": True, "ro": True, "clients": ["192.168.1.0/24"]}}, {"name": "bad name"}]})
-        self.assertEqual(got["shares"], [{"name": "media", "path": "/mnt/tank/mediab", "smb": {"on": True, "guest": False, "ro": False, "tm": False, "users": ["ada"]},
+        self.assertEqual(got["shares"], [{"name": "media", "path": "/mnt/tank/mediab", "smb": {"on": True, "guest": False, "ro": False, "tm": False, "users": ["ada"], "readers": []},
                                           "nfs": {"on": True, "ro": True, "clients": ["192.168.1.0/24"]}}])
 
     def test_the_verb_is_the_own_machines(self):

@@ -17,11 +17,17 @@ import os
 import re
 import shutil
 import subprocess
+import time
 
 from .base import log
 from .stores import save_state
 
 SMB_FILE = "/etc/samba/smb.conf.d/builderbot.conf"
+# The shares nothing serves: a folder that is a share, kept here since neither
+# Samba's file nor NFS's says it (the operator, 4 Nov).
+INTERNAL_FILE = "/etc/builderbot/shares-internal.json"
+SMB_MAIN = "/etc/samba/smb.conf"
+SMB_MAP = "/etc/samba/aerieos-users.map"
 NFS_FILE = "/etc/exports.d/builderbot.exports"
 # The accounts' SMB passwords as handed over, written for pdbedit to import
 # (smbpasswd's line format) and removed once read.
@@ -54,7 +60,7 @@ def shares_now():
         m = re.fullmatch(r"\[([^\]]+)\]", line)
         if m:
             cur = m.group(1).strip()
-            smb[cur] = {"path": "", "guest": False, "ro": False, "tm": False, "users": []}
+            smb[cur] = {"path": "", "guest": False, "ro": False, "tm": False, "users": [], "readers": [], "writers": []}
             continue
         if cur and "=" in line and not line.startswith((";", "#")):
             k, _, v = line.partition("=")
@@ -67,6 +73,10 @@ def shares_now():
                 smb[cur]["ro"] = v.lower() == "yes"
             elif k == "valid users":
                 smb[cur]["users"] = [u for u in v.split() if USER_RE.fullmatch(u)][:64]
+            elif k == "read list":
+                smb[cur]["readers"] = [u for u in v.split() if USER_RE.fullmatch(u)][:64]
+            elif k == "write list":
+                smb[cur]["writers"] = [u for u in v.split() if USER_RE.fullmatch(u)][:64]
             elif k == "fruit:time machine":
                 smb[cur]["tm"] = v.lower() == "yes"
     for line in _read(_env("BB_NFS_FILE", NFS_FILE)).splitlines():
@@ -89,13 +99,97 @@ def shares_now():
     for name in names:
         s = smb[name]
         n = nfs.get(s["path"]) or {}
-        out.append({"name": name, "path": s["path"], "smb": {"on": True, "guest": s["guest"], "ro": s["ro"], "tm": s["tm"], "users": s["users"]},
+        # Private: valid users are everybody named, the read list those who only
+        # read. Secure: a guest may read, and the write list names who writes.
+        users = s["writers"] if s["guest"] else [u for u in s["users"] if u not in s["readers"]]
+        out.append({"name": name, "path": s["path"], "smb": {"on": True, "guest": s["guest"], "ro": s["ro"] and not (s["guest"] and users), "tm": s["tm"], "users": users,
+                                                             "readers": [] if s["guest"] else s["readers"]},
                     "nfs": {"on": bool(n), "ro": bool(n.get("ro")), "clients": n.get("clients") or []}})
     for path, n in nfs.items():
         if not any(o["path"] == path for o in out):
             out.append({"name": os.path.basename(path.rstrip("/")) or path, "path": path, "smb": {"on": False, "guest": False, "ro": False, "tm": False, "users": []},
                         "nfs": {"on": True, "ro": n["ro"], "clients": n["clients"]}})
+    # The shares that are folders and nothing more.
+    try:
+        kept = json.loads(_read(_env("BB_SHARES_INTERNAL", INTERNAL_FILE)) or "[]")
+    except ValueError:
+        kept = []
+    for k in kept if isinstance(kept, list) else []:
+        if isinstance(k, dict) and k.get("name") and k.get("path") and not any(o["name"] == k["name"] or o["path"] == k["path"] for o in out):
+            out.append({"name": str(k["name"])[:63], "path": str(k["path"])[:200],
+                        "smb": {"on": False, "guest": False, "ro": False, "tm": False, "users": [], "readers": []},
+                        "nfs": {"on": False, "ro": False, "clients": []}})
     return out[:64]
+
+
+def _nobodys(path):
+    """Whether a share's folder belongs to the nobody account."""
+    try:
+        import pwd
+        return os.stat(path).st_uid == pwd.getpwnam("nobody").pw_uid
+    except (OSError, KeyError):
+        return False
+
+
+def _make_folder(path):
+    """A share's missing folder made where it is on a disk the machine has: one
+    level under a mounted pool or array or deeper, never on the root's tmpfs.
+    "" when it is there now, or why not. Closed to everybody but Samba's
+    account, which everyone named on the share writes as."""
+    if os.path.isdir(path):
+        return ""
+    probe = os.path.dirname(path)
+    while probe not in ("", "/") and not os.path.exists(probe):
+        probe = os.path.dirname(probe)
+    at = probe
+    while at not in ("", "/", "/mnt", "/srv") and not os.path.ismount(at):
+        at = os.path.dirname(at)
+    if at in ("", "/", "/mnt", "/srv"):
+        return f"{path} is not on a disk this machine has mounted"
+    try:
+        import pwd
+        import grp
+        os.makedirs(path, exist_ok=True)
+        os.chown(path, pwd.getpwnam("nobody").pw_uid, grp.getgrnam("nogroup").gr_gid)
+        os.chmod(path, 0o770)
+    except (OSError, KeyError) as e:
+        return f"{path} could not be made: {e}"
+    return ""
+
+
+def _samba_hooks(main=None):
+    """smb.conf told about the shares file and the names' map, once, in its
+    [global] section, where the image's own says nothing of them (B672). The
+    file's kept in /etc, so a boot keeps it; False when it could not be written."""
+    main = main or _env("BB_SMB_MAIN", SMB_MAIN)
+    want = [f"   username map = {_env('BB_SMB_MAP', SMB_MAP)}", f"   include = {_env('BB_SMB_FILE', SMB_FILE)}"]
+    try:
+        with open(main, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return False
+    missing = [w for w in want if w not in text.split("\n")]
+    if not missing:
+        return True
+    # The map is [global]'s, right under its head; the include goes last, since
+    # what it brings starts sections of its own.
+    lines = text.rstrip("\n").split("\n")
+    if want[0] in missing:
+        at = next((i for i, x in enumerate(lines) if x.strip().lower() == "[global]"), None)
+        if at is None:
+            lines[:0] = ["[global]", want[0]]
+        else:
+            lines.insert(at + 1, want[0])
+    if want[1] in missing:
+        lines.append(want[1])
+    try:
+        with open(main + ".new", "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        os.chmod(main + ".new", 0o644)
+        os.replace(main + ".new", main)
+    except OSError:
+        return False
+    return True
 
 
 def render(shares):
@@ -104,11 +198,26 @@ def render(shares):
     nfs = ["# Written by AerieOS (the Storage page): do not edit; the page writes it whole.\n"]
     for s in shares:
         if s["smb"]["on"]:
-            smb.append(f"[{s['name']}]\n    path = {s['path']}\n    browseable = yes\n    read only = {'yes' if s['smb']['ro'] else 'no'}\n")
+            smb.append(f"[{s['name']}]\n    path = {s['path']}\n    browseable = yes\n    read only = {'yes' if s['smb']['ro'] or (s['smb']['guest'] and s['smb']['users']) else 'no'}\n")
+            readers = list(s["smb"].get("readers") or [])
             if s["smb"]["guest"]:
                 smb.append("    guest ok = yes\n    force user = nobody\n")
+                # Secure: everybody reads as a guest, the people named write.
+                if s["smb"]["users"]:
+                    smb.append(f"    write list = {' '.join(s['smb']['users'])}\n")
             else:
-                smb.append(f"    guest ok = no\n    valid users = {' '.join(s['smb']['users'])}\n")
+                smb.append(f"    guest ok = no\n    valid users = {' '.join(s['smb']['users'] + readers)}\n")
+                if readers:
+                    smb.append(f"    read list = {' '.join(readers)}\n")
+                # A folder made for the share is nobody's and each person named
+                # on it writes as that, so two people see each other's files,
+                # as a NAS's share is (B672). A folder that was somebody's
+                # before keeps its owners.
+                if _nobodys(s["path"]):
+                    # Group-write too: without it a file written over the
+                    # network cannot be saved over again (found by a real
+                    # client: new files worked, overwriting them was denied).
+                    smb.append("    force user = nobody\n    force group = nogroup\n    create mask = 0664\n    directory mask = 0775\n")
             # A Mac's Time Machine target (R164 step 1): fruit says so to the
             # Finder, catia keeps the names it writes; the Mac finds it by
             # mDNS, which Samba registers itself.
@@ -130,10 +239,12 @@ class SharesMixin:
         the bbu group), the set imported into Samba's database whole, and
         every bbu- user Samba knows that is not in the set removed. Root,
         with Samba installed; nothing otherwise."""
-        want = sorted(({"user": str(r.get("user") or ""), "nt": str(r.get("nt") or "").upper()} for r in rows if isinstance(r, dict)),
+        want = sorted(({"user": str(r.get("user") or ""), "nt": str(r.get("nt") or "").upper(), "name": str(r.get("name") or "")} for r in rows if isinstance(r, dict)),
                       key=lambda r: r["user"])
         want = [r for r in want if re.fullmatch(r"bbu-[0-9a-f]{8}", r["user"]) and re.fullmatch(r"[0-9A-F]{32}", r["nt"])]
-        sig = hashlib.sha256(json.dumps(want).encode()).hexdigest()
+        # The record's shape in the digest, so a machine that took a set in an
+        # older shape takes it again.
+        sig = hashlib.sha256(json.dumps(["2", want]).encode()).hexdigest()
         pdbedit = shutil.which("pdbedit")
         if sig == self.state.get("smb_users_sig") or not pdbedit or os.geteuid() != 0:
             return
@@ -162,7 +273,10 @@ class SharesMixin:
                 uid = pwd.getpwnam(r["user"]).pw_uid
             except KeyError:
                 continue
-            lines.append(f"{r['user']}:{uid}:{'X' * 32}:{r['nt']}:[U          ]:LCT-00000000:\n")
+            # X: the password does not expire, and a real time it last changed;
+            # LCT-00000000 tells Samba it must change first, which no share
+            # client can do (B672).
+            lines.append(f"{r['user']}:{uid}:{'X' * 32}:{r['nt']}:[UX         ]:LCT-{int(time.time()):08X}:\n")
         path = _env("BB_SMB_USERS_FILE", SMB_USERS_FILE)
         try:
             os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
@@ -179,6 +293,17 @@ class SharesMixin:
                 os.unlink(path)
             except OSError:
                 pass
+        # The name a person signs in with, onto the Unix user Samba knows them
+        # as (B672).
+        try:
+            mp = _env("BB_SMB_MAP", SMB_MAP)
+            with open(mp + ".new", "w", encoding="utf-8") as f:
+                f.write("".join(f'{r["user"]} = "{r["name"]}"\n' for r in want if re.fullmatch(r"[A-Za-z0-9._@+-]{1,64}", r["name"])))
+            os.chmod(mp + ".new", 0o644)
+            os.replace(mp + ".new", mp)
+        except OSError as e:
+            log(f"shares: the names' map did not write: {e}")
+        _samba_hooks()
         self.state["smb_users_sig"] = sig
         save_state(self.state)
         log(f"shares: {len(lines)} SMB password(s) in Samba, {len(have - {r['user'] for r in want})} removed")
@@ -234,9 +359,18 @@ class SharesMixin:
             path = str(cfg.get("path") or "").strip()
             smb = cfg.get("smb") if isinstance(cfg.get("smb"), dict) else {}
             nfs = cfg.get("nfs") if isinstance(cfg.get("nfs"), dict) else {}
-            if not (path.startswith(ROOTS) and os.path.isabs(path) and ".." not in path.split("/") and os.path.isdir(path)):
-                say(f"refused: {path or 'no path'} is not a folder under /mnt or /srv that is here\n")
+            if not (path.startswith(ROOTS) and os.path.isabs(path) and ".." not in path.split("/")):
+                say(f"refused: {path or 'no path'} is not a folder under /mnt or /srv\n")
                 return "failed", 65
+            if not os.path.isdir(path):
+                if not re.fullmatch(r"/[A-Za-z0-9._/+@-]+", path):
+                    say(f"refused: {path} has characters a share's path may not have (spaces and the like): name its folder plainly\n")
+                    return "failed", 65
+                why = _make_folder(path)
+                if why:
+                    say(f"refused: {why}\n")
+                    return "failed", 65
+                say(f"{path}: made for the share\n")
             # The folder as it really is, and a plain path: it is written into
             # /etc/exports.d and smb.conf, where a space or a newline in a name
             # a share's user made wrote options of its own (a world export
@@ -247,15 +381,13 @@ class SharesMixin:
                     "(spaces and the like): name its folder plainly\n")
                 return "failed", 65
             path = real
-            if not smb.get("on") and not nfs.get("on"):
-                say("refused: a share is served over SMB, NFS or both\n")
-                return "failed", 64
             users = [str(u) for u in (smb.get("users") or []) if isinstance(u, str)]
-            if smb.get("on") and not smb.get("guest"):
-                if not users:
+            readers = [str(u) for u in (smb.get("readers") or []) if isinstance(u, str) and str(u) not in users]
+            if smb.get("on") and (users or readers or not smb.get("guest")):
+                if not smb.get("guest") and not users and not readers:
                     say("refused: an SMB share takes the users who may reach it, or everybody as a guest\n")
                     return "failed", 64
-                for u in users:
+                for u in users + readers:
                     if not USER_RE.fullmatch(u):
                         say(f"refused: {u!r} is not a user name\n")
                         return "failed", 64
@@ -292,14 +424,26 @@ class SharesMixin:
                 say(f"refused: {path} is shared already under another name\n")
                 return "failed", 66
             rest.append({"name": name, "path": path,
-                         "smb": {"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
+                         "smb": {"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64], "readers": readers[:64]},
                          "nfs": {"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]}})
-            say(f"share {name}: {path}, {'SMB' if smb.get('on') else ''}{' and ' if smb.get('on') and nfs.get('on') else ''}{'NFS' if nfs.get('on') else ''}\n")
+            say(f"share {name}: {path}, {'SMB' if smb.get('on') else ''}{' and ' if smb.get('on') and nfs.get('on') else ''}{'NFS' if nfs.get('on') else ''}{'internal, not exported' if not smb.get('on') and not nfs.get('on') else ''}\n")
         else:
             if len(rest) == len(have):
                 say(f"refused: no share called {name}\n")
                 return "failed", 66
             say(f"share {name}: removed\n")
+        if not _samba_hooks():
+            say("smb.conf could not be told about the shares file: Samba will not serve them until it can\n")
+        # What nothing serves is kept apart, and is still a share.
+        try:
+            ip = _env("BB_SHARES_INTERNAL", INTERNAL_FILE)
+            os.makedirs(os.path.dirname(ip), exist_ok=True)
+            with open(ip + ".new", "w", encoding="utf-8") as fh:
+                json.dump([{"name": x["name"], "path": x["path"]} for x in rest if not x["smb"]["on"] and not x["nfs"]["on"]], fh)
+            os.replace(ip + ".new", ip)
+        except OSError as e:
+            say(f"the list of internal shares did not write: {e}\n")
+            return "failed", 67
         smb_text, nfs_text = render(rest)
         smb_file, nfs_file = _env("BB_SMB_FILE", SMB_FILE), _env("BB_NFS_FILE", NFS_FILE)
         try:

@@ -198,16 +198,16 @@ function profileShares(sm){
       <div class="name">${esc(r.name)}${r.ro ? ` <span class="pill">read-only</span>` : ""}${r.guest ? ` <span class="pill">everybody</span>` : ""}${r.tm ? ` <span class="pill">Time Machine</span>` : ""}</div>
       <div class="sub"><code>\\${esc(host)}\${esc(r.name)}</code> on Windows, <code>smb://${esc(host)}/${esc(r.name)}</code> on a Mac${addr ? `, or by the address ${esc(addr)}` : ""}</div>
     </div></div>`).join("");
-  const when = sm.at ? `set ${esc(ago(sm.at))}` : "none set yet: the shares named to you ask for one";
+  const when = sm.follows ? "your shares use your sign-in password" : sm.at ? `a separate password, set ${esc(ago(sm.at))}` : "none yet: sign in again and it follows your password";
   return `<div class="row stack2"><div class="grow">
-    ${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share names you yet${sm.set ? "" : ", and no SMB password is set"}. An administrator names you on one from the Storage page.</div>`}
+    ${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share names you yet. An administrator names you on one from the Storage page.</div>`}
     <div class="logset">
       <div class="logdays setrow col ctlrow">
-        ${lbl("pfSmb", "SMB password", "what you type when a share asks: your account's name and this; at least 8 characters, kept apart from your sign-in")}
+        ${lbl("pfSmb", "A separate password for shares", "only if you want one: a share asks for your name and, unless you set this, your sign-in password. At least 8 characters")}
         <input id="pfSmb" type="password" autocomplete="new-password">
       </div>
       <div class="logdays setrow col ctlrow">
-        ${lbl("pfSmb2", "SMB password again")}
+        ${lbl("pfSmb2", "The same again")}
         <input id="pfSmb2" type="password" autocomplete="new-password">
       </div>
       <div class="actbar">
@@ -227,7 +227,7 @@ function wireShares(root){
     try{
       const j = await (await postJSON("/api/profile", {action: "smb-password", password})).json();
       if (j.error){ notify(j.error, true); return; }
-      notify(password ? "your SMB password is set: the machine takes it up within a minute" : "your SMB password is cleared");
+      notify(password ? "your separate share password is set: the machine takes it up within a minute" : "cleared: sign in again and your shares follow your password");
       await loadProfile();
     }catch(e){ notify("profile: " + failWords(e), true); }
     finally{ unbusy(btn, word); }

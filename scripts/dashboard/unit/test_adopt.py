@@ -257,10 +257,15 @@ class SharesFromTheStick(unittest.TestCase):
         by = {r["name"]: r for r in rows}
         self.assertEqual(by["media"]["path"], "/mnt/user/media")
         self.assertTrue(by["media"]["smb"]["guest"])
+        # Secure as it was: everybody reads, its writers write.
+        self.assertTrue(by["docs"]["smb"]["guest"])
         self.assertEqual(by["docs"]["smb"]["users"], ["ann"])
         self.assertTrue(by["isos"]["smb"]["guest"] and by["isos"]["smb"]["ro"])
-        self.assertEqual(by["home"]["smb"]["users"], ["ann", "bob"])
+        # Private as it was: each person read or write.
+        self.assertEqual(by["home"]["smb"]["users"], ["ann"])
+        self.assertEqual(by["home"]["smb"]["readers"], ["bob"])
         self.assertTrue(by["home"]["smb"]["tm"])
         self.assertEqual(by["backup"]["nfs"]["clients"], ["192.168.1.0/24", "10.0.0.5"])
-        self.assertNotIn("lonely", by)
-        self.assertEqual({n["name"] for n in notes}, {"docs", "lonely"})
+        # Nobody on its lists: still a share, a folder, and not exported.
+        self.assertFalse(by["lonely"]["smb"]["on"])
+        self.assertEqual({n["name"] for n in notes}, {"lonely"})

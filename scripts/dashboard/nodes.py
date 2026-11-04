@@ -1555,7 +1555,8 @@ def _census(c):
             out["shares"].append({"name": sh["name"], "path": sw(sh.get("path"), 200),
                                   "smb": {"on": smb.get("on") is True, "guest": smb.get("guest") is True, "ro": smb.get("ro") is True,
                                           "tm": smb.get("tm") is True,
-                                          "users": [sw(u, 32) for u in (smb.get("users") or [])[:64] if isinstance(u, str)]},
+                                          "users": [sw(u, 32) for u in (smb.get("users") or [])[:64] if isinstance(u, str)],
+                                          "readers": [sw(u, 32) for u in (smb.get("readers") or [])[:64] if isinstance(u, str)]},
                                   "nfs": {"on": nfs.get("on") is True, "ro": nfs.get("ro") is True,
                                           "clients": [sw(c, 80) for c in (nfs.get("clients") or [])[:64] if isinstance(c, str)]}})
     # ...and its ZFS pools (R162 step 1): name, sizes, health, the members
@@ -3686,8 +3687,6 @@ def _share_cfg(sh, req):
         nfs = req.get("nfs") if isinstance(req.get("nfs"), dict) else {}
         if not (path.startswith(("/mnt/", "/srv/")) and ".." not in path.split("/") and len(path) <= 200):
             return None, "a share's path is a folder under /mnt or /srv"
-        if not smb.get("on") and not nfs.get("on"):
-            return None, "a share is served over SMB, NFS or both"
         if smb.get("on") and not sh.get("smb"):
             return None, "no Samba on the machine yet: install Shares on its Features section first"
         if nfs.get("on") and not sh.get("nfs"):
@@ -3698,18 +3697,24 @@ def _share_cfg(sh, req):
             users, why = smb_resolve(users)
             if why:
                 return None, why
+        readers = [str(u).strip() for u in (smb.get("readers") or []) if isinstance(u, str) and str(u).strip()]
+        if smb_resolve and readers:
+            readers, why = smb_resolve(readers)
+            if why:
+                return None, why
+        readers = [u for u in readers if u not in users]
         clients = [str(c).strip() for c in (nfs.get("clients") or []) if isinstance(c, str) and str(c).strip()]
-        if smb.get("on") and not smb.get("guest") and not users:
-            return None, "an SMB share takes the users who may reach it, or everybody as a guest"
+        if smb.get("on") and not smb.get("guest") and not users and not readers:
+            return None, "an exported share takes the people who may reach it, or everybody as a guest"
         if nfs.get("on") and not clients:
             return None, "an NFS share takes the clients it is exported to (an address, a network, a name, or *)"
-        for u in users:
+        for u in users + readers:
             if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", u):
                 return None, f"{u!r} is not a user name"
         for c in clients:
             if not re.fullmatch(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}", c):
                 return None, f"{c!r} is not a client (an address, a network like 192.168.1.0/24, a name, or *)"
-        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64]},
+        cfg.update(path=path, smb={"on": bool(smb.get("on")), "guest": bool(smb.get("guest")), "ro": bool(smb.get("ro")), "tm": smb.get("tm") is True, "users": users[:64], "readers": readers[:64]},
                    nfs={"on": bool(nfs.get("on")), "ro": bool(nfs.get("ro")), "clients": clients[:64]})
     return cfg, ""
 
@@ -3725,9 +3730,11 @@ def smb_shares_for(uid):
         rep = n.get("reported") or {}
         if not ((rep.get("features") or {}).get("shares") or {}).get("smb"):
             return None
-        rows = [{"name": sh["name"], "ro": bool(sh["smb"].get("ro")), "guest": bool(sh["smb"].get("guest")), "tm": bool(sh["smb"].get("tm"))}
+        def reads_only(sm):
+            return bool(sm.get("ro")) or (me in (sm.get("readers") or [])) or (bool(sm.get("guest")) and bool(sm.get("users")) and me not in sm["users"])
+        rows = [{"name": sh["name"], "ro": reads_only(sh["smb"]), "guest": bool(sh["smb"].get("guest")), "tm": bool(sh["smb"].get("tm"))}
                 for sh in rep.get("shares") or [] if isinstance(sh, dict) and (sh.get("smb") or {}).get("on")
-                and (sh["smb"].get("guest") or (me and me in (sh["smb"].get("users") or [])))]
+                and (sh["smb"].get("guest") or (me and me in [*(sh["smb"].get("users") or []), *(sh["smb"].get("readers") or [])]))]
         addrs = ((rep.get("network") or {}).get("addresses") or [])
         return {"host": str(rep.get("hostname") or n.get("name") or ""), "address": str(addrs[0]).split("/")[0] if addrs else "",
                 "rows": rows}

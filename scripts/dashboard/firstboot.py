@@ -163,10 +163,9 @@ def adopt_want(cfg):
 def share_requests(cfg):
     """The plan's shares as storage-share's set-many takes them (R163 step
     9), each served from the merged tree where its files were: SMB as its
-    security said (public: everybody as a guest; secure: its writers by name,
-    the guests' reading not carried and said so, or everybody as a read-only
-    guest where it names no writer; private: the people on its lists by
-    name), NFS to the hosts its export named, a Time Machine share kept one.
+    security said (public: everybody as a guest; secure: everybody reads as a
+    guest and its writers write; private: the people on its lists, each as read
+    or write), NFS to the hosts its export named, a Time Machine share kept one.
     What cannot be carried is said beside each. ([rows], [notes])."""
     rows, notes = [], []
     for s in (cfg or {}).get("shares") or []:
@@ -175,21 +174,24 @@ def share_requests(cfg):
         name = str(s["name"])
         sec = str(s.get("security") or "public")
         people = [p for p in [*(s.get("read") or []), *(s.get("write") or [])] if isinstance(p, str) and p]
-        smb = {"on": s.get("smb") is True, "guest": False, "ro": False, "tm": s.get("time_machine") is True, "users": []}
+        smb = {"on": s.get("smb") is True, "guest": False, "ro": False, "tm": s.get("time_machine") is True, "users": [], "readers": []}
         if smb["on"]:
             if sec == "public":
                 smb["guest"] = True
             elif sec == "secure":
+                # As it was: everybody reads as a guest, its writers by name.
                 writers = [p for p in s.get("write") or [] if isinstance(p, str) and p]
+                smb["guest"] = True
                 if writers:
                     smb["users"] = writers
-                    notes.append({"name": name, "said": "secure: its writers by name; everybody else's guest reading is not carried"})
                 else:
-                    smb.update(guest=True, ro=True)
+                    smb["ro"] = True
             else:
-                smb["users"] = sorted(set(people))
+                writers = sorted({p for p in s.get("write") or [] if isinstance(p, str) and p})
+                smb["users"] = writers
+                smb["readers"] = sorted({p for p in s.get("read") or [] if isinstance(p, str) and p and p not in writers})
                 if not people:
-                    notes.append({"name": name, "said": "private with nobody on its lists: not served over SMB"})
+                    notes.append({"name": name, "said": "private with nobody on its lists: kept as a folder, not exported"})
                     smb["on"] = False
         clients, ro = [], False
         for rule in str(s.get("nfs_clients") or "").split():
@@ -201,8 +203,7 @@ def share_requests(cfg):
         if nfs["on"] and not nfs["clients"]:
             notes.append({"name": name, "said": "NFS with no host named: not exported"})
             nfs["on"] = False
-        if not smb["on"] and not nfs["on"]:
-            continue
+        # Exported or not, it is a share: one nothing serves stays internal.
         rows.append({"name": name, "path": f"/mnt/user/{name}", "smb": smb, "nfs": nfs})
     return rows, notes
 

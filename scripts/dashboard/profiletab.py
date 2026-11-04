@@ -77,7 +77,7 @@ def view(me):
             # The SMB shares on the controller's own machine this person
             # reaches (R164 step 1), and whether an SMB password is set;
             # left out where no own machine serves shares.
-            "smb": ({"set": bool(acct.get("smb_nt")), "at": int(acct.get("smb_at") or 0), **sh}
+            "smb": ({"set": bool(acct.get("smb_nt")), "at": int(acct.get("smb_at") or 0), "follows": bool(acct.get("smb_follows")), **sh}
                     if (sh := (smb_shares(uid) if smb_shares else None)) is not None else None),
             "two_factor": mfa.summary(uid) if mfa else {"on": False},
             "two_factor_required": bool(two_factor_required and two_factor_required(acct))}, 200

@@ -36,7 +36,7 @@ class SmbPasswords(unittest.TestCase):
         self.assertIn("8 characters", users.set_smb_password("ada", "short")["error"])
         self.assertIn("no account", users.set_smb_password("nobody", "longenough")["error"])
         self.assertEqual(users.set_smb_password("ada", "correct horse")["set"], True)
-        self.assertEqual(users.smb_users(), [{"user": "bbu-0a1b2c3d", "nt": users.nt_hash("correct horse")}])
+        self.assertEqual(users.smb_users(), [{"user": "bbu-0a1b2c3d", "nt": users.nt_hash("correct horse"), "name": "ada"}])
         self.assertNotIn("smb_nt", users.all_users()[0], "a listing never carries it")
         self.assertEqual(users.set_smb_password("ada", "")["set"], False)
         self.assertEqual(users.smb_users(), [])
@@ -67,6 +67,63 @@ class SmbPasswords(unittest.TestCase):
         own["reported"]["features"] = {}
         with mock.patch.object(nodes, "node_list", return_value=[own]):
             self.assertIsNone(nodes.smb_shares_for("u_0a1b2c3d"), "an own machine without Samba: not drawn either")
+
+
+class FollowsTheSignIn(unittest.TestCase):
+    """One name and one password (the operator, 4 Nov): a share lists people,
+    and on a machine that serves shares a person's sign-in opens them."""
+
+    def setUp(self):
+        import tempfile
+        import users
+        self.users = users
+        self.tmp = tempfile.mkdtemp()
+        self.patch = mock.patch.object(users, "load", self._load), mock.patch.object(users, "_save", self._save)
+        for p in self.patch:
+            p.start()
+        self.d = {"users": {"sean": {"uid": "u_0a1b2c3d", "password": "x"}}}
+
+    def tearDown(self):
+        for p in self.patch:
+            p.stop()
+
+    def _load(self):
+        return self.d
+
+    def _save(self, d):
+        self.d = d
+
+    def test_a_password_set_opens_the_shares_on_a_machine_that_serves_them(self):
+        u = self.users
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u._smb_follow(self.d["users"]["sean"], "correct-horse")
+        got = self.d["users"]["sean"]
+        self.assertEqual(got["smb_nt"], u.nt_hash("correct-horse"))
+        self.assertTrue(got["smb_follows"])
+        self.assertEqual(u.smb_users(), [{"user": "bbu-0a1b2c3d", "nt": got["smb_nt"], "name": "sean"}])
+
+    def test_nothing_is_kept_where_no_shares_are_served(self):
+        with mock.patch.dict(os.environ, {"BB_INSTALL": ""}):
+            self.users._smb_follow(self.d["users"]["sean"], "correct-horse")
+            self.users.smb_take_up("sean", "correct-horse")
+        self.assertNotIn("smb_nt", self.d["users"]["sean"])
+
+    def test_a_password_set_apart_is_not_followed(self):
+        u = self.users
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u._smb_follow(self.d["users"]["sean"], "correct-horse")
+            u.set_smb_password("sean", "a-separate-one")
+            apart = self.d["users"]["sean"]["smb_nt"]
+            u._smb_follow(self.d["users"]["sean"], "another-sign-in")
+        self.assertEqual(apart, u.nt_hash("a-separate-one"))
+        self.assertEqual(self.d["users"]["sean"]["smb_nt"], apart)
+        self.assertNotIn("smb_follows", self.d["users"]["sean"])
+
+    def test_a_person_who_came_by_a_move_is_taken_up_when_they_sign_in(self):
+        u = self.users
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.smb_take_up("sean", "proved-just-now")
+        self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("proved-just-now"))
 
 
 if __name__ == "__main__":

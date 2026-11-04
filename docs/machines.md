@@ -309,8 +309,7 @@ everybody as a guest, over NFS to named clients (an address, a network, a
 name, `*`), read-only or not, with the address to map it by and Remove;
 and a form for a new one. Every press is a job the machine's root agent
 runs: it writes the two files whole, checks Samba accepts them, and tells
-Samba and NFS to read again. The SMB password an account sets for itself is
-R164's.
+Samba and NFS to read again. Who signs in with what is below.
 **Pools** (R162): under the disks, the own machine's ZFS pools as `zpool`
 says them (size and what is used, health, the members by layout, the last
 scrub, errors), each with Scrub, Export and Destroy (which takes the pool's
@@ -396,12 +395,19 @@ accounts, named on the share by account name (each becomes its own Unix
 user on the machine, `bbu-` and the account's id, made when first named)
 or by role (`role:NAME` on the API; the form offers each role, and it
 names everybody holding the role at that moment, not later joiners), with
-the machine's own Unix users still accepted by name. A person reaches a
-share with their account's name and an SMB password of their own, set on
-Profile under Your shares, which also lists the shares named to them and
-the address to map each by; the password is kept only as the NT hash
-Samba keeps, handed to the own machine's agent in its hello and imported
-into Samba's database there, never written in a job or shown again. A
+the machine's own Unix users still accepted by name. A share is a folder on a pool, and it stays on this machine until **Export** is
+on. Then its **Security** says who: Private, only the people named; Secure,
+everybody reads as a guest and the people named write; Public, everybody. Each
+person named is read/write or read-only. A share lists people and has no password
+of its own: a person reaches it with
+the name and password they sign in to the dashboard with, or a separate
+password if they set one on Profile under Your shares, which also lists the
+shares named to them and the address to map each by. On a machine that serves
+shares the password is also kept as the NT hash Samba needs, which is weaker
+than the sign-in's own hash; it is handed to the own machine's agent in its
+hello and imported into Samba's database there, never written in a job or
+shown again. A missing folder is made for the share, on a mounted disk only,
+and everyone named on it writes as one account, so they see each other's files. A
 share ticked as a Mac's Time Machine target is offered to the Finder as
 one (`fruit:time machine`), found by mDNS as Samba registers it.
 

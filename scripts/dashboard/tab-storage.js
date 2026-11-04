@@ -200,35 +200,85 @@ function storageShares(n){
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const shares = n.shares || [];
   const lockedMounts = (n.pools || []).filter(p => p.locked && p.mount).map(p => p.mount);
+  // What a share is, as a person reads it: exported or kept on this machine.
+  const access = s => {
+    const m = s.smb || {};
+    if (m.guest) return (m.users || []).length ? `secure: everybody reads, ${(s.accounts || m.users).map(esc).join(", ")} write` : m.ro ? "public, read-only" : "public: everybody";
+    const names = [...(s.accounts || m.users || []).map(x => `${esc(x)}: read/write`), ...(s.readers || m.readers || []).map(x => `${esc(x)}: read-only`)];
+    return `private: ${names.join(", ") || "nobody yet"}`;
+  };
   const rows = shares.map(s => `<div class="row stack2 stshare" data-share="${esc(s.name)}"><div class="grow">
-      <div class="name">${esc(s.name)} <code>${esc(s.path)}</code>${lockedMounts.some(m => s.path === m || s.path.startsWith(m + "/")) ? ` <span class="pill warn">its pool is locked: unlock it under Pools</span>` : ""}</div>
-      ${s.smb?.on ? `<div class="sub">SMB${s.smb.ro ? ", read-only" : ""}${s.smb.tm ? ", a Time Machine target" : ""}: ${s.smb.guest ? "everybody, as a guest" : (s.accounts || s.smb.users || []).map(esc).join(", ") || "nobody yet"} · \\\\${esc(n.name)}\\${esc(s.name)}</div>` : ""}
+      <div class="name">${esc(s.name)} <code>${esc(s.path)}</code>${s.smb?.on || s.nfs?.on ? ` <span class="pill ok">exported</span>` : ` <span class="pill">internal</span>`}${lockedMounts.some(m => s.path === m || s.path.startsWith(m + "/")) ? ` <span class="pill warn">its pool is locked: unlock it under Pools</span>` : ""}</div>
+      ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>` : ""}
       ${s.nfs?.on ? `<div class="sub">NFS${s.nfs.ro ? ", read-only" : ""}: ${(s.nfs.clients || []).map(esc).join(", ")} · ${esc(n.name)}:${esc(s.path)}</div>` : ""}
-      </div>${admin && !why ? `<span class="acts"><button type="button" class="danger" data-stshare="remove" data-name="${esc(s.name)}">Remove</button></span>` : ""}</div>`).join("");
+      ${s.smb?.on || s.nfs?.on ? "" : `<div class="sub">On this machine only: nothing serves it until you export it.</div>`}
+      </div>${admin && !why ? `<span class="acts"><button type="button" data-stshareedit="${esc(s.name)}">Edit</button><button type="button" class="danger" data-stshare="remove" data-name="${esc(s.name)}">Remove</button></span>` : ""}</div>`).join("");
   // A share names the one pool it lives on, chosen when it is made (R162
   // step 6, the operator, 27 Oct): the pools and the array are the places,
   // and the share's folder sits under the one picked, nothing moved behind
   // a person's back.
-  const places = [...(n.pools || []).filter(p => p.mount).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]),
+  // The main pool first: a fast one is for apps and VMs, not for shares.
+  const places = [...(n.pools || []).filter(p => p.mount).sort((a, b) => (a.name === "fast") - (b.name === "fast")).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : [])];
-  const form = !admin || why ? "" : `<div class="field stnewshare"><div class="hint">New share: a name, the pool or the array it lives on and its folder there, and who reaches it over SMB, NFS or both. A person reaches an SMB share with their account's name and the SMB password they set on Profile; a role names everybody holding it now.</div>
-      <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" id="stShareName" placeholder="media" maxlength="63" autocomplete="off" spellcheck="false"></label></div>
-      <div class="field">${places.length ? `<label class="pick"><span class="pickw">On</span><select id="stSharePool">${optionList(places, places[0][0])}</select></label>` : `<div class="hint">No pool or array here yet: a share is a folder on one.</div>`}
-        <label class="pick"><span class="pickw">Folder</span><input type="text" id="stSharePath" placeholder="${esc(places[0] ? "media, or " + places[0][0] + "/media" : "/mnt/tank/media")}" autocomplete="off" spellcheck="false"></label>
-        <div class="hint">A name is a folder under the place picked (made there when it is missing); a whole path is taken as it is.</div></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stShareSmb" checked> SMB (Windows, a Mac, a phone)</label>
-        <label class="ndcap"><input type="checkbox" id="stShareGuest"> everybody as a guest, no password</label>
-        ${(n.accounts || []).length || (n.roles || []).length ? `<div class="lbox" id="stShareWho">${(n.roles || []).map(r => `<label class="ndcap"><input type="checkbox" data-stsharewho="role:${esc(r)}"> everybody with the role ${esc(r)}</label>`).join("")}${(n.accounts || []).map(a => `<label class="ndcap"><input type="checkbox" data-stsharewho="${esc(a)}"> ${esc(a)}</label>`).join("")}</div>` : ""}
-        <label class="pick"><span class="pickw">Other users</span><input type="text" id="stShareUsers" placeholder="the machine's own users, separated by spaces" autocomplete="off" spellcheck="false"></label>
-        <label class="ndcap"><input type="checkbox" id="stShareTm"> a Mac's Time Machine target</label></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stShareNfs"> NFS (Linux, a hypervisor)</label>
-        <label class="pick"><span class="pickw">Clients</span><input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" autocomplete="off" spellcheck="false"></label></div>
-      <div class="field"><label class="ndcap"><input type="checkbox" id="stShareRo"> read-only</label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stshare="set">Share it</button></div></div>`;
+  // As a NAS's share works (the operator, 4 Nov): a folder first, internal until
+  // Export is on; then its security, and each person's access. A share has no
+  // password of its own: each person signs in as they do here.
+  const people = (n.accounts || []).map(a => `<div class="stwho"><span class="grow">${esc(a)}</span>
+      <select data-stwho="${esc(a)}" aria-label="${esc(a)}'s access">${optionList([["", "No access"], ["ro", "Read-only"], ["rw", "Read/write"]], "")}</select></div>`).join("");
+  const form = !admin || why ? "" : `<div class="field stnewshare">
+      <div class="fgroup">
+        <div class="fgrouphead">A new share<span class="sub">A folder on a pool. It stays on this machine until you export it.</span></div>
+        <div class="fgrid">
+          <div class="setrow col ctlrow">${lbl("stShareName", "Name")}<input type="text" id="stShareName" placeholder="media" maxlength="63" autocomplete="off" spellcheck="false"></div>
+          ${places.length ? `<div class="setrow col ctlrow">${lbl("stSharePool", "On")}<select id="stSharePool">${optionList(places, places[0][0])}</select></div>` : ""}
+          <div class="setrow col ctlrow fwide">${lbl("stSharePath", "Folder", "A name is a folder on the place picked, made when it is missing. A whole path is taken as it is.")}<input type="text" id="stSharePath" placeholder="the share's name, or ${esc(places[0] ? places[0][0] + "/media" : "/mnt/tank/media")}" autocomplete="off" spellcheck="false"></div>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="fgrouphead">Export</div>
+        <div class="fgrid">
+          <div class="setrow col ctlrow">${lbl("stShareExport", "Over the network")}<select id="stShareExport">${optionList([["", "No: internal only"], ["smb", "Yes: over SMB (Windows, a Mac, a phone)"]], "")}</select></div>
+          <div class="setrow col ctlrow" id="stShareSecRow" hidden>${lbl("stShareSecurity", "Security")}<select id="stShareSecurity">${optionList([["private", "Private: only the people below"], ["secure", "Secure: everybody reads, the people below write"], ["public", "Public: everybody reads and writes"]], "private")}</select></div>
+        </div>
+        <div id="stShareOver" hidden>
+          <div id="stShareWho" class="stwholist"><div class="sub">Each person signs in with their name and password here.</div>${people || `<div class="hint">No accounts to name yet.</div>`}</div>
+          <label class="ndcap"><input type="checkbox" id="stShareTm"> A Mac's Time Machine target</label>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="fgrouphead">NFS<span class="sub">For Linux machines and hypervisors. Most people leave this off.</span></div>
+        <label class="ndcap"><input type="checkbox" id="stShareNfs"> Also export over NFS</label>
+        <div class="fgrid" id="stShareNfsRow" hidden><div class="setrow col ctlrow fwide">${lbl("stShareClients", "Clients")}<input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" autocomplete="off" spellcheck="false"></div></div>
+      </div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stshare="set">Save the share</button></div></div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share yet${n.smb || n.nfs ? ": the form below makes one" : ""}.</div>`}${form}`;
   return docSection("storage", "shares", "Shares", shares.length ? String(shares.length) : "", body);
 }
 function wireStorageShares(root, n){
+  const over = root.querySelector("#stShareOver"), ex = root.querySelector("#stShareExport"), sec = root.querySelector("#stShareSecurity"), who = root.querySelector("#stShareWho");
+  const secRow = root.querySelector("#stShareSecRow"), nfs = root.querySelector("#stShareNfs"), nfsRow = root.querySelector("#stShareNfsRow");
+  const fit = () => {
+    const on = ex?.value === "smb";
+    if (over) over.hidden = !on;
+    if (secRow) secRow.hidden = !on;
+    if (who && sec) who.hidden = sec.value === "public";
+    if (nfsRow && nfs) nfsRow.hidden = !nfs.checked;
+  };
+  if (ex) ex.onchange = fit;
+  if (sec) sec.onchange = fit;
+  if (nfs) nfs.onchange = fit;
+  // Edit fills the form with what the share is now.
+  root.querySelectorAll("[data-stshareedit]").forEach(b => b.onclick = () => {
+    const s = (n.shares || []).find(x => x.name === b.dataset.stshareedit);
+    if (!s) return;
+    $("stShareName").value = s.name; $("stSharePath").value = s.path;
+    ex.value = s.smb?.on ? "smb" : "";
+    sec.value = !s.smb?.guest ? "private" : (s.smb.users || []).length ? "secure" : "public";
+    root.querySelectorAll("[data-stwho]").forEach(x => { x.value = (s.accounts || []).includes(x.dataset.stwho) ? "rw" : (s.readers || []).includes(x.dataset.stwho) ? "ro" : ""; });
+    $("stShareTm").checked = !!s.smb?.tm; $("stShareNfs").checked = !!s.nfs?.on; $("stShareClients").value = (s.nfs?.clients || []).join(" ");
+    fit();
+    $("stShareName").scrollIntoView({block: "center"}); $("stShareName").focus();
+  });
   root.querySelectorAll("[data-stshare]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stshare, body = {action: "storage-share", id: n.node, share: act, name: b.dataset.name || ""};
     if (act === "set"){
@@ -236,16 +286,16 @@ function wireStorageShares(root, n){
       body.path = ($("stSharePath")?.value || "").trim() || body.name;
       // A folder name is under the place picked; a whole path stands as typed.
       if (body.path && !body.path.startsWith("/")) body.path = `${$("stSharePool")?.value || ""}/${body.path}`;
-      const ro = !!$("stShareRo")?.checked;
-      const who = [...root.querySelectorAll("[data-stsharewho]:checked")].map(i => i.dataset.stsharewho);
-      body.smb = {on: !!$("stShareSmb")?.checked, guest: !!$("stShareGuest")?.checked, ro, tm: !!$("stShareTm")?.checked,
-                  users: [...who, ...($("stShareUsers")?.value || "").split(/[\s,]+/).filter(Boolean)]};
-      body.nfs = {on: !!$("stShareNfs")?.checked, ro, clients: ($("stShareClients")?.value || "").split(/[\s,]+/).filter(Boolean)};
+      const on = $("stShareExport")?.value === "smb", sec = $("stShareSecurity")?.value || "private";
+      const pick = want => [...root.querySelectorAll("[data-stwho]")].filter(x => x.value === want).map(x => x.dataset.stwho);
+      body.smb = {on, guest: on && sec !== "private", ro: false, tm: on && !!$("stShareTm")?.checked,
+                  users: on && sec !== "public" ? pick("rw") : [], readers: on && sec === "private" ? pick("ro") : []};
+      body.nfs = {on: !!$("stShareNfs")?.checked, ro: false, clients: ($("stShareClients")?.value || "").split(/[\s,]+/).filter(Boolean)};
       if (!body.name || !body.path){ notify("a share takes a name and a folder", true); return; }
-    } else if (!await askYes(`Stop sharing ${body.name}? The folder and what is in it stay; nobody reaches it over SMB or NFS after.`, {title: "Remove the share?", verb: "Remove", danger: true})) return;
-    busy(b, act === "set" ? "Sharing" : "Removing");
+    } else if (!await askYes(`Remove the share ${body.name}? The folder and what is in it stay; nobody reaches it over the network after.`, {title: "Remove the share?", verb: "Remove", danger: true})) return;
+    busy(b, act === "set" ? "Saving" : "Removing");
     const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
-    notify(j.error || `${act === "set" ? "shared" : "removed"}: the job runs on the machine; the page follows its next check-in`, !!j.error);
+    notify(j.error || `${act === "set" ? "saved" : "removed"}: the job runs on the machine; the page follows its next check-in`, !!j.error);
     await refresh();
   }));
 }
@@ -281,7 +331,7 @@ function storagePools(n){
         `<button type="button" data-stpool="export" data-name="${esc(p.name)}" title="unmount its datasets and let the disks go, to import elsewhere">Export</button>`,
         `<button type="button" class="danger" data-stpool="destroy" data-name="${esc(p.name)}" title="everything on it is gone">Destroy</button>`])}</span>` : ""}</div>`;
   }).join("");
-  const form = !admin || why ? "" : `<div class="field stnewpool"><div class="hint">New pool: a name, a layout, and the disks it takes, each wiped. ${free.length ? `${free.length} disk${free.length === 1 ? "" : "s"} hold nothing` : "no disk here holds nothing"}${used.length ? `; ${used.length} hold something and take a tick to wipe` : ""}.</div>
+  const form = !admin || why ? "" : `<div class="field stnewpool"><div class="hint">A new pool: a name, a layout and its disks, each erased. ${free.length ? `${free.length} disk${free.length === 1 ? " is" : "s are"} free` : "No disk is free"}${used.length ? `; ${used.length} hold${used.length === 1 ? "s" : ""} something and need${used.length === 1 ? "s" : ""} a tick to erase` : ""}.</div>
       <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" id="stPoolName" placeholder="tank" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
       <div class="field"><label class="pick"><span class="pickw">Layout</span><select id="stPoolLayout">
         <option value="mirror">mirror: two or more disks holding the same, one may fail</option>

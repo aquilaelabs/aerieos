@@ -6454,6 +6454,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "bad request"}, 400)
         u = users.authenticate(form.get("username", [""])[0],
                                form.get("password", [""])[0])
+        if u:
+            users.smb_take_up(form.get("username", [""])[0], form.get("password", [""])[0])
         if not u:
             # A beat of delay, so guessing costs something; the message does
             # not say which half was wrong for the same reason the store
@@ -12077,6 +12079,7 @@ class Handler(BaseHTTPRequestHandler):
                 # A share's users as people (R164 step 1), and who may be named.
                 for sh in row.get("shares") or []:
                     sh["accounts"] = [names.get(u, u) for u in (sh.get("smb") or {}).get("users") or []]
+                    sh["readers"] = [names.get(u, u) for u in (sh.get("smb") or {}).get("readers") or []]
                 if users.is_admin(who):
                     row["extmounts"] = extmounts.rows()
                     row["backups"] = storebackups.rows()
