@@ -122,7 +122,8 @@
 
 ### Fixed
 
-- Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (37208e5)
+- Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (1e5c2d6, 9cd0b52)
+- Naming a projects folder took it from the system that had it, with no way back: that system could no longer read it. Who had it is now kept in the folder, Let it go gives it back, and root on the other system can run `.aerieos-give-back.sh` there (70ff89e)
 - A pool adopted from another system can be a stick's system pool whatever its filesystem: a btrfs or XFS one was not offered, which left Docker and the VMs waiting (095dce1)
 - The first-run page's links to This machine and the Storage page, and the held band's press, led nowhere while the page stood (b3d345a)
 - A mount's state on the Storage section was cut off at a desk when it carried a fix (a stale handle, a mount that did not come up): the whole reason now sits under the mount's row, and the cell keeps its first words (bdad714)
