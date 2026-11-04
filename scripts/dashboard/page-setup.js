@@ -252,8 +252,10 @@ function setupWalkHtml(s){
   cards.push(setupCard(++i, "Have these with you", false, false,
     `<p>A controller moves with two things from the old one, both under Controller settings, Move this controller.</p>
      ${factGrid([["Move token", "shown once, when you press Prepare to move"],
-                 ["The bundle", "Download the bundle, kept on the computer you are using now"]], "stickfacts")}
-     <p>If the old controller ran on this machine it is off now: its address does not answer, and the bundle is the only way.</p>
+                 ["The bundle", "Download the bundle, kept on the computer you are using now"],
+                 ["This build", `${state?.image?.version || "unstamped"}. A move never lands on a build older than the one that packed it, so update here first if the old controller is newer`]], "stickfacts")}
+     <p>If the old controller ran on this machine it is off now: its address does not answer, so the bundle is the only way. Prepare to move left one in the move folder of its config folder, on these disks, with what it held at that moment.</p>
+     <p>If your projects stay on these disks, leave the repositories unticked when you prepare: they are found where they are.</p>
      <p>Missing either one? ${esc(setupBootBack(had))} Make them there, then come back.</p>
      <p>Not moving a controller, only the disks? Leave the controller step and press Finish at the foot of this page.</p>`,
     "", "read first"));
@@ -262,13 +264,16 @@ function setupWalkHtml(s){
     : `<p>Its agent is coming up. The steps below need it, and this turns to done by itself.</p>`));
   const parts = n && (plan || had?.mounts?.length) ? adoptParts(n) : null;
   if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
-    `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, so what is new needs a writable pool. Moving for good, or with no pool, adopt Writable.</p>`}${parts.body}`));
+    `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your projects are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the projects folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick){
     const pick = stickPoolPick(n, stick, adopted || setupDisksDone(setupDisks.own) ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk." : "Nothing to pick yet: the step before gives this one its disks.");
     const roOnly = adopted && !had.writable && !(had.mounts || []).some(m => !m.ro);
     cards.push(setupCard(++i, "Where the projects and containers go", placed, false,
-      `<p>They write all day, so they live on the disks and never on the stick. The move lands there too.</p>
+      `<p>They write all day, so they live on the disks and never on the stick. There are two choices here, and usually you want both.</p>
+       ${factGrid([["System pool", "where Docker, the VMs and the toolchains write: the old system's cache pool, usually"],
+                   ["Projects folder", "only if your projects already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and the old system cannot read them until they are given back"]], "stickfacts")}
+       <p>The Projects page stays empty until the controller lands: its list comes with the move. Where they are now:</p>
        ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
                    ["The projects", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
                     {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
@@ -278,7 +283,7 @@ function setupWalkHtml(s){
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
-    : `<p>The moved controller's accounts, nodes, projects and settings take this one's place, and this setup account goes with what was here, set aside and not deleted.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld)}`;
+    : `<p>The moved controller's accounts, nodes, projects and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
   cards.push(setupCard(++i, "After it lands", false, false,
     `${factGrid([["Sign in", "with an account the old controller had"],
@@ -286,7 +291,9 @@ function setupWalkHtml(s){
                  ...(state?.firstboot?.apps_from ? [["Containers and VMs", "This machine reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
                  ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
-  cards.push(setupCard(++i, "If you go back", false, false, `<p>${esc(setupBootBack(had))}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home.</p>`, "", "any time"));
+  cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the projects folder, so the old system cannot read it. Press Let it go in the step above before you shut down. Already on the old system? Run this there as root:</p>
+       <pre class="setcmd">bash ${esc(stick.projects)}/.aerieos-give-back.sh</pre>` : ""}
+     <p>${esc(setupBootBack(had))}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home. Once a move has landed the old controller stays read-only for good, and going back is another move.</p>`, "", "any time"));
   return `<div class="setuppage">
     <div class="setuphead">
       <h2>Moving here</h2>

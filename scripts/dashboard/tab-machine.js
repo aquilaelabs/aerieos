@@ -195,15 +195,15 @@ function projectsFolderField(n, s, admin){
       <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="hint">The folder another system kept the projects in on these disks: the controller works there in place, nothing copied${
-      helpIcon("Its files become AerieOS's own and nothing in them changes, and a move here can then leave its repositories out of the bundle.")}</div></div>`;
+      helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
 }
 function wireStick(root){
   root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {
     const release = pb.dataset.projfolder === "release", path = (root.querySelector("#projFolder")?.value || "").trim();
     if (!release && !path) return notify("name the folder the projects are in first", true);
     if (!await askYes(release
-        ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are."
-        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: their owner changes, nothing in them does, and a share of this folder stops serving other people. What the projects folder held before stays underneath, unseen.`,
+        ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are, given back to who had them."
+        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: the system that had it can no longer read it until it is given back. Who had it is kept in the folder, in ${path}/.aerieos-give-back.sh: Let it go runs that, and so can root on that system. Their owner changes, nothing in them does, and a share of this folder stops serving other people.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
     busy(pb, release ? "Letting go" : "Taking it");
     const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));

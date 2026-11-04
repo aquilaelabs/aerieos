@@ -145,6 +145,33 @@ apply() {
 }
 
 # projects PATH [NAME...]: an existing folder taken as the projects folder.
+# Who had a projects folder before it was handed over, written as a script in
+# the folder itself (B665): it stays with the disks, so it runs on the other
+# system too, which has no AerieOS and has only what is on them. Let it go
+# runs it here. Nothing is written over one that is there, and a folder already
+# the account's own has nothing to give back. Relative paths, so it works from
+# wherever that system mounts the folder.
+GIVE_BACK=".aerieos-give-back.sh"
+note_owners() {
+    local f="$1" acct="$2" s="$1/$GIVE_BACK" uid gid mode
+    [ -e "$s" ] && return 0
+    uid="$(stat -c %u "$f")"; gid="$(stat -c %g "$f")"; mode="$(stat -c %a "$f")"
+    if [ -z "${BB_SP_NO_MOUNT:-}" ] && [ "$uid" = "$(id -u "$acct" 2>/dev/null)" ]; then return 0; fi
+    {
+        printf '#!/bin/bash\n# Written by AerieOS when this folder became its projects folder: gives the\n'
+        printf '# folder back to who had it. Run it as root, on this system or the one before.\n'
+        printf 'set -e\ncd "$(dirname "$(readlink -f "$0")")"\n'
+        printf 'chown -R %s:%s .\n' "$uid" "$gid"
+        local who rel
+        while IFS= read -r -d '' who && IFS= read -r -d '' rel; do
+            printf 'chown -h %s %q\n' "$who" "./$rel"
+        done < <(find "$f" -mindepth 1 \( ! -uid "$uid" -o ! -gid "$gid" \) -printf '%U:%G\0%P\0')
+        printf 'chmod %s .\n' "$mode"
+        printf 'rm -f -- %q\n' "$GIVE_BACK"
+    } > "$s.new" || { rm -f "$s.new"; echo "system-pool: could not write in $f, so it stays as it is" >&2; return 2; }
+    mv -f "$s.new" "$s"
+}
+
 set_projects() {
     local f="${1:-}"; shift || true
     stick || { echo "system-pool: only a stick boot takes a projects folder this way" >&2; return 2; }
@@ -174,6 +201,8 @@ set_projects() {
     local acct grp
     acct="$(envget BB_ACCOUNT)"; acct="${acct:-aerieos}"
     grp="$(id -gn "$acct" 2>/dev/null || true)"
+    note_owners "$f" "$acct" || return 2
+    echo "system-pool: to give it back: Let it go here, or as root on the system that had it: bash $f/$GIVE_BACK"
     if [ -z "${BB_SP_NO_MOUNT:-}" ]; then
         id "$acct" >/dev/null 2>&1 || { echo "system-pool: no account $acct here to hand the folder to" >&2; return 2; }
         echo "system-pool: handing $f to $acct (its files' owner alone)"
@@ -211,6 +240,10 @@ release_projects() {
     fi
     rm -f "$PFILE"
     echo "system-pool: $f is no longer the projects folder; its files stay where they are"
+    if [ -f "$f/$GIVE_BACK" ]; then
+        if bash "$f/$GIVE_BACK"; then echo "system-pool: $f is given back to who had it"
+        else echo "system-pool: $f could not be given back: run bash $f/$GIVE_BACK as root" >&2; fi
+    fi
     local p; p="$(pool || true)"
     if [ -n "$p" ] && mounted "$p" && [ -z "${BB_SP_NO_MOUNT:-}" ]; then
         mkdir -p "$p/$SUB/projects"

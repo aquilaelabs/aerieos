@@ -136,6 +136,8 @@ class TheImage(unittest.TestCase):
             for p in ("alpha", "beta"):
                 os.makedirs(f"{share}/{p}")
             os.makedirs(f"{d}/ws/left")
+            was = 0o775
+            os.chmod(share, was)
             env = {"BB_SP_NO_MOUNT": "1"}
 
             def run(*argv, stick=True):
@@ -155,8 +157,20 @@ class TheImage(unittest.TestCase):
             self.assertEqual(got["projects"], share)
             self.assertNotIn("projects", got["on_stick"], "the named folder is no longer the stick's to hold")
             self.assertIn(f"the projects are {share}", run("apply").stdout)
+            # Who had it is kept on the disks, and Let it go gives it back
+            # (B665); the second naming writes nothing over the first's record.
+            back = f"{share}/.aerieos-give-back.sh"
+            with open(back) as f:
+                said = f.read()
+            self.assertIn(f"chown -R {os.getuid()}:{os.getgid()} .", said)
+            self.assertIn(f"chmod {oct(was)[2:]} .", said)
+            self.assertIn(back, run("projects", share).stdout)
+            os.chmod(share, 0o750)
             r = run("projects", "--release")
             self.assertIn("no longer the projects folder; its files stay", r.stdout)
+            self.assertIn("given back to who had it", r.stdout)
+            self.assertEqual(os.stat(share).st_mode & 0o7777, was)
+            self.assertFalse(os.path.exists(back), "the record goes with the giving back")
             self.assertEqual(json.loads(run("status").stdout)["projects"], "")
             self.assertTrue(os.path.isdir(f"{share}/alpha"))
             self.assertIn("not a stick boot", self.tool(d, "apply", stick=False).stdout)

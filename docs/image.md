@@ -97,6 +97,11 @@ controller's projects the folder holds and which it does not, and what the
 projects folder held before stays underneath, unseen, until **Let it go**
 binds the pool's again.
 
+The system that had the folder cannot read it after that, so it is given back
+before going back. Who had it is written in the folder first, as
+`.aerieos-give-back.sh`, and **Let it go** runs that. It stays with the disks, so
+from the old system, as root, the same is `bash FOLDER/.aerieos-give-back.sh`.
+
 **A move onto a stick lands last.** The first page's **Moving a controller
 here?** does not take a bundle on a stick, since it would land on the stick.
 Make a setup account instead: the next page is **Moving here**, a walk of the

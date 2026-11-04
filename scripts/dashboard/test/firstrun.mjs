@@ -331,6 +331,12 @@ await firstRun(false);
       redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.pick = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
       out.backRw = words('If you go back');
+      // A projects folder named: the way back says to give it back first, and how
+      // from the old system (B665); the step says what it costs before it is pressed.
+      out.costs = words('Where the projects and containers go');
+      stick.projects = '/mnt/user/development/projects'; stick.projects_bound = true; setupSig = ''; drawSetup();
+      out.backFolder = words('If you go back');
+      stick.projects = ''; stick.projects_bound = false;
       stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.placed = pill('Where the projects and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
@@ -367,6 +373,10 @@ await firstRun(false);
     ok(walk.pick.includes('/mnt/cache') && !walk.pick.includes('/mnt/disk1'), `...a btrfs pool it adopted is a system pool to pick, a data disk is not (B663) (${walk.pick.join()})`);
     ok(/Its disks are as they were/.test(walk.back) && /parity sync/.test(walk.backRw) && /Forget it/.test(walk.back),
        `...the way back says what it costs as it stands, and to forget a prepared move (${walk.backRw.slice(0, 200)})`);
+    ok(/old system cannot read them until they are given back/.test(walk.costs) && /Projects page stays empty until the controller lands/.test(walk.costs),
+       `...naming a projects folder says what it costs and when the projects show (${walk.costs.slice(0, 260)})`);
+    ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
+       `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
