@@ -894,8 +894,14 @@ def _no_daemon_why():
     """Why there is no daemon to send docker work to, said for this install
     (B147): nodes enrolled that run no Docker want Docker, not another node,
     and an install that holds enrolling off is not told to enroll."""
-    enrolled = [n["name"] for n in (queue.node_list() if queue else [])
-                if n.get("kind") != "local" and n.get("state") not in ("retired", "pending")]
+    rows = [n for n in (queue.node_list() if queue else [])
+            if n.get("kind") != "local" and n.get("state") not in ("retired", "pending")]
+    enrolled = [n["name"] for n in rows if not (n.get("config") or {}).get("own")]
+    if rows and not enrolled:
+        # Docker is on this machine, so "install Docker" would send a person
+        # the wrong way: what it lacks is the arrangement, not the program.
+        return ("containers do not run on the controller's own machine yet, since Docker here "
+                "is root over the controller: enroll another machine on the Nodes page to run them")
     if enrolled:
         return (f"no node runs Docker that docker work can be sent to ({', '.join(enrolled[:3])}"
                 f"{' and more' if len(enrolled) > 3 else ''}): install Docker on one, "

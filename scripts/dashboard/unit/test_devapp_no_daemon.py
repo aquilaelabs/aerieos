@@ -31,6 +31,17 @@ class NoDaemon(unittest.TestCase):
         self.assertIn("(build-node): install Docker on one", w)
         self.assertNotIn("sandbox VM", w)
 
+    def test_the_own_machine_alone_is_not_told_to_install_docker(self):
+        w = self.why([{"name": "aerieos", "kind": "agent", "state": "active", "config": {"own": True}}])
+        self.assertIn("controller's own machine", w)
+        self.assertIn("enroll another machine", w)
+        self.assertNotIn("install Docker", w)
+
+    def test_another_node_beside_the_own_machine_is_the_one_named(self):
+        w = self.why([{"name": "aerieos", "kind": "agent", "state": "active", "config": {"own": True}},
+                      {"name": "build-node", "kind": "agent", "state": "active"}])
+        self.assertIn("(build-node): install Docker on one", w)
+
     def test_no_node_is_told_to_enroll_one(self):
         self.assertIn("enroll one on the Nodes page", self.why([]))
 
