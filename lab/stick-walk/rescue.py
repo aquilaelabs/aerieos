@@ -1,5 +1,5 @@
 """The boot menu's Rescue entry picked over serial, and each line of a file run there."""
-import socket,sys,time,subprocess
+import socket,sys,time
 SOCK="/tmp/vmwalk-root.sock"
 s=socket.socket(socket.AF_UNIX); s.connect(SOCK); s.settimeout(0.5)
 buf=b""; end=time.time()+90; picked=False

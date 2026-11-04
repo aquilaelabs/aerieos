@@ -4709,19 +4709,20 @@ button.eye.bare{background:none;border:0;padding:5px 4px;min-width:auto}
 .fgroup>.ndcap{display:flex;margin-top:12px}
 .fgroup>.ndcap:first-of-type{margin-top:0}
 .fgroup>.fgrid + .ndcap,.fgroup>.ndcap + .fgrid{margin-top:12px}
-@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr)} .fgrid>.fshort{max-width:none} }
+@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)} .fgrid>.fshort{max-width:none} }
 /* The older label.pick obeys too: over its field, as every label is. */
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick,.fgrid>label.pick{display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick>:is(input,select,textarea){width:100%;box-sizing:border-box;min-height:var(--ctl)}
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick{max-width:min(var(--ctl-w),88%)}
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick + label.pick,.field:not(.docbarrow,.histbar,.wkpick)>label.pick + .hint,.field:not(.docbarrow,.histbar,.wkpick)>.hint + label.pick{margin-top:14px}
-.field:not(.docbarrow,.histbar,.wkpick)>label.pick + .hint{margin-top:var(--label-gap)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick,[hidden]),.fgrid>label.pick:not([hidden]){display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick)>:is(input,select,textarea){width:100%;box-sizing:border-box;min-height:var(--ctl)}
+.field:not(.docbarrow,.histbar)>label.pick:not(.wkpick,.nodepick){max-width:min(var(--ctl-w),88%)}
+.field:not(.docbarrow,.histbar)>label.pick + label.pick,.field:not(.docbarrow,.histbar)>.hint + label.pick{margin-top:14px}
+.field:not(.docbarrow,.histbar)>label.pick + .hint{margin-top:var(--label-gap)}
 /* Fields down a form have room between them: a label belongs to the field under
    it, not to the one above. */
 .field>.setrow.col.ctlrow + .setrow.col.ctlrow,.field>.setrow.col.ctlrow + label.pick,.field>label.pick + .setrow.col.ctlrow{margin-top:14px}
 /* A share's row: its facts at the left and its actions at the right at a desk. */
 @media(min-width:601px){ .row.stack2.stshare{flex-direction:row;align-items:center} .row.stack2.stshare>.acts{flex:0 0 auto;margin-left:auto} }
+label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 .actbar>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 .actbar>label.pick>.pickw{font:var(--f-ui);color:var(--dim)}
 /* The grid itself is capped as a whole, so its cells share the surface's

@@ -35,9 +35,9 @@
 // placeholder drawn by the page's own code, so it cannot drift from it):
 // the same label and word, the picker's box shimmering.
 function nodePick(id, nodes, cur, why = () => ""){
-  if (nodes === null) return `<label class="pick"><span class="pickw">Node</span> ${skv(7, "ctl")}</label>`;
+  if (nodes === null) return `<label class="pick nodepick"><span class="pickw">Node</span> ${skv(7, "ctl")}</label>`;
   if (!nodes.length) return "";
-  return `<label class="pick"><span class="pickw">Node</span> <select id="${esc(id)}" aria-label="node">${nodes.map(n => {
+  return `<label class="pick nodepick"><span class="pickw">Node</span> <select id="${esc(id)}" aria-label="node">${nodes.map(n => {
     const w = why(n);
     return `<option value="${esc(n.id)}"${n.id === cur ? " selected" : ""}${w ? " disabled" : ""}>${esc(n.name)}${
       w ? `: ${esc(w)}` : n.live === false ? " (quiet)" : ""}</option>`;
