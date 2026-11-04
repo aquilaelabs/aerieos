@@ -16,6 +16,13 @@ docker-compose.yml               compose variant of the stack
 .env.example                     annotated compose configuration
 lab/compose.yml                  the lab's Gitea and Forgejo for aerie tests lab, a stack of its own beside the dev instance
 lab/.env.example                 the lab's one setting: the address other machines reach it at
+lab/stick-walk/.gitignore        what a walk leaves in its own folder
+lab/stick-walk/README.md         a first run walked on a real stick image in QEMU, blank disks and a reboot included
+lab/stick-walk/go.sh             the whole walk from a blank machine
+lab/stick-walk/person.mjs        one browser step of it, its sign-in kept
+lab/stick-walk/rescue.py         the boot menu's Rescue picked over serial
+lab/stick-walk/steps.mjs         the steps a person takes
+lab/stick-walk/walk.py           the VM: its stick and disks, boot, stop, and root on its second serial port
 platforms/                       each place the container edition installs (R98 step 1), its template and generated files; the installed
                                  edition's own parts (host/, modules/, installer/, image/) land beside it as they are built (R56)
   unraid/aerie-workshop.xml          Unraid Docker template (one-click updates)

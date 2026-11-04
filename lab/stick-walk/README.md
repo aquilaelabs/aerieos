@@ -1,0 +1,13 @@
+# Walking a first run on a real stick image
+
+`go.sh IMAGE.stick.raw.xz` boots a stick image in QEMU with KVM, no root, with three blank hard disks and an NVMe, and does what a person does: the first page, the account, making the pools, shares, Claude Code, a project and Finish, in a real browser, then a reboot. The suites fake the job calls, so they cannot find what this finds; this found that blank disks could not be made into anything, that nothing could reach a share and that a machine lost its node at every reboot.
+
+Needs `/dev/kvm`, OVMF, `xz` and Playwright. Port 7690 is the VM's dashboard and 1445 its SMB. Its files land in `run/`, which is not committed.
+
+- `walk.py`: lay out the stick and disks, boot, stop, and `sh CMD` for root on the VM through its second serial port.
+- `rescue.py`: pick the boot menu's Rescue over serial and run commands there.
+- `person.mjs` and `steps.mjs`: one browser step per run, its sign-in kept: `node person.mjs jobs`, `node person.mjs look HASH NAME`.
+
+An image from a release carries that release's code. To walk a branch, copy its dashboard over the VM's after first boot, as root.
+
+A real client over SMB takes Debian's `smbclient` unpacked in the VM to a temporary folder (`dpkg -x`), since `curl` speaks only SMB1, which Samba refuses.

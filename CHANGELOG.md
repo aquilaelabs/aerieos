@@ -79,6 +79,9 @@
 
 ### Changed
 
+- A share works as a NAS's does: a folder on a pool, internal until you turn Export on, then Private, Secure or Public, with each person read/write, read-only or no access, and editable after it is made. A share has no password of its own: each person signs in with their name and their sign-in password, or a separate one set on Profile (099ceeb)
+- One rule for fields on every page: a label over its field, fields in a grid with room between them, a long form in groups; and the control fits the answer, so the time zone is a pulldown and a store's path suggests the node's mounts (e96124a)
+- The first run on a machine of its own makes the disks, then gives the projects and containers a place by itself, with Shares as an optional step (d2859ed)
 - The first page asks whether you are moving a controller here, and yes opens a walk through it on the next page: what to have with you, the disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page. Every install takes it with the steps it has (b3d345a, ce7cd9e)
 - This machine reads as one page: every section a card, each fact said once, labels lined up and the words cut down. Its sections about the stick are now Pool and projects, First boot and The old system's disks (d83bc4e)
 - A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
@@ -123,6 +126,12 @@
 
 ### Fixed
 
+- An AerieOS machine lost its own node at every reboot: the agent and each account's home were kept in memory, and the page waited for ever. They now last, and a machine that lost them takes them back at its next boot (873803c)
+- A first run on blank disks could not make anything: every blank disk read as holding data and Make it stayed dead, a machine with an SSD got half its storage, and the shares could not be made (d2859ed)
+- Nothing could reach a share: Samba was never told of the shares file, a person's name was not mapped to their user, every imported password read as expired, and a file could not be saved over (099ceeb)
+- The console password could never log in, since the image had no login program (873803c)
+- VMs had no host after a reboot: libvirtd failed at every boot after the first (873803c)
+- A new project left a stray folder beside it (78c7d97)
 - Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (1e5c2d6, 9cd0b52)
 - Naming a projects folder took it from the system that had it, with no way back: that system could no longer read it. Who had it is now kept in the folder, Let it go gives it back, and root on the other system can run `.aerieos-give-back.sh` there (70ff89e)
 - A pool adopted from another system can be a stick's system pool whatever its filesystem: a btrfs or XFS one was not offered, which left Docker and the VMs waiting (095dce1)
