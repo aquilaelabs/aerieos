@@ -332,9 +332,9 @@ function storagePools(n){
         `<button type="button" class="danger" data-stpool="destroy" data-name="${esc(p.name)}" title="everything on it is gone">Destroy</button>`])}</span>` : ""}</div>`;
   }).join("");
   const form = !admin || why ? "" : `<div class="field stnewpool"><div class="hint">A new pool: a name, a layout and its disks, each erased. ${free.length ? `${free.length} disk${free.length === 1 ? " is" : "s are"} free` : "No disk is free"}${used.length ? `; ${used.length} hold${used.length === 1 ? "s" : ""} something and need${used.length === 1 ? "s" : ""} a tick to erase` : ""}.</div>
-      <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" id="stPoolName" placeholder="tank" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
-      <div class="field"><label class="pick"><span class="pickw">Layout</span><select id="stPoolLayout">
-        <option value="mirror">mirror: two or more disks holding the same, one may fail</option>
+      <div class="fgrid"><label class="pick"><span class="pickw">Name</span><input type="text" id="stPoolName" placeholder="tank" maxlength="31" autocomplete="off" spellcheck="false"></label>
+      <label class="pick"><span class="pickw">Layout</span><select id="stPoolLayout">
+        <option value="mirror">mirror: two or more disks, one may fail</option>
         <option value="raidz2">raidz2: four or more disks, any two may fail</option>
         <option value="raidz1">raidz1: three or more disks, one may fail</option>
         <option value="single">single: one disk, nothing protects it</option></select></label></div>
@@ -432,10 +432,10 @@ function storageSnapshots(n){
       </div>${admin && !why ? `<span class="acts"><button type="button" data-stsnap="take" data-pool="${esc(p.name)}" title="one of every dataset, kept beside the manual ones">Snapshot now</button></span>` : ""}</div>`;
   }).join("");
   const form = !admin || why || !pools.length ? "" : `<div class="field stsnapform"><div class="hint">A schedule: the pool, how often, and how many of that kind to keep; the oldest past that goes when the next is taken.</div>
-      <div class="prefrow ctlrow">
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Pool</span><select id="stSnapPool">${optionList(pools.map(p => [p.name, p.name]), pools[0].name)}</select></label></div>
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">How often</span><select id="stSnapKind">${optionList(SNAP_KINDS.map(([k, label]) => [k, label]), "daily")}</select></label></div>
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Keep</span><input type="number" id="stSnapKeep" min="1" max="200" value="7"></label></div>
+      <div class="fgrid">
+        <label class="pick"><span class="pickw">Pool</span><select id="stSnapPool">${optionList(pools.map(p => [p.name, p.name]), pools[0].name)}</select></label>
+        <label class="pick"><span class="pickw">How often</span><select id="stSnapKind">${optionList(SNAP_KINDS.map(([k, label]) => [k, label]), "daily")}</select></label>
+        <label class="pick fshort"><span class="pickw">Keep</span><input type="number" id="stSnapKeep" min="1" max="200" value="7"></label>
       </div>
       <div class="actbar"><span class="sp"></span>${scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove ${esc(x.pool)} ${esc(x.kind)}</button>`), true) : ""}<button type="button" class="primary" data-stsnap="schedule">Save the schedule</button></div></div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet: snapshots are a pool's.</div>`}${form}`;
@@ -490,7 +490,7 @@ function wireStorageSnapshots(root, n){
 // disk replaced, the sync and scrub schedules (the Schedules page's rows),
 // and a form for a new array that names the disks by model, size and
 // serial and says the whole again before anything is written.
-const ARRAY_POLICIES = [["mfs", "most free space: each new file lands on the emptiest disk"], ["epmfs", "existing path first, then most free space: a folder's files stay together"],
+const ARRAY_POLICIES = [["mfs", "most free space: the emptiest disk"], ["epmfs", "existing path first: a folder's files stay together"],
                         ["lfs", "fill up: one disk fills before the next is used"], ["ff", "the first disk with room"]];
 const ARRAY_KINDS = [["sync", "Sync", "0 4 * * *", "Daily, at 4:00"], ["scrub", "Scrub", "0 5 * * 0", "Weekly, Sundays at 5:00"]];
 function storageArray(n){
@@ -540,9 +540,9 @@ function storageArray(n){
     const form = !admin || why ? "" : `<div class="field stnewarray"><div class="hint">New array: the data disks (any sizes, each wiped and given its own filesystem), one or two parity disks at least as large as the largest data disk, and where new files land.</div>
       <div class="field"><div class="hint">Data disks</div>${pick("stArrayData", true)}</div>
       <div class="field"><div class="hint">Parity disks</div>${pick("stArrayParity", true)}</div>
-      <div class="prefrow ctlrow">
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Filesystem</span><select id="stArrayFs"><option value="xfs">xfs: the usual choice</option><option value="btrfs">btrfs: checksums per file</option></select></label></div>
-        <div class="setrow col ctlrow"><label class="pick"><span class="pickw">New files land on</span><select id="stArrayPolicy">${optionList(ARRAY_POLICIES, "mfs")}</select></label></div>
+      <div class="fgrid">
+        <label class="pick"><span class="pickw">Filesystem</span><select id="stArrayFs"><option value="xfs">xfs: the usual choice</option><option value="btrfs">btrfs: checksums per file</option></select></label>
+        <label class="pick"><span class="pickw">New files land on</span><select id="stArrayPolicy">${optionList(ARRAY_POLICIES, "mfs")}</select></label>
       </div>
       <div class="field"><label class="ndcap"><input type="checkbox" id="stArrayWipe"> wipe disks that hold something (what is on them is gone)</label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-starray="create">Make the array</button></div></div>`;
