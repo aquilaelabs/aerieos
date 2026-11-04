@@ -724,6 +724,8 @@ html.theming,html.theming *,html.theming *::before,html.theming *::after{
 .tourcard{position:fixed;z-index:82;width:min(360px,calc(100vw - 32px));background:var(--panel);
   border:var(--hair) solid var(--line);border-radius:var(--r-surface);box-shadow:0 8px 22px rgba(0,0,0,.45);
   padding:14px 16px 10px;font:var(--f-ui);color:var(--ink)}
+/* A dialog the person opened stands alone: the tour waits behind it. */
+body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 .tourcard .tourstep{font:var(--f-note);color:var(--dim);margin-bottom:6px}
 .tourcard .toursay{line-height:1.45;margin-bottom:10px}
 .tourcard .tourall{margin-bottom:8px}
@@ -1217,7 +1219,13 @@ body.firstrun #panes{display:none}
 .setstepbody>p+p,.setstepbody>p+.facts,.setstepbody>.facts+p,.setstepbody>.field{margin-top:8px}
 .setstepbody>.field{padding:0}
 .setstepbody>.actbar{padding:0;margin-top:8px}
-.setstepbody .pick{gap:8px}
+.setstepbody .setshares{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0}
+.stnewshare{margin-top:12px;border-top:var(--hair) solid var(--line)}
+.stnewshare .stwholist{margin-top:16px}
+.stnewshare .stwho{display:flex;align-items:center;gap:var(--field-gap);padding:8px 0;border-top:var(--hair) solid var(--line)}
+.stnewshare .stwholist>.sub{margin-bottom:8px;font:var(--f-note)}
+.stnewshare .stwho select{flex:0 0 12em;width:12em;min-height:var(--ctl)}
+@media(max-width:600px){ .stnewshare .stwho select{flex-basis:9.5em;width:9.5em} }
 .setstepbody .setcmd{margin:6px 0 8px;padding:8px 9px;font:var(--f-data);color:var(--ink);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-control,6px);white-space:pre-wrap;overflow-wrap:anywhere}
 .setstep>.actbar{justify-content:flex-end;flex-wrap:wrap}
 .setfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--field-gap);margin-top:8px}
@@ -4675,6 +4683,47 @@ button.eye.bare{background:none;border:0;padding:5px 4px;min-width:auto}
    it. Terminals and logs are not controls and are not here. */
 :is(.doctab,.nb) .ctlrow{
   max-width:min(var(--ctl-w),88%)}
+/* FORMS (the design's rule `forms`; uniform.mjs measures it on every page). One
+   way to lay out fields, so no page does it its own way:
+   - a label sits OVER its field, 4px above it, never beside it (.lbl, .pickw);
+   - fields stack with 14px between them, or go in .fgrid: two equal columns at
+     a desk, one on a phone, 14px down and 20px across, each filling its cell
+     (.fwide spans both, .fshort is a number's width);
+   - .fgroup is one concern: a head in the UI voice, a line of dim words under it,
+     a hairline and room between groups;
+   - a tick is a line of its own; a hint goes under what it explains;
+   - Save is at the foot on the right.
+   A picker in a band or an action bar is beside what it filters, and is not a
+   form's field: .docbarrow, .histbar, .actbar and .phead keep theirs inline. */
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;align-items:start;max-width:calc(var(--ctl-w) * 2 + 20px)}
+.fgrid>[hidden]{display:none}
+.fgrid>.fwide{grid-column:1 / -1}
+.fgrid>.fshort{max-width:10em}
+.fgrid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;box-sizing:border-box;min-height:var(--ctl)}
+.fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
+.fgroup{padding:16px 0;border-bottom:var(--hair) solid var(--line)}
+.fgroup:last-of-type{border-bottom:0}
+.ndstores{margin-top:8px}
+.fgrouphead{font:var(--f-ui);font-weight:600;color:var(--ink);margin-bottom:12px}
+.fgrouphead .sub{display:block;font:var(--f-note);font-weight:400;color:var(--dim);margin-top:2px}
+.fgroup>.ndcap{display:flex;margin-top:12px}
+.fgroup>.ndcap:first-of-type{margin-top:0}
+.fgroup>.fgrid + .ndcap,.fgroup>.ndcap + .fgrid{margin-top:12px}
+@media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr)} .fgrid>.fshort{max-width:none} }
+/* The older label.pick obeys too: over its field, as every label is. */
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick,.fgrid>label.pick{display:flex;flex-direction:column;align-items:stretch;gap:var(--label-gap)}
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick>.pickw,.fgrid>label.pick>.pickw{font:var(--f-ui);color:var(--dim);min-width:0;flex:none}
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick>:is(input,select,textarea){width:100%;box-sizing:border-box;min-height:var(--ctl)}
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick{max-width:min(var(--ctl-w),88%)}
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick + label.pick,.field:not(.docbarrow,.histbar,.wkpick)>label.pick + .hint,.field:not(.docbarrow,.histbar,.wkpick)>.hint + label.pick{margin-top:14px}
+.field:not(.docbarrow,.histbar,.wkpick)>label.pick + .hint{margin-top:var(--label-gap)}
+/* Fields down a form have room between them: a label belongs to the field under
+   it, not to the one above. */
+.field>.setrow.col.ctlrow + .setrow.col.ctlrow,.field>.setrow.col.ctlrow + label.pick,.field>label.pick + .setrow.col.ctlrow{margin-top:14px}
+/* A share's row: its facts at the left and its actions at the right at a desk. */
+@media(min-width:601px){ .row.stack2.stshare{flex-direction:row;align-items:center} .row.stack2.stshare>.acts{flex:0 0 auto;margin-left:auto} }
+.actbar>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap)}
+.actbar>label.pick>.pickw{font:var(--f-ui);color:var(--dim)}
 /* The grid itself is capped as a whole, so its cells share the surface's
    control width and do not stretch across a wide tab. */
 :is(.doctab,.nb) .setgrid{max-width:min(calc(var(--ctl-w) * 2),100%)}
@@ -4897,10 +4946,6 @@ button[aria-busy="true"]{opacity:.75}
    and what a section says in the prose voice, not the facts' mono (the
    operator, 4 Nov). */
 .machinetab .ndrow>.grow>.name{display:none}
-:is(.machinetab,.nodestab) .field>label.pick{display:flex;align-items:center;gap:var(--field-gap);flex-wrap:wrap}
-:is(.machinetab,.nodestab) .field>label.pick>.pickw{flex:0 0 9.5em;font:var(--f-ui);color:var(--ink)}
-:is(.machinetab,.setstepbody) .actbar>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap)}
-:is(.machinetab,.nodestab) .field>label.pick>:is(input,select){flex:0 1 26em;min-width:0;width:auto}
 :is(.machinetab,.nodestab) .ndsections .sub:not(.warn,.bad,.note),.machinetab .doclist>.row>.grow>.sub{font:var(--f-note)}
 .holdnext{white-space:nowrap;flex:0 0 auto}
 .holdnext input[type=checkbox]{width:15px;height:15px;min-height:0;margin:0}

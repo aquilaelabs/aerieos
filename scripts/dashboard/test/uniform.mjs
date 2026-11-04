@@ -704,6 +704,39 @@ function rowsWearTheClass(){
   return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .memadd, .uadd, .ndpaths, .ndname)')]
     .filter(e => !e.classList.contains('ctlrow')).map(e => e.className.split(' ').slice(0, 3).join('.')));
 }
+// The forms rule (the operator, 4 Nov: fields crammed together, each page its
+// own way): a label over its field, never beside it, and fields that do not
+// touch. A picker in a band or an action bar sits beside what it filters and
+// is not a form's field.
+function formsHold(){
+  return page.evaluate(() => {
+    const out = new Set();
+    const say = (e, why) => out.add(`${e.id || e.dataset?.k || e.name || e.getAttribute('aria-label') || e.tagName.toLowerCase()}: ${why}`);
+    const bar = '.actbar,.docbarrow,.histbar,.phead,.pghead,.sectjump,.tbl,table,.ndmline,.bar,.fnote,.wkpick,.dsrow,.addbar,.modal[hidden],[hidden],.skel,.term,.xterm';
+    const fields = [...document.querySelectorAll('.doc.on :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]),select,textarea)')]
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest(bar); });
+    for (const e of fields){
+      const box = e.getBoundingClientRect();
+      const holder = e.closest('label');
+      const named = holder?.querySelector('.pickw') || (e.id && document.querySelector(`label[for="${CSS.escape(e.id)}"]`)) || e.parentElement?.querySelector(':scope > .lbl');
+      if (!named) continue;
+      const l = named.getBoundingClientRect();
+      if (l.width && l.height && l.bottom > box.top + 2 && l.left < box.left) say(e, 'its label is beside it');
+    }
+    // Two fields in one column, touching.
+    for (const e of fields){
+      const a = e.getBoundingClientRect();
+      for (const f of fields){
+        if (f === e) continue;
+        const b = f.getBoundingClientRect();
+        if (b.top < a.bottom || b.left >= a.right || b.right <= a.left) continue;
+        const gap = b.top - a.bottom;
+        if (gap < 4 && !e.closest('.ctlline') && !f.closest('.ctlline')) say(f, `${Math.round(gap)}px under the field above it`);
+      }
+    }
+    return [...out];
+  });
+}
 function headRoom(){
   return page.evaluate(() => {
     const out = [];
@@ -970,6 +1003,8 @@ for (const kind of kinds){
   ok(side.length === 0, `[${kind}] nothing in a section or a placeholder sits on its side wall${side.length ? `; on it: ${side.slice(0, 8).join(', ')}` : ''}`);
   const bare = await rowsWearTheClass();
   ok(bare.length === 0, `[${kind}] every row of controls wears .ctlrow${bare.length ? `; not: ${[...new Set(bare)].join(', ')}` : ''}`);
+  const forms = await formsHold();
+  ok(forms.length === 0, `[${kind}] its forms hold the rule: a label over its field, fields not touching${forms.length ? `; not: ${forms.slice(0, 10).join('; ')}` : ''}`);
   const G = await glance();
   if (!G.err && (G.tiles || G.facts))
     ok(G.bad.length === 0,

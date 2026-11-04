@@ -635,6 +635,20 @@ A `title` written anyway is never drawn: `untitle()` keeps its words for a
 screen reader (`aria-label` on a control with no text, `aria-description`
 otherwise), and `saidOf(el)` reads them back for a suite. A destructive button (`.danger`) is filled, never an outline alone (the operator, 27 Oct): its scheme's own red as its words, a 22% tint of that red over the panel as its ground and a 50% mix as its edge, a little more of the tint under the pointer; the same on every surface.
 
+### forms
+
+Applies to: scripts/dashboard/index.html, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; form, field, label, pulldown, select, input
+
+One way to lay out fields, on every page, measured by uniform.mjs's forms check (the operator, 4 Nov: fields crammed together, each page its own way).
+
+**A label sits over its field**, 4px above it, never beside it: `.lbl` or `.pickw`. A picker in a band or an action bar sits beside what it filters and is not a form's field (`.docbarrow`, `.histbar`, `.actbar`, `.phead`).
+
+**Fields go in `.fgrid`**: two equal columns at a desk, one on a phone, 14px down and 20px across, each filling its cell. `.fwide` spans both, for a path or an address. `.fshort` is a number's width. Fields never touch, and a form never sizes one field by hand.
+
+**A long form is `.fgroup`s**, one concern each: a head in the UI voice with a line of dim words under it (`.fgrouphead`), a hairline and 16px between groups. A tick is a line of its own. A hint goes under what it explains. Save is at the foot on the right, as everywhere.
+
+**The control fits the answer.** A known set of answers is a pulldown, never typed: a time zone, a pool, a security level, a person's access. A choice of two to four short answers that should all stay in view is the segmented control (`.pseg`). Yes or no is a tick. An answer with likely values that may be something else is a field with suggestions (a `datalist`): a path, a store. Only what nobody can list is a plain text field: a name, an address, a token. What depends on another answer stays hidden until that answer asks for it.
+
 ### settings
 
 Applies to: scripts/dashboard/tab-settings.js, scripts/dashboard/page-projsettings.js; setting, apply, save, checkbox, switch, toggle

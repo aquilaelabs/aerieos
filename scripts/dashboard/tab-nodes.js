@@ -608,8 +608,8 @@ function nodeMachineSection(n){
   const body = `<div class="field"><div class="sub">What the machine is called on the network, and the time zone its clock, logs and schedules read.</div></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="field"><label class="pick"><span class="pickw">Name</span><input type="text" data-k="machinename" value="${esc(r.hostname || n.name || "")}" maxlength="63" autocomplete="off" spellcheck="false"${admin && !why ? "" : " disabled"}></label></div>
-    <div class="field"><label class="pick"><span class="pickw">Time zone</span><input type="text" data-k="machinetz" list="ndZones" value="${esc(r.timezone || "")}" placeholder="Region/City" autocomplete="off" spellcheck="false"${admin && !why ? "" : " disabled"}></label>
-      <datalist id="ndZones">${zones.map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
+    <div class="field"><label class="pick"><span class="pickw">Time zone</span><select data-k="machinetz"${admin && !why ? "" : " disabled"}>${
+      optionList([...new Set([r.timezone || "UTC", "UTC", ...zones])].map(z => [z, z]), r.timezone || "UTC")}</select></label></div>
     <div class="field"><label class="pick"><span class="pickw">Spin down disks</span><select data-k="machinespin"${admin && !why ? "" : " disabled"}>${optionList(SPINDOWN_WORDS, String(r.spindown ?? 0))}</select></label>
       <div class="hint">Hard disks stop after this long idle, and take a few seconds to answer the next read.</div></div>
     ${admin && !why ? `<div class="actbar"><span class="sp"></span><button type="button" class="primary" data-nd="machine-apply" disabled>Apply</button></div>` : ""}`;
@@ -1542,13 +1542,15 @@ function nodeConfSections(n){
     const now = r ? (r.free_mb === null ? `${r.path}: missing` : `${r.path}, ${
       sgb(r.free_mb)} free`) : "";
     return `
-    <div class="ndstore ctlline">
+    <div class="setrow col ctlrow">
       ${lbl("", role, STORE_ABOUT[role] || "")}
-      <input data-k="store:${esc(role)}" value="${esc(d.stores[role] || "")}" spellcheck="false"
+      <input data-k="store:${esc(role)}" list="ndStorePlaces" value="${esc(d.stores[role] || "")}" spellcheck="false"
         autocomplete="off" placeholder="${esc(r?.path || "/var/lib/builderbot/" + role)}">
       <div class="sub">${now ? "now " + esc(now) : "not reported"}</div>
     </div>`;
   }).join("");
+  // What a store may sit on, offered: the mounts this node has (the forms rule).
+  const storePlaces = `<datalist id="ndStorePlaces">${[...new Set((rep.mounts || []).map(m => m.path).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join("")}</datalist>`;
   const net = rep.network || {};
   const now = net.addresses?.length
     ? `now ${net.addresses.join(", ")} on ${net.interface || "?"}${net.gateway ? " via " + net.gateway : ""}${
@@ -1618,7 +1620,7 @@ function nodeConfSections(n){
       ${mounts}
       <div class="addbar ctlrow"><button type="button" data-madd>Add a mount</button></div>
       <div class="sub">Where job data, toolchains, caches and artifacts live.</div>
-      ${stores}
+      <div class="fgrid ndstores">${stores}</div>${storePlaces}
       <div class="actbar">
         <span class="state ndconfstate${(failedFor("storage") || [0, storStatusCls])[1] ? " " + (failedFor("storage") || [0, storStatusCls])[1] : ""}">${
           esc((failedFor("storage") || [storStatus])[0])}</span>
