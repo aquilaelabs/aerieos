@@ -79,6 +79,7 @@
 
 ### Changed
 
+- Moving a machine here is walked through on the first-run page: what to have with you, the old system's disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page; a stick whose plan names disks opens on it, and any other first run reaches it from a line under the head (b3d345a)
 - A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
 - Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
@@ -121,6 +122,9 @@
 
 ### Fixed
 
+- Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (37208e5)
+- A pool adopted from another system can be a stick's system pool whatever its filesystem: a btrfs or XFS one was not offered, which left Docker and the VMs waiting (095dce1)
+- The first-run page's links to This machine and the Storage page, and the held band's press, led nowhere while the page stood (b3d345a)
 - A mount's state on the Storage section was cut off at a desk when it carried a fix (a stale handle, a mount that did not come up): the whole reason now sits under the mount's row, and the cell keeps its first words (bdad714)
 - Enrolling a node again had moved its stores back onto the default paths, so the runner lost its JDK, the project's FTP server was not found and every toolchain read as not installed; the script carries the node's store paths and the agent keeps the ones its record has (88a2736)
 - An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (615323d)
