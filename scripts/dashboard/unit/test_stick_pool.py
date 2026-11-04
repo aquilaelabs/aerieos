@@ -57,7 +57,8 @@ class TheImage(unittest.TestCase):
         with open(os.path.join(d, "env"), "w") as f:
             f.write(f"SDK_ROOT={d}/sdk\nWORKSPACE={d}/ws\n")
         env = dict(os.environ, BB_OS_WORK=f"{d}/work", BB_OS_RUN=f"{d}/run", BB_CMDLINE=f"{d}/cmd", BB_CONTROLLER_ENV=f"{d}/env",
-                   BB_SP_DOCKER=f"{d}/docker", BB_SP_CONTAINERD=f"{d}/containerd", BB_SP_LIBVIRT=f"{d}/libvirt", BB_SP_NO_SYSTEMCTL="1")
+                   BB_SP_DOCKER=f"{d}/docker", BB_SP_CONTAINERD=f"{d}/containerd", BB_SP_LIBVIRT=f"{d}/libvirt",
+                   BB_SP_HOME=f"{d}/home", BB_SP_WORKSPACE=f"{d}/workspace", BB_SP_NO_SYSTEMCTL="1")
         return subprocess.run(["bash", TOOL, *argv], capture_output=True, text=True, env=env, check=False)
 
     def test_the_tool_says_what_is_on_the_stick_and_refuses_what_it_cannot_take(self):
@@ -127,6 +128,24 @@ class TheImage(unittest.TestCase):
                 self.tool(d, "projects", f"{d}/share/projects")
                 self.assertEqual(json.loads(self.tool(d, "status").stdout)["projects_home"], "folder")
                 self.assertNotIn("held", self.tool(d, "apply").stdout)
+
+    def test_a_home_on_the_stick_moves_to_the_pool_through_the_images_mount(self):
+        # B669: /home and /workspace are bound from the data partition, so they
+        # read as mounted and must still move, and nothing is left behind.
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(f"{d}/home/ada"); open(f"{d}/home/ada/.signin", "w").close()
+            os.makedirs(f"{d}/pool")
+            fakes = f"{d}/fakes"
+            os.makedirs(fakes)
+            for p in ("mount", "umount", "findmnt"):
+                with open(f"{fakes}/{p}", "w") as f:
+                    f.write("#!/bin/sh\nexit 0\n")
+                os.chmod(f"{fakes}/{p}", 0o755)
+            with mock.patch.dict(os.environ, {"BB_SP_NO_MOUNT": "1", "BB_SP_MOUNTED": "1", "PATH": fakes + ":" + os.environ["PATH"]}):
+                r = self.tool(d, "set", f"{d}/pool")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue(os.path.exists(f"{d}/pool/aerieos-system/home/ada/.signin"), r.stdout)
+            self.assertEqual(os.listdir(f"{d}/home"), [], "off the stick")
 
     def test_a_folder_on_the_disks_is_named_the_projects_folder_and_let_go(self):
         # R163 (the operator, 1 Nov): a controller moved here without its

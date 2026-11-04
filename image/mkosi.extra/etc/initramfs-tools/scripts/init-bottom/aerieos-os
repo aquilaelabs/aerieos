@@ -3,12 +3,13 @@
 # before the system starts so PID 1 sees it from its first read.
 #
 # overlayroot has just put a tmpfs over the read-only root, so anything
-# written anywhere lives until the next boot. Two places are made to last:
-# the data partition at /var (the state, docker, libvirt, the logs), /srv
-# bound from it (the projects), and /etc as an overlay whose upper half is on that partition, so a
-# changed file in /etc (an account made, a hostname set, a unit enabled) is
-# kept across boots while every file the next image brings still shows
-# through. Nothing else persists: an apt install into the root is gone at
+# written anywhere lives until the next boot. What is made to last: the data
+# partition at /var (the state, docker, libvirt, the logs), /srv, /home and
+# /workspace bound from it (the projects, the accounts' homes, the node's
+# workspace), and /etc and /usr/local as overlays whose upper half is on that
+# partition, so a changed file there (an account made, a hostname set, the
+# node's agent installed) is kept across boots while every file the next image
+# brings still shows through. Nothing else persists: an apt install into the root is gone at
 # the next boot, which is what makes an update a whole image.
 # rootmnt is where init mounted the root, set before any init-bottom script runs.
 # shellcheck disable=SC2154
@@ -39,6 +40,26 @@ mkdir -p "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv"
     && cp -a "${rootmnt}/srv/." "${rootmnt}/var/lib/aerieos-os/srv/"
 mount --bind "${rootmnt}/var/lib/aerieos-os/srv" "${rootmnt}/srv" \
     || panic "AerieOS: /srv did not mount from the data partition"
+
+# What the machine's own node is made of lasts too (B669): first boot's
+# provisioner puts the agent, bb-sandbox and bb-session under /usr/local, and
+# each account's home and the node's workspace are the sign-ins and the
+# conversations. On the root's tmpfs they were gone at the next boot, and the
+# machine never answered again. /usr/local is an overlay as /etc is, so what
+# the next image brings still shows through; the other two are the machine's
+# own, bound as /srv is. The system pool takes those two off a stick.
+mkdir -p "${rootmnt}/var/lib/aerieos-os/usr-local/upper" "${rootmnt}/var/lib/aerieos-os/usr-local/work"
+mount -t overlay overlay \
+    -o "lowerdir=${rootmnt}/usr/local,upperdir=${rootmnt}/var/lib/aerieos-os/usr-local/upper,workdir=${rootmnt}/var/lib/aerieos-os/usr-local/work" \
+    "${rootmnt}/usr/local" \
+    || panic "AerieOS: /usr/local's overlay did not mount"
+for place in home workspace; do
+    mkdir -p "${rootmnt}/var/lib/aerieos-os/${place}" "${rootmnt}/${place}"
+    [ -z "$(ls -A "${rootmnt}/var/lib/aerieos-os/${place}")" ] && [ -n "$(ls -A "${rootmnt}/${place}" 2>/dev/null)" ] \
+        && cp -a "${rootmnt}/${place}/." "${rootmnt}/var/lib/aerieos-os/${place}/"
+    mount --bind "${rootmnt}/var/lib/aerieos-os/${place}" "${rootmnt}/${place}" \
+        || panic "AerieOS: /${place} did not mount from the data partition"
+done
 
 # The USB edition (R161 step 10, the operator, 29 Oct: the stick read once
 # and written rarely, as Unraid's is). On a stick boot (aerietoram=1: the slot

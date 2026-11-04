@@ -72,11 +72,16 @@ as_place() {
 unhold() { held "$1" && umount "$1"; return 0; }
 # name=place, each a folder that writes all day; the projects only while no
 # folder of the machine's own is named for them.
+# The two the image itself binds from the data partition (init-bottom/aerieos-os).
+lasting() { case "$1" in home|workspace) return 0 ;; esac; return 1; }
+# Whether two paths are one folder: the same device and inode.
+on_it() { [ "$(stat -c %d:%i "$1" 2>/dev/null)" = "$(stat -c %d:%i "$2" 2>/dev/null)" ]; }
 targets() {
     local sdk
     sdk="$(envget SDK_ROOT)"
     printf '%s\n' "docker=${BB_SP_DOCKER:-/var/lib/docker}" "containerd=${BB_SP_CONTAINERD:-/var/lib/containerd}" \
-        "libvirt=${BB_SP_LIBVIRT:-/var/lib/libvirt}" "toolchains=${sdk:-/var/lib/aerieos-controller/sdk}"
+        "libvirt=${BB_SP_LIBVIRT:-/var/lib/libvirt}" "toolchains=${sdk:-/var/lib/aerieos-controller/sdk}" \
+        "home=${BB_SP_HOME:-/home}" "workspace=${BB_SP_WORKSPACE:-/workspace}"
     named_projects >/dev/null || printf '%s\n' "projects=$(projects_place)"
 }
 
@@ -129,6 +134,16 @@ apply() {
         name="${line%%=*}"; place="${line#*=}"; src="$p/$SUB/$name"
         mkdir -p "$src" "$place"
         unhold "$place"
+        if lasting "$name"; then
+            # The image binds these from the data partition: the pool's goes
+            # over that one, so here "mounted" is not "there" (B669).
+            # Only ever over the image's own: a plain folder there was never
+            # moved (set_pool), so the pool's empty one must not cover it.
+            if findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
+                on_it "$place" "$src" || mount --bind "$src" "$place"
+            fi
+            continue
+        fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
             [ -n "$(ls -A "$src" 2>/dev/null)" ] || as_place "$src" "$place"
         fi
@@ -266,10 +281,34 @@ set_pool() {
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "${SERVICES[@]/%/.service}" 2>/dev/null || true
-    local line name place src
+    local line name place src old_pool
+    old_pool="$(pool || true)"
     while IFS= read -r line; do
         name="${line%%=*}"; place="${line#*=}"; src="$p/$SUB/$name"
         mkdir -p "$src"
+        if lasting "$name"; then
+            # Only ever a mount: a plain /home is not the image's bind, and
+            # nothing of it is moved or deleted (a tool run where it does not
+            # belong).
+            if [ -z "${BB_SP_NO_MOUNT:-}" ] && ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
+                echo "system-pool: $place is not the image's own mount, and stays as it is" >&2
+                continue
+            fi
+            # Moved through what shows there, which is the data partition or
+            # the old pool, then only an old pool's bind comes down: the image's
+            # stays underneath for the day the pool is gone (B669).
+            if ! on_it "$place" "$src"; then
+                if [ -d "$place" ] && [ -n "$(ls -A "$place" 2>/dev/null)" ]; then
+                    cp -a "$place/." "$src/"
+                    find "$place" -mindepth 1 -delete
+                fi
+                [ -n "$old_pool" ] && on_it "$place" "$old_pool/$SUB/$name" && { umount "$place" || {
+                    echo "system-pool: $place is busy and stays where it is: close what holds it and set the pool again" >&2
+                    [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl start --no-block "${SERVICES[@]/%/.service}" 2>/dev/null || true
+                    return 1; }; }
+            fi
+            continue
+        fi
         # Unmounted until nothing is mounted there, and the move stopped
         # whole while something still is: a copy and a delete through a
         # bind still standing (a second one stacked under the first by two
@@ -303,6 +342,10 @@ status() {
     [ -e "$READY" ] && ready=true
     while IFS= read -r line; do
         name="${line%%=*}"; place="${line#*=}"
+        if lasting "$name"; then
+            { [ -z "$p" ] || ! on_it "$place" "$p/$SUB/$name"; } && [ -n "$(ls -A "$place" 2>/dev/null)" ] && on_stick+=("\"$name\"")
+            continue
+        fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place" && [ -n "$(ls -A "$place" 2>/dev/null)" ]; then
             on_stick+=("\"$name\"")
         fi

@@ -58,6 +58,9 @@ MOUNTED = ("something is mounted at /workspace, where this node's synced copy go
            "unmount it on the machine")
 
 
+_IMAGE_TOOL = os.environ.get("BB_OS_POOL") or "/usr/lib/aerieos-os/system-pool"
+
+
 def foreign_mount(path, mounts="/proc/self/mounts"):
     """True when something not this machine's own is mounted at `path`: a
     share left in fstab, which a copy could write through onto somebody
@@ -72,6 +75,11 @@ def foreign_mount(path, mounts="/proc/self/mounts"):
             for line in reversed(f.read().splitlines()):
                 bits = line.split()
                 if len(bits) > 2 and bits[1].replace("\\040", " ") == real:
+                    # On AerieOS the image itself binds /workspace onto the
+                    # data partition or the system pool, so it lasts a boot
+                    # (B669): a local filesystem there is the machine's own.
+                    if os.path.isfile(_IMAGE_TOOL) and bits[2] in ("ext4", "zfs", "xfs", "btrfs"):
+                        return False
                     return bits[2] != "tmpfs"
     return True
 

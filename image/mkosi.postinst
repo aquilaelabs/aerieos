@@ -46,6 +46,11 @@ NET
 # is named and never used.
 mkosi-chroot nvidia-ctk runtime configure --runtime=docker >/dev/null
 
+# libvirt's network sockets: nothing here uses them, and the TLS one activates
+# libvirtd with no certificates, which then fails at every boot after the first
+# and takes the local socket down with it (B674).
+mkosi-chroot systemctl mask libvirtd-tls.socket libvirtd-tcp.socket >/dev/null 2>&1
+
 # The initramfs again, now that the extra tree put the init-bottom script
 # and the modules list in (the kernel's own install ran before them).
 mkosi-chroot update-initramfs -u -k all

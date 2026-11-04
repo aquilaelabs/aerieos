@@ -3547,14 +3547,30 @@ UNIT
         warn "nft could not apply the port 22 rule, so port 22 stays as it was"
     fi
 fi
-elif [ -f /etc/builderbot/node.json ] && [ -x "$AGENT" ]; then
-    # Enrolled on an earlier run. The agent does NOT keep itself current
+elif [ -f /etc/builderbot/node.json ]; then
+    # Enrolled on an earlier run. A machine that lost the agent itself keeps its
+    # identity and takes it back here, as an AerieOS root from before /usr/local
+    # lasted did at every boot (B669). The agent does NOT keep itself current
     # (the dashboard's Update button queues that as a job, and nothing runs
     # it unasked), so a re-run here is the console path to the same thing:
     # fetch what the controller ships with this node's own token, check it
     # against the digest the controller sends, and swap it in only when it
     # differs. The token never leaves this shell; the same check the agent
     # makes of its own updates, made here by hand.
+    # The accounts' homes too: a machine that lost them with the old root keeps
+    # the accounts in /etc, and a session or an install has nowhere to write.
+    for who in "${USER_NAME:-}" "${SESSION_NAME:-}"; do
+        [ -n "$who" ] || continue
+        home="$(getent passwd "$who" | cut -d: -f6)"
+        case "$home" in
+            /home/*) if [ ! -d "$home" ]; then
+                         install -d -m 0700 -o "$who" -g "$(id -gn "$who")" "$home"
+                         cp -a /etc/skel/. "$home/" 2>/dev/null || true
+                         chown -R "$who:$(id -gn "$who")" "$home"
+                         say "agent: $home made again for $who"
+                     fi ;;
+        esac
+    done
     say "agent: already enrolled; checking the controller for a newer agent"
     ctl=""; tok=""
     read -r ctl tok < <(python3 -c 'import json; d = json.load(open("/etc/builderbot/node.json")); print(d.get("controller", ""), d.get("token", ""))' 2>/dev/null || true)
@@ -3564,7 +3580,7 @@ elif [ -f /etc/builderbot/node.json ] && [ -x "$AGENT" ]; then
                 "${ctl%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
             want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
             got="sha256:$(sha256sum "${AGENT}.new" | cut -d' ' -f1)"
-            have="sha256:$(sha256sum "$AGENT" | cut -d' ' -f1)"
+            have="sha256:$( { sha256sum "$AGENT" 2>/dev/null || echo none; } | cut -d' ' -f1)"
             if [ -n "$want" ] && [ "$want" != "$got" ]; then
                 warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want}); leaving the installed one"
                 rm -f "${AGENT}.new"

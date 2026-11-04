@@ -39,6 +39,8 @@ def sh(script, env=None):
     e = dict(os.environ, **(env or {}))
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=e, cwd=ROOT)
 
+REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+
 
 class Partitions(unittest.TestCase):
     def setUp(self):
@@ -163,7 +165,7 @@ class Installer(unittest.TestCase):
     def test_the_first_boot_unit_runs_the_installer_where_it_is_laid_out_and_once(self):
         unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-firstboot.service")
         self.assertIn("ExecStart=/opt/aerieos/nodes/install-controller.sh --firstboot", unit)
-        self.assertIn("ConditionPathExists=!/etc/aerieos-controller/own-node", unit)
+        self.assertIn("ConditionPathExists=|!/etc/aerieos-controller/own-node", unit)
         inst = read(self.INST)
         self.assertIn('OWN_MARK="$ETC/own-node"', inst)
         self.assertIn('ETC="$P/etc/aerieos-controller"', inst)
@@ -620,6 +622,34 @@ class Workflow(unittest.TestCase):
         r = sh("bash image/build.sh --help")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("--tree-only", r.stdout)
+
+
+class WhatAMachineKeeps(unittest.TestCase):
+    """A real first boot and reboot in a VM found these (the operator, 4 Nov):
+    what makes the machine its own node has to last, and the way in at the
+    screen has to exist. CI boots an image once, so only this holds them."""
+
+    def read(self, rel):
+        with open(os.path.join(REPO, rel), encoding="utf-8") as f:
+            return f.read()
+
+    def test_what_first_boot_installs_lasts_a_reboot(self):
+        s = self.read("image/mkosi.extra/etc/initramfs-tools/scripts/init-bottom/aerieos-os")
+        self.assertIn('"${rootmnt}/usr/local"', s, "the agent, bb-sandbox and bb-session live there (B669)")
+        self.assertRegex(s, r"for place in home workspace", "the accounts' homes and the node's workspace")
+
+    def test_a_machine_that_lost_its_agent_takes_it_back(self):
+        s = self.read("image/mkosi.extra/usr/lib/systemd/system/aerieos-os-firstboot.service")
+        self.assertIn("ConditionPathExists=|!/usr/local/sbin/builderbot-agent", s)
+        self.assertIn("ConditionPathExists=|!/etc/aerieos-controller/own-node", s)
+        p = self.read("nodes/provision-linux.sh")
+        self.assertIn('elif [ -f /etc/builderbot/node.json ]; then', p, "not only where the agent is still there")
+
+    def test_the_console_can_log_in(self):
+        self.assertRegex(self.read("image/mkosi.conf"), r"(?m)^\s+login$", "agetty has nothing to run without it (B668)")
+
+    def test_libvirt_has_no_socket_that_needs_certificates(self):
+        self.assertIn("mask libvirtd-tls.socket libvirtd-tcp.socket", self.read("image/mkosi.postinst"), "B674")
 
 
 if __name__ == "__main__":
