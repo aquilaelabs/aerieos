@@ -42,6 +42,13 @@ for (const [W, H] of [[1280, 900], [393, 852]]){
     bar: [...document.querySelectorAll('#pane0 > .bar .subnav button')].map(b => b.textContent) }));
   ok(land.hash === '#/help' && land.title && land.pick > 5 && (W < 900 || land.nav > 5) && land.bar.join() === 'Help',
      `${at}: it opens on the docs' index, every doc listed beside it or in its picker (${JSON.stringify(land)})`);
+  // The page by its tool's name, #/help/help, is its front page, never a doc called help.
+  if (W >= 900){
+    await page.evaluate(() => { location.hash = '#/help/help'; });
+    await page.waitForFunction(() => location.hash === '#/help' && document.querySelector('.helptab .wkarticle .wkpage'), null, { timeout: 10000 }).catch(() => {});
+    const self = await page.evaluate(() => ({ hash: location.hash, bad: /no doc called/.test(document.querySelector('.helptab')?.textContent || '') }));
+    ok(self.hash === '#/help' && !self.bad, `${at}: #/help/help opens Help's front page (${JSON.stringify(self)})`);
+  }
   // A link between docs opens the other one here, with its own address.
   await page.click('.helptab .wkpage a.wklink[data-page="install"]');
   await page.waitForFunction(() => location.hash === '#/help/install' && document.querySelector('.helptab .wkarticle[data-name="install"] .wktoc'), null, { timeout: 10000 });

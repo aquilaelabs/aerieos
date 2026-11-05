@@ -390,13 +390,18 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   await refreshUntil(page, () => state?.reports_ok === false, { timeout: 20000 });
   ok(/\/reports is not mapped in/.test(await page.evaluate(() => findingsOff())),
      'with no readable report Analysis is off, saying which of the three reasons it is');
-  // The tab is open from the tests above; the gate closes it on the next load.
+  // The page is open from the tests above: reloaded, it stays and says why,
+  // muted, with no red toast standing over the pages after it.
   await page.reload();
   await ready(page);
   await page.waitForFunction(() => state?.reports_ok === false, null, { timeout: 20000 });
-  await page.waitForFunction(() => !tabs.some(t => t.kind === 'findings'),
-                             null, { timeout: 10000 });
-  ok(true, '...and an Analysis tab restored with the layout is closed, once');
+  await page.evaluate(() => openFindingsTab());
+  const said = await page.waitForFunction(() => {
+    const e = document.querySelector('.fxbar')?.closest('.pane, .stack > *')?.querySelector('.empty');
+    return e && /not mapped in/.test(e.textContent) && e.textContent;
+  }, null, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => '');
+  ok(!!said && (await page.evaluate(() => tabs.map(t => t.kind))).includes('findings') && !await page.$('#toast .tst.bad'),
+     `...and the Analysis page opens and says why on itself, with no red toast (${String(said).slice(0, 80)})`);
   // A directory with nothing readable in it is the second reason, and reads
   // differently from an absent mount.
   mkdirSync(`${DIR}/reports`, { recursive: true });

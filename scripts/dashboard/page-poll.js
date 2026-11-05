@@ -308,14 +308,9 @@ function dropGoneNotebooks(){
   if (front && gone.includes(front) && !tabOf(front.id)){ railWant = "projects"; openProjectsTab(); }
 }
 
-let findingsGated = false;
-function gateFindings(){
-  const off = findingsOff();
-  if (findingsGated) return;
-  findingsGated = true;
-  if (!off) return;
-  tabs.filter(t => t.kind === "findings").forEach(t => hideTab(t.id));
-}
+// The Analysis page stays where it was put when there are no reports: it is a
+// page, which says so on itself, not a tab somebody has to close by hand.
+function gateFindings(){}
 
 // ---- what changed, and who cares ------------------------------------------
 

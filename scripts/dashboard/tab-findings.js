@@ -78,10 +78,10 @@ function openFindingsTab(){
   // Ghosted, not silent: the button says why on hover and this is the same
   // sentence, for the paths a disabled button does not cover: a saved layout,
   // a keyboard, a restored tab.
-  const off = findingsOff();
-  if (off){ notify(off, true); return; }
+  // A page now (R218), which says on itself why it has nothing, rather than a
+  // red toast that stood over the pages after it.
   openTab({kind: "findings", arg: "__findings", label: "Analysis"});
-  loadFindings();
+  if (!findingsOff()) loadFindings();
 }
 
 // ---- findings --------------------------------------------------------
@@ -189,6 +189,14 @@ function renderFindingsInto(i){
   const d = docSurface(i, "fx");
   if (!d) return;
   d.bar.classList.add("fxbar");
+  // No reports, or none that parse: what the page has to say, and no fetch.
+  const off = findingsOff();
+  if (off){
+    d.setBar("");
+    d.list.innerHTML = `<div class="empty">${esc(off)}. The Scanners page under Containers deploys AerieOS's
+      scanners to each node, and <a href="#/help/scanners">The scanners</a> says how.</div>`;
+    return;
+  }
   if (!findings){
     // The status poll drops the cache when a scan re-runs on the host, and a
     // repaint is not a fetch, so an open tab has to start one itself.

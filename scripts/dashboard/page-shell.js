@@ -260,7 +260,9 @@ function openRoute(hash){
   if (key === "notifications"){ openNotices(); return true; }
   if (key === "help"){
     railWant = "help";
-    const doc = a ? decodeURIComponent(a) : helpIndex?.home || "";
+    // #/help/help is the page by its tool's name, as #/group/tool is for any
+    // group: its front page, not a doc called help.
+    const doc = a && a !== "help" ? decodeURIComponent(a) : helpIndex?.home || "";
     if (doc && doc !== helpCur){ helpCur = doc; helpQ = ""; helpHits = null; helpRev++; }
     // ...at a section of it when the address names one (#/help/reference/
     // the-install-key): the doctor's links land on the fix itself.
