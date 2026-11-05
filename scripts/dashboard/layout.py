@@ -131,20 +131,30 @@ def boot_id():
     """An identifier for this run of the container.
 
     PID 1 is the container's init, so when it changes the container was
-    restarted. Pairing its start time with the host's boot time keeps the value
-    from repeating across a host reboot. Restarting only the dashboard leaves
-    both untouched, which is the distinction this is for.
+    restarted. Pairing its start with the kernel's id for this boot keeps the
+    value from repeating across a host reboot. Restarting only the dashboard
+    leaves both untouched, which is the distinction this is for. The kernel's
+    id and not /proc/stat's btime, which moves whenever the clock is stepped:
+    a machine's first time sync reloaded every page open on it. Digits, since
+    an agent's copy of this passes through a filter that keeps only those.
 
     An unreadable /proc gives "", which compares equal to nothing and so is
     treated as "cannot tell" by the one caller that acts on a difference.
     """
     try:
         start = Path("/proc/1/stat").read_text().rsplit(")", 1)[1].split()[19]
-        btime = next(l for l in Path("/proc/stat").read_text().splitlines()
-                     if l.startswith("btime "))
-        return f"{btime.split()[1]}.{start}"
-    except (OSError, IndexError, StopIteration):
+        return f"{_this_boot()}.{start}"
+    except (OSError, IndexError, StopIteration, ValueError):
         return ""
+
+
+def _this_boot():
+    """The kernel's id for this boot as a number, or btime where it has none."""
+    try:
+        return int(Path("/proc/sys/kernel/random/boot_id").read_text()[:8], 16)
+    except (OSError, ValueError):
+        return next(ln for ln in Path("/proc/stat").read_text().splitlines()
+                    if ln.startswith("btime ")).split()[1]
 
 
 def prune_claude_tabs():

@@ -1321,10 +1321,17 @@ git_identity() {
 # start time paired with the host's boot time, so it changes when the container
 # is recreated and not when the dashboard is merely restarted.
 boot_id() {
-    local start btime
+    local start first
     start="$(sed 's/^.*) //' /proc/1/stat 2>/dev/null | awk '{print $20}')"
-    btime="$(awk '/^btime /{print $2}' /proc/stat 2>/dev/null)"
-    [ -n "$start" ] && [ -n "$btime" ] && printf '%s.%s' "$btime" "$start"
+    first="$(head -c 8 /proc/sys/kernel/random/boot_id 2>/dev/null)"
+    if [[ "$first" =~ ^[0-9a-f]{8}$ ]]; then first=$((16#$first))
+    else first="$(awk '/^btime /{print $2}' /proc/stat 2>/dev/null)"; fi
+    [ -n "$start" ] && [ -n "$first" ] && printf '%s.%s' "$first" "$start"
+}
+# The same id as an agent from before it stopped reading btime stamps it, which
+# a node's census carries until that agent is updated.
+boot_id_by_btime() {
+    printf '%s.%s' "$(awk '/^btime /{print $2}' /proc/stat 2>/dev/null)" "$(sed 's/^.*) //' /proc/1/stat 2>/dev/null | awk '{print $20}')"
 }
 
 # A Gradle project's build folders on the node's own disk (B439): the init
@@ -1637,7 +1644,7 @@ case "$target" in
         # First of the checks, so a tab that is going to be refused anyway
         # does not first fetch a login it will not use.
         if ! tmux has-session -t "=$(sess "${agent}-${proj//[.:]/_}${slot_tail}")" 2>/dev/null \
-           && [ "$want_boot" != "$(boot_id)" ]; then
+           && [ "$want_boot" != "$(boot_id)" ] && [ "$want_boot" != "$(boot_id_by_btime)" ]; then
             bad "This tab is from before ${BB_NODE:-the container} restarted." \
                 "Its conversation is still on disk. Open ${agent_name} on ${proj} from" \
                 "the dashboard's Projects card to pick it up again. Starting a" \

@@ -532,14 +532,19 @@ def uptime_s():
 
 
 def boot_id():
-    """PID 1's start time paired with the host's boot time: the same pair,
-    in the same shape, as the controller's server.boot_id and bb-tty's."""
+    """PID 1's start time paired with the kernel's id for this boot: the same
+    pair, in the same shape, as the controller's server.boot_id and bb-tty's.
+    Not btime, which moves whenever the clock is stepped."""
     try:
         with open("/proc/1/stat") as f:
             start = f.read().rsplit(")", 1)[1].split()[19]
-        with open("/proc/stat") as f:
-            btime = next(l for l in f if l.startswith("btime ")).split()[1]
-        return f"{btime}.{start}"
+        try:
+            with open("/proc/sys/kernel/random/boot_id") as f:
+                first = int(f.read()[:8], 16)
+        except (OSError, ValueError):
+            with open("/proc/stat") as f:
+                first = next(ln for ln in f if ln.startswith("btime ")).split()[1]
+        return f"{first}.{start}"
     except (OSError, IndexError, StopIteration):
         return ""
 
