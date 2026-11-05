@@ -271,8 +271,8 @@ view is not a VM: the kernel is shared, and so is the network unless the
 node keeps each session to its own project's network (below).
 A workspace-root shell, which needs the `terminal` right, is not confined.
 
-**Each session on its own project's network (roadmap R79)** is a switch in a
-node's Sessions section, off by default. On, a session started there gets a
+**Each session on its own project's network (roadmap R79)** holds on every
+node that runs sessions, with no switch to turn it off. A session gets a
 network namespace of its own from `bb-session`: a veth pair to the node, an
 address from `10.231.0.0/16`, and a resolver file naming the node's upstream
 DNS servers. The agent keeps an nftables table (`builderbot_sessnet`) that
@@ -289,14 +289,13 @@ marked, and Docker's `DOCKER-USER` chain lets through only marked traffic
 from a session, so if the table ever disappears a session loses its network
 rather than gaining the node's. A session reaches its own containers at the
 node's address and published port, not at `localhost`, which is its own; the
-emulator it starts itself runs inside with it. Turning the switch on or off
-applies to sessions started afterwards; one started while it was on keeps
-its network until it ends. The section says, in red, when the switch is on and
-it is not in force: an agent that is not root, a firewalld or ufw firewall,
+emulator it starts itself runs inside with it. The node's Sessions section
+says, in red, when it is not in force: an agent that is not root, a firewalld or ufw firewall,
 no upstream DNS server, an older `bb-session`, or a node whose own network
 already uses `10.231.x.x` (a LAN, a VPN or a VM bridge), which a session's
 address would hide from everything on the machine. When setting it up fails,
-no session starts on that node until it works or the switch is turned off.
+no session starts on that node until it works: closed, never the node's own
+network instead.
 A container in Docker's host network mode is not reachable from an isolated
 session, since it has no address of its own to allow.
 
