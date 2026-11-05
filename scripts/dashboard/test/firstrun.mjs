@@ -73,6 +73,22 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
     await page.fill('#setEmail', 'runner@example.test');
     const dead2 = await page.evaluate(() => document.querySelector('[data-setgit]').disabled);
     ok(dead0 && dead1 && !dead2, `Save sleeps until a name and an email are both typed ${where} (${dead0} ${dead1} ${dead2})`);
+    // A read of the disks that found nothing new leaves the page alone, and a
+    // draw it does need keeps what was typed, the caret's field and Save too.
+    const same = await page.evaluate(async () => {
+      const was = document.querySelector('#setName');
+      await setupDisksLoad();
+      return was === document.querySelector('#setName');
+    });
+    ok(same, `a read of the disks with nothing new does not draw the page again ${where}`);
+    const kept = await page.evaluate(() => {
+      document.querySelector('#setEmail').focus();
+      setupSig = ''; drawSetup();
+      const n = document.querySelector('#setName'), e = document.querySelector('#setEmail');
+      return {name: n.value, email: e.value, focus: document.activeElement === e, save: !document.querySelector('[data-setgit]').disabled};
+    });
+    ok(kept.name === 'First Runner' && kept.email === 'runner@example.test' && kept.focus && kept.save,
+       `a draw the page does need keeps the typed name and email, the cursor and Save ${where} (${JSON.stringify(kept)})`);
     await page.click('[data-setgit]');
     await page.waitForFunction(() => [...document.querySelectorAll('#setupPanel .setstep')][1]?.querySelector('.pill')?.textContent === 'done',
       null, { timeout: 15000 }).catch(() => {});

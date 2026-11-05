@@ -82,12 +82,14 @@ function drawSetup(){
   // would otherwise take what was typed with it.
   setupPlaceAuto(s);
   const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
-                              s.git, s.claude, s.project, !!s.own && [JSON.stringify(dk?.disks || []), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
+                              s.git, s.claude, s.project, !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
+  const typed = setupKeepTyped(el);
   if (setupWalking()){
     el.innerHTML = setupWalkHtml(s);
     wireSetup(el, s);
+    typed();
     return;
   }
   const card = setupCard;
@@ -143,6 +145,27 @@ function drawSetup(){
     </div>
   </div>`;
   wireSetup(el, s);
+  typed();
+}
+
+// What a disk's row shows, for the redraw test: a disk's temperature and the
+// like move on every read and are not the page's business.
+function setupDisksSig(dk){
+  return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.ok]));
+}
+
+// Text a person has typed, put back when the page has had to be drawn again:
+// a disk plugged in mid-sentence moves the page, and is no reason to lose it.
+function setupKeepTyped(el){
+  const had = [...el.querySelectorAll("input[id]:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea[id]")]
+    .filter(i => i.value).map(i => ({id: i.id, value: i.value, focus: i === document.activeElement, at: i.selectionStart}));
+  return () => had.forEach(h => {
+    const now = el.querySelector("#" + CSS.escape(h.id));
+    if (!now || now.value) return;
+    now.value = h.value;
+    now.dispatchEvent(new Event("input", {bubbles: true}));
+    if (h.focus){ now.focus(); try{ now.setSelectionRange(h.at, h.at); }catch(e){ /* a type with no caret */ } }
+  });
 }
 
 function wireSetup(el, s){
@@ -487,7 +510,7 @@ async function setupDisksLoad(){
     const j = await (await fetch("/api/storage")).json();
     setupDisks.own = (j.nodes || []).find(n => n.own) || null;
   }catch(e){ /* the card says it is waiting */ }
-  setupSig = ""; drawSetup();
+  drawSetup();
 }
 // Done once the machine holds a pool or an array, whoever made it.
 const setupDisksDone = n => !!(n && ((n.pools || []).length || (n.array?.data || []).length || n.array?.mount));
