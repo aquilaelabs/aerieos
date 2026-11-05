@@ -1037,6 +1037,13 @@ def own_machine(n):
     return bool(n) and n.get("kind") == "agent" and bool((n.get("config") or {}).get("own"))
 
 
+def only_this_machine():
+    """Whether the controller's nodes are nothing but its own built-in row and
+    the machine it runs on, as a fresh install's are: what a landing move would
+    replace nothing of."""
+    return all(n["kind"] == LOCAL or own_machine(n) for n in node_list())
+
+
 def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host_only=False, nginx=False, door=None,
                 existing=None, own=False, system=""):
     """Add node, agent kind: a pending row and the one token that fills it.

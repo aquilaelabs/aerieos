@@ -12825,7 +12825,7 @@ class Handler(BaseHTTPRequestHandler):
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
         # Whether a move may land here (_move_land): a fresh controller's,
         # and on a stick only once the projects have a place on the disks.
-        fresh = len(users.all_users()) <= 1 and not any(not nodes.own_machine(n) for n in nodes.node_list())
+        fresh = len(users.all_users()) <= 1 and nodes.only_this_machine()
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
         owner = (users.account_of(me) or {}).get("role") == "owner"
@@ -13112,7 +13112,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
-        if len(users.all_users()) > 1 or any(not nodes.own_machine(n) for n in nodes.node_list()):
+        if len(users.all_users()) > 1 or not nodes.only_this_machine():
             return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
         where = Path(STATE)
         if nodes.on_stick():
