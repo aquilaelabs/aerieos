@@ -1,6 +1,6 @@
 # Coding agents
 
-A session on a project runs a coding agent in a terminal on a node: Claude
+A session on a space runs a coding agent in a terminal on a node: Claude
 (Anthropic's Claude Code), ChatGPT (OpenAI's Codex CLI), Copilot (GitHub's
 Copilot CLI), Grok (xAI's Grok Build) or Any model (OpenCode, through a
 node's model router), each used the same way and held to the same briefing
@@ -27,20 +27,20 @@ transcripts are read from.
 
 A session's name carries its agent (`claude-alpha`,
 `codex-alpha`), so one person may run a Claude session and a Codex session
-on one project at once, and two people may run different agents on it.
+on one space at once, and two people may run different agents on it.
 
 ## Starting a session
 
-A project's **Start agent** opens the chooser, in three bands under the
-node it shows (a picker where the project works on several):
+A space's **Start agent** opens the chooser, in three bands under the
+node it shows (a picker where the space works on several):
 
-- **Yours here.** Every session of yours on the project, each agent's and
+- **Yours here.** Every session of yours on the space, each agent's and
   each slot's on whichever node, with its state (working, waiting for you,
   asking you) and its **Open**, **Restart** and **End**.
-- **Start.** A line for each agent installed on that node, the project's own
+- **Start.** A line for each agent installed on that node, the space's own
   first: **New** starts a conversation, or **Sign in** where you have no
   sign-in to it there, which opens that agent's own page on the node, at its sign-in.
-- **Resume.** Your conversations on the project, newest first, each with its
+- **Resume.** Your conversations on the space, newest first, each with its
   agent, when it was and its first words; one running in a session of yours
   is marked so and not offered, since two sessions would write over it.
 
@@ -51,17 +51,17 @@ While one of yours runs, the button reads **Manage agent**.
   own session (`claude-alpha~2`), its own worktree on `<agent>/<name>-2`
   (the owner's too) and its own conversation, read as *Claude 2* in the
   dock, the card and Sessions. A Send with several of yours running asks
-  which one. Each person may run three of one agent on a project at once
+  which one. Each person may run three of one agent on a space at once
   unless its settings say otherwise (Agents may, *Sessions of one agent*,
   1 to 9); a slot past it is refused at the terminal.
 
 - **A tree of its own.** Each agent's session works in a tree of its own: an
   agent other than Claude in a worktree on a branch `<agent>/<name>`
   (`codex/pat`), the owner's included; Claude keeps `claude/<name>` and the
-  owner's project directory, so nothing that existed moves. Two agents of
+  owner's space directory, so nothing that existed moves. Two agents of
   one person meet through git, as two people do.
 - **The briefing, the agent's own way.** The same briefing a Claude session
-  is handed, never written into the project's tree: Codex CLI is given it as
+  is handed, never written into the space's tree: Codex CLI is given it as
   developer instructions (`-c developer_instructions=...`, read from the
   file at exec), which add to its own rather than replace them; Copilot CLI
   reads it as an `AGENTS.md` in a folder named by
@@ -77,15 +77,15 @@ While one of yours runs, the button reads **Manage agent**.
   read on 22 Oct); the pick rides the terminal's argument and bb-tty passes
   only a word on that agent's list. Nothing is saved for the next start.
   Grok runs its own default model: no list of its is kept yet.
-- **Which agents a project allows.** Its settings' Agents may section has
+- **Which agents a space allows.** Its settings' Agents may section has
   Coding agents, a tick for each agent beside Claude; one left unticked is
   not offered there and its terminal refuses. Claude always may.
 - **Who may.** A role's Terminal area covers every agent alike: an account
-  that may start a Claude session on a project may start any agent the
-  project allows, and one that may not is offered none, the server refusing
+  that may start a Claude session on a space may start any agent the
+  space allows, and one that may not is offered none, the server refusing
   the same whoever asks.
 - **The one Start opens.** Under the same ticks, *Start opens* names the
-  agent listed first in Start agent's menu, and the one a project offers to
+  agent listed first in Start agent's menu, and the one a space offers to
   install where its node lacks it; Claude unless it names another. The
   menu still offers every allowed agent installed on each node.
 - **Signed in or refused.** A terminal that would start a Codex, Copilot or
@@ -131,7 +131,7 @@ your sign-in, what you added to the agent and Remove.
   in a session, for you alone; Profile no longer lists them.
 
 The Nodes page keeps one line per node saying which agents are installed
-there and which you are signed in to. A project's Start sends a person to
+there and which you are signed in to. A space's Start sends a person to
 that agent's own page on its node, at its sign-in, when they have no
 sign-in there.
 
@@ -152,7 +152,7 @@ on its own; a session turns that off, so each guard runs once. The hooks act onl
 same agent run by hand is untouched. Codex's own hook trust is passed over
 for AerieOS's where its version has the flag for it.
 
-Not every guard has a place on every agent, and the project's settings
+Not every guard has a place on every agent, and the space's settings
 (Agents may, under How each agent is guarded) say which hold for which: Copilot has no hook
 after a summary, so the house rules are not said again then, and Codex's and
 Copilot's searches are in the shell, out of the code map's hint's reach.
@@ -173,12 +173,12 @@ limit and Home's sessions tile alike.
 ## Your conversations, every agent's
 
 `aerie transcripts` in a session lists the asking account's own conversations
-on the project, from every coding agent that account uses, each marked with
+on the space, from every coding agent that account uses, each marked with
 its agent, and never another account's (unless its person made one visible
 on the Sessions view): the controller looks under that account's transcripts
 and nowhere else. Codex's and Copilot's are kept by their Stop hook at the
 end of every turn (Grok's too), copied from the agent's own log into an `<agent>/` folder
-of the tree's folder in the account's transcripts, which the projects share
+of the tree's folder in the account's transcripts, which the spaces share
 or claudesync carries to the controller as it carries Claude Code's. The
 Sessions view shows each row's agent, reads and downloads it, shares and
 deletes it, and Resume opens that agent and no other: the log is put back
@@ -206,10 +206,10 @@ The fifth agent signs in to nobody. The **Model router** is a card of the
 Library's under Services, and it is set up on the node's Installed page:
 with a node picked, its page there (Configure on its row) takes the
 provider keys you give it, other OpenAI-compatible endpoints, Ollama
-beside it where you turn it on, and the projects allowed to use it;
+beside it where you turn it on, and the spaces allowed to use it;
 Install deploys LiteLLM there as a written container once something is
 behind it, Save on a deployed one rebuilds it with the change, and Remove
-takes it off. On the Containers page it is a row of the System section. Each allowed project is handed the router's
+takes it off. On the Containers page it is a row of the System section. Each allowed space is handed the router's
 address and a key of its own at a session's start, so its spend is its
 own. Start's **Any model** offers the router's models with their context
 and price where the router knows them (`Read the models` on its page reads
@@ -222,8 +222,8 @@ Each model is marked: one walked with OpenCode and AerieOS's tools
 same, and one whose context cannot hold the briefing and the house rules
 (the block a session is handed, counted by the server) says **too small
 for the briefing**, with Start's line under the picker saying by how much.
-While an Any model session runs, its tab on the dock says what its project
-has spent through the router so far (the key is the project's, so the
+While an Any model session runs, its tab on the dock says what its space
+has spent through the router so far (the key is the space's, so the
 spend is) and, for a model Ollama runs on the node, its tokens per second
 as the router's log last measured it (**Read the spend** on its page
 reads both). Its guards are a plugin of AerieOS's that bb-tty writes into the
@@ -231,5 +231,5 @@ account's OpenCode plugins folder, calling `bb-agent-hook open` before a
 tool (a refusal throws, so the tool does not run), on a prompt, at a
 permission ask, at the turn's end and after a summary, and exporting the
 conversation into the tree's transcript folder at each turn's end, where
-aerie transcripts and the Sessions view read it. A project no router allows
+aerie transcripts and the Sessions view read it. A space no router allows
 is told so at Start.

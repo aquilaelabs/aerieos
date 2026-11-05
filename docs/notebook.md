@@ -1,7 +1,7 @@
-# A project's page
+# A space's page
 
-Every project has a page of its own, opened from its card on the Projects
-page or at `#/projects/NAME`, and the page is the project's **notebook**: the
+Every space has a page of its own, opened from its card on the Spaces
+page or at `#/spaces/NAME`, and the page is the space's **notebook**: the
 one surface here that both you and a session write. This doc covers the
 page's header and its views, grouped on the view strip as **Overview**
 (Overview, Settings), **Plan** (Roadmap, Bugs), **Code** (Git, Tests,
@@ -10,7 +10,7 @@ each one keeps.
 
 ## The page and its views
 
-**The page's header** wears the project's color and carries its name, the
+**The page's header** wears the space's color and carries its name, the
 branch and the node, the session's state as a dot and a word, and its
 actions: **Start agent** (**Open** and the agent's name, in green, while your session
 runs) with the chooser under it, **Shell**, and the rest behind one menu,
@@ -18,20 +18,20 @@ the same menu its card has ([projects.md](projects.md#a-projects-card-and-its-me
 
 **The view strip** under it is two rows: the five groups, and the views of
 the group picked, each group coming back to the view last picked in it.
-The address names the view (`#/projects/web/bugs`), so a link to a project's
+The address names the view (`#/spaces/web/bugs`), so a link to a space's
 bug list lands on it.
 
 | Group | Views | What they keep |
 |---|---|---|
-| Overview | Overview, Settings | The code base, the brief, the rules, what Claude remembers and what a session is sent; the project's settings |
+| Overview | Overview, Settings | The code base, the brief, the rules, what Claude remembers and what a session is sent; the space's settings |
 | Plan | Roadmap, Bugs | The shared list of work and the bug tracker |
 | Code | Git, Tests, Analysis | The repository, the test registry, the scanner's findings |
-| Ship | Artifacts, Docker | What the project built, and its containers |
-| Docs | Wiki, Design | The project's wiki, and what it looks like |
+| Ship | Artifacts, Docker | What the space built, and its containers |
+| Docs | Wiki, Design | The space's wiki, and what it looks like |
 
 ## Overview: what Claude remembers here
 
-**Overview** is the page's first view: the code base, the brief the project
+**Overview** is the page's first view: the code base, the brief the space
 started from, the rules, what a session is sent (described in
 [sessions.md](sessions.md#telling-a-projects-sessions-about-this-environment)),
 and the **Memories**, what Claude remembers here.
@@ -59,7 +59,7 @@ memory itself: written with the frontmatter Claude uses and given its
 index line in the same act, never one without the other. Mostly Claude
 writes these itself; this is for the standing instruction you would
 otherwise repeat once a session and hope stuck.
-It sits on the project's page rather than beside a Claude terminal on
+It sits on the space's page rather than beside a Claude terminal on
 purpose, since *why did it do that?* is usually asked after the session has
 ended, and it is folded shut, because a handful of files nobody edits does
 not earn the top of a page. Editing one arms the Memories section's own
@@ -68,7 +68,7 @@ not earn the top of a page. Editing one arms the Memories section's own
 running session is holding what it read then, which is what Save tells it,
 in the one line it spends.
 
-**Settings**, beside Overview in its group, is the project's settings,
+**Settings**, beside Overview in its group, is the space's settings,
 described in [projects.md](projects.md#a-projects-settings).
 
 ## Working in the notebook
@@ -85,7 +85,7 @@ moved, so the filter bar keeps every handler it had and there is no second
 copy of it to drift.
 
 **It opens on Overview** the first time, and after that on the view you were
-on: the view is kept per project, so going off to another page and coming
+on: the view is kept per space, so going off to another page and coming
 back finds it, and each group comes back to the view last picked in it.
 
 **Each section saves its own.** A notebook section that stages anything (the
@@ -147,7 +147,7 @@ is the question worth answering.
 memories each have a **History** button with the same bar: search, a time
 window, a cap, and the same rows: what happened, to which line, by whom,
 when. **By whom is the account, not just "you" or "claude"**: those two say a
-person or a session, and with several people on a project that does not say
+person or a session, and with several people on a space that does not say
 which of them dropped an item. A session carries its account's name too, because a session
 has an author: the person it was minted for. The memory log records what the *notebook* changed
 (wrote, edited, forgot): Claude's own memory writes are files, not events,
@@ -163,7 +163,7 @@ button beside it is **Revert**, which throws away what has not been saved
 and is dead whenever there is nothing to throw. Leaving the view asks first
 if anything is unsaved. It is the one surface here that
 **both sides write**:
-you add "make the picker wrap properly", a session adds "a project can be
+you add "make the picker wrap properly", a session adds "a space can be
 created in one click and only deleted from a shell", and either of you can tick
 something off.
 
@@ -244,12 +244,12 @@ arrows, and a session is told it is parked rather than left to wonder. It is
 the only control here that undoes itself (the same tap brings it back) and
 it applies to an item, never to one step of a plan, because the thing you
 have decided not to do now is the whole plan. Shelved items do not count
-towards the number on the project's card. A session can shelve (something turns
+towards the number on the space's card. A session can shelve (something turns
 out to be blocked, and saying so on the item beats saying it in a reply nobody
 re-reads), and can ask for one back with `aerie roadmap unshelve N WHY`: taking
 one off reverses a decision it was not told the reason for, so the request
 is held on the notebook with its reason, whatever the roadmap gate says, and
-a user or administrator on the project approves or denies it there.
+a user or administrator on the space approves or denies it there.
 **Finished** at the top of the view shows the items ticked off, with the
 plans they had, below the shelved ones; they are hidden until asked for,
 because a list is read to find out what is left.
@@ -306,7 +306,7 @@ the step does not start from a cold grep. Claude writes them with
 them alongside the words.
 
 **An item can name the release it is meant for**, its target: the
-project's own version, as `0.6.0`. It shows as a tag above the item's words
+space's own version, as `0.6.0`. It shows as a tag above the item's words
 and among its facts, and a line of chips under the list's own narrows it to
 one release, or to the items meant for none yet; the Finished section
 narrows with it, so what went into a release can be read back. The Reword
@@ -450,12 +450,12 @@ first, since an arrangement is work.
 ## What a session may add
 
 **How much of what a session adds lands on its own** is the *Agents may*
-section of the project's settings: add to the roadmap, file bugs, add rules
+section of the space's settings: add to the roadmap, file bugs, add rules
 and fill in build and test, each **auto**, **ask** or **deny**. Auto: an item, report or
 rule a session adds lands at once, marked as its own. Ask holds it instead: the
 session is told "held for approval as R12", the page shows a band above
 its views with how many changes are waiting (and a count on each view), the bell
-carries a row per project that takes you there, and **Review** opens the
+carries a row per space that takes you there, and **Review** opens the
 list: every held change with a checkbox and its full text under a fold, a
 select-all box, and Approve and Deny at the foot. Approve replays the ticked
 changes in the order they were made; Deny drops them and anything that rode
@@ -484,7 +484,7 @@ says it as *Happens*, a chip narrows the list by it, and the Sort orders by
 it. `aerie bug add --report N` files AerieOS's diagnostics report N (`aerie
 diag reports`) with its words, area, repro and that answer. It is
 write-through, not staged: a report is a form submitted once. Each report
-is stamped with the project's version as `aerie version` prints it, on filing
+is stamped with the space's version as `aerie version` prints it, on filing
 (*in 0.4.0-dev.390+045bb5a* on the row) and again on closing (*closed in*),
 plus the image the container was running when it was filed; a report that
 predates the stamp stays blank rather than being backfilled with a guess.
@@ -502,7 +502,7 @@ because a closed bug is the record that stops the same report being chased
 twice.
 
 **Delete** is separate and narrower: for a report that should never have
-existed: mis-filed, duplicated, aimed at the wrong project. It takes the row
+existed: mis-filed, duplicated, aimed at the wrong space. It takes the row
 and leaves the reason in the log. The briefing tells sessions that this is
 the only case for it; anything that was a real bug gets closed.
 
@@ -549,14 +549,14 @@ branch with work not yet in `main` opens to its commits and the diff `main`
 would take, which is what a pull request page shows, so that page is not
 needed to read work before accepting it. It
 reads on open and again when the tree's history moves, never on the poll,
-and every question is git plumbing on the controller against the project on
+and every question is git plumbing on the controller against the space on
 the share: a sha or a path from the address is checked against what the
 repository itself reports before it reaches a command.
 
 The view acts too, each button one fixed git command with checked arguments,
-run under your author and the project's own credentials: **Fetch**, **Pull**
+run under your author and the space's own credentials: **Fetch**, **Pull**
 (fast-forward only, refused with uncommitted changes) and **Push** (through
-the same path `aerie git push` takes, offered only to a project with push
+the same path `aerie git push` takes, offered only to a space with push
 rights) at the right of the view's control row, the branch picker at its
 left, what is to push or pull counted in the tiles under it; **Commit all** with a message at the
 top of Changes and **Discard** on each file; **New branch** at the top of
@@ -581,37 +581,37 @@ the tree. A session's `aerie git push` with such lines is held: the bell shows
 them whole, each with its file and line, Approve pushes and Deny drops it,
 and `aerie git push` waits on the answer the way `aerie root run` does. The Git
 view's Push shows the same lines in a confirm. An approved line in a file
-is okayed for that project (`/config/pushok.json`) and passes from then on;
+is okayed for that space (`/config/pushok.json`) and passes from then on;
 a line that changes is asked about again. The hold is the third answer of
-the project's git policy, **Hold a push that looks sensitive**: off, a
+the space's git policy, **Hold a push that looks sensitive**: off, a
 session's push goes without being read, and the Git view's confirm still
 shows what it saw. The **only on `<host>`** fold says of each branch
 whether `main` already has every commit on it, and offers **Delete on
 `<host>`** for the ones where it does, which is the only case where removing
 a branch there can lose nothing. **Revert** and **Branch here**
 on a picked commit. A session's token
-has none of these (it has `aerie git`), and a project locked against the account takes no action.
+has none of these (it has `aerie git`), and a space locked against the account takes no action.
 
 ## Tests
 
-The Tests view is the project's test registry, described in [building.md](building.md#the-test-registry).
+The Tests view is the space's test registry, described in [building.md](building.md#the-test-registry).
 
 ## Analysis
 
 **Analysis**, under Code, is the scanner's findings for that
-project alone, worst level first, read-only: the scan runs on the host, and
+space alone, worst level first, read-only: the scan runs on the host, and
 `aerie findings` reads the same digest in a terminal, and **Analysis** under
-Projects on the rail opens the whole report as a page, with a project
+Spaces on the rail opens the whole report as a page, with a space
 selector and the same filter bar. Findings whose paths
-resolve into anything other than a **valid** project: one that is listed and
+resolve into anything other than a **valid** space: one that is listed and
 free of error-level issues; an archived one still counts: are set aside rather
 than shown as "unattributed". The label is reserved for paths that genuinely
 place nowhere, which is the case worth a look.
 
 That rule is a subtraction, and deliberately so: rather than recognizing each
-kind of thing that is not a project, findings attribute only to the projects
+kind of thing that is not a space, findings attribute only to the spaces
 worth reading them for, and everything else in the share falls out together.
-It matters because of how the toolchain store is mapped here, beside the projects
+It matters because of how the toolchain store is mapped here, beside the spaces
 folder in the same development share, so the host's scanner walks it like
 anything else and one report grew nine thousand findings for a pile of
 downloaded toolchains.
@@ -623,7 +623,7 @@ hundreds through several passes when 267 of them were one share and 9 were a
 scanner's configuration. A
 marker file (`.bbignore`) handles the case where the container knows about the
 directory, but a share mapped in with nothing to mark it is still listed as a
-project (one with an error, because it is not a repository), so subtracting
+space (one with an error, because it is not a repository), so subtracting
 only the *listed* names would have left it in play. Subtracting the valid ones
 catches both, and needs no excludes configured on the scanner.
 
@@ -639,7 +639,7 @@ the entry: `found`, `gone`, or `changed` when the count or level moved.
 Two things keep it honest. A finding is identified by **rule and path, not
 line**, because line numbers move whenever anything is inserted above them and
 a key including the line turns one edit into a gone-and-found pair for
-everything below it. And **the first scan of a project seeds silently**: the
+everything below it. And **the first scan of a space seeds silently**: the
 starting point rather than an entry, because stamping a discovery date on
 findings older than the feature would be confidently wrong. A report that
 fails to parse, or a reports directory that is not there this minute, is
@@ -648,13 +648,13 @@ rest of this is careful about.
 
 ## Artifacts
 
-**Artifacts**, under Ship, is what the project has built, listed from its
+**Artifacts**, under Ship, is what the space has built, listed from its
 `dist/` directory, and the convention is the feature. Build systems scatter
 their outputs (gradle five directories deep, cargo into `target/`), and a view
 that went looking for all of those would be a catalog of build systems that
 is wrong the week a new one arrives. So the deal is one word long: **what
 ships goes in `dist/`**, a session that builds something copies it there, and
-the view lists `dist/` and nothing else. An empty view on a project that builds
+the view lists `dist/` and nothing else. An empty view on a space that builds
 things means the copy step is missing, and it says so.
 
 Each row is labeled by kind (apk, xpi, whatever the extension says) with
@@ -671,8 +671,8 @@ reach the share at all: they are working files on the node's own disk, at
 the paths the reel's `frames.json` names.
 
 They go by age and never by need. Nothing can tell whether a capture is done
-with: two sessions on one project may each be reading a reel the other made,
-and a session ending is not evidence that its reel is. So the project's
+with: two sessions on one space may each be reading a reel the other made,
+and a session ending is not evidence that its reel is. So the space's
 settings carry **Captures kept for N days** (7; 0 keeps them), the server
 sweeps what is older on the read that draws the view, a person removes one
 from the fold, and a session lets one of its own go with `aerie capture prune
@@ -715,17 +715,17 @@ file changed" would restate the mtime column.
 
 ## Docker
 
-The Docker view is every container that belongs to this project, with the
-Containers page's rows and controls, so a dev radarr for a media project is
-found beside that project rather than among every project's on the
+The Docker view is every container that belongs to this space, with the
+Containers page's rows and controls, so a dev radarr for a media space is
+found beside that space rather than among every space's on the
 Containers page. How those containers are built and run is
 [containers.md](containers.md).
 
 ## Wiki
 
-The **Wiki** is the project's wiki, for whoever uses or works on it: pages
+The **Wiki** is the space's wiki, for whoever uses or works on it: pages
 of Markdown that a person writes on the view or a session writes with
-`aerie wiki save`, under the project's dial Agents may: Write the wiki (auto
+`aerie wiki save`, under the space's dial Agents may: Write the wiki (auto
 lands a page, ask holds it on the notebook for approval with its text, deny
 refuses it, and hidden keeps the wiki from sessions altogether, reading
 included, for notes that are the people's alone). It reads like an encyclopedia: one article at a time, its title over a
@@ -738,11 +738,11 @@ was opened is refused rather than overwritten. The controller keeps it as a git
 repository of its own (`/config/wiki/PROJECT`) in the shape a forge's wiki
 has, one `Page-Name.md` per page with `Home`, `_Sidebar` and `_Footer` as
 GitHub reads them, so every change has a history and the wiki is never in
-the project's tree, where a session could rewrite what the controller then
-pushes. **Export** is a zip of the pages, which works for any project, with
-a remote or without. A project with push rights on GitHub, Gitea or GitLab
+the space's tree, where a session could rewrite what the controller then
+pushes. **Export** is a zip of the pages, which works for any space, with
+a remote or without. A space with push rights on GitHub, Gitea or GitLab
 gets **Push**, which sends the wiki to the repository's own `.wiki.git`
-with the project's credentials, and **Pull**, which takes in what was
+with the space's credentials, and **Pull**, which takes in what was
 changed there (a page changed on both sides is named and nothing is taken
 until one side matches). A forge makes a wiki's repository only when its
 first page is saved on the web, so a first push to a repository with no
@@ -754,10 +754,10 @@ person's: they reach outside AerieOS.
 
 ## Design
 
-**Design**, under Docs, is what the project looks like, in two folds. The
+**Design**, under Docs, is what the space looks like, in two folds. The
 pages are laid out as labeled blocks on a phone or desktop frame, each named
 for what it is for and the platform it is built for, a web app or an Android,
-iOS, Linux, macOS or Windows app, since one project can be several. The
+iOS, Linux, macOS or Windows app, since one space can be several. The
 themes are each a named set of colors, dark or light, that a preset fills and
 you add to or cut, the app starting on the first, and each carrying the
 design language of its own: type and the exact families, shape, space,
@@ -792,13 +792,13 @@ rules and can name the one that says it, whose text a session then reads in
 the choice's place; the words a session reads are the record's own and
 nothing is added to them.
 
-A new project's design is empty, no theme and no page, and a project built
+A new space's design is empty, no theme and no page, and a space built
 that way is built as a session sees fit, the session then putting the look it
-arrived at into the design so the next one finds it. A project designed
+arrived at into the design so the next one finds it. A space designed
 before it is built is built to the design: its briefing says the notebook
 holds one, what is in it, that on a tree with no code yet the design, the
 rules and the roadmap are the specification, and that what the design leaves
-open goes back into it, under the project's dial. Every edit is staged behind
+open goes back into it, under the space's dial. Every edit is staged behind
 Save; nothing on the view is a prompt and nothing on it reaches into a
 session. A session meets the design by itself and piece by piece, through
 the rules its briefing names and `aerie design show`, which prints the

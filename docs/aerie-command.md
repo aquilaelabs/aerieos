@@ -63,7 +63,7 @@ loadDocker` or `draws .dmtab` is one call rather than a hunt. Built with
 nothing installed (python's own parser, a small scanner for the scripts),
 into `.bb-map/` beside the tree, rebuilt by itself when a source is newer.
 Every build keeps `.bb-map/` out of git through the repository's own
-exclude file, never the project's `.gitignore`, so a project's commits
+exclude file, never the space's `.gitignore`, so a space's commits
 never carry the index. It is rough on purpose, braces not scope, and says
 so where it guesses.
 
@@ -76,13 +76,13 @@ captures it takes `--full` (whole page, not just the viewport), `--scale 2`
 (2x pixels, crisp in GitHub's column), `--wait MS` (pages whose async
 fetches settle after networkidle), and `--resize W` (imagemagick downscale,
 in place, so full-size originals never land in a repo). `--auth user:pass`
-falls back to `BB_TOKEN` or a `DASHBOARD_AUTH` you pass for the command. The intended split for a project's docs
-screenshots: the project keeps a script that boots its app into a
+falls back to `BB_TOKEN` or a `DASHBOARD_AUTH` you pass for the command. The intended split for a space's docs
+screenshots: the space keeps a script that boots its app into a
 photogenic state (staged data, ready-wait) and ends with one `aerie capture shot`
 line; the Playwright plumbing lives here, once.
 
 `aerie tool graphics favicon LOGO.svg [DIR]` is the same idea for a web app's icon: the
-project supplies its mark as one SVG, and out come `favicon.ico` holding
+space supplies its mark as one SVG, and out come `favicon.ico` holding
 every small size in one file (the bare `/favicon.ico` request browsers make
 cannot ask for a particular one), `apple-touch-icon.png` at 180 for iOS
 (`--bg COLOR` flattens it: iOS composites transparency onto black), and
@@ -137,7 +137,7 @@ cores, memory, the card's load and memory and how many compute on it, and
 what runs there by kind: emulators, Gradle, other Java, compilers,
 browsers, media, docker builds, each coding agent) with the jobs active on
 the node and the agents' sessions working there, and answers quiet, busy, saturated or
-unknown, with the reasons. Another project's work is counted and never
+unknown, with the reasons. Another space's work is counted and never
 named. The load right now is read in the session as well, since a heartbeat
 is up to 25 s old. `aerie node wait-quiet` waits for two quiet readings ten
 seconds apart and exits 1, saying how busy, when the time runs out. A test

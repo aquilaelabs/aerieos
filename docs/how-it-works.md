@@ -1,7 +1,7 @@
 # How AerieOS works
 
 AerieOS is one container, the **controller**, and the machines it enrolls,
-the **nodes**. The controller serves the dashboard and keeps every project's
+the **nodes**. The controller serves the dashboard and keeps every space's
 notebook and record; the nodes run the work: the agents' sessions, builds, tests,
 CI, the emulator and containers. This page is the overview: what the image
 carries, how it is kept safe and how it starts, and which doc explains each
@@ -16,8 +16,8 @@ edge:
 | On the rail | What it is | Explained in |
 |---|---|---|
 | Home, the top bar, the dock | The landing page, the bell, the search, the terminals and the chat | [dashboard.md](dashboard.md) |
-| Projects | Every project as a card; making, linking, archiving and deleting one | [projects.md](projects.md) |
-| A project's page | Its notebook: Overview, Roadmap, Bugs, Git, Tests, Analysis, Artifacts, Docker, Wiki, Design | [notebook.md](notebook.md) |
+| Spaces | Every space as a card; making, linking, archiving and deleting one | [projects.md](projects.md) |
+| A space's page | Its notebook: Overview, Roadmap, Bugs, Git, Tests, Analysis, Artifacts, Docker, Wiki, Design | [notebook.md](notebook.md) |
 | Build | Library, Emulator and Phone | [toolchains.md](toolchains.md) |
 | Build, Machines | The coding agents: installed from the Library, signed in to on the Installed page | [agents.md](agents.md) |
 | Build | CI runner, builds, tests, the scanner's findings, signing and releases | [building.md](building.md) |
@@ -45,7 +45,7 @@ edge:
 | **Lint** | shellcheck, hadolint, actionlint, ruff, node --check: `aerie lint` runs the right ones over a repo |
 | **Media** | ffmpeg, imagemagick |
 | **Runner** | Not in the image: CI runners are a node's, added on the CI runner page under Build |
-| **Versioning** | `mise` for per-project tool pinning (gradle, go, rust, on demand) |
+| **Versioning** | `mise` for per-space tool pinning (gradle, go, rust, on demand) |
 
 Slimmer builds: `--build-arg INSTALL_PLAYWRIGHT=false`, `INSTALL_ANDROID=false`.
 The heavyweight toolchains (Flutter, .NET, Swift, extra Android packages)
@@ -65,7 +65,7 @@ update cannot touch. See [the toolchain store lives outside the image](toolchain
 - **No passwords, no general sudo**: `root` and `builder` are locked
   accounts; brute-forcing has no target. Builder may sudo exactly two
   commands: `mint-runner-token`, which only emits 1-hour tokens, and
-  `deploy-key`, which keeps a project's deploy key root-only and loads it
+  `deploy-key`, which keeps a space's deploy key root-only and loads it
   into the agent.
 - **Your root door** is host-side: `docker exec -it -u 0 AerieOS bash`.
 - Don't attach the runner to public repos; treat container-produced commits
@@ -101,16 +101,16 @@ manager, and drops to its own account):
 |---|---|
 | `30-git-and-auth.sh` | git defaults and GitHub's host keys; no commit identity and no container-wide token |
 | `35-publishing.sh` | npm publish auth, when an `NPM_TOKEN` is in the secrets folder |
-| `40-projects.sh` | project report, optional per-project bootstrap |
+| `40-projects.sh` | space report, optional per-space bootstrap |
 
 Your own hooks go in `config/startup.d/` on the share: `*.root.sh` runs as
 root, `*.disabled.sh` is skipped, filename order. All hooks are idempotent:
 they check state before installing.
 
-The dashboard starts early in the boot, before any project's own `setup.sh`
+The dashboard starts early in the boot, before any space's own `setup.sh`
 and the SDK/Playwright hooks, so the web UI is reachable in seconds rather
 than after the whole start-up. For a few of those seconds it knows less than
-it will: the toolchain store is listed as a project until the hook that marks
+it will: the toolchain store is listed as a space until the hook that marks
 it runs, and the git facts on the cards are blank. All of that corrects itself on the next
 poll. `aerie logs` times each
 hook and prints how far into the boot it started, so "what is the wait" is a

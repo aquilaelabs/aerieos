@@ -78,7 +78,7 @@ the parts that decide the phasing.
 - Work is not scheduled. There is one job at a time in `devapp.py` (`_job`, a
   module global) and another in `toolchains.py`. Nothing queues, nothing is
   placed, nothing retries.
-- `/workspace` is a mounted share holding every project. Sessions, builds, the
+- `/workspace` is a mounted share holding every space. Sessions, builds, the
   Actions runner and the emulator all run in the controller container against
   that one tree.
 - State is JSON files under `/config` with an flock around read-modify-write
@@ -151,13 +151,13 @@ compromised or misconfigured controller cannot make a node into something it
 was not enrolled to be.
 
 *Amended 2 September, by the operator:* **capabilities stopped being a
-setting.** A node is not "for" docker or for building; a project names ONE
-node and that node does everything the project needs, so nobody is asked
-which. Every node enrols with the full set, and what a project can actually
+setting.** A node is not "for" docker or for building; a space names ONE
+node and that node does everything the space needs, so nobody is asked
+which. Every node enrols with the full set, and what a space can actually
 DO on its node is what is INSTALLED there: the census's `toolchains`, which
 the node's page shows in place of the toggles, and which the Library
-adds to. Three projects on three VMs keeps them apart; three projects on one
-VM shares it; the choice is the project's node, and nothing else.
+adds to. Three spaces on three VMs keeps them apart; three spaces on one
+VM shares it; the choice is the space's node, and nothing else.
 
 The paragraph above still stands as the *mechanism*: the field, the wire, and
 the agent's refusal are untouched (§15 door 7: retrofitting node-side
@@ -383,8 +383,8 @@ phase 5's system jobs (mounts, network) exist, but an `exec` job drops to
 the account the provisioner enrolled, the same `aerie` that docker runs as,
 before it runs anything. That account is outside every session's view and in
 the docker group, so a session token cannot queue a job at all: a session runs
-`aerie run`, `aerie build`, `aerie test` and `aerie emu` where it is, on its project's node,
-inside the view that keeps it to its own project (R35).
+`aerie run`, `aerie build`, `aerie test` and `aerie emu` where it is, on its space's node,
+inside the view that keeps it to its own space (R35).
 
 **Ship long-poll first.** It gives sub-second job pickup, crosses every proxy
 and NAT, and needs no new protocol machinery in a stdlib-only server. Each
@@ -403,7 +403,7 @@ concrete meaning of rule 1: the wire format scales by swapping the listener,
 never by forking the agent.
 
 **Not gRPC**, at either tier. It brings protobuf and a code generator to a
-stdlib-only project, and its benefit (typed streaming) is not the missing
+stdlib-only space, and its benefit (typed streaming) is not the missing
 piece at 100 nodes; the listener model is.
 
 ### Enrollment, at both scales
@@ -467,7 +467,7 @@ is a convenience; at fleet scale it is the difference between a protocol that
 can evolve and one frozen by its oldest node.
 
 **That version is `WINDOW.BUILD`, and only the first half is a promise.** The
-window is AerieOS's own semver minor: while the project is `0.5.x`, any
+window is AerieOS's own semver minor: while the space is `0.5.x`, any
 `0.5` agent works with any `0.5` controller, in both directions. The next
 minor is where that ends, and it is therefore where a breaking change to this protocol
 and the removal of the compatibility paths carrying old ones belong. Inside a
@@ -475,7 +475,7 @@ window: add, do not change, so a field gains a default rather than a new
 meaning, a verb gains a sibling rather than a signature.
 
 The build is the agent file's own counter and moves only when that file
-moves, which is why it is not the project's patch number; most patches ship
+moves, which is why it is not the space's patch number; most patches ship
 no new agent. It does not reset at a boundary (`0.6.28` follows `0.5.27`),
 so "which of these is newer" always has an answer.
 
@@ -483,14 +483,14 @@ A node whose agent is from another window is reported as such and not
 refused: the Nodes page separates *behind* (a newer build in the same window,
 routine) from *out of window* (the promise was never made, update before
 relying on it). Refusing would strand a node on a guess. The one thing an
-out-of-window agent does stop is sessions on the projects bound to
+out-of-window agent does stop is sessions on the spaces bound to
 that node: the controller ends the running ones and ghosts each such
-project's Start agent until the node is updated, per project, so a
-project on a current node is untouched.
+space's Start agent until the node is updated, per space, so a
+space on a current node is untouched.
 
 What a session is briefed with is no longer in this window, or in any
 window: it is assembled per session by the controller and handed to `claude`
-on the way in, so there is no copy of it on a node or in a project to be from
+on the way in, so there is no copy of it on a node or in a space to be from
 another version (R63). The window is the agent's alone.
 
 ### Tailscale
@@ -526,8 +526,8 @@ the first migration:
 
 *Amended 18 September:* the retention job exists (roadmap R17 step 1, R42).
 A job's log is the only copy of what a node's job wrote, and nothing deleted
-one: `nodes.prune_job_logs` keeps the newest `JOB_LOG_KEEP` per project and
-nothing older than `JOB_LOG_DAYS`, swept as each project's jobs end and once
+one: `nodes.prune_job_logs` keeps the newest `JOB_LOG_KEEP` per space and
+nothing older than `JOB_LOG_DAYS`, swept as each space's jobs end and once
 at boot for whatever ended while the controller was down. The job ROW stays
 and only the chunks go, because a list that forgets a build ran is worse than
 one that cannot show its output. Two constants with a reason rather than the
@@ -556,9 +556,9 @@ story their DBAs already own, and it is the prerequisite for controller HA
 the wrong design.** Four reasons, in order of cost: build tools do
 pathological small-file IO and network filesystems turn minutes into hours; a
 dropped mount mid-build corrupts state *in the source tree on the
-controller*; two nodes building one project would share one `build/`
+controller*; two nodes building one space would share one `build/`
 directory; and a container on a remote node would hold a writable path into
-every project on the box: the thing the sandbox VM exists to prevent. At
+every space on the box: the thing the sandbox VM exists to prevent. At
 enterprise scale every one of these gets worse, and the fourth becomes a
 finding in somebody's report.
 
@@ -585,7 +585,7 @@ reads as not installed within a hello, whatever the last check said
 (`toolchains.store_known`, B671), so a store emptied to start over offers
 every row for installing again. The listing names the versions under the
 Android families too (`store_dirs.versions`: ndk, build-tools, platforms,
-cmake), which is what a version a project pins is read against
+cmake), which is what a version a space pins is read against
 (`toolchains.pin_rows`, B712). The Android system images are guest
 artifacts, identical on every host, and live once under `<store>/shared`
 with each scope's `android/system-images` a symlink to them: kept by the
@@ -594,29 +594,29 @@ agent on every hello (`share_images()`) and by the controller at boot
 
 ### What `/workspace` means in the new model
 
-- **On the controller: unchanged, and canonical.** The projects share, mounted
-  whole, holding every project including uncommitted work. Sessions run here;
+- **On the controller: unchanged, and canonical.** The spaces share, mounted
+  whole, holding every space including uncommitted work. Sessions run here;
   the notebook is about these directories; `aerie` works exactly as today. It is
   the source of truth and the only writable copy.
 - **On a node: a synced copy, for sessions** (below), and nothing
   permanent for a job. A job gets
   `/var/lib/builderbot/jobs/<job-id>/workspace`, materialized before the first
   step and deleted after, with a retention window (keep the last failed job
-  per project), so failures can be inspected.
+  per space), so failures can be inspected.
 - **The GUI's node browser reads that path**, read-only, for debugging: a
   viewing mechanism, never the execution mechanism. The agent exposes
   "list/read under this job's directory", not a filesystem.
 
-### A synced copy, the one way a node holds its projects (R162, R163)
+### A synced copy, the one way a node holds its spaces (R162, R163)
 
-A node holds its projects without mounting anything: its `/workspace` is
-a directory of its own, and each project bound to it is a copy the agent
+A node holds its spaces without mounting anything: its `/workspace` is
+a directory of its own, and each space bound to it is a copy the agent
 keeps in step with the controller's over the agent API, the one connection
 a node behind a one-way tunnel may open. The controller's copy on the share
 stays the original; a node is never told about another node, only the
 controller is.
 
-- **The first copy** is one download: the controller streams the project
+- **The first copy** is one download: the controller streams the space
   as a tar (`sync-tar`), the agent unpacks it and hashes what arrived, and
   anything the stream did not bring is fetched a file at a time (R163).
 - **Up.** The agent compares the tree with its record of what the two last
@@ -627,7 +627,7 @@ controller is.
   file that has changed and then held still for a tick goes up as a put
   naming the hash it was changed from.
 - **Down.** A put, a write from VS Code (files.py tells wssync.py) or a
-  change a scan of the share finds bumps the project's revision and leaves
+  change a scan of the share finds bumps the space's revision and leaves
   a hint the node's held work request takes at once; the agent then asks
   what changed since its revision. It also asks every ten seconds, which is
   what finds a change made on the share some other way.
@@ -636,52 +636,52 @@ controller is.
   `NAME.conflict-NODE-TIME.EXT` (inside `.git`, under
   `.git/bbsync-conflicts/`), which syncs everywhere; the node then takes the
   version kept. The bell lists it until the copy is deleted.
-- **What a project reads** comes down too, read-only (R163): a node holds the
-  projects bound to it and the ones those read, so a session sees the read
+- **What a space reads** comes down too, read-only (R163): a node holds the
+  spaces bound to it and the ones those read, so a session sees the read
   ones at `/workspace/NAME` as it did on the share. The controller refuses
   a put to one, the agent never sends one, and the controller's version
   overwrites whatever changed there.
-- **A dev instance** on a synced node finds its project where a compose
+- **A dev instance** on a synced node finds its space where a compose
   expects it: devapp's path mapping takes the node's own `/workspace` as the
-  projects root, as it took the share mounted there (R163), and a dev
-  instance lives on its project's own nodes, which hold the project.
+  spaces root, as it took the share mounted there (R163), and a dev
+  instance lives on its space's own nodes, which hold the space.
 - **A second account's worktree** (`/workspace/.worktrees/PROJECT/UID`,
-  session_dir) is a sync unit of its own beside its project, held by the
-  project's nodes (B615): one the controller has comes down, and one a
+  session_dir) is a sync unit of its own beside its space, held by the
+  space's nodes (B615): one the controller has comes down, and one a
   session made on a node goes up, the controller writing its `.git` line as
   git does (a node never sends a `.git` file). A session on a node waits for
-  its account's worktree as it waits for the project.
+  its account's worktree as it waits for the space.
 - **Not synced:** what a node rebuilds (`node_modules`, `.gradle`, virtualenvs,
-  caches), git's lock files, and a symlink pointing out of the project.
+  caches), git's lock files, and a symlink pointing out of the space.
   `.git` and `dist/` are synced: a session commits on the node, and a build
   there lands its artifacts where the Artifacts view reads them.
-- **A session waits** for its project's first copy: the node reports each
-  project as copying or ready, and Start agent says which. Binding a
-  project to a synced node, or changing what it reads, tells every synced
+- **A session waits** for its space's first copy: the node reports each
+  space as copying or ready, and Start agent says which. Binding a
+  space to a synced node, or changing what it reads, tells every synced
   node at once (`wssync.held_changed`), so the first copy starts on the
   save rather than at the node's next look of its own, half a minute
   later.
 - **Leaving it** (R164, 10 Oct). Stop syncing in the node's Sessions
   section ends its sessions and holds new ones, while the agent keeps
-  sending up what is waiting: it walks every project whole once more and
+  sending up what is waiting: it walks every space whole once more and
   reports what is left, files and conversations (`sync_drain` on the
   heartbeat). Clean up /workspace is live only once that is nothing: the
   node is then off (config `workspace: off`), and the agent removes each
-  project its records name, the records and `/workspace/.claude`, once, by
+  space its records name, the records and `/workspace/.claude`, once, by
   the token the controller handed it, never through a mount, and says what
   it freed (`sync_clean`). Keep syncing undoes Stop before the clean-up;
-  from off, Move to a synced copy holds the projects again. There is no way
-  back to the projects share: no node mounts the controller's disk (the
+  from off, Move to a synced copy holds the spaces again. There is no way
+  back to the spaces share: no node mounts the controller's disk (the
   operator, 10 Oct).
 - **Daily snapshots** (R165, 10 Oct), so a node gone wrong, or
   compromised, cannot destroy the original through its copy: once a day
-  each project's tree, exactly what the sync carries, `.git` included, is
+  each space's tree, exactly what the sync carries, `.git` included, is
   snapshotted on the controller (`snapshots.py`, in the project-snapshots
   store of `paths.py`, where no node API reaches). A file's contents are
   stored once by hash, read-only, and a day is a list of paths and hashes,
-  so an unchanged file costs nothing. Kept for the project's *Snapshots
+  so an unchanged file costs nothing. Kept for the space's *Snapshots
   kept for* days (14 by default, 0 for none), older days and the objects
-  only they named removed. The project settings' Snapshots fold restores the
+  only they named removed. The space settings' Snapshots fold restores the
   whole tree as of a day, or one file; a restore first snapshots the tree
   as it is (a *before restore* day), writes through the files the sync
   reads, and tells the sync, so every node follows. An administrator's;
@@ -691,7 +691,7 @@ controller is.
   `~/.claude/projects` links to `/workspace/.claude/<uid>/projects`, which
   on a synced node is the node's own: the agent makes `/workspace/.claude`
   as the session account, and its mirror (`claudesync.py` on both sides)
-  keeps the folders of the projects bound to the node in step with the
+  keeps the folders of the spaces bound to the node in step with the
   controller's, which the Profile page, the notebook's Memories,
   `aerie transcripts` and the resume offer read. A transcript only grows, so a change goes up as
   its new tail, checked against the controller's last 4 KB; a memory goes
@@ -708,11 +708,11 @@ controller is.
   the agent that began after the command saw nothing left to send; after a
   relayed verb, until this copy has caught up to the revision the controller
   reached, which is also how a fetch's bundle in `.git/bb-relay/` arrives
-  before it is unbundled. The agent keeps each project's state in
+  before it is unbundled. The agent keeps each space's state in
   `.git/.bbsync-state` (or `.bbsync-state` without git) for aerie to read
   (`lib/syncwait.py`); sync leaves the file alone.
 - **The only way** (R163 step 6, 10 Oct). A node enrolls holding a synced
-  copy, and nothing mounts the projects share on a node any more: the
+  copy, and nothing mounts the spaces share on a node any more: the
   enroll dialog's choice, Move to a synced copy as a move off the share,
   the share reasons on the session gate (not mounted, refused by the
   export, read-only), the agent's mount watcher and aerie's NFS workarounds
@@ -734,7 +734,7 @@ file with its hash and the revision it last changed at, deletions kept.
    paths and `.git`, hashes it, serves it by digest; nodes cache by digest, so
    an unchanged tree transfers nothing.
 2. **Git ref**, for commit-shaped work (release builds, anything that must be
-   reproducible): the node fetches from the project's remote or from the
+   reproducible): the node fetches from the space's remote or from the
    controller acting as a dumb git server.
 3. **Delta sync**, later, keyed on the previous snapshot's digest: the
    optimization that makes a 2GB tree tolerable over a WAN, not needed on day
@@ -765,7 +765,7 @@ the nodes*, sets the numbers:
   ten times that). Under it, on the root filesystem, Docker's or a store,
   the bell names the node and what is short, and a build, a test or a
   container's rebuild there is refused with the numbers. `aerie run` is not:
-  it is how room is made. A build also wants as much free as the project's
+  it is how room is made. A build also wants as much free as the space's
   last one took (its workspace, measured by the agent as the job ends and
   shown on the Artifacts view and the job's row).
 - **Memory warning** (92%): a node or a VM using more than that over ten
@@ -774,7 +774,7 @@ the nodes*, sets the numbers:
   no limit gets this one right after it starts.
 
 Every hour a node under twice the floor has Docker's build cache a week old
-and its unused images two weeks old pruned, and the projects' build caches
+and its unused images two weeks old pruned, and the spaces' build caches
 no job has used for two weeks cleared (a `cache-clear` job with an age).
 
 **The fence.** The provisioner puts everything AerieOS runs on a node in
@@ -821,8 +821,8 @@ reports none, and the controller answers `/devdata` for it until that node
 is updated.
 
 *Amended 2 September:* there are **four** stores, not three, with `artifacts`
-joins data, toolchains and cache: this node's copy of what a project built,
-per project underneath, so a VM that is several projects' node keeps two
+joins data, toolchains and cache: this node's copy of what a space built,
+per space underneath, so a VM that is several spaces' node keeps two
 `app-release.apk` apart. It exists for the node that is not on the LAN: an
 emulator or a container on a cloud node should start from a copy beside it
 rather than pulling one across the link on every run, and the second run of
@@ -892,19 +892,19 @@ somebody remembered to set.
 *Where phase 6 landed it:* `workspace.py` on the controller makes the
 dirty-tree snapshot: git's view of the tree (tracked plus untracked, minus
 ignored and minus `.git`), never `dist/`, as one uncompressed tar named by
-its sha256 under `/config/snapshots`, the last five per project kept, and
+its sha256 under `/config/snapshots`, the last five per space kept, and
 serves it to the agent's `source?digest=` verb. A run (`aerie run`, `aerie build`,
 `aerie test`, or the same `run` action on `/api/v1/jobs`) snapshots, then
-queues an exec carrying the digest on the node the project assigns to the
+queues an exec carrying the digest on the node the space assigns to the
 role in its settings dialog (build, test, ci, emulator: the last two are
 settings for phases 7 and 9). The agent fetches by digest into its cache
 store once, checks it, unpacks it under `<data>/jobs/<id>/workspace`, runs
-there with `BUILDERBOT_WORKSPACE` and a per-project `BUILDERBOT_CACHE`
+there with `BUILDERBOT_WORKSPACE` and a per-space `BUILDERBOT_CACHE`
 under the cache store, uploads what the outputs globs match through the
-`artifact` verb: into the project's `dist/` by basename, with
+`artifact` verb: into the space's `dist/` by basename, with
 `dist/.provenance/<name>.json` beside it (job, node, snapshot digest,
 command, sha256), and deletes the workspace; a failed job keeps it and
-replaces the previous kept failure of that project. The census reports the
+replaces the previous kept failure of that space. The census reports the
 cache store's size and *Clear cache* on the row is a `cache-clear` job. A
 toolchain install on a node is a `toolchain` job: the agent fetches the
 bundle (aerie, its library, the catalog) by digest into the toolchain store
@@ -920,7 +920,7 @@ real node: the mechanism is complete, the proof needs a node with a JDK.
 The job declares outputs as globs; the agent uploads on success,
 content-addressed; the controller stores them and the Artifacts view lists them
 under the version stamp that is already the convention. Retention by count and
-age per project, with pool-level quotas as the later enterprise knob.
+age per space, with pool-level quotas as the later enterprise knob.
 
 Provenance rides along nearly free and matters to both tiers: every artifact
 row already knows its job, its source digest/ref and its node. Keep that chain
@@ -972,34 +972,34 @@ job. The unhardwiring this phase owes: deploy targets touch no environment
 variable of their own: `DOCKER_HOST` became a node in phase 2, and both it
 and `DOCKER_HOST_PATHS` have since left the five places entirely (§11).
 
-**A container on a node its project is not on (R166, 10 Oct).** For a box
-that should run a project's container without ever holding its source (a
-web-facing one, a project kept off any public repository), Send to Docker
-offers every node, and one outside the project's set is marked *image
+**A container on a node its space is not on (R166, 10 Oct).** For a box
+that should run a space's container without ever holding its source (a
+web-facing one, a space kept off any public repository), Send to Docker
+offers every node, and one outside the space's set is marked *image
 shipped*. That instance is recorded `ship`, and its rebuild is two jobs: on
-the project's own node (the first that is up), build from its synced copy,
+the space's own node (the first that is up), build from its synced copy,
 `docker save` the images the compose file builds, and upload them to the
 controller (`devimage-put`, accepted only from that node for that running
 job, into the images store of `paths.py`); then on the instance's node,
 fetch it (`devimage`, the same rule), `docker load`, remove the file, and
 `up --no-build --pull never` from the instance's own compose directory.
 The image file is gone from the controller when the second job ends. A
-bind into the project's tree is refused before the build, since that node
+bind into the space's tree is refused before the build, since that node
 has no tree and must not. Making one is a person's (docker-write and the
-project's node right); the project's sessions rebuild it, as they do their
+space's node right); the space's sessions rebuild it, as they do their
 own node's, and reach its published ports (`session_net_own` counts every
-node holding a container the project owns). What the image itself holds is
+node holding a container the space owns). What the image itself holds is
 the Dockerfile's: a final stage that copies the source carries the source.
 
 **Copy or move a container to another node, its data with it (10 Oct).**
 Send to Docker makes a fresh container; Copy or move on a Containers page row
 takes one that exists, with its named volumes and its data directory, to
-any agent node, the project's own listed first (and only they carry its
+any agent node, the space's own listed first (and only they carry its
 codebase, its development and its sessions; on any other its image
 is shipped as above). The dialog shows its env to change for the new node.
 `relocate.py` runs it as three jobs, each queued when the one before
 succeeds: on the old node, stop it, pack every volume of its compose
-project and its data directory (through a `busybox` container, since a
+space and its data directory (through a `busybox` container, since a
 volume has no path the job's account reaches) and upload the file
 (`devdata-put`); on the new node, fetch it (`devdata`) and, as the dialog's
 *Its data* chose (14 Oct), either unpack it at once (make each volume again
@@ -1016,7 +1016,7 @@ around the packing (and a copy starts it again); one that is down or
 stopped is left as it is, and a failed move brings it back up at home
 only if it was up (B725). A
 copy starts the original again after packing and is a new record carrying
-the original's ref, compose file, project and risk acknowledgement; a move
+the original's ref, compose file, space and risk acknowledgement; a move
 keeps its name, takes its old node's containers down only once it is up
 there (`down`, so the old node keeps a copy of its volumes until somebody
 removes them), and goes back and starts there again if it does not come
@@ -1024,7 +1024,7 @@ up. The row says each step, and why the last one did not happen. A
 person's only: a session cannot copy or move one.
 
 **A hosting-only node: a public box that runs containers and reaches back
-for nothing (10 Oct).** For a cloud VPS that should run a project's
+for nothing (10 Oct).** For a cloud VPS that should run a space's
 workers and web-facing containers and never be a way into the home network,
 the pieces stack:
 
@@ -1051,7 +1051,7 @@ the pieces stack:
    a managed node enrolled before, so `aerie logs --node NAME --crash` has the
    boot before a crash to read; a fresh VPS keeps its journal in memory.
 2. *Make it hosting only*, ticked in the Enroll dialog or later on its page
-   (`nodes.host_only`): no project may list it, so no code, synced copy or
+   (`nodes.host_only`): no space may list it, so no code, synced copy or
    session goes there, and its hello hands it no aerie bundle, no session
    tokens and no FTP; the agent stops its session half and runs no sync. At
    the agent door (`Handler._agent`, `nodes.host_refuses`) it may say hello,
@@ -1059,11 +1059,11 @@ the pieces stack:
    fetch an image shipped to it and carry a container's data in a copy or a
    move, and nothing else (refusals audited, once an hour a verb). Only
    container, storage and network, self-update and cache-clearing jobs are
-   placed on it. A node a project still lists is refused until it is taken
-   off; the node's own Projects section lists them, each with Remove
-   (`nodeProjectsSection`), which saves that project's settings without it.
+   placed on it. A node a space still lists is refused until it is taken
+   off; the node's own Spaces section lists them, each with Remove
+   (`nodeProjectsSection`), which saves that space's settings without it.
 3. *Move the containers over* with Copy or move: each comes with its
-   volumes and data, its image built on the project's own node at home and
+   volumes and data, its image built on the space's own node at home and
    shipped, its env changed on the way where the VPS needs another port or
    address. A service that runs a registry image (mariadb) is pulled on the
    VPS (B660). One that does not come up goes back where it was, and why is
@@ -1072,14 +1072,14 @@ the pieces stack:
    directory to the new one (R191). Its registry images keep up to date
    with Check for updates and Update on the Containers page (R195); what is
    built from code keeps Rebuild.
-4. *Tick it under Also works on*, in the project's settings, where it is
+4. *Tick it under Also works on*, in the space's settings, where it is
    marked Hosting only (the Nodes section; one list on screen, `prefs.hosts`
    underneath for the hosting-only rows and `prefs.nodes` for the rest; a
-   hosting-only node may be ticked by whoever may set the project's node;
+   hosting-only node may be ticked by whoever may set the space's node;
    the Node picker above the list never offers one, since it holds no code
-   and runs no session). The project's sessions may then
+   and runs no session). The space's sessions may then
    make a container there (`aerie devapp new --node NAME`, built on the
-   project's own node and shipped) and rebuild and remove the ones there,
+   space's own node and shipped) and rebuild and remove the ones there,
    under its Agents may: Run its container, as on its own node; a node not
    named stays a person's to send to.
 4z. *One name, one row.* A script made with a name a row already wears,
@@ -1140,7 +1140,7 @@ the pieces stack:
    (Hostnames on the nginx page, the operator, 12 Oct; or typed into a route row
    with "type a hostname…", or into a container row's Route through nginx,
    and put on the list by the save): a name is added once and
-   any route on any node, for any project's container, picks it, and one a
+   any route on any node, for any space's container, picks it, and one a
    route still uses cannot be deleted. A
    node holds a list of certificate pairs, each known by the domain its
    names say (a wildcard pair for `*.example.com` is `example.com`'s; the
@@ -1196,7 +1196,7 @@ the pieces stack:
 What runs in those containers has no node token (it lives root-owned in
 the agent's own file) and reaches the controller, if at all, only as the
 tunnel's address, which is refused everything but the agent API.
-Development stays on the project's own nodes.
+Development stays on the space's own nodes.
 
 **When the box may have been taken over (R92).** The controller assumes it
 might be, and nothing the box says reaches past its own containers. The
@@ -1204,7 +1204,7 @@ tunnel address the controller refuses everything but the agent API from is
 the enroll script's, never what the node reports (`tunnel_addr`), and a
 removed node's hostname and address stay refused. A node's address is the
 X-Forwarded-For hop the proxy wrote, not the client's own, and a
-hosting-only node is opened to a project's sessions only by its containers'
+hosting-only node is opened to a space's sessions only by its containers'
 ports, never whole (`devapp.reach`). A job placed by selector is taken only
 if it is one the node may run by name (`fits`). Data brought home from it is
 unpacked only into the moved instance's own volumes: a manifest naming
@@ -1258,11 +1258,11 @@ machine (the marker names the way, so the remove undoes exactly that), read
 at the next boot, which the row asks the person for; the census says both
 whether AerieOS wrote it and whether the running kernel has groups.
 
-**Which projects a container may go under.** The project pickers on Send,
-on a row's Project and Built from, and the project a Send, copy or move is
-made from, are the asker's own list of projects, for an administrator and
+**Which spaces a container may go under.** The space pickers on Send,
+on a row's Space and Built from, and the space a Send, copy or move is
+made from, are the asker's own list of spaces, for an administrator and
 the owner as for a user (`users.may_work`, refused on the server as well as
-left out of the picker): they could add any project to their list first,
+left out of the picker): they could add any space to their list first,
 and the list is the seatbelt against a container landing under the wrong
 one.
 
@@ -1284,7 +1284,7 @@ per-pool) are a table and a lookup later, not a hunt through handlers.
 
 **Audit.** Every mutation writes a row: when, principal, action, target,
 parameter digest. Built in phase 1, because it is one middleware and one table
-now and an archaeology project later. The homelab gets "what did the session
+now and an archaeology space later. The homelab gets "what did the session
 change while I slept": genuinely useful here, where an agentic session is a
 second pair of hands, and the enterprise gets the first thing their review
 asks for.
@@ -1394,7 +1394,7 @@ block, and approval mode, and nothing else changes meaning.
 ### The unhardwiring
 
 `DOCKER_HOST` is the first of a class, and the class should be named: this
-project has grown up hard-wiring runtime behavior into the container's
+space has grown up hard-wiring runtime behavior into the container's
 environment, where changing anything means editing a template and recreating
 the container. That was fine while everything was one box; it is the wrong
 home for anything the node work touches, and the operator has asked for the
@@ -1462,7 +1462,7 @@ account and enables the unit. Package-manager abstraction and
 docker-on-request are still the shape written above, not the shape shipped.
 Notably absent: a `--workspace` role for agent nodes, since job-scoped snapshots
 replaced it (§6) for JOBS. A node that runs sessions (§19, phase 10a) mounts
-the projects share at `/workspace` all the same, through the phase-5 config
+the spaces share at `/workspace` all the same, through the phase-5 config
 plane like any other mount; that is the session's tree, not a job's.
 *Since replaced* (R162, R163, 10 Oct): the session's tree is a synced copy
 the agent keeps at `/workspace`, and nothing is mounted there.
@@ -1505,7 +1505,7 @@ tunnel to the controller, the sandbox label in `daemon.json` (docker keeps
 running; it takes at its next restart) and bb-sandbox itself. Three rings
 are asked for, in the Un-enroll dialog as boxes and on the machine as flags:
 `--stores` takes the stores on the machine's own disk (the toolchains, the
-caches, the artifacts, a dev instance's data, the synced project copies,
+caches, the artifacts, a dev instance's data, the synced space copies,
 `/var/lib/builderbot`); `--configured` undoes what was set up from the
 dashboard after enrolling (the mounts AerieOS used, `/workspace` and
 whatever a store sits on, taken out of fstab; the runners' units; the GPU
@@ -1738,7 +1738,7 @@ console is unchanged and remains the fallback.
 And the caution that survives from the first pass, now with a sharper edge:
 **the `local` node is not a sandbox.** Jobs placed on it run inside the
 controller container, beside `/config`, the dashboard credential and every
-project's source. That is already true of builds today, so it is not a
+space's source. That is already true of builds today, so it is not a
 regression, but `docker-host` on `local` stays off unless a socket is
 deliberately mounted, the Nodes screen says what `local` means, and an
 enterprise deployment should be able to disable the local node entirely
@@ -1781,28 +1781,28 @@ be ceremony. *Where it stands (30 Oct):* the controller's settings are
 **Settings** in the rail's Controller group, and the gear keeps the
 scheme, the time zone and Profile.
 
-**Project-scoped**, which node runs this project's work. One node, named in
-the project row's existing settings dialog beside the person's own settings (the
+**Project-scoped**, which node runs this space's work. One node, named in
+the space row's existing settings dialog beside the person's own settings (the
 dialog and its poll plumbing already exist in `claude-prefs.json`, and a
-second surface for per-project settings would be a second place to look).
+second surface for per-space settings would be a second place to look).
 Not a selector and not per-role: the operator dropped both, on 1 and 2
-September respectively: a project picks a machine, and that machine does its
-containers, builds, tests, CI and emulation. A project that never opens the
+September respectively: a space picks a machine, and that machine does its
+containers, builds, tests, CI and emulation. A space that never opens the
 dialog has no node, and is told so where it matters.
 
 Since 25 Sep (R82) the one node is the **primary**, and the dialog can add
-others the project also works on: a Linux node and a Windows one for a
+others the space also works on: a Linux node and a Windows one for a
 tree with both halves. Everything that reads one node keeps reading the
-primary. What the set changes: a container of the project may live on any
-node of the set and on no other (a session reaches only its own project's
+primary. What the set changes: a container of the space may live on any
+node of the set and on no other (a session reaches only its own space's
 containers on its own node, so one elsewhere would be out of reach), the
 pickers offer the set and nothing outside it, a container is only given to
-a project that works on the node it is on, starting a session asks which
+a space that works on the node it is on, starting a session asks which
 node when there is more than one, and each session's firewall reaches the
-project's containers on the set's other nodes by their published ports (a
+space's containers on the set's other nodes by their published ports (a
 Mac, Windows or guest node of the set is reached whole, having no
 containers to narrow to). There is no default node
-for a project with none: it is told to set one. Storage:
+for a space with none: it is told to set one. Storage:
 node *bindings* go in the database (they reference node ids, must survive a
 node's rename, and want auditing); the existing model/effort prefs stay where
 they are: no churn for its own sake.
@@ -1817,7 +1817,7 @@ Un-enroll; Enroll at the top; the pending-approval strip above the list when a
 bulk token is in play, in the same held-above-the-fold shape the Phone tab's
 asks use. *Where it stands (19 Oct):* the **Nodes page**, under Machines
 on the rail, shows one node at a time, picked in its bar, its sections
-Health, Projects, Sessions, GPU, Claude Code, Storage, Network and
+Health, Spaces, Sessions, GPU, Claude Code, Storage, Network and
 Advanced, with New VM and Enroll node in the bar.
 
 **The rule for anything new:** *who has to be able to change it, and what has
@@ -1838,12 +1838,12 @@ scopes is two settings wearing one name, and should be split before it ships.
   one. There is no Refresh: each node's heartbeat carries a fingerprint of
   its containers, and the page reads the selected node again when it moves.
 - **New container** and **Send to Docker manager** gain a node select,
-  defaulting to the project's configured node, else the only node, else ask.
+  defaulting to the space's configured node, else the only node, else ask.
 - The row's build/log tail is the job view scoped to that instance, and each
   row names the node it ran on (phase 4).
 
 *Where it stands (19 Oct):* the Docker manager is the **Containers** page on
-the rail, one node at a time, and a project's own containers are its page's
+the rail, one node at a time, and a space's own containers are its page's
 Docker view.
 
 ### The rest
@@ -1852,7 +1852,7 @@ Docker view.
   tail (the dev-instance row's rendering, generalized), Cancel on a row, and
   a filter for what is not over. `aerie jobs` is the read-only form: `aerie jobs
   [--node NAME] [--type T]` lists, `aerie jobs ID [--all]` reads one job's log,
-  and a session sees its project's jobs, the nodes' own toolchain and system
+  and a session sees its space's jobs, the nodes' own toolchain and system
   jobs only with the diagnostics grant.
 - Later, enterprise-flavored and additive: the audit view (a read of the
   table phase 1 starts writing), pool filters wherever a node list appears.
@@ -1861,7 +1861,7 @@ Docker view.
 
 *Where it stands (19 Oct):* the tab strip and the panes below are gone.
 Every tool is a page on the rail with an address (`#/containers`,
-`#/machines/nodes`, `#/projects/NAME/roadmap`), and the terminals and the
+`#/machines/nodes`, `#/spaces/NAME/roadmap`), and the terminals and the
 chat live in the dock at the foot of every page, which keeps them alive
 across a move between pages as the strip did. What follows is the reasoning
 as it was written.
@@ -1944,7 +1944,7 @@ notices nothing.
 **Phase 2: Tools → Nodes, and multiple Docker hosts over ssh.**
 CRUD, capability toggles, labels, test, drain, remove. The sandbox VM becomes
 an ordinary node. The Docker manager gains its node picker and per-node
-caches; the project dialog gains its Nodes group; the gear graduates to the
+caches; the space dialog gains its Nodes group; the gear graduates to the
 Settings tab as the first controller-scoped settings arrive (§13). Delivers
 "more than one Docker host" with no agent written: worth doing even if
 nothing later happens.
@@ -1955,7 +1955,7 @@ heartbeat and census, **metrics included** (§9): CPU, memory and per-store
 headroom ride the heartbeat from day one, because they prove the channel with
 something the operator actually wants to see. Job type `exec` only. Nodes may
 be `agent` or `ssh`; both work. **Stop and reassess here**: this is the phase
-that changes the project's shape.
+that changes the space's shape.
 
 **Phase 4: jobs and the queue.**
 The job model, placement function, streaming logs, concurrency, cancel,
@@ -2027,7 +2027,7 @@ of them for a controller from before the list), the node record keeps what
 was asked for under each slot, and `aerie
 ci-labels` lists every label the registry knows; this box's and every
 node runner's, with `--write` regenerating `.github/actionlint.yaml` from
-it; `aerie lint` notes a declared label no runner carries. **A project's CI
+it; `aerie lint` notes a declared label no runner carries. **A space's CI
 node setting decides where its jobs land by label**: the workflow's
 `runs-on` names the node, and nothing else can, because GitHub places the
 job, not this controller. The controller's own runner was retired on 5 Sep,
@@ -2045,14 +2045,14 @@ Modes `lan` and `funnel`; the `route` record shaped for `public`.
 
 **Phase 9: device hosts.** Required, not optional, since §18.
 
-*Where phase 9 landed it:* `aerie emu` goes to the project's node when it has
+*Where phase 9 landed it:* `aerie emu` goes to the space's node when it has
 one (`BB_EMU_LOCAL=1` keeps a verb on a box that still carries its own
 emulator): the verb is an exec job whose spec carries `aerie` argv instead of
 a command, and the agent runs this very `aerie` from the bundle in
 `<data>/emu/<project>` with the node's store as its SDK, so `sdk_env()`:
 `SDK_ROOT`, `ANDROID_HOME` at the store's `android/`, `JAVA_HOME` at its
 `jdk/`, the tools on `PATH`, AVDs under the data store. Inputs come from the
-project's `dist/` by name through the new `file` agent verb (an APK for
+space's `dist/` by name through the new `file` agent verb (an APK for
 `aerie emu install`); what the verb writes comes back through the outputs
 globs like a build's. Two catalog rows bootstrap a node for Android:
 `jdk` (Temurin 21) and `android-tools` (sdkmanager, linked in as
@@ -2206,7 +2206,7 @@ it gets argued into this section first and built second.
 3. **Windows/macOS nodes?** The agent model extends (a service instead of
    systemd), the provisioner does not. Decide before the Go agent, not after.
 4. **Session `docker`:** with several nodes, does a session's environment get
-   the project's default node, or nothing, with everything through `aerie`?
+   the space's default node, or nothing, with everything through `aerie`?
    *Answered by §18: nothing, with everything through `aerie`.*
 5. **Retention defaults** for logs, artifacts and failed workspaces: the one
    part of the design that grows without bound, at both tiers.
@@ -2215,7 +2215,7 @@ it gets argued into this section first and built second.
 
 Decided 1 September, after phase 3, and it changes the destination rather
 than the route: **the container is the controller and nothing else.** No
-build runs here, no test, no CI job, no emulator. A project names the nodes
+build runs here, no test, no CI job, no emulator. A space names the nodes
 its builds, tests, CI and emulation run on; a session on this container
 reaches them only through `aerie` verbs that submit jobs; the artifacts come
 back into `dist/`. A VM is therefore required for full function, and the
@@ -2233,17 +2233,17 @@ Three things follow, in the order they have to happen.
 Actions runner and emulation on nodes. Only then does the image drop the
 JDK, the Android SDK and emulator, .NET, Flutter and Swift, and only then
 does the local node lose `package-build`. The other order strands every
-project between a container that cannot build and a node that cannot yet.
+space between a container that cannot build and a node that cannot yet.
 `aerie toolchains` shrinks to what a session and the dashboard actually use here:
 node, Python, and the Playwright browsers for `aerie capture shot` against a URL.
 
 **Then the session's tools close.** The settings file `claude_scope()`
 already passes (`scripts/dashboard/bb-tty`) denies the file tools every
-sibling project and `VERSION`. It grows a Bash rule: denied except an
+sibling space and `VERSION`. It grows a Bash rule: denied except an
 allow-list: `aerie`, `git`, and read-only inspection. Every `aerie` verb that used
 to run something locally (`aerie emu`, a build, a test) submits a job to the
-project's node for that role, streams the log back, and refuses with the
-reason when the project has no node for it. So the job channel: audited,
+space's node for that role, streams the log back, and refuses with the
+reason when the space has no node for it. So the job channel: audited,
 node-scoped, capability-checked on the node itself: is the one execution
 path a session has.
 
@@ -2259,7 +2259,7 @@ described as the other.
 What this does to the rest of the document: rule 2 no longer promises a
 working system with zero configuration; it promises one with one decision;
 phase 9 is required; a phase 10 exists; and open question 4 ("does a
-session's environment get the project's default node?") is answered:
+session's environment get the space's default node?") is answered:
 nothing, with everything through `aerie`. The self-hosted runner on this
 container, and everything CLAUDE.md says about CI sharing the box, goes with
 phase 7.
@@ -2306,16 +2306,16 @@ question stops mattering: whoever is on the node reads the node's store.
 **Nothing here is designed yet.** These are the decisions it turns on, and
 each is a real fork rather than a detail:
 
-1. **The project tree.** The biggest one, and it argues with a rule this
+1. **The space tree.** The biggest one, and it argues with a rule this
    document already made: job workspaces are dirty-tree snapshots, *never* a
    network mount (§6). A snapshot is right for a job that runs for a minute.
    An interactive session edits one tree for hours and expects its edits to
-   still be there tomorrow. So either the node mounts the projects share and
+   still be there tomorrow. So either the node mounts the spaces share and
    that rule is narrowed to *jobs*, or `/workspace` moves to the node and this
    container's copy becomes the view rather than the original. Pick one
    deliberately; they are not compatible half-way.
-2. **A project with no node then has no session.** On 2 September the operator
-   settled the opposite: a project may have no node, and a session there still
+2. **A space with no node then has no session.** On 2 September the operator
+   settled the opposite: a space may have no node, and a session there still
    reads, edits, commits and pushes; it simply cannot compile. If sessions
    live on nodes that policy has to change, or this container keeps running
    sessions for the nodeless, which means both paths exist forever.
@@ -2353,7 +2353,7 @@ that the machine on the other side of it has nothing to run.
 Decided 5 September, and phase 10a (the node's half) is built. Each fork
 above, in order:
 
-1. **The projects share is mounted on the node**, at `/workspace`, through the
+1. **The spaces share is mounted on the node**, at `/workspace`, through the
    phase-5 config plane (one more row in the node's mounts). §6's rule is
    narrowed to *jobs*: a job's workspace is still a snapshot and never a
    mount; a session's tree is the mount, because it edits one tree for
@@ -2363,11 +2363,11 @@ above, in order:
    9-10 Oct): the node holds a synced copy at `/workspace` and mounts
    nothing there; path parity still holds, and relayed verbs wait for the
    two copies to agree (§6, the synced copy).
-2. **A project with no node has no Claude session (R47, 12 Sep).** The fork
+2. **A space with no node has no Claude session (R47, 12 Sep).** The fork
    below was settled the other way on 2 September and has been settled again:
    this container carries no Claude Code at all, so there is nothing here for
-   a nodeless project to run. Its SHELL still opens here. Both paths exist, and
-   the proxy decides per project: bound to a node whose census reports the
+   a nodeless space to run. Its SHELL still opens here. Both paths exist, and
+   the proxy decides per space: bound to a node whose census reports the
    session half up, the session is relayed there; otherwise it is this
    container's, as it always was.
 3. **The login is per node and per account**, in that account's home on the
@@ -2377,18 +2377,18 @@ above, in order:
    same way. Nothing fetches a login from anywhere: one machine, one
    account, one login. **Transcripts and memories are one place**: every
    account's `~/.claude/projects`, on every machine, is a link to
-   `/workspace/.claude/<uid>/projects` on the projects share
+   `/workspace/.claude/<uid>/projects` on the spaces share
    (`claude_projects_link` in lib/common.sh, made when the home is; on a
    node holding a synced copy, the node's own directory, mirrored with the
    controller's: see the synced copy above), and
-   the tree rule is the same on both machines: the owner in the project
+   the tree rule is the same on both machines: the owner in the space
    directory, everybody else in a worktree, so the transcript slug is the
    same string wherever the session ran, and the notebook's Memories and the
    resume chooser read a node's conversations without knowing where they
    happened. A home that already held transcripts has them copied across
    and the original kept beside the link, renamed, for the operator to
    delete. The share carries a `.bbignore`; bb-tty walls every other
-   account's directory in it as it walls a sibling project.
+   account's directory in it as it walls a sibling space.
 4. **The terminal is the same bb-tty, on the node.** The agent's screen
    relay, on the node's LAN address at port 7684, opens a pty for each
    terminal the controller carries to it (writable, the read-only twin, or a
@@ -2401,18 +2401,18 @@ above, in order:
    claim, so bb-tty shows the token to the controller
    (`POST /api/v1/tty-grant`) before anything starts, and the account, its
    name and whether it is the owner come from that answer, which also runs
-   the controller's own checks (the project is the token's, the account may
+   the controller's own checks (the space is the token's, the account may
    open it, a writable terminal is for an account with a shell). No answer,
    no terminal (B166). The tmux server is the node's; a dropped browser
    detaches.
 5. **aerie's notebook verbs are relayed**: `POST /api/v1/bb` with the session's
    token carries the words (`roadmap add …`, `bug show 3`, `version --file`),
-   the controller runs its own aerie in that project's tree and returns what it
+   the controller runs its own aerie in that space's tree and returns what it
    printed. One implementation of every verb, kept where the state is;
    the verbs that relay are one list in `scripts/lib/relay-verbs`, read by
    aerie on the node and by the server, and a test holds both to it. `toolchains`, `emu`, `run`, `build`, `test` are NOT
    relayed; they answer for the machine the session is on, which is the
-   point. The token's scope is the project; a session's credential is the
+   point. The token's scope is the space; a session's credential is the
    same scoped token it has always had (bug #16), now with a hop.
 6. **A third account.** Sessions run as `builder` (provision-linux.sh
    `--session-user`), made with the controller's PUID:PGID so files it saves
@@ -2422,12 +2422,12 @@ above, in order:
    (0700 root) and never enters a session's environment: the sessions get
    the controller's URL and certificate pin, and nothing else of the agent's.
 
-Phase 10b is built too: `server.session_target` decides per project:
+Phase 10b is built too: `server.session_target` decides per space:
 local, the node (`reported.session.up` and `/workspace` mounted), or
 refused with the reason (offline, no session half, no mount) rather than
 quietly started on the wrong machine, and `/termws` carries the terminal to
 the node's screen relay on the address it enrolled from, with `tok:` and
-`name:` after the account. The project's card carries the same decision (`session_at`,
+`name:` after the account. The space's card carries the same decision (`session_at`,
 `session_why`), so Start agent is dead with the sentence before
 anything is asked. Two of its refusals are passing and say to wait rather
 than to unbind: the agent not answering (a reboot, an update), and a node
@@ -2437,7 +2437,7 @@ re-reports the moment `/workspace` appears rather than at the next
 ten-minute hello, and the provisioner's unit orders after `remote-fs.target`
 so the first census usually has the mount already. *Since replaced* (R163
 step 6, 10 Oct): the mount refusals are gone with the mount; the gate
-waits for the project's synced copy instead ("being copied, N files to
+waits for the space's synced copy instead ("being copied, N files to
 go"), and refuses a node taken off its copy (R164). A mount the server
 refused is neither: the agent tries an unmounted fstab entry when it takes
 the census and reports what mount said (`mounts[].error`), the row and the
@@ -2462,13 +2462,13 @@ The node's sessions are on the Sessions card too: the agent's heartbeat
 carries the session account's tmux sessions (name, attached, directory,
 pane title), the controller lists them beside its own under its own naming
 rule: the owner's bare, everybody else's prefixed, `node_name` keeping the
-node's: each with an "on <node>" pill, claude_with and the project cards
+node's: each with an "on <node>" pill, claude_with and the space cards
 count them, and ending one queues a kill the agent's held poll takes at
 once (`nodes.session_kill`, `{"kill_sessions": [...]}` in the work reply).
 The two hooks a session runs post from a node too: `POST /api/v1/hook`
 with the session's token takes a `note` (the file an edit is about to
 touch, answered with who else has it open: `aerie work` reads the same
-record), an `asked` line for the project's feed, and `started`, which
+record), an `asked` line for the space's feed, and `started`, which
 bb-tty sends when it is about to make the session, since the controller cannot
 see one start on a node. The account is the token's, never the request's.
 Keys reach a node's session the same way: the key row, the read-only
@@ -2490,7 +2490,7 @@ built AVDs from `ANDROID_SYSTEM_IMAGES` is gone: an API level is what a
 store holds an image for, and `aerie emu create` fetches one. A node is a
 MACHINE: the toolchains, the card and `/dev/kvm` are its own, from
 `nodes/provision-linux.sh` and the toolchain store. `aerie emu` on a
-controller with no node for the project refuses and says where it runs.
+controller with no node for the space refuses and says where it runs.
 A node's sessions outlive a controller restart on purpose (the tmux is the
 node's) and, since B107, an AGENT restart too: the unit is installed with
 `KillMode=process`, because systemd's default takes the whole cgroup and the
@@ -2542,7 +2542,7 @@ from the other side). The controller never runs that git in the shared
 tree, whose hooks and config a session can write: it works in a repository
 of its own that borrows the tree's objects, and the node's aerie brings the
 result into the tree as the session (scripts/dashboard/gitrelay.py). A
-project's SSH deploy key is one of these: made or pasted in the project's
+space's SSH deploy key is one of these: made or pasted in the space's
 settings beside its git access token (the operator, 12 Oct), kept where its
 sessions push with it and never read it. The Claude login was
 handed to a node's account by `aerie login` with the session's token, as the

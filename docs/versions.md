@@ -1,7 +1,7 @@
 # Versions and release lines
 
-A project's version is its `VERSION` file, moved by `aerie version bump` and
-`aerie version set` where the project's policy lets a session move it, and
+A space's version is its `VERSION` file, moved by `aerie version bump` and
+`aerie version set` where the space's policy lets a session move it, and
 released with `aerie version release`. Between releases a build is
 `X.Y.Z-dev.N`, where X.Y.Z is the release the work is heading for.
 
@@ -21,7 +21,7 @@ what is meant for one.
 
 A *patch line* is one whose last number is above 0 (0.6.2). There a bump or
 a release is refused for anything but the patch, and the gate holds the
-project's own rules for what a patch may not change: a house rule named
+space's own rules for what a patch may not change: a house rule named
 `patch`, or `patch-` and a word, says in its files what that is (`aerie rules
 add patch "A patch adds no migration and keeps the API." --files
 "scripts/dashboard/statemigrations, docs/api.md"`), and `aerie tests
@@ -60,7 +60,7 @@ Every release starts as a draft, a dev build and a stable release alike:
 CI builds and attaches its files, but only the repository's own people see
 it until its owner publishes it from the Artifacts view's **Drafts**, where
 its notes are read and corrected first. Publishing is a person's press; a
-coding agent's session cannot do it, whatever the project's dials say, and
+coding agent's session cannot do it, whatever the space's dials say, and
 it is refused while the release is short of a file `.release-files` names.
 The tag and the code are public once pushed; the release's files and the
 image tags people follow are not. A tag pushes the image under its exact
@@ -86,7 +86,7 @@ Each release says how far back it reaches, in two numbers.
   upgrades from a build before it: an older `/config` is refused at start, and
   the way on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
-  from another window takes nothing but its own update, and its projects'
+  from another window takes nothing but its own update, and its spaces'
   sessions wait until it has it. The controller keeps what the previous
   window's agents need to be updated and to hand over what they left on the
   node, and nothing older.

@@ -19,7 +19,7 @@ On the controller, in its state directory (`/config`):
 - **The audit log**: when, who, what was done and to what, with a digest of
   the request rather than the request itself, so a token or an environment
   typed into a form is not kept in it.
-- **Every project's notebook**: its roadmap, bugs, house rules, design,
+- **Every space's notebook**: its roadmap, bugs, house rules, design,
   wiki, memories and chat, with who wrote each entry.
 - **Notifications** each account was shown, and **problem reports** sessions
   filed about AerieOS itself (`aerie report`), both cleared from the
@@ -27,9 +27,9 @@ On the controller, in its state directory (`/config`):
 - **Node records**: each node's name, address and what it reported about
   itself.
 
-On the projects share and the nodes:
+On the spaces share and the nodes:
 
-- **Each project's files**, and its copy on the node it builds on.
+- **Each space's files**, and its copy on the node it builds on.
 - **The coding agents' own records**: each account's sign-in to each agent
   (Claude Code, Codex CLI, Copilot CLI) on each node, kept on that node and
   used only by that account's sessions, and the transcripts each agent writes
@@ -49,24 +49,24 @@ Only when something is used, and only from your own machines:
   a Copilot session to GitHub, each under that person's own account and that
   company's terms, which they accept when they sign in to it.
 - **GitHub and the container registries**, to check for newer images and
-  apps, and **the git hosts** you add projects from.
+  apps, and **the git hosts** you add spaces from.
 - **Each toolchain's vendor**, when one is installed or checked for updates.
 - **Cloudflare's API**, only if you turn on the controller's outside tunnel.
 
 ## Removing it
 
-An administrator removes an account on the Users page, and a project, with
+An administrator removes an account on the Users page, and a space, with
 its notebook and files, by deleting it and purging it from the trash.
 Notifications and problem reports are cleared from the dashboard. A
 person's sign-in to an agent is removed by signing out on the
 Installed page. The
 whole install is removed by deleting the controller's `/config`, the
-projects share and each node's store.
+spaces share and each node's store.
 
 ## If you run AerieOS for other people
 
 The data above is yours as the operator: you decide who has an account,
-which projects they see and what an agent may do, and any duty to tell the
+which spaces they see and what an agent may do, and any duty to tell the
 people you give accounts to how their data is handled is yours. This page is
 meant as the basis for that notice. An AerieOS that is reachable from the
 internet holds the same data, so it also needs the care any service holding

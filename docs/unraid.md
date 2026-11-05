@@ -27,7 +27,7 @@ those rows. Nothing else.
 
 | I want to… | Runner token (CI runner page) | SSH key | Per-project token |
 |---|:--:|:--:|:--:|
-| Run sessions against the mounted projects, no remote git | | | |
+| Run sessions against the mounted spaces, no remote git | | | |
 | `git clone` / `pull` / `push` private repos from inside | | ● | *or* ● |
 | Run a self-hosted runner for **one repo** | ● | | |
 | Run a self-hosted runner for the **whole org** | ● | | |
@@ -40,8 +40,8 @@ public.
 | Credential | Type | Permissions | Lives where |
 |---|---|---|---|
 | **Runner token** | PAT (fine-grained), resource owner = **the org** | *One* permission; see the runner-scope table below | Typed into the node's runner on the CI runner page; kept root-only on the controller. Never visible to sessions |
-| **SSH key** | ed25519, **no passphrase** | n/a, since access is whatever the git host grants the key | Made or pasted under **Deploy key** in a project's settings (kept at `/config/deploy-keys`, root-only), or dropped into `/secrets/ssh/` by hand. Either way loaded into a root-owned agent: usable by git, unreadable by sessions |
-| **Per-project token** | PAT (fine-grained) | *Contents*: R/W on the one repository | Typed into the dashboard's clone dialog or the project's settings, stored at `/config/gitcreds/<project>` and named by that repo's `.git/config`. There is no container-wide git token |
+| **SSH key** | ed25519, **no passphrase** | n/a, since access is whatever the git host grants the key | Made or pasted under **Deploy key** in a space's settings (kept at `/config/deploy-keys`, root-only), or dropped into `/secrets/ssh/` by hand. Either way loaded into a root-owned agent: usable by git, unreadable by sessions |
+| **Per-project token** | PAT (fine-grained) | *Contents*: R/W on the one repository | Typed into the dashboard's clone dialog or the space's settings, stored at `/config/gitcreds/<project>` and named by that repo's `.git/config`. There is no container-wide git token |
 
 **Runner scope decides the runner token's permission**, and it is the only
 one that token needs:
@@ -65,7 +65,7 @@ desktop is the intended arrangement and the tightest one available.
 
 **A token is readable by a session, and that's unavoidable.** Over HTTPS, "git can
 authenticate with it" and "sessions can't read it" are contradictory: same
-user, same file. Only the ssh-agent breaks that tie. What a per-project token
+user, same file. Only the ssh-agent breaks that tie. What a per-space token
 changes is the blast radius rather than the exposure: it is scoped to one
 repository and named by that repository's `.git/config`, so a token that opens
 one repo opens one repo.
@@ -117,8 +117,8 @@ curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-builderbot.xml \
 Then in the WebUI: **Docker** tab → **Add Container** → in the *Template*
 dropdown pick **builderbot**. You get a form with everything already wired:
 
-* the projects folder (`/mnt/user/projects`) mapped to `/workspace`: one
-  mapping for all of them, so every project AerieOS makes lands in that
+* the spaces folder (`/mnt/user/projects`) mapped to `/workspace`: one
+  mapping for all of them, so every space AerieOS makes lands in that
   share and adding one never means editing the container again
 * the appdata paths for home and config
 * TZ under the advanced view, which only sets the container's own clock: each
@@ -142,12 +142,12 @@ Docker → Docker Stop Timeout) is plenty, and nothing in Extra Params changes
 it, since Unraid passes its own timeout on every stop.
 
 **Sessions are not affected by any of this.** They run on their
-projects' nodes, in tmux there, and a controller that stops does not touch
+spaces' nodes, in tmux there, and a controller that stops does not touch
 them: the dashboard simply cannot reach them until it is back.
 
 ### Stopping cleanly before an update
 
-Nothing you care about lives in the container: projects are bind mounts to the
+Nothing you care about lives in the container: spaces are bind mounts to the
 array, the accounts and settings are on the home and config volumes, and the
 sessions, their logins and the emulator are on the nodes.
 Uncommitted work is not at risk from a restart.
@@ -213,7 +213,7 @@ docker cp Aerie-Workshop:/opt/aerieos/icon.png \
 ### Android emulator (on a node)
 
 The controller runs no emulator, carries no SDK and claims no GPU: `aerie emu`
-on a project runs on that project's node, whose toolchain store holds the
+on a space runs on that space's node, whose toolchain store holds the
 emulator (the Library) and its images (Emulator page) and whose own
 `/dev/kvm` and card do the work. A node is a machine you enroll from the
 Nodes page (**Enroll node**, or **New VM**) on a VM or a spare
@@ -240,7 +240,7 @@ notebook context.
    everyone else
 4. **Finish the setup page.** Its first step is the first node (**Enroll
    node** or **New VM**, in its card); then your name and email,
-   Claude Code on the node and a first project, which can wait for Home's
+   Claude Code on the node and a first space, which can wait for Home's
    Getting started card. The rest of the dashboard opens once a node that
    runs sessions (not a hosting-only one) is enrolled and answering: nothing
    runs without one
@@ -251,28 +251,28 @@ looking at (thumbtack the ones you use to keep them on top),
 and browser terminals backed by tmux.
 
 Every tool is a page on the rail down the left edge, in groups: Home,
-Projects (with Analysis), Build (Library, Emulator, Phone, CI runner),
+Spaces (with Analysis), Build (Library, Emulator, Phone, CI runner),
 Containers (Containers, VMs), Controller (Settings, Network, Keys, Audit),
 Machines (Nodes, Storage, Installed), Sessions, Jobs (with Schedules),
 People (Users, Roles), Settings (Profile) and Help. A page your account's grants forbid is not drawn. On a phone the
-rail is a bar of five across the foot in the same order (Home, Projects,
+rail is a bar of five across the foot in the same order (Home, Spaces,
 Build, Containers, More), and
 every page is the one page area, with the terminals and the chat in the dock
 at its foot. `aerie doctor`'s verdict is the colored dot after the bell in the
 top bar; pressing it lists the checks and offers a ↻ that runs it now.
 
-The Projects page is a card for each project in the projects share, and it
+The Spaces page is a card for each space in the spaces share, and it
 says what is wrong with each one rather than hiding it: an error in red (no
 git repository, or ownership the container cannot work with), a warning in
 amber, because it is asking for something. A card with an error carries no
 Start agent, since a session cannot start there; an *archived* one
 (**Archive** in its menu) is folded under Archived at the foot of the page.
-A directory with a `.bbignore` file in it is not treated as a project: the
+A directory with a `.bbignore` file in it is not treated as a space: the
 container marks its own paths that way (the toolchain store, if you put it inside
-the projects share), and you can drop the same file into
+the spaces share), and you can drop the same file into
 anything you would rather the page ignored.
 
-**New project** in the page's bar creates one: a fresh local repo from the
+**New space** in the page's bar creates one: a fresh local repo from the
 name and the brief you give it, one unpacked from an archive you have, or a
 clone of a repository a deploy key or token can already reach, which needs
 only the URL: the name comes from the repository, and a `CLAUDE.md` it
@@ -291,7 +291,7 @@ ports: live on any shell) and **git**, which grays out when the active
 shell's directory is not a git repository.
 
 The dock starts with one workspace terminal; every terminal, that one
-included, can be minimized. **Start agent** opens one session per project:
+included, can be minimized. **Start agent** opens one session per space:
 resumable if a previous conversation exists, and **Shell** opens another
 terminal each time you click it. Terminals are named for where they are
 (`sh: <directory>`, following a `cd`; `Claude: <project>` and the like for each agent), with the full path
@@ -317,7 +317,7 @@ websocket are all on the dashboard port: the terminals are websockets at
 `/termws`, behind the same sign-in, so there is no second port to open.
 
 **On the credential.** The terminal is a writable shell inside a container that holds your loaded
-ssh-agent and read-write mounts of every project, so anyone reaching it can
+ssh-agent and read-write mounts of every space, so anyone reaching it can
 push to your repos. On a trusted LAN with a real password that is a reasonable
 trade; exposed to the internet it is not, and no password makes it one.
 
@@ -328,7 +328,7 @@ else:
 
 1. Container settings → **Scanner reports (read-only)** → your scanner's output
    directory, e.g. `/mnt/user/appdata/scanners/reports`
-2. Apply, then from a project directory: `aerie findings`
+2. Apply, then from a space directory: `aerie findings`
 
 The read-only mount is the whole design. The scanner binaries stay on the host,
 so a session can read what was found but cannot run a scan, change the rules,
@@ -396,12 +396,12 @@ Pick per your taste:
 
 | Approach | Result |
 |---|---|
-| Deploy key made or pasted in the project's settings, or an SSH key in `secrets/ssh/` | Usable *and* unreadable: the only option that gives both |
-| Per-project token, in the clone dialog or the project's settings | Session-readable by design, but scoped to the one repository that names it: a token that opens one repo opens one repo |
+| Deploy key made or pasted in the space's settings, or an SSH key in `secrets/ssh/` | Usable *and* unreadable: the only option that gives both |
+| Per-project token, in the clone dialog or the space's settings | Session-readable by design, but scoped to the one repository that names it: a token that opens one repo opens one repo |
 | `gh auth login` in a session | Same exposure, and a separate token you can revoke independently |
 
 **How the SSH shielding works:** at startup a *root-owned* `ssh-agent` loads
-every key from `secrets/ssh/` and every deploy key a project's settings made
+every key from `secrets/ssh/` and every deploy key a space's settings made
 or kept (`/config/deploy-keys`, through the root-only `deploy-key` helper,
 the builder account's second sudo rule); sessions get only the agent's socket. When
 a session runs `git push`, the agent signs the authentication challenge on its
@@ -411,18 +411,18 @@ placed in `~/.ssh` instead keep working too: that's the simple, unshielded
 option.)
 
 With several deploy keys loaded, one per private repo, ssh needs telling
-which key belongs to which repo. The dashboard's **New project…** clone
+which key belongs to which repo. The dashboard's **New space…** clone
 form does that for you: it lists the loaded keys (their public halves,
 straight from the agent), and picking one writes the selector and alias
 and clones through them: the
 same picker also shows the public key to paste into the repo's
 **Settings → Deploy keys** on GitHub. A *new* key is made or pasted under
-**Deploy key** in the project's settings, or added host-side: drop the
+**Deploy key** in the space's settings, or added host-side: drop the
 private key in `secrets/ssh/` and restart the container so the agent picks
 it up.
 
 The same picker appears when **linking** a local repo to GitHub (**Link to a git host**
-in the menu of a project that has no remote): pick the key, or none if a PAT
+in the menu of a space that has no remote): pick the key, or none if a PAT
 is configured. Linking only ever targets an *empty* GitHub repository,
 and with a PAT, one that does not exist yet is created for you, private.
 
@@ -465,9 +465,9 @@ an `NPM_TOKEN` in the secrets folder lands in the controller's `~/.npmrc`.
 Shielding covers the credentials with real blast radius: the PAT and the
 SSH private keys.
 
-## Dev instances: building a project's app
+## Dev instances: building a space's app
 
-The dashboard's Containers page can build a project's compose app and bring it up
+The dashboard's Containers page can build a space's compose app and bring it up
 and down: no GitHub minutes, no registry round trip. It builds on a **sandbox
 VM**: a small machine whose only job is running Docker, reached over ssh, with
 no real containers on it and no route to this server's daemon. Setting it up is
@@ -492,7 +492,7 @@ The first boot, what `aerie doctor` checks and how each person signs in to their
 
 ## Daily use
 
-Opening a session, a shell and the status line, adding a project, and updating: [install.md, step 7](install.md#7-daily-use-and-updating).
+Opening a session, a shell and the status line, adding a space, and updating: [install.md, step 7](install.md#7-daily-use-and-updating).
 
 ### Playwright
 
@@ -509,7 +509,7 @@ Headless works out of the box; there is no display server in the container.
 
 ### Android
 
-Nothing Android is in the image. A project builds on its node: the JDK, the
+Nothing Android is in the image. A space builds on its node: the JDK, the
 SDK (`android-tools`, platforms, build-tools) and the emulator are recipes in
 the node's toolchain store, installed from the dashboard's Library
 with that node picked. From a session:
@@ -573,12 +573,12 @@ ceiling: a container stuck in a restart loop burns through them quickly, so
 if that happens, grab the files off the share before restarting again.
 
 **File ownership.** The container writes as `99:100` (`nobody:users`). If a
-project is owned differently, fix that project once
+space is owned differently, fix that space once
 (`chown -R 99:100 /mnt/user/projects/FreshBoot`). The container
-never chowns the projects share itself; that folder is yours, and a container
+never chowns the spaces share itself; that folder is yours, and a container
 quietly changing the ownership of a share because it started is a surprise, not
 a repair. It warns in the log if it cannot write there, and the dashboard names
-any project it cannot read, write or enter.
+any space it cannot read, write or enter.
 
 **`/mnt/user` vs `/mnt/cache`.** Mount through `/mnt/user` (the FUSE layer).
 Mixing direct-disk and user-share paths for the same data corrupts files.

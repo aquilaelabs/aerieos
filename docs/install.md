@@ -19,7 +19,7 @@ new in 0.9 and experimental. A controller moves between any of them
 ### 0. Know the credentials (they are NOT interchangeable)
 
 Separate credentials for separate jobs: a **runner token** for the nodes' CI
-runners, and **git SSH keys** or a per-project token for your projects.
+runners, and **git SSH keys** or a per-space token for your spaces.
 Which of them your setup needs, what each is exactly, and the three things
 that trip people up are in
 [unraid.md, shared step 1](unraid.md#shared-step-1-credentials); decide
@@ -70,8 +70,8 @@ not a file here: it is typed on the CI runner page (under Build) and kept
 root-only by the controller. Details and threat model: [docs/unraid.md, Shielding
 secrets](unraid.md#shielding-secrets-pat--ssh-keys-from-sessions).
 
-Skippable: a project's settings can make an SSH deploy key for it or hold
-its git access token instead, one project at a time. Or, if you don't care
+Skippable: a space's settings can make an SSH deploy key for it or hold
+its git access token instead, one space at a time. Or, if you don't care
 about shielding, put keys in `home/.ssh/`; everything works, a session can
 just see them.
 
@@ -92,7 +92,7 @@ Required / usually touched:
 
 | Field | Set it to |
 |---|---|
-| Projects folder | One mapping for all of them: `/mnt/user/projects` → `/workspace`. Every folder inside it is a project |
+| Spaces folder | One mapping for all of them: `/mnt/user/projects` → `/workspace`. Every folder inside it is a space |
 | State paths | Pre-wired to `/mnt/user/appdata/BuilderBot/{home,config}` |
 | **Secrets directory** | The folder from step 2 (or leave empty if unshielded) |
 
@@ -106,7 +106,7 @@ Everything else has sane defaults: full reference in [reference.md](reference.md
 | Web dashboard | Always on (it is the controller). Map port 7680 and open it: the first page is the setup, see step 6 and [the dashboard](dashboard.md) |
 | Logs on the array | Set the **Logs directory** path field (template) / uncomment the `/logs` volume (compose) |
 | Static analysis reports | Point the **Scanner reports** path at your scanner's output dir: read-only; see [Static analysis reports](building.md#static-analysis-reports) |
-| Docker builds (CI jobs, a project's containers) | On a node, never in this container: a node's own Docker, or the Docker sandbox VM ([sandbox-vm.md](sandbox-vm.md)). The template has no Docker socket field |
+| Docker builds (CI jobs, a space's containers) | On a node, never in this container: a node's own Docker, or the Docker sandbox VM ([sandbox-vm.md](sandbox-vm.md)). The template has no Docker socket field |
 | Extra tools | the Library, per node; the controller carries what it needs in the image |
 | Virtual machines | **VM host** in a node's Features section on the Nodes page (or ticked on Enroll node), on a machine with `/dev/kvm`; then the VMs page, see [vms.md](vms.md) |
 | A box on the internet that only serves | Enroll it hosting-only and tick the hosting firewall: it takes in 80 and 443 alone, and its page's **Lock down** stops and revokes it in one press |
@@ -122,7 +122,7 @@ Then open the dashboard. The first page makes the owner account; the setup
 page after it is four steps, each a card with its own button: your first
 node (**Enroll node** for a machine you already have, **New VM**
 for a new VM), your name and email, Claude Code on that node, and a first
-project. The node cannot be skipped: nothing runs without one, so **Finish**
+space. The node cannot be skipped: nothing runs without one, so **Finish**
 opens only once one is enrolled and answering, and it has to be one that
 runs sessions, not a hosting-only one. The other three can wait: Home keeps
 them in its Getting started card. Storage and the idle timeout are not
@@ -142,7 +142,7 @@ on a node, where sessions run.
 
 Each person signs in to the agent they use (Claude, ChatGPT or Copilot) on
 each node they work on, from that agent's row of the Installed page
-(under Machines): **Sign in**, which a project's **Start agent** offers the
+(under Machines): **Sign in**, which a space's **Start agent** offers the
 first time. The flow runs on that node, the machine the agent is installed
 on: Claude's code is pasted back in the section, and ChatGPT's and
 Copilot's device codes are entered at OpenAI or GitHub. Each node keeps the
@@ -172,7 +172,7 @@ the same reason; they make a job look routable when nothing will pick it up.
 ### 7. Daily use and updating
 
 A session is opened from the dashboard, with **Start agent** on the
-project's card or page, and runs on that project's node. There is no
+space's card or page, and runs on that space's node. There is no
 `claude`, `codex` or `copilot` in this container to exec into.
 
 ```bash
@@ -180,10 +180,10 @@ docker exec -it Aerie-Workshop aerie shell                        # shell as bui
 docker exec -it Aerie-Workshop aerie status                       # what this box is
 ```
 
-**Adding a project**: **New project** on the Projects page makes one, as a
+**Adding a space**: **New space** on the Spaces page makes one, as a
 fresh repository, a clone of one on a git host, or from an archive you already
-have. Only AerieOS makes a project: a folder made by hand on the projects
-share is not listed. A project with a problem says so on its card: no git
+have. Only AerieOS makes a space: a folder made by hand on the spaces
+share is not listed. A space with a problem says so on its card: no git
 repository or the wrong ownership in red.
 
 **The apps for your machines**: the Android app is a card on the
@@ -218,7 +218,7 @@ and move it on when you choose to upgrade.
 
 - From any release to any later release, in one step, from 0.9 on.
 - **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from BuilderBot
-  0.8 or earlier: install fresh, with a new `/config`, and add your projects
+  0.8 or earlier: install fresh, with a new `/config`, and add your spaces
   again from their repositories.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
   below, with the older image.
@@ -280,7 +280,7 @@ it to answer rather than for a node you enroll; Enroll another machine is
 there for more, and none is needed. `sudo aerie ...` is the container's `docker exec -it
 AerieOS aerie ...`.
 
-Options worth knowing: `--workspace PATH` (the projects folder, by default
+Options worth knowing: `--workspace PATH` (the spaces folder, by default
 `/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),
 `--docker` (the controller's account in the docker group, the bare-metal
 form of mounting the docker socket into the container: containers can then
@@ -330,8 +330,8 @@ back on the new release.
 
 **Taking it away.** `--remove` stops the controller and takes away its
 release, service, `aerie` and wall, and this machine's node; the state, the
-env file, the secrets, the account and the projects stay, and `--install`
-puts it back on them. `--remove --purge` takes all but the projects.
+env file, the secrets, the account and the spaces stay, and `--install`
+puts it back on them. `--remove --purge` takes all but the spaces.
 
 **The appliance image.** A machine that is only AerieOS can run the
 installed edition from the appliance image instead: Debian pinned to a
@@ -360,7 +360,7 @@ container to a machine of its own, and back.
    the bundle carries beyond the state and the deploy key (each store kept
    outside the state, with its size; the repositories, unless the new home
    reaches the same folder, a share both mount or the disks the new machine
-   adopts, where This machine names it as the projects folder (see
+   adopts, where This machine names it as the spaces folder (see
    [image.md](image.md)); the install key, when the new home should not ask
    for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
@@ -372,7 +372,7 @@ container to a machine of its own, and back.
    and open its page. It asks whether you are moving a controller here: say yes
    and make a setup account, and the next page, **Moving here**, walks through
    what the move takes, in order and on that page: on a stick its disks and where
-   the projects go, then the token with the old controller's address, while it
+   the spaces go, then the token with the old controller's address, while it
    still runs (the new home pulls the bundle from it, packed at that moment,
    under a proof derived from the token). The setup account goes when the move
    lands. Anywhere but a stick, the first page also lands it at once with no
@@ -413,7 +413,7 @@ container to a machine of its own, and back.
    row is retired there). A bare-metal destination keeps the node its own
    machine already is: AerieOS enrolls it at the first boot, and the
    landing carries that node and its credential into the moved state, so
-   its agent goes on without enrolling again, and the projects that ran on
+   its agent goes on without enrolling again, and the spaces that ran on
    the source's own machine run on this one; a stick's prepared plan of
    disks to adopt is kept the same way. A bare-metal install whose machine
    is not a node yet enrolls it afresh with the installer. A same-address move (the new home takes over

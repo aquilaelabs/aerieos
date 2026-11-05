@@ -1,4 +1,4 @@
-# Users, roles and project access
+# Users, roles and space access
 
 *Design, 4 September 2026, built since under roadmap #22. The sections below
 keep the reasoning as it was written; where they say what is to be built, it
@@ -11,8 +11,8 @@ absolute. `DASHBOARD_AUTH=user:password` gets you the dashboard, and the
 dashboard has no idea who you are once you are in: every button is available to
 whoever opened the page. Three things follow.
 
-- There is no way to let somebody work on one project without handing them
-  every project, the Nodes page, the toolchain installer and the phone.
+- There is no way to let somebody work on one space without handing them
+  every space, the Nodes page, the toolchain installer and the phone.
 - A Claude session is given that same credential, so "the operator only" is a
   convention rather than a mechanism (bug #16).
 - It is the last big thing hardwired into the template. Everything else the
@@ -23,8 +23,8 @@ whoever opened the page. Three things follow.
 
 Three built-in roles, one special account, and since R137 (5 Oct) roles of
 your own: named sets of grants, made on the Roles page and given to a
-person in their settings on the Users page, or by a project's owner from
-a name in that project's People section (17 Oct). The first version of
+person in their settings on the Users page, or by a space's owner from
+a name in that space's People section (17 Oct). The first version of
 this page said "not a permission matrix", and for a long time that held;
 what changed is that the three roles grew combinations nobody could read
 off them (a user who may push, an administrator who may not touch a node),
@@ -32,13 +32,13 @@ and the operator asked for a person to be given a group of permissions
 instead.
 
 A **grant** is a capability on a scope. The capabilities are the actions
-the gate already asks about: `read` and `work` on a project (`work` is
+the gate already asks about: `read` and `work` on a space (`work` is
 everything a person does there that is not listed on its own), `version`,
 `lock`, `rename`, `trash`, `git-auth`, `docker-write` and `command-pin` on
-a project, `node`, `toolchains-write`, `jobs` and `terminal` on a node,
-`create`, `runner` and `admin` for the controller. A scope on a project is
-every project, the projects the account is on, or named ones; on a node it
-is every node, the nodes of the account's projects, or named ones. A
+a space, `node`, `toolchains-write`, `jobs` and `terminal` on a node,
+`create`, `runner` and `admin` for the controller. A scope on a space is
+every space, the spaces the account is on, or named ones; on a node it
+is every node, the nodes of the account's spaces, or named ones. A
 **role** is a named set of grants; an account carries its built-in role
 and any of your own, and their grants add up: a role never takes anything
 away, so the sum is readable. The built-in roles below are grants too, the
@@ -48,7 +48,7 @@ and pages are drawn from the same answer the server refuses on
 (`state.can`), which is what keeps them consistent.
 
 **An area instance by instance** (R260, 16 Oct). On an Everywhere role the
-areas that reach a machine (Nodes, Toolchains, Jobs, New projects, Storage)
+areas that reach a machine (Nodes, Toolchains, Jobs, New spaces, Storage)
 open on the nodes, and CI runner on each runner, with Read and Write on each.
 The area's own boxes tick or clear every instance, and show partly ticked
 when some are held; every instance ticked at one level is the area on every
@@ -56,29 +56,29 @@ instance, nodes and runners added later included. The server holds each
 action to the instance it touches: a node's verbs to Nodes Write on that
 node, a runner's to CI runner Write on that runner, and making a new node or
 runner to Write on every one, since a new one is none of those named yet.
-Jobs are still listed by project; Jobs per node says where one may be run.
+Jobs are still listed by space; Jobs per node says where one may be run.
 
 | Role | What it is |
 |---|---|
-| **owner** | The master admin. Exactly one, always. Its username can be changed; it cannot be deleted, demoted, locked or stripped of a project. Every other rule is a guard rail around that sentence. |
+| **owner** | The master admin. Exactly one, always. Its username can be changed; it cannot be deleted, demoted, locked or stripped of a space. Every other rule is a guard rail around that sentence. |
 | **admin** | Everything the owner can do, *except* anything aimed at the owner: no deleting it, no demoting it, no changing its password. |
-| **user** | Named projects, and the work inside them. Not where that work runs. |
+| **user** | Named spaces, and the work inside them. Not where that work runs. |
 
-A user, on a project they have: sessions, the terminal, the notebook,
-artifacts, dev instances, builds and tests, and the project's own build and
+A user, on a space they have: sessions, the terminal, the notebook,
+artifacts, dev instances, builds and tests, and the space's own build and
 test commands. Not: deleting, renaming or trashing it, and nothing outside the
-projects they were given.
+spaces they were given.
 
-**Which node a project builds on, and that node's configuration, are an
+**Which node a space builds on, and that node's configuration, are an
 admin's.** There was briefly a fourth role that could do those two things; it
 went, and the reason is the thing worth keeping: *a node is shared*. Changing
-the stores or the network of the node project A builds on changes it for every
-other project on that node, including ones the person doing it cannot see.
+the stores or the network of the node space A builds on changes it for every
+other space on that node, including ones the person doing it cannot see.
 That is not a project-scoped act however it is reached, so it does not belong
 to a project-scoped role. Enrollment, revocation, retiring, runner installs
 and agent updates were never in question and stay with an admin too.
 
-In the project's settings dialog this is a field, not a page: a user opens the
+In the space's settings dialog this is a field, not a page: a user opens the
 dialog and edits the build command, and the node select is not theirs to
 change.
 
@@ -90,21 +90,21 @@ somebody decides it should not be.
 **A session, and the branch it works on, are its account's.** Nobody presses
 a key in another person's session or types into it, an admin included: a key
 there answers a question it asked them (B172). An admin may end one, from the
-project's settings, which list every account's sessions on that project. A
+space's settings, which list every account's sessions on that space. A
 branch belongs to the session that works on it: checked out in that account's
-worktree, or `claude/<name>` for an account that exists, and the project
+worktree, or `claude/<name>` for an account that exists, and the space
 directory's branch is the owner's; main is everybody's. A user merges only
 their own. An admin may merge anyone's, is asked each time with the owner
 named, and is refused while that person's Claude session is working, because
-a branch mid-prompt holds half a change. A merge into the project directory
-waits only while the session standing in it is working. The project
+a branch mid-prompt holds half a change. A merge into the space directory
+waits only while the session standing in it is working. The space
 directory is the owner's working tree: from the Git view nobody else
 commits, discards, reverts, pulls or switches branches in it, an admin only
 after being asked, and merging into main stays everybody's (git.py
 `not_yours`, projsessions.py; the operator, 24 Sep).
 
-Which other projects a project's sessions may read (its settings' Reads) is
-AerieOS's owner's alone: it hands one project's sessions another's code
+Which other spaces a space's sessions may read (its settings' Reads) is
+AerieOS's owner's alone: it hands one space's sessions another's code
 and notebook, so no administrator or user grants it on their own say,
 whatever their roles. They see the list and save the rest of the dialog;
 a change to it is refused, and the row says why (the operator, 6 Oct).
@@ -148,32 +148,32 @@ and should keep working unchanged.
 Today a session inherits the operator's credential, which is why "only the
 operator can install a toolchain" is a rule the code asks nicely about.
 
-Under this model a session is given **a scoped token**: one project, `user`
+Under this model a session is given **a scoped token**: one space, `user`
 rights, revocable, and never a person's password. That is the actual fix for
 bug #16, and it belongs here rather than in a separate effort: the token has
 nowhere to come from until users exist.
 
 ## Enforcement, and why it is mostly one function
 
-A project you cannot see does not appear, not grayed out, not present and
+A space you cannot see does not appear, not grayed out, not present and
 refused. Absent.
 
 That is cheaper than it sounds, because there is already one chokepoint.
-`server.project_list()` is what enumerates the projects share, and all
-seventeen of its callers go through it: the Projects page, the state payload, and
+`server.project_list()` is what enumerates the spaces share, and all
+seventeen of its callers go through it: the Spaces page, the state payload, and
 every `if name not in {p["name"] for p in project_list()}` guard. Filter it by
 the requesting principal and three things happen at once.
 
 - The GUI stops listing what the person cannot see, everywhere, because
   everywhere reads the same list.
 - **The existence check becomes the permission check.** Somebody asking
-  `/api/roadmap?project=payroll` gets *not a project*: the same answer a typo
+  `/api/roadmap?project=payroll` gets *not a space*: the same answer a typo
   gets. No separate `may()` call at those seventeen sites, and no way to probe
-  which projects exist by comparing error messages.
-- Anything added later that lists projects is covered on the day it is
+  which spaces exist by comparing error messages.
+- Anything added later that lists spaces is covered on the day it is
   written, because it will call the same function.
 
-What is left for `may()` is the short deny list on projects a user *does*
+What is left for `may()` is the short deny list on spaces a user *does*
 have: delete, rename, trash, and changing the node it builds on. A handful of
 endpoints, named explicitly.
 
@@ -188,8 +188,8 @@ theatre grows.
 **Any account with a Claude session is a powerful thing.** Code
 generation plus a shell is most of a computer. The session's own boundary is
 the sibling-project deny list, and that is a guardrail rather than a sandbox:
-the file tools refuse the other projects, `Bash` is not covered, and
-CLAUDE.md says so out loud. So somebody who wants to read a project they were
+the file tools refuse the other spaces, `Bash` is not covered, and
+CLAUDE.md says so out loud. So somebody who wants to read a space they were
 not given can, with effort, from a session they were given.
 
 These roles are therefore for **scoping, not containment**: deciding who works
@@ -198,7 +198,7 @@ name a person. It is meant for people you would already trust with a shell on
 this box. It is not a defense against one of them deciding to go looking.
 
 Building it as though it were would mean sandboxing every session, and that is
-a different and much larger project, and one the node work has quietly made
+a different and much larger space, and one the node work has quietly made
 tractable: a person who needs a hard boundary gets their own node, where the
 boundary is a machine rather than a rule. Until somebody needs that, this is
 the honest amount of mechanism.
@@ -206,7 +206,7 @@ the honest amount of mechanism.
 ## The surface
 
 **Users**, under People on the rail, is a page of settings: the accounts as a
-list beside the picked one's settings (its name, roles and projects, profile
+list beside the picked one's settings (its name, roles and spaces, profile
 and password, saved together), **Add user** at the right of the page's bar,
 and Remove at the foot. The owner's carries no Remove and says why, rather
 than offering one that fails.

@@ -6,7 +6,7 @@
 
 <p align="center">
   Your own server, for your files, your apps and your code: your disks, shares, apps and VMs
-  and your projects in one dashboard, with coding agents (Claude Code, ChatGPT's Codex CLI,
+  and your spaces in one dashboard, with coding agents (Claude Code, ChatGPT's Codex CLI,
   GitHub's Copilot CLI and xAI's Grok Build) when you want them.
 </p>
 
@@ -25,8 +25,8 @@
 > to lose: try it on separate repositories made for testing, and keep backups
 > of what it works on.
 >
-> **Check a project's rules before you use it there.** Some open source
-> projects, employers and clients forbid AI coding tools, or contributions
+> **Check a space's rules before you use it there.** Some open source
+> spaces, employers and clients forbid AI coding tools, or contributions
 > written with them. That is their call to make, and AerieOS does not
 > check it for you.
 
@@ -34,13 +34,13 @@
 
 AerieOS is a **controller** and the machines you enroll under it, the
 **nodes**. The controller keeps the dashboard and the record of every
-project: its plan, its bugs, its rules, its design. The nodes do the work:
+space: its plan, its bugs, its rules, its design. The nodes do the work:
 the agents' sessions, builds, tests, CI, Android emulators, containers and
 virtual machines.
 
-Each project holds git repositories on a shared disk. Open it from the
+Each space holds git repositories on a shared disk. Open it from the
 browser, on a desktop or a phone, and a session of Claude, ChatGPT, Copilot
-or Grok starts on its node already briefed with the project's house rules,
+or Grok starts on its node already briefed with the space's house rules,
 roadmap and open bugs. Close the tab and the session keeps going.
 
 On a machine of its own it is a NAS as well: the disks as pools or an array
@@ -86,10 +86,10 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   CLI), Copilot (Copilot CLI), Grok (Grok Build) and any model through a
   node's model router (OpenCode), each started with Start agent and held to
   the same briefing, rules and guards. Real terminals in a dock at the foot
-  of every page, at a desk or on a phone, each session in its own project's
+  of every page, at a desk or on a phone, each session in its own space's
   view of the disk. Resume, restart, pick the model and effort, and a note on
-  the project's page when a running session is behind what changed.
-- **A page per project.** Its overview and house rules, roadmap, bug
+  the space's page when a running session is behind what changed.
+- **A page per space.** Its overview and house rules, roadmap, bug
   tracker, git, tests, static analysis, artifacts, containers, VMs, wiki and
   design, shared between you and every session that works there.
 - **Nodes that do the work.** Enroll a Linux machine or VM with one script:
@@ -103,35 +103,35 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   router, and apps as containers, as one store of cards per node; what is
   installed is managed on the Installed page, where each thing is configured
   where it lives, and a card the node cannot take is not drawn.
-- **Builds, tests and CI.** `aerie build` and `aerie test` run on the project's
-  node, a test run is timed and recorded, a node picked as a project's test
+- **Builds, tests and CI.** `aerie build` and `aerie test` run on the space's
+  node, a test run is timed and recorded, a node picked as a space's test
   node runs its suites as a job, and a node can be a self-hosted GitHub
   Actions runner.
-- **Android end to end.** An emulator per project, a real phone lent through
+- **Android end to end.** An emulator per space, a real phone lent through
   the companion app, screenshots and frame-by-frame reels a session can read,
   and release signing with keys no session ever sees.
-- **Containers and hosting.** A project's compose file becomes a dev
+- **Containers and hosting.** A space's compose file becomes a dev
   instance with one click; hosting-only nodes run what a dev node built, and
   an nginx per node puts a hostname and a certificate in front of it, from
   Let's Encrypt where you ask. A public box can take in only 80 and 443,
   and Lock down stops it and revokes it in one press if it is ever taken over.
-- **Virtual machines.** A project's VMs on any node with KVM, made from a
+- **Virtual machines.** A space's VMs on any node with KVM, made from a
   cloud image or an installer's ISO (Windows included), each on its own
   network, with snapshots, more disks when it needs them, USB devices given
   through, and its screen and console in the dock. Ask a session for "a
-  Debian 12 VM with 4 GB" and it makes one, where the project allows it.
+  Debian 12 VM with 4 GB" and it makes one, where the space allows it.
 - **Storage, on the installed editions.** The machine's disks as ZFS pools
   or an array of mixed disks with parity, SMB and NFS shares, a pool for
   each purpose, snapshots, backups of the pools and a sealed copy of the
   controller's own configuration after every change.
-- **People and permissions.** Accounts with roles, per-project access, and a
+- **People and permissions.** Accounts with roles, per-space access, and a
   dial for everything a session may do on its own (file bugs, add rules, run
   its container, sign a release): allowed, asked of a person, or refused.
   Two-factor sign-in, passkeys, and the bell reaching you by email, a
   webhook, ntfy, Gotify, Pushover, Telegram, Discord or Slack.
 - **Secrets kept sealed.** A key made at install seals what the controller
   keeps. Each person has a store of their own for their agents' sign-ins
-  and the git tokens they give a project, which they can hold under a key
+  and the git tokens they give a space, which they can hold under a key
   of their own or purge at any time. A session reaches a git host only
   through `aerie git`, which hands over the credential, so the session never
   holds it.
@@ -292,7 +292,7 @@ account, so do this before anyone else can reach it. Then:
 3. **Install an agent on the node**: Build, then the Library, with that node
    picked: Claude Code, Codex CLI for ChatGPT, Copilot CLI or Grok Build;
    then sign in to it on the Installed page under Machines.
-4. **Add a project** on the Projects page (clone one, start an empty one,
+4. **Add a space** on the Spaces page (clone one, start an empty one,
    or upload an archive), and press **Start agent**.
 
 The full checklist, with every option, is
@@ -312,7 +312,7 @@ Everything else, from installing to the full command reference, is in
 - [Storage](docs/nas.md): pools, the array, shares, what is built on top
 - [Start here](docs/start-here.md), for an account on somebody else's AerieOS
 - [How it works](docs/how-it-works.md), the overview, with a doc for each part
-  of the dashboard: [projects](docs/projects.md), [a project's page](docs/notebook.md),
+  of the dashboard: [spaces](docs/projects.md), [a space's page](docs/notebook.md),
   [sessions](docs/sessions.md), [building](docs/building.md),
   [toolchains](docs/toolchains.md), [containers](docs/containers.md), [VMs](docs/vms.md),
   [machines](docs/machines.md) and [people](docs/people.md)

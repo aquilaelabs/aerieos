@@ -7,7 +7,7 @@ what was pressed in what order, where it snagged, and what that moved from
 dev to alpha (house rule `vetting`). A walk that snags is the point of
 walking it; the snag is fixed or filed, then the walk continues.
 
-## New deploy to first project to first build and test (15 September 2026)
+## New deploy to first space to first build and test (15 September 2026)
 
 The starting state was made by the two verbs built for it that day: **Reset
 AerieOS** on the controller (Settings page, the word `reset` typed), which
@@ -15,16 +15,16 @@ moved every account, node, setting, token and notebook into a dated
 directory and brought the dashboard back at *Create the owner*; and
 **Uninstall** on the node, which took the agent, its accounts, its mounts,
 its stores and `bb-sandbox` off the VM and left docker, a few packages and
-three empty mountpoints. Project files on the share were not touched by
+three empty mountpoints. Space files on the share were not touched by
 either, which is what a fresh dashboard then shows.
 
 What was pressed, in order:
 
 1. **Create the owner.** The setup form, one account. No snag.
-2. **The first look.** The Projects card listed a project left over on the
+2. **The first look.** The Spaces card listed a space left over on the
    share from before the reset. Trashed from its row and purged from the
    Trash, both asking for the name. No snag; a fresh install on a share that
-   held projects before will see the same, which is right.
+   held spaces before will see the same, which is right.
 3. **Enroll node.** The Nodes page minted a token and showed the command:
    `sudo bash provision-linux.sh --controller URL --token bbe_…`. *Snag:* the
    dialog does not say where `provision-linux.sh` comes from, and the
@@ -45,7 +45,7 @@ What was pressed, in order:
    refusal names the path and the remove verb; the tab shows them installed.
    Not a snag, and a good property: a second node inherits the first one's
    toolchains.
-6. **New project.** Clone of the lab forge's `lab/hello` with a token, push
+6. **New space.** Clone of the lab forge's `lab/hello` with a token, push
    rights ticked. Bound to the node in its settings with a build command, a
    test command and an output glob. No snag.
 7. **A session's verbs, without a session.** The dev pair has no Claude
@@ -78,15 +78,15 @@ What a new user would still stumble on, in order of when they meet it: where
 to get the provisioner (filed), the `useradd` warning during provisioning
 (B131), and a git read refusing for want of a commit identity (B128).
 
-## A Docker project, an Android app, and three people on one project (16 September 2026)
+## A Docker space, an Android app, and three people on one space (16 September 2026)
 
 The second walk, page-driven at desktop and phone widths, on the pair the
 first walk left behind: the owner `stencil`, the node `bb-dev-sandbox`, the
-project `hello`. Three things the mandate asked for, in the order they were
+space `hello`. Three things the mandate asked for, in the order they were
 done, with what snagged and what was moved.
 
-**A compose project through the Docker manager.** A one-file nginx project
-(`web`) was made from the New project dialog, bound to the node in its
+**A compose space through the Docker manager.** A one-file nginx space
+(`web`) was made from the New space dialog, bound to the node in its
 settings, and sent to Docker from its Artifacts view. The dialog asked for
 the instance name and a confirm, the build ran as a job on the node, Up
 brought it up, and the site answered on the node's address. *Snag, fixed
@@ -100,7 +100,7 @@ build would wait the build out): the last answer stands until the job ends.
 
 **An Android app, built on the node.** JDK, the Android command-line tools
 and the platform tools were installed from the Toolchains page (the Library's
-toolchains today) with the node picked (a job each; the tab shows the running one). A new empty project
+toolchains today) with the node picked (a job each; the tab shows the running one). A new empty space
 (`droid`) took a one-screen Java app with Gradle 8.14 and AGP 8.10, its
 settings took the node, `./gradlew assembleDebug` and the APK glob, and
 `aerie build` was run on the node under the exact environment a session gets
@@ -118,20 +118,20 @@ Library's today) asked to install the emulator's libraries on a node that had ne
 installed the emulator, because every android recipe shares one directory
 (B139, fixed: a recipe is held when its own tool exists).
 
-**Three people on one project.** The owner added `dev2` (a user, granted
-`hello` only) and `dev3` (an admin). As dev2: the Projects card listed
+**Three people on one space.** The owner added `dev2` (a user, granted
+`hello` only) and `dev3` (an admin). As dev2: the Spaces card listed
 `hello` and nothing else; the API refused everything not hers (artifacts
-"not a project", roadmap and settings "not found", users "that is an
+"not a space", roadmap and settings "not found", users "that is an
 administrator's"); the Claude button opened a session on the node in a
 worktree of her own (`.worktrees/hello/<uid>`) on the read-only console
 with the "message Claude, then Enter" bar, while the owner's session on the
-same project ran beside it in the project directory: three tmux sessions on
+same space ran beside it in the space directory: three tmux sessions on
 the node at once, each named for its account. *Snag, fixed (B141):* with
 both accounts carrying one Claude login, pressing Claude again to get back
 to your own running session was refused with the one-account sentence
 naming the other person, and the refusal arrived as the browser's JSON
 viewer inside the tab. *Snag, fixed (B142):* dev3, an admin, was told to
-take the project on from the Users page, whose editor hid the project list
+take the space on from the Users page, whose editor hid the space list
 for anyone but a user. *Filed:* the sign-out button of a user whose login
 is shared names a session that is not theirs (see the notes in B137's
 area), and a plain user's Doctor card carried the controller's whole pill
@@ -150,14 +150,14 @@ What this walk moved or confirmed:
 - Alpha, new evidence: the Docker manager against an agent node end to end
   (Send, build, Up, the route); the Android toolchain from the Toolchains page (now the Library) and
   a Gradle build on a node with the store's JDK and SDK; several accounts
-  with sessions on one project at once, each in its own tree; the users
+  with sessions on one space at once, each in its own tree; the users
   editor and the API's per-account refusals.
 - Still dev: nothing this walk touched; the unwalked hosts and hypervisors
   stay where they are.
 
 What a new user would still stumble on, in order of when they meet it: the
-New project dialog has no node picker, so every project is born with
-"node: none" and needs its settings before Claude can start; a project's
+New space dialog has no node picker, so every space is born with
+"node: none" and needs its settings before Claude can start; a space's
 settings dialog leads with rename; the Docker row stacks three settings
 pickers above its buttons; and the notebook foot's Save and Revert sit
 ghosted on views with nothing to save.
@@ -172,28 +172,28 @@ setup: `stencil` (owner), `dev2` (user, granted `hello` alone), `dev3`
 
 What was pressed, in order:
 
-1. **New project, from nothing.** `journey-scratch`, no git host, a sentence
+1. **New space, from nothing.** `journey-scratch`, no git host, a sentence
    of notes. It came back as a repository on `main` with CLAUDE.md written
-   from those notes, and its row said `no node: pick one in the project's
+   from those notes, and its row said `no node: pick one in the space's
    settings, or enroll one on the Nodes page`. No snag: the row names the one
    thing standing between it and a session, which is what the 16 September
    walk asked for.
-2. **The same box as dev2.** The Projects card listed `hello` and nothing
+2. **The same box as dev2.** The Spaces card listed `hello` and nothing
    else. `journey-scratch`, made a minute earlier, was not there.
 3. **Reaching past the grant, as a person does by pasting a link.** The Git
    view, the roadmap, the changelog and the settings write, all named
    `journey-scratch`, all answered 400 `not a project` rather than 403. That
-   is the design and it is the right one: a project somebody cannot see does
+   is the design and it is the right one: a space somebody cannot see does
    not exist for them, so the answer is the same one a typo gets and leaks
-   nothing. Creating a project at all was 403, which a plain user may not do.
+   nothing. Creating a space at all was 403, which a plain user may not do.
 4. **...and doing the job they were given.** The other half, because a grant
    that is too tight fails a tester as surely as one that leaks: on `hello`,
    the Git view, the roadmap and the changelog all answered, the row said the
-   project was theirs to work in, and a session could start on
+   space was theirs to work in, and a session could start on
    `bb-dev-sandbox`.
-5. **As dev3, the admin.** Every project listed, and none of them marked
+5. **As dev3, the admin.** Every space listed, and none of them marked
    theirs to work in. That is the seatbelt the code describes rather than a
-   wall: hiding a project from somebody who administers the box would only
+   wall: hiding a space from somebody who administers the box would only
    send them looking for it.
 
 No snag in any of it. The isolation a second person meets holds at both
@@ -204,7 +204,7 @@ the code.
 from the image it was last built from, and only its TEST runs use the live
 checkout. It was serving `0a1cfb3`, built twenty hours earlier and thirty
 commits behind the branch, so everything hardened that day (a session's
-findings scoped to its own project, the per-account model and commit author,
+findings scoped to its own space, the per-account model and commit author,
 B165's atomic fix) was not in what was walked. The walk proved yesterday's
 isolation.
 
@@ -220,7 +220,7 @@ branch head, so the same ground was covered again with that day's work
 actually present. A session token was minted against the dev controller's own
 state, which is what stands in for a Claude session there.
 
-6. **A session sees its one project.** The token for `hello` listed `hello`
+6. **A session sees its one space.** The token for `hello` listed `hello`
    and nothing else, and the poll's finding counts were empty rather than the
    box's.
 7. **Parking, and not un-parking.** The session added a roadmap step, shelved
@@ -228,18 +228,18 @@ state, which is what stands in for a Claude session there.
    shelf is the operator's*. The owner then unshelved it in one call. That is
    the asymmetry the control was built for, proved from both sides rather than
    from the tests alone.
-8. **Two people, one project, two models.** As the owner, `hello` was given a
+8. **Two people, one space, two models.** As the owner, `hello` was given a
    model, an effort and a commit author. The owner's row carried them under
-   `yours`; `dev2`, who has the same project, carried none of them; and the
-   project's own settings carried no model at all. Asked the way a session is
+   `yours`; `dev2`, who has the same space, carried none of them; and the
+   space's own settings carried no model at all. Asked the way a session is
    asked (`aerie settings --json` for each seat), the owner's session would
    launch on `opus` at `high` and commit as `Stencil Alt`, while `dev2`'s on
-   the same project would launch on Claude's own default and commit as
-   themselves. That is the whole of what "yours, not the project's" was meant
+   the same space would launch on Claude's own default and commit as
+   themselves. That is the whole of what "yours, not the space's" was meant
    to mean, seen from outside the code.
 
 No snag. Everything set during the walk was put back, and the box was left
-with the four projects it started with.
+with the four spaces it started with.
 
 - Alpha, new evidence: several accounts on one controller, each seeing only
   what they were granted, proved from the outside rather than from the tests.
@@ -290,7 +290,7 @@ at all, and macOS, which is R23 step 3 and wants a Mac.
   a managed node.
 - Still dev: the macOS half, which has never been run on a Mac.
 
-## 20 September: the Git view on a project linked over http, and two people
+## 20 September: the Git view on a space linked over http, and two people
 
 Walked on the dev pair after `aerie devapp rebuild`, so the instance was serving
 the branch tip (05381aa) rather than whatever it was last built from, which is
@@ -301,26 +301,26 @@ got git's own words back: `fatal: could not read Username for
 'https://github.com': terminal prompts disabled`. That is a dead end for
 whoever reads it, and the two things behind it were not the same thing.
 
-1. **As `dev2`, a user with one project.** Signed in, met the welcome panel,
+1. **As `dev2`, a user with one space.** Signed in, met the welcome panel,
    closed it. Sees `hello` and nothing else; no Administration card, and
    `state.can` agrees field by field (terminal, docker-write,
    toolchains-write, git-auth, admin all false). Nothing here needed a
    refusal, because nothing was offered.
 2. **As the owner, Fetch and Pull on `hello`** (linked to the lab Gitea over
    plain http). They failed with git's prompt error, and the reason was NOT
-   the one the production failure had: this project's stored token had been
+   the one the production failure had: this space's stored token had been
    taken away by an earlier Reset, so `has_token` was false and there was
-   nothing anywhere to authenticate with. The API says so on the projects
+   nothing anywhere to authenticate with. The API says so on the spaces
    payload, which is how it was told apart from the other cause in a minute
    rather than an afternoon.
 3. **With a token stored** (minted on the lab Gitea, put in through the
-   project's settings dialog), Fetch answered `fetched` and Pull `Already up
+   space's settings dialog), Fetch answered `fetched` and Pull `Already up
    to date`. That is B184 proven on an instance: the controller names its own
    credential record on the command line, and the mirror git dir that
    deliberately drops the tree's helper no longer costs the view its reach.
-4. **With the token cleared again**, the refusal now reads: *this project has
+4. **With the token cleared again**, the refusal now reads: *this space has
    no access token stored, and gitea.lan:3000 asks for one: put it in the
-   project's settings dialog under Access token, or point the remote at ssh.*
+   space's settings dialog under Access token, or point the remote at ssh.*
    A token that is present and rejected says the other thing instead. Both
    are sentences that name the control; git's line named only what happened.
 5. **The Emulator page** drew for the picked node, and its button on the Tools
@@ -334,7 +334,7 @@ whoever reads it, and the two things behind it were not the same thing.
 
 - Alpha, new evidence: the Git view authenticates on an http remote through
   the controller's own credential record; the two credential failures are told
-  apart and both name the control; a user with one project sees one project.
+  apart and both name the control; a user with one space sees one space.
 - Still dev: a real Claude session on the dev pair, which has no Claude login,
   so the tester's first hour is still unwalked past the point where a session
   would start.
@@ -348,7 +348,7 @@ it, kept the console errors and counted what each open fetched, and the
 controller's own request trace was read beside it.
 
 1. **As `dev2` on a phone.** Signed in, met the welcome panel, closed it.
-   One project, no Administration card, `state.can` all false. The Tests
+   One space, no Administration card, `state.can` all false. The Tests
    view's *Open the run's output* is hidden, since a user has no shell. The
    Roadmap view's hint says nothing can be sent because no session runs.
    No console error on any surface.
@@ -382,7 +382,7 @@ controller's own request trace was read beside it.
 6. **A step and its arrow.** With one item added to `hello`'s roadmap and
    no session running, the arrow is drawn dead, the hint under the list
    says why, and a press on the arrow itself now says *no Claude session
-   is running here* in the band (B213 on an instance). The project row's
+   is running here* in the band (B213 on an instance). The space row's
    Claude button is unlit, and the two agree (B214).
 7. **The Phone page** says in one sentence that no node carries adb and how
    to change that. **The Emulator page** draws for the picked node and says
@@ -400,14 +400,14 @@ controller's own request trace was read beside it.
   their first hour on a node.
 
 
-## 26 September: sending a project to Docker twice
+## 26 September: sending a space to Docker twice
 
-On `builderbot-dev` built from `d8f120d`, as the owner, with the project
+On `builderbot-dev` built from `d8f120d`, as the owner, with the space
 `web` (an nginx compose whose `.env.example` sets `WEB_PORT=8088`) already
 holding one container, `web-dev`, on `bb-dev-sandbox`.
 
 1. **Send, with a container already there.** The Artifacts view's **Send to
-   Docker manager** opened on the name `web`, the project's own, since
+   Docker manager** opened on the name `web`, the space's own, since
    `web-dev` is not it, and the hint under the name said the new one goes
    beside the one it already has and needs ports of its own. The env came
    seeded with `WEB_PORT=8088`; it was changed to `8089` and Create pressed.
@@ -416,7 +416,7 @@ holding one container, `web-dev`, on `bb-dev-sandbox`.
    image and brings it up.*); answered yes, it built on the node and the
    controller reported it running with `8089->80` published, beside
    `web-dev` on `8088`. The page itself was not loaded from here: the
-   session the walk ran in reaches only its own project's containers, and
+   session the walk ran in reaches only its own space's containers, and
    the VM's address is not one of them.
 3. **Send again.** The dialog opened on `web-2`, saying it goes beside the
    two it already has. With the Containers page's branches loaded, Build from
@@ -425,10 +425,10 @@ holding one container, `web-dev`, on `bb-dev-sandbox`.
 4. **What a session is handed.** `web`'s briefing (the Overview's
    source, `/api/preamble`) carries the new paragraph: `aerie devapp new
    [NAME] [--branch REF]` is Send done from a session, and it, not `aerie
-   container new`, is how the project's own code goes into Docker. The old
+   container new`, is how the space's own code goes into Docker. The old
    *create it when it has none* is gone from it.
 
-- Alpha, new evidence: Send makes a second container of a project, named
+- Alpha, new evidence: Send makes a second container of a space, named
   and built in the one gesture, on a real node.
 - Still dev: `aerie devapp new` from a real session on the dev pair, which has
   no Claude login and so no session token. The verb is proven by the
@@ -444,10 +444,10 @@ operator signed in, and a Haiku session opened on `web` from the dashboard's
 Claude button, in manual mode, at 10.231.0.2 on its own network. It was
 driven as a person would: prompts typed through the dashboard, each bash
 command approved at its prompt, its outputs appended to a file in the
-project and read off the dev share. On `builderbot-dev` at 1f77097, then
+space and read off the dev share. On `builderbot-dev` at 1f77097, then
 e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
 
-1. **`aerie devapp ls`** listed `web` and `web-dev` as the project's own.
+1. **`aerie devapp ls`** listed `web` and `web-dev` as the space's own.
    **`aerie devapp log web-dev`** resolved to `web-dev-web-1` (B307's fix)
    and then failed: `docker logs` went out over `ssh://bb@devnode.lan`,
    "Host key verification failed". Only the bare reads ran through the
@@ -471,7 +471,7 @@ e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
 5. **Deny.** The same command was refused with the sentence naming
    Agents may: Run its container.
 
-- Alpha, new evidence: a session sends its project to Docker, rebuilds
+- Alpha, new evidence: a session sends its space to Docker, rebuilds
   it, reads its log and reaches its port, under each of the three
   settings, on a real node with a real session.
 - Still dev: `aerie container new` from a session was not walked; nor was a
@@ -481,7 +481,7 @@ e8c11cc; `web`'s compose given `cap_add: CHOWN, SETUID` for the walk.
 
 The three scanners the operator runs on the host (semgrep, trivy,
 mobsfscan, one-shot services under a `scan` profile) were made as a
-container of no project on the dev VM from the Containers page's own path, with
+container of no space on the dev VM from the Containers page's own path, with
 the paths moved to what the pair shares: `/workspace` scanned read-only,
 reports and caches under `/workspace/.scanners` on the same share, which
 this box mounts at `/workspace-dev`, and `COMPOSE_PROFILES=scan` in its
@@ -499,7 +499,7 @@ and filed (B314):* `aerie devapp env` printed the env without a final newline,
 so the line I appended joined the one before it and the default path was
 mounted; fixed on the same day. After the rebuild: `droid`'s Analysis view
 shows the StrandHogg error with its remedy; the Static analysis tab is live
-with a project picker, seven findings, the six unattributed ones under
+with a space picker, seven findings, the six unattributed ones under
 their own heading; and the Haiku session on `web` ran `aerie findings` (no
 findings for web, one line per report) and was refused `--all`, as a
 session should be.

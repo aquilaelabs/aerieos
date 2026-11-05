@@ -9,8 +9,8 @@ open a pull request, and let the image follow.
 
 ## Getting a checkout
 
-Clone the repository and open it as a project on an AerieOS, which is what
-its own sessions do: the tree lives on the projects share, the notebook
+Clone the repository and open it as a space on an AerieOS, which is what
+its own sessions do: the tree lives on the spaces share, the notebook
 (roadmap, bugs, rules, tests) is the controller's, and `aerie` is on the PATH.
 Outside an AerieOS the linters and the dashboard's suite still run; the
 notebook verbs do not, since they relay to a controller.
@@ -27,7 +27,7 @@ notebook verbs do not, since they relay to a controller.
   shows what changed over time. Both are how a change is shown to somebody
   who was not watching.
 - A change that touches how sessions start, what they are handed, or what a
-  node does is rebuilt onto the project's dev instance and walked there
+  node does is rebuilt onto the space's dev instance and walked there
   before production is asked to build it (`aerie devapp rebuild`; the house
   rule `prove-on-dev`).
 
@@ -39,7 +39,7 @@ notebook verbs do not, since they relay to a controller.
   `docs/layout.md` against `git ls-files`, the agent's version against its
   file). CI runs the same set on a pull request.
 - `aerie tests run` runs the dashboard's Playwright suite, isolated: its own
-  server on a spare port, a scratch state, fake projects, a private tmux
+  server on a spare port, a scratch state, fake spaces, a private tmux
   server. `aerie dashboard test FILE` runs one file; `aerie tests keep` holds the
   fixture up so `aerie tests probe FILE.mjs` can ask the page a question.
 - `aerie tests preflight` lists what the branch changed, asks the code map

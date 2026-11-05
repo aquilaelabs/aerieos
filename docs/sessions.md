@@ -1,8 +1,8 @@
 # Sessions
 
-A session is a coding agent running in a terminal on a project's node:
+A session is a coding agent running in a terminal on a space's node:
 **Claude** (Anthropic's Claude Code), **ChatGPT** (OpenAI's Codex CLI) or
-**Copilot** (GitHub's Copilot CLI), started from the project's card or page
+**Copilot** (GitHub's Copilot CLI), started from the space's card or page
 with Start agent and kept in the dock at the foot of every page. This doc
 covers starting one (the agent, the node, the model and effort, the
 sign-in), the Sessions page, what a session sees and reaches, what it is
@@ -12,47 +12,47 @@ in [dashboard.md](dashboard.md#the-dock-and-its-terminals).
 ## The three agents
 
 Each agent is used the same way, and the same things hold for each: one
-briefing, the house rules' guards, the project's view and walls, the dock's
+briefing, the house rules' guards, the space's view and walls, the dock's
 working, waiting and asking states, the transcripts and Resume, and `aerie`.
 Where they differ is how each takes those, in its own form:
 
 - **The briefing**: Claude reads it as a system prompt file; ChatGPT as
   developer instructions added to Codex's own; Copilot as an instructions
-  folder it reads like a project's AGENTS.md. None of it is written into
-  the project's tree.
+  folder it reads like a space's AGENTS.md. None of it is written into
+  the space's tree.
 - **The guards**: Claude's are the hooks in its generated settings file;
   ChatGPT's and Copilot's are each agent's own hooks, written into the
   account's hooks file for it, every one running the same list. Codex's
   are trusted for each launch by the hashes Codex reports for them.
 - **The conversations**: each agent keeps its own transcripts, listed on a
-  project's Sessions view with the agent named, and Start agent's menu
+  space's Sessions view with the agent named, and Start agent's menu
   offers each agent's last one to resume.
 - **The sign-in**: each agent's, per account and per node, on the Agents
   page (see [below](#the-agents-on-a-node-and-their-sign-in)).
 
-Which agent Start agent opens first is your pick for the project; the menu
+Which agent Start agent opens first is your pick for the space; the menu
 lists every agent installed on its node.
 
 ## Starting a session
 
 **The model and effort are picked when a session starts** (the operator, 12
-Oct), not kept in the project's settings: pressing Start agent opens a menu
+Oct), not kept in the space's settings: pressing Start agent opens a menu
 (the node, Resume or New conversation), and that choice turns the menu to
 Model and Effort with Start, opening on the last ones picked here and naming
 on *Claude's default* the model the last session answered on. Start keeps
-the picks as yours for the project (`claude-prefs.json`, what the launcher
-reads) and opens the session on them. A new project's first session picks
+the picks as yours for the space (`claude-prefs.json`, what the launcher
+reads) and opens the session on them. A new space's first session picks
 them beside its brief instead. While a session of yours is running, the menu
 offers a red **Restart** beside Open tab and End session, which ends it and
 turns to the same Model and Effort before resuming the conversation; and
-the project's card says, under that session in the warning color, what has
+the space's card says, under that session in the warning color, what has
 changed since it started that it will not see until it is started again (a
 toolchain installed on its node that puts something on `PATH`, or
 AerieOS updated, whose briefing a session reads once), and why.
 
 **Changing it while a session is running asks about that session.** Some
 settings a session takes only when it starts: the
-author it commits as, the projects it reads and the places it sees, its
+author it commits as, the spaces it reads and the places it sees, its
 node, and what its briefing says (replies, questions, how a test run meets
 a change, how long captures are kept). Save with one of those changed while
 your session is running and the settings name the changes and put two
@@ -65,31 +65,31 @@ ended, which is the whole reason it asks. Everything else in the settings
 (the build and test commands, the dials, where tests run) is read when it
 is used, so those save without a question.
 
-**A project's Start agent knows which node it is about.** Where this
+**A space's Start agent knows which node it is about.** Where this
 account's session is already running, the press opens the chooser rather
 than jumping to the tab: **Open tab**, a red **Restart** and **End session**
 for the node it runs on (Restart ends the session, asks the model and effort
 as Resume and New conversation do, and resumes the same conversation, so it
-starts fresh on whatever changed since), and the project's other nodes
+starts fresh on whatever changed since), and the space's other nodes
 offered beside it, so a session on a
 second node can be started from the same place. Where this account is
-signed in on the project's node, the press starts the session or opens the
+signed in on the space's node, the press starts the session or opens the
 chooser with Resume and New conversation, as it always has. Where
 it is not, the chooser offers **Sign in on** that node in their place, which
 opens that agent's own page on that node, at its sign-in. A
-project on several nodes lists each under its name: Resume and New
+space on several nodes lists each under its name: Resume and New
 conversation for a node this account is signed in on, the sign-in for one it
 is not, and the reason alone for one where a session cannot start.
 
 **An agent's tab does not come back on its own after a restart.** The
 conversation ended with the container; the transcript did not, so the
-project's Start agent offers to resume it and that stays a decision you
+space's Start agent offers to resume it and that stays a decision you
 make. Enforcing it takes two halves: the saved layout drops agents' tabs at
 boot, and, because a browser left open still holds its own copy, and a phone
 waking up reloads the terminal iframe, which spawns whatever its URL names:
 each agent's terminal URL carries the run of the container it was opened in.
 One from a previous run is refused where the session would have been created,
-with a line saying to open it from its project's Start agent instead.
+with a line saying to open it from its space's Start agent instead.
 Shell tabs carry no such marker and never needed one: a shell is safe to
 recreate in the same directory, which is why it survives a restart and a
 conversation does not.
@@ -101,14 +101,14 @@ nothing a session can do.** The provisioner does not install it: a node's
 Library (under Build) installs it, and the Installed page (under Machines) has its row, with the version its session account
 runs against the latest the controller knows, asked on the toolchains' own
 clock (weekly, when a node starts, and on **Check for updates**). Until it
-is installed no Claude session starts there: the project's Start agent
+is installed no Claude session starts there: the space's Start agent
 is ghosted with the reason, and the terminal refuses with the same
 sentence. Press **Install** or **Update** there to install or update it:
 that ends every Claude session on the node first, then the agent runs the
 installer as the session account and, on a managed node, pins the binary
 where the account cannot write it, so `claude update` typed in a session
 changes nothing that runs (the auto-updater is off there too). **Remove**
-takes it off. Nothing starts again on its own: a project's Start agent does,
+takes it off. Nothing starts again on its own: a space's Start agent does,
 when you press it, and until the job ends it is held with the reason. A
 node behind is a row in the bell, and stays on what it has until you
 install the update: nothing updates it before a session starts (a switch
@@ -119,7 +119,7 @@ signed in there, with a button to the Installed page.
 **ChatGPT's Codex CLI and Copilot CLI are installed the same way**, each
 from its own card on the Library and its row on the Installed page: Install, Update and Remove run the
 vendor's installer as the session account and pin the binary on a managed
-node, and an agent's update holds its starts there until it ends. A project
+node, and an agent's update holds its starts there until it ends. A space
 whose agent is missing on its node offers Install for that agent in place
 of Start agent.
 
@@ -160,7 +160,7 @@ runs that agent's own sign-out on that node, in that account's home.
 
 **Sessions**, on the rail, is every terminal and agent's session of your
 account, here and on the nodes, one row each: its name, exactly as its tab
-in the dock is named and with the same hover text, then its project, its
+in the dock is named and with the same hover text, then its space, its
 node and when it started. **Press the name** to go to its tab, reopening it
 first if it was minimized. Beside it, **Open** puts back a tab that was
 minimized, **Minimize** takes a shell's tab off the dock (it keeps running),
@@ -182,9 +182,9 @@ in it, or the agent's conversation (its transcript is kept and can be resumed).
 
 ## How many sessions work at once
 
-**How many sessions work at once is a node's to limit**, not a project's:
+**How many sessions work at once is a node's to limit**, not a space's:
 what a working session costs is the machine's (Claude Code itself, and the
-builds and tests it runs), several projects share a node, and each Anthropic
+builds and tests it runs), several spaces share a node, and each Anthropic
 account's own limits are already its own. An administrator sets it in the node's
 **Sessions** section on the Nodes page, where the line beside it says how many are
 working and waiting now; 0, the default, is no limit. A prompt past the limit
@@ -196,16 +196,16 @@ working from the moment its prompt is let through until it stops, and also
 whenever its pane's title shows Claude working, so a session opened before the
 limit existed, or one that was interrupted, is counted by what it is doing.
 
-## Keeping a session in its own project
+## Keeping a session in its own space
 
 A Claude session started from the dashboard is launched with a generated
 settings file that denies its file tools, `Read` and `Edit` (which covers
-every tool that writes), access to every *other* project under `/workspace`.
+every tool that writes), access to every *other* space under `/workspace`.
 A ChatGPT or Copilot session gets the same walls from its own hooks. Siblings are
 enumerated by name rather than matched by
-pattern, so a project called `app[1]` cannot quietly take its neighbors out of
+pattern, so a space called `app[1]` cannot quietly take its neighbors out of
 the list. That file is passed with
-`--settings`, which ranks as a command-line argument: above the project's own
+`--settings`, which ranks as a command-line argument: above the space's own
 `.claude/settings.json` and `.claude/settings.local.json`, so a session cannot
 widen its own boundary by editing files in the repo it is working on. Only the
 root-owned managed policy file outranks it.
@@ -215,16 +215,16 @@ into the wrong tree by mistake, which is the common failure, and Bash is not
 under it.
 
 **The hard boundary is the session's view (roadmap R35).** Every session on a
-node runs as one account and the node holds every project bound to it, so file
-permissions cannot keep projects apart. On a Linux node provisioned as a
-sandbox, a project's Claude session and its project shells start inside a
+node runs as one account and the node holds every space bound to it, so file
+permissions cannot keep spaces apart. On a Linux node provisioned as a
+sandbox, a space's Claude session and its space shells start inside a
 mount, PID and IPC namespace built by `nodes/bb-session`, a root helper that
 is the session account's one sudo rule. Inside it `/workspace` holds only the
-project, its worktrees and the account's Claude share (other projects'
+space, its worktrees and the account's Claude share (other spaces'
 transcripts are empty); the account's home is the only home and its
-AerieOS cache keeps only this project's folder; `/tmp`, `/var/tmp` and
+AerieOS cache keeps only this space's folder; `/tmp`, `/var/tmp` and
 `/dev/shm` are the session's own; the agent's stores keep only the
-emulator's logs and the project's own CI logs and artifacts; the toolchain
+emulator's logs and the space's own CI logs and artifacts; the toolchain
 store is read-only, so nothing a session writes can reach
 a command another account or a job runs (Flutter's own tree is the one
 exception, since it writes there on every run, with its `bin` still
@@ -238,19 +238,19 @@ out: a directory that holds one of the view's own places (the toolchain
 store under `/mnt`, say) is covered and that place put back inside it, and
 one that holds none is hidden whole, with the mounts inside either let go so
 the mount table names no export. The agent's own directory
-(`/var/lib/builderbot`) is covered the same way, so other projects' build
+(`/var/lib/builderbot`) is covered the same way, so other spaces' build
 caches, their containers' data and the agent's tools are not there. The
 base home, which belongs to the account every session runs as, is new in
 the view and holds what a session runs from it, read-only: the launchers on
 its `PATH` and Claude Code. Its keys, history and settings are not there. So
 a share mounted on the node next month is out of every view without anybody
-naming it. A share a project works with is named in the project's settings
-(**Also sees**, a path on the node, set by whoever may set the project's
+naming it. A share a space works with is named in the space's settings
+(**Also sees**, a path on the node, set by whoever may set the space's
 node); it is handed to the helper as `--sees` and put back as the node has
-it. The helper refuses one that names the system's own, the projects share,
+it. The helper refuses one that names the system's own, the spaces share,
 a home or the agent's stores, so the setting cannot bring back what the view
 leaves out on purpose. Two things are known to show through: the names of
-the account's own other projects, as empty folders under
+the account's own other spaces, as empty folders under
 `~/.claude/projects`, and a share mounted under one of the system's own
 directories, which is left as the node has it.
 
@@ -268,17 +268,17 @@ the sudo rule from the bundle, and reports on the node's Sessions section
 whether a view can be built and why not. A guest machine or a container
 node, whose agent is not root, cannot, and says so there. The
 view is not a VM: the kernel is shared, and so is the network unless the
-node keeps each session to its own project's network (below).
+node keeps each session to its own space's network (below).
 A workspace-root shell, which needs the `terminal` right, is not confined.
 
-**Each session on its own project's network (roadmap R79)** holds on every
+**Each session on its own space's network (roadmap R79)** holds on every
 node that runs sessions, with no switch to turn it off. A session gets a
 network namespace of its own from `bb-session`: a veth pair to the node, an
 address from `10.231.0.0/16`, and a resolver file naming the node's upstream
 DNS servers. The agent keeps an nftables table (`builderbot_sessnet`) that
 judges everything leaving a session's link: the internet, the controller and
-the DNS servers pass, and so do the containers the session's project owns on
-that node (the project a container belongs to on the Containers page, the same
+the DNS servers pass, and so do the containers the session's space owns on
+that node (the space a container belongs to on the Containers page, the same
 setting that says whose sessions may work on it); everything else that is not
 the internet (every other container, the node's own services, the LAN) is
 refused, and nothing, on the network or on the node itself, can open a
@@ -301,48 +301,48 @@ session, since it has no address of its own to allow.
 
 ## What a session reaches
 
-**Reads.** In What sessions reach, a project's settings name the other projects a
+**Reads.** In What sessions reach, a space's settings name the other spaces a
 session on it may read: their trees, bound read-only at `/workspace/NAME`
 into the session's view on a node, and their notebooks, which `aerie roadmap`,
 `aerie bug`, `aerie rules`, `aerie design` and the rest answer for with `aerie -p NAME`
 in front. Their running containers answer the session too, on its own
-project's nodes, so a page of theirs can be opened and photographed with
-`aerie capture`; a read project's node the reading project is not on stays
+space's nodes, so a page of theirs can be opened and photographed with
+`aerie capture`; a read space's node the reading space is not on stays
 out until the operator adds it. Every write is refused by name, on the API
 and on the relayed verbs alike, and a session's Claude gets the same wall:
-Read allowed, Edit denied. The briefing names the projects a session reads,
-and the shipped "stay in project" rule carries the exception. Set by the
-operator in the project's settings, never by a session.
+Read allowed, Edit denied. The briefing names the spaces a session reads,
+and the shipped "stay in space" rule carries the exception. Set by the
+operator in the space's settings, never by a session.
 
-**Also sees.** Beside them, a project's settings name the places on its
-node a session is shown: a share or a disk mounted there that the project
+**Also sees.** Beside them, a space's settings name the places on its
+node a session is shown: a share or a disk mounted there that the space
 works with, by its path (`/mnt/media`). A session's view holds no other
-(see the session's view, above), so this is how a project is given one. Set
-by whoever may set the project's node, never by a session; a path that is
-the system's own, the projects share, a home or the agent's is refused, and
+(see the session's view, above), so this is how a space is given one. Set
+by whoever may set the space's node, never by a session; a path that is
+the system's own, the spaces share, a home or the agent's is refused, and
 a session started after the save sees the place. A path one of the
-project's nodes does not have is passed over there.
+space's nodes does not have is passed over there.
 
-**Also reaches**, under What sessions reach in a project's settings, opens
+**Also reaches**, under What sessions reach in a space's settings, opens
 the rest by hand (the operator, 7 Oct): a machine its sessions may still
 reach, by its address, or one service on it, as `address:port`, without
-making the project read another. Each address applies on the project's
-nodes ticked beside it when the project is on more than one, on all of them
+making the space read another. Each address applies on the space's
+nodes ticked beside it when the space is on more than one, on all of them
 when every one is ticked, which also covers a node added later. It is
-handed to the node with what the project owns there and lands in the same
+handed to the node with what the space owns there and lands in the same
 sets, so sessions already running reach it within a poll, without a
 restart. Setting it is an administrator's, since it is a hole in a shared
-node's firewall that reaches past the project; a session cannot. An IPv4 address only:
+node's firewall that reaches past the space; a session cannot. An IPv4 address only:
 a name or a range is refused by name, as are this machine, multicast, the
-sessions' own range and a project's own node, which a session reaches only
+sessions' own range and a space's own node, which a session reaches only
 through its containers. On a node whose switch is off it does nothing yet,
 and the field says so.
 
-## Telling a project's sessions about this environment
+## Telling a space's sessions about this environment
 
 Every session is handed one block of text before it types anything, assembled
 by the controller at the moment the session starts: a short core of what
-holds every time, then the house rules in effect, then the project's own
+holds every time, then the house rules in effect, then the space's own
 lines (what it reads, what a new ask does during a test run, its design) and
 an index of the rest of how this machine works, then the open roadmap and
 the open bugs. The rest is **topics**: each section of the briefing after the
@@ -352,7 +352,7 @@ and read whole with `aerie help TOPIC` when the work reaches it, so a session
 pays for the manual only where it needs it, and what it is held to comes
 first and short, because a rule read after five thousand words of how-to is
 read at the same weight as the how-to. A topic the tree gates out (Android on
-a project with none) is not in the index and still answers when asked for. The
+a space with none) is not in the index and still answers when asked for. The
 Overview's *What a session is sent* fold shows a person exactly that string, byte for byte, because it is the same assembly
 rather than another rendering of it.
 
@@ -371,7 +371,7 @@ plan's past is a `aerie roadmap show` away. The block travels to the session in 
 file rather than on tmux's command line, which takes at most 16KB and answers a
 longer one with `command too long` and nothing else.
 
-**What is kept and what a session is sent are two things.** A project only
+**What is kept and what a session is sent are two things.** A space only
 grows, and every conversation pays for the block. So the notebook keeps what
 there is (two hundred open roadmap items, the parked ones not counted; two
 hundred open bugs; forty standing rules and two hundred named ones), and the
@@ -387,7 +387,7 @@ always there, whatever the others hold.
 
 **And you can read the whole of it.** The Overview's last fold, *What a
 session is sent*, holds the exact string a session started here is handed: the
-briefing's core, the house rules, the project's lines and the index of
+briefing's core, the house rules, the space's lines and the index of
 topics, then the roadmap and the tracker as counts, with its size on the
 heading and each part's size under it, the rules against their share, so a
 part that has started saying less is seen there before a session meets it. It is the same string, not a rendering
@@ -396,7 +396,7 @@ fold cannot quietly stop describing what sessions get. Shut by default, since
 it is a thing to check rather than to read every time.
 
 Two settings shape that string without touching what you read in the
-notebook. Each person's **Replies** pick in a project's settings says how
+notebook. Each person's **Replies** pick in a space's settings says how
 wordy Claude's replies to them are there, and their
 **Questions** pick how often Claude asks them, more, fewer or rarely; both
 ride the block as its own part and
@@ -426,11 +426,11 @@ checked are checked as well as said:
   --refuse`) are the starts of commands a session's shell call may not run:
   the call is refused with the rule's text as the reason. The shipped
   ask-do-not-install refuses the system package managers, and three of the
-  briefing's never-do lines are refused in every project (`pkill -f`, the
+  briefing's never-do lines are refused in every space (`pkill -f`, the
   emulator binary, setting the account's commit identity). A pattern that
   starts with `!` is an exception, such as a package manager's dry run.
-- **A project rule replaces a global one by name.** *In place of* (`aerie rules
-  add --replaces NAME`) takes a global rule out of that project's block, so
+- **A space rule replaces a global one by name.** *In place of* (`aerie rules
+  add --replaces NAME`) takes a global rule out of that space's block, so
   a session reads one rule rather than two and an instruction to prefer one.
 - **The map first.** A search for where a name is defined or called (a grep
   for `def NAME`, `function NAME` or `NAME(`, or the Grep tool's) is handed
@@ -439,10 +439,10 @@ checked are checked as well as said:
   know adds nothing.
 - **Test runs in the background.** A suite started in the foreground is
   refused, since it holds every reply until it ends and a new ask could
-  never cut into it the way the project's *While a test runs* setting
+  never cut into it the way the space's *While a test runs* setting
   says; the unit tier runs either way.
 - **And it can be counted.** `aerie rules audit [DAYS]` reads the account's
-  own conversations on the project and counts the commands a rule refuses,
+  own conversations on the space and counts the commands a rule refuses,
   run or tried, and how often the code map was asked against a grep of the
   code, so whether sessions keep to a rule is a number rather than a feeling.
 
@@ -451,22 +451,22 @@ it off? An obligation somebody might reasonably not want (sessions filing
 what they notice, chasing a bug they meet, installing nothing, walking a
 change in the app before calling it done) is a **global rule**, and what
 nobody would switch off (no credential in a repository, a true report,
-another person's branch left alone, the project's own files) is a line of
-the briefing. The global rules are listed in every project's notebook,
-under the project's own rules on the Overview: anybody who works on
-the project can switch one off for that project alone, staged behind the
+another person's branch left alone, the space's own files) is a line of
+the briefing. The global rules are listed in every space's notebook,
+under the space's own rules on the Overview: anybody who works on
+the space can switch one off for that space alone, staged behind the
 rules section's own Save, and an administrator also adds, edits and removes them,
-or turns a shipped one off, for every project from the same place.
+or turns a shipped one off, for every space from the same place.
 
-None of it is copied into the project. There is no file to render, push, or
+None of it is copied into the space. There is no file to render, push, or
 keep in step, and nothing to go stale: the briefing is one file in the image
-(`config/templates/briefing.md`), the rules live in `/config`, and a project
+(`config/templates/briefing.md`), the rules live in `/config`, and a space
 that has never heard of AerieOS gets the same briefing as one that has.
-The parts that only apply to some projects are marked in that file with the
-evidence that decides them, matched as globs against the project's tree, so a
-project with no Android in it is not told how to drive an emulator.
+The parts that only apply to some spaces are marked in that file with the
+evidence that decides them, matched as globs against the space's tree, so a
+space with no Android in it is not told how to drive an emulator.
 
-`CLAUDE.md` in a project is the project's own notes, committed, and nobody's
+`CLAUDE.md` in a space is the space's own notes, committed, and nobody's
 to generate. **A session is still held to the current environment**: a hook on
 every tool call (`bb-gate`) refuses to run anything while the controller is
 not answering, which is what a restart after an update looks like. That is
@@ -485,7 +485,7 @@ session an update stopped, for its own account or an administrator, with a
 Resume that types into it (the roadmap's send, which presses Enter only if
 the line echoed) that AerieOS is back and to pick up from its note.
 
-The compatibility window still holds a project whose *node* runs an agent
+The compatibility window still holds a space whose *node* runs an agent
 from another window, and the Nodes page's Update is what clears it. Inside a
 window an agent behind the controller is updated by the controller itself
 once its node is idle (R253): until then it takes no job but its own update,

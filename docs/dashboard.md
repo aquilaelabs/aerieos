@@ -43,7 +43,7 @@ away and honest about being a shell.
 
 **The page is a rail, a top bar, a page on show and the dock.** The rail
 down the left edge is eleven groups, each one press, in this order:
-**Home**; **Projects** (Projects, Analysis); **Build** (Library, Emulator,
+**Home**; **Spaces** (Spaces, Analysis); **Build** (Library, Emulator,
 Phone, CI runner); **Containers** (Containers, VMs); **Controller** (This
 machine on a bare-metal install, Settings, Network, Keys, Audit);
 **Machines** (Nodes, Storage, Installed); **Sessions**; **Jobs** (Jobs,
@@ -52,19 +52,19 @@ Schedules); **People** (Users, Roles); **Settings** (Profile); and
 its page. A page an account's grants forbid is not drawn: People only for
 an account that may read accounts, the Controller group only for one that
 may read the controller. Every page has an address (`#/containers`,
-`#/machines/nodes`, `#/projects/NAME/roadmap`), so a reload, a shared link
+`#/machines/nodes`, `#/spaces/NAME/roadmap`), so a reload, a shared link
 and the back button land on it. A page a press opens rather than the
 sub-nav (nginx and Scanners from their containers' Configure, a Library
 entry's page, an installed thing's page) wears a small top header whose
 Back returns to the page it came from. Terminals and the chat are the
 dock's, at the foot of every page. On a phone the rail is a bar of five
-across the foot in the same order (Home, Projects, Build, Containers, and
+across the foot in the same order (Home, Spaces, Build, Containers, and
 More for the rest), and every page is the one page area above it, with the
-dock at its foot. The search in the top bar jumps to a page, a project, a
+dock at its foot. The search in the top bar jumps to a page, a space, a
 container or a node as you type; it does not search inside notebooks.
 
 **The Machines, Build and Containers groups wear one header over their
-pages**, in a project's shape: the node picked once where a project's name
+pages**, in a space's shape: the node picked once where a space's name
 is, with when it was seen, where it dials in from and its agent beside it,
 and the group's sub-nav under it with the group's own actions at its right
 (Machines: New VM and Enroll node). Every page of the group
@@ -94,16 +94,16 @@ is typed, each line found opening its doc at the section it is in.
 one screen. Across the top, six tiles count the whole install: the nodes
 online of those enrolled, the containers running of all of them, the jobs
 running (with how many failed today), the sessions open, the
-updates due and the projects whose CI is red. Each is a link into the page
+updates due and the spaces whose CI is red. Each is a link into the page
 that holds the number. The machines and their containers are counted only
 for an account that may read the Nodes page; a node that has not answered
 within a few seconds counts as unknown and the tile says "as last seen".
 Under the tiles, Attention is the bell's own rows (a node behind, a red CI
 run, a file changed in two places), dismissed there as on the bell, and
 Last jobs is the ten newest, each opening its row on the Jobs page with
-the log open. Under those, the pinned projects at a glance, each with its
+the log open. Under those, the pinned spaces at a glance, each with its
 repositories, its session state and the one notice it carries; the pin by a
-project's name on the Projects page puts it here or takes it off. Home reads its numbers when
+space's name on the Spaces page puts it here or takes it off. Home reads its numbers when
 it opens, and the queue's again when a job moves; the containers are asked
 only on opening, and nothing is read on a timer. A browser with nothing open lands on it.
 
@@ -229,7 +229,7 @@ running container is not serving.
 
 **The dock** is the foot of every page. Shut, it is one line: **Chat**
 (with its unread count), then each open terminal as a tab (an agent's
-session with its state dot, a project's in that project's color), then
+session with its state dot, a space's in that space's color), then
 **+** for a new shell and the chevron. A press on a terminal brings the dock
 up with it, half the area to begin with, and dragging the line changes that
 height, which this browser keeps. The chevron puts it down again and the
@@ -245,7 +245,7 @@ phone's alone: a desktop has a keyboard, so it carries no on-screen one at
 all. One flyout at a time on a phone, because there is not the height for
 two, and a flyout that has done its job gets out of the way: sending a
 command closes it. The dock's line carries each session's dot, amber if it is waiting on you, blue while it works,
-as each project's card does.
+as each space's card does.
 
 The dock starts with one terminal (**workspace**, a shell at `/workspace`),
 and every shell or agent's session you open is another tab on its line.
@@ -257,13 +257,13 @@ it back on its own. The window is the terminal on a page of its own
 (`/terminal` on the dashboard's port), so closing the dashboard leaves it
 working.
 
-- **Start agent** on a project opens a chooser of the coding agents, one
-  session of each per project. While yours runs the button reads **Manage
+- **Start agent** on a space opens a chooser of the coding agents, one
+  session of each per space. While yours runs the button reads **Manage
   agent**, in green, and the chooser offers **Open** (its tab), **Restart**
-  and **End**. If none runs but the project has a previous conversation, you
+  and **End**. If none runs but the space has a previous conversation, you
   are offered to **resume** it or start a **new** one: the tmux session dies
   with a container restart, the transcript does not.
-- **Shell** opens *another* terminal at the project path every time you
+- **Shell** opens *another* terminal at the space path every time you
   press it, so you can have several side by side. **+** on the dock's line
   does the same for `/workspace`.
 - **−** on a terminal's tab minimizes it, and asks nothing. The terminal
@@ -281,9 +281,9 @@ Ctrl+D, or a crash, and the tmux session goes with it, and the tab closes rather
 than holding a dead terminal until somebody closes it. Shells too: one you
 typed `exit` in is just as dead.
 
-Nothing is lost by closing it. The transcript is on disk and the project's
+Nothing is lost by closing it. The transcript is on disk and the space's
 Start agent offers to resume it, which is a better way back than a corpse in
-a tab: the project knows the transcript id and the dead tab does not.
+a tab: the space knows the transcript id and the dead tab does not.
 
 The rule is *seen alive, then gone*, and the transition is load-bearing: "has
 no session" is also true of every tab restored from a saved layout before
@@ -372,7 +372,7 @@ split one inside tmux, only the active pane's contents are kept.
 
 **Agents' sessions do not come back.** The conversation ended with the container,
 and a session wearing its old name would be a new one pretending otherwise. Its
-tab is dropped at boot too, and the project's **Start agent** offers to resume
+tab is dropped at boot too, and the space's **Start agent** offers to resume
 the transcript, which is still on disk.
 
 ## Commands run in the terminal
@@ -410,7 +410,7 @@ terminal, which is not something a button should be able to do.
 The flyout holds no `aerie` commands: each has a page that does it better
 (status on Home, the emulator on its page, the logs in Controller settings,
 an agent's sign-in on the Installed page). The Tests view sends `aerie tests log -f`
-into the project's shell from its own button.
+into the space's shell from its own button.
 
 What is there, top to bottom: **pinned**, the commands whose **thumbtack**
 is pressed, in their lists' order; **your commands** (below); **Linux**, the
@@ -420,7 +420,7 @@ tab; and **git**, its commands verbatim (`git status`, log, diff, branches,
 stashes, fetch, pull), ghosting against the directory the active shell is
 *in*: outside a git repository the whole list grays out, and the verdict
 follows a `cd` on the next status poll. There is no `gh`: a node carries
-none, and a push is `aerie git push`'s, under the project's policy. Pins live in
+none, and a push is `aerie git push`'s, under the space's policy. Pins live in
 `/config/pinned-commands.json`: one machine, one set, so a pin made at the
 desk is there on the phone.
 
@@ -467,7 +467,7 @@ overwrites what somebody is typing is worse than a stale line.
 
 The endpoint is **deliberately tiny**: file mtimes and in-memory counters, no
 git, no tmux, no adb, which is what makes it affordable at a second and a
-half, where `/api/status` runs git for every project and is affordable at
+half, where `/api/status` runs git for every space and is affordable at
 fifteen. The one thing that is not free, the set of attached devices, is
 cached with a floor of a few seconds and refreshed at once when the dashboard
 itself connects or disconnects, so pressing Connect is instant rather than up
@@ -489,18 +489,18 @@ A problem with AerieOS itself goes to the **diagnostics**, where whoever
 looks after this AerieOS reads it (`aerie diag reports`). It is a log, not a
 conversation: nothing goes back to whoever sent it, and **Clear reports**
 empties it. A session sends one with `aerie report "what happened"`, under the
-project's **Agents may: Report AerieOS bugs**. A person sends one from a
-project's menu: **Report an AerieOS bug** opens **Report a bug**, with a category to
+space's **Agents may: Report AerieOS bugs**. A person sends one from a
+space's menu: **Report an AerieOS bug** opens **Report a bug**, with a category to
 pick, what happened and how to make it happen, and **Send** puts it in the
-diagnostics under that project with its node and the build it was seen on,
+diagnostics under that space with its node and the build it was seen on,
 marked as from the dashboard. A person's report is heard whatever that
-project's Agents may dial says, from a project they are on: an administrator
-shown every project but not on this one cannot start a session there, so
+space's Agents may dial says, from a space they are on: an administrator
+shown every space but not on this one cannot start a session there, so
 its menu has no such entry for them and the server refuses one. A
-project's report can carry the reporter's latest conversation on it,
+space's report can carry the reporter's latest conversation on it,
 ticked in the dialog: its last 400 KB, redacted, kept as a file of its own
 beside the report. The diagnostics name that file, the download beside the
 logs is a zip of `diagnostics.json` with a `conversations/` folder holding
 each one, and `aerie report conversation N` prints it for a session. The bug in
-the header is the same dialog about no project in particular, for anybody
+the header is the same dialog about no space in particular, for anybody
 signed in, and the diagnostics list it as general.

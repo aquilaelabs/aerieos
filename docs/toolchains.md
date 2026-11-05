@@ -7,7 +7,7 @@ it. **CI runner** is in [building.md](building.md#ci-runners), and the
 companions to install on your own machines are Library cards
 ([reference.md](reference.md#the-apps-a-person-installs)). This doc covers the
 store, the Library and the Installed page, the NVIDIA card, Android
-versions and the emulator, and a phone lent to a project.
+versions and the emulator, and a phone lent to a space.
 
 ## The toolchain store lives outside the image
 
@@ -50,17 +50,17 @@ older ones rather than in their place. The platform row's newest is the
 newest level's base (`platforms;android-37.0`, what `compileSdk = 37`
 names), not a quarterly minor or an extension level. A session cannot
 write the store, so the Android Gradle plugin cannot fetch a missing
-platform itself: a project wanting a level the store lacks names it, and
+platform itself: a space wanting a level the store lacks names it, and
 the operator ticks the row.
-What a project pins by number in its Gradle files (`ndkVersion`,
+What a space pins by number in its Gradle files (`ndkVersion`,
 `buildToolsVersion`, `compileSdk`) is a row of its own on the page of the
-node it builds on, named for the project, installed or not. Two more rows come from
+node it builds on, named for the space, installed or not. Two more rows come from
 what a build needs with no line pinning it: the build-tools its Android
 Gradle plugin version defaults to when no `buildToolsVersion` says
 otherwise (read from the version catalog, a plugins block or the old
 classpath, against the table in the plugin's release notes). The level a
-project compiles against is the Emulator page's question instead: it says
-which of its node's projects compile against a level no image here is of,
+space compiles against is the Emulator page's question instead: it says
+which of its node's spaces compile against a level no image here is of,
 and names the index's plain Google APIs image of that level to pick, since
 an image exists at every level in several flavors under names only
 Google's index knows (API 37 is `android-37.0`).
@@ -110,7 +110,7 @@ compose file asks for the card the way compose always has
 (`deploy.resources.reservations.devices` with `driver: nvidia`, or
 `runtime: nvidia`, or `gpus:`), and one that asks is checked before it
 starts: where the node has no card, no running driver or no toolkit, or the
-node's switch or the project's *The node's GPU* setting says the card is
+node's switch or the space's *The node's GPU* setting says the card is
 not for it, the Containers page's row says the compose cannot start as written
 and why, and an Up or a Rebuild asked anyway (a session's `aerie devapp
 rebuild` included) is refused in the same words, rather than failing after
@@ -121,7 +121,7 @@ moves work onto it: a program uses a GPU only if it was written to, through
 CUDA or the video encoder. A node with a card has a **GPU** section on the
 Nodes page with two switches and one Apply: *render the Android emulator on
 the card*, which starts or stops the headless X server the emulator needs,
-and *let sessions and jobs compute on it*, on by default. A project has its
+and *let sessions and jobs compute on it*, on by default. A space has its
 own setting, *The node's GPU* in its Nodes settings, for running as if the machine
 had none. Where either says no, a session started from then on has
 `CUDA_VISIBLE_DEVICES` empty and the unified-memory device CUDA cannot start
@@ -134,7 +134,7 @@ card's memory is one pool for every session on the node, so a heavy job is
 started as `aerie gpu run [--mem MB] -- CMD`, which takes a lease (one at a
 time per node), waits for its turn and for that much free memory, and lets
 go when the command ends. The briefing tells a session all of this only
-where its project's node reports a card.
+where its space's node reports a card.
 
 The Android system images live on the same store without being toolchains
 (one exists at every API level at once), so they have verbs of their own:
@@ -318,7 +318,7 @@ row in the dashboard's list, where everything installs.
 Samsung, Pixel, Oppo, OnePlus, Xiaomi. There is no per-vendor SDK to install
 and no vendor emulator image to download: Samsung's Galaxy skins are
 cosmetic, and the vendor libraries (Samsung IAP or Health, Oppo/Xiaomi push)
-are Gradle dependencies a project declares, not toolchains a container holds.
+are Gradle dependencies a space declares, not toolchains a container holds.
 What genuinely differs is the *system image* you emulate against, which is
 why those are not toolchains. A toolchain is one thing at one version; a system
 image exists at **every API level at once**, so the question is which level
@@ -374,7 +374,7 @@ the page (the pick holds across the Library, the Emulator, the Phone and
 the CI runner, and a sub-tab says *not here* when the node lacks what it
 needs). A section per kind, in
 this order: the coding agents a session runs (Claude Code, Codex CLI,
-Copilot CLI, Grok Build, OpenCode), the toolchains a project builds with,
+Copilot CLI, Grok Build, OpenCode), the toolchains a space builds with,
 the tool packs a person added, the services a node runs for the others
 (the model router), the apps a NAS runs as containers, and under **For
 you** the companions a person downloads for their own machines. Every row
@@ -478,7 +478,7 @@ needs a JDK. The catalog carries `requires`, the
 install pulls in what is missing (never what is already there) and the page
 says what it added. Node.js is a toolchain like any other for the same reason:
 it is not needed to *be* a node (the agent is Python, and the provisioner
-installs that), but a project built with npm needs it, and so does anything
+installs that), but a space built with npm needs it, and so does anything
 driving a browser through Playwright, which declares it.
 
 **Two machines may share one toolchain store, and AerieOS recognizes the
@@ -587,31 +587,31 @@ with a vendor driver, and Mesa answering counts as failure for exactly the
 reason above, and it falls back to software when it does not. `aerie emu gpu`
 says which you have and why, in one line.
 
-**Each project has its own emulator**, so one project's sessions never boot
-a phone another project installed and signed into things on. `aerie emu` keeps each project's AVDs in
-a folder of its own (`~/.android/avd-projects/PROJECT`), and a project's
-first `aerie emu start` makes its phone. With nothing making projects take
+**Each space has its own emulator**, so one space's sessions never boot
+a phone another space installed and signed into things on. `aerie emu` keeps each space's AVDs in
+a folder of its own (`~/.android/avd-projects/PROJECT`), and a space's
+first `aerie emu start` makes its phone. With nothing making spaces take
 turns, `aerie emu start` decides whether the node has room for another: not
 while the node is saturated, and only with the phone's memory, the
 emulator's own and 2 GB for builds free, waiting up to five minutes for
 room and then refusing with the numbers; a card short of a few hundred MB
 free renders that phone in software. Phones made before AVDs were kept per
-project are one project's to keep (`aerie emu adopt`, or automatically for the project named
+space are one space's to keep (`aerie emu adopt`, or automatically for the space named
 in the old folder's `.heir`), and a `bb-scrub.txt` beside an adopted phone
-names packages another project left there, removed on its first boot.
+names packages another space left there, removed on its first boot.
 
 ## Playwright, Android, plugins, publishing
 
 - **Playwright**: the browsers are a toolchain on the store (the Library's
   playwright card), so `npx playwright test` runs headless in a session on any
   node that has it installed.
-- **Android**: `./gradlew assembleRelease` runs on the project's node once
+- **Android**: `./gradlew assembleRelease` runs on the space's node once
   the Library has installed the JDK and the Android tools there; the
   emulator is that node's too, `aerie emu start`. See
   [Multiple Android versions](#multiple-android-versions) to emulate more
   than one API level.
 - **Claude Code plugins**: `/plugin` inside a session installs one for that
-  person alone, in their own `~/.claude` on the node; a project's committed
+  person alone, in their own `~/.claude` on the node; a space's committed
   `.claude/settings.json` can name plugins everybody on it is offered. Each
   person's, and the MCP servers they added to each coding agent, are listed
   on that agent's row of the **Installed** page with the node picked, and every account's in
@@ -626,12 +626,12 @@ names packages another project left there, removed on its first boot.
   Python of its own, run as `python-ml`, with PyTorch built for CUDA (13 today, so a driver of 580 or newer),
   numpy and ONNX. PyTorch's wheels carry the CUDA libraries, so a node needs
   only its NVIDIA driver; a heavy job runs as `aerie gpu run --mem MB --
-  python-ml train.py`. A project wanting more packages makes its own
+  python-ml train.py`. A space wanting more packages makes its own
   environment over it (`python-ml -m venv --system-site-packages .venv`), so
   the store's copy stays as installed. Its install works in a folder beside
   itself on the store rather than in the node's `/tmp`, since the download is
   gigabytes and a node's own disk may not have them.
-- **Publishing**: from a session, whatever the project's own credentials
+- **Publishing**: from a session, whatever the space's own credentials
   allow on its node (`gh release create`, Gradle publish tasks); from a shell
   on the controller, `npm publish` with an `NPM_TOKEN` from an `*.env` file
   in the secrets folder. An Android build is
@@ -645,8 +645,8 @@ The container carries no adb and holds no phone. A handset is driven from a
 page, under Build with that node picked, pairs and connects it over
 Android's wireless debugging and lists what a session is waiting to do
 there.
-Several nodes can each hold their own phone; a project's sessions reach the
-phone on the project's node and no other.
+Several nodes can each hold their own phone; a space's sessions reach the
+phone on the space's node and no other.
 
 **Open the dashboard on the phone and the IP is already there.** The address
 the field exists to capture is the client address of that very request, and
@@ -691,9 +691,9 @@ phone's owner and waits; on **Allow** the node runs it and hands back the
 output. The reason is required, not optional: approving a command you did
 not write, with no sentence saying what it is for, is a guess.
 
-**Lent to a project, a phone is driven without asking, and only for that
-project's app.** Its owner lends it from the project's menu (**Lend your phone**) to one project on its
-node, for an hour, four hours or until taken back. That project's sessions
+**Lent to a space, a phone is driven without asking, and only for that
+space's app.** Its owner lends it from the space's menu (**Lend your phone**) to one space on its
+node, for an hour, four hours or until taken back. That space's sessions
 then install one of its own builds (`aerie phone install dist/APP.apk`, whose
 package the lease learns), start, stop or pick it as the keyboard, read its
 logcat, take screenshots and recordings into `dist/phone/`, read the
@@ -714,7 +714,7 @@ pairing code* screen to announce its port on the phone's own network,
 then posts a notification whose reply box takes the six digits over that
 screen, since leaving it cancels it; the controller pairs the node and
 connects it on the port debugging announces. The same screen lends the
-phone to a project and takes it back. Android still wants Wireless
+phone to a space and takes it back. Android still wants Wireless
 debugging switched on by hand: no app can read the code or turn it on. Over a VPN it is the same: pair and
 connect by the phone's VPN address, and the node finds the port; Android
 still wants the phone on Wi-Fi for wireless debugging.
@@ -729,14 +729,14 @@ root on it is not a user's to allow. (Their own phone is: a phone request
 goes to whoever connected the handset, which is the asker when it is theirs.
 Letting a particular user allow root on a particular sandbox is a
 permissions design of its own, not written yet.) Allow runs that one command as root on the
-project's node, as a system job whose log opens with the reason and who
+space's node, as a system job whose log opens with the reason and who
 allowed it, so the Jobs page is the record; Deny says no. Only a node
 provisioned as a sandbox takes it: somebody's own machine is not the
 controller's to run root on, and there is no fake sudo either: a refusal
 that says why beats a success that did not happen.
 
 **Installing an APK and pushing an extension** from the Artifacts view go
-the same way: the file is fetched onto the project's node and installed on
+the same way: the file is fetched onto the space's node and installed on
 the phone there, or handed to web-ext there for a temporary add-on that
 stays live until Stop. Both buttons are the connection owner's: anybody
 else sees them ghosted with the owner named, and a push also needs web-ext

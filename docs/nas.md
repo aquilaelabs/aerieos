@@ -30,7 +30,7 @@ OpenMediaVault (mergerfs with SnapRAID, periodic parity). AerieOS offers
 two, said plainly for what each gives up.
 
 **ZFS pools, the default for matched disks.** Mirrors or RAIDZ2, a dataset
-per project and per container's data with quotas, scrubs on a schedule,
+per space and per container's data with quotas, scrubs on a schedule,
 snapshots and replication mapped onto AerieOS's own snapshots and
 backups. Checksums on every block and self-heal from redundancy are what a
 build machine's data wants; the price is that a pool grows by whole vdevs,
@@ -48,7 +48,7 @@ readable on any machine, which is the reason to want it.
 
 **Pools by purpose, no cache tier.** No mover between a cache and the array (the
 operator, 27 Oct): an SSD is a pool of its own holding AerieOS's hot data
-(/config, the project workspaces, toolchains, build caches, apps' data and
+(/config, the space workspaces, toolchains, build caches, apps' data and
 VM disks); the hard-disk array holds the shares, media and backups; each
 share names the one pool it lives on when it is made, and nothing moves
 behind a person's back. A pool of one SSD has no redundancy, so it is

@@ -1,20 +1,20 @@
 # VMs
 
-A project's virtual machines, made, started, stopped, snapshotted and removed
+A space's virtual machines, made, started, stopped, snapshotted and removed
 on the nodes whose VM host feature is installed, by a person on the VMs page
-or by a project's session with `aerie vm`, under the project's own
+or by a space's session with `aerie vm`, under the space's own
 setting. The VMs page sits in the Containers group beside Containers, and
 is built from the Containers page's pieces.
 
 **The machine's own VMs** (R165): a VM may belong to the machine rather
-than a project: Belongs to on New VM offers "This machine's own" to an
+than a space: Belongs to on New VM offers "This machine's own" to an
 administrator, and such a VM is keyed under `machine`, grouped and chipped
 as This machine's own on the VMs page, acted on by administrators alone
 under the VMs area, and never a session's (a session sees its own
-project's VMs and nothing else). It is for the NAS's own apps and
+space's VMs and nothing else). It is for the NAS's own apps and
 desktops (a Home Assistant VM, a Windows desktop) on any VM host, the
 controller's own machine first where there is one; its network is its
-own as a project's is, or the LAN from its Hardware dialog.
+own as a space's is, or the LAN from its Hardware dialog.
 
 ## Where a VM runs
 
@@ -59,28 +59,28 @@ person, and AerieOS does not make them.
 
 ## The dial, the area and the limits
 
-- **Make VMs**, under Agents may in the project's settings, reads as Run its
+- **Make VMs**, under Agents may in the space's settings, reads as Run its
   container does: deny (the default) refuses a session's `aerie vm`, ask holds
   each for the administrators' bell with Allow and Deny, auto does it. A
   person may always do from the page what the dial holds a session to
   asking for. Changing it is the VMs area's.
-- **VMs**, a project area in the roles: Read sees its VMs, Write makes,
+- **VMs**, a space area in the roles: Read sees its VMs, Write makes,
   starts, stops, snapshots and removes them. Every role that held Containers
   was given VMs at the same level when this arrived (state migration 0002).
-- **What its VMs may hold** in the project's settings: how many, and their
+- **What its VMs may hold** in the space's settings: how many, and their
   vCPUs, memory and disk added up (4, 8, 16 GB and 200 GB by default). Each
   node keeps 2 GB of memory and 10 GB of disk for itself besides. A VM that
   would pass either is refused with the limit named.
 
 ## The network
 
-Each project has a network of its own on each node, a /24 out of
+Each space has a network of its own on each node, a /24 out of
 10.232.0.0/16 kept for it, NAT'd to the internet. A table of AerieOS's
-own (`builderbot_vmnet`) keeps a VM off other projects' VMs, off the LAN
+own (`builderbot_vmnet`) keeps a VM off other spaces' VMs, off the LAN
 (unless the node's Features row lets its VMs onto it), and off the node
 itself but for the DHCP and DNS libvirt serves; the controller's address and
-port it reaches. Its project's sessions reach it, by ssh and anything else,
-through the sessions' own table; no other project's session does.
+port it reaches. Its space's sessions reach it, by ssh and anything else,
+through the sessions' own table; no other space's session does.
 
 ## Snapshots
 
@@ -100,12 +100,12 @@ as a VM on its host, and is retired with its credential revoked when the VM
 is removed. A session's is always an administrator's to allow, whatever the
 dial says: adding a node is theirs.
 
-A VM made a node is not on its project's network, and its own account is
+A VM made a node is not on its space's network, and its own account is
 `admin`, not `builder`: `builder` is the account its sessions run as, which
 has no sudo, where cloud-init gives the VM's own account sudo. It joins the LAN through
 the host's own interface (macvtap) and takes an address from the LAN's DHCP
 like any other machine, because the controller reaches a node at its address
-(its sessions' terminals, its Docker over SSH), which a project network
+(its sessions' terminals, its Docker over SSH), which a space network
 behind the host's NAT does not give it. Its firewall is the one the
 provisioner makes on every node, and the VMs page shows the address its
 agent dials in from. A macvtap guest cannot talk to its own host, so a
@@ -116,7 +116,7 @@ another machine than the controller's.
 
 **Console** on a running VM's row opens its serial console in the dock,
 `virsh console` as the jobs account on the node's container terminal
-server, for a person with a shell and VMs Write on its project. Ctrl+]
+server, for a person with a shell and VMs Write on its space. Ctrl+]
 leaves it.
 
 **Screen** opens the VM's display in the dock: keyboard, mouse and all,
@@ -124,14 +124,14 @@ drawn by noVNC, which the image carries. Every VM has one, on its host's
 loopback alone; the node's agent relays it on port 7684, the port its
 terminals come in on too, which it opens to the controller alone, and only for a request the
 controller signed for that VM within the last two minutes. It takes VMs
-Write on the VM's project, since seeing a screen is driving the machine.
+Write on the VM's space, since seeing a screen is driving the machine.
 A screen password set at New VM is asked for when it opens.
 
 A Screen is shared: several people can have it open at once, all on one
 keyboard and mouse. A Console is one person's at a time, and opening it
 takes it from whoever had it. The VM's row says who is on its Screen and who
 has its Console. While somebody has the Console, anybody else is refused
-it; the project's owner and the administrators may take it over, asked
+it; the space's owner and the administrators may take it over, asked
 first, and the person it is taken from is told who took it.
 
 ## From an installer
@@ -168,14 +168,14 @@ says what it was given.
   to is refused unless **Share them** is ticked.
 - **Memory ceiling**: it starts with its memory and may balloon up to
   this, through a virtio balloon; empty for none.
-- **Network**: its project's own network, or the LAN as a machine of its
+- **Network**: its space's own network, or the LAN as a machine of its
   own through the node's wired interface (refused on Wi-Fi, which cannot
   carry it).
-- **Shared folder**: a folder of the project, read-only if ticked, seen
+- **Shared folder**: a folder of the space, read-only if ticked, seen
   inside the VM through virtiofs: `mount -t virtiofs project /mnt`. It is
-  always inside the project; a dot shares the whole of it. Inside, its files
+  always inside the space; a dot shares the whole of it. Inside, its files
   are the VM's own account's (uid 2000), and what anyone in the VM writes is
-  the folder owner's on the node, so nothing in the project turns root's.
+  the folder owner's on the node, so nothing in the space turns root's.
   A node whose VM host was installed before this asks for **Bring in shared
   folders** on its Features row.
 - **Devices passed through**: a USB device by its vendor and product, or a
@@ -250,8 +250,8 @@ aerie vm rm db
 ```
 
 Each is under the same Make VMs setting as making one. A session's
-hardware stops at its own project: it may pin, give a memory ceiling and
-share a folder of the project, while putting a VM on the LAN and passing a
+hardware stops at its own space: it may pin, give a memory ceiling and
+share a folder of the space, while putting a VM on the LAN and passing a
 device through are a person's, from the VMs page; a USB device asked for
 with `aerie vm usb` is held for an administrator on the bell whatever Make VMs
 says, since a device can be a disk or a key.

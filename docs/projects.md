@@ -1,89 +1,89 @@
-# Projects
+# Spaces
 
-A project is a named thing of its own that holds git repositories under
-`/workspace`, each repository in exactly one project. A project is a card on
-the **Projects** page (Projects on the rail), and each repository opens as a
+A space is a named thing of its own that holds git repositories under
+`/workspace`, each repository in exactly one space. A space is a card on
+the **Spaces** page (Spaces on the rail), and each repository opens as a
 page of its own, described in [notebook.md](notebook.md). This doc covers the
-Projects page, making a project and adding repositories to it (new, cloned or
+Spaces page, making a space and adding repositories to it (new, cloned or
 from an archive), linking a repository to a git host, a card's two faces and
-a project's settings, archiving and deleting, and how a repository is
+a space's settings, archiving and deleting, and how a repository is
 reached: push rights, tokens, deploy keys and FTP.
 
-## The Projects page
+## The Spaces page
 
-The **Projects** page shows every project as a card: its name, its
+The **Spaces** page shows every space as a card: its name, its
 repositories with their branches, who has a session there, and **Start
 agent** (**Manage agent**, in green, while your session runs), **Add
 repository** and **Edit** on each. The bar holds a search, the bin and **New
-project**; the cards can be kept together in groups of your own (**Group**,
-on a card's back), and archived projects are folded under **Archived** at the
+space**; the cards can be kept together in groups of your own (**Group**,
+on a card's back), and archived spaces are folded under **Archived** at the
 page's foot. A problem with a repository is
 said on the card rather than hidden: an **error** in red, a directory the
 container user cannot read/write/enter (with the `chown` that fixes it) or
 one holding no valid git repository, and a **warning** in amber, because
 it is asking for something. This is what
 makes one mapping for the whole folder workable: a directory that is not a
-project says so instead of quietly not appearing. Hidden directories are
+space says so instead of quietly not appearing. Hidden directories are
 skipped outright, and empty directories are never listed either: a mount point waiting for
 content is not a fault to report.
-A directory holding a **`.bbignore`** file is not a project and is not
+A directory holding a **`.bbignore`** file is not a space and is not
 listed: the container writes one into any path of its own that lands in
-the projects share (the toolchain store, if you map it inside the projects
+the spaces share (the toolchain store, if you map it inside the spaces
 folder rather than beside it), and you can create one by hand for anything else
 you would rather not see. It *hides*; archiving **blocks** a session, which is a
 different promise.
 
-## Making a project
+## Making a space
 
-In the page's bar, **New project** asks for a name and nothing else, and
-makes a project with no repository in it. Its name is what people read, so
-spaces and punctuation are kept ("Web shop, v2"); two projects never share
+In the page's bar, **New space** asks for a name and nothing else, and
+makes a space with no repository in it. Its name is what people read, so
+spaces and punctuation are kept ("Web shop, v2"); two spaces never share
 one. **Add repository** on its card then makes or clones a repository into
 it, in the dialog described next, which leaves out the node and the Agents
-may dials, since those are the project's. First run and Home's Getting
-started open the same dialog on its own, and the project is made around the
+may dials, since those are the space's. First run and Home's Getting
+started open the same dialog on its own, and the space is made around the
 repository, named as it is.
 
-A project needs no repository at all. Press **Start agent** on an empty
-project's card and a session starts in a plain folder of the project's own
+A space needs no repository at all. Press **Start agent** on an empty
+space's card and a session starts in a plain folder of the space's own
 (`/workspace/KEY`, with no git and no notebook), told that there is no code
-here: its work is containers and VMs on the project's node, made with
+here: its work is containers and VMs on the space's node, made with
 `aerie container new` from a compose file it writes in that folder, or
-`aerie vm`, under the project's Agents may dials. Name a project "Media
+`aerie vm`, under the space's Agents may dials. Name a space "Media
 server" and ask its session for a media server stack, or for a VM set up to
 your requirements, and nothing about code is ever on the screen: the card
 lists no repository, Report bug is not offered, git and the build, test and
 notebook verbs are refused with why, and the briefing leaves the code topics
-out. The card's **Settings** opens the project's settings as a dialog: its
+out. The card's **Settings** opens the space's settings as a dialog: its
 name's hint, its people, where it runs, what its sessions reach, its
 toolchains, what is yours there, its running sessions and the Agents may
 dials that need no code (Run its container, Make VMs, Install a tool pack,
-Report AerieOS bugs, Use a lent PC). On a project with repositories the same
-dialog holds what is the project's as a whole, and says that git, build and
+Report AerieOS bugs, Use a lent PC). On a space with repositories the same
+dialog holds what is the space's as a whole, and says that git, build and
 test, file access and snapshots are each repository's, in its notebook's
-Settings view. The dialog's Agents may dials are the project's defaults:
+Settings view. The dialog's Agents may dials are the space's defaults:
 every repository in it inherits each one until its own notebook's
 Permissions view sets it apart, where each dial's first choice reads "as
-the project (deny)" with the inherited word, which is what a new repository
+the space (deny)" with the inherited word, which is what a new repository
 starts on; picking a value there is that repository's override alone, and
-picking "as the project" gives it back. Add repository on the card makes a
-project with no repository a coding project; Delete project removes its
+picking "as the space" gives it back. Add repository on the card makes a
+space with no repository a coding space; Delete space removes its
 folder with it.
 
 A fresh local repo (`git init`) asks for a name and a free-text *Brief*: what you want
-built. The brief is not the project's `CLAUDE.md`, which every session
+built. The brief is not the space's `CLAUDE.md`, which every session
 reads as standing instructions and which would go on asserting the first
-day's decisions after the project moved past them. It is kept in the tree
+day's decisions after the space moved past them. It is kept in the tree
 as `BUILDERBOT-BRIEF.md`, out of git through the repository's own exclude
-file, for the first session: pressing Start agent on the project opens
+file, for the first session: pressing Start agent on the space opens
 it in a dialog, editable, beside the model and effort that session starts
 on. **Build it** starts the session with the brief as its first prompt;
 **Start without it** starts one that was not given it. Either way the
-brief leaves the tree then, and the project page's Overview keeps it,
+brief leaves the tree then, and the space page's Overview keeps it,
 as `aerie brief` prints it. When nodes are
-enrolled it also asks which node the project runs on (the only one is
-picked for you; *none* is an option), the same setting the project's
-settings change later, so a new project can build and start a
+enrolled it also asks which node the space runs on (the only one is
+picked for you; *none* is an option), the same setting the space's
+settings change later, so a new space can build and start a
 session without a second dialog. It asks the same way what a session
 may enter into the notebook (add to the roadmap, file bugs, add rules,
 fill in build and test), auto unless you say otherwise, so that is a
@@ -93,11 +93,11 @@ or xz, unpacked into the new directory before `git init`. However it
 arrived, the code map a session asks before grepping (`aerie map`) is built
 for it in the background the moment the tree is there: the dialog closes
 as usual, the card says *mapping the code* for the seconds it takes, and
-a session on that project waits for it, so its first question
+a session on that space waits for it, so its first question
 about the tree is answered from an index rather than by building one. A single
-top-level folder inside is dropped (the project directory *is* that
+top-level folder inside is dropped (the space directory *is* that
 folder), desktop junk like `__MACOSX` is skipped, and no brief is asked
-for: an archive is where that project starts, so the field goes when one
+for: an archive is where that space starts, so the field goes when one
 is picked, and a request carrying both is refused.
 Nothing is committed; the first session, or you, decides what the first
 commit is. Paths that would land outside the directory are refused whole. A clone
@@ -116,17 +116,17 @@ Picking one makes the server handle the container side: it writes the
 touched) and clones through the alias, which the remote then keeps, so
 later pushes offer the right key too. Only the matched agent key's own
 public line is ever written; nothing from the request is. With a PAT
-configured (a per-project token, or `gh auth login`) the key is optional even for
+configured (a per-space token, or `gh auth login`) the key is optional even for
 private repos: gh answers for plain https remotes.
 
-## Linking a project to a git host
+## Linking a space to a git host
 
-Every repo's menu carries its **remote** whichever state the project is
+Every repo's menu carries its **remote** whichever state the space is
 in: for one with **no remote at all** it is **Link to a git host**, and
 for one that already has a remote it is the host's settings (**GitHub
 settings**, say): the access token, which credential git reaches for, the
 repository's address, and **Unlink**, all described under
-[An access token for one project](#an-access-token-for-one-project),
+[An access token for one space](#an-access-token-for-one-project),
 [A new address for the same repository](#a-new-address-for-the-same-repository) and
 [Unlinking](#unlinking).
 Linking looks like the bottom of the clone form: the repository's address
@@ -136,11 +136,11 @@ host names itself and the row says so, locked. A server nobody has
 answered for is the one case where the row is a question, because a
 hostname does not say what is running on it and only the person who set
 the server up knows; the answer is remembered against that host, so the
-second project on the same server is read back rather than asked again.
+second space on the same server is read back rather than asked again.
 Then it asks how the push authenticates: a **deploy key**
-the agent holds, or an **access token** for this project alone, checked
+the agent holds, or an **access token** for this space alone, checked
 with the host where the host has an API to ask, stored under `/config` and
-read by git's helper. It sets `origin`, records the project as able to
+read by git's helper. It sets `origin`, records the space as able to
 push, and pushes the current branch, but **only into an empty repository**:
 `git ls-remote` must come back with no refs first, so linking can never
 write over existing work. A repository that does not exist at all is
@@ -158,7 +158,7 @@ GitLab, where subgroups make it a real part of an address.
 does: everything checkable is checked while the dialog is still up (the
 name, the URL, the key, whether the directory is free, whether the repo
 already has a remote), and then the dialog closes and the work carries on
-server-side. The job appears as its own band above the Projects page's
+server-side. The job appears as its own band above the Spaces page's
 grid, saying what it is
 doing: an ellipsis, not a percentage; git's progress is a
 carriage-return animation on stderr and parsing it back into a bar is a
@@ -170,21 +170,21 @@ passing through a toast you may not have been there to see. `git init` is
 the exception and stays synchronous; it is done before a spinner would
 render, and a row that flashes up for one frame is worse than none.
 
-## A project's card
+## A space's card
 
-A card has two faces. Its **front** says what the project is: its name, with
+A card has two faces. Its **front** says what the space is: its name, with
 **Pin** and **Archive** as icons beside it (lit where they are set), its id
 and node, who has a session there with the agent each runs and what it is
 doing, each repository with its branch (the name opens its page), and
 **Start agent**, **Add repository** and **Edit**. A press on the card
-itself opens nothing. A project with no repository yet says so, and its
+itself opens nothing. A space with no repository yet says so, and its
 Start agent waits for one.
 
 **Edit** turns the card over in place, to its **back**, the same size as the
-front: the project's name with a pencil to rename it; each repository with
+front: the space's name with a pencil to rename it; each repository with
 icons for a **shell** in it, its **git host** (linking it, or the host's
 settings once linked), lending it **your phone** when your phone is
-connected on its node, **rename**, **move** to another project and
+connected on its node, **rename**, **move** to another space and
 **delete**; and along the foot one line of icons, each named when hovered:
 **Color**, **Group**, **Lock** (its owner's or an administrator's), **Report
 bug** (which repository it is about, the first unless you pick another) and
@@ -193,37 +193,37 @@ there is no menu on a card.
 
 A repository's own page keeps **Start agent**, **Shell** and a menu in its
 header (link, phone, report, archive, lock, pin, settings). **Color** is your
-own color for the project, a stripe down its card, its repositories' pages'
-headers and its terminals' tabs, so several projects tell apart without
-reading each name; **Group** is a label of yours that keeps projects together
-on the Projects page, and nothing else follows from it.
+own color for the space, a stripe down its card, its repositories' pages'
+headers and its terminals' tabs, so several spaces tell apart without
+reading each name; **Group** is a label of yours that keeps spaces together
+on the Spaces page, and nothing else follows from it.
 
-**The node** beside the branch on every project's card and in its page's
-header is the node its work runs on. A project with none says nothing more;
+**The node** beside the branch on every space's card and in its page's
+header is the node its work runs on. A space with none says nothing more;
 its Start agent is ghosted with where to pick one.
 
-**A pin** per project, the pin by its name or **Pin** on its back, decides whether
+**A pin** per space, the pin by its name or **Pin** on its back, decides whether
 Home's glance shows it.
-The pins are each person's own: unpinning takes a project off your glance
-and nobody else's, and nothing else: the Projects page lists everything
+The pins are each person's own: unpinning takes a space off your glance
+and nobody else's, and nothing else: the Spaces page lists everything
 under `/workspace`, pinned or not, with the same controls on each card and
 *unpinned* after the name of one that is not. Pins live per account in
 `/config/pinned-projects.json`. An account made since 7 Oct starts with
-nothing pinned and pins what it wants from the Projects page; one made
+nothing pinned and pins what it wants from the Spaces page; one made
 before that with no set yet still sees everything pinned. The page lists
-projects by name, case aside.
+spaces by name, case aside.
 
 **Delete**, a repository's bin icon on a card's back, moves it to
 `/workspace/.trash/<name>` with every file kept: a second delete of the same
 name is numbered rather than overwriting the first, and `/config` is not
-touched, so putting one back is a `mv`. It is also **Delete project…** at the
+touched, so putting one back is a `mv`. It is also **Delete space…** at the
 foot of every repository's settings. The bin in the page's bar lists what was
-deleted and which project each was in; **Put back** returns it to that
-project, or asks which project when that one is gone. A project is deleted
-only once nothing is left in it: **Delete project** is on its back then, and
+deleted and which space each was in; **Put back** returns it to that
+space, or asks which space when that one is gone. A space is deleted
+only once nothing is left in it: **Delete space** is on its back then, and
 not before.
 
-## A project's settings
+## A space's settings
 
 **Settings** on a card's back, or in a repository's menu, opens its own settings, which
 are also the Settings view of its page, in sections: General (its name),
@@ -233,44 +233,44 @@ to you there, and the name and email your commits carry), Repository, Nodes,
 Build and test, What sessions reach, File access, Snapshots and Running
 sessions; its Android signing keys are a view of their own, Signing, in Ship.
 The git credential is not in it; that is the remote, in the
-same menu, so a credential has one home whether or not the project has a remote
+same menu, so a credential has one home whether or not the space has a remote
 yet. Renaming changes the name it is shown under and nothing else (R154):
-a project has a permanent id and a directory that is never handed out again,
+a space has a permanent id and a directory that is never handed out again,
 and everything (the notebook, the containers, the sessions, the agents' own
 transcripts and memories) is keyed by the directory, so a rename moves
 nothing and needs nothing closed first. A name follows GitHub's rules for a
 repository's: letters, digits, `-`, `_` and `.` only, each run of anything
 else one `-`, so "Turing Lens" is shown as Turing-Lens, and the field says
-so as it is typed. Two live projects are never shown under one name: a
+so as it is typed. Two live spaces are never shown under one name: a
 second gets Name-2, whether it was created, cloned or put back from the
-trash. A name ever used gives a new project the next free
+trash. A name ever used gives a new space the next free
 directory (Name-2), deleted for good included, while it is still shown as
-Name, and the New project dialog says so as the name is typed; so it never
-inherits an old project's notebook or containers, and a project put back from the trash always fits where it was.
-Each project also has an id, P and a number (P3), shown first on its card's
+Name, and the New space dialog says so as the name is typed; so it never
+inherits an old space's notebook or containers, and a space put back from the trash always fits where it was.
+Each space also has an id, P and a number (P3), shown first on its card's
 and its page's facts line: it never changes and is never given to another
-project, so it names the project for good. A Claude session is named after
-the project with its id, "builderbot (P3)", which is how the Claude app lists
+space, so it names the space for good. A Claude session is named after
+the space with its id, "builderbot (P3)", which is how the Claude app lists
 it, and `aerie -p P3` names it as `aerie -p builderbot` does.
-Only AerieOS makes a project (create, clone, or start from an imported
+Only AerieOS makes a space (create, clone, or start from an imported
 archive): a folder made by hand on the share is not listed, and the folders
 already there when this arrived were recorded once, as they were.
 
-## Archiving and locking a project
+## Archiving and locking a space
 
-**Archive**, by a project's name or on its back, puts a project out of sight and changes
-nothing else: its card folds under **Archived** at the foot of the Projects
-page and leaves Home's pinned projects, and the project keeps working for
+**Archive**, by a space's name or on its back, puts a space out of sight and changes
+nothing else: its card folds under **Archived** at the foot of the Spaces
+page and leaves Home's pinned spaces, and the space keeps working for
 everybody on it, sessions included. **Unarchive**, in the same places, brings
-it back. The project's owner or an administrator archives one.
+it back. The space's owner or an administrator archives one.
 
-**Lock** keeps people out of a project, and it comes in two kinds. The
-project's owner locks it with **Lock**: every other account's session on it
+**Lock** keeps people out of a space, and it comes in two kinds. The
+space's owner locks it with **Lock**: every other account's session on it
 ends, and until the owner presses **Unlock** nobody else starts a session in
 it or changes it, administrators included. An administrator who is not its
 owner locks it with **Admin: Lock**: every session on it ends, the owner's
 too, and nobody at all starts one or changes it until an administrator
-presses **Admin: Unlock**. A locked project stays on the Projects page with a
+presses **Admin: Unlock**. A locked space stays on the Spaces page with a
 padlock after its name that says whose lock it is. Locked against you:
 
 - a session of yours is refused at launch, with a message saying whose lock
@@ -286,41 +286,41 @@ is enforced by the server on every write and by the terminal launcher on
 every session, which on a node asks the controller with the session's own
 token, because a terminal's words and the API paths are reachable on their own and
 a rule only the page honored would be advice. It is not a sandbox: the file
-tools are denied on every project but a session's own, and a session in
-another project can still reach this directory through Bash.
+tools are denied on every space but a session's own, and a session in
+another space can still reach this directory through Bash.
 
-## A project and its repositories
+## A space and its repositories
 
-Each repository in a project stays what it was: its folder, its notebook,
+Each repository in a space stays what it was: its folder, its notebook,
 its git host link (remote, token or deploy key, push rights, forge, CI and
 releases), its version and changelog, its signing keys and its dev
-instance. Nothing on disk moves when a repository joins a project or leaves
+instance. Nothing on disk moves when a repository joins a space or leaves
 one.
 
-What one session needs is the project's: its node, its coding agents, its
+What one session needs is the space's: its node, its coding agents, its
 people and roles, its owner, its Agents may dials, and each person's pin,
 group and color, and its archive and lock. One **Start agent** starts the
-project's session, which runs on the first repository and works in all of
+space's session, which runs on the first repository and works in all of
 them: each one's tree is in its view to write, on the same branch name, and
 `aerie` answers for the repository whose tree it is run in. A session asked for
 on another of its repositories is refused and pointed at the first. A
-repository's page names the project, with its repositories as a switch beside
+repository's page names the space, with its repositories as a switch beside
 the name when there are several, and its Roadmap and Bugs carry the other
-repositories' open items under **Also in** the project's name.
+repositories' open items under **Also in** the space's name.
 
-What a project grants others goes by the project: one that reads it reads
+What a space grants others goes by the space: one that reads it reads
 every repository in it, including one added later, with no setting changed.
 
-**Move**, a repository's icon on a card's back, puts it in another project of
-yours. It is refused while a session runs on either project, since each was
+**Move**, a repository's icon on a card's back, puts it in another space of
+yours. It is refused while a session runs on either space, since each was
 started with the trees it had, and while either is locked; it says why. The
-owner of both projects, or an administrator, moves one; never a session.
+owner of both spaces, or an administrator, moves one; never a session.
 
-The record is `project-repos.json` under `/config`, beside each project's
+The record is `project-repos.json` under `/config`, beside each space's
 name and id in `projects.json`. An install from before 0.8.0 is moved once,
-at its first start: each repository becomes a project of its own under the
+at its first start: each repository becomes a space of its own under the
 name it was shown as, its settings, owner, people, pins, groups, colors,
-archive and lock going with it, and a project of several repositories keeps
+archive and lock going with it, and a space of several repositories keeps
 its own name.
 
 ## Push rights
@@ -330,8 +330,8 @@ that decision is made once. Three rules, all deliberate:
 
 - **It cannot be turned off.** A working copy that could push yesterday and
   cannot today explains nothing to whoever is standing in it. Deleting the
-  project is the way out, which never touches GitHub.
-- **One project per repository.** Two working copies pushing to one remote is
+  space is the way out, which never touches GitHub.
+- **One space per repository.** Two working copies pushing to one remote is
   how a branch ends up racing itself, and here both may be the same session on
   different days. Deleting the holder frees it.
 - **The token is checked first.** Before the clone starts, GitHub is asked
@@ -347,15 +347,15 @@ a guardrail, not a sandbox: a shell in the container can delete it.
 
 A grant names the **host as well as the path**, because `sean/app` on GitHub
 and `sean/app` on a Gitea in the cupboard are two repositories: mirroring one
-to the other is a reason to link a second project, not a collision to refuse.
+to the other is a reason to link a second space, not a collision to refuse.
 Grants written before there was more than one host are stamped as GitHub's
 once, at startup, since nothing else could be linked when they were made.
 
-## An access token for one project
+## An access token for one space
 
 Cloning a private repository asks for an optional **access token**. The
 token is yours: it goes into your own key store (sealed under your account's
-key, on Profile), and the project's file at `/config/gitcreds/<project>`
+key, on Profile), and the space's file at `/config/gitcreds/<project>`
 names that entry and nothing secret. git is handed it by `git-credential-bb`,
 named from that repository's `.git/config` and nowhere else, with git's
 empty-value reset ahead of it, so the globally configured helper is never
@@ -366,7 +366,7 @@ forge`: pull requests, issues, CI runs and their logs, and releases on
 GitHub, GitLab, Gitea or Forgejo, each run on the controller with the token,
 which never reaches a session. The controller measures what the token may
 do without changing anything (when it is stored, when Measure is pressed
-on the Permissions view and once a day), and the project's Permissions view, **On the git host**, lists
+on the Permissions view and once a day), and the space's Permissions view, **On the git host**, lists
 each ability with what the token says and an Allow or Deny over it: Deny
 takes the ability away whatever the token allows, and merging starts at
 Deny. Every session is told at its start what it may do there and what to
@@ -376,35 +376,35 @@ each on every host.
 
 That last part is the point. A token minted to reach one private repo usually
 reaches every repo it was scoped to; in the environment it also reaches them
-from every project and every session. Here it opens the one project you gave it
-to, and stays with that project whatever it is renamed to.
+from every space and every session. Here it opens the one space you gave it
+to, and stays with that space whatever it is renamed to.
 
 **Every git action is a person's, with their own token.** Each person who
-pushes or pulls on a project gives it their own token (one token may serve
-several projects, and two people may give tokens with different scopes), so
-the forge's log says who did what. The project keeps none of its own: its
+pushes or pulls on a space gives it their own token (one token may serve
+several spaces, and two people may give tokens with different scopes), so
+the forge's log says who did what. The space keeps none of its own: its
 settings list who has given one, never the token, and your own store's
-tokens for the host are offered there with **Give it to this project**;
+tokens for the host are offered there with **Give it to this space**;
 **Take it back** withdraws yours. You keep one token for each git host
 and sign-in: a new one for the same host and account replaces the one
-before in place, and every project using it moves to the new one. A token
+before in place, and every space using it moves to the new one. A token
 is used only while its person is
 signed in, on any browser or device (the phone app counts): your sessions'
 `aerie git`, your presses in the Git view, the release you cut and the wiki
 you sync all run with yours, and signed out everywhere, a session of yours
 is told that `aerie git` waits for you. The Git view's line says whose token a
 press would use. Work that is nobody's in the moment (watching CI) takes
-the token of anyone on the project signed in now, and pauses, said on the
-project, while nobody who gave one is. A project's token from before 0.9.0
-stays its owner's for that project.
+the token of anyone on the space signed in now, and pauses, said on the
+space, while nobody who gave one is. A space's token from before 0.9.0
+stays its owner's for that space.
 
-A project that already has push rights can be given a token from its host's
+A space that already has push rights can be given a token from its host's
 settings, in its menu, including one that pushes with a **deploy key**. Setting one there
 does not switch anything by itself: git never asks a credential helper about an
-ssh remote, so a project with an `ssh://` or `git@` origin goes on using its
+ssh remote, so a space with an `ssh://` or `git@` origin goes on using its
 key however many tokens are stored for it.
 
-The same section holds the project's **deploy key**, beside the token:
+The same section holds the space's **deploy key**, beside the token:
 **Make a key** makes one and **Paste a key** keeps one you already have. The
 private half goes on stdin to a root-only helper (`deploy-key`, the builder
 account's second sudo rule), which keeps it under `/config/deploy-keys` and
@@ -442,7 +442,7 @@ credential you did not choose.
 out (the operator, 7 Oct). It runs `git ls-remote` for the read and `git push
 --dry-run` of HEAD to a branch nobody has for the write, which the host refuses
 at the handshake when a deploy key is read-only or a token cannot push, and
-which sends nothing; the project's own pre-push hook is skipped, so a clone
+which sends nothing; the space's own pre-push hook is skipped, so a clone
 without push rights is still asked about its credential. For a token it also
 asks the host's API what git cannot see: on GitHub a classic token's scopes
 (without `workflow` a push touching `.github/workflows` is refused) and the
@@ -461,10 +461,10 @@ field cannot be pre-filled and typing over an invisible one is how a working
 credential gets replaced by accident. It is disabled, with **Clear the stored
 token** under it: pressing that opens the field for a new one, ghosts the
 *Access token* side and puts the choice back on *Deploy key*. Like everything
-else in this dialog it is staged: the project changes when you press Save,
+else in this dialog it is staged: the space changes when you press Save,
 and the link offers the way back until you do.
 
-Clear the only credential a project has and both sides go quiet, with a line
+Clear the only credential a space has and both sides go quiet, with a line
 saying it cannot push to GitHub and that everything else, commit, branch and
 build, still works locally. The field stays typeable there deliberately:
 ghosting it would be tidier and would leave no way back to pushing.
@@ -474,8 +474,8 @@ the deploy key and its `~/.ssh/config` alias stay where they are, and the
 repository keeps its credential helper: an ssh remote simply never consults
 one. So going back costs nothing, and the exact alias is restored rather than
 guessed, because the alias is named after the *key* and there would be nothing
-in the project to guess it from. A side you cannot take is shown disabled with
-the reason: a project with no token stored, or one that has only ever been
+in the space to guess it from. A side you cannot take is shown disabled with
+the reason: a space with no token stored, or one that has only ever been
 https and so has no key remote to return to.
 
 **It is not shielded the way a deploy key is.** Those are served by a root-owned
@@ -498,7 +498,7 @@ time the token is checked.
 that cannot be undone. It takes four things off, and the answer names each:
 the `origin` remote, the stored access token, the credential helper pointing
 at it, and the push grant, which is what frees the repository for another
-project to be linked to it.
+space to be linked to it.
 
 **It touches nothing in the tree.** No commit, no branch, no file, no reflog:
 the history that was pushed is still here and can be pushed again the moment
@@ -508,9 +508,9 @@ thing that has gone. Any remote other than `origin` is left alone and named
 back to you.
 
 The deploy-key alias in `~/.ssh/config` stays as well. It is named after the
-*key* and the host, not the project, and another project may be using it.
+*key* and the host, not the space, and another space may be using it.
 
-Unlinking is also **how a project moves from one host to another**: linking
+Unlinking is also **how a space moves from one host to another**: linking
 refuses a repository that already has a remote, so this is the first half of
 the move and pointing it at the new host is the second. The same repository
 at a new address on the same host is not a move, and needs no unlinking:
@@ -528,34 +528,34 @@ access token stays filed under the host it always was, and the push grant
 moves to the new path, so pushing carries on with nothing typed again.
 
 Saving asks the new address for its branches and needs one of them to be a
-commit this project already has: a renamed owner keeps every commit, while a
+commit this space already has: a renamed owner keeps every commit, while a
 typo or another repository has none. Refused, with the remote left where it
-was: an address on another host, a repository another project may push to,
+was: an address on another host, a repository another space may push to,
 and one that shares no history. A fork shares history too, so this checks
 that it is the same history, not the same repository on the host's books;
 that difference is why it is the administrator's control.
 
-Changing it does not wait for the project's terminals to close: the address,
+Changing it does not wait for the space's terminals to close: the address,
 like the token and the authentication switch, is `.git/config` and the
 store, which a running session reads on its next push. Only a new name, which
 moves the directory, still asks for them to be closed first.
 
 ## File access over FTP
 
-A project's tree can be reached from outside AerieOS with an FTP client
+A space's tree can be reached from outside AerieOS with an FTP client
 (R151, the operator, 7 Oct): the **File access** section of its settings
-turns it on, picks the port, and gives each account that sees the project
-**Read** or **Read and write**. Setting it up is the project owner's or an
+turns it on, picks the port, and gives each account that sees the space
+**Read** or **Read and write**. Setting it up is the space owner's or an
 administrator's; signing in also needs File access on the account's roles
-on that project (R152), and gets the lesser of the two, so a role without it
-refuses even the project's owner. A session never may set it. Anybody else on the project
+on that space (R152), and gets the lesser of the two, so a role without it
+refuses even the space's owner. A session never may set it. Anybody else on the space
 is shown only that it is on, and where.
 
-The server is the project's primary node's: the **ftp** toolchain's
-`bb-ftpd` (pyftpdlib), one per project, which the agent starts from what
+The server is the space's primary node's: the **ftp** toolchain's
+`bb-ftpd` (pyftpdlib), one per space, which the agent starts from what
 hello hands it, as the session account, rooted at `/workspace/NAME`, so a
 file written over FTP is owned as a session's would be. It listens on the
-port and uses the nine after it for passive data, which is why two projects
+port and uses the nine after it for passive data, which is why two spaces
 on one node are kept ten ports apart; the first free block from 2121 is
 offered. TLS is required on the control and the data connection (FTPS,
 explicit), because the password is the account's own AerieOS password and
@@ -566,11 +566,11 @@ it once.
 `bb-ftpd` knows nobody's password. Each login goes up its stdout to the
 agent, which asks the controller's `ftp-auth`, and the answer goes back down
 its stdin: the name and password checked as the dashboard's sign-in checks
-them, then the access the project's settings give that account, and none for
-an account since taken off the project. Nothing is cached, so an access taken
+them, then the access the space's settings give that account, and none for
+an account since taken off the space. Nothing is cached, so an access taken
 away holds from the next login. Ten failed logins from one address in five
 minutes refuse that address for the rest of the window, and every login,
-failed or not, is in the audit log. The project's `.git` is read-only over
+failed or not, is in the audit log. The space's `.git` is read-only over
 FTP whatever the access, and nothing outside the tree is reachable, a
 symlink pointing out of it included. A node whose store has no ftp
 toolchain is said in red under the section as soon as it is ticked, from
@@ -578,5 +578,5 @@ the node's last report, before anything is tried; the tick stays usable,
 so the port and the access can be set before the install. Save, when it
 turns the server on or moves its port, asks the node's address from the
 controller whether anything answers on the port or the nine after it and
-refuses, naming the ports, when something does; the project's own running
+refuses, naming the ports, when something does; the space's own running
 server is not asked about.

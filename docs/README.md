@@ -1,9 +1,9 @@
 # AerieOS documentation
 
 AerieOS is your own server, for your files, your apps and your code: your disks,
-shares, apps, VMs and projects, with coding agents (Claude Code, ChatGPT's Codex
+shares, apps, VMs and spaces, with coding agents (Claude Code, ChatGPT's Codex
 CLI, GitHub's Copilot CLI, xAI's Grok Build, and any model through OpenCode) when
-you want them. The **controller** serves this dashboard and keeps every project's plan, bugs
+you want them. The **controller** serves this dashboard and keeps every space's plan, bugs
 and rules; the machines it enrolls, the **nodes**, do the work: the agents'
 sessions, builds, tests, CI, Android emulators, containers and VMs. On a
 machine of its own it runs the storage too. These
@@ -14,7 +14,7 @@ line in any of them.
 [install.md](install.md) (on Unraid, [unraid.md](unraid.md)). Given an
 account on somebody's AerieOS, read [start-here.md](start-here.md). To
 find your way around, read [how-it-works.md](how-it-works.md), the overview,
-then the doc for the part you are on: the docs under *Work on a project*,
+then the doc for the part you are on: the docs under *Work on a space*,
 *Build, test and ship* and *Machines, people and devices* follow the
 dashboard's rail.
 
@@ -31,19 +31,19 @@ dashboard's rail.
 - [unraid.md](unraid.md): the same on Unraid, step by step
 - [sandbox-vm.md](sandbox-vm.md): the Docker sandbox VM a node usually is: why, how, and enrolling it
 
-## Work on a project
+## Work on a space
 
-- [projects.md](projects.md): the Projects page: making, cloning and linking a project, its menu and settings, archiving and deleting it
-- [git-hosts.md](git-hosts.md): what an agent can do on your git host (GitHub, GitLab, Gitea): each ability, the token permission it needs, and the project's Allow or Deny over it
-- [notebook.md](notebook.md): a project's page: Overview, Roadmap, Bugs, Git, Tests, Analysis, Artifacts, Docker, Wiki and Design
+- [projects.md](projects.md): the Spaces page: making, cloning and linking a space, its menu and settings, archiving and deleting it
+- [git-hosts.md](git-hosts.md): what an agent can do on your git host (GitHub, GitLab, Gitea): each ability, the token permission it needs, and the space's Allow or Deny over it
+- [notebook.md](notebook.md): a space's page: Overview, Roadmap, Bugs, Git, Tests, Analysis, Artifacts, Docker, Wiki and Design
 - [sessions.md](sessions.md): sessions of each agent, Claude, ChatGPT and Copilot: starting one, the Sessions page, what a session sees, what it is told and the rules it is held to
 
 ## Build, test and ship
 
 - [building.md](building.md): builds and tests on a node, CI runners and their logs, the scanner's findings, signing and releases
 - [scanners.md](scanners.md): setting up the static analysis stack (Semgrep, Trivy, mobsfscan) and the script that runs it
-- [versions.md](versions.md): a project's version, release lines (two releases built at once), and moving fixes forward and back between them
-- [toolchains.md](toolchains.md): the Build pages: Toolchains, the NVIDIA card, Android versions and the Emulator, and a Phone lent to a project
+- [versions.md](versions.md): a space's version, release lines (two releases built at once), and moving fixes forward and back between them
+- [toolchains.md](toolchains.md): the Build pages: Toolchains, the NVIDIA card, Android versions and the Emulator, and a Phone lent to a space
 - [agents.md](agents.md): the coding agents a session runs (Claude Code, Codex CLI, Copilot CLI, Grok Build, OpenCode): installing each on a node from the Library and signing in to it there
 - [tool-packs.md](tool-packs.md): toolchains you add yourself from a repository, the commands they give a session, and how to write one
 - [containers.md](containers.md): the Containers page and nginx: dev instances, how one is reached, their networks and image updates
@@ -54,7 +54,7 @@ dashboard's rail.
 ## Machines, people and devices
 
 - [machines.md](machines.md): This machine, Controller settings, Network, Nodes, Storage, Installed, the logs and the Jobs page
-- [people.md](people.md): accounts and roles, a project's owner and invitations, the chat, and your Profile
+- [people.md](people.md): accounts and roles, a space's owner and invitations, the chat, and your Profile
 - [companion-app.md](companion-app.md): the Android companion app: pairing, approvals and notifications from a phone
 
 ## Look things up

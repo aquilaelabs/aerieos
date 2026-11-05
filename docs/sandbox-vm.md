@@ -5,7 +5,7 @@ session can build, run and destroy containers without any of it reaching the
 server's real ones.
 
 AerieOS's controller stays exactly what it is: the container, on the
-projects share, holding the record (or the same controller installed bare
+spaces share, holding the record (or the same controller installed bare
 metal, [install.md](install.md)). Only the *daemon* moves, onto a machine
 enrolled as a node like any other; nothing on AerieOS's side is a setting.
 
@@ -57,13 +57,13 @@ Two things also get better on the way:
 
 ## Path parity, which is the whole design
 
-Mount the projects share into the VM **at the same path AerieOS uses**:
+Mount the spaces share into the VM **at the same path AerieOS uses**:
 `/workspace`.
 
 This is not tidiness. A compose file's bind-mount *source* is resolved by
 whatever runs the container, so if both machines call the share `/workspace`,
 a relative bind like `./data:/data` means the same directory whichever side
-asks. Mount it anywhere else and every project's compose file is wrong in the
+asks. Mount it anywhere else and every space's compose file is wrong in the
 worst way available: Docker does not fail on a missing bind source, it creates
 an empty directory and mounts that, and the app comes up with no data.
 
@@ -151,12 +151,12 @@ rather than something available to whatever is building a container this
 afternoon.
 
 **And a second, for sessions** (roadmap #24, docs/nodes.md §19). A
-session on a project bound to this node runs *here*, and it runs as
+session on a space bound to this node runs *here*, and it runs as
 `builder` (`--session-user NAME`, `none` to run no sessions) which is in
 `kvm` for the emulator and in **no docker group**: the account that edits
 your source is the one thing on this machine to keep away from a group that
 is root. It is made with `--session-uid`/`--session-gid` **99:100**, the
-controller's PUID:PGID, so a file it saves on the projects share is owned
+controller's PUID:PGID, so a file it saves on the spaces share is owned
 exactly as one saved from the controller is; a different uid would leave the
 share with files the rest of the array does not expect. `provision-linux.sh`
 installs tmux, jq and git for it (the coding agents are installed
@@ -184,17 +184,17 @@ group is root on this machine to anyone who wants it. One
 `docker run -v /:/host --privileged` and the separation is over. That is not a
 hole to plug: the VM exists to be wrecked, and AerieOS needs the daemon to
 do its job. What the split buys is that the machine's own configuration, the
-fstab deciding whether `/workspace` is the projects share and read-only, is not
+fstab deciding whether `/workspace` is the spaces share and read-only, is not
 one command away from a session that wandered.
 
-**Mount the projects share read-only, unless this node runs sessions.** For
+**Mount the spaces share read-only, unless this node runs sessions.** For
 a Docker-only sandbox nothing on the machine writes source code (the daemon
 only ever *resolves* bind sources there), so read-only costs nothing and
-means a container that binds its project tree cannot scribble on your
+means a container that binds its space tree cannot scribble on your
 source. A node with a session account is the other case: a session works on
 that share from here, so it has to be read-write: the dashboard refuses to
 send a session to a node whose `/workspace` is read-only and says so on the
-project's button, because a session that cannot save a file is worse than
+space's button, because a session that cannot save a file is worse than
 none. `:ro` on `add-share`/`add-nfs` decides it when the mount is made;
 `bb-sandbox readonly /workspace` decides it afterwards, and
 `readonly /workspace off` puts it back (or untick read-only on the mount's
@@ -442,7 +442,7 @@ any of them is a second VM on the first one's firmware variables and
 address.
 
 What it is sized for: **16 GiB, 6 cores, a 200G disk.** The sandbox used to
-be a box that built the odd image; now it is where a project's Gradle build,
+be a box that built the odd image; now it is where a space's Gradle build,
 the Android emulator with a system image behind it, a session and
 its Playwright browsers all run, sometimes in the same afternoon, and the
 toolchain store lands on its disk unless the stores are pointed at a share.
@@ -537,7 +537,7 @@ Then what differs from Unraid's placeholder, each for a reason:
   The rule names the VM's address, so the address and the rule move
   together: change the rule first, then the address. Done the other way
   round the host refuses the mount ("access denied by server"), `nofail`
-  lets the boot go on without it, and every project bound to the node loses
+  lets the boot go on without it, and every space bound to the node loses
   its Start agent: the node's page and the button say what the server
   said. Apply network on the Nodes page asks each server first and refuses
   an address the exports do not admit.
@@ -565,9 +565,9 @@ Then what differs from Unraid's placeholder, each for a reason:
   something needs it: a compose that never mentions `${BB_DEV_DATA}` does not
   care.
 
-  `ro` instead of `rw` on the projects share is worth knowing about: the
+  `ro` instead of `rw` on the spaces share is worth knowing about: the
   sandbox could build from your source and never alter it. It breaks any
-  compose that writes to a bind mount inside the project, which is common
+  compose that writes to a bind mount inside the space, which is common
   enough that it is not where I would start.
 
   To move to virtiofs later, add a `<filesystem>` block per share: the
@@ -669,12 +669,12 @@ reason to reach the host's daemon and no way to: the actual prize, and not
 another layer of filtering but one fewer thing holding the keys to the real
 containers.
 
-**What this changes for a session.** The rule in every project's `CLAUDE.md`
+**What this changes for a session.** The rule in every space's `CLAUDE.md`
 says the daemon is a sandbox VM and is a session's to build on, run on and
 wreck. So this hands a session a Docker host it can actually use, which is the
 half that is easy to miss while thinking about what it takes away. The
 dev-instance *controls* stay the operator's, and the dashboard's own compose
-project names stay the dashboard's.
+space names stay the dashboard's.
 
 **The builder changed with it.** AerieOS forced `DOCKER_BUILDKIT=0` for as
 long as a socket proxy stood between it and a daemon, because buildx attaches

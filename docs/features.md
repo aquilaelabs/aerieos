@@ -7,37 +7,37 @@ explains each in full.
 
 One page in the browser, at a desk or on a phone ([dashboard.md](dashboard.md)).
 
-- **The rail** down the left edge: Home, Projects, Build, Containers,
+- **The rail** down the left edge: Home, Spaces, Build, Containers,
   Controller, Machines, Sessions, Jobs, People, Settings and Help. On a phone it is a bar
   at the foot.
 - **Home**: tiles for what is running and what needs you (nodes online,
   containers running, jobs and failures, sessions open, updates due, CI in
-  the red), your attention list, the last jobs and your pinned projects.
-- **Search** at the top jumps to any page, project, container or node.
+  the red), your attention list, the last jobs and your pinned spaces.
+- **Search** at the top jumps to any page, space, container or node.
 - **The bell** holds what waits on your answer and what was said; **the
   doctor's dot** beside it is the controller's health at a glance.
 - **The dock** at the foot of every page holds the chat and your terminals.
 - **Help** is these docs, with a search across them, inside the dashboard.
 - Color schemes, light and dark, chosen per person.
 
-## Projects
+## Spaces
 
-Each project holds git repositories, each in one project ([projects.md](projects.md)).
+Each space holds git repositories, each in one space ([projects.md](projects.md)).
 
-- **New project** makes one by its name; **Add repository** on its card
+- **New space** makes one by its name; **Add repository** on its card
   clones one from GitHub, Gitea, Forgejo or any git remote, starts an empty
   one, or unpacks a zip or tarball of code you already have. Link an existing
   local repository to an empty one on a host; move a repository to another
-  project.
+  space.
 - Groups, pins, a color of your own, rename, archive, and a trash that
-  keeps a deleted repository, and which project it was in, until it is purged.
-- A per-project **Settings** page: its node, build and test commands, what
+  keeps a deleted repository, and which space it was in, until it is purged.
+- A per-space **Settings** page: its node, build and test commands, what
   an agent may do, the toolchains its sessions may use, signing keys, file
   access and who is on it.
 
-## A project's page
+## A space's page
 
-Everything about a project, shared between you and every session that
+Everything about a space, shared between you and every session that
 works there ([notebook.md](notebook.md)).
 
 - **Overview**: house rules, memories, the code base at a glance.
@@ -48,30 +48,30 @@ works there ([notebook.md](notebook.md)).
   push, and the CI runs of the repository's workflows.
 - **Tests**: every run recorded and timed, per suite.
 - **Analysis**: static-analysis findings from a scanner you run.
-- **Artifacts**: the project's builds in `dist/`, with releases.
-- **Docker**: the project's containers.
+- **Artifacts**: the space's builds in `dist/`, with releases.
+- **Docker**: the space's containers.
 - **Wiki** and **Design**: a wiki read like an encyclopedia, and the
-  project's design language and pages, which sessions follow.
+  space's design language and pages, which sessions follow.
 
 ## Sessions
 
 ([sessions.md](sessions.md), [agents.md](agents.md))
 
 - **Start agent** opens a session of Claude (Claude Code), ChatGPT (Codex
-  CLI), Copilot (Copilot CLI) or Grok (Grok Build) on the project's node, in a real terminal in
+  CLI), Copilot (Copilot CLI) or Grok (Grok Build) on the space's node, in a real terminal in
   the dock. Resume it later, restart it, and pick the model and effort.
-- Each session starts **briefed**: the project's house rules, roadmap and
+- Each session starts **briefed**: the space's house rules, roadmap and
   open bugs, so you ask for the thing rather than explain the place.
-- **What an agent may do is a dial per project**: add to the roadmap, file
+- **What an agent may do is a dial per space**: add to the roadmap, file
   bugs, add rules, write the wiki, run its container, sign a build, publish
   a release. Each is allowed, asked of a person, or refused.
-- **A session sees only its own project** on disk, with your git identity on
+- **A session sees only its own space** on disk, with your git identity on
   its commits. Credentials stay out of its reach: it reaches a git host only
   through `aerie git` and signs through AerieOS, without ever holding the
   keys.
 - **Asking**: a session waiting on a permission prompt shows amber in the
-  dock, on its project and in the bell.
-- A session may **read other projects** you allow, without changing them.
+  dock, on its space and in the bell.
+- A session may **read other spaces** you allow, without changing them.
 - Each person signs in to each agent with their own account, on each node,
   from the Installed page under Machines.
 
@@ -82,7 +82,7 @@ What a session (or you, in a terminal) uses to work with AerieOS
 
 - The notebook from the terminal: `aerie roadmap`, `aerie bug`, `aerie rules`,
   `aerie design`, `aerie changelog`.
-- `aerie build`, `aerie test` and `aerie run` on the project's node.
+- `aerie build`, `aerie test` and `aerie run` on the space's node.
 - `aerie map`: where a name is defined and who calls it, across the code.
 - `aerie capture`: screenshots and frame-by-frame reels of a page or the
   emulator that a session can look at.
@@ -121,23 +121,23 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
   own for any tool, from a git repository, a pasted `bbtool.json` or an
   upload, with the commands it gives Claude. Kept at the version you
   approved.
-- Per project, which toolchains and packs its sessions may use.
+- Per space, which toolchains and packs its sessions may use.
 - **The NVIDIA card**: its driver and container toolkit installed on a node.
 
 ## Android
 
 ([toolchains.md](toolchains.md), [companion-app.md](companion-app.md))
 
-- Android SDK versions, system images and an **emulator** per project.
-- A **real phone** lent to a project through the Android app.
+- Android SDK versions, system images and an **emulator** per space.
+- A **real phone** lent to a space through the Android app.
 - **Release signing** with keys a session never sees.
-- **The Android app**: your projects, the bell and your sessions on a phone.
+- **The Android app**: your spaces, the bell and your sessions on a phone.
 
 ## Containers
 
 ([containers.md](containers.md))
 
-- A project's compose file becomes a **dev instance** with one press, built
+- A space's compose file becomes a **dev instance** with one press, built
   and run on its node.
 - **Copy or move** a container and its data to another node.
 - **nginx** per node puts a hostname and a certificate in front of what runs
@@ -151,10 +151,10 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 
 ([building.md](building.md))
 
-- Builds and tests run on the project's node; their output lands in `dist/`.
+- Builds and tests run on the space's node; their output lands in `dist/`.
 - A node can be a **self-hosted GitHub Actions runner**, with its CI logs
-  readable from the project.
-- Versions and a changelog per project, and releases tagged and published
+  readable from the space.
+- Versions and a changelog per space, and releases tagged and published
   from the Artifacts view.
 
 ## People
@@ -162,15 +162,15 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 ([people.md](people.md), [users.md](users.md))
 
 - Accounts with **roles**: built-in or your own, giving each area Read or
-  Write, everywhere or per project.
-- A project's **owner** and **invitations**.
+  Write, everywhere or per space.
+- A space's **owner** and **invitations**.
 - A **chat** between the people on a controller.
 - **Your profile**: name, email and git identity, your time zone, and the
   devices signed in as you.
-- **File access**: a project's files over FTPS, signing in with your own
+- **File access**: a space's files over FTPS, signing in with your own
   account.
 - **Your key store**: your agents' sign-ins and the git tokens you give a
-  project, sealed under a key of your account's. Profile lists what it
+  space, sealed under a key of your account's. Profile lists what it
   holds, and you can purge it at any time without a password.
 - **The install key**, made at install, seals what the controller keeps;
   an administrator changes it from the Keys page, with no environment
@@ -180,7 +180,7 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 
 ## Running it
 
-- One container, the controller; your projects, its state and its
+- One container, the controller; your spaces, its state and its
   toolchains in folders you choose ([install.md](install.md)).
 - **Upgrades** between releases carried forward automatically, with a backup
   first and a clear refusal on an unsupported jump ([install.md](install.md#upgrading)).

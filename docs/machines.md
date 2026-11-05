@@ -23,11 +23,11 @@ recognized as the same store a node mounts; that is plumbing, not a node on
 the page.) A controller installed bare metal can be a node of itself
 ([install.md](install.md#bare-metal)): its machine is then
 [This machine](#this-machine) in the Controller group rather than a node
-here, offered in a project's node pickers as such, its session network
+here, offered in a space's node pickers as such, its session network
 always on, and the Doctor says whether the wall between its sessions and
 the controller holds. The
 page shows one node, picked in the Machines header over it: one band for
-Nodes, Storage and Installed, with the node pulldown where a project's name
+Nodes, Storage and Installed, with the node pulldown where a space's name
 is, when it was seen, where it dials in from (the address of its last
 hello, so a node whose address moves is followed within a minute) and its
 agent beside it, and **New VM** and **Enroll node** at the right
@@ -39,8 +39,8 @@ ships a newer one, busy until the node comes back on it), then
 the headings and opens one, the small jump chips over them: Health (the
 meters: cpu, memory, the card's load and its own memory where an NVIDIA
 driver answers, and each store's room; the toolchains its census found,
-which is what a project bound to it can build), Repositories (the
-projects bound to it), Sessions (whether it runs them, which are open, and
+which is what a space bound to it can build), Repositories (the
+spaces bound to it), Sessions (whether it runs them, which are open, and
 one line saying which coding agents are installed there and which you are
 signed in to: the Library installs them and the **Installed** page signs
 in), GPU (where it has a card), USB (on a VM host: each USB device with
@@ -53,14 +53,14 @@ without it), and the hosting firewall on a hosting-only
 node; and a row each for what the Library installs, the GPU driver, the
 Android emulator and the model router, pointing there), Storage (mounts and stores), Network, and Advanced, which
 holds the node's **name** (Rename changes what it is called everywhere here:
-the pickers, the project cards and the label a runner installed from then on registers
+the pickers, the space cards and the label a runner installed from then on registers
 with; a runner already installed keeps the label it registered with until
 it is reinstalled), the path
 mapping and the rarely pressed verbs: **Lock down** (a hosting-only node's: every container
 there stopped, its door shut and its credential revoked, docs/nodes.md), **Drain** (finish what is running,
 accept nothing new: what makes a node safe to reboot), **Clear cache**,
 **Revoke**, **Disable** (the operator, 11 Oct: kept and configured, its agent
-dialing in, but off every picker, refused to a project's set and handed no
+dialing in, but off every picker, refused to a space's set and handed no
 work or session until **Enable**), and **Un-enroll**, which on a node
 provisioned as a sandbox that is dialing in uninstalls AerieOS from the
 machine and then removes the node here (retire: off every list, its record kept as
@@ -76,7 +76,7 @@ own networks (nothing of the isolation outlives the agent), the `aerie` and
 `builder` accounts with their homes, `/etc/builderbot` with the tunnel to
 the controller, and bb-sandbox itself. Three boxes to tick: the stores on
 the machine's own disk (toolchains, caches, artifacts, dev instance data, the
-synced project copies, `/var/lib/builderbot`); what was configured from the
+synced space copies, `/var/lib/builderbot`); what was configured from the
 dashboard after enrolling (the mounts and their fstab lines, the runners'
 units, the GPU display); and, ticked for a hosting node, what it was given
 as a host (cloudflared with its token, the port 22 rule,
@@ -95,35 +95,35 @@ that logs in anywhere, and a node reached by token alone takes every kind of
 job, docker included. A node's **path mapping**: what this container's paths
 are called on that machine, which its daemon needs to resolve a compose
 file's bind sources: is under Advanced. Every change writes an audit row. **Check**, beside the mapping,
-proves the two machines mean the same directory by the projects share: a
+proves the two machines mean the same directory by the spaces share: a
 marker is made under it here and looked for through the node's daemon, and
 the page says plainly whether it was found: the one pair nothing else
 verifies, and one that fails silently when it is wrong.
 
-**A node does everything for the projects bound to it.** There is nothing to
-pick per node: no "this one builds, that one deploys". A project names one
+**A node does everything for the spaces bound to it.** There is nothing to
+pick per node: no "this one builds, that one deploys". A space names one
 node in its settings and its containers, builds, tests, CI and
-emulation all go there, so three projects on three VMs stay apart and three
-projects on one VM share it. **Its sessions too** (roadmap #24,
+emulation all go there, so three spaces on three VMs stay apart and three
+spaces on one VM share it. **Its sessions too** (roadmap #24,
 docs/nodes.md §19): a node provisioned with a session account runs its
 terminals in the agent's screen relay, each a pty running bb-tty from the aerie
-the controller ships, so a session on a project bound to it works *on* that machine, with its
-toolchains, in the copy of the project its agent keeps at `/workspace` in
+the controller ships, so a session on a space bound to it works *on* that machine, with its
+toolchains, in the copy of the space its agent keeps at `/workspace` in
 step with this container's (a synced copy, the one way a node holds its
-projects: nothing mounts the projects share on a node). The node's census
+spaces: nothing mounts the spaces share on a node). The node's census
 says whether that half is up (`session`: the screen relay's port, account,
 which agents the account has) and how far each copy is; `aerie roadmap`, `aerie bug`, `aerie version` and the other verbs
 whose state is this container's are relayed back here over the API with the
-session's own token. The controller carries a bound project's session to
-that node's screen relay when its census says the half is up and the project's copy is there, and
-refuses with the reason (on the project's Start agent and in the terminal) when
+session's own token. The controller carries a bound space's session to
+that node's screen relay when its census says the half is up and the space's copy is there, and
+refuses with the reason (on the space's Start agent and in the terminal) when
 the node cannot take one, rather than starting it on the wrong machine. A
-project with **no** node has no session at all: this container carries no
+space with **no** node has no session at all: this container carries no
 coding agent, so the button says so and names what to do. Its shell still
 opens here, on the same share (a tree to read, the linters, git) because
 what moved to a node is the agents and not the terminal. A node's sessions ride its
 heartbeat onto the Sessions page, with the node named, and ending one
-there reaches the node's agent within a poll. What a project can actually do on its node is
+there reaches the node's agent within a poll. What a space can actually do on its node is
 what is **installed** there: its Health section lists the toolchains its census found,
 and the Library, with the node picked, is where more are added. (Underneath, the
 node still refuses a job asking for something it did not enroll with: the
@@ -132,7 +132,7 @@ full set, so it is a mechanism rather than a setting.)
 
 **An account that does not administer sees the Nodes page and changes
 nothing on it but its own sign-in.** Its picker lists the nodes its own
-projects work on and no others; every control on the node's page is
+spaces work on and no others; every control on the node's page is
 ghosted for it, enrolling included, and a line on
 the page says so; the verbs behind those controls are an administrator's on
 the server as well.
@@ -241,8 +241,8 @@ every node's default path is the same string.
 
 **Four stores per node**, each a directory of its own: `data` (job
 workspaces and AVDs), `toolchains` (the toolchains installed there: what a
-project bound to that node can build), `cache` (build caches, per project)
-and `artifacts` (that node's copy of what its projects built, per project).
+space bound to that node can build), `cache` (build caches, per space)
+and `artifacts` (that node's copy of what its spaces built, per space).
 The artifacts store is what makes a node off the LAN reasonable: an emulator
 or a container there starts from a copy beside it, and a second run of an
 unchanged build copies nothing. A store path may not be a system directory:
@@ -288,9 +288,9 @@ offered to a node that did not enroll as a sandbox.
 **Storage**, under Machines, is what a node's disks hold, and whose. It shows
 one node at a time, picked in the Machines header: a line saying when it was measured,
 its filesystems as a stack of meters, its stores and Docker's share, then
-each project's folders on it (the synced copy, the build cache, artifacts, a
+each space's folders on it (the synced copy, the build cache, artifacts, a
 dev instance's data, emulators, the accounts' build caches), largest first,
-with every project this account may not see folded into one line. The
+with every space this account may not see folded into one line. The
 numbers are the agent's hourly walk, said with their age; **Measure now**
 asks for a fresh one, which the node's next report brings.
 
@@ -474,7 +474,7 @@ page: the fields drawn from the block, a secret shown only as set (typed to
 replace, `clear` to take it out), Save keeping the answers sealed on the
 controller and handing them to the node for the pack's verbs. A service,
 the **Model router**, is configured the same way (the provider keys, other
-OpenAI-compatible endpoints, Ollama beside it, the projects allowed) and
+OpenAI-compatible endpoints, Ollama beside it, the spaces allowed) and
 holds its models and spend, Ollama's pulled models, Install once
 something is behind it, and Remove; the Library's card for it only
 installs. Over the rows, the system packages the node lacks for what its
@@ -490,11 +490,11 @@ has been up, its agent and whether the wall between its sessions and the
 controller is in force), then the **Updates** section (the release running
 against the newest, **Check for updates**, **Update**: [Controller settings](#controller-settings)),
 then the machine as a node, drawn exactly as a node's page draws any node:
-its health, the projects on it, its sessions, GPU, USB, features,
+its health, the spaces on it, its sessions, GPU, USB, features,
 storage, network and the advanced verbs, reboot and power off
 among them. The machine is not a row on the Nodes page and not in its
-picker; a project still picks it as its node, shown as **This machine** in
-every project's node picker, so its sessions, builds and containers run
+picker; a space still picks it as its node, shown as **This machine** in
+every space's node picker, so its sessions, builds and containers run
 there as on any node. The container edition has no machine of its own and
 does not draw the page (R90 step 8, R56 step 8).
 
@@ -610,7 +610,7 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   with nothing typed or written, here and on every node, where the node
   itself enforces it so the rule holds while this container is down.
 - **Storage on this controller**: where each kind of thing that grows
-  (project snapshots, job snapshots, the git relay's repositories, the Git
+  (space snapshots, job snapshots, the git relay's repositories, the Git
   view's working area, the logs) is kept, moved to a new empty path on Apply
   and switched once all of it is there, while the records, the database,
   the signing keys and the git credentials stay in the state directory
@@ -635,7 +635,7 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   maintenance, by the sign-in page, the API (503) and the app, and stays
   signed in for when it ends. Turning it on ends everybody else's coding
   agent sessions and terminals, here and on the nodes; it asks first, listing
-  each with whose it is, its project, whether it is working or waiting, and
+  each with whose it is, its space, whether it is working or waiting, and
   its node. Nodes are not accounts and keep running, and a band under the
   header reminds the owner it is on.
 - **Move this controller** (R90 step 12, R175): the move armed (the token
@@ -651,15 +651,15 @@ placement rule and the unhardwiring are docs/nodes.md §13 and §11).
 
 
 **Reset AerieOS** starts the controller over at the setup page: accounts,
-node enrollments, project settings, git tokens, the notebook, memories and
+node enrollments, space settings, git tokens, the notebook, memories and
 logs are moved into a dated `.reset-…` directory under `/config`, never
-deleted, and project files are not touched. Its dialog first offers to
+deleted, and space files are not touched. Its dialog first offers to
 un-enroll every node, so each machine can be enrolled again afterwards, with
 the same box the Nodes page's Un-enroll shows saying what un-enrolling takes
 off a machine and what it leaves; a node with a session or a container
 running cannot be ticked until they are ended. It asks for the word `reset`
 typed, waits for each node it un-enrolls to report, and the dashboard
-re-executes itself. Projects are deleted from the Projects page, one at a
+re-executes itself. Spaces are deleted from the Spaces page, one at a
 time.
 
 ## Upgrades and /config
@@ -674,7 +674,7 @@ entrypoint and again in the dashboard:
   `/config/backups/before-VERSION` (VERSION being the build about to
   migrate it), then each migration past the stamp runs once, in order, and
   the stamp moves with each. The newest three copies are kept. A copy leaves
-  out what grows and is rebuilt (the logs, the job and project snapshots,
+  out what grows and is rebuilt (the logs, the job and space snapshots,
   images in transit, the relay and Git view repositories, the apps fetched
   from a release, earlier copies and a Reset's moved-aside state) and keeps
   every record, the database, the signing keys, the git credentials and the
@@ -736,7 +736,7 @@ list, redacted and on the audit trail), so a report can be taken out before
 the diagnostics go to somebody. **Clear reports** deletes every one after a
 confirmation that says how many; the numbers carry on, so a bug that names
 report #3 never meets a second one. Whoever reads Controller settings reads
-the reports there; a session reads them only where its project is granted
+the reports there; a session reads them only where its space is granted
 the diagnostics, and never deletes one.
 
 One deliberate omission from *this session*: the **CI logs stay where they are**, under `config/ci-logs/<repo>/`, one
@@ -761,9 +761,9 @@ fact. The checkbox in the bar narrows the list to what is running or waiting.
 `aerie jobs [--node NAME] [--type T]` prints the same list read-only, so a
 session can see what became of the work it asked for, and `aerie jobs ID
 [--all]` prints one job's log. Both ask the controller as the caller, so
-they are narrowed the way the page is: a session sees its own project's jobs
+they are narrowed the way the page is: a session sees its own space's jobs
 and its reads', and the nodes' own jobs (a toolchain install, a system
-change) only where the project's settings grant it the diagnostics, which is
+change) only where the space's settings grant it the diagnostics, which is
 also what `aerie diag` needs; a node's machine logs (`aerie logs --node NAME`) are
 a grant of their own. The log is the only copy:
 a node buffers it and posts it here, and keeps nothing. `/api/v1/healthz` answers without a credential with

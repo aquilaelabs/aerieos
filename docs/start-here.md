@@ -7,13 +7,13 @@ it in Help.
 
 ## What it is
 
-A server you reach in a browser, with coding agents at work on its projects. Each project on the
-Projects page holds git repositories on a shared disk. A **session** is a coding
+A server you reach in a browser, with coding agents at work on its spaces. Each space on the
+Spaces page holds git repositories on a shared disk. A **session** is a coding
 agent working in them (Claude, through Claude Code; ChatGPT, through Codex
 CLI; Copilot, through Copilot CLI; Grok, through Grok Build; or any model,
 through OpenCode and a machine's model router), on one of the machines
 behind the dashboard, with a terminal you can watch and type into. A
-project's page holds its **notebook**, where you and the sessions keep the
+space's page holds its **notebook**, where you and the sessions keep the
 plan: the roadmap, the bugs, the house rules and the git view.
 
 Nothing runs on your laptop, and nothing here is on your laptop. Close the tab
@@ -21,12 +21,12 @@ and a session keeps going.
 
 ## Finding your way
 
-- **The rail**, down the left edge: Home, Projects, Build, Containers,
+- **The rail**, down the left edge: Home, Spaces, Build, Containers,
   Controller, Machines, Sessions, Jobs, People, Settings and Help, each a
   page. On a
-  phone it is the bar at the foot, in the same order: Home, Projects, Build,
+  phone it is the bar at the foot, in the same order: Home, Spaces, Build,
   Containers, and More for the others.
-- **The search** at the top jumps to a page, a project, a container or a
+- **The search** at the top jumps to a page, a space, a container or a
   node by its name.
 - **The dock** at the foot of every page holds the chat and your terminals;
   a tab pulls it up, and on a phone it is a sheet.
@@ -40,10 +40,10 @@ and a session keeps going.
 2. **Your profile** (the gear, top right, then Profile): your name, your email and the git
    identity your commits will carry. No session starts until these are set,
    because a commit with no author is a mess somebody else has to clean up.
-3. **Install an agent, then sign in to it**, on each machine your projects
+3. **Install an agent, then sign in to it**, on each machine your spaces
    work on. A node has no agent until the **Library** (under Build, with
    that node picked in the header) installs one: press Install on Claude
-   Code, Codex CLI, Copilot CLI or Grok Build. Then press a project's **Start
+   Code, Codex CLI, Copilot CLI or Grok Build. Then press a space's **Start
    agent**: where you are not signed in on its node yet, it offers **Sign in
    on** that node, which opens that node's **Installed** page (under
    Machines) on that agent's own page. Press Sign in there: Claude's
@@ -53,22 +53,22 @@ and a session keeps going.
    and is yours: it is not shared with the other people here, nobody else's
    sessions use it, and another node asks for its own the first time you
    work there.
-4. **Open a project**: press its name for its page and notebook, **Start
+4. **Open a space**: press its name for its page and notebook, **Start
    agent** for a session (its menu picks the agent, and resumes the last
    conversation or starts a new one), **Shell** for a plain shell. Terminals
    open in the dock at the foot of every page.
-5. **Say what you want done.** A session starts already knowing this project's
+5. **Say what you want done.** A session starts already knowing this space's
    house rules, its roadmap and its open bugs, so you can ask for the thing
    rather than explaining the place.
 
 ## What is shared, and what is yours
 
-The machines are shared. So is the disk the projects live on, and the store
-the toolchains live on. Two people working on one project will see each
+The machines are shared. So is the disk the spaces live on, and the store
+the toolchains live on. Two people working on one space will see each
 other's uncommitted changes, and the dashboard says so when it notices.
 
-Your agents' logins are yours. Your terminal sessions are yours. Which projects
-you can see is set per account, so a project you cannot see is not one you are
+Your agents' logins are yours. Your terminal sessions are yours. Which spaces
+you can see is set per account, so a space you cannot see is not one you are
 missing: you have not been given it.
 
 ## When something says no
@@ -77,16 +77,16 @@ A refusal is meant to name the way out, so read it rather than pressing again.
 The four you are most likely to meet:
 
 - **not signed in** to an agent: step 3 above, once per person on each node.
-- **the node is away**: the machine a project builds on is not answering, so
+- **the node is away**: the machine a space builds on is not answering, so
   nothing runs there until it is back. It is not your doing.
 - **a tool is missing**: builds use what the machine has, and installing more
   is an administrator's call, from the Library. Say what you needed.
-- **a session may not push here**: the project's git policy keeps pushing with
+- **a session may not push here**: the space's git policy keeps pushing with
   a person. Your commit is made; push it from the notebook's Git view.
 
 ## Telling somebody
 
-Use the **Bugs** view (under Plan) on the project's page. It is the same tracker the
+Use the **Bugs** view (under Plan) on the space's page. It is the same tracker the
 sessions read, so what you file is what gets picked up, and a report that says
 what you pressed and what it said back is worth ten that say it broke. If the
 dashboard itself is the thing that is broken, tell the person who gave you the
@@ -114,8 +114,8 @@ roadmap, and it never reads your chat history.
   emulator, a phone lent to it and its CI runner.
 - **Containers**: what runs on each node's Docker and its VMs; the nginx in
   front of them and the scanners are the System section's rows.
-- **People**: accounts, roles and which projects each one sees.
+- **People**: accounts, roles and which spaces each one sees.
 
-A project's own settings are on its page. The Machines, Build and
+A space's own settings are on its page. The Machines, Build and
 Containers groups each show one node at a time, picked once in the header
 over their pages.

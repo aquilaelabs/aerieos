@@ -24,7 +24,7 @@ at the end, shows.
      when its install steps fetch the tool itself.
    - **Upload files**: a zip or tar of the pack's folder, the `bbtool.json`
      at its top beside the scripts it runs. A single top-level folder is
-     dropped, as with a project's archive, and it is at most 8 MB, since
+     dropped, as with a space's archive, and it is at most 8 MB, since
      every node carries it; a pack fetches anything bigger as it installs.
 2. Press **Look**. AerieOS shows what it would do: what it fetches and
    runs to install, each command a session would get and the exact words it
@@ -35,8 +35,8 @@ at the end, shows.
    its own, its version a commit there; the nodes take it from the
    controller, so it needs no git host at all.
 4. Install it on a node from its card on the Library, like any toolchain.
-5. In each project that should use it, open **Settings**, then
-   **Toolchains**, and tick it. A pack starts off in every project, so
+5. In each space that should use it, open **Settings**, then
+   **Toolchains**, and tick it. A pack starts off in every space, so
    adding one hands it to nobody by itself.
 
 To update a pack, open its row's **Edit**. For a repository's pack it looks
@@ -108,7 +108,7 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 | `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary) and `asking` (its permission prompt). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. |
 | `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
-| `first_prompt` | How a new project's brief is handed over: after `--`, after a `flag`, or not at all. |
+| `first_prompt` | How a new space's brief is handed over: after `--`, after a `flag`, or not at all. |
 | `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
 | `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
@@ -203,7 +203,7 @@ it to everyone, and each Create makes another container of it.
 A session looks through the catalog with `aerie tool search WORDS`: each
 entry's name, kind, tier and what it is, and whether it is added here, never
 its address or commit. `aerie tool install NAME --why "what it is for"` asks for
-a tool pack from it, and the project's **Install a tool pack** setting,
+a tool pack from it, and the space's **Install a tool pack** setting,
 under Agents may, says what happens: **deny** refuses, **ask** (the default)
 puts it on the bell for a person who may curate the catalog, whose Allow
 adds it at the commit the signed index pins, its sha256 checked, and
@@ -211,9 +211,9 @@ adds it at the commit the signed index pins, its sha256 checked, and
 node itself: once it is added, a person installs it from the Library. The
 briefing names the two verbs and the setting's value.
 
-## What a project's sessions can use
+## What a space's sessions can use
 
-Each project's **Settings → Toolchains** lists every toolchain installed on
+Each space's **Settings → Toolchains** lists every toolchain installed on
 its node, shipped ones and packs alike. Shipped toolchains start on, packs
 off. A toolchain left off is:
 
@@ -264,7 +264,7 @@ the scripts it runs:
 | `verbs` | The commands a session calls as `aerie tool NAME VERB`. |
 | `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and one held that stops fitting after an upgrade is a line on the bell saying to update or remove it (R169 step 6). |
 | `touches` | What it touches: `hosts`, up to 16 host names its install fetches from, and `root`, true when it needs root on the node to install. Look shows both before it is added, and a pack that needs root is added by an administrator alone (R169 step 4). |
-| `config` | What it asks for on each node (R172): a list of fields, each `{name, label, kind, help, required, env, scope}`, the kind one of `secret`, `text`, `choice` (with `choices`), `list` (with `fields`, rows of them), `switch` or `projects`. The Installed page draws them as Configure on the pack's row for the node picked; the answers are kept on the controller, a secret sealed and never shown again, and handed to the node, where a field with `env` reaches the pack's verbs as that environment variable (a switch as `1` or empty, a list as JSON). `scope` is `node` (the default: one answer for everybody on that node, set by whoever may Configure there) or `person`: each person's own, set under **Yours** on the same row by anyone who works on that node's projects, a secret sealed under their own key, written into their home on the node and read by their sessions' verbs over the node's answer. |
+| `config` | What it asks for on each node (R172): a list of fields, each `{name, label, kind, help, required, env, scope}`, the kind one of `secret`, `text`, `choice` (with `choices`), `list` (with `fields`, rows of them), `switch` or `projects`. The Installed page draws them as Configure on the pack's row for the node picked; the answers are kept on the controller, a secret sealed and never shown again, and handed to the node, where a field with `env` reaches the pack's verbs as that environment variable (a switch as `1` or empty, a list as JSON). `scope` is `node` (the default: one answer for everybody on that node, set by whoever may Configure there) or `person`: each person's own, set under **Yours** on the same row by anyone who works on that node's spaces, a secret sealed under their own key, written into their home on the node and read by their sessions' verbs over the node's answer. |
 | `guidance` | A Markdown file in the repository telling a session, whichever coding agent runs it, when and how to use the pack. It reads it with `aerie help tool-NAME`. |
 | `icon` | Optional: a PNG, WebP or SVG file in the repository, at most 64 KB, which its Library card shows in place of its kind's glyph. It is read at the commit the pack is kept at, and refused with the pack when it is not the image its name says. It is shown as an image and nothing else, so an SVG's scripts never run. A pack without one keeps its kind's glyph. |
 
@@ -275,9 +275,9 @@ word is a file inside the pack (`{dir}/...`), or `sh`, `bash` or `python3`
 followed by a script inside the pack. These may appear in the words:
 
 - `{dir}`: the pack's directory in the store.
-- `{dist}`: the project's `dist/`, made if it is missing, where results the
+- `{dist}`: the space's `dist/`, made if it is missing, where results the
   Artifacts view lists belong.
-- `{project}`: the project's name.
+- `{project}`: the space's name.
 - `{args}`: a word on its own, replaced by whatever the caller typed after
   the verb, each word passed as one word.
 

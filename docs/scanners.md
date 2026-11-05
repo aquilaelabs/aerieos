@@ -1,12 +1,12 @@
 # The scanners
 
 AerieOS runs its own static analysis stack on each node that holds
-projects, from the **Scanners** page: Configure on a node's scanners row in
+spaces, from the **Scanners** page: Configure on a node's scanners row in
 the Containers page's System section opens it.
 Nothing is scanned on the controller and nothing of the controller's is
-mounted on a node: each node runs the scanners over the projects whose node
+mounted on a node: each node runs the scanners over the spaces whose node
 it is and sends what they found up to the controller over the agent's own
-API, where the Analysis page, each project's Analysis view and `aerie findings`
+API, where the Analysis page, each space's Analysis view and `aerie findings`
 read it ([building.md](building.md#static-analysis-reports)).
 
 | Scanner | What it finds |
@@ -24,11 +24,11 @@ rule and vulnerability caches stay on the node between runs.
 ## Set it up
 
 1. **Deploy.** The page lists every node. Press **Deploy** on a node that
-   holds projects, or the bar's **Deploy on N nodes** for all of them at
-   once: the controller writes the compose project to the node (the three
+   holds spaces, or the bar's **Deploy on N nodes** for all of them at
+   once: the controller writes the compose space to the node (the three
    scanners as services, their versions pinned to the newest known) and the
    node pulls the images, a job on the Jobs page. A node that hosts
-   containers only holds no project and is not offered.
+   containers only holds no space and is not offered.
 2. **Schedule.** One timetable runs every node's scanners: daily, weekly
    (Sundays at 4:00, the default) or monthly at 4:00, or a cron line of your
    own under Custom. **Turn on** starts it; **Run now on every node** runs
@@ -37,12 +37,12 @@ rule and vulnerability caches stay on the node between runs.
    controller was down runs once when it is back, said as late.
 3. **Read what they found.** Each run writes one SARIF per scanner on the
    node and sends it up as it finishes; the Analysis page shows it on its
-   next look, grouped by project, and `aerie findings history` says what
+   next look, grouped by space, and `aerie findings history` says what
    changed between runs. A run that fails is on the bell with its log.
 
-A project is scanned on its node, never on its extra nodes, so nothing is
-scanned twice; a project moved to another node is scanned there next run.
-The page's last section, **Not covered**, lists each project no scanner
+A space is scanned on its node, never on its extra nodes, so nothing is
+scanned twice; a space moved to another node is scanned there next run.
+The page's last section, **Not covered**, lists each space no scanner
 reaches, with why: no node, a node that hosts containers only, or a node
 with no scanners deployed.
 
@@ -69,4 +69,4 @@ A scanner you run yourself can still hand AerieOS its SARIF this
 release: `SCANNER_REPORTS_PATH` (deprecated in 0.9.0 and removed in the
 release after) names a folder on the host, mounted read-only at `/reports`
 and read beside what the nodes send up. Reports must be SARIF 2.1.0, their
-paths naming each project's directory.
+paths naming each space's directory.

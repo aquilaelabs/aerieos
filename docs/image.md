@@ -29,7 +29,7 @@ how it boots, and how it is built. The decisions behind it are in
   page uses (smartmontools, ZFS, mergerfs, SnapRAID).
 - **No apt.** `apt` and `apt-get` are diverted to a stub that says why: the
   root forgets at the next boot, and a package installed into it would be
-  gone without a word. A tool a project needs is a toolchain, from the
+  gone without a word. A tool a space needs is a toolchain, from the
   Library; a package the node needs is added to
   `image/mkosi.conf` and comes with the next image.
 
@@ -71,30 +71,30 @@ minute rather than every five seconds. The system's logs (`/var/log`), the
 controller's own logs and the journal are kept in memory, so they start
 again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
-containers, the VMs, the toolchains and the projects, lives on a **system
-pool**: picked under This machine's **Pool and projects** from the pools and the
+containers, the VMs, the toolchains and the spaces, lives on a **system
+pool**: picked under This machine's **Pool and spaces** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
-picked, docker and the VMs wait, and the projects are held: the projects
-folder is an empty read-only mount of its own, no project is made, cloned
-or moved in, and they are never written to the stick. **Pool and projects**
+picked, docker and the VMs wait, and the spaces are held: the spaces
+folder is an empty read-only mount of its own, no space is made, cloned
+or moved in, and they are never written to the stick. **Pool and spaces**
 also says what still lives on the stick and how much has been written to it,
 in its life and since this boot. An installed disk has none of this: its
 data partition is the machine's disk.
 
-**The projects where they already are.** Under **Pool and projects**, the
-**Projects folder** names a folder already on the machine's disks as the
-projects folder: a share of the disks the machine adopted, a pool or the
+**The spaces where they already are.** Under **Pool and spaces**, the
+**Spaces folder** names a folder already on the machine's disks as the
+spaces folder: a share of the disks the machine adopted, a pool or the
 array, never the stick, and never a disk adopted read only. It is bound
-over the projects folder at every boot in place of the system pool's, with
+over the spaces folder at every boot in place of the system pool's, with
 no pool needed, and the controller restarts on it. Its files are handed to
 the controller's own account and the folder closed to other accounts, as a
-projects folder it made is: their owner changes and nothing in them does, since
+spaces folder it made is: their owner changes and nothing in them does, since
 git refuses a tree another account owns, the controller could not write it, and
-sessions on this machine are refused while anybody can walk into the projects.
+sessions on this machine are refused while anybody can walk into the spaces.
 A share of that folder stops serving other people. The job says which of the
-controller's projects the folder holds and which it does not, and what the
-projects folder held before stays underneath, unseen, until **Let it go**
+controller's spaces the folder holds and which it does not, and what the
+spaces folder held before stays underneath, unseen, until **Let it go**
 binds the pool's again.
 
 The system that had the folder cannot read it after that, so it is given back
@@ -106,7 +106,7 @@ from the old system, as root, the same is `bash FOLDER/.aerieos-give-back.sh`.
 The first page asks whether you are moving a controller here. Say yes and make
 a setup account, and the next page is **Moving here**, a walk of the steps in
 the order they have to happen, each done on that page: what to have with you
-(the move token and the bundle), the disks, where the projects and containers
+(the move token and the bundle), the disks, where the spaces and containers
 go, landing the controller, what comes after it, and the way back. Every install
 takes the same walk with the steps it has: a stick made from another system's
 backup adopts that system's disks in it and says what going back costs, any
@@ -121,9 +121,9 @@ a pool. The move is the same one Controller settings lands, under **Move a
 controller here** (the token with the old controller's address, or the
 bundle). An old controller that ran on this machine is off by now, so its
 address does not answer and the bundle is the only way. It is spooled and
-unpacked in the projects folder on the disks, and its state takes the setup
+unpacked in the spaces folder on the disks, and its state takes the setup
 account's place.
-A controller whose projects already sit on these disks needs no repositories
+A controller whose spaces already sit on these disks needs no repositories
 in its bundle: name their folder first, and they are found where they are.
 
 **The data partition takes the stick's room.** The image's data partition
@@ -251,7 +251,7 @@ the disks and says why: disks of one size become a ZFS mirror, raidz1 or
 raidz2, which checks every block and repairs one that rots; disks of mixed
 sizes become an array with its largest disk as parity, which uses every
 disk and grows one at a time; an SSD beside hard disks becomes a fast pool
-of its own for apps, VMs and projects, never a cache. As you choose it says
+of its own for apps, VMs and spaces, never a cache. As you choose it says
 how much you can use, how many disks may fail and how it grows, and
 Advanced picks another layout. **Make it** names every disk it erases by
 serial before anything is written. On a stick the first pool made becomes the
@@ -324,7 +324,7 @@ the data partition and mounted by the initramfs
 before the system starts, so PID 1 sees it from its first read:
 
 - **`/var`**, the data partition itself: the controller's state and
-  secrets' home, the projects, docker, libvirt, the logs.
+  secrets' home, the spaces, docker, libvirt, the logs.
 - **`/etc`**, as an overlay whose upper half is `/var/lib/aerieos-os/etc`:
   an account made, a hostname set, a unit enabled or a share written is kept
   across boots, and every file the next image brings still shows through
@@ -332,7 +332,7 @@ before the system starts, so PID 1 sees it from its first read:
 - **`/usr/local`**, an overlay the same way: the machine's own node, its agent,
   `bb-sandbox` and `bb-session`, which first boot installs there.
 - **`/srv`, `/home` and `/workspace`**, bound from the data partition: the
-  projects, each account's home and sign-ins, and the node's workspace. A
+  spaces, each account's home and sign-ins, and the node's workspace. A
   system pool takes them off a stick, with Docker and the VMs.
 
 Nothing else persists, which is what makes an update a whole image.

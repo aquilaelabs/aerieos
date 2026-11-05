@@ -1,7 +1,7 @@
 # Containers and nginx
 
 The Containers group on the rail: **Containers** is the Docker manager,
-where a project's containers are built, started, stopped and given their env
+where a space's containers are built, started, stopped and given their env
 on a node, and **VMs** the virtual machines ([vms.md](vms.md)), both for
 the node picked once in the group's header. The containers
 AerieOS deploys itself (each node's nginx, its scanners and its model
@@ -11,27 +11,27 @@ container's own settings page (the nginx page, the Scanners page, the
 router's row on Installed). Their env and compose file are that page's to
 write and never the row's; a container you want otherwise is one you deploy
 yourself. A page opened that way carries a small top header with **Back**,
-naming the page it was opened from and returning there. A project's own
+naming the page it was opened from and returning there. A space's own
 containers are also its page's Docker view. This doc covers the manager, a
-container's row, a dev instance built from a project and its mounts, how an
+container's row, a dev instance built from a space and its mounts, how an
 instance is reached, the containers' networks, nginx, and image updates.
 
 ## The Containers page
 
-**Containers** on the rail is the **Docker manager**, which is where a project's
-containers are built, started, stopped and given their env. A project can have
+**Containers** on the rail is the **Docker manager**, which is where a space's
+containers are built, started, stopped and given their env. A space can have
 several: the Artifacts view's dev row is one button, **Send to Docker
 manager**, which names a container and takes you there; every container of a
-project is built from that project's codebase, and rebuilding takes whatever
-that codebase says at the time. It opens on the project's own name while the
-project has no container and on `<project>-2`, `-3` after, so another one is
-the same press, and a session sends its project the same way with `aerie
-devapp new`, under the project's **Run its container** setting.
+space is built from that space's codebase, and rebuilding takes whatever
+that codebase says at the time. It opens on the space's own name while the
+space has no container and on `<project>-2`, `-3` after, so another one is
+the same press, and a session sends its space the same way with `aerie
+devapp new`, under the space's **Run its container** setting.
 
 **The page at a glance.** Under the bar, a row of tiles says how many
 containers run of how many are here, how many have an update due, how many
-projects they belong to, and how many on the daemon nobody here started; a
-row of chips narrows the list to one project (All puts it back, and nothing
+spaces they belong to, and how many on the daemon nobody here started; a
+row of chips narrows the list to one space (All puts it back, and nothing
 is saved). A container's row is its name and a state pill with a dot of its
 color, a facts grid (image, ports, containers, what it was built from, its
 compose file), its notices, its settings with one Apply, then its action
@@ -39,7 +39,7 @@ bar. A published port is a link to where it answers, and a port nginx
 routes to shows the address as a fact beside it. Docker's health is read
 off the status and said on the pill: healthy, unhealthy or starting, not
 just running. The bar holds a search box (a name, an image, a port or a
-project, narrowing the rows as it is typed) and a Cards or List switch: in
+space, narrowing the rows as it is typed) and a Cards or List switch: in
 the list each container is one line, its name, state and facts, that opens
 into its card, which is the view for a node with thirty containers and
 this browser's choice to keep.
@@ -52,8 +52,8 @@ the container runs on. On a node that is a terminal of the agent's screen
 relay, on port 7684 and open to the controller only, run as the docker account:
 the session account stays out of docker, since docker is root on the
 machine. It is for a person who may start and stop that
-container (its project's account or an administrator) and has a shell, and
-for an administrator alone when the project's **Run its container** is
+container (its space's account or an administrator) and has a shell, and
+for an administrator alone when the space's **Run its container** is
 Deny. A container on a hosting-only node runs no terminal, so its Shell is
 dead with the reason under the row. The controller checks the account and
 that the container is one of the instance's running ones before anything
@@ -103,7 +103,7 @@ ago, a container that crashed or one a shell started is on the page within a
 heartbeat.
 
 **The rows are still there, and they stop claiming anything.** What an
-instance *is*: its name, its project, what it was last built from, what its
+instance *is*: its name, its space, what it was last built from, what its
 env still wants: lives on this side of the wire and needs no daemon; only
 whether it is *running* is the daemon's to know. So a manager opened against a
 VM that is off lists everything on record, grayed, each row saying **state
@@ -121,7 +121,7 @@ page per node. Each node's last-known container list is kept, so switching to
 an offline node paints instantly in the grayed state above rather than
 spinning at a machine that will not answer, and the reason is that node's
 own. **New container** and **Send to Docker manager** gain the same select,
-defaulting to the project's own node from its settings (a per-project
+defaulting to the space's own node from its settings (a per-space
 binding, `auto` unless chosen); an instance stays bound to the node it was
 created on, and everything that acts on it: Up, Down, Rebuild, the data
 directory's one-shot containers: addresses that node's daemon.
@@ -141,7 +141,7 @@ a host path is long, and a row that scrolls sideways on a phone hides the half
 you were reading.
 
 **Edit settings**, behind a row's ⋯, opens the container's settings as one
-grid with one Apply: the project it belongs to, the node it runs on, the
+grid with one Apply: the space it belongs to, the node it runs on, the
 branch it builds from, a compose file from the tree laid over its own, the
 GPU it is given (none, an NVIDIA card through the container toolkit, or an
 AMD card or APU through its render devices under /dev/dri, for every service
@@ -181,23 +181,23 @@ are that node's nginx page. On the controller's own machine these run
 where the Containers page runs them, under R165's arrangement of the own
 node as a docker host.
 
-**New container** on that page runs something with no project behind it, and
-takes the **project** it belongs to (Send to Docker manager takes the same,
-with the project it is built from picked by default): a
+**New container** on that page runs something with no space behind it, and
+takes the **space** it belongs to (Send to Docker manager takes the same,
+with the space it is built from picked by default): a
 name, a compose file and an environment, which is the shape Portainer's stacks
 and Dockge use. Labels are not a fourth box, in compose they belong in the
 YAML. The compose file is checked by compose itself before it is saved, and
-kept in `/config/containers/<name>/` where no project scan can see it; its
+kept in `/config/containers/<name>/` where no space scan can see it; its
 relative bind sources resolve against its own data directory under `/devdata`,
 which is a path the daemon has; this container too where the share is
 mounted here, and only the sandbox where it is not. Removing one takes its files
 with it, because its compose file *is* the thing.
 
-It lists what has been sent to it, not every project that could be sent: a
-project with a compose file does not appear there until you send one, and
+It lists what has been sent to it, not every space that could be sent: a
+space with a compose file does not appear there until you send one, and
 **Remove** takes a container down and drops it from the list again. Removing
 keeps its env file and its data directory, so sending it again under the same
-name finds them, and the project's Artifacts view is untouched either way,
+name finds them, and the space's Artifacts view is untouched either way,
 which is where it comes back from.
 
 The same page lists every container on the picked node's daemon, not only the ones this
@@ -206,26 +206,26 @@ list like this to find out about, so the others are shown and marked *not ours*
 rather than hidden, and an administrator can start, stop and restart one by
 name and read its log.
 
-**Every row belongs to a project or to none**, and the page is grouped that way:
-each project's containers together under its name, the projects in
+**Every row belongs to a space or to none**, and the page is grouped that way:
+each space's containers together under its name, the spaces in
 alphabetical order, and what belongs to none last. A container built from a
-project belongs to it until its row says otherwise, one written here belongs
-to the project picked when it was made, and one somebody else started belongs
-to none until an administrator picks a project on its row; that choice is kept
-by name on its node, so the same container recreated keeps it. The project it
-belongs to lists it in its notebook's Docker view, and that project's
+space belongs to it until its row says otherwise, one written here belongs
+to the space picked when it was made, and one somebody else started belongs
+to none until an administrator picks a space on its row; that choice is kept
+by name on its node, so the same container recreated keeps it. The space it
+belongs to lists it in its notebook's Docker view, and that space's
 sessions are the only ones that can see it: `aerie devapp ls` lists them and `aerie
 devapp log NAME` reads one, while rebuilding, changing the env, starting and
-stopping follow that project's *Agents may: Run its container*. An account
-that is not an administrator sees what belongs to its projects.
+stopping follow that space's *Agents may: Run its container*. An account
+that is not an administrator sees what belongs to its spaces.
 
-## A dev instance built from a project
+## A dev instance built from a space
 
 **The dev instance** heads the list, shaped like every other row in it: the
 kind on a pill (`docker`, where a file says `apk` or `xpi`), the compose
-project's own name in bold, and whether it is `(running)`, `(stopped)` or
+space's own name in bold, and whether it is `(running)`, `(stopped)` or
 `(down)` in parentheses after it, where a file carries its size and age. The
-name is the compose project's rather than a container's: a compose file may
+name is the compose space's rather than a container's: a compose file may
 set `container_name` to anything it likes and may declare several, and this is
 the one name that is always true of all of them.
 
@@ -249,16 +249,16 @@ known rather than asked, and asking beats guessing for the rest.
 
 The mounts are not repeated in the warnings below. They are all on the row
 already, with the path each one lands on, so naming the ones that reach past
-the project would restate what is two lines above in worse words. What the
+the space would restate what is two lines above in worse words. What the
 warnings keep is the set that is invisible otherwise: `privileged`, added
 capabilities, host devices, and the host's process or network namespace:
-the flags that make a container more than a container. It appears when the project
+the flags that make a container more than a container. It appears when the space
 carries a compose file
-and the project's node is the [sandbox VM](sandbox-vm.md): a machine
+and the space's node is the [sandbox VM](sandbox-vm.md): a machine
 whose only job is running Docker, which is what keeps all of this away from
-the server's real containers: the project's compose app, built over there and
+the server's real containers: the space's compose app, built over there and
 controlled in the file rows' own language. **Up** and **Down** are compose
-against the project's own file, under a compose project named for the
+against the space's own file, under a compose space named for the
 instance. **Env** edits the
 instance's env file: kept in `/config/devenv/`, never in the repo, handed to
 compose as `--env-file`; Up stays dead while the repo's `.env.example`
@@ -270,15 +270,15 @@ and runs build → down → up, unless the rebuild finds new settings in
 example with the old values preserved in comments, and leaves Up for the
 operator. Before the first build the button reads
 **Build**, and nothing is built until it is pressed.
-**Build from** picks the branch it is built from. A project's tree is shared, one checkout for every session and person on it, so this does not switch it:
-the build comes from a git worktree of that branch beside the project, marked
-with a `.bbignore` so the projects list knows what it is, and the project's own
+**Build from** picks the branch it is built from. A space's tree is shared, one checkout for every session and person on it, so this does not switch it:
+the build comes from a git worktree of that branch beside the space, marked
+with a `.bbignore` so the spaces list knows what it is, and the space's own
 checkout is left where it is. The row then says which branch it was built from,
 and "the code has moved" means that branch has, not the working copy. **Send to
 Docker manager** offers the same picker, because a second instance is usually a
 second branch: a pull request running beside the one that is up.
 
-Two instances of one project are the same compose file, so they publish the
+Two instances of one space are the same compose file, so they publish the
 same host ports and the second cannot start as written. That is said **before**
 the press: the row names the port and what already has it, read off the
 container list the page already has, and the answer is the per-instance env
@@ -288,7 +288,7 @@ references `${BB_DEV_DATA}/...` gets its volumes on the cache drive by
 convention, in a per-instance directory the VM makes itself, so that share is
 mounted over there and needs no mount here at all. By the same convention a
 build sees `BB_BUILD_REV`, `BB_BUILD_AT` and `BB_BUILD_VERSION`: the commit
-it is from, when, and the project's version, for a compose whose build args
+it is from, when, and the space's version, for a compose whose build args
 want a stamp (AerieOS's own passes them to its Dockerfile). An image tag
 takes `BB_BUILD_TAG`, the same version with no `+`, which a tag cannot carry.
 `BB_DOCKER_GID` is the docker group's id on the instance's node, for a
@@ -348,7 +348,7 @@ letting compose say what actually went wrong beats refusing on this side's
 reading of a file compose is about to read for itself.
 
 **A path this container also mounts needs a pair, even on a sandbox VM.**
-`/workspace:/workspace` covers the projects share and nothing else. If you also
+`/workspace:/workspace` covers the spaces share and nothing else. If you also
 map the dev-data share here, so you can create a compose file's bind
 directories from a shell, which is the usual reason to, then a compose
 mounting `/devdata/...` is naming a path AerieOS has, and it will say so
@@ -357,21 +357,21 @@ machines mount the same share at the same path, which is the arrangement the
 sandbox is for. The alternative is to not map it here at all: what AerieOS
 cannot see, it does not check.
 
-**Container names and project names are separate groups.** A project existing
-reserves nothing: a container may be called `mediareducer-dev` while a project
+**Container names and space names are separate groups.** A space existing
+reserves nothing: a container may be called `mediareducer-dev` while a space
 is too, because they are not the same kind of thing. The one name that cannot
 be reused is another *container's*: two instances resolving to one compose
-project name would be one set of containers, one env file and one data
+space name would be one set of containers, one env file and one data
 directory with two rows driving them, so the second is refused and told which
-instance has it. A project's *default* instance is named for the project,
+instance has it. A space's *default* instance is named for the space,
 since nobody typed a name for it.
 
-**Which project a container belongs to is tracked separately**, and is never
+**Which space a container belongs to is tracked separately**, and is never
 read out of its name; it is the key it is stored under. That is what decides
-whose sessions may touch it, so a project can stand up several
+whose sessions may touch it, so a space can stand up several
 containers, name them anything, and still own all of them.
 
-Which compose projects on the daemon are **this dashboard's** is answered the
+Which compose spaces on the daemon are **this dashboard's** is answered the
 same way, from what it has stored, not from what things are called. So the
 manager can list every container on the VM, including ones you started by
 hand, and still be right about which of them it is driving.
@@ -403,7 +403,7 @@ The nginx page keeps one list of public **Hostnames**, shared by every node's
 nginx (the operator, 12 Oct): a name is added once and shows where it is
 routed, and is deleted only when nothing routes it, the refusal saying
 where it is. A route's hostname is picked from that list, so several routes,
-nodes and projects' containers use one name without typing it again.
+nodes and spaces' containers use one name without typing it again.
 
 nginx keeps up to date like the toolchains and the agent (R192, the
 operator, 11 Oct). The controller reads the registry's tag list once a week
@@ -440,34 +440,34 @@ it at another ACME directory (a staging one, or a private CA).
 
 The Scanners page, opened from the scanners' row in the System section,
 deploys AerieOS's own static analysis
-scanners (Semgrep, Trivy, mobsfscan) to each node that holds projects as
-one compose project of one-shot services, their versions pinned at the
+scanners (Semgrep, Trivy, mobsfscan) to each node that holds spaces as
+one compose space of one-shot services, their versions pinned at the
 deploy like nginx's image (R145), and runs them there on one schedule over
-the projects whose node it is; each node sends its SARIF up to the
+the spaces whose node it is; each node sends its SARIF up to the
 controller over the agent's own API, so nothing of the controller's is
 mounted on a node, and the Analysis page reads what came. The page says
 each node's state and versions, Update when newer are out (checked weekly),
-each node's last run with its log, Run now, Remove, and the projects
+each node's last run with its log, Run now, Remove, and the spaces
 nothing covers with why. The whole of it is [scanners.md](scanners.md).
 
-## Each project's containers on their own network
+## Each space's containers on their own network
 
-**Each project's containers on their own network (R178, the operator, 11
+**Each space's containers on their own network (R178, the operator, 11
 Oct)** is the same idea for the containers themselves, for a node two
-web-facing projects share. Docker already keeps compose networks apart,
-but a container reached another project's container by the node's address
+web-facing spaces share. Docker already keeps compose networks apart,
+but a container reached another space's container by the node's address
 (its published port, after Docker's DNAT) and the node's own ports, measured
 on the dev pair. The agent's keeper runs a second table,
 `builderbot_ctrnet`: forward from a compose bridge passes to its own
-bridge, the bridges of the projects its owner reads, the controller, DNS
+bridge, the bridges of the spaces its owner reads, the controller, DNS
 and the internet, and is dropped to any other bridge and rejected to the
 private ranges; into the node it passes to the controller, DNS, 80 and 443
-(nginx, the way in) and the published ports of its own project and the ones
+(nginx, the way in) and the published ports of its own space and the ones
 it reads. The hello carries the map (`devapp.container_net_own`, compose
-project to the compose projects it may reach) and the switch (config
+space to the compose spaces it may reach) and the switch (config
 `container_net`, on by default for a hosting-only node, on the row beside
 the session switch elsewhere); a prefs change or the switch asks for a
-hello, so a container reaches a newly read project within a poll. Nothing
+hello, so a container reaches a newly read space within a poll. Nothing
 is marked: a missing table leaves Docker's own rules, and the row says not
 in force rather than a container being cut off. A container that has to talk
 to a machine on the LAN (an AerieOS controller under test to its nodes, an
@@ -496,7 +496,7 @@ the bell carries one note per node. What is built from code is not asked:
 Rebuild is what moves that, and it is ghosted until the code has moved. An
 image pinned by digest (nginx's) is its own page's, an image never pulled is
 pulled by Up, and a private one says the registry would not answer. A
-project's container is named whatever its owner wants: Send to Docker
-offers the project's name and the compose file's folder or variant, and the
+space's container is named whatever its owner wants: Send to Docker
+offers the space's name and the compose file's folder or variant, and the
 Edit dialog renames it while it is down, its record carrying the name while
 the instance keeps its key.
