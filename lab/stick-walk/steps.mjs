@@ -1,6 +1,84 @@
 // What a person does in a browser on a first run, a step per run of person.mjs.
+import { readFileSync, writeFileSync } from 'node:fs';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 export const steps = {
+  // The walk's disks, and its projects' place if it asks, then the landing.
+  async movedisks({ page, BASE, shot, tall }){
+    await page.goto(BASE); await sleep(7000);
+    await page.waitForSelector('[data-setdisksmake]', { timeout: 20000 });
+    await page.click('[data-setdisksmake]'); await sleep(1200);
+    const m = await page.$('.modal:not([hidden])'); if (!m) throw new Error('Make it asked nothing');
+    await (await m.$('button.danger, button.primary')).click();
+    await sleep(45000); await tall('72-walk-disks', 2400);
+    const cards = await page.evaluate(() => [...document.querySelectorAll('#setupPanel .setstep')].map(c => c.querySelector('h3')?.textContent + ' [' + (c.querySelector('.pill')?.textContent || '') + ']: ' + c.querySelector('.setstepbody')?.innerText.replace(/\s+/g, ' ').slice(0, 400)));
+    for (const c of cards.slice(2, 5)) console.log('-', c);
+  },
+  async moveplace({ page, BASE, shot, tall }){
+    await page.goto(BASE); await sleep(7000);
+    await page.selectOption('#stickPool', '/mnt/fast');
+    await page.click('[data-stickpool]'); await sleep(1500);
+    const m = await page.$('.modal:not([hidden])');
+    if (m){ console.log((await m.innerText()).replace(/\s+/g, ' ').slice(0, 400)); await (await m.$('button.danger, button.primary')).click(); }
+    for (let i = 0; i < 40; i++){ await sleep(5000); if (await page.evaluate(() => !!document.querySelector('[data-moveland]') && !document.querySelector('[data-moveland]').disabled)){ console.log('ready after', (i + 1) * 5, 's'); break; } }
+    await tall('72b-walk-placed', 2400);
+    const cards = await page.evaluate(() => [...document.querySelectorAll('#setupPanel .setstep')].map(c => c.querySelector('h3')?.textContent + ' [' + (c.querySelector('.pill')?.textContent || '') + ']: ' + c.querySelector('.setstepbody')?.innerText.replace(/\s+/g, ' ').slice(0, 300)));
+    for (const c of cards.slice(3, 5)) console.log('-', c);
+  },
+  async moveland({ page, BASE, shot, tall, args }){
+    await page.goto(BASE); await sleep(7000);
+    await page.waitForSelector('[data-moveland]', { timeout: 30000 });
+    await tall('73-walk-land', 2400);
+    console.log('land enabled', await page.$eval('[data-moveland]', b => !b.disabled));
+    await page.fill('#landTok', readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim());
+    await page.setInputFiles('#landFile', new URL('run/moved.bbmove', import.meta.url).pathname);
+    await page.click('[data-moveland]'); await sleep(1200);
+    const m = await page.$('.modal:not([hidden])'); if (!m) throw new Error('Land asked nothing');
+    console.log((await m.innerText()).replace(/\s+/g, ' ').slice(0, 400));
+    await (await m.$('button.danger, button.primary')).click();
+    for (let i = 0; i < 40; i++){ await sleep(3000); const t = await page.evaluate(() => document.querySelector('#toasts, .toast, .notify')?.innerText || ''); if (t){ console.log('said:', t.slice(0, 300)); break; } }
+    await sleep(15000); await shot('74-after-land'); console.log(page.url()); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 500));
+  },
+  async movesignin({ page, BASE, shot, tall, phone }){
+    await page.goto(BASE); await sleep(2000);
+    await page.fill('#u', 'ada'); await page.fill('#p', 'firstrun-pass');
+    await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
+    await sleep(8000); await shot('75-signed-in'); console.log(page.url());
+    await page.evaluate(() => { document.querySelector('.tourcard button')?.click(); });
+    console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 900));
+    await page.goto(BASE + '#/projects'); await sleep(5000); await tall('76-projects', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 600));
+    await page.goto(BASE + '#/machines/nodes'); await sleep(5000); await tall('77-nodes', 1200); console.log((await page.innerText('body')).replace(/\n+/g, ' | ').slice(0, 700));
+  },
+  // The next machine's first page: yes, a controller is moving here.
+  async movefirst({ page, BASE, shot, tall, phone }){
+    await page.goto(BASE); await sleep(1500);
+    await page.check('input[name=walk][value=move]');
+    await page.fill('#u', 'setup'); await page.fill('#p', 'setup-pass-1'); await page.fill('#p2', 'setup-pass-1');
+    await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
+    await sleep(9000);
+    await tall('71-walk', 2400); await phone('71-walk-phone', 3400);
+    const cards = await page.evaluate(() => [...document.querySelectorAll('#setupPanel .setstep')].map(c => c.querySelector('h3')?.textContent + ' [' + (c.querySelector('.pill')?.textContent || '') + ']: ' + c.querySelector('.setstepbody')?.innerText.replace(/\s+/g, ' ')));
+    for (const c of cards) console.log('-', c.slice(0, 700));
+  },
+  // A move, from a machine that has been through a first run: Prepare to move,
+  // its token and bundle kept in run/ for moveland on the next machine.
+  async moveprepare({ page, BASE, shot, tall }){
+    await page.goto(BASE + '#/controller/settings'); await sleep(5000);
+    await page.evaluate(() => { document.querySelector('.tourcard button')?.click(); });
+    await page.locator('text=Move this controller').first().click(); await sleep(3000);
+    await page.waitForSelector('[data-moveprep]', { timeout: 30000 });
+    await tall('60-move-before', 1500);
+    console.log((await page.innerText('[data-sect="settings:move"], .main, body')).replace(/\n+/g, ' | ').slice(0, 900));
+    const repos = page.locator('[data-movepiece="repos"]'); if (await repos.count()) await repos.check();
+    await page.click('[data-moveprep]');
+    await page.waitForSelector('a[href="/api/move-bundle"]', { timeout: 60000 }); await sleep(800);
+    await tall('61-move-armed', 1500);
+    const token = await page.evaluate(() => [...document.querySelectorAll('.hint code')].map(c => c.textContent).find(t => t.length > 12));
+    writeFileSync(new URL('run/move-token.txt', import.meta.url), token || '');
+    console.log('token', token ? `${token.length} characters` : 'NOT SHOWN');
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('a[href="/api/move-bundle"]')]);
+    await dl.saveAs(new URL('run/moved.bbmove', import.meta.url).pathname);
+    console.log('bundle', dl.suggestedFilename());
+  },
   async pageshots({ page, BASE }){
     const go = async (hash, name, h) => {
       await page.setViewportSize({ width: 1440, height: h }); await page.goto(BASE + hash); await sleep(6500);
