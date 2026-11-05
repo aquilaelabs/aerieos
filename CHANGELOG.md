@@ -164,6 +164,7 @@
 - A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (ef2656d)
 - The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (f80e647)
 - Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (46119a7)
+- A dashboard page no longer reloads by itself when the machine's clock is corrected, which took what was being typed or pressed with it (ce458a5)
 
 ### Security
 
