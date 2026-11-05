@@ -413,7 +413,8 @@ container to a machine of its own, and back.
    row is retired there). A bare-metal destination keeps the node its own
    machine already is: AerieOS enrolls it at the first boot, and the
    landing carries that node and its credential into the moved state, so
-   its agent goes on without enrolling again; a stick's prepared plan of
+   its agent goes on without enrolling again, and the projects that ran on
+   the source's own machine run on this one; a stick's prepared plan of
    disks to adopt is kept the same way. A bare-metal install whose machine
    is not a node yet enrolls it afresh with the installer. A same-address move (the new home takes over
    the old hostname) needs no knock: the certificate travels in the

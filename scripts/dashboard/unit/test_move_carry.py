@@ -47,6 +47,24 @@ class Carry(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(state, "firstboot.json")))
         self.assertEqual(len(said), 2, said)
 
+    def test_the_projects_on_the_old_machine_run_on_this_one(self):
+        d = tempfile.mkdtemp()
+        aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
+        os.makedirs(aside)
+        os.makedirs(state)
+        db(os.path.join(aside, "builderbot.db"), [("n_here", "tower", True, "online")], [("t_here", "n_here")])
+        db(os.path.join(state, "builderbot.db"), [("n_old", "oldbox", True, "online"), ("n_far", "draconis", False, "online")], [])
+        with open(os.path.join(state, "claude-prefs.json"), "w") as f:
+            json.dump({"projects": {"web": {"node": "n_old", "nodes": ["n_old", "n_far"]}, "api": {"node": "n_far", "nodes": ["n_far"]}}, "users": {}}, f)
+        with open(os.path.join(state, "move.json"), "w") as f:
+            json.dump({"nodes": ["n_old", "n_far"], "here_bare_metal": True}, f)
+        said = move.carry_here(aside, state)
+        p = json.load(open(os.path.join(state, "claude-prefs.json")))["projects"]
+        self.assertEqual(p["web"], {"node": "n_here", "nodes": ["n_here", "n_far"]})
+        self.assertEqual(p["api"], {"node": "n_far", "nodes": ["n_far"]})
+        self.assertEqual(json.load(open(os.path.join(state, "move.json")))["nodes"], ["n_far"], "the old machine is not waited for")
+        self.assertTrue(any("1 project that ran" in x for x in said), said)
+
     def test_nothing_the_moved_state_has_is_replaced(self):
         d = tempfile.mkdtemp()
         aside, state = os.path.join(d, "aside"), os.path.join(d, "state")

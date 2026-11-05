@@ -1191,6 +1191,7 @@ def carry_here(aside, state_dir):
                     for oid, ocfg in dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall():
                         if (json.loads(ocfg or "{}") or {}).get("own"):
                             dst.execute("UPDATE nodes SET state = 'retired' WHERE id = ?", (oid,))
+                            said += _own_node_handed_on(state_dir, oid, nid)
                     dst.execute(f"INSERT INTO nodes ({', '.join(ncols)}) VALUES ({', '.join('?' * len(ncols))})", r)
                     for t in src.execute(f"SELECT {', '.join(tcols)} FROM tokens WHERE node_id = ? AND kind = 'node'", (nid,)):
                         dst.execute(f"INSERT OR IGNORE INTO tokens ({', '.join(tcols)}) VALUES ({', '.join('?' * len(tcols))})", t)
@@ -1205,6 +1206,44 @@ def carry_here(aside, state_dir):
     if fb_old.is_file() and not fb_new.exists():
         shutil.copyfile(str(fb_old), str(fb_new))
         said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on This machine")
+    return said
+
+
+def _own_node_handed_on(state_dir, old, new):
+    """The moved controller's own machine is retired for this one's: the
+    projects that ran there run here now, their folder having come with the
+    controller, and it is not a node to wait for. The lines said."""
+    said = []
+    f = Path(state_dir) / "claude-prefs.json"
+    try:
+        d = json.loads(f.read_text())
+        moved = 0
+        for p in (d.get("projects") or {}).values():
+            if not isinstance(p, dict):
+                continue
+            was = (p.get("node"), list(p.get("nodes") or []))
+            if p.get("node") == old:
+                p["node"] = new
+            if old in (p.get("nodes") or []):
+                p["nodes"] = list(dict.fromkeys(new if x == old else x for x in p["nodes"]))
+            moved += was != (p.get("node"), list(p.get("nodes") or []))
+        if moved:
+            tmp = f.with_name(f.name + ".new")
+            tmp.write_text(json.dumps(d))
+            os.replace(tmp, f)
+            said.append(f"{moved} project{'' if moved == 1 else 's'} that ran on the old controller's machine run on this one now")
+    except (OSError, ValueError):
+        pass
+    f = Path(state_dir) / "move.json"
+    try:
+        d = json.loads(f.read_text())
+        if old in (d.get("nodes") or []):
+            d["nodes"] = [x for x in d["nodes"] if x != old]
+            tmp = f.with_name(f.name + ".new")
+            tmp.write_text(json.dumps(d))
+            os.replace(tmp, f)
+    except (OSError, ValueError):
+        pass
     return said
 
 
