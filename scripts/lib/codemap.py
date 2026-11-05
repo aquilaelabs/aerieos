@@ -1869,9 +1869,23 @@ def scan_sh(text, sink, known=()):
 
 # ---- the index ------------------------------------------------------------
 
+def _ignored_dirs(root):
+    """The folders git ignores here, whose copies of a file would answer ahead
+    of the file itself; none where it is not a repository."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "-oi", "--exclude-standard", "--directory"],
+                           capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if r.returncode != 0:
+        return set()
+    return {os.path.normpath(os.path.join(root, x)) for x in r.stdout.splitlines() if x.endswith("/")}
+
+
 def sources(root):
+    ignored = _ignored_dirs(root)
     for dp, dns, fns in os.walk(root):
-        dns[:] = [d for d in dns if d not in SKIP_DIRS and not d.startswith(".")]
+        dns[:] = [d for d in dns if d not in SKIP_DIRS and not d.startswith(".") and os.path.normpath(os.path.join(dp, d)) not in ignored]
         for fn in fns:
             p = Path(dp) / fn
             if MINIFIED.search(fn):
