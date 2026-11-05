@@ -33,7 +33,7 @@ jobs:
   # with a build attestation on each an install reads.
   appliance:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,7 +48,7 @@ jobs:
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.
           snap="$(tr -d '[:space:]' < image/SNAPSHOT)"
-          curl -fsSL -o keyring.deb "https://snapshot.debian.org/archive/debian/${snap}/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb"
+          curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o keyring.deb "https://snapshot.debian.org/archive/debian/${snap}/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb"
           echo "9ea7778e443144ca490668737a8ab22dd3e748bb99e805e22ec055abeb3c7fac  keyring.deb" | sha256sum -c -
           sudo dpkg -i keyring.deb
           # The version build.sh pins (MKOSI_PIN), so a config key means the same here as there,
@@ -71,13 +71,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
+          # The snapshot the image is pinned to has outages apt's own retries
+          # do not outlast. Another try picks up from the packages already in
+          # mkosi's package cache, which --force keeps, so it costs only what
+          # is still missing.
+          for try in 1 2 3; do
+            sudo -E image/build.sh --out out 2>&1 | tee build.log && exit 0
+            [ "$try" -lt 3 ] || break
+            grep -qE '^E: Failed to fetch https://snapshot\.debian\.org/.* 50[234] ' build.log || break
+            echo "::warning title=Build the image::snapshot.debian.org is failing: try $try of 3 ended, trying again in ten minutes"
+            sleep 600
+          done
           # A failure's last lines as the job's error annotation (its end, under
           # the annotation's length cap, where the error is), which GitHub
           # shows without signing in, where the log itself needs a token.
-          if ! sudo -E image/build.sh --out out 2>&1 | tee build.log; then
-            tail -n 40 build.log | tail -c 3500 | python3 -c 'import sys; t = sys.stdin.read(); print("::error title=Build the image::" + t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
-            exit 1
-          fi
+          tail -n 40 build.log | tail -c 3500 | python3 -c 'import sys; t = sys.stdin.read(); print("::error title=Build the image::" + t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+          exit 1
       - name: What moved since the last release
         if: github.event_name == 'schedule'
         shell: bash
