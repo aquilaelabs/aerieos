@@ -226,7 +226,7 @@ def verb(name, auth, req):
     if name == "sync":
         act, project = str(req.get("action") or ""), str(req.get("project") or "")
         if not _access(auth, project):
-            return {"error": f"{project or 'that project'} is not one this account may edit or read from an app: "
+            return {"error": f"{project or 'that space'} is not one this account may edit or read from an app: "
                              "your roles give no File access there, or its owner closed it to editors and apps"}, 403
         if act == "state":
             return wssync.state(_nid(auth), project)
@@ -255,7 +255,7 @@ def file_verb(name, auth, q):
         return {"path": p, "ctype": "application/octet-stream", "headers": {}}, 200
     project = q.get("project", [""])[0]
     if not _access(auth, project):
-        return {"error": "not a project this account may read from an app"}, 403
+        return {"error": "not a space this account may read from an app"}, 403
     if name == "sync-file":
         path, no = wssync.file_path(_nid(auth), project, q.get("path", [""])[0])
         return no if no else ({"path": path, "ctype": "application/octet-stream", "headers": {}}, 200)
@@ -269,5 +269,5 @@ def put(auth, q, stream, length):
         return {"error": auth["error"]}, 401
     project = q.get("project", [""])[0]
     if _access(auth, project) != "rw":
-        return {"error": f"{project or 'that project'} is read-only for this account"}, 403
+        return {"error": f"{project or 'that space'} is read-only for this account"}, 403
     return wssync.put(_nid(auth), project, q, stream, length)

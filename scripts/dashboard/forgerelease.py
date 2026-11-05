@@ -254,7 +254,7 @@ def publish(project, tag, version, sha, comp=""):
     name = entry["name"]
     token, scheme = _own_token(project, at["host"])
     if not token:
-        why = f"the controller has no {name} token for this project, so the tag is its release"
+        why = f"the controller has no {name} token for this space, so the tag is its release"
         _keep(project, tag, "", why, name)
         return {"error": why, "forge": name}
     base = forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"]))
@@ -275,7 +275,7 @@ def _github(project, tag, version, sha, comp=""):
     repo = cilogs.repo_of(project)
     token = cilogs._token(project)
     if not token:
-        why = "the controller has no GitHub token for this project, so the tag is its release"
+        why = "the controller has no GitHub token for this space, so the tag is its release"
         _keep(project, tag, "", why)
         return {"error": why, "forge": "GitHub"}
     base = f"{API}/repos/{repo}/releases"
@@ -537,7 +537,7 @@ def edit_plan(project, tag, notes=None, attach=()):
             t = _tree_git(project, "ls-files", "--error-unmatch", "--", rel)
             if t is None or t.returncode:
                 return {"error": f"{rel} is not committed: a release carries a build in dist/ or a file "
-                                 "the project's history has, so what it shows can be found again"}
+                                 "the space's history has, so what it shows can be found again"}
             # ...as the history has it: a tracked file changed since was
             # attached as it is now, which no commit holds (B564).
             same = _tree_git(project, "diff", "--quiet", "HEAD", "--", rel)
@@ -578,7 +578,7 @@ def edit(project, plan):
             notes = _with_files(notes, pinned, lambda sha, rel: f"https://github.com/{cilogs.repo_of(project)}/raw/{sha}/{rel}")
         token = cilogs._token(project)
         if not token:
-            return {"error": "the controller has no GitHub token for this project", "forge": name}
+            return {"error": "the controller has no GitHub token for this space", "forge": name}
         try:
             return _github_edit(project, cilogs.repo_of(project), token, tag, notes, files) | {"forge": name}
         except Refused as e:
@@ -591,7 +591,7 @@ def edit(project, plan):
     name = entry["name"]
     token, scheme = _own_token(project, at["host"])
     if not token:
-        return {"error": f"the controller has no {name} token for this project", "forge": name}
+        return {"error": f"the controller has no {name} token for this space", "forge": name}
     f = _Forge(forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"])),
                entry, token)
     web = f"{scheme or ('https' if at['scheme'] in ('ssh', '') else at['scheme'])}://{at['host']}/{at['path']}"
@@ -744,7 +744,7 @@ def _handle(project):
     if cilogs.repo_of(project):
         token = cilogs._token(project)
         if not token:
-            raise Refused("the controller has no GitHub token for this project")
+            raise Refused("the controller has no GitHub token for this space")
         return "github", "GitHub", (cilogs.repo_of(project), token)
     at = _remote(project)
     entry = forges.forge_of(at["host"]) if at else None
@@ -752,7 +752,7 @@ def _handle(project):
         raise Refused(f"{project} is not on GitHub, Gitea or GitLab, so it has no release page")
     token, scheme = _own_token(project, at["host"])
     if not token:
-        raise Refused(f"the controller has no {entry['name']} token for this project")
+        raise Refused(f"the controller has no {entry['name']} token for this space")
     f = _Forge(forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"])),
                entry, token)
     return entry["kind"], entry["name"], (f, at)

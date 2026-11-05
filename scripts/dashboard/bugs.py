@@ -694,7 +694,7 @@ def send(project, bug_id, sessions=(), note="", prefix="", want=""):
     # for why the bare name is the owner's conversation (B194).
     session = running_session(prefix, project, set(sessions), want)
     tag = ids.label("bugs", bug_id)
-    line = (f"Please look at bug {tag} in this project's tracker. "
+    line = (f"Please look at bug {tag} in this space's tracker. "
             f"Run `aerie bug show {tag}` for the report: the area, how to "
             f"reproduce it, expected against actual, and the notes so far. "
             f"When you have dealt with it, close it with `aerie bug fix "
@@ -805,7 +805,7 @@ def brief(project):
     for b in rows:
         by[b.get("severity", "medium")] = by.get(b.get("severity", "medium"), 0) + 1
     sev = ", ".join(f"{by[s]} {s}" for s in reversed(SEVERITIES) if by.get(s))
-    return (f"The project has a bug tracker with {len(rows)} open ({sev}). `aerie bug` lists them, "
+    return (f"The space has a bug tracker with {len(rows)} open ({sev}). `aerie bug` lists them, "
             "`aerie bug show B7` prints one in full: where it lives, how to reproduce it, what is known "
             "about why. The bugs a prompt names arrive with it. `aerie bug add \"...\" --sev medium "
             "--area \"...\" --repro \"...\" --reproduces always|sometimes|once|untried` files one you find "

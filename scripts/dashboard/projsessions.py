@@ -92,7 +92,7 @@ def end(project, name, node=""):
     row = next((r for r in of(project) if r["name"] == name
                 and (not node or r["node_id"] == node)), None)
     if not row:
-        return {"error": "no such session on this project"}
+        return {"error": "no such session on this space"}
     r = END(row["name"], row["node_id"]) or {}
     if r.get("error") or r.get("code"):
         return {"error": r.get("error") or (r.get("out") or "tmux refused").strip()[:200]}

@@ -61,7 +61,7 @@ ok(typeof meta.body.built === 'string',
   rmSync(`${DIR}/ws/AerieOS`, { recursive: true, force: true });
   ok(meta.apk === signed, `the app is offered the signed build, not a newer unsigned one (${meta.apk})`);
   ok(meta.apk_sha256 === createHash('sha256').update('signed').digest('hex'),
-     `...read from the project whose origin is AerieOS's repository, not a folder named AerieOS (${meta.apk_sha256})`);
+     `...read from the space whose origin is AerieOS's repository, not a folder named AerieOS (${meta.apk_sha256})`);
 }
 
 // ---- a row in each list the app reads ----------------------------------------------

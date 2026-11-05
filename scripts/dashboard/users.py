@@ -582,9 +582,9 @@ PERSON_ONLY = {
     "controller": "the controller's settings, logs and checks",
     "controller-read": "the controller's logs",
     "nodes-write": "changing the nodes",
-    "containers-read": "every project's containers",
-    "settings": "a project's settings, sessions and snapshots",
-    "signing": "a project's signing keys",
+    "containers-read": "every space's containers",
+    "settings": "a space's settings, sessions and snapshots",
+    "signing": "a space's signing keys",
 }
 
 
@@ -603,7 +603,7 @@ def may(u, action, project=None):
     # have not taken on is read-only whoever you are. The remedy differs and
     # the sentence says so.
     if project is not None and not may_see(u, project):
-        return "not a project"              # the same answer a typo gets
+        return "not a space"              # the same answer a typo gets
     # A session on a project that reads this one: every read goes through,
     # and every write is refused with the reason, which is the whole of
     # what "reads" means. `aerie` is the relay, whose own door keeps the
@@ -615,9 +615,9 @@ def may(u, action, project=None):
         return (f"{project} is read-only from a session on {u['session']}: it reads "
                 f"{project}'s code and notebook, and a session on {project} is what changes them")
     if project is not None and not may_work(u, project):
-        return ("you hold no role on this project: give yourself one on it in your "
+        return ("you hold no role on this space: give yourself one on it in your "
                 "settings on the Users page" if is_admin(u) else
-                "you were not given this project")
+                "you were not given this space")
     # A session may never write the house rules it is being held to. Ahead of
     # the admin pass, because the operator's OWN session carries a token with
     # the operator's uid on it. This is not a question about who somebody is
@@ -625,10 +625,10 @@ def may(u, action, project=None):
     # to be talked out of `user` above.
     if action == "rules" and (u or {}).get("session"):
         return ("a session cannot change the rules it is being held to: they "
-                "are the operator's, written on the project's Overview in the notebook")
+                "are the operator's, written on the space's Overview in the notebook")
     # ...nor hand out the project's files to people outside AerieOS (R151).
     if action == "ftp" and (u or {}).get("session"):
-        return "who may reach a project's files over FTP is a person's to set, not a session's"
+        return "who may reach a space's files over FTP is a person's to set, not a session's"
     # ...and may not approve what it has waiting (roadmap #27): a session
     # signing off its own additions is the setting not existing.
     if action == "pending" and (u or {}).get("session"):
@@ -648,7 +648,7 @@ def may(u, action, project=None):
         import membership
         if is_admin(u) or uid_of(u) == membership.owner_of(project):
             return ""
-        return "file access over FTP is set up by the project's owner or an administrator"
+        return "file access over FTP is set up by the space's owner or an administrator"
     # The grants (R137): what the account's roles allow, on this project
     # where one is named. The built-in roles reproduce the answers from
     # before roles existed; a role of your own says exactly what it grants.
@@ -659,23 +659,23 @@ def may(u, action, project=None):
         # (R255 step 2): the area and level a role gives, not "an
         # administrator's", since a role of anybody's may grant it.
         what, why = {
-            "rename": ("renaming a project", ""),
-            "trash": ("deleting a project", ""),
-            "lock": ("locking a project", "it ends whoever's session is running there"),
+            "rename": ("renaming a space", ""),
+            "trash": ("deleting a space", ""),
+            "lock": ("locking a space", "it ends whoever's session is running there"),
             "command-pin": ("moving the pinned commands", "they are one set for everybody on this controller"),
-            "version": ("moving a project's version, releasing it or changing who may",
-                        "a release pushes a tag with the project's own credentials"),
+            "version": ("moving a space's version, releasing it or changing who may",
+                        "a release pushes a tag with the space's own credentials"),
             "jobs": ("running a command on a node", "a job runs outside every session's view, as the "
                      "node's own account, so it reaches everything on that machine"),
-            "node": ("choosing which node a project builds on",
-                     "a node is shared, so changing it reaches every project on it"),
+            "node": ("choosing which node a space builds on",
+                     "a node is shared, so changing it reaches every space on it"),
             # The CI runner tab (R137 step 3, the operator's R136 line):
             # its status stays on the Tools card for everybody.
             "runner": ("the CI runner's settings", "its status is on the Tools card"),
             # A project this account made would not be in the list it was
             # given, so it would vanish on the next paint, and the create
             # dialog is one of the two places a git token is written.
-            "create": ("making a project", "the projects you can work on are the ones you were given"),
+            "create": ("making a space", "the spaces you can work on are the ones you were given"),
             # The one that makes the rest of the role mean something.
             # Everything else here is enforced by this server, in Python,
             # and a shell is the way around all of it: one uid, one tmux
@@ -684,7 +684,7 @@ def may(u, action, project=None):
             # that may not have one gets a Claude console instead of a
             # window it could point somewhere else (roadmap #27).
             "terminal": ("a shell", "your agent's session opens as a console instead"),
-            "git-auth": ("how a project authenticates to its remote", "the token is what pushes, and "
+            "git-auth": ("how a space authenticates to its remote", "the token is what pushes, and "
                          "changing the method or clearing it reaches everybody who works on it"),
             "docker-write": ("starting and stopping containers", "you can see what is running and open it"),
             "toolchains-write": ("installing on a node", "these are gigabytes on shared disk"),
@@ -1599,8 +1599,8 @@ def assign(me, name, global_roles=None, project_roles=None):
     roles (R155). (payload, status)."""
     can = assignable(me)
     if not can["admin"] and not can["projects"]:
-        return {"error": "the Roles page's people are an administrator's, or a project owner's for "
-                         "their own projects"}, 403
+        return {"error": "the Roles page's people are an administrator's, or a space owner's for "
+                         "their own spaces"}, 403
     known = roles.all_roles()
     with _lock:
         d = load()
@@ -1609,7 +1609,7 @@ def assign(me, name, global_roles=None, project_roles=None):
             return {"error": f"no account called {name}"}, 400
         # The owner's account is nobody's but the owner's to change (R152 (a)).
         if u.get("role") == "owner" and (me or {}).get("role") != "owner":
-            return {"error": "the owner's roles and projects are the owner's alone"}, 403
+            return {"error": "the owner's roles and spaces are the owner's alone"}, 403
         # ...and the built-in admin an administrator's, given or taken (B66).
         if not is_admin(me) and (u.get("role") == "admin"
                                  or "admin" in [str(r) for r in global_roles or []]):
@@ -1622,7 +1622,7 @@ def assign(me, name, global_roles=None, project_roles=None):
             onp = [r for r in want if r not in roles.BUILTIN and known[r].get("scope") != "global"]
             if onp:
                 return {"error": f"{', '.join(onp)} {'is a role' if len(onp) == 1 else 'are roles'} "
-                                 "on a project: give it on the project, under Projects"}, 400
+                                 "on a space: give it on the space, under Spaces"}, 400
             if "admin" in want:
                 u["role"] = "admin"
             elif u.get("role") == "admin":

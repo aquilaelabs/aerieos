@@ -198,7 +198,7 @@ const made = [];   // owner/repo pairs to delete at the end
   ok(again.status === 200 && /not empty/.test(jj.error || ''),
      `a repository that already holds commits is refused, so nothing is overwritten (${jj.error || jj.note})`);
   ok(!readFileSync(`${DIR}/ws/delta/.git/config`, 'utf8').includes('[remote'),
-     '...and no remote was added to the project that asked');
+     '...and no remote was added to the space that asked');
 }
 
 // Unlinked, then linked again under the ACCOUNT rather than the organization:

@@ -178,7 +178,7 @@ def _subnet(d, project, nid):
         if str(sub) not in used:
             nets[project] = str(sub)
             return str(sub)
-    raise RuntimeError("every project network on this node is taken")
+    raise RuntimeError("every space network on this node is taken")
 
 
 def nets_on(nid):
@@ -354,7 +354,7 @@ def check_caps(d, project, nid, size):
         want = 1 if k == "count" else size[k]
         if k in caps and used[k] + want > caps[k]:
             return (f"{project}'s VMs may hold {caps[k]} {words[k]} in all and hold {used[k]}: this one would pass "
-                    "that (an administrator raises it in the project's settings)")
+                    "that (an administrator raises it in the space's settings)")
     n = node(nid) or {}
     rep = n.get("reported") or {}
     on = _used(d, nid=nid)
@@ -655,9 +655,9 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
         out["mem_max_mb"] = mx
     if hw.get("net") is not None:
         if hw["net"] not in ("project", "lan"):
-            return None, "a VM's network is its project's or the LAN"
+            return None, "a VM's network is its space's or the LAN"
         if hw["net"] == "lan" and not person:
-            return None, ("putting a VM on the LAN is a person's: it takes it past the firewall that keeps a project's "
+            return None, ("putting a VM on the LAN is a person's: it takes it past the firewall that keeps a space's "
                           "VMs off the LAN; its Hardware dialog on the VMs page does it")
         out["net"] = hw["net"]
     if hw.get("share") is not None:
@@ -665,7 +665,7 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
         if sh:
             sub = str(sh.get("path") or "").strip().strip("/")
             if ".." in sub.split("/"):
-                return None, "a shared folder is inside the project, not above it"
+                return None, "a shared folder is inside the space, not above it"
             out["share"] = {"path": f"/workspace/{project}" + (f"/{sub}" if sub else ""), "tag": "project",
                             "ro": sh.get("ro") is True}
         else:

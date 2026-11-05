@@ -40,7 +40,7 @@ await page.evaluate(() => openStorageTab());
 await page.waitForSelector('.storagetab [data-stnode]', { timeout: 15000 });
 const row = await page.evaluate(() => (storageList || []).find(n => n.name === 'diskbox'));
 ok(row && row.measured && row.projects.map(p => p.name).join() === 'alpha,beta' && row.projects[0].total === 6400 && !row.other,
-   `the tab lists the node with its projects largest first, every one named for an administrator (${JSON.stringify(row?.projects)})`);
+   `the tab lists the node with its spaces largest first, every one named for an administrator (${JSON.stringify(row?.projects)})`);
 // One node at a time, picked in the bar like Toolchains (the operator, 11 Oct).
 await page.waitForFunction(() => [...document.querySelectorAll('.pane .bar select#ndPick option')].some(o => o.textContent === 'diskbox'), null, { timeout: 15000 });
 ok(await page.$eval('.pane .bar label.pick select#ndPick', s => [...s.options].some(o => o.textContent === 'diskbox')),
@@ -65,7 +65,7 @@ const drawn = await page.$eval(sect, s => ({ status: 'measured ' + ([...s.queryS
     return `${d.closest('details').querySelector('summary .t').textContent}: ${rows.join(', ')}`; }) }));
 ok(/measured 10 min ago/.test(drawn.status) && drawn.meters.join() === '/,/mnt/share' && drawn.used && /93\.8 GB \/ 125 GB/.test(drawn.vals[0])
    && drawn.stores && drawn.proj.join('|') === 'alpha|beta' && drawn.measure,
-   `...the node: each filesystem a meter, the stores and Docker's share, the projects in rows, Measure now under the head's facts (${JSON.stringify(drawn)})`);
+   `...the node: each filesystem a meter, the stores and Docker's share, the spaces in rows, Measure now under the head's facts (${JSON.stringify(drawn)})`);
 ok(drawn.disks.join(' | ') === '/: cache store, the accounts\' homes, Docker, artifacts store, synced copies | /mnt/share: ',
    `...and under each meter what AerieOS holds on that disk, largest first, the share with nothing on it bare (${JSON.stringify(drawn.disks)})`);
 // The meters are one stack: every track the same width, the values one column.

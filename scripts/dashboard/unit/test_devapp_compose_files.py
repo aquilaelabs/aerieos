@@ -96,7 +96,7 @@ class ComposeFiles(unittest.TestCase):
         """The Artifacts row carried "compose cannot read it" and nothing of
         why (Turing Lens, 10 Oct): compose's own last lines go with it."""
         was = devapp._run
-        devapp._run = lambda *a, **k: {"code": 15, "out": "noise\nservice \"web\" refers to undefined network front: invalid compose project"}
+        devapp._run = lambda *a, **k: {"code": 15, "out": "noise\nservice \"web\" refers to undefined network front: invalid compose space"}
         try:
             self.assertIsNone(devapp._config("Clanker-Detector"))
             self.assertIn("undefined network front", devapp.config_error())

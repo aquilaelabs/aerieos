@@ -56,10 +56,10 @@ hold_projects() {
     held "$place" && return 0
     bound "$place" && return 0
     if [ -z "${BB_SP_NO_MOUNT:-}" ] && ! mount -t tmpfs -o ro,size=64k,mode=0755 "$HELD" "$place" 2>/dev/null; then
-        echo "system-pool: the projects folder could not be held read only; the controller still makes no project until they have a place" >&2
+        echo "system-pool: the spaces folder could not be held read only; the controller still makes no space until they have a place" >&2
         return 0
     fi
-    echo "system-pool: the projects are held: none is made on the stick, and they wait for a system pool or a folder on the disks"
+    echo "system-pool: the spaces are held: none is made on the stick, and they wait for a system pool or a folder on the disks"
 }
 # A folder made on a pool is as the place it is bound over is, whoever that is
 # (the projects and the toolchains are the controller's, not root's, B597).
@@ -96,7 +96,7 @@ apply_projects() {
     if [ ! -d "$f" ]; then
         # Held meanwhile: nothing written underneath where the disk will be.
         hold_projects
-        echo "system-pool: the projects folder $f is not there yet (its disks not mounted): tried again in half a minute" >&2
+        echo "system-pool: the spaces folder $f is not there yet (its disks not mounted): tried again in half a minute" >&2
         return 1
     fi
     mkdir -p "$place"
@@ -107,7 +107,7 @@ apply_projects() {
             systemctl restart --no-block "$CONTROLLER" 2>/dev/null || true
         fi
     fi
-    echo "system-pool: the projects are $f"
+    echo "system-pool: the spaces are $f"
 }
 stick() { grep -qw 'aerietoram=1' "$CMDLINE" 2>/dev/null; }
 mounted() { [ -n "${BB_SP_MOUNTED:-}" ] && { [ "$BB_SP_MOUNTED" = 1 ]; return; }; findmnt -rn --target "$1" -o TARGET 2>/dev/null | grep -qx "$1"; }
@@ -173,7 +173,7 @@ note_owners() {
     uid="$(stat -c %u "$f")"; gid="$(stat -c %g "$f")"; mode="$(stat -c %a "$f")"
     if [ -z "${BB_SP_NO_MOUNT:-}" ] && [ "$uid" = "$(id -u "$acct" 2>/dev/null)" ]; then return 0; fi
     {
-        printf '#!/bin/bash\n# Written by AerieOS when this folder became its projects folder: gives the\n'
+        printf '#!/bin/bash\n# Written by AerieOS when this folder became its spaces folder: gives the\n'
         printf '# folder back to who had it. Run it as root, on this system or the one before.\n'
         printf 'set -e\ncd "$(dirname "$(readlink -f "$0")")"\n'
         printf 'chown -R %s:%s .\n' "$uid" "$gid"
@@ -189,9 +189,9 @@ note_owners() {
 
 set_projects() {
     local f="${1:-}"; shift || true
-    stick || { echo "system-pool: only a stick boot takes a projects folder this way" >&2; return 2; }
-    case "$f" in /*) ;; *) echo "system-pool: a projects folder is named by its path" >&2; return 2 ;; esac
-    case "/$f/" in */../*|*/./*) echo "system-pool: a projects folder is named by its path, with no . or .." >&2; return 2 ;; esac
+    stick || { echo "system-pool: only a stick boot takes a spaces folder this way" >&2; return 2; }
+    case "$f" in /*) ;; *) echo "system-pool: a spaces folder is named by its path" >&2; return 2 ;; esac
+    case "/$f/" in */../*|*/./*) echo "system-pool: a spaces folder is named by its path, with no . or .." >&2; return 2 ;; esac
     [ -d "$f" ] || { echo "system-pool: $f is not a folder on this machine" >&2; return 2; }
     local place src_dev f_dev
     place="$(projects_place)"
@@ -200,7 +200,7 @@ set_projects() {
     if [ -n "$src_dev" ] && [ "$src_dev" = "$f_dev" ]; then
         echo "system-pool: $f is on the stick itself: name a folder on the machine's disks" >&2; return 2
     fi
-    case "$f" in "$place"|"$place"/*) echo "system-pool: $f is the projects folder itself" >&2; return 2 ;; esac
+    case "$f" in "$place"|"$place"/*) echo "system-pool: $f is the spaces folder itself" >&2; return 2 ;; esac
     if findmnt -rn -o OPTIONS --target "$f" 2>/dev/null | tr , '\n' | grep -qx ro; then
         echo "system-pool: $f is mounted read only (its disks were adopted read only): adopt them writable first" >&2; return 2
     fi
@@ -209,7 +209,7 @@ set_projects() {
     for n in "$@"; do
         if [ -d "$f/$n" ]; then found=$((found + 1)); else missing+=("$n"); fi
     done
-    [ "$#" -eq 0 ] || echo "system-pool: $f holds $found of the controller's $# projects${missing[*]:+; not there: ${missing[*]}}"
+    [ "$#" -eq 0 ] || echo "system-pool: $f holds $found of the controller's $# spaces${missing[*]:+; not there: ${missing[*]}}"
     # Its files handed to the controller's account, as a projects folder it
     # made is: another system's (uid 99, say) is refused by git as dubious
     # and cannot be written. Nothing in them changes but their owner.
@@ -234,7 +234,7 @@ set_projects() {
     fi
     # What lay in the projects folder before stays where it was, under the
     # bind, never deleted: letting the folder go shows it again.
-    [ -n "$(ls -A "$place" 2>/dev/null)" ] && echo "system-pool: what $place held before stays underneath, unseen while $f is the projects folder"
+    [ -n "$(ls -A "$place" 2>/dev/null)" ] && echo "system-pool: what $place held before stays underneath, unseen while $f is the spaces folder"
     mkdir -p "$WORK"
     printf '%s\n' "$f" > "$PFILE.new"; mv -f "$PFILE.new" "$PFILE"
     apply_projects
@@ -246,7 +246,7 @@ set_projects() {
 release_projects() {
     local place f
     place="$(projects_place)"; f="$(named_projects || true)"
-    [ -n "$f" ] || { echo "system-pool: no projects folder is named"; return 0; }
+    [ -n "$f" ] || { echo "system-pool: no spaces folder is named"; return 0; }
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "$CONTROLLER" 2>/dev/null || true
     if bound "$place" && [ -z "${BB_SP_NO_MOUNT:-}" ] && ! umount "$place"; then
         echo "system-pool: $place is busy: close what holds it and let it go again" >&2
@@ -254,7 +254,7 @@ release_projects() {
         return 1
     fi
     rm -f "$PFILE"
-    echo "system-pool: $f is no longer the projects folder; its files stay where they are"
+    echo "system-pool: $f is no longer the spaces folder; its files stay where they are"
     if [ -f "$f/$GIVE_BACK" ]; then
         if bash "$f/$GIVE_BACK"; then echo "system-pool: $f is given back to who had it"
         else echo "system-pool: $f could not be given back: run bash $f/$GIVE_BACK as root" >&2; fi
@@ -369,5 +369,5 @@ case "${1:-}" in
     projects)
         if [ "${2:-}" = --release ]; then release_projects; else shift; set_projects "$@"; fi ;;
     status) status ;;
-    *) echo "usage: system-pool apply | set PATH | projects PATH [NAME...] | projects --release | status" >&2; exit 64 ;;
+    *) echo "usage: system-pool apply | set PATH | spaces PATH [NAME...] | spaces --release | status" >&2; exit 64 ;;
 esac

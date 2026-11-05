@@ -382,7 +382,7 @@ def check(project, force=False):
     token = cilogs._token(project) if repo else ""
     if not repo or not token:
         done["error"] = ("not on GitHub" if not repo else
-                         "the controller has no GitHub token for this project, so it cannot fetch the APK to sign")
+                         "the controller has no GitHub token for this space, so it cannot fetch the APK to sign")
         return done
     seen = {}
     try:

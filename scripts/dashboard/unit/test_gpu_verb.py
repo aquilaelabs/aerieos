@@ -64,7 +64,7 @@ class GpuVerb(unittest.TestCase):
     def test_a_session_the_card_is_not_for_is_told_who_said_so(self):
         self.card()
         self.smi()
-        self.assertIn("project's settings", self.go("line", gpu="project").stdout)
+        self.assertIn("space's settings", self.go("line", gpu="project").stdout)
         self.assertIn("switched off for sessions", self.go("line", gpu="node").stdout)
         r = self.go("run", "--", "true", gpu="node")
         self.assertNotEqual(r.returncode, 0)

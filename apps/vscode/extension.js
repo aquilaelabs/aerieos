@@ -173,7 +173,7 @@ async function pickProject(context, why) {
   const { projects, tooOld } = await c.projects();
   if (tooOld) vscode.window.showWarningMessage(tooOld);
   if (!projects.length) {
-    throw new Error('no project here is open to you in an editor. Its settings (File access) say who may, '
+    throw new Error('no space here is open to you in an editor. Its settings (File access) say who may, '
       + 'and whether opening it in an editor is on.');
   }
   // An archived project is out of sight (R119): last, and said so. A lock
@@ -266,7 +266,7 @@ async function cmdSignOut(context) {
 
 async function cmdOpenProject(context) {
   try {
-    const project = await pickProject(context, 'A project to open as a folder');
+    const project = await pickProject(context, 'A space to open as a folder');
     if (!project) return;
     const n = (vscode.workspace.workspaceFolders || []).length;
     vscode.workspace.updateWorkspaceFolders(n, 0, { uri: at(project), name: `${project} (AerieOS)` });
@@ -280,7 +280,7 @@ async function cmdOpenProject(context) {
 // project, and an agent's id after it).
 async function cmdOpenSession(context, project, agent) {
   try {
-    project = typeof project === 'string' ? project : await pickProject(context, 'Which project\'s agent session to open');
+    project = typeof project === 'string' ? project : await pickProject(context, 'Which space\'s agent session to open');
     if (!project) return;
     const c = await connect(context);
     const facts = await sessionFacts(c, project);
@@ -320,7 +320,7 @@ async function cmdOpenSession(context, project, agent) {
 async function cmdSearch(context) {
   try {
     const folder = (vscode.workspace.workspaceFolders || []).find(f => f.uri.scheme === SCHEME);
-    const project = folder ? fsp.where(folder.uri).project : await pickProject(context, 'A project to search');
+    const project = folder ? fsp.where(folder.uri).project : await pickProject(context, 'A space to search');
     if (!project) return;
     const query = await vscode.window.showInputBox({ prompt: `Search ${project}'s files for` });
     if (!query) return;

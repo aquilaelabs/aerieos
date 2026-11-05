@@ -258,7 +258,7 @@ def clean(hw, vcpus, mem_mb, project=""):
         out["mem_max_mb"] = mx
     if hw.get("net") is not None:
         if hw["net"] not in ("project", "lan"):
-            return None, "a VM's network is its project's or the LAN"
+            return None, "a VM's network is its space's or the LAN"
         out["net"] = hw["net"]
     if hw.get("share") is not None:
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
@@ -266,14 +266,14 @@ def clean(hw, vcpus, mem_mb, project=""):
             path = os.path.normpath(str(sh.get("path") or ""))
             parts = path.split("/")
             if not path.startswith("/workspace/") or ".." in parts or len(parts) < 3 or (project and parts[2] != project):
-                return None, "a shared folder is one of the project's own, under /workspace"
+                return None, "a shared folder is one of the space's own, under /workspace"
             # Where it really is: virtiofsd serves a link's target as root,
             # so a link to / or to another project's folder in the project's
             # tree gave the VM that (B541). Resolved, inside the project's own
             # folder, and the resolved path is what the domain is given.
             root, real = os.path.realpath("/workspace/" + parts[2]), os.path.realpath(path)
             if real != root and not real.startswith(root + "/"):
-                return None, f"{path} leads out of the project's folder, to {real}"
+                return None, f"{path} leads out of the space's folder, to {real}"
             path = real
             tag = str(sh.get("tag") or "project")
             if not TAG_RE.fullmatch(tag):

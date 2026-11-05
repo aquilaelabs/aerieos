@@ -253,7 +253,7 @@ ${code}`], { encoding: 'utf8' });
   const rec = JSON.parse(readFileSync(`${fresh}/users.json`, 'utf8')).users.boss;
   ok(rec.role === 'owner' && !rec.projects.length
      && /^pbkdf2_sha256\$/.test(rec.password) && /^u_[0-9a-f]{8}$/.test(rec.uid),
-     '...as an owner, hashed, with an id of its own and no project taken on yet (R135: the role sees them all)');
+     '...as an owner, hashed, with an id of its own and no space taken on yet (R135: the role sees them all)');
   ok(!JSON.parse(run('print(json.dumps(u.claim("second", "longenough1")))')).ok,
      '...and the second claim is refused, because there is now an account');
   ok(!JSON.parse(run('print(json.dumps(u.claim("x", "short")))')).ok
@@ -419,11 +419,11 @@ ${code}`], { encoding: 'utf8' });
     await census([{ name: `${uidOf('sharer')}~claude-beta`, attached: false,
                     cwd: '/workspace/beta', title: '' }]);
     ok((await term(other, 'claude:beta')).status !== 409 && (await term(owner, 'claude:beta')).status !== 409,
-       'each account has its own session on the project, in a checkout of its own');
+       'each account has its own session on the space, in a checkout of its own');
     // The list an account that does not administer is shown: the nodes its
     // own projects work on, and its sign-in is refused anywhere else.
     const shown = ((await as(other, '/api/v1/nodes')).nodes || []).map(n => n.name);
-    ok(shown.join() === 'talkbox', `an account that does not administer is shown the nodes its own projects are on, and no others (${shown.join()})`);
+    ok(shown.join() === 'talkbox', `an account that does not administer is shown the nodes its own spaces are on, and no others (${shown.join()})`);
     const elsewhere = ((await napi('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' && n.id !== box.id);
     const stray = await as(other, '/api/signin', { node: elsewhere.id });
     ok(stray.status === 403 && /not a node one of your projects/.test(stray.error || ''),
@@ -434,7 +434,7 @@ ${code}`], { encoding: 'utf8' });
     const lj = theirs.job ? await napi(`/api/v1/jobs?id=${theirs.job}`) : {};
     ok(theirs.status === 200 && lj.type === 'claude-login' && lj.node === box.id && lj.spec?.uid === uidOf('sharer')
        && /^bbs_/.test(lj.spec?.token || ''),
-       `on its own project's node it starts one: a claude-login job there, for that account (${theirs.error || lj.type})`);
+       `on its own space's node it starts one: a claude-login job there, for that account (${theirs.error || lj.type})`);
     // The link a flow prints signs somebody in: it is shown to the person
     // the flow was started for and to nobody else, and only they type into it.
     ok((await as(other, '/api/status')).signin?.running === true && (await as(owner, '/api/status')).signin?.running === false,
@@ -487,7 +487,7 @@ ${code}`], { encoding: 'utf8' });
        '...in every spelling the argument has');
     // The one thing it may ask for, and only on a project it was given.
     ok((await term(other, 'claude:zzz-not-a-project')).status === 403,
-       'a Claude session on a project it cannot see is refused the same way');
+       'a Claude session on a space it cannot see is refused the same way');
     ok((await term(owner, 'sh:1:')).status !== 403,
        'an administrator still has a shell');
 
@@ -495,7 +495,7 @@ ${code}`], { encoding: 'utf8' });
     const post = (h, path, body) => bare(path, { method: 'POST', headers: h,
       body: JSON.stringify(body) });
     ok((await post(other, '/api/create', { name: 'sneaky', token: 'ghp_x' })).status === 403,
-       'a user cannot make a project, which is where a git token would be stored');
+       'a user cannot make a space, which is where a git token would be stored');
     ok((await post(other, '/api/rename', { name: 'beta', to: 'beta2', auth: 'https' })).status === 403,
        '...nor change how one authenticates, which travels through rename');
     ok((await post(other, '/api/devapp', { project: 'beta', action: 'up' })).status === 403,
@@ -516,7 +516,7 @@ ${code}`], { encoding: 'utf8' });
     const theirs = await (await bare('/api/v1/nodes', { headers: other })).json();
     const all = await (await bare('/api/v1/nodes', { headers: owner })).json();
     ok(all.nodes.length > theirs.nodes.length,
-       `a user sees only the nodes its own projects build on (${
+       `a user sees only the nodes its own spaces build on (${
           theirs.nodes.length} of ${all.nodes.length})`);
     // ...and the scoping is on the ANSWER, not only the picker. `?node=` is a
     // string in a URL, and the answer is what carries the other projects'
@@ -526,7 +526,7 @@ ${code}`], { encoding: 'utf8' });
                             { headers: other });
     const body = await peek.json();
     ok(/not a node one of your projects builds on|none of your projects/.test(body.error || ''),
-       `a node no project of theirs builds on is refused, not listed (${body.error})`);
+       `a node no space of theirs builds on is refused, not listed (${body.error})`);
     const pk = await (await bare('/api/toolchains?node=' + encodeURIComponent(nodeId),
                                  { headers: other })).json();
     ok(/not a node one of your projects builds on|none of your projects/.test(pk.error || ''),
@@ -537,7 +537,7 @@ ${code}`], { encoding: 'utf8' });
     // no containers anywhere, and the way out is its settings.
     const own = await (await bare('/api/docker?project=beta', { headers: other })).json();
     ok(/beta has no node, so it has no containers anywhere/.test(own.error || '') && own.blind === true,
-       `a user's project with no node is told it has no node, in its own words (${String(own.error).slice(0, 60)})`);
+       `a user's space with no node is told it has no node, in its own words (${String(own.error).slice(0, 60)})`);
   }
 
   // ---- an admin sees everything and works on what it took on (#27) ---------
@@ -557,7 +557,7 @@ ${code}`], { encoding: 'utf8' });
     const theirs = await projects(adm);
     const all = await projects(owner);
     ok(theirs.length === all.length && theirs.length > 1,
-       `a fresh admin is shown every project (${theirs.length} of ${all.length})`);
+       `a fresh admin is shown every space (${theirs.length} of ${all.length})`);
     ok(theirs.every(p => p.mine === false),
        '...and none of them marked as theirs to change, having taken none on');
     ok((await projects(other)).every(p => p.name === 'beta'),
@@ -566,7 +566,7 @@ ${code}`], { encoding: 'utf8' });
     // Read-only means it: the writes refuse, by name, with the remedy.
     const r = await post(adm, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' });
     ok(r.status === 403 && /no role on this project/.test((await r.json()).error || ''),
-       'an admin cannot edit the notebook of a project it has not taken on');
+       'an admin cannot edit the notebook of a space it has not taken on');
     ok((await post(adm, '/api/bugs', { project: 'alpha', action: 'add', title: 'x' })).status === 403,
        '...nor file a bug on it');
     ok((await post(adm, '/api/prefs', { project: 'alpha', build: 'make' })).status === 403,
@@ -580,7 +580,7 @@ ${code}`], { encoding: 'utf8' });
       // By project (R138): the list names alpha's project, by its key.
       const ak = projectKey('alpha');
       ok(!list.includes('*') && list.includes(ak) && await mine() === true,
-         `the owner's "*" became the projects that exist, alpha's among them (${list.join(', ')})`);
+         `the owner's "*" became the spaces that exist, alpha's among them (${list.join(', ')})`);
       await post(owner, '/api/users', { action: 'projects', name: 'test', projects: list.filter(p => p !== ak) });
       const off = await post(owner, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' });
       ok(await mine() === false && off.status === 403,
@@ -607,7 +607,7 @@ ${code}`], { encoding: 'utf8' });
     const kept = await post(other, '/api/prefs', { project: 'beta', node: '', nodes: [], git_name: 'Sharer S.' });
     const moved = await post(other, '/api/prefs', { project: 'beta', node: 'elsewhere' });
     ok(kept.status === 200 && moved.status === 403 && /which node a project builds on/.test((await moved.json()).error || ''),
-       `a user saves their commit name with the node unchanged (${kept.status}), and cannot move the project to another node (${moved.status})`);
+       `a user saves their commit name with the node unchanged (${kept.status}), and cannot move the space to another node (${moved.status})`);
     // What is the box's rather than a project's is an administrator's: the
     // container log, the trash, the daemon's containers, the deploy keys,
     // the command lists that run in terminals.
@@ -618,7 +618,7 @@ ${code}`], { encoding: 'utf8' });
        'a user cannot write the command lists an administrator\'s terminal runs');
     ok((await bare('/api/v1/jobs?n=50', { headers: other })).status === 200
        && ((await (await bare('/api/v1/jobs?n=50', { headers: other })).json()).jobs || []).every(j => j.project === 'beta'),
-       'a user reads only the jobs of projects they were given');
+       'a user reads only the jobs of spaces they were given');
     ok(!((await (await bare('/api/status', { headers: other })).json()).attention || []).length,
        '...and the bell\'s node alerts, which only an administrator can act on, are not theirs');
     // Memories are the reader's own, in the reader's home, not the owner's
@@ -632,8 +632,8 @@ ${code}`], { encoding: 'utf8' });
       const theirs = `${DIR}/home/users/${uid}/.claude/projects/${slug}/memory`;
       const owners = `${DIR}/home/.claude/projects/${slug}/memory`;
       mk(theirs, { recursive: true }); mk(owners, { recursive: true });
-      wf(`${theirs}/theirs.md`, '---\nname: theirs\ndescription: a user\'s own\nmetadata:\n  type: project\n---\n\nmine\n');
-      wf(`${owners}/owners.md`, '---\nname: owners\ndescription: the owner\'s\nmetadata:\n  type: project\n---\n\nnot yours\n');
+      wf(`${theirs}/theirs.md`, '---\nname: theirs\ndescription: a user\'s own\nmetadata:\n  type: space\n---\n\nmine\n');
+      wf(`${owners}/owners.md`, '---\nname: owners\ndescription: the owner\'s\nmetadata:\n  type: space\n---\n\nnot yours\n');
       const seenBy = async h => ((await (await bare('/api/memory?project=beta', { headers: h })).json()).memories || []).map(m => m.name);
       const u = await seenBy(other), o = await seenBy(owner);
       ok(u.includes('theirs') && !u.includes('owners'),
@@ -655,7 +655,7 @@ ${code}`], { encoding: 'utf8' });
     // between this and a user's list.
     ok((await post(adm, '/api/users', { action: 'projects', name: 'second',
                                         projects: ['alpha'] })).status === 200,
-       'an admin can add a project to its own list: a seatbelt, not a wall');
+       'an admin can add a space to its own list: a seatbelt, not a wall');
     ok((await post(adm, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' })).status === 200,
        '...and then it works on it');
     ok((await post(other, '/api/users', { action: 'projects', name: 'sharer',
@@ -690,22 +690,22 @@ print(u.remove("second"))`], { encoding: 'utf8' });
 
     // A project feed is the project's rule, not a new one.
     ok((await chat(other, { action: 'send', project: 'beta', text: 'looking at this' })).status === 200,
-       'a project they were given takes a message');
+       'a space they were given takes a message');
     const denied = await chat(other, { action: 'send', project: 'alpha', text: 'x' });
     ok(denied.status === 403,
-       '...and one they were not is refused, the same as the project is');
+       '...and one they were not is refused, the same as the space is');
     // An admin is shown every project, so every project's channel is readable
     // to them: a channel is the group chat for the people on it, and saying
     // something in one is not a change to the project. The list marks which
     // are actually theirs; the door does not need to.
     ok((await chat(owner, { action: 'read', project: 'gamma' })).status === 200,
-       'an administrator can read a project channel it has not taken on');
+       'an administrator can read a space channel it has not taken on');
     // ...and a user is not even shown that one exists: the channel list is
     // drawn from the projects in their own payload.
     const theirProjects = ((await (await bare('/api/status', { headers: other })).json())
       .projects || []).map(p => p.name);
     ok(theirProjects.length === 1 && theirProjects[0] === 'beta',
-       `a user's channel list is only the projects they were given (${theirProjects})`);
+       `a user's channel list is only the spaces they were given (${theirProjects})`);
     ok((await chat(other, { action: 'read', project: 'gamma' })).status === 403,
        '...and asking for another one directly is refused, not merely undrawn');
 
@@ -780,7 +780,7 @@ print(u.remove("second"))`], { encoding: 'utf8' });
     const feed = await (await chat(owner, { action: 'read', project: 'beta' })).json();
     ok((feed.messages || []).some(m => /sharer asked: rewrite the parser/.test(m.text)
                                   && m.kind === 'asked'),
-       'a prompt on a shared project reaches the others, marked as a prompt');
+       'a prompt on a shared space reaches the others, marked as a prompt');
 
     // ...but only what a PERSON typed. UserPromptSubmit fires for every turn a
     // session receives, and a background command finishing arrives as one,
@@ -855,10 +855,10 @@ ${code}`], { encoding: 'utf8' }).trim();
      'an ordinary account is told it is not an administrator, so the page draws no Administration card');
   const theirRules = await (await as('/api/rules?project=alpha')).json();
   ok(theirRules.may_global === false && (theirRules.global || []).length > 0,
-     '...and its project\'s Briefing lists the global rules with no way to change them for every project');
+     '...and its space\'s Briefing lists the global rules with no way to change them for every space');
   const wrote = await post('/api/global-rules',
-    { action: 'save', rules: [{ name: 'sneak', text: 'every project, please' }] });
-  ok(wrote.status === 403, `...and cannot write a rule for every project (${wrote.status})`);
+    { action: 'save', rules: [{ name: 'sneak', text: 'every space, please' }] });
+  ok(wrote.status === 403, `...and cannot write a rule for every space (${wrote.status})`);
   const stillNone = await (await bare('/api/global-rules', { headers: {
     Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
   ok(!(stillNone.rules || []).some(r => r.name === 'sneak'), '...and nothing was written');
@@ -866,7 +866,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   const mine = await (await as('/api/status')).json();
   const names = (mine.projects || []).map(p => p.name);
   ok(names.includes('alpha') && !names.includes('ep.silon') && names.length === 1,
-     `a user's state carries only the projects they were given (${names.join(', ')})`);
+     `a user's state carries only the spaces they were given (${names.join(', ')})`);
   const all = await (await bare('/api/status', { headers: {
     Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
   ok((all.projects || []).length > names.length,
@@ -876,13 +876,13 @@ ${code}`], { encoding: 'utf8' }).trim();
   // typo gets, never "forbidden", which would confirm it is there.
   const hidden = await (await post('/api/roadmap', { action: 'save', project: 'ep.silon', items: [] })).json();
   ok(/not a project/.test(hidden.error || ''),
-     `a project they cannot see reads as absent, not refused (${hidden.error})`);
+     `a space they cannot see reads as absent, not refused (${hidden.error})`);
 
   // ...and on a project they DO have, the verbs that reach past it are an
   // administrator's.
   const renamed = await post('/api/rename', { name: 'alpha', to: 'alpha2' });
   ok(renamed.status === 403 && /needs .+ Write/.test((await renamed.json()).error || ''),
-     'renaming their own project is refused, and says what it needs (R255 step 2)');
+     'renaming their own space is refused, and says what it needs (R255 step 2)');
   const trashed = await post('/api/trash', { name: 'alpha' });
   ok(trashed.status === 403, 'so is deleting it');
   const renoded = await post('/api/prefs', { project: 'alpha', node: 'local' });
@@ -1040,7 +1040,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   await pick('tabmade');
   await page.waitForSelector('.userstab #ueAccess #rolesAddProj', { timeout: 15000 });
   ok(!await page.$('.userstab #ueRole') && /on no project yet/.test(await page.$eval('.userstab #ueAccess', e => e.textContent)),
-     'its settings set no built-in role, and say the account is on no project yet');
+     'its settings set no built-in role, and say the account is on no space yet');
   ok(await page.$$eval('.userstab #ueSave, .userstab #ueRevert', bs => bs.length === 2 && bs.every(b => b.disabled)),
      'Save and Revert sleep while nothing on the account is unsaved');
   await page.fill('.userstab #ueFull', 'Tab Made');
@@ -1071,7 +1071,7 @@ ${code}`], { encoding: 'utf8' }).trim();
     const st = await page.$eval('.userstab .rdetail .actbar .state', e => e.textContent.trim()).catch(() => '');
     const row = await page.$eval('.userstab [data-upick="tabmade"]', e => e.textContent.replace(/\s+/g, ' '));
     ok(/on 1 project/.test(head) && st !== 'unsaved' && !/no role/.test(row),
-       `a roles-only Save reads the account again: "${st || 'saved'}", its header on 1 project, its row not "no role" (B33, B38: ${row.trim()})`);
+       `a roles-only Save reads the account again: "${st || 'saved'}", its header on 1 space, its row not "no role" (B33, B38: ${row.trim()})`);
   }
   await page.waitForSelector('.userstab [data-upick="tabmade"]', { state: 'visible', timeout: 15000 });
 
@@ -1087,7 +1087,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   const memOk = await as('/api/memory?project=alpha');
   const memNo = await as('/api/memory?project=delta');
   ok(memOk.status === 200 && memNo.status === 400,
-     `the memory read answers for its project and refuses another (${memOk.status}, ${memNo.status})`);
+     `the memory read answers for its space and refuses another (${memOk.status}, ${memNo.status})`);
 
   // The owner cannot be removed through the door either, not just in the page.
   const refused = await bare('/api/users', { method: 'POST',
@@ -1136,11 +1136,11 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
 
   const seen = await (await as('/api/status')).json();
   ok(JSON.stringify((seen.projects || []).map(p => p.name)) === '["alpha"]',
-     `a session token sees its own project and no other (${
+     `a session token sees its own space and no other (${
        (seen.projects || []).map(p => p.name).join(', ')})`);
   ok(/not a project/.test(((await (await post('/api/roadmap',
        { action: 'save', project: 'ep.silon', items: [] })).json()).error) || ''),
-     '...and another project reads as absent, not refused');
+     '...and another space reads as absent, not refused');
 
   // Parking a roadmap item is one direction for a session. It knows when
   // something is blocked or waiting on somebody; it does not know why the
@@ -1173,7 +1173,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     const fp = await (await as('/api/findings')).json();
     const rows = (fp.reports || []).flatMap(r => r.findings || []);
     ok(rows.length === 1 && rows[0].project === 'alpha' && rows[0].rule === 'A1',
-       `a session's findings are its own project's and no other (${
+       `a session's findings are its own space's and no other (${
          rows.map(r => `${r.project || '?'}:${r.rule}`).join(', ') || 'none'})`);
     // Said of the whole payload, not just the rows: a project name in a
     // subtitle or a count is the same leak in a smaller font.
@@ -1186,11 +1186,11 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     ok(!('aside' in fp),
        '...not even how many findings were held back, which would move when somebody else edits their code');
     ok(JSON.stringify(fp.projects || []) === '["alpha"]',
-       `...and the projects it lists are its own (${JSON.stringify(fp.projects || [])})`);
+       `...and the spaces it lists are its own (${JSON.stringify(fp.projects || [])})`);
     // The same question of the poll, which carries its own copy of the counts.
     const stat = await (await as('/api/status')).json();
     ok(Object.keys(stat.findings_counts || {}).join(',') === 'alpha',
-       `the poll's finding counts are its project's alone (${
+       `the poll's finding counts are its space's alone (${
          Object.keys(stat.findings_counts || {}).join(',') || 'none'})`);
   }
 
@@ -1203,7 +1203,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   // the operator's, and a node named in a request is a machine the token
   // was never bound to.
   ok((await post('/api/prefs', { project: 'alpha', gate: { roadmap: 'auto' } })).status === 403,
-     'a session cannot change its project\'s settings');
+     'a session cannot change its space\'s settings');
   // Nor queue a job at all (R35): a job runs as the node's enrolled account,
   // outside the session's view, so its own node is no better than another.
   for (const [what, body] of [['on its own node', { action: 'run', project: 'alpha', argv: ['true'] }],
@@ -1215,7 +1215,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   }
   const jl = await (await as('/api/v1/jobs?n=50')).json();
   ok(Array.isArray(jl.jobs) && jl.jobs.every(j => j.project === 'alpha'),
-     `the job list a session reads holds its project's jobs and no other (${jl.jobs?.length ?? '?'})`);
+     `the job list a session reads holds its space's jobs and no other (${jl.jobs?.length ?? '?'})`);
   ok((await as('/api/v1/jobs?id=j_nothing')).status === 404, '...and a job it may not see is absent, not refused');
   // ...but the phone's `ask` is exactly what a session does, and the control
   // on it is that the operator reads the reason and decides.
@@ -1374,10 +1374,10 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
       Authorization: 'Basic ' + Buffer.from('plainone:plainonepw1').toString('base64') };
     for (const action of ['abort', 'dismiss']) {
       const r = await bare('/api/project-job', { method: 'POST', headers: plainAuth, body: JSON.stringify({ action }) });
-      ok(r.status === 403, `a plain account cannot ${action} the project job somebody else started (${r.status})`);
+      ok(r.status === 403, `a plain account cannot ${action} the space job somebody else started (${r.status})`);
     }
     ok(JSON.stringify(asUser.project_job) === '{}' && typeof asOwner.project_job?.running === 'boolean',
-       `...and its status carries no project job to draw, while an administrator's does (${JSON.stringify(asUser.project_job)})`);
+       `...and its status carries no space job to draw, while an administrator's does (${JSON.stringify(asUser.project_job)})`);
     // B172: a session is its owner's. The name says whose (u_<uid>~...),
     // and the owner's own here keep bare names; nobody ends or types into
     // anybody else's. Decided before the session is looked up, so a
@@ -1406,9 +1406,9 @@ u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(jso
 print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim();
     const sessAuth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + stok };
     const across = await act(sessAuth, '/api/send', { session: 'claude-beta', macro: 'lx-ls' });
-    ok(across.status === 403, `a session's token cannot reach its own account's session on another project (${across.status})`);
+    ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
-    ok(home.status !== 403, `...and does reach its own project's (${home.status})`);
+    ok(home.status !== 403, `...and does reach its own space's (${home.status})`);
     // B173-B175: what acts on a project by name asks the right as well as
     // the name. A plain account given alpha cannot lock it, move the shared
     // pins, read how its remote authenticates, or move its version; the
@@ -1486,14 +1486,14 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
          && /no Play upload key/.test(noKey.body.error || '') && /aerie build/.test(noFile.body.error || '')
          && asked.status === 200 && asked.body.id && ask && ask.kind === 'sign'
          && ask.cmd.join(' ') === 'sign alpha-release.apk --for sideload',
-         `a session's aerie sign waits on the project's owner, and what it could not sign is refused before anybody is asked (${asked.body.to || JSON.stringify(asked.body)}; ${JSON.stringify(setNode).slice(0, 80)})`);
+         `a session's aerie sign waits on the space's owner, and what it could not sign is refused before anybody is asked (${asked.body.to || JSON.stringify(asked.body)}; ${JSON.stringify(setNode).slice(0, 80)})`);
       await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
       await bare('/api/prefs', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ project: 'alpha', sign: 'deny' }) });
       const denied = await sign({ file: 'alpha-release.apk', route: 'sideload', why: 'for testers' });
       const other = await bare('/api/signing', { method: 'POST', headers: sessAuth,
         body: JSON.stringify({ action: 'sign', project: 'beta', file: 'x.apk', route: 'sideload', why: 'w' }) });
       ok(denied.status === 403 && /Sign a build/.test(denied.body.error || '') && other.status === 403,
-         `...at Deny it is refused naming the setting, and another project's build is never its to sign (${denied.status}/${other.status})`);
+         `...at Deny it is refused naming the setting, and another space's build is never its to sign (${denied.status}/${other.status})`);
       // Managing keys (R106 step 6): at Ask a new key or a mapping waits on
       // the owner too, and a session reads which keys exist but no secret.
       // A key is made only once the backups have a password (2 Oct).
@@ -1501,7 +1501,7 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
       await bare('/api/signing', { method: 'POST', headers: ownerAuth,
         body: JSON.stringify({ action: 'backup-password', project: 'alpha', new: 'a-backup-password' }) });
       ok(unlocked.status === 409 && /backup password/.test(unlocked.body.error || ''),
-         `...and no key is proposed before the project's backups have a password (${unlocked.status})`);
+         `...and no key is proposed before the space's backups have a password (${unlocked.status})`);
       const listed = await sign({ action: 'keys' });
       const newKey = await sign({ action: 'generate', key: 'watch', route: 'sideload', why: 'the watch app' });
       const rot = await sign({ action: 'rotate', from: 'default', to: 'watch', why: 'move the app to the new key' });
@@ -1580,7 +1580,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         ok(/has no version/.test(noVersion.body.error || '') && /uncommitted changes/.test(dirtyAsked.body.error || '')
            && asked.status === 200 && ask && ask.kind === 'release'
            && ask.tag === 'v1.2.3' && ask.sha === sha && !gitR('tag', '--list', 'v1.2.3'),
-           `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the project's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
+           `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the space's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
         await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
         // An Android APK the release could not have signed is said before
         // the tag (R134 step 4), and --without-apk goes on to the ask.
@@ -1606,7 +1606,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         // answer a typo gets.
         ok(denied.status === 403 && /Tag and publish a release/.test(denied.body.error || '') && [400, 403].includes(other.status)
            && !gitR('tag', '--list', 'v1.2.3'),
-           `...at Deny it is refused naming the setting, another project is never its to release, and nothing was tagged (${denied.status}/${other.status})`);
+           `...at Deny it is refused naming the setting, another space is never its to release, and nothing was tagged (${denied.status}/${other.status})`);
         // aerie version release --edit (R139): the published release's notes
         // and files, under the same dial, each edit its own ask that the
         // owner reads whole. What may be attached is the project's own: a
@@ -1629,19 +1629,19 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
              && loose.status === 400 && /not committed/.test(loose.body.error || '')
              && asked.status === 200 && ask?.kind === 'release-edit' && ask.tag === 'v1.2.3'
              && /asset:shot\.png/.test(ask.detail || '') && ask.cmd.includes('attach shot.png (1 KB)'),
-             `a session's edit of its release names the tag, the notes whole and each file to its owner, and a file outside the project or never committed is refused first (${ask?.cmd?.join(' ')}; ${outside.body.error} | ${loose.body.error})`);
+             `a session's edit of its release names the tag, the notes whole and each file to its owner, and a file outside the space or never committed is refused first (${ask?.cmd?.join(' ')}; ${outside.body.error} | ${loose.body.error})`);
           await bare('/api/phone', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'deny', id: asked.body.id }) });
           await bare('/api/prefs', { method: 'POST', headers: ownerAuth, body: JSON.stringify({ project: 'relproj', release: 'deny' }) });
           const no = await edit({ notes: 'x' });
           const elsewhere = await edit({ project: 'alpha', notes: 'x' });
           ok(no.status === 403 && /Tag and publish a release/.test(no.body.error || '') && [400, 403].includes(elsewhere.status),
-             `...at Deny an edit is refused naming the same setting, and another project's release is never its to edit (${no.status}/${elsewhere.status})`);
+             `...at Deny an edit is refused naming the same setting, and another space's release is never its to edit (${no.status}/${elsewhere.status})`);
         }
         rmSync(R, { recursive: true, force: true });
       }
       // ...and how busy a node is (R108), for its own project only.
       const nb = await bare('/api/node-busy?project=beta', { headers: sessAuth });
-      ok(nb.status === 403, `a session asks how busy only its own project's nodes are (${nb.status})`);
+      ok(nb.status === 403, `a session asks how busy only its own space's nodes are (${nb.status})`);
     }
     // A project's owner and its people (membership.py, the operator, 1 Oct).
     // Invite only keeps an administrator from adding themselves; AerieOS's
@@ -1668,7 +1668,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: [] });
         ok(adminTry.status === 403 && /AerieOS's owner alone/.test(adminTry.body.error || '') && ownerTry.status === 200
            && adminSame.status === 200 && adminOff.status === 403 && can === false,
-           `only AerieOS's owner changes which projects a project's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
+           `only AerieOS's owner changes which spaces a space's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
       }
       // A key's backup goes to a person with Releases write ON the project
       // (the operator, 1 Oct; R255 step 3): adminone sees alpha and holds no
@@ -1684,7 +1684,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         const listOn = await post(ownerAuth, '/api/signing', { action: 'list', project: 'alpha' });
         ok(off.status === 403 && /give yourself one on it/.test(offMsg.error || '') && on.status === 200
            && listOff.body.may_backup === false && listOn.body.may_backup === true,
-           `a signing key's backup is for a person with a role on the project only, and the dialog offers it only to them (${off.status}/${on.status})`);
+           `a signing key's backup is for a person with a role on the space only, and the dialog offers it only to them (${off.status}/${on.status})`);
         // A backup password, the project's owner's (the operator, 1 Oct):
         // then every download needs it, AerieOS's owner's included,
         // carried in a POST body and never a URL; five misses hold them.
@@ -1704,7 +1704,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
            // project's node cannot wrap it now (B232: which node, and why), said
            // so, never the bare key.
            && (right.status === 200 || (right.status === 409 && /no node to sign on|is offline|install (it|them) on its Toolchains|takes no new work/.test(rightSaid))),
-           `a backup password is the project owner's to set, and then every download asks for it, a plain link and a wrong one refused (${plain.status}/${wrong.status}/${right.status} ${rightSaid})`);
+           `a backup password is the space owner's to set, and then every download asks for it, a plain link and a wrong one refused (${plain.status}/${wrong.status}/${right.status} ${rightSaid})`);
         for (let i = 0; i < 5; i++) await dl('nope');
         const held = await dl('a-long-password');
         ok(held.status === 429, `...and five wrong in a row hold the downloads, even for the right one (${held.status})`);
@@ -1759,21 +1759,21 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       const now = await post(ownerAuth, '/api/members', { action: 'view', project: 'gamma' });
       ok(moved.body.owner === 'adminone' && offer.body.owner === 'adminone' && offer.body.offered === 'plainone'
          && off && off.by === 'adminone' && took.body.owner === true && now.body.owner === 'plainone',
-         `AerieOS's owner hands a project on at once; its own owner offers it, and it moves when accepted (${moved.body.owner} -> offered ${offer.body.offered} -> ${now.body.owner})`);
+         `AerieOS's owner hands a space on at once; its own owner offers it, and it moves when accepted (${moved.body.owner} -> offered ${offer.body.offered} -> ${now.body.owner})`);
       // The owner role the handover made is gamma's alone (B726): the roles
       // payload says whose it is, and the People section offers it under
       // gamma and no other project.
       const rl = await (await bare('/api/roles', { headers: ownerAuth })).json();
       const gOwner = Object.values(rl.roles || {}).find(r => isG(r.project));
       ok(gOwner && /^Owner of /.test(gOwner.label || '') && gOwner.scope === 'projects',
-         `a project's owner role carries its project (${JSON.stringify(gOwner || {}).slice(0, 80)})`);
+         `a space's owner role carries its space (${JSON.stringify(gOwner || {}).slice(0, 80)})`);
       // One named before a rename is tied to its project by its note, and
       // one whose project is gone is not offered at all (B369).
       for (const [name, of] of [['gamma-was_owner', 'gamma'], ['vanished-xyz_owner', 'vanished-xyz']])
         await post(adminAuth, '/api/roles', { action: 'set', name, scope: 'projects', perms: { projects: 'write' }, note: `the owner of ${of}` });
       const rl2 = (await (await bare('/api/roles', { headers: adminAuth })).json()).roles || {};
       ok(isG(rl2['gamma-was_owner']?.project) && !rl2['vanished-xyz_owner'],
-         `an owner role named before a rename is gamma's by its note, and one of a project gone is not listed (${JSON.stringify({ was: rl2['gamma-was_owner']?.project, gone: !!rl2['vanished-xyz_owner'] })})`);
+         `an owner role named before a rename is gamma's by its note, and one of a space gone is not listed (${JSON.stringify({ was: rl2['gamma-was_owner']?.project, gone: !!rl2['vanished-xyz_owner'] })})`);
       await page.evaluate(() => { loadRoles(); openUsersTab(); });
       await page.waitForSelector('.userstab [data-upick="plainone"]', { timeout: 15000 });
       await page.click('.userstab [data-upick="plainone"]');
@@ -1785,12 +1785,12 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
          `...and the People section offers it under gamma alone (${JSON.stringify(where)})`);
       await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', owner: 'test' });
       const sessM = await act(sessAuth, '/api/members', { action: 'view', project: 'alpha' });
-      ok(sessM.status === 403, `...and a session has no say in who joins a project (${sessM.status})`);
+      ok(sessM.status === 403, `...and a session has no say in who joins a space (${sessM.status})`);
       await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: false });
     }
     const lockBeta = await act(plainAuth, '/api/lock', { name: 'beta', locked: true });
     ok(lockBeta.status === 400 && /not a project/.test(lockBeta.error),
-       `...nor lock a project it was not given, which it is not told exists (${lockBeta.status})`);
+       `...nor lock a space it was not given, which it is not told exists (${lockBeta.status})`);
     const vs = await act(sessAuth, '/api/version', { project: 'alpha', action: 'policy', policy: 'any' });
     ok(vs.status === 403 && /aerie version bump/.test(vs.error),
        `a session's token cannot use the version panel, where it could loosen its own policy (${vs.status})`);

@@ -151,7 +151,7 @@ class HeldNotes(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("write where you are and what is next", said)
         code, _ = self.run_gate(lambda home: {"tool_name": "Write", "tool_input": {"file_path": "/workspace/alpha/main.py"}})
-        self.assertEqual(code, 2, "the project's own files are not notes")
+        self.assertEqual(code, 2, "the space's own files are not notes")
         code, _ = self.run_gate(lambda home: {"tool_name": "Write", "tool_input": {
             "file_path": home + "/.claude/../elsewhere.txt"}})
         self.assertEqual(code, 2, "a path that only starts out in ~/.claude is resolved first")

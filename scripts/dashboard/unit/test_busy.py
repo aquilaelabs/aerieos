@@ -35,7 +35,7 @@ class Verdict(unittest.TestCase):
         self.assertEqual(word, "busy")
         self.assertIn("load 2.4 on 4 cores", why)
         self.assertIn("running: 1 emulator, 2 gradle", why)
-        self.assertIn("1 job of other projects", why)
+        self.assertIn("1 job of other spaces", why)
         self.assertIn("2 other agent sessions working", why)
 
     def test_saturated(self):

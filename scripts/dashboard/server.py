@@ -225,7 +225,7 @@ SETUP_FIELDS = """  <!--ERR-->
 
 RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps a sealed copy of its configuration on
     its disks and lets you download one. Pick a copy and give the password, and this install becomes
-    that controller: its accounts, nodes, projects and settings. Nothing else is set up first.</p>
+    that controller: its accounts, nodes, spaces and settings. Nothing else is set up first.</p>
   <!--ERR-->
   <!--FOUND-->
   <label for="b">Or a copy you kept (builderbot-backup-VERSION-DATE.bbbackup)</label>
@@ -238,13 +238,13 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
 # On a stick the first run's move door is shut (the operator, 1 Nov): the
 # bundle never lands on the stick, so the disks come first.
 STICK_MOVE_FIRST = ("This machine runs from a stick, and a move lands on its disks, never on the stick. Make a setup account: "
-                    "the next page walks you through the disks, where the projects go and landing the move, in that order. "
+                    "the next page walks you through the disks, where the spaces go and landing the move, in that order. "
                     "Have the old controller's move token and its bundle with you. The setup account goes when the move lands.")
 
 MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move token once.
     Give the token here with its bundle, or with the old controller's address while it still
     runs (the bundle is pulled from it, packed at that moment), and this install becomes that
-    controller: its accounts, nodes, projects and settings, with each node checking back in on
+    controller: its accounts, nodes, spaces and settings, with each node checking back in on
     its own. Nothing else is set up first.</p>
   <!--ERR-->
   <label for="t">The move token</label>
@@ -1742,7 +1742,7 @@ def _att_words(a):
 def _ask_words(a):
     """An ask in one line, the page's (page-bell.js askTag)."""
     k, proj = a.get("kind"), a.get("project") or ""
-    label = registry.label(proj) if proj else "a project"
+    label = registry.label(proj) if proj else "a space"
     node = a.get("node_name") or "the default node"
     return {"root": f"root on {node}", "rebuild": f"{' '.join(a.get('cmd') or [])[:60]} in {label}",
             "container": f"container {a.get('name') or ''} on {node}", "sign": f"sign a build of {label}",
@@ -2175,7 +2175,7 @@ def gpu_container_why(project, node_id):
     toolkit, Docker's runtime)."""
     who = gpu_for(project, node_id)
     if who == "project":
-        return "this project's settings say the node's GPU is not for it (The node's GPU)"
+        return "this space's settings say the node's GPU is not for it (The node's GPU)"
     n = nodes.node(node_id) if node_id and not NODES_OK else None
     if who == "node":
         return f"{n['name'] if n else 'its node'}'s GPU is switched off for sessions and jobs (Nodes page, GPU)"
@@ -2407,7 +2407,7 @@ def session_target(project, claude=False, node="", uid=""):
     no_node = {"where": "refused", "name": "",
                # The row says it whole, the fact and then what to do about
                # it (no tooltip carries a second half any more).
-               "why": "no node to run a coding agent's session on: pick one in the project's settings, or enroll "
+               "why": "no node to run a coding agent's session on: pick one in the space's settings, or enroll "
                       "one on the Nodes page under Machines"} if claude \
         else {"where": "local"}
     if not nid or NODES_OK:
@@ -2466,9 +2466,9 @@ def session_target(project, claude=False, node="", uid=""):
         # session on, and its row on the Nodes tab is the way back.
         why = (f"{project}'s sessions run on {name}, which "
                + ("is leaving its synced copy: what is left there is going up to the controller"
-                  if (n.get("config") or {}).get("leaving") else "holds no projects now")
+                  if (n.get("config") or {}).get("leaving") else "holds no spaces now")
                + ". Its row on the Nodes page moves it to a synced copy again,"
-               " or bind the project to another node")
+               " or bind the space to another node")
     elif not ((rep.get("sync") or {}).get(project) or {}).get("ready"):
         # A synced copy (R162) that is not there yet: a session started now
         # would open an empty or half-copied tree.
@@ -2506,7 +2506,7 @@ def session_target(project, claude=False, node="", uid=""):
             "why": why + ("." if passing else
                           ". Sessions run on a node and nowhere else (this container "
                           "carries no Claude Code), so the way on is that machine "
-                          "coming back, or another node in the project's settings.")}
+                          "coming back, or another node in the space's settings.")}
 
 def ctr_target(name, instance):
     """Where a container's Shell runs (R218 step 4): on the machine its
@@ -2890,7 +2890,7 @@ def session_behind(s):
     # works in the ones its project held when it started (bb-tty's works).
     added = _repos_since(s, started)
     if added:
-        why.append(f"{', '.join(added[:3])}{' and more' if len(added) > 3 else ''} added to its project since it started")
+        why.append(f"{', '.join(added[:3])}{' and more' if len(added) > 3 else ''} added to its space since it started")
     return why
 
 
@@ -3780,13 +3780,13 @@ def session_seen_note(project, uid, node, who=None, begin=False):
             moved = [(name, verb) for k, name, verb in SEEN_HALVES
                      if k in was_revs and was_revs.get(k, "") != revs_now.get(k, "")]
             if moved:
-                said.append("Since your last prompt somebody else changed this project's "
+                said.append("Since your last prompt somebody else changed this space's "
                             + ", ".join(n for n, _ in moved) + ": read "
                             + ", ".join(v for _, v in moved) + " before going on.")
         if new_stale:
-            said.append(f"This project's {', '.join(stale)} changed since this session started, and "
+            said.append(f"This space's {', '.join(stale)} changed since this session started, and "
                         "a session takes those when it starts: end it and start a new one to have "
-                        "them (a project added to Reads answers aerie -p already; its tree is mounted "
+                        "them (a space added to Reads answers aerie -p already; its tree is mounted "
                         "by the new session).")
         fresh = [r for r in watched or [] if int(r.get("id") or 0) > was_diag]
         if fresh:
@@ -4113,10 +4113,10 @@ def no_node_advice(name):
     # Settings is the notebook's view now, and "can push" read as news
     # about a remote beside a repository with no upstream (B456): it is the
     # project's push rights, so it says what to do with them.
-    return ("Pick one on the project's notebook Settings"
+    return ("Pick one on the space's notebook Settings"
             + (", or push a commit and let CI build it."
                if projects.may_push(name)
-               else ". This project has no push rights either, so CI is not a "
+               else ". This space has no push rights either, so CI is not a "
                     "fallback until it does.")
             + " Reading and editing the code needs no node.")
 
@@ -4601,9 +4601,9 @@ for _u in users.all_users():
 # store, the project linked to it (0011, the operator, 27 Oct).
 try:
     if (_moved := gitcreds.adopt(membership.owner_of)):
-        print(f"dashboard: {_moved} project token(s) moved into their owners' key stores", flush=True)
+        print(f"dashboard: {_moved} space token(s) moved into their owners' key stores", flush=True)
 except OSError as e:
-    print(f"dashboard: project tokens left as they were: {e}", flush=True)
+    print(f"dashboard: space tokens left as they were: {e}", flush=True)
 
 # An account's conversations with Claude as a download: transcripts.py.
 import transcripts                                               # noqa: E402
@@ -6286,7 +6286,7 @@ class Handler(BaseHTTPRequestHandler):
         the same reply before this existed (R60)."""
         if name and name in set(project_names(self._who())):
             return False
-        self._json({"error": f"not a project: {name}" if name else "not a project"}, 400)
+        self._json({"error": f"not a space: {name}" if name else "not a space"}, 400)
         return True
 
     def _not_card(self, name):
@@ -6724,11 +6724,11 @@ class Handler(BaseHTTPRequestHandler):
         if scope is None:
             return nid, None
         if not scope:
-            return "", "none of your projects builds on a node"
+            return "", "none of your spaces builds on a node"
         if not nid:
             return sorted(scope)[0], None
         if nid not in scope:
-            return "", "not a node one of your projects builds on"
+            return "", "not a node one of your spaces builds on"
         return nid, None
 
     def _nodes_for(self, rows):
@@ -6863,7 +6863,7 @@ class Handler(BaseHTTPRequestHandler):
         admin = users.is_admin(me)
         if not admin:
             if not owner:
-                return f"{name} belongs to no project, so its shell is an administrator's"
+                return f"{name} belongs to no space, so its shell is an administrator's"
             why = users.may(me, "write", owner)
             if why:
                 return why
@@ -6941,7 +6941,7 @@ class Handler(BaseHTTPRequestHandler):
         if uid and (arg == "shell" or arg.startswith("sh:") or is_agent) \
                 and not users.git_ready(me, want):
             return (f"{me['name']} has no name and email for commits yet: set them on your "
-                    "Profile (the gear in the header), or for one project in its settings "
+                    "Profile (the gear in the header), or for one space in its settings "
                     "dialog, and open this again")
         if not is_agent:
             return ""
@@ -7057,7 +7057,7 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
         project, _, name = str((q.get("vm") or [""])[0]).partition("/")
         if not registry.is_project(project):
-            return self._json({"error": f"no project called {project}"}, 404)
+            return self._json({"error": f"no space called {project}"}, 404)
         if self._refused("vms-write", project):
             return None
         rec = next((v for v in vms.view([project]) if v.get("name") == name), None)
@@ -7144,7 +7144,7 @@ class Handler(BaseHTTPRequestHandler):
             if held and not vms.may_take(my_uid, vkey):
                 return None, None, (f"{', '.join(w for _, w in held)} has {vmm.group(2)}'s Console open, and it is "
                                     "one person's at a time. Its Screen can be shared, or ask them; the "
-                                    "project's owner or an administrator can take it over.", 409)
+                                    "space's owner or an administrator can take it over.", 409)
         # A terminal on the controller itself, switched off for this install
         # (R81): what a node runs is the node's, and stays.
         if target["where"] != "node" and (why := featuresoff.sentences().get("shell")):
@@ -7278,9 +7278,9 @@ class Handler(BaseHTTPRequestHandler):
             # and the project's visibility asked again as the tab is kept.
             name, _, run = rest.rpartition(":")
             if not name or not run.isdigit():
-                return None, "a CI run's log is named by its project and its run"
+                return None, "a CI run's log is named by its space and its run"
             if name not in set(project_names(self._who())):
-                return None, f"not a project: {name}"
+                return None, f"not a space: {name}"
             held = {}
 
             def read():
@@ -7678,7 +7678,7 @@ class Handler(BaseHTTPRequestHandler):
         # A session's only with the diagnostics grant: the trace is every
         # request the controller answered, every project's paths among them.
         if not who or not (users.is_admin(who) or (who.get("session") and not self._diag_why())):
-            return self._json({"error": "the trace is for an administrator, or a session whose project "
+            return self._json({"error": "the trace is for an administrator, or a session whose space "
                                         "has the diagnostics grant (the Debug page)"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         try:
@@ -8114,8 +8114,8 @@ class Handler(BaseHTTPRequestHandler):
         readonly = not can["admin"] and not can["projects"] and not me.get("session") \
             and not self._area_read_why("accounts", me=me)
         if not can["admin"] and not can["projects"] and not readonly:
-            return self._json({"error": "the Roles page is an administrator's, a project owner's "
-                                        "for their own projects, or for reading, Accounts and roles Read's"}, 403)
+            return self._json({"error": "the Roles page is an administrator's, a space owner's "
+                                        "for their own spaces, or for reading, Accounts and roles Read's"}, 403)
         # By project (R138): an entry kept under a repository's name counts
         # for the project it is in, as everywhere roles are read.
         scope = None if can["admin"] or readonly else {repos.key_of(p) for p in can["projects"]}
@@ -8426,7 +8426,7 @@ class Handler(BaseHTTPRequestHandler):
         # The machine's own (R165 step 3): an administrator's, with or without one yet.
         machine = project == vms.MACHINE and not sess and users.is_admin(me)
         if not project or not (registry.is_project(project) or orphan or machine):
-            return self._json({"error": "which project's VM? name one"}, 400)
+            return self._json({"error": "which space's VM? name one"}, 400)
         # The address this controller was reached at, which a VM made a node
         # dials (R91 step 14): the asker's own, as Enroll node's script uses.
         req = dict(req, ctl=f"{'https' if self.headers.get('X-Forwarded-Proto') == 'https' else 'http'}://"
@@ -8444,7 +8444,7 @@ class Handler(BaseHTTPRequestHandler):
             mode = prefs.get(sess)["makevms"]
             if mode == "deny":
                 return self._json({"error": f"{sess}'s settings say an agent may not make or change VMs "
-                                            "(Make VMs is deny): a person changes that in the project's settings"}, 403)
+                                            "(Make VMs is deny): a person changes that in the space's settings"}, 403)
             # A USB device to a VM is held for a person whatever the dial
             # says (R116 step 6): a device can be a disk or a key.
             if mode == "ask" or action in ("usb-give", "usb-take"):
@@ -8467,7 +8467,7 @@ class Handler(BaseHTTPRequestHandler):
         notice to each person it is taken from."""
         uid = users.uid_of(me) or ""
         if not (users.is_admin(me) or (uid and membership.owner_of(project) == uid)):
-            return self._json({"error": "taking a VM's Console from whoever has it is the project's owner's or an "
+            return self._json({"error": "taking a VM's Console from whoever has it is the space's owner's or an "
                                         "administrator's; its Screen can be shared instead"}, 403)
         key = f"{project}/{name}"
         vms.take(uid, key)
@@ -8657,7 +8657,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._not_project(name):
             return
         if not ciwatch.claim(name):
-            return self._json({"error": "a look at this project's CI is already running"}, 409)
+            return self._json({"error": "a look at this space's CI is already running"}, 409)
         try:
             return self._json(ciwatch.look(name))
         finally:
@@ -8720,7 +8720,7 @@ class Handler(BaseHTTPRequestHandler):
         got = memory.payload(q.get("project", [""])[0], sessions_anywhere(),
                              home=home_for(users.uid_of(self._who())))
         return self._json(got if got is not None
-                          else {"error": "not a project"}, 400 if got is None else 200)
+                          else {"error": "not a space"}, 400 if got is None else 200)
 
     def _get_tests(self):
         """GET /api/tests."""
@@ -9014,7 +9014,7 @@ class Handler(BaseHTTPRequestHandler):
         # build runs, the identity its commits carry), and nobody may
         # change a project they cannot see or have not taken on.
         if (self._who() or {}).get("session"):
-            return self._json({"error": "a project's settings are the operator's: "
+            return self._json({"error": "a space's settings are the operator's: "
                                         "say what should change in your reply"}, 403)
         if self._not_project(name):
             return
@@ -9033,7 +9033,7 @@ class Handler(BaseHTTPRequestHandler):
             want = (req.get("nodes") if isinstance(req.get("nodes"), list) else []) + [req.get("node") or ""]
             host = [(nodes.node(n) or {}).get("name") or n for n in want if n and nodes.host_only(n)]
             if host:
-                return self._json({"error": f"{', '.join(host)} hosts containers only: no project's code "
+                return self._json({"error": f"{', '.join(host)} hosts containers only: no space's code "
                                             "or sessions go there. Send a container to it from the "
                                             "Containers page instead"}, 400)
             # A disabled node is kept but not offered (the operator, 11 Oct).
@@ -9054,14 +9054,14 @@ class Handler(BaseHTTPRequestHandler):
                        if str(n).strip() and not nodes.host_only(str(n).strip())]
                 if bad:
                     return self._json({"error": f"{', '.join(bad)} is not a hosting-only node: a node the "
-                                                "project works on takes its containers already, from Nodes in its settings"}, 400)
+                                                "space works on takes its containers already, from Nodes in its settings"}, 400)
         # Which other projects a session here may read is AerieOS's
         # owner's alone (the operator, 6 Oct): it hands one project's sessions
         # another's code and notebook, which no administrator or user grants
         # on their own say. Only a change is asked about.
         if req.get("reads") is not None and prefs.reads_changed(name, req.get("reads")) \
                 and (self._who() or {}).get("role") != "owner":
-            return self._json({"error": "which other projects a project's sessions may read is set by "
+            return self._json({"error": "which other spaces a space's sessions may read is set by "
                                         "AerieOS's owner alone"}, 403)
         # ...and so are the places on it a session here is shown (sees): a
         # share on a node is every project's there, so naming one is for
@@ -9227,7 +9227,7 @@ class Handler(BaseHTTPRequestHandler):
             # bb-dev-sandbox, 16 Sep, before this refusal.
             if (self._who() or {}).get("session"):
                 return self._json({"error": "a session runs aerie run, build, test and emu where it "
-                                            "is, on its project's node; a job would run outside "
+                                            "is, on its space's node; a job would run outside "
                                             "the session's view, so a session cannot queue one"}, 403)
             # ...nor from an account without the right: the same job queued with
             # a password instead of a token is the same command in the same
@@ -9237,7 +9237,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": why}, 403)
             name = field(req, "project")
             if name not in set(project_names(self._who())):
-                return self._json({"error": "not a project"}, 400)
+                return self._json({"error": "not a space"}, 400)
             # ...and by grant on the node the job would run on (R137 step
             # 3): the one named, else the project's primary, as run_job
             # picks it.
@@ -9303,7 +9303,7 @@ class Handler(BaseHTTPRequestHandler):
             # Said in the log, as the heartbeat's sign-out is (B236): which
             # session's check took a login away is not on the page.
             print(f"[dashboard] {nid} reports {agent} signed out for {uid}, "
-                  f"from a check in {proj or 'no project'}", flush=True)
+                  f"from a check in {proj or 'no space'}", flush=True)
         r = claudegrant.report(home_for(uid), nid, req.get("email") or "", req.get("plan") or "",
                                signed_in=signed_in, agent=agent)
         return self._json(r, 400 if r.get("error") else 200)
@@ -9344,7 +9344,7 @@ class Handler(BaseHTTPRequestHandler):
         project = _arg_project(arg)
         if not project or project != who["session"]:
             return self._json({"error": f"this token is for {who['session']}, and the terminal "
-                                        f"asked for is {'for ' + project if project else 'not a project'}"},
+                                        f"asked for is {'for ' + project if project else 'not a space'}"},
                               403)
         rest = "/?arg=" + urllib.parse.quote(arg, safe="")
         refused = self._term_refused(rest, me) or self._claude_held(rest, me)
@@ -9807,7 +9807,7 @@ class Handler(BaseHTTPRequestHandler):
         # Which project it belongs to: one of them, or none.
         under = field(req, "owner")
         if act == "owner" and under and under not in set(project_names(me)):
-            return self._json({"error": f"no project called {under}"}, 400)
+            return self._json({"error": f"no space called {under}"}, 400)
         # Onto the LAN (R178) opens a way out of the wall around a project's
         # containers: an administrator's, as the node's own switches are.
         if act in containers.LAN_CTL and not users.is_admin(me):
@@ -9832,7 +9832,7 @@ class Handler(BaseHTTPRequestHandler):
         project gone to the trash asks nothing of it."""
         if not owner or owner == devapp.SYSTEM or not registry.is_project(owner) or users.may_work(me, owner):
             return ""
-        return (f"{registry.label(owner)} is not on your list of projects: "
+        return (f"{registry.label(owner)} is not on your list of spaces: "
                 "add it to your own list on the Users page to work on its containers")
 
     def _container(self, req):
@@ -9906,7 +9906,7 @@ class Handler(BaseHTTPRequestHandler):
         # compose call and a data directory either way.
         if name not in set(project_names(me)) \
                 and name not in containers.overview_names():
-            return self._json({"error": f"not a project or container: {name}"}, 400)
+            return self._json({"error": f"not a space or container: {name}"}, 400)
         act = field(req, "action")
         # The verb onto this request's trace row (B717): a POST keyed by its
         # path alone could not say which devapp action was the slow one.
@@ -9975,11 +9975,11 @@ class Handler(BaseHTTPRequestHandler):
                 # A project, not a container written here: one of those is
                 # nobody's list to be on.
                 if target and registry.is_project(target) and not users.may_work(me, target):
-                    return self._json({"error": f"{registry.label(target)} is not on your list of projects: "
+                    return self._json({"error": f"{registry.label(target)} is not on your list of spaces: "
                                                 "add it to your own list on the Users page first"}, 403)
         if act == "relocate" and session:
             return self._json({"error": "copying or moving a container to another node is a person's: "
-                                        "it puts the project's data on another machine"}, 403)
+                                        "it puts the space's data on another machine"}, 403)
         # A SESSION is a further question, and the answer is a per-project
         # dial with the notebook's own three words. Rebuild runs the project's
         # own Dockerfile and brings the container up on the node's daemon: for
@@ -10016,10 +10016,10 @@ class Handler(BaseHTTPRequestHandler):
             # Oct), under its Run its container dial below; anywhere else it
             # is a person's.
             if session and (name != sess or str(req.get("node") or "") not in (prefs.get(sess).get("hosts") or [])):
-                return self._json({"error": "sending a project's container to a node it is not on is a "
+                return self._json({"error": "sending a space's container to a node it is not on is a "
                                             "person's, unless the node is ticked under Also works on in the "
-                                            "project's settings (a hosting-only node takes containers alone): "
-                                            "it puts the project's image on another machine"}, 403)
+                                            "space's settings (a hosting-only node takes containers alone): "
+                                            "it puts the space's image on another machine"}, 403)
             if not session and self._refused("node", name):
                 return None
         if act not in ("starter", "state", "probe") and session:
@@ -10032,7 +10032,7 @@ class Handler(BaseHTTPRequestHandler):
                 and on in (prefs.get(sess).get("hosts") or [])
             if on and mine and on != mine and not shipped_there:
                 return self._json({"error": "this dev instance is on another node: it stayed "
-                                            "where it was running when this project moved, "
+                                            "where it was running when this space moved, "
                                             "and a session works on its own node's. The "
                                             "operator uses or removes it from the Docker "
                                             "manager"}, 403)
@@ -10053,8 +10053,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": devapp.RUN_DENIED}, 403)
             if act == "new":
                 if "owner" in req and field(req, "owner") != name:
-                    return self._json({"error": "a session creates its own project's container, "
-                                                "belonging to its own project"}, 403)
+                    return self._json({"error": "a session creates its own space's container, "
+                                                "belonging to its own space"}, 403)
                 req.pop("owner", None)
                 # ...on its own node: the node a session names is dropped,
                 # except for one it ships to, which the hosts gate above has
@@ -10086,13 +10086,13 @@ class Handler(BaseHTTPRequestHandler):
         # only into a project they can see.
         if act == "move":
             if me.get("session"):
-                return self._json({"error": "moving a container to another project is a person's, "
+                return self._json({"error": "moving a container to another space is a person's, "
                                             "on the Containers page"}, 403)
             if field(req, "to") not in set(project_names(me)):
-                return self._json({"error": f"no project called {field(req, 'to')}"}, 400)
+                return self._json({"error": f"no space called {field(req, 'to')}"}, 400)
         if act == "owner" and field(req, "owner") \
                 and field(req, "owner") not in set(project_names(me)):
-            return self._json({"error": f"no project called {field(req, 'owner')}"}, 400)
+            return self._json({"error": f"no space called {field(req, 'owner')}"}, 400)
         # Which instance of that project. Absent means the one every project
         # has always had, so a caller that predates instances still works and
         # a request that names a strange one is answered rather than obeyed:
@@ -10136,7 +10136,7 @@ class Handler(BaseHTTPRequestHandler):
             # dial. The tag and the forge's release are made here, with the
             # project's own credentials, which the session never holds.
             if name != who["session"]:
-                return self._json({"error": "a session releases its own project and no other"}, 403)
+                return self._json({"error": "a session releases its own space and no other"}, 403)
             mode = (prefs.get(name) or {}).get("release") or "ask"
             if mode == "deny":
                 return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
@@ -10161,14 +10161,14 @@ class Handler(BaseHTTPRequestHandler):
                 got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev)
                 return self._json({**got, "channel": plan["channel"]} if isinstance(got, dict) else got, code)
             r = phone.ask_release(field(req, "why"), name, comp, plan, membership.owner_of(name),
-                                  membership.owner_name(name) or "the project's owner",
+                                  membership.owner_name(name) or "the space's owner",
                                   asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev)
             return self._json({**r, "channel": plan["channel"]}, 400 if r.get("error") else 200)
         if act == "release-remove":
             # Files off a published release: its own ask, never part of an
             # edit, under the release's dial (the operator, 5 Oct).
             if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session changes its own project's release and no other"}, 403)
+                return self._json({"error": "a session changes its own space's release and no other"}, 403)
             if not who.get("session") and self._refused("version", name):
                 return None
             comp = field(req, "component") or ""
@@ -10190,7 +10190,7 @@ class Handler(BaseHTTPRequestHandler):
             if mode == "auto":
                 return self._json(*_release_remover(name, plan, str(acct.get("name") or ""), self._principal()))
             r = phone.ask_release_remove(field(req, "why"), name, plan, membership.owner_of(name),
-                                         membership.owner_name(name) or "the project's owner",
+                                         membership.owner_name(name) or "the space's owner",
                                          asker_name=str(acct.get("name") or ""), principal=self._principal())
             return self._json(r, 400 if r.get("error") else 200)
         if act == "release-withdraw":
@@ -10198,7 +10198,7 @@ class Handler(BaseHTTPRequestHandler):
             # always a person's answer, whatever the dial, since nothing
             # undoes it; a session asks, a person at the panel does it.
             if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session withdraws its own project's release and no other"}, 403)
+                return self._json({"error": "a session withdraws its own space's release and no other"}, 403)
             if not who.get("session") and self._refused("version", name):
                 return None
             if who.get("session") and ((prefs.get(name) or {}).get("release") or "ask") == "deny":
@@ -10212,7 +10212,7 @@ class Handler(BaseHTTPRequestHandler):
             if not who.get("session"):
                 return self._json(*_release_withdrawer(name, plan, str(acct.get("name") or ""), self._principal()))
             r = phone.ask_release_withdraw(field(req, "why"), name, plan, membership.owner_of(name),
-                                           membership.owner_name(name) or "the project's owner",
+                                           membership.owner_name(name) or "the space's owner",
                                            asker_name=str(acct.get("name") or ""), principal=self._principal())
             return self._json(r, 400 if r.get("error") else 200)
         if act == "release-edit":
@@ -10220,7 +10220,7 @@ class Handler(BaseHTTPRequestHandler):
             # notes and files, under the same dial as the release itself, a
             # session's own project only, every edit its own ask.
             if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session edits its own project's release and no other"}, 403)
+                return self._json({"error": "a session edits its own space's release and no other"}, 403)
             if not who.get("session") and self._refused("version", name):
                 return None
             comp = field(req, "component") or ""
@@ -10243,14 +10243,14 @@ class Handler(BaseHTTPRequestHandler):
             if mode == "auto":
                 return self._json(*_release_editor(name, plan, str(acct.get("name") or ""), self._principal()))
             r = phone.ask_release_edit(field(req, "why"), name, plan, membership.owner_of(name),
-                                       membership.owner_name(name) or "the project's owner",
+                                       membership.owner_name(name) or "the space's owner",
                                        asker_name=str(acct.get("name") or ""), principal=self._principal())
             return self._json(r, 400 if r.get("error") else 200)
         if act == "release-drafts":
             # The drafts waiting to be read and published (the operator,
             # 1 Nov), each with the files it still lacks.
             if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session reads its own project's drafts and no other"}, 403)
+                return self._json({"error": "a session reads its own space's drafts and no other"}, 403)
             d = forgerelease.drafts(name)
             if d.get("error"):
                 # No release page to read (no forge, no token): no drafts,
@@ -10284,7 +10284,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(r, 400 if r.get("error") else 200)
         if who.get("session"):
             return self._json({"error": "a session moves its version with aerie version bump, "
-                                        "under the project's policy, and releases with aerie version release"}, 403)
+                                        "under the space's policy, and releases with aerie version release"}, 403)
         if act != "ask" and self._refused("version", name):
             return None
         return self._json(*version.verb(name, act, req, self._who(), self._principal()))
@@ -10295,7 +10295,7 @@ class Handler(BaseHTTPRequestHandler):
         is refused: who joins a project is a person's decision."""
         me = self._who() or {}
         if me.get("session"):
-            return self._json({"error": "who joins a project is a person's decision"}, 403)
+            return self._json({"error": "who joins a space is a person's decision"}, 403)
         if not me:
             return self._json({"error": "not signed in"}, 401)
         name = field(req, "project")
@@ -10329,7 +10329,7 @@ class Handler(BaseHTTPRequestHandler):
         if act == "unlink-forge":
             fid = field(req, "id")
             if gitcreds.linked_projects(uid, fid):
-                return self._json({"error": "a project uses this token: give it another in its settings first, "
+                return self._json({"error": "a space uses this token: give it another in its settings first, "
                                             "or purge your key store"}, 409)
             return self._json({"ok": accountkeys.unlink_forge(uid, fid)})
         if act == "purge":
@@ -10446,7 +10446,7 @@ class Handler(BaseHTTPRequestHandler):
                 for p in gitcreds.linked_projects(uid, fg["id"]):
                     if p in keep:
                         continue
-                    line = accountkeys.forge_line(uid, fg["id"], why="moved to the project", project=p, by=uid)
+                    line = accountkeys.forge_line(uid, fg["id"], why="moved to the space", project=p, by=uid)
                     if line and gitcreds.keep_as_own(p, line):
                         moved.append(p)
             body, code = accountkeys.move_to_own(uid, secret, how, pid)
@@ -10499,7 +10499,7 @@ class Handler(BaseHTTPRequestHandler):
                              "uses": f"the token{'s' if len(gv) > 1 else ''} {who}, each in their own key store"})
                 continue
             rows.append({"kind": "git", "name": f.name, "sealed": raw.startswith(gitcreds.SEALED),
-                         "uses": "git push and pull for the project's repositories", "go": ["project", f.name]})
+                         "uses": "git push and pull for the space's repositories", "go": ["project", f.name]})
         # The dashboard's own TLS key (R158 step 2), sealed under the install key.
         if tls.certificate_pem():
             rows.append({"kind": "tls", "name": "the dashboard's certificate", "sealed": tls._key_sealed(),
@@ -10513,7 +10513,7 @@ class Handler(BaseHTTPRequestHandler):
         for proj in signing._projects():
             for k in signing.key_names(proj):
                 rows.append({"kind": "signing", "name": f"{proj}: {k}", "sealed": signing.at_rest(proj) == "sealed",
-                             "uses": "signing the project's Android builds", "go": ["project", proj]})
+                             "uses": "signing the space's Android builds", "go": ["project", proj]})
         for uid, r in sorted(mfa.load().items()):
             t = (r or {}).get("totp") or {}
             if t.get("on"):
@@ -10575,7 +10575,7 @@ class Handler(BaseHTTPRequestHandler):
                 if mode == "auto":
                     return self._json(*_release_signer(name))
                 r = phone.ask_release_sign(field(req, "why"), name, owner,
-                                           membership.owner_name(name) or "the project's owner",
+                                           membership.owner_name(name) or "the space's owner",
                                            asker_name=str(acct.get("name") or ""))
                 return self._json(r, 400 if r.get("error") else 200)
             if act in ("keys", "generate", "map", "rotate"):
@@ -10598,7 +10598,7 @@ class Handler(BaseHTTPRequestHandler):
                 if kmode == "auto":
                     return self._json(*_keymaker(act, name, args, by="claude"))
                 r = phone.ask_keys(field(req, "why"), name, act, args, owner,
-                                   membership.owner_name(name) or "the project's owner",
+                                   membership.owner_name(name) or "the space's owner",
                                    asker_name=str(acct.get("name") or ""))
                 return self._json(r, 400 if r.get("error") else 200)
             mode = (prefs.get(name) or {}).get("sign") or "ask"
@@ -10613,7 +10613,7 @@ class Handler(BaseHTTPRequestHandler):
             if mode == "auto":
                 return self._json(*signing.start(self._principal(), name, file, route, key))
             r = phone.ask_sign(field(req, "why"), name, file, route, owner,
-                               membership.owner_name(name) or "the project's owner",
+                               membership.owner_name(name) or "the space's owner",
                                asker_name=str(acct.get("name") or ""), principal=self._principal(), key=key)
             return self._json(r, 400 if r.get("error") else 200)
         if self._not_project(name):
@@ -10666,7 +10666,7 @@ class Handler(BaseHTTPRequestHandler):
         name = q.get("project", [""])[0]
         who = self._who() or {}
         if who.get("session") and name != who["session"]:
-            return self._json({"error": "a session asks about its own project's nodes"}, 403)
+            return self._json({"error": "a session asks about its own space's nodes"}, 403)
         if self._not_project(name):
             return None
         if NODES_OK:
@@ -10873,7 +10873,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not signed in"}, 401)
         name = field(req, "project")
         if name not in set(project_names(me)):
-            return self._json({"error": f"not a project: {name}"}, 400)
+            return self._json({"error": f"not a space: {name}"}, 400)
         return self._json(presence.heartbeat(name, me.get("uid") or "",
                                              str(req.get("client") or "")[:64],
                                              field(req, "where"), leave=bool(req.get("leave"))))
@@ -10942,9 +10942,9 @@ class Handler(BaseHTTPRequestHandler):
         into = field(req, "project")
         if into:
             if not registry.is_repos(into) or not users.may_see(me, into):
-                return self._json({"error": f"not a project: {into}"}, 400)
+                return self._json({"error": f"not a space: {into}"}, 400)
             if not users.may_work(me, into):
-                return self._json({"error": f"{registry.label(into)} is not on your list of projects: "
+                return self._json({"error": f"{registry.label(into)} is not on your list of spaces: "
                                             "add it to your own list on the Users page first"}, 403)
             if (bad := projects.locked_out(into, users.uid_of(me))):
                 return self._json(bad, 403)
@@ -10959,7 +10959,7 @@ class Handler(BaseHTTPRequestHandler):
         limited = roles.nodes_for(me, "newprojects", "write")
         if limited is not None and nid not in limited:
             names = [n["name"] for n in ([] if NODES_OK else nodes.node_list()) if n["id"] in limited] or limited
-            return self._json({"error": f"a project you make goes on {', '.join(names)}: pick "
+            return self._json({"error": f"a space you make goes on {', '.join(names)}: pick "
                                         + ("that node" if len(names) == 1 else "one of those nodes")}, 403)
         # The token a person gives is kept in their own key store (the
         # operator, 27 Oct): who gave it is the server's to say (`_uid`).
@@ -10986,7 +10986,7 @@ class Handler(BaseHTTPRequestHandler):
         tree (snapshots.py), newest first, and how many it keeps. An
         administrator's, like a restore."""
         if (self._who() or {}).get("session"):
-            return self._json({"error": "a project's snapshots are the operator's"}, 403)
+            return self._json({"error": "a space's snapshots are the operator's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
         if self._refused("settings", name) or self._not_project(name):
@@ -11000,7 +11000,7 @@ class Handler(BaseHTTPRequestHandler):
         first so it can be undone). Never a session's: a session is what a
         restore may be undoing."""
         if (self._who() or {}).get("session"):
-            return self._json({"error": "a project's snapshots are the operator's"}, 403)
+            return self._json({"error": "a space's snapshots are the operator's"}, 403)
         name = field(req, "project")
         if self._refused("settings", name) or self._not_project(name):
             return None
@@ -11062,7 +11062,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not an account"}, 403)
         if me.get("session"):
             return self._json({"error": "a conversation is deleted or shared by its person, from the "
-                                        "project's Sessions view, not by a session"}, 403)
+                                        "space's Sessions view, not by a session"}, 403)
         name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
         if self._not_project(name):
             return
@@ -11153,7 +11153,7 @@ class Handler(BaseHTTPRequestHandler):
         name = field(req, "project")
         if me.get("session"):
             if name != me["session"]:
-                return self._json({"error": "a session works its own project's git host and no other"}, 403)
+                return self._json({"error": "a session works its own space's git host and no other"}, 403)
         elif self._not_project(name) or self._readonly(name):
             return None
         verb = " ".join(str(req.get("verb") or "").split())[:40]
@@ -11177,7 +11177,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "an account's, not a session's: a session uses aerie git"}, 403)
         name = field(req, "project")
         if name not in set(project_names(me)):
-            return self._json({"error": "not a project"}, 400)
+            return self._json({"error": "not a space"}, 400)
         if self._readonly(name):
             return None
         action = field(req, "action")
@@ -11212,7 +11212,7 @@ class Handler(BaseHTTPRequestHandler):
         if why := featuresoff.refused("POST", "/api/vms", {}):
             return self._json({"error": why, "off": True}, 403)
         if not registry.is_project(project):
-            return self._json({"error": "which project's VMs is it for? name one"}, 400)
+            return self._json({"error": "which space's VMs is it for? name one"}, 400)
         if self._refused("vms-write", project):
             return None
         try:
@@ -11404,7 +11404,7 @@ class Handler(BaseHTTPRequestHandler):
             mode = prefs.get(sess)["installpacks"]
             if mode == "deny":
                 return self._json({"error": f"{sess}'s settings say an agent may not add a tool pack (Install a tool pack is deny): "
-                                            "a person adds one from the Library, or changes that in the project's settings"}, 403)
+                                            "a person adds one from the Library, or changes that in the space's settings"}, 403)
             # At auto one that needs root is refused by the add itself (R169
             # step 4), its words saying to ask: an administrator's alone.
             if mode == "ask":
@@ -11472,7 +11472,7 @@ class Handler(BaseHTTPRequestHandler):
         if action == "phone-remove":
             project = field(req, "project")
             if not project or not (users.is_admin(self._who()) or users.may_see(self._who(), project)):
-                return self._json({"error": "which of your projects?"}, 400)
+                return self._json({"error": "which of your spaces?"}, 400)
             return self._result(nodes.node_avd_remove(self._principal(), nid, project,
                                                       field(req, "uid"), field(req, "name")))
         iid = req.get("images") if isinstance(req.get("images"), list) else field(req, "image")
@@ -11517,7 +11517,7 @@ class Handler(BaseHTTPRequestHandler):
         who = self._who() or {}
         proj = who.get("session") or field(req, "project")
         if proj and not who.get("session") and not users.may_see(who, proj):
-            return self._json({"error": "not a project"}, 400)
+            return self._json({"error": "not a space"}, 400)
         asking = prefs.get(proj)["node"] if proj else ""
         # The debug grant's, named only (the operator, 6 Oct): the session's
         # account, or the person asking, must hold it as well as the project
@@ -11591,7 +11591,7 @@ class Handler(BaseHTTPRequestHandler):
         A session is refused: it has the tree, and it is never a person."""
         me = self._who() or {}
         if me.get("session"):
-            return self._json({"error": "a session has its project's tree already: this is a "
+            return self._json({"error": "a session has its space's tree already: this is a "
                                         "person's editor's"}, 403)
         if why := files.api_refused(self.headers.get("X-BB-Api"), self.headers.get("X-BB-App")):
             return self._json({"error": why, "update": True}, 426)
@@ -11641,13 +11641,13 @@ class Handler(BaseHTTPRequestHandler):
             # one cannot start a session here, so has nothing of its to report.
             if not sess and not users.may_work(me, proj):
                 return self._json({"error": f"you are not on {proj}, so a bug from there is not yours to "
-                                            "report: ask to be added, or report from a project you work on"}, 403)
+                                            "report: ask to be added, or report from a space you work on"}, 403)
             # The dial is Claude's (Agents may: Report AerieOS bugs): a
             # person reporting from a project's row is always heard.
             if sess and prefs.get(proj)["report"] == "deny":
                 return self._json({"error": f"reporting AerieOS bugs is off for {proj}: its "
                                             "settings, Agents may: Report AerieOS bugs. A "
-                                            "problem goes into this project's tracker"}, 403)
+                                            "problem goes into this space's tracker"}, 403)
             # The person's latest conversation on the project, when they
             # ticked Include it (the operator, 2 Oct): theirs only, found and
             # rendered here, never named by the page.
@@ -11930,7 +11930,7 @@ class Handler(BaseHTTPRequestHandler):
             if not fields or act != "configure":
                 return self._json({"error": f"{pack or 'nothing'} asks nothing of each person"}, 400)
             if not self._works_on_node(who, nid):
-                return self._json({"error": "your own settings here are for whoever works on this node's projects"}, 403)
+                return self._json({"error": "your own settings here are for whoever works on this node's spaces"}, 403)
             r = packconfig.set_mine(nid, pack, fields, req.get("values"), users.uid_of(who))
             return self._json(r, 400 if r.get("error") else 200)
         if (why := users.may_node(who, "configure", nid)):
@@ -12157,7 +12157,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         who = self._who() or {}
         if who.get("session") and who.get("session") != name and users.key_of(who.get("session") or "") != users.key_of(name):
-            return self._json({"error": "a session is handed its own project's key"}, 403)
+            return self._json({"error": "a session is handed its own space's key"}, 403)
         got = router.for_project(name)
         if got:
             got["models"] = router.models_for(name)
@@ -12390,7 +12390,7 @@ class Handler(BaseHTTPRequestHandler):
         if not lock_may(name, uid, admin, projects.load_locks().get(name)):
             return self._json({"error": "an administrator locked it, and an administrator unlocks it"
                                         if projects.load_locks().get(name, {}).get("admin")
-                                        else "the project's owner or an administrator locks it, and "
+                                        else "the space's owner or an administrator locks it, and "
                                              "the one who locked it unlocks it"}, 403)
         # An administrator who is not its owner locks it against its owner
         # too (the operator, 23 Oct); its owner's lock leaves the owner in.
@@ -12449,7 +12449,7 @@ class Handler(BaseHTTPRequestHandler):
         never a session's."""
         me = self._who()
         if not me or me.get("session"):
-            return self._json({"error": "a person makes and changes projects, never a session"}, 403)
+            return self._json({"error": "a person makes and changes spaces, never a session"}, 403)
         act = field(req, "action")
         admin = users.is_admin(me)
         mine = lambda n: admin or membership.may_manage(me, n)          # noqa: E731
@@ -12466,16 +12466,16 @@ class Handler(BaseHTTPRequestHandler):
         if act == "rename":
             key = field(req, "key")
             if not registry.is_repos(key) or not users.may_see(me, key):
-                return self._json({"error": f"not a project: {key}"}, 400)
+                return self._json({"error": f"not a space: {key}"}, 400)
             if not mine(key):
-                return self._json({"error": "the project's owner or an administrator renames it"}, 403)
+                return self._json({"error": "the space's owner or an administrator renames it"}, 403)
             return self._result(registry.set_name(key, field(req, "to")))
         if act == "delete":
             key = field(req, "key")
             if not registry.is_repos(key) or not users.may_see(me, key):
-                return self._json({"error": f"not a project: {key}"}, 400)
+                return self._json({"error": f"not a space: {key}"}, 400)
             if not mine(key):
-                return self._json({"error": "the project's owner or an administrator deletes it"}, 403)
+                return self._json({"error": "the space's owner or an administrator deletes it"}, 403)
             got = repos.delete(key)
             if got.get("ok"):
                 membership.forget_project(key)
@@ -12490,17 +12490,17 @@ class Handler(BaseHTTPRequestHandler):
         if act == "owned":
             name = field(req, "name")
             if not (registry.is_repos(name) or registry.is_project(name)) or not users.may_see(me, name):
-                return self._json({"error": f"not a project: {name}"}, 400)
+                return self._json({"error": f"not a space: {name}"}, 400)
             return self._json({"containers": devapp.owned_by(name), "vms": sorted(v.get("name") or "" for v in vms.view([name]))})
         if act in ("move", "move-check"):
             name, to = field(req, "name"), field(req, "to")
             if self._not_project(name):
                 return None
             if not registry.is_repos(to) or not users.may_see(me, to):
-                return self._json({"error": f"not a project: {to}"}, 400)
+                return self._json({"error": f"not a space: {to}"}, 400)
             was = repos.project_of(name)
             if not all(users.may_work(me, k) for k in (to, was or name)) or not (mine(to) and mine(was or name)):
-                return self._json({"error": "the owner of both projects, or an administrator, moves a repository "
+                return self._json({"error": "the owner of both spaces, or an administrator, moves a repository "
                                             "between them"}, 403)
             for k in (to, was or name):
                 if (bad := projects.locked_out(k, users.uid_of(me))):
@@ -12618,7 +12618,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         me = self._who()
         if not me or me.get("session") or not (users.is_admin(me) or users.uid_of(me) == membership.owner_of(name)):
-            return self._json({"error": "the project's owner or an administrator archives it"}, 403)
+            return self._json({"error": "the space's owner or an administrator archives it"}, 403)
         return self._json(*projects.archive_verb(name, on))
 
     def _trash(self, req):
@@ -12650,14 +12650,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         into = field(req, "project")
         if into and (not registry.is_repos(into) or not users.may_see(self._who(), into)):
-            return self._json({"error": f"not a project: {into}"}, 400)
+            return self._json({"error": f"not a space: {into}"}, 400)
         was = registry.last_project(projects.restore_dir(field(req, "name")))
         into = into or (was if registry.is_repos(was) else "")
         # Its project deleted since: which one is asked. One deleted before
         # projects came first was in none, and comes back in a project of
         # its own as every repository did then (_place, migration 0010).
         if not into and was:
-            return self._json({"error": f"it was in {registry.label(was)}, which is deleted: pick the project "
+            return self._json({"error": f"it was in {registry.label(was)}, which is deleted: pick the space "
                                         "to put it back into", "pick": True}, 409)
         body, code = projects.trash_restore(req)
         if code == 200 and not body.get("error"):
@@ -12772,7 +12772,7 @@ class Handler(BaseHTTPRequestHandler):
         (delete_group): a label for the Projects page, nothing more."""
         me = self._who() or {}
         if me.get("session"):
-            return self._json({"error": "a session has no Projects page: the groups are a person's own"}, 403)
+            return self._json({"error": "a session has no Spaces page: the groups are a person's own"}, 403)
         if "rename" in req:
             return self._json(*projects.rename_group(users.uid_of(me), field(req, "rename"), field(req, "to")))
         if "delete" in req:
@@ -12787,7 +12787,7 @@ class Handler(BaseHTTPRequestHandler):
         (projects.set_mark): worn by its card, its tabs and its bar."""
         me = self._who() or {}
         if me.get("session"):
-            return self._json({"error": "a session has no Projects page: a project's color is a person's own"}, 403)
+            return self._json({"error": "a session has no Spaces page: a space's color is a person's own"}, 403)
         name, color = field(req, "name"), field(req, "color")
         if self._not_card(name):
             return None
@@ -13268,7 +13268,7 @@ class Handler(BaseHTTPRequestHandler):
             # useful to them, while a user has the channels they were given
             # and no others. The list marks which are actually theirs.
             if not users.may_see(me, proj):
-                return self._json({"error": "not a project"}, 403)
+                return self._json({"error": "not a space"}, 403)
             key, box = f"p:{proj}", ("project", proj)
         elif who:
             other = by_name.get(who)
@@ -13276,7 +13276,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "no such account"}, 403)
             key, box = f"dm:{other}", ("dm", other)
         else:
-            return self._json({"error": "name a person or a project"}, 400)
+            return self._json({"error": "name a person or a space"}, 400)
 
         return self._json(*chat.converse(act, me, uid, box, key, req.get("text", ""),
                                          {u: n for n, u in by_name.items()}))
@@ -13423,7 +13423,7 @@ def main():
     try:
         membership.prune_gone(registry)
     except Exception as e:                                            # noqa: BLE001
-        print(f"[dashboard] owner roles of gone projects not pruned: {type(e).__name__}: {e}", flush=True)
+        print(f"[dashboard] owner roles of gone spaces not pruned: {type(e).__name__}: {e}", flush=True)
     # Daemons: these loops must die with the server, not hold it open.
     doctor.start()
     idle.start()

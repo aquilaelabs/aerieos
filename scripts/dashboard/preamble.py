@@ -175,7 +175,7 @@ def sees_line(project):
             sees = []
     if not sees:
         return ""
-    return (f"Of the shares and disks mounted on its node, this project is shown "
+    return (f"Of the shares and disks mounted on its node, this space is shown "
             f"{', '.join(sees)}, as the node has each; one that is missing here is not on "
             f"this node.")
 
@@ -207,7 +207,7 @@ def identity_line(project):
     if is_work(project):
         lab = label_of(project) if label_of else project
         pid = id_of(project) if id_of else ""
-        return (f"This project is shown as {lab}" + (f"; its id is {pid}, which never changes" if pid else "")
+        return (f"This space is shown as {lab}" + (f"; its id is {pid}, which never changes" if pid else "")
                 + f". Call it {lab} when you speak of it. It has no repository: there is no code here to write, "
                 f"nothing is under git, there is no build or test to run, and it has no notebook (no roadmap, "
                 f"bugs, rules of its own, wiki, design or memories), so `git`, `aerie git`, `aerie build`, "
@@ -215,27 +215,27 @@ def identity_line(project):
                 f"have put on the record goes in your reply instead. Its folder, /workspace/{project}, is "
                 f"yours for what a container or a VM needs: a compose file and its env for `aerie container "
                 f"new`, a VM's requirements for `aerie vm`, notes on what you set up. The work here is "
-                f"containers and VMs on this project's node (`aerie help containers`, `aerie help asks`): "
+                f"containers and VMs on this space's node (`aerie help containers`, `aerie help asks`): "
                 f"a stack asked for (a media server, a backup target, a database) is made with `aerie "
                 f"container new` from a compose file you write in this folder, each service's data on the "
-                f"node's own store, and a VM with `aerie vm`, under the project's Agents may dials; the "
+                f"node's own store, and a VM with `aerie vm`, under the space's Agents may dials; the "
                 f"Library's apps (`aerie tool search`) are compose files already vetted. A repository added "
-                f"to the project later makes it a coding project; until then nothing here is code.")
+                f"to the space later makes it a coding space; until then nothing here is code.")
     if several:
         name, pid, members = several
         where = ", ".join(f"{lab} at /workspace/{d}" for d, lab in members)
-        return (f"This project is shown as {name}; its id is {pid}, which never changes. Call it {name} when "
-                f"you speak of it. Its repositories are {where}: each is this project's own to work in, "
+        return (f"This space is shown as {name}; its id is {pid}, which never changes. Call it {name} when "
+                f"you speak of it. Its repositories are {where}: each is this space's own to work in, "
                 f"commit to and push, the session starts in /workspace/{project}, and `aerie -p` takes a "
                 f"repository's directory to answer for that one.")
     lab = label_of(project) if label_of else project
     pid = id_of(project) if id_of else ""
     if got:
         lab, pid = got[0] or lab, got[1] or pid
-    said = f"This project's id is {pid}, which never changes; `aerie -p {pid}` names it." if pid else ""
+    said = f"This space's id is {pid}, which never changes; `aerie -p {pid}` names it." if pid else ""
     if not lab or lab == project:
         return said
-    return (f"This project is shown as {lab}; its directory is /workspace/{project}, which every "
+    return (f"This space is shown as {lab}; its directory is /workspace/{project}, which every "
             f"path and `aerie -p` use. Call it {lab} when you speak of it."
             + (f" Its id is {pid}, which never changes." if pid else ""))
 
@@ -286,7 +286,7 @@ def dials_line(project):
             said.append(f"Move the version {version_policy(project)}")
         except Exception:                                        # noqa: BLE001
             said.append("Move the version unknown (aerie version policy says)")
-    return ("This project's Agents may, as set now (auto runs at once, ask waits for its person's answer "
+    return ("This space's Agents may, as set now (auto runs at once, ask waits for its person's answer "
             "on the bell, deny is refused; say which applies rather than the default): " + "; ".join(said) + ".")
 
 
@@ -307,15 +307,15 @@ def reads_line(project):
     if not reads:
         return ""
     names = ", ".join(_shown(r) for r in reads)
-    return (f"This project reads {names}: each is at /workspace/NAME, read-only, and "
+    return (f"This space reads {names}: each is at /workspace/NAME, read-only, and "
             f"`aerie -p NAME` in front of `aerie roadmap`, `aerie bug`, `aerie rules`, `aerie design`, "
             f"`aerie tests` or `aerie map` makes the verb answer for it, so its notebook and its code "
-            f"are yours to read, and its containers answer from here on this project's nodes, so "
+            f"are yours to read, and its containers answer from here on this space's nodes, so "
             f"`aerie -p NAME devapp` says where its page is and `aerie capture shot` photographs it; "
             f"`aerie -p NAME transcripts` lists this account's own conversations there, every agent's, "
             f"and `show ID` prints one, and their files are under ~/.claude/projects read-only. "
             f"Nothing there is yours to change: a write to its tree fails, a write to its notebook is "
-            f"refused, and its containers are not yours to start or stop; a session on that project is "
+            f"refused, and its containers are not yours to start or stop; a session on that space is "
             f"what changes them.")
 
 
@@ -335,7 +335,7 @@ def design_line(project):
     dial = _design_dial(project)
     fill = {"auto": "a save of yours lands",
             "ask": "a save of yours waits for the operator's approval on the notebook",
-            "deny": "the project refuses a session's save, so say in your reply what you would put there"}[dial]
+            "deny": "the space refuses a session's save, so say in your reply what you would put there"}[dial]
     if not rec:
         # Nothing designed beforehand (the operator, 29 Sep): build as you
         # would, then put what you arrived at into the notebook so the next
@@ -345,7 +345,7 @@ def design_line(project):
                 "`aerie design save` (the themes with their colors as tokens, the type, corners, space and "
                 "motion you settled on, the pages you built, the rules you followed; `aerie design schema` "
                 "prints the shape) so the next session finds it there. "
-                f"Under the project's dial Agents may: Add to the design, {fill}.")
+                f"Under the space's dial Agents may: Add to the design, {fill}.")
     lang, pages = rec["language"], rec["pages"]
     themes = ", ".join(t["name"] for t in lang["themes"])
     own = sum(len(t.get("rules") or []) for t in lang["themes"]) + sum(len(p.get("rules") or []) for p in pages)
@@ -364,7 +364,7 @@ def design_line(project):
     if left:
         bits.append(", ".join(left) + " not chosen yet")
     empty = _no_code_yet(project)
-    return (f"This project's notebook holds a design already: {'; '.join(bits)}. "
+    return (f"This space's notebook holds a design already: {'; '.join(bits)}. "
             + ("The tree has no code yet, so the design, the rules and the roadmap are the "
                "specification: build to them from the first file. " if empty else "")
             + "Read `aerie design show` before laying out or styling anything, `aerie design show NAME` for "
@@ -372,7 +372,7 @@ def design_line(project):
               "(`aerie design file > docs/design-language.md`); the notebook never writes it into the tree by itself. What the "
               "design leaves open and you had to decide (a color it does not name, a page it does not have, "
               "a choice of its language nobody has made) "
-              f"goes back into it with `aerie design save` so it is complete; under the project's dial, {fill}.")
+              f"goes back into it with `aerie design save` so it is complete; under the space's dial, {fill}.")
 
 
 def _design_dial(project):
@@ -550,7 +550,7 @@ def packs_line(project):
     if not on:
         return ask
     names = ", ".join(f"{(r.get('label') or n)} (`aerie tool {n}`)" for n, r in sorted(on.items()))
-    return (f"This project's sessions may use the tool packs {names}: `aerie tool NAME` lists a pack's verbs, "
+    return (f"This space's sessions may use the tool packs {names}: `aerie tool NAME` lists a pack's verbs, "
             f"and `aerie help tool-NAME` prints what the pack says about using them. A person here added each; "
             f"none is shipped with AerieOS. " + ask)
 
@@ -615,13 +615,13 @@ def memory_part(project, uid="", agent=""):
     head = ["## Memories", "",
             "What you remember is each repository's, kept for your account across sessions and coding agents: "
             "`aerie memory` lists a repository's, `aerie memory show NAME` reads one whole, and "
-            "`aerie memory add NAME --type user|feedback|project|reference --about \"one line\" \"...\"` saves one, "
+            "`aerie memory add NAME --type user|feedback|space|reference --about \"one line\" \"...\"` saves one, "
             + ("with `aerie -p REPO` on the repository it is about, so it stays with that repository if it moves to another "
-               f"project; one about the project as a whole goes on {first}."
+               f"space; one about the space as a whole goes on {first}."
                if many else "so a session of any agent here starts knowing it.")]
     if claude:
         head += ["", "Claude Code's own memory here is this repository's index and folder; a fact about another "
-                    "repository of the project is saved with `aerie -p REPO memory add`, not there."]
+                    "repository of the space is saved with `aerie -p REPO memory add`, not there."]
     return "\n".join(head + out).strip(), "; ".join(left)
 
 
@@ -692,7 +692,7 @@ def repos_part(project):
     ws = os.environ.get("WORKSPACE", "/workspace")
     lines = ["## The project's repositories",
              "",
-             f"This session is {name} ({pid}), a project of {len(members)} repositories, and works in every one: "
+             f"This session is {name} ({pid}), a space of {len(members)} repositories, and works in every one: "
              f"each is its own repository with its own notebook, git host, CI and releases. Each tree below is "
              f"yours to write (a worktree of it on this session's branch, where you have one); aerie answers for "
              f"the repository whose tree you run it in, and `aerie -p NAME` for another.",
@@ -799,7 +799,7 @@ def for_agent(agent_id, text):
         return text
     return (f"This session runs {a.product}, AerieOS's {a.name} agent. Everything below holds for it "
             "as for a Claude session: where this briefing says Claude, read the session you are; "
-            "the house rules, the project's Agents may settings and aerie apply to you alike.\n\n" + text)
+            "the house rules, the space's Agents may settings and aerie apply to you alike.\n\n" + text)
 
 
 def block(project, reply="", asks="", uid="", agent=""):

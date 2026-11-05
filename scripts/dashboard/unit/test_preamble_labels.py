@@ -30,8 +30,8 @@ class PreambleLabels(unittest.TestCase):
             out = subprocess.run([sys.executable, VERBS, DASH, "here", ""], env=env,
                                  capture_output=True, text=True, timeout=60)
             self.assertEqual(out.returncode, 0, out.stderr)
-            self.assertIn("This project is shown as public; its directory is /workspace/here", out.stdout)
-            self.assertIn("This project reads old-private (directory Old), plain:", out.stdout)
+            self.assertIn("This space is shown as public; its directory is /workspace/here", out.stdout)
+            self.assertIn("This space reads old-private (directory Old), plain:", out.stdout)
 
     def test_the_id_reaches_the_briefing_and_the_session_name(self):
         with tempfile.TemporaryDirectory() as t:
@@ -62,7 +62,7 @@ class PreambleLabels(unittest.TestCase):
             def run(proj, *a):
                 return subprocess.run([sys.executable, VERBS, DASH, proj, *a], env=env,
                                       capture_output=True, text=True, timeout=60)
-            self.assertIn("This project's sessions may use the tool packs Hex kit (`aerie tool hexkit`)", run("here", "").stdout)
+            self.assertIn("This space's sessions may use the tool packs Hex kit (`aerie tool hexkit`)", run("here", "").stdout)
             self.assertIn("Dump before you patch.", run("here", "--topic", "tool-hexkit").stdout)
             self.assertNotIn("tool packs", run("other", "").stdout)
             self.assertNotEqual(run("other", "--topic", "tool-hexkit").returncode, 0)

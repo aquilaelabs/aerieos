@@ -118,7 +118,7 @@ class Move(unittest.TestCase):
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=2 << 30)):
             why = move.room_for(5 << 30, self.tmp)
         self.assertIn("without the repositories", why)
-        self.assertIn("projects folder on This machine", why)
+        self.assertIn("spaces folder on This machine", why)
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=20 << 30)):
             self.assertEqual(move.room_for(5 << 30, self.tmp), "")
 

@@ -319,12 +319,12 @@ def rename(req):
     # host (set_address); "" leaves the remote where it points.
     address = _field(req, "address").strip()
     if not old or not PROJECT_NAME.fullmatch(old):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     if auth and auth not in ("https", "ssh", "none"):
         return {"error": "that is not an authentication mode"}, 400
     src = WORKSPACE / old
     if not src.is_dir():
-        return {"error": f"{old} is not a project under the workspace"}, 400
+        return {"error": f"{old} is not a space under the workspace"}, 400
     if _field(req, "to").strip() and not shown:
         return {"error": "a name needs at least one letter or digit in it"}, 400
     if token and not TOKEN_RE.fullmatch(token):
@@ -373,7 +373,7 @@ def rename(req):
     elif unlink_mine:
         uid = str(req.get("_uid") or "")
         if not gitcreds.unlink_person(old, uid):
-            return {"error": "you have not given this project a token"}, 400
+            return {"error": "you have not given this space a token"}, 400
         if not gitcreds.givers(old) and not token_helper(old):
             unscope(src)
         moved.append("your token, no longer given to it")
@@ -662,12 +662,12 @@ def deploy_key(project, action, text=""):
     (payload, status). A key made or kept is wired as the project's ssh
     remote to switch to (Deploy key, then Save); it does not switch."""
     if not PROJECT_NAME.fullmatch(project or "") or not (WORKSPACE / project).is_dir():
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     dest = WORKSPACE / project
     name = deploy_key_name(project)
     if action == "key-forget":
         if f"bb-{name}-" in origin_url(dest):
-            return {"error": "this project pushes with that key now: pick the access token or "
+            return {"error": "this space pushes with that key now: pick the access token or "
                              "Disabled and Save first"}, 409
         _, err = _key_helper(["forget", name])
         if err:
@@ -682,9 +682,9 @@ def deploy_key(project, action, text=""):
     url = origin_url(dest)
     host, repo = forges.host_of(url), repo_path_of(url)
     if not host or not repo:
-        return {"error": "this project has no remote on a host to give a deploy key to"}, 400
+        return {"error": "this space has no remote on a host to give a deploy key to"}, 400
     if not isinstance(load_push().get(project), dict):
-        return {"error": "this project was cloned without push rights, so a key would push nothing"}, 400
+        return {"error": "this space was cloned without push rights, so a key would push nothing"}, 400
     if action == "key-store" and "PRIVATE KEY" not in text:
         return {"error": "paste the whole private key, BEGIN and END lines included"}, 400
     pub, err = _key_helper(["make" if action == "key-make" else "store", name],
@@ -718,7 +718,7 @@ def _same_repository(dest, url):
     for sha in tips:
         if run(["git", "-C", str(dest), "cat-file", "-e", f"{sha}^{{commit}}"], timeout=15)["code"] == 0:
             return ""
-    return (f"the repository at {url} shares no commit with this project, so it is not "
+    return (f"the repository at {url} shares no commit with this space, so it is not "
             "this repository at a new address; a different repository is linked with "
             "Unlink and Link")
 
@@ -739,7 +739,7 @@ def set_address(project, dest, url):
     shares no commit with this project."""
     now = origin_url(dest)
     if not now:
-        return "", "this project has no origin remote to point anywhere else"
+        return "", "this space has no origin remote to point anywhere else"
     if busy_name() == project:
         return "", f"a job is working on {project}; let it finish first"
     old_path = repo_path_of(now)
@@ -756,7 +756,7 @@ def set_address(project, dest, url):
         return "", ""
     holder = push_holder(host, new_path.lower())
     if holder and holder != project:
-        return "", f"{holder} already pushes to {host}/{new_path}, and one project pushes to a repository"
+        return "", f"{holder} already pushes to {host}/{new_path}, and one space pushes to a repository"
     # The same remote with its path replaced: the form, the user and an
     # alias stay as they were.
     i = now.rfind(old_path)
@@ -792,16 +792,16 @@ def set_auth(project, dest, mode):
     if mode not in ("https", "ssh", "none"):
         return "", "that is not an authentication mode"
     if not now:
-        return "", "this project has no origin remote to switch"
+        return "", "this space has no origin remote to switch"
     if mode == now:
         return "", ""                       # already there; not worth an error
     if mode == "https" and not token_helper(project):
-        return "", ("there is no access token stored for this project; "
+        return "", ("there is no access token stored for this space; "
                     "set one in the same dialog and it can use it")
     if mode == "ssh":
         url = _remembered_ssh(project)
         if not url:
-            return "", ("this project has no deploy-key remote to go back to: "
+            return "", ("this space has no deploy-key remote to go back to: "
                         "it has only ever used https")
     else:
         # As written, NOT folded: a lowercased path would turn
@@ -813,7 +813,7 @@ def set_auth(project, dest, mode):
         # is not a hostname anything can fetch from over https.
         host = forges.host_of(origin_url(dest))
         if not repo or not host:
-            return "", "could not read the repository from this project's remote"
+            return "", "could not read the repository from this space's remote"
         # Remembered BEFORE the rewrite, or switching back has nothing to go on.
         if now == "ssh":
             _remember_ssh(project, origin_url(dest))
@@ -855,10 +855,10 @@ HOOK = """#!/bin/sh
 # for push rights on it, so pushing is refused here rather than being allowed
 # to surprise somebody.
 #
-# Push rights are granted once, when a project is cloned, and cannot be turned
-# on afterwards: delete this project and clone it again asking for them. Only
-# one project at a time may push to a given repository.
-echo "refusing to push: this project was cloned without push rights." >&2
+# Push rights are granted once, when a space is cloned, and cannot be turned
+# on afterwards: delete this space and clone it again asking for them. Only
+# one space at a time may push to a given repository.
+echo "refusing to push: this space was cloned without push rights." >&2
 echo "Delete it and clone again with push enabled if that is what you want." >&2
 exit 1
 """
@@ -939,10 +939,10 @@ def trash(req):
     """
     name = _field(req, "name").strip()
     if not name or not PROJECT_NAME.fullmatch(name):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     src = WORKSPACE / name
     if not src.is_dir():
-        return {"error": f"{name} is not a project under the workspace"}, 400
+        return {"error": f"{name} is not a space under the workspace"}, 400
     with _lock:
         if _job["running"]:
             return {"error": f"already {DOING.get(_job['kind'], 'working on')} "
@@ -1341,7 +1341,7 @@ def create(req, env=None):
             holder = push_holder(addr["host"], repo_id)
             if holder:
                 return {"error": f"{holder} already has push rights on "
-                                 f"{addr['host']}/{repo_id}. Only one project "
+                                 f"{addr['host']}/{repo_id}. Only one space "
                                  f"may push to a repository: unlink or delete "
                                  f"that one first, or clone this one without push"}, 409
             # Asked of the host before the right is granted, where the host can
@@ -1370,7 +1370,7 @@ def create(req, env=None):
         # so the dialog stops offering one once a file is picked, and a
         # request carrying both is refused rather than half obeyed.
         if about and _field(req, "archive"):
-            return {"error": "a project started from an archive has no brief: its code is where it starts"}, 400
+            return {"error": "a space started from an archive has no brief: its code is where it starts"}, 400
     # After sanitizing, the only way to fail this is an empty name: every
     # other shape has already been turned into something legal. Kept as the
     # gate rather than replaced by `if not name`, because it is the invariant
@@ -1427,7 +1427,7 @@ def create(req, env=None):
         shutil.rmtree(dest, ignore_errors=True)             # made a moment ago
         forget_token(name)                                  # written a moment ago
         _unmade(name)
-        return {"error": "another project job is already running"}, 409
+        return {"error": "another space job is already running"}, 409
     if want_push:
         grant_push(name, addr["host"], repo_id, "token" if token else "key")
     return {"ok": True, "name": name, "started": True}, 200
@@ -1636,7 +1636,7 @@ class _Refused(Exception):
 
 def _check_budget(names, total):
     if len(names) > MEMBERS_MAX:
-        raise _Refused(f"more than {MEMBERS_MAX} entries: too many for one project")
+        raise _Refused(f"more than {MEMBERS_MAX} entries: too many for one space")
     if total > UNPACKED_MAX:
         raise _Refused(f"unpacks to more than {UNPACKED_MAX // (1 << 30)}GB")
 
@@ -1661,10 +1661,10 @@ def _unzip(src, dest):
             if rel.endswith("/"):
                 continue                      # directories come with their files
             if not _member_ok(rel):
-                raise _Refused(f"{i.filename} would land outside the project")
+                raise _Refused(f"{i.filename} would land outside the space")
             out = dest / rel
             if dest not in out.resolve().parents:
-                raise _Refused(f"{i.filename} would land outside the project")
+                raise _Refused(f"{i.filename} would land outside the space")
             out.parent.mkdir(parents=True, exist_ok=True)
             with z.open(i) as f, open(out, "wb") as g:
                 shutil.copyfileobj(f, g)
@@ -1698,7 +1698,7 @@ def _untar(src, dest):
             if not (m.isfile() or m.isdir() or m.issym()):
                 continue                      # devices, fifos: not source
             if not _member_ok(rel):
-                raise _Refused(f"{m.name} would land outside the project")
+                raise _Refused(f"{m.name} would land outside the space")
             m.name = rel
             keep.append(m)
         # The data filter refuses what a repository never holds (links that
@@ -1765,7 +1765,7 @@ def link(req):
     except OSError:
         here = set()
     if name not in here:
-        return {"error": f"unknown project: {name}"}, 400
+        return {"error": f"unknown space: {name}"}, 400
     dest = str(WORKSPACE / name)
     if run(["git", "-C", dest, "rev-parse", "--is-inside-work-tree"],
            timeout=10)["out"].strip() != "true":
@@ -1835,7 +1835,7 @@ def link(req):
                   lambda: _link(dest, name, forge, host, path, remote,
                                 bool(keyname), pat, helper=helper, token=token,
                                 scheme=addr["scheme"], user=user)):
-        return {"error": "another project job is already running"}, 409
+        return {"error": "another space job is already running"}, 409
     return {"ok": True, "name": name, "started": True}, 200
 
 
@@ -1856,10 +1856,10 @@ def unlink(req):
     """
     name = _field(req, "name").strip()
     if not name or not PROJECT_NAME.fullmatch(name):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     dest = WORKSPACE / name
     if not dest.is_dir():
-        return {"error": f"{name} is not a project under the workspace"}, 400
+        return {"error": f"{name} is not a space under the workspace"}, 400
     if run(["git", "-C", str(dest), "rev-parse", "--is-inside-work-tree"],
            timeout=10)["out"].strip() != "true":
         return {"error": f"{name} is not a git repository"}, 400
@@ -2168,7 +2168,7 @@ def pin(uid, name, on, fresh=False):
     here = _projects_here()
     name = _key(name)
     if name not in here:
-        return {"error": f"unknown project: {name}"}, 400
+        return {"error": f"unknown space: {name}"}, 400
     with lock:
         pins = load_project_pins(uid, fresh)
         names = here.copy() if pins is None else set(pins)
@@ -2250,7 +2250,7 @@ def set_mark(kind, uid, name, value, start=None):
     rest are not lost. (payload, status)."""
     name = _key(name)
     if not name or name not in _projects_here():
-        return {"error": f"unknown project: {name}"}, 400
+        return {"error": f"unknown space: {name}"}, 400
     with lock:
         d = _marks(kind)
         mine = _clean_marks(d.get(str(uid or ""), start))
@@ -2283,7 +2283,7 @@ def rename_group(uid, old, new):
     in use joins the two. (payload, status)."""
     old, new = " ".join(str(old or "").split()), " ".join(str(new or "").split())[:GROUP_MAX]
     if not new:
-        return {"error": "a group needs a name: to empty one, take each project out of it"}, 400
+        return {"error": "a group needs a name: to empty one, take each space out of it"}, 400
     with lock:
         d = _marks("group")
         mine = _clean_marks(d.get(str(uid or "")))
@@ -2438,7 +2438,7 @@ def lock_verb(name, on, by="", admin=False):
     kind: a name-checked write. The sessions it ends are the server's to
     end, which sees every node's. (payload, status)."""
     if not _here(name):
-        return {"error": f"unknown project: {name}"}, 400
+        return {"error": f"unknown space: {name}"}, 400
     name = _key(name)
     with lock:
         locks = load_locks()
@@ -2457,7 +2457,7 @@ def archive_verb(name, on):
     """Archive or unarchive a project, once the server has let this person:
     out of sight, and nothing else. (payload, status)."""
     if not _here(name):
-        return {"error": f"unknown project: {name}"}, 400
+        return {"error": f"unknown space: {name}"}, 400
     name = _key(name)
     with lock:
         names = set(load_archived())
@@ -2477,10 +2477,10 @@ def auth_answer(name):
     and one subprocess per dialog is nothing where one per project per poll
     is not. (payload, status)."""
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     return auth_options(name, d), 200
 
 
@@ -2498,14 +2498,14 @@ def forge_target(name):
     {error} saying what is missing. The token is the controller's to use
     and never leaves it."""
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown project"}
+        return {"error": "unknown space"}
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown project"}
+        return {"error": "unknown space"}
     written = run(["git", "-C", str(d), "config", "--get", "remote.origin.url"], timeout=15)
     url = written["out"].strip() if written["code"] == 0 else ""
     if not url:
-        return {"error": "this project has no remote"}
+        return {"error": "this space has no remote"}
     host, repo = forges.host_of(url), repo_path_of(url)
     forge = forges.forge_of(host)
     stored = token_target(name) or {}
@@ -2513,9 +2513,9 @@ def forge_target(name):
     if not forge.get("kind"):
         return {"error": f"{host or 'its host'} has no API AerieOS knows: git alone reaches it"}
     if not tok:
-        return {"error": "this project has no access token: link one under its settings, Git"}
+        return {"error": "this space has no access token: link one under its settings, Git"}
     if not repo:
-        return {"error": "could not read the repository from this project's remote"}
+        return {"error": "could not read the repository from this space's remote"}
     # The repository the project was linked to, where it has one on record,
     # is the one asked about: the tree's origin is a session's to rewrite,
     # and pointed at another repository on the host it took the project's
@@ -2523,7 +2523,7 @@ def forge_target(name):
     rec = load_push().get(name) or {}
     if rec.get("repo"):
         if (str(rec.get("host") or host).lower(), str(rec["repo"]).lower()) != (str(host).lower(), str(repo).lower()):
-            return {"error": f"this project's origin names {host}/{repo}, not its repository {rec.get('host') or host}/{rec['repo']}: "
+            return {"error": f"this space's origin names {host}/{repo}, not its repository {rec.get('host') or host}/{rec['repo']}: "
                              "set the remote back (git remote set-url origin) before asking its git host"}
         repo = rec["repo"]
     return {"forge": forge, "host": stored.get("host") or host, "repo": repo,
@@ -2564,13 +2564,13 @@ def auth_test(name, typed=""):
     that is gone when this returns.
     """
     if not PROJECT_NAME.fullmatch(name or ""):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     d = WORKSPACE / name
     if not d.is_dir():
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     url = origin_url(d)
     if not url:
-        return {"error": "this project has no remote to test"}, 400
+        return {"error": "this space has no remote to test"}, 400
     # As written, not as get-url rewrites it through a url.insteadOf: the
     # host and the path are the ones a token is filed and asked under.
     written = run(["git", "-C", str(d), "config", "--get", "remote.origin.url"], timeout=15)
@@ -2586,7 +2586,7 @@ def auth_test(name, typed=""):
         if bad:
             return {"error": bad}, 400
         if not repo or not host:
-            return {"error": "could not read the repository from this project's remote"}, 400
+            return {"error": "could not read the repository from this space's remote"}, 400
         scheme = stored.get("scheme") or "https"
         fd, tmp = tempfile.mkstemp(prefix="bb-authtest-")
         q = lambda x: urllib.parse.quote(x, safe="")  # noqa: E731
@@ -2645,7 +2645,7 @@ def auth_test(name, typed=""):
             missing += [m for m in got["missing"] if not (can_push is False and m.startswith("write access"))]
             notes += got["notes"]
         if not may_push(name):
-            notes.append("This project was set up without push rights, so a session's push is "
+            notes.append("This space was set up without push rights, so a session's push is "
                          "refused here whatever the credential may do.")
     finally:
         if tmp:

@@ -43,7 +43,7 @@ TAIL = 4096
 UID = re.compile(r"u_[0-9a-f]{8}")
 TMP = ".bbsync-"
 BBIGNORE = ("AerieOS: each account's Claude transcripts and memories, kept in step "
-            "with the controller's. Not a project.\n")
+            "with the controller's. Not a space.\n")
 
 
 def slug(path):

@@ -31,7 +31,7 @@ await page.waitForSelector('.projtab details[data-sect="projects:archived"]', { 
 await page.evaluate(() => { document.querySelector('.projtab details[data-sect="projects:archived"]').open = true; });
 await page.waitForSelector(row('delta'), { timeout: 15000 });
 ok(await page.$$eval(`${row('delta')} [data-open]`, b => b.length === 1),
-   'a locked project still has a page to open');
+   'a locked space still has a page to open');
 
 await page.evaluate(n => openNotebook(n), 'alpha');
 await nbShown(page);
@@ -45,7 +45,7 @@ ok(await page.$eval('#memSect', d => d.open) && await page.$eval('#memN', e => e
    'the memories start open, with their count on the heading');
 await openFold(page, '#memSect');
 ok(await page.$eval('#memTitle', el => el.textContent === 'Notebook: alpha'),
-   'the panel opens on that project');
+   'the panel opens on that space');
 // On the strip's FIRST tab, whichever that is: the default is read off the
 // strip rather than marked on a button, so reordering the tabs moves it.
 ok(await page.$eval('.pane .nb .nbtabs button', b => b.classList.contains('on'))
@@ -104,7 +104,7 @@ ok(await page.$('#memDrift details[data-sect="memory:drift"]') !== null
 // way a session writes one, and taken away again so the counts below hold.
 {
   const { unlinkSync } = await import('node:fs');
-  writeFileSync(`${MEM}/linker.md`, '---\nname: linker\ndescription: points at one that was renamed\nmetadata:\n  type: project\n---\n\nSee [[tabs]] and [[gone-elsewhere]].\n');
+  writeFileSync(`${MEM}/linker.md`, '---\nname: linker\ndescription: points at one that was renamed\nmetadata:\n  type: space\n---\n\nSee [[tabs]] and [[gone-elsewhere]].\n');
   await page.evaluate(() => notebooks.get('alpha').reloadMemory());
   await page.waitForFunction(() => [...document.querySelectorAll('#memDrift div')]
     .some(d => /gone-elsewhere/.test(d.textContent)), null, { timeout: 10000 });
@@ -319,9 +319,9 @@ const post = (body) => page.evaluate(async b => {
 for (const [what, body] of [
   ['a path climbing out of the memory directory',
    { action: 'save', project: 'alpha', file: '../../../evil.md', text: 'x' }],
-  ['a project name that is really a path',
+  ['a space name that is really a path',
    { action: 'save', project: '../../etc', file: 'MEMORY.md', text: 'x' }],
-  ['a project that does not exist',
+  ['a space that does not exist',
    { action: 'save', project: 'nosuch', file: 'MEMORY.md', text: 'x' }],
   ['a file that is not a memory here',
    { action: 'save', project: 'alpha', file: 'passwd.md', text: 'x' }],
@@ -393,7 +393,7 @@ ok((JSON.parse(readFileSync(`${DIR}/state/roadmap.json`, 'utf8'))
 // memory most often is a session using its own file tools, which increments
 // nothing (roadmap #26).
 writeFileSync(`${MEM}/arrived.md`,
-  '---\nname: arrived\ndescription: written by a session\nmetadata:\n  type: project\n---\n\nnobody pressed anything\n');
+  '---\nname: arrived\ndescription: written by a session\nmetadata:\n  type: space\n---\n\nnobody pressed anything\n');
 await refreshUntil(page, () => [...document.querySelectorAll('#memList .mname')]
   .some(e => e.textContent === 'arrived'));
 ok(true, 'a memory a session writes appears in an open book, with nothing touched');
@@ -406,7 +406,7 @@ ok(true, 'a memory a session writes appears in an open book, with nothing touche
 // hour of typing, so what is stored is put on screen to read and copy from
 // and the two answers are to write over it or to reload deliberately.
 writeFileSync(`${MEM}/clash.md`,
-  '---\nname: clash\ndescription: two writers\nmetadata:\n  type: project\n---\n\nas loaded\n');
+  '---\nname: clash\ndescription: two writers\nmetadata:\n  type: space\n---\n\nas loaded\n');
 await page.evaluate(() => notebooks.get('alpha').reloadMemory());
 await soleMem('clash');
 await page.click('#memList .mem:has(.mname:text-is("clash")) .mEdit');
@@ -417,7 +417,7 @@ await page.$eval(`#memList .mem:has(.mname:text-is("clash")) textarea[data-file]
 // A session writing the same file with its own tools, which is the writer
 // that passes through nothing this module could count.
 writeFileSync(`${MEM}/clash.md`,
-  '---\nname: clash\ndescription: two writers\nmetadata:\n  type: project\n---\n\nwhat the session wrote\n');
+  '---\nname: clash\ndescription: two writers\nmetadata:\n  type: space\n---\n\nwhat the session wrote\n');
 // Save once it is live (the typing wakes it a tick later) and give the
 // refusal's band the patient wait: a flat one ran out under load with the
 // save still in flight (B332).
@@ -472,7 +472,7 @@ ok(!!await page.$('.pane .nb'), 'Escape does not dismiss it; a tab is not a dial
 // The project's page (R218 step 3), its header named for the project.
 ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'notebook'
      && /alpha/.test(document.querySelector('#pane0 .bar.proj .pname')?.textContent || '')),
-   'it is the page on show, its header named for its project');
+   'it is the page on show, its header named for its space');
 // A notebook whose project this account no longer has (deleted) sends no
 // presence beat, which the server answers with a 400 on every poll (B65);
 // its project back, it beats again. Planted and read in one evaluate.
@@ -491,7 +491,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'notebook'
     }finally{ window.fetch = realFetch; state.projects = was; }
   });
   ok(asked[0] === 0 && asked[1] === 1,
-     `a deleted project's notebook sends no presence beat, and one it has again does (${asked.join(' then ')})`);
+     `a deleted space's notebook sends no presence beat, and one it has again does (${asked.join(' then ')})`);
 }
 await page.evaluate(() => hideTab(tabs.find(t => t.kind === 'notebook').id));
 await nbGone(page);

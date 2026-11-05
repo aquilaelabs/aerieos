@@ -155,7 +155,7 @@ if argv and argv[0] == "release":
         print('aerie version [--for DIR] release --why "..."   tag this commit, push the tag and publish the\n'
               "    forge's release (GitHub, Gitea or GitLab), as Release on the Artifacts view does. Under\n"
               "    Agents may: Tag and publish a release: auto releases at once, ask waits for the\n"
-              "    project's owner, deny refuses. A release whose Android APK could not be signed (bb\n"
+              "    space's owner, deny refuses. A release whose Android APK could not be signed (bb\n"
               "    sign status) is refused before the tag; --without-apk releases it anyway, to be\n"
               "    signed after with aerie sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N):\n"
               "    no bump, no changelog section; CI publishes it as a pre-release for the dev channel.\n"
@@ -198,7 +198,7 @@ if argv and argv[0] == "release":
     if r.get("channel"):
         print(f"[builderbot] {r['channel']}", file=sys.stderr)
     if r.get("id") and not r.get("released"):
-        print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}) to release, waiting up "
+        print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}) to release, waiting up "
               "to 15 minutes for Approve in their bell", file=sys.stderr)
         o = waits.outcome(auth, r["id"], "the release was not allowed")
         if o.get("code"):
@@ -296,7 +296,7 @@ if argv and argv[0] == "policy":
     # Read-only on purpose: a session should be able to see the limit it is
     # held to and never to move it.
     print(f"{proj}: {policy_line()}")
-    print("a person changes this with Agents may: Move the version in the project's settings,"
+    print("a person changes this with Agents may: Move the version in the space's settings,"
           " or on its Artifacts view; aerie version set X.Y.Z moves to a later version in one step")
     raise SystemExit(0)
 

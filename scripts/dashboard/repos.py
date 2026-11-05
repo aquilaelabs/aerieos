@@ -257,7 +257,7 @@ def add(key, dirname):
     key, dirname = str(key or ""), str(dirname or "")
     with _lock:
         if not registry.is_repos(key):
-            return {"error": f"{key} is not a project"}
+            return {"error": f"{key} is not a space"}
         if not registry.is_project(dirname):
             return {"error": f"{dirname} is not a repository here"}
         other = project_of(dirname)
@@ -285,7 +285,7 @@ def move(dirname, to):
         if was == to:
             return {"error": f"{registry.label(dirname)} is already in {registry.label(to)}"}
         if not registry.is_repos(to):
-            return {"error": f"{to} is not a project"}
+            return {"error": f"{to} is not a space"}
         if was:
             d = _load()
             d["projects"][was]["members"] = [m for m in d["projects"][was]["members"] if m != dirname]
@@ -333,7 +333,7 @@ def delete(key):
     key = str(key or "")
     with _lock:
         if not registry.is_repos(key):
-            return {"error": f"{key} is not a project"}
+            return {"error": f"{key} is not a space"}
         left = members(key)
         if left:
             return {"error": f"{registry.label(key)} still holds {', '.join(registry.label(m) for m in left)}: "

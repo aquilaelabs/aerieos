@@ -66,7 +66,7 @@ function scannersLastRun(n){
   const st = SCAN_STATE[last.state] || ["", last.state || ""];
   return last.error ? `<span class="pill bad">not run</span> ${esc(last.error)}`
     : `<span class="pill ${st[0]}">${esc(st[1])}</span> ${esc(ago(last.at))}${last.late ? `, ${esc(last.late)}` : ""}${
-        last.projects?.length ? ` over ${last.projects.length} project${last.projects.length === 1 ? "" : "s"}` : ""}${
+        last.projects?.length ? ` over ${last.projects.length} space${last.projects.length === 1 ? "" : "s"}` : ""}${
         last.job ? ` <a href="#" data-scanlog="${esc(last.job)}">its log</a>` : ""}`;
 }
 
@@ -74,16 +74,16 @@ function scannersNodeSection(n){
   const key = `node-${n.node}`;
   const projects = (n.projects || []).length;
   if (n.host_only) return docSection("scanners", key, n.name, "hosts containers only",
-    `<div class="field"><div class="hint">This node hosts containers only and holds no project, so there is nothing here to scan.</div></div>`);
+    `<div class="field"><div class="hint">This node hosts containers only and holds no space, so there is nothing here to scan.</div></div>`);
   if (!n.deployed){
     return docSection("scanners", key, n.name, "not deployed",
-      `<div class="field"><div class="hint">${projects ? `${projects} project${projects === 1 ? "" : "s"} here ${projects === 1 ? "is" : "are"} not scanned until the scanners are deployed.` : "No project is bound to this node; one bound later is scanned here once the scanners are deployed."}</div></div>
+      `<div class="field"><div class="hint">${projects ? `${projects} space${projects === 1 ? "" : "s"} here ${projects === 1 ? "is" : "are"} not scanned until the scanners are deployed.` : "No space is bound to this node; one bound later is scanned here once the scanners are deployed."}</div></div>
        <div class="field"><div class="actbar"><span class="sp"></span><button type="button" class="primary" data-scandeploy="${esc(n.node)}">Deploy</button></div></div>`);
   }
   const behind = Object.keys(n.behind || {});
   const dep = n.deploy_state && !["succeeded", "failed", "canceled"].includes(n.deploy_state) ? "deploying" : "";
   const status = dep ? "deploying" : behind.length ? "update out" : "deployed";
-  const facts = [["Runs", scannersVersions(n.versions)], ["Scans", projects ? (n.projects || []).join(", ") : "nothing yet: no project is bound here"],
+  const facts = [["Runs", scannersVersions(n.versions)], ["Scans", projects ? (n.projects || []).join(", ") : "nothing yet: no space is bound here"],
                  ["Last run", scannersLastRun(n), {html: true}],
                  ["Reports", Object.keys(n.reports || {}).length ? Object.entries(n.reports).map(([k, r]) => `${SCAN_NAMES[k] || k} ${ago(r.at)}`).join(", ") : "none sent yet"]];
   const news = behind.length ? `${behind.map(k => `${SCAN_NAMES[k] || k} ${n.behind[k]}`).join(", ")} ${behind.length === 1 ? "is" : "are"} out: Update pins ${behind.length === 1 ? "it" : "them"} and pulls.` : "";

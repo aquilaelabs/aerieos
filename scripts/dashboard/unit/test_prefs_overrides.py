@@ -50,7 +50,7 @@ class Overrides(unittest.TestCase):
         got = prefs.get("server")
         self.assertEqual((got["makevms"], got["gate"]["roadmap"], got["overrides"]), ("deny", "auto", ["gate.roadmap", "makevms"]))
         self.assertEqual(prefs.get("app")["makevms"], "auto", "the other repository still inherits")
-        self.assertEqual(prefs.get(self.key)["makevms"], "auto", "...and the project's default stands")
+        self.assertEqual(prefs.get(self.key)["makevms"], "auto", "...and the space's default stands")
         # The project's default moves under the one that inherits, not the override.
         prefs.set_prefs("app", scope="project", makevms="ask")
         self.assertEqual((prefs.get("app")["makevms"], prefs.get("server")["makevms"]), ("ask", "deny"))
@@ -90,7 +90,7 @@ class Overrides(unittest.TestCase):
         prefs.adopt(self.key, "app")
         got = prefs.get("app")
         self.assertEqual((got["gate"]["roadmap"], got["devbuild"], got["overrides"]), ("ask", "auto", []),
-                         "the dials moved to the project; the repository inherits them")
+                         "the dials moved to the space; the repository inherits them")
         self.assertEqual((prefs.get("server")["gate"]["roadmap"], prefs.get("server")["devbuild"]), ("ask", "auto"))
 
     def test_a_project_with_no_repository_reads_inherit_as_nothing(self):

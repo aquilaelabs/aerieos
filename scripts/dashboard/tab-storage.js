@@ -70,10 +70,10 @@ function storageHeld(n){
     name: `${role} store`, path: st.path, fs: st.fs || "", slow: !!st.slow, mb: st.slow ? null : (st.used_mb || 0)}));
   if (n.workspace?.path){
     const ws = [...(n.projects || []), n.other || {}].reduce((a, p) => a + (p.workspace || 0), 0);
-    items.push({name: "synced copies", path: n.workspace.path, fs: n.workspace.fs || "", mb: ws, note: "per project below"});
+    items.push({name: "synced copies", path: n.workspace.path, fs: n.workspace.fs || "", mb: ws, note: "per space below"});
   }
   if (n.homes?.path) items.push({name: "the accounts' homes", path: n.homes.path, fs: n.homes.fs || "", mb: n.homes.mb || 0,
-                                 note: "their build caches per project below"});
+                                 note: "their build caches per space below"});
   const dk = n.docker || {};
   if (dk.kinds?.length){
     const total = dk.kinds.reduce((a, k) => a + (k.mb || 0), 0);
@@ -766,8 +766,8 @@ function wireStorageBackups(root, n){
 
 function storageProjects(n, where){
   const rows = [...(n.projects || [])];
-  if (n.other) rows.push({name: "other projects", other: true, ...n.other});
-  if (!rows.length) return `<div class="empty">no project's folders here yet</div>`;
+  if (n.other) rows.push({name: "other spaces", other: true, ...n.other});
+  if (!rows.length) return `<div class="empty">no space's folders here yet</div>`;
   // The ones holding nothing here are one line, not a row of "none" each
   // (R203): four of five read none / 0 MB on a node that held one project.
   const empty = rows.filter(r => !r.other && !r.total);
@@ -777,11 +777,11 @@ function storageProjects(n, where){
   // desk, and on a phone each cell its column's word beside its number,
   // since a column of bare numbers under a name said nothing (B655). An
   // empty cell says so.
-  const tcols = [{label: "Project"}, ...cols.map(w => ({label: w, num: true})), {label: "total", num: true}];
+  const tcols = [{label: "Space"}, ...cols.map(w => ({label: w, num: true})), {label: "total", num: true}];
   const tail = empty.length ? `<div class="field stnone"><div class="sub">${esc(andList(empty.map(r => projLabel(r.name))))} hold${empty.length === 1 ? "s" : ""} nothing here</div></div>` : "";
   if (!shown.length) return tail;
   return tblWrap(tcols, shown.map(r => `<div class="row stack2 stproj${r.other ? " dim" : ""}">${tblLine(tcols, [
-      `<span class="name">${r.other ? "other projects <span class=\"dim\">· ones you cannot see</span>" : esc(projLabel(r.name))}</span>`,
+      `<span class="name">${r.other ? "other spaces <span class=\"dim\">· ones you cannot see</span>" : esc(projLabel(r.name))}</span>`,
       ...cols.map(w => r[w] ? sgb(r[w]) : `<span class="dim">none</span>`), `<b>${sgb(r.total)}</b>`])}</div>`).join(""), "sttbl") + tail;
 }
 
@@ -791,7 +791,7 @@ function storageProjects(n, where){
 // 23 Oct).
 function storagePhones(n){
   const rows = [...(n.phones || [])].sort((a, b) => (b.mb || 0) - (a.mb || 0));
-  const cols = [{label: "Phone"}, {label: "Project"}, {label: "Account"}, {label: "last started"},
+  const cols = [{label: "Phone"}, {label: "Space"}, {label: "Account"}, {label: "last started"},
                 {label: "snapshot", num: true}, {label: "size", num: true}];
   return `<div class="field"><div class="hint">Each is removed on the ${pageLink("emulator", "Emulator page")}, with this node picked.</div></div>`
     + tblWrap(cols, rows.map(p => `<div class="row stack2 stphone">${tblLine(cols, [
@@ -822,8 +822,8 @@ function storageBody(n, where){
   // no loose words at a page's top).
   // A fact's value is short, as a node's head's are, never a sentence.
   const setOn = [["Stores set on", pageLink("nodes", "the Nodes page"), {html: true}]];
-  const byProject = (count, body) => docSection("storage", "projects", "By project", count,
-    `<div class="field"><div class="hint">What each project's folders hold${n ? ` on ${esc(n.name)}` : ""}.${helpIcon("Its synced copy, build cache, artifacts, dev instance data, emulators and the accounts' build caches.")}</div></div>
+  const byProject = (count, body) => docSection("storage", "projects", "By space", count,
+    `<div class="field"><div class="hint">What each space's folders hold${n ? ` on ${esc(n.name)}` : ""}.${helpIcon("Its synced copy, build cache, artifacts, dev instance data, emulators and the accounts' build caches.")}</div></div>
       ${body}`);
   if (!n) return `${pageHead({cls: "toolstate", facts: [["Measured", GHOST], ["Walk", GHOST], ...setOn], actions: storageMeasureBtn(GHOST)})}${skRows(2)}${byProject("", skRows(3))}`;
   const age = !n.measured ? "not measured yet"
@@ -850,7 +850,7 @@ function storageBody(n, where){
     ${storageOther(n)}
     ${storageBackups(n)}
     ${storageDisks(n)}
-    ${byProject(`${(n.projects || []).length} project${(n.projects || []).length === 1 ? "" : "s"}`, storageProjects(n, where))}
+    ${byProject(`${(n.projects || []).length} space${(n.projects || []).length === 1 ? "" : "s"}`, storageProjects(n, where))}
     ${(n.phones || []).length ? docSection("storage", "phones", "Phones", `${n.phones.length}, ${sgb(n.phones.reduce((a, p) => a + (p.mb || 0), 0))}`, storagePhones(n)) : ""}
     ${n.slow?.length ? `<div class="field"><div class="hint warn">Not measured in time: ${esc(n.slow.join(", "))}. A slow share; the next walk tries again.</div></div>` : ""}
   </div>`;

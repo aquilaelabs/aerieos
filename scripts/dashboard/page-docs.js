@@ -192,10 +192,10 @@ function bootPage(hash){
         "sessions open", "updates due", "CI red"].map(l => `<span class="tile"><span class="tv">${skv(1.4)}</span><span class="tl">${l}</span></span>`).join("")}</div></div>
       <div class="field"><div class="homegrid"><section class="hcard"><h3>Attention</h3>${skRows(2)}</section>
         <section class="hcard"><h3>Last jobs</h3>${skRows(3)}</section></div></div>
-      <div class="field"><section class="hsect"><h3>Projects at a glance</h3>${skRows(2)}</section></div>`);
+      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${skRows(2)}</section></div>`);
   else if (key === "projects" && tool === "projects")
     body = doc(`<input type="search" disabled placeholder="name, branch or node"><span class="sp"></span>
-      <span class="actbar"><button type="button" class="ic" disabled>${BIN}</button><button type="button" class="primary" disabled>New project</button></span>`,
+      <span class="actbar"><button type="button" class="ic" disabled>${BIN}</button><button type="button" class="primary" disabled>New space</button></span>`,
       `<div class="field pgridband"><div class="pgrid">${Array.from({length: 6}, (_, j) => skProjectCard(j)).join("")}</div></div>`);
   // The rest: their rows in a floating card, as the pages draw them at a
   // desk (their exact first paints are R218's templates step).

@@ -104,7 +104,7 @@ function nbSigningView({$, nb, project}){
       <div class="sub dim">${esc(about)}${k && !d.remove && !d.file
         ? ` ${k.backed_up ? `Backed up ${esc(ago(k.backed_up))}.` : "Not backed up yet."}` : ""}</div>
       ${never ? `<div class="notice bad">Never backed up: ${mayBackup ? "download a copy and keep it offline"
-        : "an administrator on this project downloads a copy to keep offline"}, since losing it is final.</div>` : ""}
+        : "an administrator on this space downloads a copy to keep offline"}, since losing it is final.</div>` : ""}
       ${retired ? `<div class="sub">Retired: rotated to ${esc(k.retired_for)}. Kept, since the proof and every device before Android 9 still need it.</div>` : ""}
       ${rotated ? `<div class="sub">Rotated from ${esc(k.rotated_from)}: Android 9 and newer see this key, older devices still see ${esc(k.rotated_from)}.</div>` : ""}
       ${k && !d.remove && pw[`${key}:${route}`] ? `<div class="rnsignbar actbar">
@@ -156,7 +156,7 @@ function nbSigningView({$, nb, project}){
           <select id="sgImpRoute" aria-label="the slot it goes in"><option value="">the slot the backup names</option>${
             SIGN_ROUTES.map(([r, w]) => `<option value="${r}">${w}</option>`).join("")}</select>
           <input type="password" id="sgImpPass" autocomplete="off" placeholder="the backup password it was made under, or a keystore's own" aria-label="the backup's or the keystore's password">
-          <div class="sub dim">A backup from a project with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
+          <div class="sub dim">A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
           <div class="actbar"><button type="button" id="sgAddCancel">Cancel</button><button type="button" class="primary" id="sgImpGo" disabled>Import</button></div>
         </div></div>`
       : "";
@@ -165,7 +165,7 @@ function nbSigningView({$, nb, project}){
     const lock = `<div class="field"><div class="rnsign rnsignlock">
       <div>Backup password: ${locked ? "set" : "none"}</div>
       <div class="sub dim">${locked ? "Every key backup asks for it, whoever downloads it."
-        : "Every key backup will ask for it, whoever downloads it."}${mayLock ? "" : " The project's owner sets it."}</div>
+        : "Every key backup will ask for it, whoever downloads it."}${mayLock ? "" : " The space's owner sets it."}</div>
       ${locked ? "" : `<div class="notice warn">No key can be added or made until it has one${mayLock ? ": set it first" : ""}.</div>`}
       ${mayLock && lockOpen ? `<div class="rnsignform">
         ${locked ? `<input type="password" id="sgLockCur" autocomplete="current-password" placeholder="the backup password now" aria-label="the backup password now">` : ""}
@@ -204,8 +204,8 @@ function nbSigningView({$, nb, project}){
     // would stop it, and how the newest went.
     const r = rel || {};
     const relBody = !r.wanted
-      ? `<div class="field"><div class="sub dim">This project's workflows hand over no unsigned APK, so AerieOS signs none of its releases${
-          helpIcon("A workflow that uploads its unsigned release APK as an artifact named bb-release-apk-TAG has it signed on the project's node with the sideload key and attached to the release, with no key or password on GitHub.")}</div></div>`
+      ? `<div class="field"><div class="sub dim">This space's workflows hand over no unsigned APK, so AerieOS signs none of its releases${
+          helpIcon("A workflow that uploads its unsigned release APK as an artifact named bb-release-apk-TAG has it signed on the space's node with the sideload key and attached to the release, with no key or password on GitHub.")}</div></div>`
       : `<div class="field" id="sgRel">
           ${(r.keys || []).map(k => `<div class="rninvite" data-relkey="${esc(k.key)}">${k.package ? `<code>${esc(k.package)}</code> ` : ""}<span class="dim">releases sign with</span>
             <b>${esc(k.key)}</b> <span class="dim">${esc(signFp(k.sha256))}${k.rotated_from ? `, rotated from ${esc(k.rotated_from)}` : ""}</span></div>`).join("")}
@@ -213,7 +213,7 @@ function nbSigningView({$, nb, project}){
           ${(r.failed || []).map(f => `<div class="notice bad">${esc(f.tag)}: ${esc(f.why)}${f.at ? ` <span class="dim">${esc(ago(f.at))}</span>` : ""}</div>`).join("")}
           ${(r.signed || []).slice(0, 3).map(x => `<div class="sub">${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.tag)}</a>` : esc(x.tag)}:
             ${esc((x.files || []).join(", "))} signed with ${esc(x.key)} <span class="dim">${esc(signFp(x.cert))}, ${esc(ago(x.at))}</span></div>`).join("")}
-          <div class="sub dim">The release's APK is built unsigned by its workflow and signed on ${r.node ? `the project's node, ${esc(r.node)}` : "the project's node"}, never in CI: no keystore or password is a GitHub secret.</div>
+          <div class="sub dim">The release's APK is built unsigned by its workflow and signed on ${r.node ? `the space's node, ${esc(r.node)}` : "the space's node"}, never in CI: no keystore or password is a GitHub secret.</div>
           ${why ? "" : r.looking
             ? `<div class="rnsignbar actbar"><button type="button" class="link" id="sgRelGo" disabled>Looking for unsigned APKs…</button></div>`
             : `<div class="rnsignbar actbar"><button type="button" class="link" id="sgRelGo">Look for unsigned APKs now</button></div>`}

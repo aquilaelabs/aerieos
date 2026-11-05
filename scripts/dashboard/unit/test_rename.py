@@ -87,7 +87,7 @@ class Rename(unittest.TestCase):
         self.assertTrue(containers.rename_container("radarr", "radarr").get("same"), "the same name is nothing to do")
         write_json(devapp.FILE, devapp._load() | {"alpha": {"main": {"node": "n1"}}})
         self.assertIn("not a container written here", containers.rename_container("alpha", "beta")["error"],
-                      "a project's container is renamed with its instance named")
+                      "a space's container is renamed with its instance named")
 
     def test_a_projects_container_takes_a_name_of_its_own(self):
         """The operator, 11 Oct: a project's container is named whatever its
@@ -97,7 +97,7 @@ class Rename(unittest.TestCase):
         write_json(devapp.FILE, devapp._load() | {"aquilaeLabs": {"main": {"node": "n1", "compose": "site/compose.yml"},
                                                                    "staging": {"node": "n1"}}})
         devapp.write_env("aquilaeLabs", "PORT=8080\n", "main")
-        self.assertEqual(devapp._pname("aquilaeLabs", "main"), "aquilaelabs", "named for the project until named")
+        self.assertEqual(devapp._pname("aquilaeLabs", "main"), "aquilaelabs", "named for the space until named")
         self.assertIn("is already aquilaeLabs's container", containers.rename_container("aquilaeLabs", "staging", "main")["error"],
                       "not a name another container answers to")
         self.assertIn("radarr already exists", containers.rename_container("aquilaeLabs", "radarr", "main")["error"])
@@ -112,7 +112,7 @@ class Rename(unittest.TestCase):
         self.assertEqual(devapp._pname("aquilaeLabs", "main"), "turing-site", "the compose name is its own now")
         self.assertEqual(devapp.row_named("turing-site"), ("aquilaeLabs", "main"), "aerie devapp --container finds it by it")
         self.assertEqual(devapp.read_env("aquilaeLabs", "main"), "PORT=8080\n", "its env followed the name")
-        self.assertEqual(devapp._pname("aquilaeLabs", "staging"), "staging", "the project's other container is untouched")
+        self.assertEqual(devapp._pname("aquilaeLabs", "staging"), "staging", "the space's other container is untouched")
         # Named back to the project's own default: no name kept.
         r = containers.rename_container("aquilaeLabs", "aquilaeLabs", "main")
         relocate.rename_done(self.q.jobs[r["job"]], "succeeded")

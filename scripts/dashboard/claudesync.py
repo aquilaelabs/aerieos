@@ -78,7 +78,7 @@ def _may(nid, uid, rel):
     if not rel_ok(rel):
         return None, ({"error": "not a transcripts path"}, 400)
     if not project_of(rel.split("/")[0], _held(nid)):
-        return None, ({"error": "not a project this node holds"}, 403)
+        return None, ({"error": "not a space this node holds"}, 403)
     top = root() / uid / "projects"
     p = top / rel
     # A link anywhere on the way would carry a write out of the folder.

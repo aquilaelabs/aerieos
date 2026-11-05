@@ -69,7 +69,7 @@ fun PhoneScreen(store: Store) {
     Pull(got.value == null && got.error == null, reload) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
             Text("This phone", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Ink)
-            Dim("Connect it to a node over Android's Wireless debugging, then lend it to a project: that project's sessions install, run, see and touch its own app here, and anything else still asks you.")
+            Dim("Connect it to a node over Android's Wireless debugging, then lend it to a space: that space's sessions install, run, see and touch its own app here, and anything else still asks you.")
             got.error?.let { Problem(it) }
             if (got.value != null && nodes.isEmpty()) Problem("No node with adb is dialing in: install android-tools on one from the Library.")
             if (node != null) {
@@ -123,7 +123,7 @@ fun PhoneScreen(store: Store) {
 
                 val lease = node.obj("lease")
                 if (connected && node.bool("mine")) {
-                    SectionHead("Lend to a project", inset = false)
+                    SectionHead("Lend to a space", inset = false)
                     if (lease.length() > 0) {
                         val left = if (lease.isNull("left")) "until taken back" else "${lease.int("left") / 60} min left"
                         Panel(Modifier.fillMaxWidth()) {
@@ -138,7 +138,7 @@ fun PhoneScreen(store: Store) {
                         }) { Text("Take back") }
                     } else {
                         val ps = node.strs("lendable")
-                        if (ps.isEmpty()) Problem("No project of yours runs on ${node.str("name")}, so there is none to lend it to.")
+                        if (ps.isEmpty()) Problem("No space of yours runs on ${node.str("name")}, so there is none to lend it to.")
                         else {
                             if (lendTo !in ps) lendTo = ps.first()
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

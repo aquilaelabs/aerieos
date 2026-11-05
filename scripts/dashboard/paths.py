@@ -32,10 +32,10 @@ _moving = {}              # name -> {"to", "started", "error"}
 # name -> (directory under STATE by default, what it holds, as the page says it)
 KINDS = {
     "project-snapshots": ("project-snapshots",
-                          "each project's daily snapshots (R165): one copy of every file that changed"),
-    "job-snapshots": ("snapshots", "the trees jobs are run from, kept a few per project"),
+                          "each space's daily snapshots (R165): one copy of every file that changed"),
+    "job-snapshots": ("snapshots", "the trees jobs are run from, kept a few per space"),
     "images": ("images", "dev-instance images on their way from the node that built them to the one they run on"),
-    "gitrelay": ("gitrelay", "a bare repository per project, through which a node pushes and fetches"),
+    "gitrelay": ("gitrelay", "a bare repository per space, through which a node pushes and fetches"),
     "gitview": ("gitview", "the Git view's working area per repository"),
     "logs": ("logs", "this controller's own logs (boot, dashboard, docker, terminal) and the kept CI runs; job logs are in its database"),
 }
@@ -104,7 +104,7 @@ def problem(name, path):
     if real == ws or real.startswith(ws + "/"):
         # Nodes reach the projects through their synced copies; nothing kept
         # here belongs where a node's writes land (B618, R165).
-        return f"{p} is inside the projects at {WORKSPACE}, where nodes' writes land"
+        return f"{p} is inside the spaces at {WORKSPACE}, where nodes' writes land"
     if real in ("/", "/etc", "/usr", "/bin", "/sbin", "/lib", "/proc", "/sys", "/dev", "/boot"):
         return f"{p} is the system's"
     for other in KINDS:

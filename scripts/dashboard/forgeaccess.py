@@ -383,11 +383,11 @@ def may(project, ab, m=None):
     if m.get("error") and not m.get("has"):
         return False, m["error"]
     if override(project).get(ab) == "deny":
-        return False, (f"{BY_ID[ab]['label']} is turned off for this project (its Permissions, "
+        return False, (f"{BY_ID[ab]['label']} is turned off for this space (its Permissions, "
                        "On the git host): its owner turns it on")
     got = (m.get("has") or {}).get(ab)
     if got is False:
-        return False, (f"this project's token may not: {BY_ID[ab]['label'].lower()} needs "
+        return False, (f"this space's token may not: {BY_ID[ab]['label'].lower()} needs "
                        f"{needs(ab, m.get('kind') or '')} (docs/git-hosts.md)")
     return True, ""
 
@@ -418,7 +418,7 @@ def briefing(project):
         if t.get("error"):
             return ""
         threading.Thread(target=measure, args=(project, t), daemon=True).start()
-        return ("Your git host: not measured yet, so what this project's token may do there is unknown; "
+        return ("Your git host: not measured yet, so what this space's token may do there is unknown; "
                 "`aerie forge whoami` measures it now.")
     if m.get("error") and not m.get("has"):
         return f"Your git host: {m['error']}."
@@ -436,7 +436,7 @@ def briefing(project):
         lines.append("You may: " + "; ".join(a["label"].lower() for a in yes) + ".")
     for a in no:
         if pol[a["id"]] == "deny":
-            lines.append(f"Not: {a['label'].lower()} (turned off for this project; its owner turns it on).")
+            lines.append(f"Not: {a['label'].lower()} (turned off for this space; its owner turns it on).")
         else:
             lines.append(f"Not: {a['label'].lower()}; ask the person to give the token {needs(a['id'], m.get('kind') or '')}.")
     return "\n".join(lines)

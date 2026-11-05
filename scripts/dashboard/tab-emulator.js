@@ -157,10 +157,10 @@ function emuPhonesSaid(phones){
 function emuPhones(d){
   const may = mayToolchains(emuNode);
   const size = mb => mb === null || mb === undefined ? "?" : mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : Math.round(mb) + " MB";
-  const cols = [{label: "Phone"}, {label: "Project"}, {label: "last started"}, {label: "snapshot", num: true},
+  const cols = [{label: "Phone"}, {label: "Space"}, {label: "last started"}, {label: "snapshot", num: true},
                 {label: "size", num: true}, ...(may ? [{act: true, w: "6.5rem"}] : [])];
   const rows = [...d.phones].sort((a, b) => (b.mb || 0) - (a.mb || 0));
-  return `<div class="field"><div class="hint">A phone removed is made again by its project's next <code>aerie emu start</code>, empty: what was installed and signed in on it goes.</div></div>`
+  return `<div class="field"><div class="hint">A phone removed is made again by its space's next <code>aerie emu start</code>, empty: what was installed and signed in on it goes.</div></div>`
     + tblWrap(cols, rows.map(p => `<div class="row stack2 emphone">${tblLine(cols, [
       `<span class="name">${esc(p.name)}</span>${p.running ? ` <span class="pill ok">running</span>` : ""}`,
       esc(projLabel(p.project)), p.running ? "now" : p.ran ? esc(ago(p.ran)) : `<span class="dim">never</span>`,

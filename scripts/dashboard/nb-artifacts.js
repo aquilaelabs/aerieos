@@ -43,7 +43,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     if (src) src.onclick = () => { location.href = "/api/source?project=" + encodeURIComponent(project); };
     // Why Push and Install are ghosted, when they are: the phone is on the
     // project's node and belongs to whoever connected it there.
-    const phoneWhy = !dev ? "no phone is connected on this project's node: connect one in the Phone page, on its node"
+    const phoneWhy = !dev ? "no phone is connected on this space's node: connect one in the Phone page, on its node"
       : !art.mine ? `connected by ${art.owner?.name || "somebody else"}: only they can push to it or install on it`
       : "";
     const inst = art.install || {};
@@ -87,7 +87,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
                ${railAllows("library") ? `Add to it from the ${pageLink("library", "Library")}.`
                  // Not offered a page their grants keep them from (B114).
                  : "An account that may open the Library adds to it there."}</div>`
-            : `<div class="hint">No node: nothing can be compiled for this project here.
+            : `<div class="hint">No node: nothing can be compiled for this space here.
                ${esc(b.why || "")}</div>`,
           {cls: b.node ? (b.gap ? "bad" : "") : "warn"});
         wireSections(el);
@@ -168,8 +168,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     const devNote = rows.some(a => /\d+\.\d+\.\d+-dev\.\d+-[0-9a-f]{7}/.test(a.name))
       ? `<div class="hint dim">${keep
           ? `Each product keeps its newest ${keep} builds; a release and anything pinned stay${
-              helpIcon("The project's settings say how many (Dev builds kept). A signed build counts by its signed copy alone, and older ones are removed as new ones arrive.")}`
-          : "Every dev build is kept: this project's settings say so (Dev builds kept)."}</div>` : "";
+              helpIcon("The space's settings say how many (Dev builds kept). A signed build counts by its signed copy alone, and older ones are removed as new ones arrive.")}`
+          : "Every dev build is kept: this space's settings say so (Dev builds kept)."}</div>` : "";
     // Sections like the rest of the view (the operator, 6 Oct): the files
     // were a band of their own under Version, the one part of the tab that
     // did not fold, and a long list pushed Captures off the screen. The dev
@@ -227,7 +227,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
                 : "install it on the phone, temporarily"}">Push</button>` : ""}
             ${(a.kind === "apk" || a.kind === "aab") && !relWhy && !/-signed\.(apk|aab)$/.test(a.name)
               ? (art.sign_routes || []).map(r => `<button type="button" data-artsign="${i}" data-route="${r}"
-                title="sign it on the project's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
+                title="sign it on the space's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
                   (art.sign_routes || []).length > 1 ? (r === "play" ? " for Play" : " to sideload") : ""}</button>`).join("") : ""}
             ${a.view ? `<button type="button" data-artview="${i}"
                 title="read it here, without downloading it">View</button>` : ""}
@@ -261,9 +261,9 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       capBox.innerHTML = !caps.length ? "" : docSection("artifacts", "captures", "Captures",
         `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
         `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
-           emulator shot, not what the project ships. ${days
+           emulator shot, not what the space ships. ${days
              ? `Each is removed ${days} day${days === 1 ? "" : "s"} after it was taken`
-             : "Kept until somebody removes one"}; the project's settings say how long.</div>`
+             : "Kept until somebody removes one"}; the space's settings say how long.</div>`
         + caps.map((c, i) => `
         <div class="artrow">
           <span class="grow">
@@ -478,7 +478,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     });
     box.innerHTML = all.map(v => docSection("artifacts",
       `version${v.component ? ":" + v.component : ""}`,
-      all.length > 1 ? (v.component || `${projLabel(v.project)} (the project)`) : artTitle("version"),
+      all.length > 1 ? (v.component || `${projLabel(v.project)} (the space)`) : artTitle("version"),
       v.target || "no VERSION file",
       verSection(v) + nb.sectBar(`artifacts:version${v.component ? ":" + v.component : ""}`),
       {cls: v.target ? "" : "warn"})).join("");
@@ -526,7 +526,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     box.querySelectorAll("[data-verunbump]").forEach(b => b.onclick = async () => {
       const comp = b.dataset.verunbump || "";
       const blk = all.find(x => (x.component || "") === comp);
-      if (!await askYes(`Take ${comp ? comp + "'s" : "this project's"} version back `
+      if (!await askYes(`Take ${comp ? comp + "'s" : "this space's"} version back `
                    + `from ${blk?.target} to ${blk?.prev}?\n\n`
                    + `The code stays; ${blk?.target}'s changelog lines return to Unreleased.`)) return;
       box.querySelectorAll("button,select").forEach(x => x.disabled = true);
@@ -555,7 +555,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       const moves = parts.find(([comp, part]) => !comp && windowMove(part, cost));
       if (moves && !await askYes(
             `Bump the ${moves[1]}? This moves the compatibility window.\n\n`
-            + `Sessions on ${cost.projects.length} project${cost.projects.length === 1 ? "" : "s"} `
+            + `Sessions on ${cost.projects.length} space${cost.projects.length === 1 ? "" : "s"} `
             + `(${cost.projects.join(", ")}) end until each node's agent is updated on the Nodes page.`)) return null;
       for (const [comp] of parts) delete verPending[comp];
       if (policy != null) verPolicyPending = null;
@@ -872,7 +872,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
             pattern="[0-9]+\.[0-9]+\.[0-9]+">
           <button type="button" data-veradd>Give it its own version</button>
           <button type="button" data-verask="@fold"
-            title="put the question to this project's session, for
+            title="put the question to this space's session, for
 this directory">Send to ${esc(sendAgent(project).name)}</button>
         </div>
       </details>`;
@@ -961,7 +961,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
       + (windowMove(staged, cost) ? `<div class="verln"><span></span>
            <span class="vermark bad">this moves the compatibility window from ${
              esc(cost.window)} to ${esc((v.next[staged] || "").split(".").slice(0, 2).join("."))
-             }: sessions on ${cost.projects.length} project${cost.projects.length === 1 ? "" : "s"
+             }: sessions on ${cost.projects.length} space${cost.projects.length === 1 ? "" : "s"
              } end until each is updated from the bell</span></div>` : "")
       + line("a build now", f.semver)
       + (v.running ? line("running here", v.running, stale ? "" : "off") : "")
@@ -1016,7 +1016,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
               inputmode="decimal" aria-label="starting version"
               pattern="[0-9]+\.[0-9]+\.[0-9]+">
             <button type="button" data-verinit="${esc(v.component || "")}"${state?.can?.version === false ? " disabled" : ""}
-              title="${state?.can?.version === false ? "moving a project's version is not one of your roles' grants" : "write a VERSION file at this number and commit it"}">Set</button>
+              title="${state?.can?.version === false ? "moving a space's version is not one of your roles' grants" : "write a VERSION file at this number and commit it"}">Set</button>
           </span></div>
         <div class="actbar verbtns">
           <button type="button" data-verask="${esc(v.component || "")}"
@@ -1041,7 +1041,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
     return `<label class="verpol">
       <span>Agent access</span>
       <select id="verPolicy" data-was="${esc(v.policy)}"
-        aria-label="what a session may do with this project's version">
+        aria-label="what a session may do with this space's version">
         ${optionList((v.policies || []).map(o => [o, POLICY_LABEL[o] || o]), verPolicyPending ?? v.policy)}
       </select>${verPolicyPending != null
         ? `<span class="vermark">staged: on Save</span>` : ""}
@@ -1102,7 +1102,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
       }
       else if (j.unbumped) notify(`version returned: ${j.unbumped.was} → ${
         j.unbumped.target}: its changelog is back in Unreleased`);
-      else if (j.created) notify(`${j.created.component || "this project"} `
+      else if (j.created) notify(`${j.created.component || "this space"} `
                                  + `is now ${j.created.target}`);
       return j;
     }catch(e){ notify("version: " + failWords(e), true); }

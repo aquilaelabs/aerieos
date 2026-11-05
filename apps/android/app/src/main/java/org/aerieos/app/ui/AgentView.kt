@@ -114,7 +114,7 @@ private fun placesOf(p: JSONObject): List<JSONObject> {
 /** Why no session may start here, or "" (the page's claudeDeadWhy). */
 private fun deadWhy(p: JSONObject, running: Boolean): String = when {
     p.bool("locked_me") -> lockedWhy(p)
-    p.has("mine") && !p.bool("mine", true) -> "read-only: you hold no role on this project; its owner or an administrator gives you one to work on it"
+    p.has("mine") && !p.bool("mine", true) -> "read-only: you hold no role on this space; its owner or an administrator gives you one to work on it"
     p.str("write_why").isNotBlank() -> p.str("write_why")
     p.str("held").isNotBlank() -> p.str("held")
     p.str("session_at").isBlank() && p.str("session_why").isNotBlank() && !running -> p.str("session_why")
@@ -185,7 +185,7 @@ fun AgentView(api: Api, project: String, status: JSONObject?, reloadStatus: () -
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Column(Modifier.padding(16.dp, 4.dp)) {
-                if (p == null && status != null) Dim("this project is not in the dashboard's list for you")
+                if (p == null && status != null) Dim("this space is not in the dashboard's list for you")
                 if (p != null) {
                     val places = placesOf(p)
                     val several = places.size > 1
@@ -225,7 +225,7 @@ fun AgentView(api: Api, project: String, status: JSONObject?, reloadStatus: () -
             SectionHead("Conversations")
             Column(Modifier.padding(horizontal = 16.dp)) {
                 if (tr.error != null) Problem(tr.error)
-                if (tr.value != null && rows.isEmpty()) Dim("none of yours on this project yet")
+                if (tr.value != null && rows.isEmpty()) Dim("none of yours on this space yet")
             }
         }
         items(rows) { r -> LogRow(api, r, showProject = false) }
@@ -373,7 +373,7 @@ private fun BriefStep(api: Api, project: String, a: Agent, onCancel: () -> Unit,
         title = { Text("First ${a.name} session on $project") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Dim("Build it hands the session this brief as its first prompt; Start without it puts the brief away. Either way it leaves the project's tree, and its notebook keeps it.")
+                Dim("Build it hands the session this brief as its first prompt; Start without it puts the brief away. Either way it leaves the space's tree, and its notebook keeps it.")
                 if (text == null) Loading()
                 else OutlinedTextField(text!!, { text = it }, label = { Text("The brief") },
                                        modifier = Modifier.fillMaxWidth(), minLines = 4, maxLines = 12)
@@ -416,7 +416,7 @@ fun TerminalPane(api: Api, arg: String, label: String, onClose: () -> Unit) {
             TextButton(onClick = onClose) { Text("Close") }
         }
         Column(Modifier.padding(horizontal = 16.dp)) {
-            Dim("Close leaves the session running; End, on the project's Agent view, stops it.")
+            Dim("Close leaves the session running; End, on the space's Agent view, stops it.")
             if (said.isNotBlank()) Problem(said)
         }
         val u = url

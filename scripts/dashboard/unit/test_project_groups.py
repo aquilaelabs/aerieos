@@ -37,7 +37,7 @@ class Groups(unittest.TestCase):
         projects.set_group("u1", "beta", "Games")
         projects.set_group("u2", "alpha", "Clients")
         got, st = projects.delete_group("u1", "Clients")
-        self.assertEqual((st, got["groups"]), (200, {"beta": "Games"}), "the group's projects are in no group")
+        self.assertEqual((st, got["groups"]), (200, {"beta": "Games"}), "the group's spaces are in no group")
         self.assertEqual(projects.load_project_groups("u2"), {"alpha": "Clients"}, "another account's group stays")
         self.assertEqual(projects.delete_group("u1", "Clients")[1], 400, "a group that is not there is said so")
 
@@ -56,7 +56,7 @@ class Groups(unittest.TestCase):
     def test_only_a_project_that_exists(self):
         got, status = projects.set_group("u1", "nope", "Work")
         self.assertEqual(status, 400)
-        self.assertIn("unknown project", got["error"])
+        self.assertIn("unknown space", got["error"])
 
     def test_a_long_name_is_cut(self):
         projects.set_group("u1", "alpha", "x" * 100)
@@ -66,7 +66,7 @@ class Groups(unittest.TestCase):
     def test_colors_start_from_the_projects_and_are_each_accounts(self):
         old = {"alpha": "teal", "beta": ""}
         self.assertEqual(projects.load_marks("color", "u1", start=old), {"alpha": "teal"},
-                         "an account that never picked sees what the projects wore")
+                         "an account that never picked sees what the spaces wore")
         projects.set_mark("color", "u1", "beta", "red", start=old)
         self.assertEqual(projects.load_marks("color", "u1", start=old), {"alpha": "teal", "beta": "red"},
                          "its first pick keeps the rest it started with")

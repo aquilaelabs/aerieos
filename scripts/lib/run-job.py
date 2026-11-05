@@ -25,7 +25,7 @@ if node:
     hit = [n for n in got if n["id"] == node or n["name"] == node]
     if not hit:
         sys.exit(f"[builderbot] ERROR: no node called {node}"
-                 + (" that this session may use: a session sees only the nodes its project builds on"
+                 + (" that this session may use: a session sees only the nodes its space builds on"
                     if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else " (aerie nodes lists them)"))
     nid = hit[0]["id"]
 r = call("/api/v1/jobs", {"action": "run", "project": proj, "role": role, "node": nid,

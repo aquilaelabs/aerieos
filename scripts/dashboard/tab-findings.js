@@ -198,7 +198,7 @@ function renderFindingsInto(i){
   if (!findings || findings.loading){
     // Its template (R218 step 16): the bar's three narrowing controls stand
     // where they will, their boxes shimmering; the findings are on their way.
-    d.setBar(fxBarHtml([], fxState, `<select aria-label="project" disabled><option>all projects</option></select>`, true));
+    d.setBar(fxBarHtml([], fxState, `<select aria-label="space" disabled><option>all spaces</option></select>`, true));
     // As it lands across projects: a project's name over its card.
     d.list.innerHTML = skTpl(`<div class="fxproj"><span class="name">${skv(8)}</span></div>${skRows(6)}`);
     return;
@@ -222,8 +222,8 @@ function renderFindingsInto(i){
   // about the report, not a project to pick among them.
   const projects = Object.keys(perProject).sort((a, b) =>
     (a === "unattributed paths") - (b === "unattributed paths") || a.localeCompare(b));
-  const projSelect = `<select id="fxProject" aria-label="project">
-      ${optionList([["", `all projects · ${all.length}`], ...projects.map(pn => [pn, `${projLabel(pn)} · ${perProject[pn]}`])], fxProject)}
+  const projSelect = `<select id="fxProject" aria-label="space">
+      ${optionList([["", `all spaces · ${all.length}`], ...projects.map(pn => [pn, `${projLabel(pn)} · ${perProject[pn]}`])], fxProject)}
     </select>`;
   // Grouped by project when looking across them, flat when one is chosen:
   // a heading repeating the selector's own value is noise.
@@ -248,7 +248,7 @@ function renderFindingsInto(i){
                      fxState, projSelect));
   d.list.innerHTML = body;
   const aside = findings.aside ? `${findings.aside} finding(s) are
-      against paths that are no project's and are counted aside rather than
+      against paths that are no space's and are counted aside rather than
       listed${(state?.findings_heads || []).length
         ? ": " + (state.findings_heads || []).map(h =>
             `${esc(h.head)} <span class="dim">× ${h.n}</span>`).join(" · ")

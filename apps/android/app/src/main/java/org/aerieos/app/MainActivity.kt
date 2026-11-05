@@ -261,7 +261,7 @@ fun AerieApp(openOn: String, activity: MainActivity) {
         }
         val nav = rememberNavController()
         val tabs = listOf(
-            Tab("home", "Projects", Icons.Filled.Home),
+            Tab("home", "Spaces", Icons.Filled.Home),
             Tab("approvals", "Approvals", Icons.Filled.Notifications),
             // Named by the dashboard's rail group it is in, as a rail press
             // is (Machines: Nodes and Storage); the screen keeps its page's name.

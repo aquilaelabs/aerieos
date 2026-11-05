@@ -44,7 +44,7 @@ class Keep(unittest.TestCase):
 
     def test_a_token_with_no_project_is_refused(self):
         self.assertEqual(bbapi.keep_token("bbs_" + base64.urlsafe_b64encode(b"|1|x").decode()),
-                         "the token names no project")
+                         "the token names no space")
 
 
 if __name__ == "__main__":

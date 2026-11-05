@@ -203,7 +203,7 @@ def look(project):
     # project, while nobody who gave one is.
     import gitcreds                                         # noqa: PLC0415
     if not token and gitcreds.STATE and gitcreds.givers(project):
-        err = "paused: nobody who gave this project a token is signed in; it looks again when one is"
+        err = "paused: nobody who gave this space a token is signed in; it looks again when one is"
     for where, kind, val in flows:
         # A moving label is GitHub's: a Gitea or Forgejo runner's labels are
         # its own config, which moves only when its admin moves it.

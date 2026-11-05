@@ -615,7 +615,7 @@ claude_projects_link() {
     fi
     if [ ! -d "$share" ]; then
         mkdir -p "$share" 2>/dev/null || return 0
-        printf 'AerieOS: each account'"'"'s Claude transcripts and memories, shared by the controller and its nodes. Not a project.\n' \
+        printf 'AerieOS: each account'"'"'s Claude transcripts and memories, shared by the controller and its nodes. Not a space.\n' \
             > "$share/.bbignore" 2>/dev/null || true
     fi
     mkdir -p "$target" 2>/dev/null || return 0

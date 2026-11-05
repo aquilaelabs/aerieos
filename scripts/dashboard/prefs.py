@@ -858,7 +858,7 @@ def sees_problem(path):
         return (f"{path} is not a place on a node: a path from the top, in letters, "
                 f"digits, dots, dashes and underscores")
     if path.split("/")[1] in SEES_NEVER:
-        return (f"{path} is the machine's own or AerieOS's: a project is shown a share "
+        return (f"{path} is the machine's own or AerieOS's: a space is shown a share "
                 f"or a disk mounted on its node, like /mnt/media")
     return ""
 
@@ -1011,7 +1011,7 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
     `overrides` is {dial name: True to set it apart from the project,
     False to inherit again} (R208 step 6)."""
     if not project:
-        return {"error": "no project"}
+        return {"error": "no space"}
     with _lock:
         d = _load()
         cur = _clean(d["projects"].get(project))
@@ -1093,7 +1093,7 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
                 if sees_problem(p):
                     return {"error": sees_problem(p)}
             if len(set(got)) > SEES_MAX:
-                return {"error": f"a project is shown {SEES_MAX} places at most, not {len(set(got))}"}
+                return {"error": f"a space is shown {SEES_MAX} places at most, not {len(set(got))}"}
             cur["sees"] = _sees_of({"sees": got})
         if reaches is not None:
             got = reaches if isinstance(reaches, list) else str(reaches).split(",")
@@ -1103,7 +1103,7 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
                 if reaches_problem(e["addr"]):
                     return {"error": reaches_problem(e["addr"])}
             if len({e["addr"] for e in got}) > REACH_MAX:
-                return {"error": f"a project's sessions may be let reach {REACH_MAX} addresses at most, "
+                return {"error": f"a space's sessions may be let reach {REACH_MAX} addresses at most, "
                                  f"not {len({e['addr'] for e in got})}"}
             cur["reaches"] = _reaches_of({"reaches": got})
         if build is not None:
@@ -1196,7 +1196,7 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
             # and its session may run a job; "" is the session's own node.
             tn = str(test_node or "").strip()[:40]
             if tn and tn not in _nodes_of(cur) and tn != cur.get("node"):
-                return {"error": "the test node is one of the project's nodes: add it under Node first"}
+                return {"error": "the test node is one of the space's nodes: add it under Node first"}
             cur["test_node"] = tn
         if test_change is not None:
             if test_change not in TEST_CHANGE:

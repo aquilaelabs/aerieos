@@ -142,7 +142,7 @@ class Runs(unittest.TestCase):
         self.assertEqual(edit("/workspace/.worktrees/beta/codex-u_0123abcd/main.py"), 0)
         self.assertEqual(edit("/workspace/beta/main.py"), 0)
         self.assertEqual(edit("/workspace/.worktrees/beta/codex-u_0123abcd/VERSION"), 2)
-        self.assertEqual(edit("/workspace/gamma/main.py"), 2, "a project it does not hold is still walled")
+        self.assertEqual(edit("/workspace/gamma/main.py"), 2, "a space it does not hold is still walled")
 
     def test_a_copilot_search_runs_the_map_hook_as_claudes_grep_does(self):
         self.assertEqual(self.call("copilot", "pre", {"toolName": "grep", "toolArgs": {"pattern": "def main"}})[0], 0)

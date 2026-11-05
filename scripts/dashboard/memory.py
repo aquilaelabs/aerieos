@@ -521,7 +521,7 @@ def _conflict(p, rev, what):
 def save(project, file, text, rev=None, home=None):
     d = memory_dir(project, home)
     if d is None:
-        return {"error": f"not a project: {project}"}
+        return {"error": f"not a space: {project}"}
     if file == INDEX:
         return {"error": "the index is written from the memories themselves"}
     p = _target(d, file)
@@ -560,7 +560,7 @@ def save_index(project, entries, rev=None, home=None):
     """
     d = memory_dir(project, home)
     if d is None:
-        return {"error": f"not a project: {project}"}
+        return {"error": f"not a space: {project}"}
     want = {}
     for e in entries:
         f = e.get("file") if isinstance(e, dict) else None
@@ -619,7 +619,7 @@ def create(project, name, title, hook, mtype, body, home=None):
     """
     d = memory_dir(project, home)
     if d is None:
-        return {"error": f"not a project: {project}"}
+        return {"error": f"not a space: {project}"}
     name = (name or "").strip()
     if not SLUG_RE.match(name) or len(name) > MAX_SLUG:
         return {"error": "a name is lowercase words joined by dashes, "
@@ -689,7 +689,7 @@ def _unindex(d, file):
 def delete(project, file, home=None):
     d = memory_dir(project, home)
     if d is None:
-        return {"error": f"not a project: {project}"}
+        return {"error": f"not a space: {project}"}
     if file == INDEX:
         # Removing it loses the pointer to every memory at once, which is
         # never what one bin icon should mean. It is not offered (there is no

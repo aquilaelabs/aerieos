@@ -521,7 +521,7 @@ function tpDraw(first){
     // row left to uninstall them from.
     const at = await post({action: "where", name: n});
     if (at.error){ tpForm.error = at.error; tpDraw(); return; }
-    if (!await askYes(`Remove the tool pack ${n}? It leaves the catalog, and projects that use it lose it.`)) return;
+    if (!await askYes(`Remove the tool pack ${n}? It leaves the catalog, and spaces that use it lose it.`)) return;
     const j = await post({action: "remove", name: n});
     if (j.error){ tpForm.error = j.error; tpDraw(); return; }
     tpClose(); loadToolchains();

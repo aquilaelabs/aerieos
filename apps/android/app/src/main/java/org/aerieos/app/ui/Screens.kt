@@ -312,20 +312,20 @@ fun HomeScreen(store: Store, onAdmin: (Boolean) -> Unit, onWaiting: (Int) -> Uni
                 }
             }
             item {
-                SectionHead("Projects")
+                SectionHead("Spaces")
                 // A box to find one in, once the list is longer than a screen.
-                if (every.size > 6) OutlinedTextField(find, { find = it }, label = { Text("Find a project") },
+                if (every.size > 6) OutlinedTextField(find, { find = it }, label = { Text("Find a space") },
                     singleLine = true, modifier = Modifier.fillMaxWidth().padding(16.dp, 0.dp, 16.dp, 6.dp))
                 if (every.isEmpty()) Column(Modifier.padding(horizontal = 16.dp)) {
-                    Dim("no project yet: New project on the dashboard makes one") }
+                    Dim("no space yet: New space on the dashboard makes one") }
                 else if (shown.isEmpty()) Column(Modifier.padding(horizontal = 16.dp)) {
-                    Dim("no project's name has \u201c${find.trim()}\u201d in it") }
+                    Dim("no space's name has \u201c${find.trim()}\u201d in it") }
             }
             items(shown, key = { it.str("name") }) { p -> projectRow(p) }
             if (find.isBlank() && kept.isNotEmpty() && kept.size < every.size) item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                     TextButton(onClick = { all = !all }) {
-                        Text(if (all) "Only the ones on my sidebar" else "All ${every.size} projects") }
+                        Text(if (all) "Only the ones on my sidebar" else "All ${every.size} spaces") }
                 }
             }
             if (find.isBlank() && archived.isNotEmpty()) item {
@@ -574,7 +574,7 @@ fun UsersScreen(store: Store) {
                 }
                 val pr = u.obj("profile")
                 Dim(listOf(pr.str("full_name"), pr.str("email")).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "no profile yet" })
-                Dim("projects: " + u.strs("projects").joinToString(", ").ifBlank { "none" })
+                Dim("spaces: " + u.strs("projects").joinToString(", ").ifBlank { "none" })
                 if (open == name) EditAccount(
                     api, u, roles, everyProject,
                     // The owner is the one account that cannot go or be
@@ -587,7 +587,7 @@ fun UsersScreen(store: Store) {
             }
             Hairline()
         }
-        item { Dim("A user sees only the projects listed for them. Everything here is an administrator's, and the owner cannot be removed or demoted.") }
+        item { Dim("A user sees only the spaces listed for them. Everything here is an administrator's, and the owner cannot be removed or demoted.") }
     }
     }
 }
@@ -613,7 +613,7 @@ private fun AddAccount(api: Api, roles: List<String>, onDone: (String) -> Unit) 
                        onDone(try { api.userAdd(name.trim(), pw, role); "${name.trim()} added" }
                               catch (e: Exception) { e.message ?: e.toString() })
                    } }, modifier = Modifier.padding(top = 8.dp)) { Text("Add account") }
-            Dim("Projects are given after it exists: open the row.")
+            Dim("Spaces are given after it exists: open the row.")
         }
     }
 }
@@ -634,8 +634,8 @@ private fun EditAccount(api: Api, u: JSONObject, roles: List<String>, everyProje
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (r in roles) FilterChip(selected = role == r, onClick = { role = r }, label = { Text(r) })
         }
-        Text("Projects", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-        if (everyProject.isEmpty()) Dim("no projects to give yet")
+        Text("Spaces", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+        if (everyProject.isEmpty()) Dim("no spaces to give yet")
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (p in everyProject) FilterChip(
@@ -863,8 +863,8 @@ fun MoreScreen(store: Store, isAdmin: Boolean, nav: NavHostController, onSignOut
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Tell me when Claude can take a message")
-                Dim("a note, naming the project, when a session of yours is waiting on you: " +
-                    "at once where the project's During-a-test-run setting interrupts a run, " +
+                Dim("a note, naming the space, when a session of yours is waiting on you: " +
+                    "at once where the space's During-a-test-run setting interrupts a run, " +
                     "and when its tests finish where it waits for them")
             }
             Switch(checked = turns, enabled = watch, onCheckedChange = { turns = it; watchSaid = "" })

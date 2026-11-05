@@ -571,7 +571,7 @@ const post = body => page.evaluate(async b => {
 }, body);
 const testingOf = async () => (await page.evaluate(async () =>
   (await (await fetch('/api/status')).json()).projects)).find(p => p.name === 'alpha').testing;
-ok((await testingOf()) === null, 'a project with no run going says testing: null on the status poll');
+ok((await testingOf()) === null, 'a space with no run going says testing: null on the status poll');
 const begun = await post({ project: 'alpha', action: 'begin', cmd: 'npm test cards' });
 ok(begun.status === 200 && /^[0-9a-f]{12}$/.test(begun.body.testing?.id || ''),
    `begin answers the run's id (${JSON.stringify(begun.body)})`);
@@ -593,7 +593,7 @@ ok(/^tests running, started just now(?: by \w+)?: npm test cards$/.test(headGoin
    `the Tests view's status line names the run going, on its control row under its tiles: when it started, by whom, the command (${JSON.stringify(headGoing).slice(0, 120)})`);
 await page.waitForFunction(() => /tests running, started just now/.test(document.querySelector('.pane .bar.proj .ptesting')?.textContent || ''),
   null, { timeout: 20000 });
-ok(true, "...and the project's header says tests running, started just now");
+ok(true, "...and the space's header says tests running, started just now");
 const other = await post({ project: 'alpha', action: 'end', id: 'not-this-run' });
 ok(other.body.ended === false && (await testingOf()) !== null,
    "another run's end does not end this one");

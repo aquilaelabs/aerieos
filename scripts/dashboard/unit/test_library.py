@@ -90,7 +90,7 @@ class Rows(unittest.TestCase):
     def test_a_service_is_a_row_with_its_configuration_as_the_page_sees_it(self):
         # R172: the model router as a card, its values from its own status.
         fields = [{"name": "anthropic", "kind": "secret", "label": "Anthropic"}, {"name": "custom", "kind": "list", "label": "Other", "fields": [{"name": "name", "kind": "text"}, {"name": "base", "kind": "text"}, {"name": "key", "kind": "secret"}]},
-                  {"name": "ollama", "kind": "switch", "label": "Ollama"}, {"name": "projects", "kind": "projects", "label": "Projects"}]
+                  {"name": "ollama", "kind": "switch", "label": "Ollama"}, {"name": "projects", "kind": "projects", "label": "Spaces"}]
         status = {"deployed": True, "url": "http://10.0.0.5:4000", "providers": {"anthropic": True, "openai": False},
                   "custom": [{"name": "groq", "base": "https://api.groq.com/v1", "key": True}], "ollama": {"on": True, "models": ["qwen"]},
                   "projects": ["web"], "models": [{"id": "x"}], "models_at": 5, "spend": {"web": 1.5}}

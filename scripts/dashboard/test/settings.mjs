@@ -69,7 +69,7 @@ await page.click('.settingstab #setReset');
 await page.waitForSelector('#resetmodal:not([hidden]) #resetGo', { timeout: 10000 });
 ok(await page.$eval('#resetGo', b => b.disabled)
    && await page.$eval('#resetBody .hint.bad', h => /Project files stay/.test(h.textContent)),
-   '...which opens a dialog with a typed confirmation, the real button asleep, saying project files stay');
+   '...which opens a dialog with a typed confirmation, the real button asleep, saying space files stay');
 await page.fill('#resetWord', 'reset');
 ok(await page.$eval('#resetGo', b => !b.disabled), '...and wakes on the word');
 await page.click('#resetKeep');
@@ -262,7 +262,7 @@ const dbg = await page.evaluate(() => ({ head: document.querySelector('.debugtab
   settings: SETTING_GROUPS.some(g => g.key === 'debug'), projSettings: !!document.getElementById('rnDebugField') }));
 ok(/Debug mode on/.test(dbg.head) && /DEBUG_MODE=1/.test(dbg.head) && dbg.group === 'controller' && dbg.hash === '#/controller/debug'
    && !dbg.tour && !dbg.dev && !dbg.settings && !dbg.projSettings,
-   `the Debug page is the Controller group's beside Settings, saying debug mode is on from DEBUG_MODE, with no tour, Settings and a project's settings carrying none of it (${JSON.stringify(dbg)})`);
+   `the Debug page is the Controller group's beside Settings, saying debug mode is on from DEBUG_MODE, with no tour, Settings and a space's settings carrying none of it (${JSON.stringify(dbg)})`);
 
 // ---- saving ----------------------------------------------------------------
 await page.check('.debugtab #dbgDev');
@@ -278,7 +278,7 @@ const was = await page.$eval(alphaRow, i => i.checked);
 await page.click(alphaRow);
 await page.click('.debugtab #dbgSave');
 await page.waitForFunction(([k, w]) => !!projectList().find(c => c.key === k)?.first?.prefs?.diag === !w, [key, was], { timeout: 30000 });
-ok(true, `...and a project's grant ticked on its row is saved with the section's Save (${key}: diagnostics ${!was})`);
+ok(true, `...and a space's grant ticked on its row is saved with the section's Save (${key}: diagnostics ${!was})`);
 await page.click(alphaRow);
 await page.click('.debugtab #dbgSave');
 await page.waitForFunction(([k, w]) => !!projectList().find(c => c.key === k)?.first?.prefs?.diag === w, [key, was], { timeout: 30000 });
@@ -334,7 +334,7 @@ ok(bare.git_name === 'T. Person', '...for a shell with no project too');
   const text = execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings'], { encoding: 'utf8', env: envs });
   const asJson = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), 'settings', '--json'], { encoding: 'utf8', env: envs }));
   ok(/^  reads\s+beta$/m.test(text) && asJson.reads.join() === 'beta',
-     `aerie settings names the projects this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
+     `aerie settings names the spaces this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: [] }) })).json()));
 }
@@ -346,7 +346,7 @@ await page.waitForSelector('#rnmodal:not([hidden])');
 // project, and lives in that account's record. The invariant the removal was
 // protecting still holds, and is what is asserted: nothing reaches the tree.
 ok(!!(await page.$('#rnGitName')) && !!(await page.$('#rnGitEmail')),
-   'the project dialog asks for a commit author again, as this account\'s own');
+   'the space dialog asks for a commit author again, as this account\'s own');
 await page.fill('#rnGitName', 'Alter Ego');
 await page.fill('#rnGitEmail', 'alter@example.invalid');
 await saveDialog(page);
@@ -361,7 +361,7 @@ const elsewhere = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie
   { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
     DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'beta', BB_ACCOUNT_UID: owner } }));
 ok(elsewhere.git_name === 'T. Person',
-   `...on that project only, with every other one still the Profile's (${elsewhere.git_name})`);
+   `...on that space only, with every other one still the Profile's (${elsewhere.git_name})`);
 
 // ---- global rules (R63), in each project's notebook --------------------------
 // There is no dialog for them (the operator, 2 Oct): they are listed under a
@@ -387,7 +387,7 @@ ok(elsewhere.git_name === 'T. Person',
   const shipped = (await globals()).filter(r => r.builtin).map(r => r.name);
   const rows = await page.$$eval('.nb #rlGlobal .grule .btitle', es => es.map(e => e.textContent.trim()));
   ok(shipped.length >= 3 && shipped.every(n => rows.includes(n)),
-     `a project's Briefing lists every global rule under its own (${rows.join(', ')})`);
+     `a space's Briefing lists every global rule under its own (${rows.join(', ')})`);
 
   // An administrator adds one here, for every project.
   await page.click('.nb #grAddHere');
@@ -396,9 +396,9 @@ ok(elsewhere.git_name === 'T. Person',
   await page.click('.nb .grule.editing .grSave');
   await page.waitForFunction(() => [...document.querySelectorAll('.nb #rlGlobal .grule .btitle')].some(e => e.textContent.trim() === 'no-secrets'),
     null, { timeout: 15000 });
-  ok((await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 'an administrator adds a global rule from a project\'s notebook, stored once');
+  ok((await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 'an administrator adds a global rule from a space\'s notebook, stored once');
   ok(/Never write credentials/.test(await pre('alpha')) && /Never write credentials/.test(await pre('beta')) && /\(global\)/.test(await pre('beta')),
-     '...and every project\'s sessions are handed it, marked global');
+     '...and every space\'s sessions are handed it, marked global');
 
   // Switched off for this project alone, staged until the rules section's Save.
   const row = '.nb #rlGlobal .grule:has(.btitle:text-is("no-secrets"))';
@@ -411,7 +411,7 @@ ok(elsewhere.git_name === 'T. Person',
   await page.waitForFunction(async () => ((await (await fetch('/api/rules?project=alpha')).json()).global || [])
     .some(g => g.name === 'no-secrets' && g.off_here), null, { timeout: 15000, polling: 300 });
   ok(!/Never write credentials/.test(await pre('alpha')) && /Never write credentials/.test(await pre('beta')),
-     'Save turns it off for this project alone: alpha\'s sessions stop being handed it and beta\'s are not touched');
+     'Save turns it off for this space alone: alpha\'s sessions stop being handed it and beta\'s are not touched');
 
   // A shipped one off for every project, from the same place.
   const first = shipped[0];
@@ -421,7 +421,7 @@ ok(elsewhere.git_name === 'T. Person',
   await page.waitForFunction(n => (document.querySelector(`.nb #rlGlobal`)?.textContent || '').includes('off everywhere'), first, { timeout: 15000 });
   ok((await globals()).find(r => r.name === first)?.disabled === true
      && !(await pre('beta')).includes((await globals()).find(r => r.name === first).text.slice(0, 40)),
-     `an administrator turns a shipped rule off for every project from there (${first})`);
+     `an administrator turns a shipped rule off for every space from there (${first})`);
   ok(/never write a credential into a repository/.test(await pre('beta')) && /never a success you did not see/.test(await pre('beta')),
      'what nobody would turn off is in the briefing\'s core instead: no credential in a repository, a true report');
   // Put back as they were.
@@ -480,7 +480,7 @@ ok(elsewhere.git_name === 'T. Person',
   // Settings in its menu by design (R218 step 3), not as a button on its
   // face, and on its back among the named icons (R138, the operator).
   ok(!(await page.$('#projects [data-rn]')) && !(await page.$('.doc .projtab .pcacts:not(.pcfoot) > [data-rn]')),
-     'no project row carries a settings button any more');
+     'no space row carries a settings button any more');
   await page.evaluate(() => openProjectSettings('alpha'));
   await page.waitForSelector('.nb .nbview[data-view="settings"]:not([hidden]) .nbsettings #rnName', { timeout: 15000 });
   const inView = await page.evaluate(() => ({ name: $('rnName').value, modal: $('rnmodal').hidden,
@@ -565,7 +565,7 @@ ok(elsewhere.git_name === 'T. Person',
     typed: $('rnGitName').value, yours: !document.querySelector('.rnbar[data-rnbar="yours"] [data-rnsave]').disabled,
     build: document.querySelector('.rnbar[data-rnbar="build"] [data-rnsave]').disabled }));
   ok(!err && after.typed === 'Typed Not Saved' && after.yours && after.build,
-     `...Build and test's Save stores the build command and nothing of Yours on this project, whose change stays typed and unsaved (${JSON.stringify(after)})`);
+     `...Build and test's Save stores the build command and nothing of Yours on this space, whose change stays typed and unsaved (${JSON.stringify(after)})`);
   await rnSect(page, 'yours');
   await page.click('.rnbar[data-rnbar="yours"] [data-rnrevert]');
   // Revert asks first, in the page's question modal (R121), answered a beat
@@ -574,7 +574,7 @@ ok(elsewhere.git_name === 'T. Person',
   ok(await page.evaluate(was => $('rnGitName').value === was
        && document.querySelector('.rnbar[data-rnbar="yours"] [data-rnrevert]').disabled
        && $('rnBuildCmd').value === 'make one', nameWas),
-     '...and its Revert puts Yours on this project back alone');
+     '...and its Revert puts Yours on this space back alone');
   // A section's Save is its own fields alone, and refuses one somebody else
   // saved since these settings were opened (the operator, 17 Oct: a save in
   // one section put back another section's change, and a session's change
@@ -636,7 +636,7 @@ ok(elsewhere.git_name === 'T. Person',
     const also = await page.evaluate(id => ({ ticked: !!document.querySelector(`#rnNodesMore input[value="${id}"]`)?.checked,
       unsaved: !document.querySelector('.snav [data-spick="runs"] .sunsaved')?.hidden }), other.id);
     ok(also.ticked && !also.unsaved,
-       `a project's second node is ticked under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
+       `a space's second node is ticked under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
     await post('/api/prefs', { project: 'alpha', node: first.id, nodes: [first.id] });
     await post('/api/v1/nodes', { action: 'retire', id: other.id });
   }
@@ -652,7 +652,7 @@ ok(elsewhere.git_name === 'T. Person',
 {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openProjectSettings('alpha'); });
   await page.waitForSelector('#rnSnapDays', { state: 'attached', timeout: 15000 });
-  ok(await page.$eval('#rnSnapDays', i => i.value) === '14', 'a project keeps 14 days of snapshots unless set otherwise');
+  ok(await page.$eval('#rnSnapDays', i => i.value) === '14', 'a space keeps 14 days of snapshots unless set otherwise');
   // Each number beside its unit, not over it (B51: "days" on a line under
   // its box), at a desk and on a phone.
   {
@@ -739,7 +739,7 @@ ok(elsewhere.git_name === 'T. Person',
   ok(before === `${DIR}/state/gitview`, `...each at its default in the state directory (${before})`);
   const inWs = await post('/api/paths', { name: 'gitview', path: `${DIR}/ws/alpha/gv` });
   ok(inWs.status === 400 && /inside the projects/.test(inWs.body.error || ''),
-     `a path in the projects is refused: nodes' writes land there (${inWs.body.error})`);
+     `a path in the spaces is refused: nodes' writes land there (${inWs.body.error})`);
   mkdirSync(`${DIR}/full`, { recursive: true });
   writeFileSync(`${DIR}/full/x`, 'x');
   const full = await post('/api/paths', { name: 'gitview', path: `${DIR}/full` });

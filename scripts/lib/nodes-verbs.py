@@ -31,7 +31,7 @@ def list_():
     rows = [n for n in rows if n["kind"] != "local"]
     if not rows:
         print("no node is enrolled; the dashboard's Nodes page mints a token for one")
-        print("a project with no node can be read and edited here, and cannot be built")
+        print("a space with no node can be read and edited here, and cannot be built")
         raise SystemExit(0)
     for n in rows:
         caps = ",".join(n["capabilities"]) or "-"

@@ -63,7 +63,7 @@ class Carry(unittest.TestCase):
         self.assertEqual(p["web"], {"node": "n_here", "nodes": ["n_here", "n_far"]})
         self.assertEqual(p["api"], {"node": "n_far", "nodes": ["n_far"]})
         self.assertEqual(json.load(open(os.path.join(state, "move.json")))["nodes"], ["n_far"], "the old machine is not waited for")
-        self.assertTrue(any("1 project that ran" in x for x in said), said)
+        self.assertTrue(any("1 space that ran" in x for x in said), said)
 
     def test_nothing_the_moved_state_has_is_replaced(self):
         d = tempfile.mkdtemp()

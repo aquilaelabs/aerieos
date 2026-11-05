@@ -120,18 +120,18 @@ ok((await page.locator('#roadmapList .roadmap[data-step="-1"] .n').first()
    '...and it wears "new" rather than a number, because it has not got one yet');
 await saveList();
 ok(read().projects.alpha.length === 1,
-   'Save writes it, into /config and not into the project');
+   'Save writes it, into /config and not into the space');
 
 
 // ---- what a session adds is marked -------------------------------------
 // Through bb, the same way a session would: one file, two writers.
-execFileSync(BB, ['roadmap', 'add', 'delete a project from the dashboard'],
+execFileSync(BB, ['roadmap', 'add', 'delete a space from the dashboard'],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } });
 await page.evaluate(() => notebooks.get('alpha').reload());
 await page.waitForFunction(() => document.querySelectorAll('#roadmapList .roadmap').length === 2);
 items = await open();
-const mine = items.find(i => i.text.includes('delete a project'));
+const mine = items.find(i => i.text.includes('delete a space'));
 ok(mine && mine.claude,
    'an item a session added through aerie roadmap shows up, marked as Claude\'s');
 ok(items.filter(i => i.claude).length === 1,
@@ -234,7 +234,7 @@ await page.waitForFunction(() => [...document.querySelectorAll('#pane1 .dtab')]
 ok(read().projects.alpha.find(r => String(r.id) === mine.id).sent > 0,
    'sending crosses it off; the record is what was handed over');
 const pane = tmuxCapture('claude-alpha');
-ok(pane.includes('delete a project from the dashboard'),
+ok(pane.includes('delete a space from the dashboard'),
    '...because it really went into the session');
 ok(/\(Also: the shared to-do list/.test(pane),
    '...with the note about the other changes on the same line, not racing it');
@@ -283,7 +283,7 @@ await page.waitForFunction(() => !document.querySelector('.sendbox'),
                            null, { timeout: 20000 });
 const sent = tmuxCapture('claude-alpha');
 ok(!/\/model/.test(sent) && !/\/effort/.test(sent),
-   'a send types no slash command, even with a model set for the project');
+   'a send types no slash command, even with a model set for the space');
 ok(/delete a project/.test(sent), '...and the step itself goes on its own');
 // Back into the notebook: sending lands you in the session's tab, and what
 // follows is about the panel.
@@ -929,10 +929,10 @@ await page.waitForFunction(() => /beta/.test(
   document.querySelector('.pane .doc.on .nb h3')?.textContent || ''), { timeout: 15000 });
 const nbTabs = await page.evaluate(() => tabs.filter(t => t.kind === 'notebook').map(t => t.arg));
 ok(nbTabs.length === 2 && nbTabs.includes('alpha') && nbTabs.includes('beta'),
-   `both projects' notebooks are open at once (${nbTabs})`);
+   `both spaces' notebooks are open at once (${nbTabs})`);
 ok(await page.evaluate(() => tabs.filter(t => t.kind === 'notebook')
      .every(t => tabLabel(t).includes(t.arg))),
-   '...each named for its project');
+   '...each named for its space');
 await page.evaluate(n => openNotebook(n), 'alpha');
 await page.waitForFunction(() => /alpha/.test(
   document.querySelector('.pane .doc.on .nb h3')?.textContent || ''), { timeout: 15000 });
@@ -1123,8 +1123,8 @@ ok(!bbRoadmap('--prompt').includes('a job to finish'),
 
 // ---- what the server refuses -------------------------------------------
 for (const [what, body] of [
-  ['a project that does not exist', { action: 'add', project: 'nosuch', text: 'x' }],
-  ['a project name that is really a path', { action: 'add', project: '../etc', text: 'x' }],
+  ['a space that does not exist', { action: 'add', project: 'nosuch', text: 'x' }],
+  ['a space name that is really a path', { action: 'add', project: '../etc', text: 'x' }],
   ['an empty item', { action: 'add', project: 'alpha', text: '   ' }],
   ['an item nobody has', { action: 'edit', project: 'alpha', id: 9999, text: 'x' }],
   ['an action nobody offers', { action: 'burn', project: 'alpha' }],
@@ -2217,7 +2217,7 @@ ok(await nbOn() === await page.evaluate(() => document.querySelector('.pane .nb 
   // The refusal asked for is the browser's one 403 line, not an error of the page's.
   page.errors.splice(seen, page.errors.length - seen, ...page.errors.slice(seen).filter(e => !/403/.test(e)));
   ok(fin.status === 200 && Array.isArray(fin.body.finished) && add.status === 403,
-     `a project not taken on still lists its finished items, and stays closed to a change (${fin.status}, add ${add.status})`);
+     `a space not taken on still lists its finished items, and stays closed to a change (${fin.status}, add ${add.status})`);
 }
 
 // Steps between items (R168): Move to on a step's row, Split and Fold into

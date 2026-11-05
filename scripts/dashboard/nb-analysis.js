@@ -31,7 +31,7 @@ function nbAnalysisView({$, nb, project}){
     rows.forEach(f => lv[f.level] = (lv[f.level] || 0) + 1);
     viewGlance(hint, Object.keys(lv).sort((a, b) => (LEVEL_ORDER[a] ?? 9) - (LEVEL_ORDER[b] ?? 9)).slice(0, 6)
       .map(l => ({label: `${l}${lv[l] === 1 ? "" : "s"}`, value: lv[l], tone: l === "error" ? "bad" : l === "warning" ? "warn" : ""})),
-      rows.length ? "" : "no findings for this project in the latest scan");
+      rows.length ? "" : "no findings for this space in the latest scan");
     // The same two filters the Analysis tab has, project-fixed: one slice of
     // narrowing shared by both surfaces, so learning one is learning the
     // other. The bar only appears when there is something to narrow.
@@ -161,7 +161,7 @@ function nbAnalysisView({$, nb, project}){
       // width: this is a page of text, not a field.
       body = `<div class="field">
         <div class="hint">Every session started here is handed this, on top of `
-        + `the project's CLAUDE.md.</div>
+        + `the space's CLAUDE.md.</div>
         <textarea id="preText" readonly rows="16" spellcheck="false"
           aria-label="what a session started here is sent">${esc(d.text)}</textarea>
         <div class="sub dim" id="preParts">${
@@ -195,12 +195,12 @@ function nbAnalysisView({$, nb, project}){
     if (!d || (!d.pending && !k)) return "";
     const by = k?.by ? ` by ${k.by}` : "";
     const line = d.pending
-      ? "Waiting for the first session: Start agent on this project opens it to change before it is sent."
+      ? "Waiting for the first session: Start agent on this space opens it to change before it is sent."
       : k.sent ? `Sent as the first session's first prompt ${ago(k.at)}${by}. No session after that one reads it.`
       : `Set aside ${ago(k.at)}${by}, when the first session started without it.`;
     const body = `<div class="field"><div class="hint">${esc(line)}</div>
       <textarea id="briefKept" readonly rows="8" spellcheck="false"
-        aria-label="the brief this project was started from">${esc(d.pending ? d.text : k.text)}</textarea></div>`;
+        aria-label="the brief this space was started from">${esc(d.pending ? d.text : k.text)}</textarea></div>`;
     return docSection("briefing", "brief", briefTitle("brief"),
                       d.pending ? "waiting" : k.sent ? "sent" : "set aside", body, {open: false, fold: true});
   }

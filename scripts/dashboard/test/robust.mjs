@@ -230,7 +230,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
     return { inert: !!tpl?.inert, split: !!tpl?.querySelector('.rsplit > .rlist + .rdetail'),
              labels: [...(tpl?.querySelectorAll('.rdetail .lbl') || [])].map(x => x.textContent.trim()),
              values: tpl?.querySelectorAll('.skv').length || 0, waiting: !!tpl?.classList.contains('loading') }; });
-  ok(t.inert && t.waiting && t.split && t.labels.includes('Account name') && t.labels.includes('Roles and projects') && t.values > 0,
+  ok(t.inert && t.waiting && t.split && t.labels.includes('Account name') && t.labels.includes('Roles and spaces') && t.values > 0,
      `a page waiting on its data draws its own template, its values shimmering, inert until they land (${JSON.stringify(t)})`);
   await page.unroute('**/api/users*');
   await page.evaluate(() => { usersList = null; loadUsers(); });

@@ -108,7 +108,7 @@ class WorkspaceMixin:
             except OSError:
                 continue
         job.say(f"the workspace is kept at {ws} for a look; the next failure of "
-                f"{project or 'this project'} replaces it\n")
+                f"{project or 'this space'} replaces it\n")
         job.outputs.append({"kind": "workspace", "path": ws})
 
     def deliver(self, job, base, outputs):

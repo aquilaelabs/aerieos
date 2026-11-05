@@ -232,7 +232,7 @@ const opts = await page.$$eval('.fxtab #fxProject option',
 // toolstore and vendored-junk are nobody's: attribution only knows valid
 // projects, so everything else is set aside rather than swelling a junk row.
 ok(opts.join(',') === 'alpha,beta,delta,unattributed paths',
-   `the project picker lists valid projects, locked ones included (${opts.join(',')})`);
+   `the space picker lists valid spaces, locked ones included (${opts.join(',')})`);
 ok(/somewhere\/else/.test(await page.$eval('.fxtab', e => e.textContent)),
    'the aside names the paths it could not place, rather than only counting them');
 
@@ -241,7 +241,7 @@ ok(/somewhere\/else/.test(await page.$eval('.fxtab', e => e.textContent)),
 await page.selectOption('.fxtab #fxProject', 'alpha');
 await page.waitForFunction(() => !document.querySelector('.fxtab .fxproj'),
                            { timeout: 10000 });
-ok(true, 'picking a project drops the per-project headings: the picker already says it');
+ok(true, 'picking a space drops the per-space headings: the picker already says it');
 await page.selectOption('.fxtab .fxLevel', 'error');
 // On the condition the assertion is about, not on the row count changing:
 // the count is a proxy that need not move at all, and swallowing its timeout
@@ -340,7 +340,7 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   const uris = rows.map(r => r.locations[0].physicalLocation.artifactLocation.uri);
   ok(uris.some(u => u.startsWith('alpha/')) && uris.some(u => !u.includes('/ws/'))
      && new Set(rows.map(r => r.level)).size >= 2,
-     `...with a finding in a project, one that places nowhere, and more than one level (${uris.join(', ')})`);
+     `...with a finding in a space, one that places nowhere, and more than one level (${uris.join(', ')})`);
   // Never mixed into a true report: two fake rows in a real one would make
   // every number on the card wrong and nothing would say why.
   const beside = (() => {
@@ -371,7 +371,7 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   const quiet = asSession(`${DIR}/ws/ep.silon`);
   const named = ['alpha', 'gamma', 'delta', 'toolstore', 'vendored-junk'].filter(w => quiet.includes(w));
   ok(/No findings for ep\.silon/.test(quiet) && named.length === 0,
-     `a session with no findings of its own is not handed the list of projects that do have them (${
+     `a session with no findings of its own is not handed the list of spaces that do have them (${
        named.join(', ') || 'nothing named'})`);
   const loud = asSession(`${DIR}/ws/alpha`);
   ok(/in alpha/.test(loud) && !/--all/.test(loud),
@@ -467,7 +467,7 @@ print(json.dumps(out))
     .filter(p => (p.issues || []).some(i => /shorten to/.test(i.text)))
     .map(p => p.name).sort());
   ok(JSON.stringify(said) === JSON.stringify(['My.App', 'my-app']),
-     'two projects that shorten to one name are both told so');
+     'two spaces that shorten to one name are both told so');
   ok(await page.evaluate(() => (state.projects || []).find(p => p.name === 'My.App')
        .issues.find(i => /shorten to/.test(i.text)).level === 'warning'),
      '...as a warning: an error would take them out of findings attribution and '
@@ -544,7 +544,7 @@ print(json.dumps(out))
      "the pin by the card's name is pressed in while it is pinned");
   await page.click(`${card} .pcfront [data-pmark]`);
   await page.waitForFunction(() => document.querySelector('.doc.on .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'false', null, { timeout: 15000 });
-  ok(true, '...and pressing it unpins the project');
+  ok(true, '...and pressing it unpins the space');
   await page.evaluate(() => setProjectPinned('alpha', true));
   await page.waitForFunction(() => document.querySelector('.doc.on .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 15000 });
 }
@@ -572,12 +572,12 @@ print(json.dumps(out))
     drawProjects(state.projects);
   }, patch);
   await plant({ session_at: 'shed', session_why: '', locked: false });
-  ok(await line() === '', 'a project whose node takes sessions carries no notice');
+  ok(await line() === '', 'a space whose node takes sessions carries no notice');
   await plant({ session_at: 'shed', locked: false,
                 session_why: "alpha's sessions run on shed, which is offline. Sessions run on a "
                            + 'node and nowhere else (this container carries no Claude Code), so '
                            + 'the way on is that machine coming back, or another node in the '
-                           + "project's settings." });
+                           + "space's settings." });
   ok(/offline/.test(await line()),
      `a node that cannot take one puts the reason on the card (${await line()})`);
   ok(/Sessions run on a node and nowhere else/.test(await line()),
@@ -587,9 +587,9 @@ print(json.dumps(out))
   ok(await page.$eval(`${C} [data-c]`, b => /nowhere else/.test(saidOf(b))),
      '...and a screen reader hears the same words on the ghosted button');
   await plant({ session_at: '', locked: false, node_name: '',
-                session_why: "no node to run a Claude session on: pick one in the project's settings, or enroll one on the Nodes page" });
-  ok(await line() === "no node to run a Claude session on: pick one in the project's settings, or enroll one on the Nodes page",
-     `a project with no node says so on the card, with what to do (${await line()})`);
+                session_why: "no node to run a Claude session on: pick one in the space's settings, or enroll one on the Nodes page" });
+  ok(await line() === "no node to run a Claude session on: pick one in the space's settings, or enroll one on the Nodes page",
+     `a space with no node says so on the card, with what to do (${await line()})`);
   ok(await page.$eval(`${C} [data-c]`, b => /^Claude: no node to run a Claude session on: pick one/.test(saidOf(b))),
      '...while the button carries the fix');
   await plant({ session_at: 'shed', node_name: 'shed', session_why: '',
@@ -601,9 +601,9 @@ print(json.dumps(out))
   ok(/shed/.test(await page.$eval(`${C} .pcfacts`, e => e.textContent)),
      '...and the node is a fact beside the branch, not a sentence');
   const facts = await page.$eval(`${C} .pcfacts`, e => e.textContent);
-  ok(/^P\d+ · /.test(facts), `...and the project's id comes first on the line (${facts})`);
+  ok(/^P\d+ · /.test(facts), `...and the space's id comes first on the line (${facts})`);
   await plant({ locked: true });
-  ok(await line() === '', 'a locked project says nothing: no session there is the decision, not a fault');
+  ok(await line() === '', 'a locked space says nothing: no session there is the decision, not a fault');
   await plant({ locked: false, session_at: '', session_why: '' });
   // Who is here is the card's state: this account's session as the dot
   // and a word, in the session dot's own colors (the operator, 29 Sep).
@@ -710,9 +710,9 @@ print(json.dumps(sorted(ns.siblings_of(mi, '/workspace'))))
 `], { encoding: 'utf8' });
 const sib = JSON.parse(sibOut.trim().split('\n').pop());
 ok(sib.includes('SDK'),
-   'a share mounted beside the projects folder is known to be one');
+   'a share mounted beside the spaces folder is known to be one');
 ok(!sib.includes('AerieOS'),
-   '...while a mount from somewhere else is not, even named after a project');
+   '...while a mount from somewhere else is not, even named after a space');
 ok(!sib.includes('reports') && sib.length === 1,
    '...and a whole-filesystem mount names no directory, so it says nothing');
 
@@ -1300,7 +1300,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
   });
   ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ projects?$/.test(arch.said)
      && /^Unarchive/.test(arch.unarchive) && !arch.menu.some(t => /^Group/.test(t)) && !arch.home && !arch.mark,
-     `an archived project's card is folded away under Archived, Unarchive by its name and no Group on its back, not among the pinned, and not locked (${JSON.stringify(arch)})`);
+     `an archived space's card is folded away under Archived, Unarchive by its name and no Group on its back, not among the pinned, and not locked (${JSON.stringify(arch)})`);
 // Turned over inside the fold, its back is whole on the screen: every
 // control of it above the dock's line and nothing over it, the dock shut
 // as a person pulls it down to work on the page.
@@ -1355,7 +1355,7 @@ await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
 const inTab = await page.$$eval('.doc .projtab .pcard .name', ns => ns.map(n => n.textContent.trim()));
 ok(inTab.length >= 2 && inTab.includes('alpha'),
-   'the Projects page lists every project');
+   'the Spaces page lists every space');
 ok(await page.$eval('.doc .projtab .pcard', r =>
      !!r.querySelector('[data-open]') && !!r.querySelector('[data-s]')
      && !!r.querySelector('[data-kmark]') && !!r.querySelector('[data-lock]') && !!r.querySelector('[data-pmark]')),
@@ -1488,7 +1488,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   await page.press('.doc .projtab .pjgroup .askline input', 'Enter');
   await page.waitForSelector('.doc .projtab .pjgroup[data-group="Customers"] .pcard[data-row="beta"]', { timeout: 15000 });
   ok(!(await page.$('.doc .projtab .pjgroup[data-group="Clients"]')),
-     'the pencil beside a group\'s name renames the group, its projects with it');
+     'the pencil beside a group\'s name renames the group, its spaces with it');
   // Delete group, last on the pencil's box, takes the group away and its
   // projects back to no group (the operator, 19 Oct).
   await page.click('.doc .projtab .pjgroup[data-group="Customers"] [data-pjgrename]');
@@ -1497,14 +1497,14 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   await page.click('.doc .projtab .pjgroup .askline [data-askalso]');
   await page.waitForFunction(() => !document.querySelector('.doc .projtab .pjgroup') &&
     !!document.querySelector('.doc .projtab #pjGrid > .pgrid .pcard[data-row="beta"]'), null, { timeout: 15000 });
-  ok(last, "the pencil's box ends with Delete group, which takes the group away and its projects back to no group");
+  ok(last, "the pencil's box ends with Delete group, which takes the group away and its spaces back to no group");
   await group('beta', 'Clients');
   await page.waitForSelector('.doc .projtab .pjgroup[data-group="Clients"] .pcard[data-row="beta"]', { timeout: 15000 });
   await group('beta', '');
   await page.waitForFunction(() => !document.querySelector('.doc .projtab .pjgroup') &&
     !!document.querySelector('.doc .projtab #pjGrid > .pgrid .pcard[data-row="beta"]'), null, { timeout: 15000 });
   ok(g.head === 'Clients 1' && g.cards.join() === 'beta' && offered.includes('Clients'),
-     `Group puts a project under its group's name on the page, the next ask offering the groups made, and an empty answer takes it back out (${JSON.stringify({ ...g, offered })})`);
+     `Group puts a space under its group's name on the page, the next ask offering the groups made, and an empty answer takes it back out (${JSON.stringify({ ...g, offered })})`);
 }
 
 // Unpinning takes a project off the sidebar and leaves it on the tab, whole.
@@ -1513,7 +1513,7 @@ await page.waitForFunction(
   () => document.querySelector('.doc .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'false', { timeout: 15000 });
 ok(await page.$$eval('.doc .projtab .pcard .name',
      ns => ns.some(n => n.textContent.trim() === 'alpha')),
-   'an unpinned project leaves the sidebar and stays on the page');
+   'an unpinned space leaves the sidebar and stays on the page');
 ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
      r => !!r.querySelector('[data-c]') && !!r.querySelector('[data-open]')),
    '...still carrying every control, which is the whole promise of the pin');
@@ -1525,14 +1525,14 @@ ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
   const sorted = part => part.every((o, i) => !i || part[i - 1].n.localeCompare(o.n) <= 0);
   ok(firstLoose > 0 && order.slice(firstLoose).every(o => !o.pin)
      && sorted(order.slice(0, firstLoose)) && sorted(order.slice(firstLoose)),
-     `the pinned projects come first, each part by name (${order.map(o => `${o.n}${o.pin ? '*' : ''}`).join(', ')})`);
+     `the pinned spaces come first, each part by name (${order.map(o => `${o.n}${o.pin ? '*' : ''}`).join(', ')})`);
 }
 // The tab is a document, not a card adrift in one. It used to draw itself
 // inside .card, rounded, bordered and floating on a darker gutter, while the
 // notebook in the pane beside it filled the pane. One language.
 ok(await page.$eval('.doc .projtab', e => !e.classList.contains('card'))
    && await page.$eval('.doc:has(.projtab)', e => e.classList.contains('flush')),
-   'the Projects page fills its pane the way the notebook does');
+   'the Spaces page fills its pane the way the notebook does');
 await page.evaluate(() => setProjectPinned('alpha', true));
 await page.waitForFunction(
   () => document.querySelector('.doc .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'true', { timeout: 15000 });
@@ -1624,14 +1624,14 @@ await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.doc .projtab .pcard', { timeout: 15000 });
 // The card's menu says Unpin while it is pinned, Pin once it is not.
 const tackLit = () => page.$eval('.doc .projtab .pcard[data-row="beta"] .pcfront [data-pmark]', b => b.getAttribute('aria-pressed') === 'true');
-ok(await tackLit(), 'the Projects page shows beta pinned');
+ok(await tackLit(), 'the Spaces page shows beta pinned');
 await page.evaluate(() => setProjectPinned('beta', false));
 await page.waitForFunction(() =>
   document.querySelector('.doc .projtab .pcard[data-row="beta"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'false',
   { timeout: 5000 });
 ok(true, '...and unpinning it there turns the page\'s menu item to Pin too');
 ok(await page.evaluate(() => !(state.projects.find(p => p.name === 'beta') || {}).pinned),
-   '...with the project unpinned in the same breath');
+   '...with the space unpinned in the same breath');
 await page.evaluate(() => setProjectPinned('beta', true));
 await page.waitForFunction(() =>
   document.querySelector('.doc .projtab .pcard[data-row="beta"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'true',
@@ -1642,7 +1642,7 @@ ok(true, '...and pinning it back lights it again, first click');
 await page.evaluate(() => setProjectPinned('ep.silon', false));
 await page.waitForFunction(() =>
   document.querySelector('.doc .projtab .pcard[data-row="ep.silon"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'false', { timeout: 8000 });
-ok(true, 'a dotted project name unpins too, animation and all');
+ok(true, 'a dotted space name unpins too, animation and all');
 // ...and back, which is the direction that used to be a plain redraw: pinning
 // is watched from the Projects tab, which on a desktop sits in the column
 // beside the sidebar, so the row has to unroll rather than shove the projects
@@ -1695,7 +1695,7 @@ await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnName', el => el.value) === 'alpha',
    'the rename dialog opens on the current name');
 ok(/Folder: \/workspace\/alpha · project #\d+/.test(await page.$eval('#rnHint', e => e.textContent)),
-   'the settings say the folder the project lives in, and its id, under the name');
+   'the settings say the folder the space lives in, and its id, under the name');
 {
   // Sections, every one open by default at every width, with a jump bar
   // over them (the operator, 8 Oct: too much was hidden in folds). One shut
@@ -1748,7 +1748,7 @@ ok(await page.$eval('#rnOwner', s => s.value) === 'test'
    && await page.$('#rnInviteOnly:not([disabled])') !== null
    && /Any administrator can add people/.test(await page.$eval('#rnPeopleLabel .help', e => e.dataset.help))
    && /On it:/.test(await page.$eval('#rnPeople', e => e.textContent)),
-   'the gear shows the project\'s owner, to hand on, and Invite only, off, what that allows behind the ? on People');
+   'the gear shows the space\'s owner, to hand on, and Invite only, off, what that allows behind the ? on People');
 await page.click('#rnInviteOnly');
 ok(await page.$eval('#rnInviteOnly', c => c.checked)
    && (await api('/api/members', { action: 'view', project: 'alpha' })).body.invite_only === false,
@@ -1871,14 +1871,14 @@ await page.click('#rnCancel');
      && relApi.keys?.[0]?.key === 'watch' && /no node to sign on|is offline|has no jdk|has no Android SDK|no GitHub token|not on GitHub|^$/.test(relApi.why || ''),
      `the Signing view's Releases names the key an app's releases sign with, a retired key's successor (${relLine}; ${relApi.why || 'ready'})`);
   ok(await page.$(`${V} #sgRelGo`) !== null && /signed on the project's node.*never in CI/s.test(await page.$eval(`${V} #sgRel`, e => e.textContent)),
-     '...says the APK is signed on the project\'s node and not in CI, and offers a look now');
+     '...says the APK is signed on the space\'s node and not in CI, and offers a look now');
   // What keeps the project's node from a key's work is said in its words,
   // naming the node and what it lacks, never the controller's keytool (B232).
   const signList = (await api('/api/signing', { project: 'alpha', action: 'list' })).body;
   const nodeLine = await page.$eval(`${V} .sgnode`, e => e.textContent.trim()).catch(() => '');
   ok(!/keytool/i.test(await page.$eval(V, e => e.textContent)) && typeof signList.node_why === 'string'
      && (signList.node_why ? nodeLine === signList.node_why : nodeLine === ''),
-     `the Signing view says what keeps the project's node from checking or making a key, in the node's words (${signList.node_why || 'ready'})`);
+     `the Signing view says what keeps the space's node from checking or making a key, in the node's words (${signList.node_why || 'ready'})`);
   // The bell's row before a release, drawn from the poll's own shape.
   await holdPoll(page);
   await page.evaluate(() => { state.attention = [...(state.attention || []), {kind: 'release-sign', id: 'alpha', project: 'alpha',
@@ -1910,7 +1910,7 @@ await page.evaluate(() => { state.invites = [{ id: 7, project: 'beta', by: 'ada'
 ok(await page.$eval('#bellPanel', e => /invited to beta/.test(e.textContent) && /ada invited you to work on beta/.test(e.textContent))
    && await page.$('#bellPanel [data-binvite="7"][data-yes="1"]') !== null
    && await page.$('#bellPanel [data-binvite="7"][data-yes="0"]') !== null,
-   'an invitation to a project is in the bell with Accept and Decline');
+   'an invitation to a space is in the bell with Accept and Decline');
 await freePoll(page);
 await page.evaluate(() => { state.invites = []; drawBell(); toggleBell(false); });
 
@@ -1925,7 +1925,7 @@ ok(/GitHub/.test(await page.$eval('#rnTitle', e => e.textContent))
    && await page.$eval('#rnMineField', el => el.hidden),
    'the chain opens the same dialog on the remote alone, with the rest put away');
 ok(!await page.$eval('#rnTokenField', el => el.hidden),
-   'a project pushing with a deploy key is offered a token');
+   'a space pushing with a deploy key is offered a token');
 const kh = await page.$eval('#rnTokenHint', e => e.textContent);
 ok(/deploy key/.test(kh) && /does nothing until the switch below/.test(kh),
    '...told in a line that setting one does not switch anything by itself');
@@ -1958,10 +1958,10 @@ await page.click('#rnCancel');
 // shuts once that is answered: reopened before then, the late close shut it.
 await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 8000 });
 await page.evaluate(() => renameProject('alpha', 'git'));
-ok(await page.$eval('#rnDelete', e => e.hidden), 'the chain\'s door has no Delete: it is about the remote, not the project');
+ok(await page.$eval('#rnDelete', e => e.hidden), 'the chain\'s door has no Delete: it is about the remote, not the space');
 await page.waitForSelector('#rnAuthField:not([hidden])', { timeout: 8000 });
 ok(await page.$eval('#rnTokenClear', b => b.hidden),
-   'a project with no token stored is offered nothing to clear');
+   'a space with no token stored is offered nothing to clear');
 // The address, for the same repository after its owner is renamed on the
 // host: filled from the remote as written, sent only when changed, and a
 // refusal said in the dialog with the remote left where it was.
@@ -1982,12 +1982,12 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
 // when it is more than one thing; the server's half is unit/test_auth_test.py,
 // so its answer is set here and the draw is what is read.
 {
-  ok(!await page.$eval('#rnTestField', e => e.hidden), 'the chain\'s door offers Test for a project with a remote');
+  ok(!await page.$eval('#rnTestField', e => e.hidden), 'the chain\'s door offers Test for a space with a remote');
   let asked = null;
   const answer = { using: 'its deploy key', mode: 'ssh', read: true, push: false,
                    missing: ['write access for the deploy key: ERROR: The key you are authenticating with has been marked as read only.',
                              'the workflow scope'],
-                   notes: ['This project was set up without push rights.'] };
+                   notes: ['This space was set up without push rights.'] };
   await page.route('**/api/project-auth', async route => {
     const b = JSON.parse(route.request().postData() || '{}');
     if (b.action !== 'test') return route.continue();
@@ -2040,7 +2040,7 @@ v = await seen();
 ok(!v.closed && v.token && v.onKey && !v.onToken,
    '...and clearing opens the field, ghosts the token side and puts the pick back on the key');
 ok(await page.$eval('#rnTokenClear', b => /Keep the stored token/.test(b.textContent)),
-   '...with the way back offered, since nothing has happened to the project yet');
+   '...with the way back offered, since nothing has happened to the space yet');
 
 // Only a token, no key: the side that does not exist is the ghosted one, and
 // the pick cannot leave the side that does.
@@ -2080,7 +2080,7 @@ await page.click('#rnCancel');
   // The editor's and the apps' door is on unless a project closed it
   // (R104, the operator, 22 Oct): switched off here, the section is shut.
   const editorOn = await page.$eval('#rnFtpEditor', c => c.checked);
-  ok(editorOn, '...a project is open to its people\'s editors and apps until its owner closes it (R104)');
+  ok(editorOn, '...a space is open to its people\'s editors and apps until its owner closes it (R104)');
   await page.click('#rnFtpEditor');
   const shut = await page.$eval('#rnFtp', e => ({ port: e.querySelector('.logdays').hidden,
     people: e.querySelector('.rnftppeople').hidden }));
@@ -2126,7 +2126,7 @@ await page.evaluate(() => { if (!document.getElementById('rnmodal').hidden) clos
 await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnTitle', e => e.textContent.trim()) === 'alpha',
-   'the dialog is the project\'s settings, not a rename form wearing its name');
+   'the dialog is the space\'s settings, not a rename form wearing its name');
 ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySelector('[data-rnsave]') && b.querySelector('[data-rnrevert]')
      && [...b.querySelectorAll('button')].every(x => x.disabled))),
    '...each section with its own Save and Revert, dead while nothing in it has changed');
@@ -2134,7 +2134,7 @@ ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySele
 // tab it sits behind the row's fold on a phone, which is where it was not
 // being found. It asks first, and a declined ask moves nothing.
 ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete project/.test(await page.$eval('#rnDelete', e => e.textContent)),
-   'the settings dialog offers Delete project at its foot');
+   'the settings dialog offers Delete space at its foot');
 {
   let asked = '';
   page.answers.push(q => { asked = q.text; return -1; });
@@ -2162,7 +2162,7 @@ ok(await page.$eval('.rnbar[data-rnbar="project"] [data-rnsave]', b => !b.disabl
    'a change wakes its own section\'s Save and no other');
 await page.click('.rnbar[data-rnbar="project"] [data-rnrevert]');
 await page.waitForFunction(() => document.getElementById('rnName').value === projLabel('alpha'), null, { timeout: 5000 });
-ok(!await page.$('#rnColor'), '...and the dialog has no color: a project\'s color is each person\'s own');
+ok(!await page.$('#rnColor'), '...and the dialog has no color: a space\'s color is each person\'s own');
 await page.click('#rnCancel');
 await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 10000 });
 // A color is this account's own (the operator, 18 Oct): picked from a card's
@@ -2177,7 +2177,7 @@ await page.click('.doc .projtab [data-row="alpha"] [data-pcolor]');
 await page.waitForSelector('.doc .projtab [data-row="alpha"] .pcpop', { timeout: 5000 });
 ok(await page.$$eval('.doc .projtab [data-row="alpha"] .pcpop [data-color]', bs =>
      bs.length === 9 && bs[0].dataset.color === '' && bs[0].getAttribute('aria-checked') === 'true'),
-   'the card menu\'s Color offers the colors, none picked for a project this account never colored');
+   'the card menu\'s Color offers the colors, none picked for a space this account never colored');
 // Color again rolls the swatches up, nothing picked.
 await page.click('.doc .projtab [data-row="alpha"] [data-pcolor]');
 await page.waitForFunction(() => !document.querySelector('.doc .projtab [data-row="alpha"] .pcpop'), null, { timeout: 5000 }).catch(() => {});
@@ -2189,7 +2189,7 @@ await page.click('.doc .projtab [data-row="alpha"] .pcpop [data-color="teal"]');
 await page.waitForFunction(() => document.querySelector('.doc .projtab [data-row="alpha"]')?.classList.contains('pc'), null, { timeout: 10000 });
 const kept = await page.evaluate(() => { const p = state.projects.find(x => x.name === 'alpha'); return { mine: p.color, project: p.prefs?.color || '' }; });
 ok(kept.mine === 'teal' && kept.project === '' && !await page.$('.doc .projtab [data-row="alpha"] .pcpop'),
-   `a pick wears it on the card at once and rolls the swatches up, kept as this account's and not the project's (${JSON.stringify(kept)})`);
+   `a pick wears it on the card at once and rolls the swatches up, kept as this account's and not the space's (${JSON.stringify(kept)})`);
 // Back turns the card over without saving anything, so it is no primary,
 // and wears the card's color as the front's buttons do.
 const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback [data-pedit]', b => {
@@ -2302,7 +2302,7 @@ await page.click('.doc .projtab .pcard[data-row="alpha"] [data-rn]');
 await page.waitForSelector('#rnmodal:not([hidden]) > .box.rnproject', { timeout: 10000 });
 ok(await page.evaluate(() => !!document.querySelector('.doc.on .projtab') && $('rnTitle').textContent === 'alpha settings'
      && !document.querySelector('#rnmodal .rnwork') && !$('rnProjectNote').hidden),
-   `a card's Settings opens the project's dialog over the Projects page, its notebook opened before or not (${await page.evaluate(() => location.hash)})`);
+   `a card's Settings opens the space's dialog over the Spaces page, its notebook opened before or not (${await page.evaluate(() => location.hash)})`);
 await page.click('#rnCancel');
 await page.waitForFunction(() => $('rnmodal').hidden, null, { timeout: 5000 });
 await page.evaluate(() => openProjectsTab());
@@ -2395,7 +2395,7 @@ await page.evaluate(() => renameProject('gamma'));
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnReply', e => e.disabled)
    && await page.$eval('#rnAsks', e => e.disabled),
-   'a locked project cannot be given session settings: no session starts there to have them');
+   'a locked space cannot be given session settings: no session starts there to have them');
 ok(/locked by an administrator/.test(await page.$eval('#rnPrefHint', e => e.textContent)),
    '...and says which of the two reasons it is');
 await page.click('#rnCancel');
@@ -2429,13 +2429,13 @@ ok(await page.$eval('#rnmodal', el => el.hidden), 'Cancel closes it');
 ok(!await page.$('.pgrid .pcacts > [data-del]'),
    'the sidebar card has no delete: that one is brushed past on a phone');
 ok(await page.$('.doc .projtab [data-del]'),
-   '...and the Projects page does');
+   '...and the Spaces page does');
 // The thumbtack is on both since 30 Sep (the operator's ask): unpinning
 // from the card it is shown in, pinning back from the tab. It went the
 // delete's way once, on the crowded side of a phone's row; the phone folds
 // it behind the row's more button now.
 ok(await page.$('.doc .projtab [data-pmark]'),
-   'the pin is on the card\'s rows as on the Projects page\'s');
+   'the pin is on the card\'s rows as on the Spaces page\'s');
 
 // Locking, which is now the only gate there is. The eye that excluded a
 // project is gone: two buttons that looked alike, sat side by side and both
@@ -2448,7 +2448,7 @@ await openArchived(page);
 await page.waitForSelector('.pgrid .pcard[data-row="delta"]', { timeout: 10000 });
 const dRow = '.pgrid .pcard[data-row="delta"]';
 ok(await page.$$eval(`${dRow} .pcname .lockmark`, e => e.length) === 1,
-   'a locked project wears a closed padlock after its name');
+   'a locked space wears a closed padlock after its name');
 ok(await page.$eval(`${dRow} [data-c]`, e => e.disabled),
    '...with its Claude button ghosted rather than taken away');
 ok(await page.$(`${dRow} [data-open]`) !== null && await page.$(`${dRow} [data-s]`) !== null,
@@ -2718,9 +2718,9 @@ ok(cmdPin.status === 200 && (cmdPin.body.pinned || []).includes('lx-free'),
 ok(JSON.parse(readFileSync(`${DIR}/state/pinned-commands.json`, 'utf8')).includes('lx-free'),
    '...into pinned-commands.json, which is its own file');
 ok(!Object.values(JSON.parse(readFileSync(`${DIR}/state/pinned-projects.json`, 'utf8'))).flat().includes('lx-free'),
-   '...and not into the projects one');
+   '...and not into the spaces one');
 ok((await api('/api/pin', { name: 'alpha', pinned: true })).status === 400,
-   'a project name is not a command, and the command pin says so');
+   'a space name is not a command, and the command pin says so');
 ok((await api('/api/project-pin', { name: 'lx-free', pinned: true })).status === 400,
    '...and a command name is not a project');
 // The bb commands left the panel (the operator, 17 Oct): every one has its
@@ -2777,7 +2777,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   }, null, { timeout: 10000 }).then(h => h.jsonValue()).then(JSON.parse);
   const menu = await readMenu();
   ok(menu.nodes.join() === '*ubu,fresh,rh' && /^cpu 7%/.test(menu.facts) && /RTX A2000/.test(menu.facts),
-     `pressing Start on a project with several nodes shows them in the node picker, its own node picked, with what that node has (${menu.nodes.join()}; ${menu.facts})`);
+     `pressing Start on a space with several nodes shows them in the node picker, its own node picked, with what that node has (${menu.nodes.join()}; ${menu.facts})`);
   ok(menu.buttons.map(b => `${b.kind}:${b.node}`).join() === 'new:n_ubu' && menu.buttons.every(b => !b.dead)
      && menu.lines[0] === 'Claude: New' && menu.titles.join() === 'Start,Resume',
      `...and a Start band with a line for Claude there, New where this account is signed in, and a Resume band under it (${menu.lines.join(' | ')}; ${menu.titles.join()})`);
@@ -2842,7 +2842,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   await page.waitForFunction(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'), null, { timeout: 10000 });
   await refreshUntil(page, () => { const y = (state?.projects || []).find(p => p.name === 'alpha')?.yours || {};
     return y.model === 'sonnet' && y.effort === 'high'; }, { timeout: 20000 });
-  ok(true, '...and Start saves them as this account\'s for the project, which the launcher reads, and opens the session');
+  ok(true, '...and Start saves them as this account\'s for the space, which the launcher reads, and opens the session');
   await (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
     headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', model: '', effort: '' }) })).json();
@@ -2893,7 +2893,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     await cap(3);
     ok(set.agent_slots === 1 && over.status >= 400 && /lets each person run 1 Claude session at once/.test(over.error)
        && /agent_slots is 1 to 9/.test(bad.error || ''),
-       `a slot past the project's cap is refused at its terminal, and the cap is 1 to 9 (${over.status} ${over.error.slice(0, 80)})`);
+       `a slot past the space's cap is refused at its terminal, and the cap is 1 to 9 (${over.status} ${over.error.slice(0, 80)})`);
   }
   const ended = await page.evaluate(async () => {
     const real = endSession; let asked = null;
@@ -2994,7 +2994,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
       `${e.querySelector('b')?.textContent.trim()} ${e.querySelector('.rmfacts')?.textContent.trim() || ''}`);
   });
   ok(/^ubu cpu 7%/.test(one[0] || '') && /RTX A2000/.test(one[0] || ''),
-     `a project on one node gets that node's name and what it has in its chooser too (${one.join(' | ')})`);
+     `a space on one node gets that node's name and what it has in its chooser too (${one.join(' | ')})`);
   // Who is in a session on a project: one line per account per node, the
   // node in brackets, each with its own working or waiting dot.
   const who = await page.evaluate(() => {
@@ -3010,15 +3010,15 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   // Your session behind what changed since it started says so on the
   // card, once for every node it is on; another person's is theirs.
   const behind = await page.evaluate(() => {
-    state.claude_where = { alpha: [{ who: 'test', node: 'ubu', behind: ['beta added to its project since it started'] },
-                                   { who: 'test', node: 'fresh', behind: ['beta added to its project since it started'] },
+    state.claude_where = { alpha: [{ who: 'test', node: 'ubu', behind: ['beta added to its space since it started'] },
+                                   { who: 'test', node: 'fresh', behind: ['beta added to its space since it started'] },
                                    { who: 'w.peer', node: 'ubu', behind: ['go installed on ubu since it started'] }] };
     const p = state.projects.find(x => x.name === 'alpha');
     const mine = projectNote(p);
     state.claude_where = { alpha: [{ who: 'w.peer', node: 'ubu', behind: ['go installed on ubu since it started'] }] };
     return { mine, theirs: projectNote(p) };
   });
-  ok(behind.mine === '<div class="pnote warn">Restart your session to use what changed: beta added to its project since it started.</div>'
+  ok(behind.mine === '<div class="pnote warn">Restart your session to use what changed: beta added to its space since it started.</div>'
      && !/Restart/.test(behind.theirs),
      `a card says your session is behind what changed, once, and not another person's (${JSON.stringify(behind)})`);
   // Every note in a project's header is a band with its x (the operator, 29
@@ -3079,7 +3079,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   await page.$eval('#rnReads', l => { l.scrollTop = l.scrollHeight; l.dispatchEvent(new Event('scroll')); });
   const readsEnd = await page.$eval('#rnReads', l => [l.classList.contains('scrollup'), l.classList.contains('scrolldown')]);
   ok(reads.room > 0 && reads.down && !reads.up && /inset/.test(reads.shadow) && readsEnd[0] && !readsEnd[1],
-     `a list that scrolls, the project's Reads, draws a hairline on the edge with more past it, and the other at its end (${JSON.stringify({ ...reads, shadow: reads.shadow.slice(0, 30), end: readsEnd })})`);
+     `a list that scrolls, the space's Reads, draws a hairline on the edge with more past it, and the other at its end (${JSON.stringify({ ...reads, shadow: reads.shadow.slice(0, 30), end: readsEnd })})`);
   // To the end once the dialog has stopped growing (B741, B749): its
   // sections fill in after it opens (the Claude section's content is a
   // thousand pixels that land late), so a wait that succeeded at the first

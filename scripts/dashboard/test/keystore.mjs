@@ -22,7 +22,7 @@ const given = await page.evaluate(async () => {
 let mine = await keys({ action: 'mine' });
 // With no install key nothing can be sealed into a person's store: the token
 // is the project's own, and the store has nothing to unlock.
-if (!mine.sealing){ ok(!given.error, `this fixture has no install key: the token is the project's own, and the store has nothing to unlock (skipped; ${given.error || 'given'})`); await done(browser); process.exit(0); }
+if (!mine.sealing){ ok(!given.error, `this fixture has no install key: the token is the space's own, and the store has nothing to unlock (skipped; ${given.error || 'given'})`); await done(browser); process.exit(0); }
 ok(!given.error && (mine.forges || []).length >= 1, `a token given to alpha is in the store (${given.error || (mine.forges || []).length + ' entries'})`);
 ok(mine.own === false && mine.locked === false && mine.for === 3600, `the store is under the install key, open, an hour's window (${JSON.stringify({ own: mine.own, locked: mine.locked, for: mine.for })})`);
 

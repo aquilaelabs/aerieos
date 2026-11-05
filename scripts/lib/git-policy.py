@@ -13,16 +13,16 @@ p = rec.get("gitpol") or {}
 # refused, and that is the thing to know before the policy under it.
 pu = rec.get("push") or {}
 if "rights" in pu:
-    print("push at all:    ", "no: this project was given no push rights; the operator grants them with Link to a git host on its Projects page"
+    print("push at all:    ", "no: this space was given no push rights; the operator grants them with Link to a git host on its Spaces page"
           if not pu["rights"]
-          else "no: its remote is https and the controller holds no credential for it; the operator links one on its Projects page"
+          else "no: its remote is https and the controller holds no credential for it; the operator links one on its Spaces page"
           if pu.get("auth") == "none"
           else "no: it has no origin remote" if not pu.get("auth")
           else f"yes ({'the key its ssh address carries' if pu['auth'] == 'ssh' else 'the token the controller holds'})")
 print("push its branch:", p.get("push", "allow"))
 print("push to main:   ", p.get("main", "deny"))
 print("hold a sensitive push:", p.get("scan", "hold"), "(a push with lines that look like a secret waits on the bell)"
-      if p.get("scan", "hold") == "hold" else "(the project's policy lets a push go unread)")
+      if p.get("scan", "hold") == "hold" else "(the space's policy lets a push go unread)")
 print("Its branches are the ones this tree has, one at a time: a name that is only on the")
 print("remote, a tag, --all, and deleting a branch there stay with the operator whatever")
 print("these say.")

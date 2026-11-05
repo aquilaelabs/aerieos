@@ -151,7 +151,7 @@ class Mirror(unittest.TestCase):
         self.assertEqual(node_cs.project_of("-workspace-alpha", ws, ["alpha"]), "alpha")
         self.assertEqual(node_cs.project_of("-workspace--worktrees-alpha-u-0123abcd", ws, ["alpha"]), "alpha")
         self.assertEqual(node_cs.project_of("-workspace-alphabet", ws, ["alpha"]), "",
-                         "a project whose name starts another's is not claimed")
+                         "a space whose name starts another's is not claimed")
         self.assertEqual(node_cs.project_of("-workspace-beta", ws, ["alpha"]), "")
 
     # -- end to end ----------------------------------------------------------------------
@@ -199,9 +199,9 @@ class Mirror(unittest.TestCase):
 
     def test_only_the_projects_it_holds(self):
         other = os.path.join(self.node_ws, ".claude", UID, "projects", node_cs.slug(f"{self.node_ws}/beta"), "x.jsonl")
-        write(other, "read-only project's\n")
+        write(other, "read-only space's\n")
         self.tick()
-        self.assertEqual(self.agent.ctl.sent, [], "a project it only reads is not sent")
+        self.assertEqual(self.agent.ctl.sent, [], "a space it only reads is not sent")
         q = {"uid": [UID], "path": [node_cs.slug(f"{self.node_ws}/beta") + "/x.jsonl"], "mode": ["whole"]}
         out, code = ctl_cs.put("n1", q, io.BytesIO(b"x"), 1)
         self.assertEqual(code, 403, out)

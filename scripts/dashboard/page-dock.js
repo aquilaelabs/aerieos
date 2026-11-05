@@ -116,7 +116,7 @@ function dockBar(){
   // come and go, so it never scrolls off the start of the line.
   return `<div class="dockline" role="tablist" aria-label="the chat and terminals">
       <span class="dtab dchat${chatOn ? " on" : ""}${waiting ? " unread" : ""}"><button type="button" class="dlbl" data-dchat
-        role="tab" aria-selected="${chatOn && dockUp}" title="${waiting ? `${waiting} unread` : "people and the projects' channels"}">Chat${
+        role="tab" aria-selected="${chatOn && dockUp}" title="${waiting ? `${waiting} unread` : "people and the spaces' channels"}">Chat${
         waiting ? ` <span class="pill">${waiting}</span>` : ""}</button></span>${tabsHtml}
       ${mayShell() ? `<button type="button" class="ic dnew" data-dnew aria-label="a new shell" title="a new terminal at /workspace">+</button>` : ""}
     </div>
@@ -140,7 +140,7 @@ function dockSpend(t){
   const model = p.yours?.open_model || "";
   const tps = model && r.rate?.[model];
   const bits = [r.spend !== null && r.spend !== undefined ? `$${Number(r.spend).toFixed(2)}` : "", tps ? `${tps} tok/s` : ""].filter(Boolean);
-  return bits.length ? ` <span class="dim dspend" title="${esc(`the project's spend through the router so far${tps ? `, and ${model}'s speed on the node` : ""}`)}">${esc(bits.join(" · "))}</span>` : "";
+  return bits.length ? ` <span class="dim dspend" title="${esc(`the space's spend through the router so far${tps ? `, and ${model}'s speed on the node` : ""}`)}">${esc(bits.join(" · "))}</span>` : "";
 }
 
 function wireDockBar(bar){

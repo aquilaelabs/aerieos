@@ -110,9 +110,9 @@ def _not_a_read(argv):
     if verb in READ_FORMS and first in forms:
         return ""
     if verb in READ_FORMS:
-        return (f"aerie {verb} {first} would change it, and a session on the project "
+        return (f"aerie {verb} {first} would change it, and a session on the space "
                 f"that reads it only reads")
-    return f"aerie {verb} acts on the project's own machines, and reading it does not"
+    return f"aerie {verb} acts on the space's own machines, and reading it does not"
 
 
 def admit(me, req):
@@ -150,7 +150,7 @@ def admit(me, req):
     # answers for its own project, which is what a session wants anyway.
     if me.get("session") and argv[:1] == ["findings"] \
             and any(a in ("-a", "--all") for a in argv[1:]):
-        return None, ({"error": "aerie findings --all reads every project in the report, "
+        return None, ({"error": "aerie findings --all reads every space in the report, "
                                 "and a session reads its own: run it without --all"}, 403)
     project = field(req, "project") or me.get("session") or ""
     # A shown name (R154) is taken for its directory (B1): the person names
@@ -174,7 +174,7 @@ def admit(me, req):
             # for another project" sent a session guessing at spellings, and
             # read the same for a project that does not exist.
             if not project or not (WORKSPACE / project).is_dir():
-                return None, ({"error": f"there is no project called {project}"}, 400)
+                return None, ({"error": f"there is no space called {project}"}, 400)
             return None, ({"error": f"{shown(me['session'])} does not read {shown(project)}: its owner adds it "
                                     f"under Reads in {shown(me['session'])}'s settings, and a session "
                                     "started after that sees it"}, 403)
@@ -190,10 +190,10 @@ def admit(me, req):
             and users.uid_of(me) and not users.git_ready(me, project):
         return None, ({"error": "no name and email for commits yet: set them on your "
                                 "Profile (the gear in the dashboard's header), or for "
-                                "this project alone on its notebook's Settings"}, 403)
+                                "this space alone on its notebook's Settings"}, 403)
     if not project or (WORKSPACE / project).name != project \
             or not (WORKSPACE / project).is_dir():
-        return None, ({"error": "not a project"}, 400)
+        return None, ({"error": "not a space"}, 400)
     return project, None
 
 
@@ -210,8 +210,8 @@ def run(me, req, project):
     if argv[:1] == ["git"] and argv[1:2] and argv[1] in gitrelay.VERBS and gitrelay.bad_args(argv[2:]):
         return {"error": gitrelay.bad_args(argv[2:])}, 400
     if argv[:2] == ["git", "push"] and not projects.may_push(project):
-        return {"error": "this project has no push rights: the operator grants them "
-                         "in the clone dialog or with Link to a git host on its Projects page; "
+        return {"error": "this space has no push rights: the operator grants them "
+                         "in the clone dialog or with Link to a git host on its Spaces page; "
                          "aerie git policy says so first"}, 403
     # The tree the session is in: the project directory, or one of its
     # worktrees. Anything else (a path outside the share, a sibling
@@ -232,7 +232,7 @@ def run(me, req, project):
     if argv and argv[0] == "git" and argv[1:2] == ["push"] and me.get("session"):
         pol = prefs.get(project)["gitpol"]
         if pol.get("push") == "deny":
-            return {"error": "this project's git policy does not let a session "
+            return {"error": "this space's git policy does not let a session "
                              "push; the operator pushes from the Git view"}, 403
         # Read out of the tree's files, never by running git in it (B148),
         # and out of the tree the push would RUN in, which is a worktree
@@ -270,7 +270,7 @@ def run(me, req, project):
         for dest in plan["dests"]:
             if dest == main:
                 if pol.get("main") != "allow":
-                    return {"error": f"this project's git policy does not let a session "
+                    return {"error": f"this space's git policy does not let a session "
                                      f"push to {main}; push your branch and say so, "
                                      "and the operator merges from the Git view"}, 403
             elif dest not in local and (dest.startswith("refs/tags/")
@@ -279,7 +279,7 @@ def run(me, req, project):
                                  "release's name here: aerie version release pushes it, and "
                                  "releasing again finishes one whose push failed"}, 403
             elif dest not in local:
-                return {"error": f"this project's git policy lets a session push its own "
+                return {"error": f"this space's git policy lets a session push its own "
                                  f"branches, and there is no {dest} in this tree: that "
                                  "name is on the remote or nowhere, and either way it is "
                                  f"not this session's to write. Push {head} and say what "

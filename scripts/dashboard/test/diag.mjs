@@ -116,7 +116,7 @@ print(uid)`);
   ok(r.status === 403 && /alpha has not been granted the controller's diagnostics: the Debug page grants them/.test(r.body.error || ''),
      `...and on, still refused until the PROJECT is granted it (${r.body.error})`);
   const g = (await call('/api/prefs', { project: 'alpha', diag: true })).body;
-  ok(!g.error && prefsPy('print(p.get("alpha").get("diag"))') === 'True', `the grant is the project's (${g.error || 'set'})`);
+  ok(!g.error && prefsPy('print(p.get("alpha").get("diag"))') === 'True', `the grant is the space's (${g.error || 'set'})`);
   r = await call('/api/diag', {}, asOwner);
   ok(r.status === 200 && Array.isArray(r.body.nodes) && r.body.nodes.some(n => n.name === node.name),
      `...then the owner's session on alpha reads the report (${r.status})`);
@@ -153,7 +153,7 @@ print(json.dumps(m.job_add('system', {'node': '${node.id}'}, 'exec', {'argv': ['
   r = await call('/api/diag', {}, basic('diag.admin', 'diag.admin-pw'));
   ok(r.status === 200, `...as is the administrator with a password, in the dashboard (${r.status})`);
   r = await call('/api/prefs', { project: 'alpha', diag: false }, basic('diag.plain', 'diag.plain-pw'));
-  ok(r.status === 403, `a plain account may not change a project's Debug grants (${r.status})`);
+  ok(r.status === 403, `a plain account may not change a space's Debug grants (${r.status})`);
   const can = acc => call('/api/status', undefined, basic(acc, `${acc}-pw`)).then(x => x.body?.can?.debug);
   ok(await can('diag.admin') === true && await can('diag.plain') === false,
      'the status gives an administrator the debug options and a plain account none');

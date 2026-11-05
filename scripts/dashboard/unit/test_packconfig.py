@@ -16,7 +16,7 @@ FIELDS = [{"name": "api_key", "label": "API key", "kind": "secret", "env": "HEX_
           {"name": "verbose", "label": "Verbose", "kind": "switch", "env": "HEX_VERBOSE"},
           {"name": "hosts", "label": "Hosts", "kind": "list", "env": "HEX_HOSTS",
            "fields": [{"name": "name", "label": "Name", "kind": "text"}, {"name": "key", "label": "Key", "kind": "secret"}]},
-          {"name": "projects", "label": "Projects", "kind": "projects"}]
+          {"name": "projects", "label": "Spaces", "kind": "projects"}]
 
 
 class Keeper(unittest.TestCase):
@@ -33,7 +33,7 @@ class Keeper(unittest.TestCase):
     def test_answers_are_checked_kept_sealed_and_shown_as_set(self):
         self.assertIn("required", packconfig.set_values("n_1", "hexkit", FIELDS, {"region": "eu"})["error"])
         self.assertIn("one of", packconfig.set_values("n_1", "hexkit", FIELDS, {"api_key": "k1", "region": "mars"})["error"])
-        self.assertIn("lists project names", packconfig.set_values("n_1", "hexkit", FIELDS, {"api_key": "k1", "projects": "web"})["error"])
+        self.assertIn("lists space names", packconfig.set_values("n_1", "hexkit", FIELDS, {"api_key": "k1", "projects": "web"})["error"])
         r = packconfig.set_values("n_1", "hexkit", FIELDS, {"api_key": "k1", "region": "eu", "verbose": True,
                                                             "hosts": [{"name": "a", "key": "ka"}], "projects": ["web", "web", "app"]})
         self.assertEqual(r["values"], {"api_key": True, "region": "eu", "verbose": True, "hosts": [{"name": "a", "key": True}], "projects": ["app", "web"]})

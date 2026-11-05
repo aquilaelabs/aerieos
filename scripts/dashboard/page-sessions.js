@@ -53,7 +53,7 @@ function sessionProject(name){
 // the strip (it keeps running), and End stops one, which closing a tab never
 // does. It reads the status poll's sessions, so it draws on every read and
 // paints only what changed.
-const SESS_COLS = [{label: "Session"}, {label: "Project", w: "minmax(0,.7fr)"}, {label: "Node", w: "minmax(0,.6fr)"},
+const SESS_COLS = [{label: "Session"}, {label: "Space", w: "minmax(0,.7fr)"}, {label: "Node", w: "minmax(0,.6fr)"},
                    {label: "Started", w: "7rem"}, {label: "", act: true, w: "10.5rem"}];
 
 function renderSessionsInto(i){

@@ -40,7 +40,7 @@ def session_sudoers(user, accounts=False):
     own users (R125), each of them may start its own session the same way
     (bb-session holds it to its own account), and nothing more."""
     return (f"# Written by the AerieOS agent (R35): the one command {user} may run as root,\n"
-            f"# which starts a session inside a view of this node that holds only its project.\n"
+            f"# which starts a session inside a view of this node that holds only its space.\n"
             f"Defaults!{SESSION_BIN} !use_pty, !lecture\n"
             f"{user} ALL=(root) NOPASSWD: {SESSION_BIN}\n"
             # ...and its worktree, made for it as the tree's owner (R125 step 7).
@@ -766,7 +766,7 @@ class SessionNet:
             error = why
         if error != self.ctr_said:
             self.ctr_said = error
-            log(f"container network: {error}" if error else "container network: each project's containers reach their own and the projects it reads, and nothing else on this node")
+            log(f"container network: {error}" if error else "container network: each space's containers reach their own and the spaces it reads, and nothing else on this node")
         was = SESSNET_STATUS.get("ctr") or {}
         now_is = {"wanted": want, "can": can if want else True, "why": why, "active": want and can and self.ctr_up and not error,
                   "error": error if error != why else "", "bridges": len(self.ctr_bridges) if hasattr(self, "ctr_bridges") else 0}

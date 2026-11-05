@@ -91,7 +91,7 @@ class App(tk.Tk):
         ttk.Label(top, text=f"{c.get('account', '')} on {c.get('url', '')}").pack(side="left")
         ttk.Button(top, text="Sign out", command=self.signout).pack(side="right")
         self.tree = ttk.Treeview(f, columns=("folder", "state"), show="tree headings", height=8)
-        self.tree.heading("#0", text="Project")
+        self.tree.heading("#0", text="Space")
         self.tree.heading("folder", text="Folder")
         self.tree.heading("state", text="State")
         self.tree.pack(fill="both", expand=True, padx=12)
@@ -193,7 +193,7 @@ class App(tk.Tk):
         s = settings.load()
         name = self.selected() or next((n for n in sorted(self.mine, key=str.lower) if n not in s["picked"]), "")
         if not name:
-            messagebox.showinfo("AerieOS", self.mine_said or "You are not on any project yet: an owner adds you on "
+            messagebox.showinfo("AerieOS", self.mine_said or "You are not on any space yet: an owner adds you on "
                                 "its People section, and it shows up here.")
             return
         folder = filedialog.askdirectory(title=f"The folder {name} is kept in")

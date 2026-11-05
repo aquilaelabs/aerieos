@@ -828,7 +828,7 @@ function makeNotebook(project){
     $("nvList").innerHTML = rows.length ? vmGroupsHtml(rows)
       : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
           ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
-          : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this project's settings); a person makes one with New VM."
+          : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this space's settings); a person makes one with New VM."
           : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`;
     wireVms($("nvList"));
   }
@@ -863,7 +863,7 @@ function makeNotebook(project){
     viewGlance($("dkHint"), blind || !n ? "" : dmTiles({running: mine.filter(d => d.running).length, all: mine.length,
       behind: mine.filter(d => (d.images_behind || []).length || d.nginx_to).length, checked: !!got.images_at}),
       blind && n ? `on ${esc(where)}: the daemon did not answer, so the rows cannot say what is running`
-        : n ? `on ${esc(where)}${imgs}` : "no node runs this project's containers yet", "", blind && n ? "warn" : "");
+        : n ? `on ${esc(where)}${imgs}` : "no node runs this space's containers yet", "", blind && n ? "warn" : "");
     const key = JSON.stringify([mine, others, job && job.step, job && job.running, job && (job.log || "").length,
                                 dmView, got.images_at, blind]);
     if (key === dkSeen) return;
@@ -876,7 +876,7 @@ function makeNotebook(project){
     // What the view is for, as its empty state (R119 step 4).
     dmNoteOpen($("dkList"));
     $("dkList").innerHTML = dmGroupsHtml(mine, others, job, blind, project)
-      || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/projects/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`;
+      || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`;
     dmWireRows($("dkList"), got);
   }
   $("dkOpen").onclick = () => openDocker();
@@ -1118,8 +1118,8 @@ function agentButton(p){
     : p.session_why ? p.session_why
     : othersOn(name).length ? `${othersOn(name).join(", ")} also working here, in a checkout of their own: start yours`
     : p.session_node && !agentOn(ag.id, p.session_node) && !live.has(myAgentSession(ag.id, name))
-      ? `${ag.name}: you are not signed in on ${p.session_at}, this project's node. Press for its sign-in`
-    : p.session_at ? `${ag.name}: a session on ${p.session_at}, this project's node`
+      ? `${ag.name}: you are not signed in on ${p.session_at}, this space's node. Press for its sign-in`
+    : p.session_at ? `${ag.name}: a session on ${p.session_at}, this space's node`
     : mine ? `${agentOfSession(tmuxBase(sess))?.agent.name || ag.name}: your session is running; open its tab, restart or end it`
     : p.last_claude ? `${ag.name}: no session running; resume or start one`
     : `${ag.name}: start a session here`;

@@ -252,7 +252,7 @@ class WorkMixin:
         # A project's name, never "." or "..": the old clean-up kept dots, so
         # ".." named the store's parent and root removed it whole.
         if project and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", project):
-            job.say(f"refused: {project!r} is not a project's name\n")
+            job.say(f"refused: {project!r} is not a space's name\n")
             return "failed", 64
         targets = [os.path.join(root, project)] if project else \
                   [os.path.join(root, d) for d in os.listdir(root)]
@@ -343,7 +343,7 @@ class WorkMixin:
             job.say(f"{name} is not one of {project}'s phones on this node\n")
             return "failed", 2
         if storage.avd_running(avd):
-            job.say(f"{name} is running: stop it (aerie emu stop in the project's session) and remove it then\n")
+            job.say(f"{name} is running: stop it (aerie emu stop in the space's session) and remove it then\n")
             return "failed", 75
         shutil.rmtree(avd, ignore_errors=True)
         with contextlib.suppress(OSError):
@@ -363,7 +363,7 @@ class WorkMixin:
         job.say("measuring the disks\n")
         got = storage.measure(self.state)
         job.say(f"measured {len(got.get('filesystems') or [])} filesystems and "
-                f"{len(got.get('projects') or {})} projects in {got.get('took_s', 0)}s\n")
+                f"{len(got.get('projects') or {})} spaces in {got.get('took_s', 0)}s\n")
         self.hello()
         return "succeeded", 0
 

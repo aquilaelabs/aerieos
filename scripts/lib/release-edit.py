@@ -97,7 +97,7 @@ if r.get("error"):
     fail(f"[builderbot] ERROR: {r['error']}")
 what = f"withdraw {withdraw} and its tag" if withdraw else "take files off the release" if remove else "edit the release"
 if r.get("id") and not (r.get("edited") or r.get("removed") or r.get("withdrawn")):
-    print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}) to {what}, "
+    print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}) to {what}, "
           "waiting up to 15 minutes for Approve in their bell", file=sys.stderr)
     o = waits.outcome(auth, r["id"], f"it was not allowed to {what}")
     if o.get("code"):

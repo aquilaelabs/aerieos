@@ -275,7 +275,7 @@ const TABKINDS = {
   // they changed.
   sessions: { multi: false, label: () => "Sessions",
               render: (i) => renderSessionsInto(i), live: "always" },
-  projects: { multi: false, label: () => "Projects",
+  projects: { multi: false, label: () => "Spaces",
               render: (i) => renderProjectsInto(i), open: () => projectsShown(), live: "always" },
   // nodesRev as well as dockerRev: the node PICKER on this tab is drawn from
   // the node list, and that list arrives on its own schedule. Watching only

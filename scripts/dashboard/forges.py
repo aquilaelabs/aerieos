@@ -86,7 +86,7 @@ unvetted_ok = None
 # or clone naming another is refused; on, the rest are offered tagged dev.
 FORGES = (
     {"id": "github", "name": "GitHub", "host": "github.com", "fixed": True,
-     "vetted": "in daily use: every project here that pushes, and create.mjs against the harness",
+     "vetted": "in daily use: every space here that pushes, and create.mjs against the harness",
      "user": "x-access-token",
      "kind": "github", "nested": False,
      "token": re.compile(r"[A-Za-z0-9_]{20,255}"),
@@ -474,7 +474,7 @@ def token_access(entry, host, token, path, scheme="https"):
         level = max((perms.get(k) or {}).get("access_level") or 0
                     for k in ("project_access", "group_access"))
         if level and level < 30:
-            out["missing"].append("the Developer role or above on the project: its account has "
+            out["missing"].append("the Developer role or above on the space: its account has "
                                   f"access level {level}, which reads but cannot push")
         me, _w = _ask(f"{base}/personal_access_tokens/self", kind, token)
         scopes = (me or {}).get("scopes") if isinstance(me, dict) else None

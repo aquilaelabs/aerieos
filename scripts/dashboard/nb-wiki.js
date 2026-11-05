@@ -266,7 +266,7 @@ function nbWikiView({$, nb, project}){
     // Why Push is dead, on the row and not in a tooltip (the operator, 23
     // Sep): a phone has no hover.
     const why = ro && rem?.label ? ro : pages().length && rem?.label && !rem.auth
-      ? `Push needs the project's push rights on ${rem.label}: grant them in the project's remote dialog. Pull works without them for a public wiki.` : "";
+      ? `Push needs the space's push rights on ${rem.label}: grant them in the space's remote dialog. Pull works without them for a public wiki.` : "";
     $("wkWhy").textContent = why;
     $("wkWhy").hidden = !why;
   }
@@ -284,7 +284,7 @@ function nbWikiView({$, nb, project}){
   function article(){
     const meta = byName(nb.wkCur);
     if (!meta) return `<article class="wkarticle"><div class="hint">No pages yet. Start with Home, the page a wiki opens on; a session adds pages with aerie wiki save${
-      nb.wkData?.gate === "deny" ? ", though this project's Agents may: Write the wiki is deny" : ""}.</div></article>`;
+      nb.wkData?.gate === "deny" ? ", though this space's Agents may: Write the wiki is deny" : ""}.</div></article>`;
     const pg = nb.wkPages[meta.name];
     // A reader (B101) gets no Edit, Rename or Remove on a page: New page,
     // dead above, says why.

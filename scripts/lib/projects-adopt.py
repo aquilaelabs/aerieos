@@ -31,6 +31,6 @@ if not os.path.isdir(os.path.join(ws, folder)):
     sys.exit(f"[builderbot] ERROR: there is no folder {ws}/{folder}")
 registry.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), workspace=ws, write_json=write_json)
 if registry.get(folder):
-    sys.exit(f"[builderbot] ERROR: {folder} is a project already, or was one: the registry never hands a folder out twice")
+    sys.exit(f"[builderbot] ERROR: {folder} is a space already, or was one: the registry never hands a folder out twice")
 r = registry.claim(folder, name or folder)
-print(f"{folder} is a project, shown as {r['name']} (P{r['id']})")
+print(f"{folder} is a space, shown as {r['name']} (P{r['id']})")

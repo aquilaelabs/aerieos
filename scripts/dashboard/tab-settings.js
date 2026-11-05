@@ -155,7 +155,7 @@ function renderSettingsInto(i){
     // Last, apart from the settings (R218 step 32); the Nodes section that
     // only linked to the Nodes page is gone with it, the rail being the way.
     sect("reset", "Reset AerieOS", "", `<div class="field" data-group="Reset">
-      <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but project files is moved aside, not deleted.</div>
+      <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but space files is moved aside, not deleted.</div>
       <div class="actbar"><span class="sp"></span><button type="button" class="danger" id="setReset">Reset AerieOS</button></div>
     </div>`)}`;
   sectJump(d.list.querySelector("[data-sects]"));
@@ -386,7 +386,7 @@ function moveLandBox(ld, inWalk = false, heldSaid = false){
   return `<div class="field" data-movelandbox>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
-          ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
+          ld.stick ? " On this stick the bundle lands on the machine's disks, in the spaces' folder, never on the stick." : ""}`)}</div>
 `}
       ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
@@ -543,7 +543,7 @@ function reportsSection(){
   const list = reportsList === null ? `<div class="row stack2"><div class="grow"><div class="sub dim">reading the reports…</div></div></div>`
     : !rows.length ? `<div class="empty">No reports. A session's <code>aerie report</code> and Report a bug in the header land here.</div>`
     : rows.map(r => `<div class="row repline" data-report="${r.id}"><div class="grow">
-        <div class="name">#${r.id} ${esc(r.project || "no project")}<span class="dim"> · ${esc(ago(r.at))} · ${esc(r.by || "")}${r.area ? ` · ${esc(r.area)}` : ""}</span></div>
+        <div class="name">#${r.id} ${esc(r.project || "no space")}<span class="dim"> · ${esc(ago(r.at))} · ${esc(r.by || "")}${r.area ? ` · ${esc(r.area)}` : ""}</span></div>
         <div class="sub reptext">${esc(r.text || "")}</div></div>
         ${mayDelete ? rmIcon(`data-repdel="${r.id}"`, `Delete report ${r.id}`, {title: "take it out: it is not in the diagnostics downloaded after"}) : ""}
       </div>`).join("");
@@ -590,9 +590,9 @@ async function clearReports(btn){
 // The checks, in the order Controller settings lists them, with what each asks.
 const CHECK_KINDS = [
   ["release", "A newer AerieOS", "Asks the releases for a newer version than this install runs, on a bare-metal install; the Update window applies it."],
-  ["images", "Container images", "Asks each project container's registry for a newer image."],
+  ["images", "Container images", "Asks each space container's registry for a newer image."],
   ["nginx", "nginx", "Asks the registry for a newer nginx image for the nodes that serve hostnames."],
-  ["scanners", "Scanners", "Asks for newer versions of the scanners the nodes run over projects."],
+  ["scanners", "Scanners", "Asks for newer versions of the scanners the nodes run over spaces."],
   ["catalog", "Library", "Asks upstream for the toolchains' and coding agents' newest versions, and the vetted catalog for its index. A node's own check of what it holds is on its page."]];
 const SETTING_GROUPS = [
   // The apps this controller offers its people (R272 step 3, apps.py): each
@@ -620,11 +620,11 @@ const SETTING_GROUPS = [
      .filter(k => s?.settings?.[k]?.value).length} offered`,
    fields: [
     {key: "apps_android", label: "Android app", type: "bool",
-     hint: "The notebook, the bell and your sessions on a phone, and the phone lent to a project."},
+     hint: "The notebook, the bell and your sessions on a phone, and the phone lent to a space."},
     {key: "apps_vscode", label: "VS Code extension", type: "bool", dev: true,
-     hint: "A project's files and terminal in VS Code."},
+     hint: "A space's files and terminal in VS Code."},
     {key: "apps_companion", label: "Windows companion", type: "bool", dev: true,
-     hint: "A folder on a Windows PC kept in step with a project, for a tool that only runs there."}]},
+     hint: "A folder on a Windows PC kept in step with a space, for a tool that only runs there."}]},
   // The home tunnel the controller runs itself (R176): the public hostname
   // a node off the LAN dials, the tunnel's token, and an API token that
   // writes the hostname's record and the tunnel's rules rather than having
@@ -702,7 +702,7 @@ const SETTING_GROUPS = [
    heading: s => s?.settings?.backup_password?.set ? "on" : "off",
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
-     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, projects, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
+     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
   // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
   // token that may read AerieOS's repository, with which the dev channel and
   // the version picker see the drafts not published yet.
@@ -914,8 +914,8 @@ async function askReset(){
   const list = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   const shut = () => { modal.hidden = true; body.innerHTML = ""; };
   body.innerHTML = `<div class="field">
-      <div class="hint bad">Accounts, nodes, project settings, tokens, the notebook, memories and logs move into a dated
-        directory under the controller's config. Project files stay. The next page is the setup page.</div>
+      <div class="hint bad">Accounts, nodes, space settings, tokens, the notebook, memories and logs move into a dated
+        directory under the controller's config. Space files stay. The next page is the setup page.</div>
     </div>
     ${list.length ? `<div class="field">
       <label class="lbl">Un-enroll first</label>

@@ -59,7 +59,7 @@ class Reach(unittest.TestCase):
     def test_a_node_taken_off_the_project_is_not(self):
         got, status = containers.session_verb("alpha", {}, "logs", "probe", {})
         self.assertEqual(status, 403, got)
-        self.assertNotIn("n_host", self.visited, "nothing of the project's is looked for off its nodes")
+        self.assertNotIn("n_host", self.visited, "nothing of the space's is looked for off its nodes")
 
 
 if __name__ == "__main__":

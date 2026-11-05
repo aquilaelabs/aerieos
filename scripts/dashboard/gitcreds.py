@@ -209,7 +209,7 @@ def usable(project, uid):
         if _live(uid):
             return {"by": uid, "mine": True, "live": True, "given": True, "why": ""}
         return {"by": uid, "mine": True, "live": False, "given": True,
-                "why": "your token for this project is used only while you are signed in, and you are "
+                "why": "your token for this space is used only while you are signed in, and you are "
                        "signed out everywhere: aerie git waits for you to sign in to the dashboard"}
     other = next((u for u, _ in g if _live(u) and not _locked(u)), "")
     if other:
@@ -217,14 +217,14 @@ def usable(project, uid):
     if g and not own_line(project):
         shut = [u for u, _ in g if _live(u) and _locked(u)]
         return {"by": "", "mine": False, "live": False, "given": False,
-                "why": ("everyone signed in who gave this project a token has their key store locked: one of them "
-                        "unlocks it on their Profile, or give yours in the project's settings") if shut else
-                       "nobody who gave this project a token is signed in: give yours in the project's "
+                "why": ("everyone signed in who gave this space a token has their key store locked: one of them "
+                        "unlocks it on their Profile, or give yours in the space's settings") if shut else
+                       "nobody who gave this space a token is signed in: give yours in the space's "
                        "settings, or wait for one of them"}
     if own_line(project):
         return {"by": "", "mine": False, "live": True, "given": False, "why": ""}
     return {"by": "", "mine": False, "live": False, "given": False,
-            "why": "this project has no git token: give yours in the project's settings"}
+            "why": "this space has no git token: give yours in the space's settings"}
 
 
 def _write_givers(project, rows, keep_own=True):

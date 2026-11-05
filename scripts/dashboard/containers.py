@@ -279,9 +279,9 @@ def build_refusal(name, compose_text, env_text=""):
     if not svcs:
         return ""
     return (f"{name or 'this container'} builds {', '.join(svcs)} from a relative path, and a "
-            "container written here has no project tree behind it: compose resolves that path "
+            "container written here has no space tree behind it: compose resolves that path "
             "against the container's own data directory, which is empty, so there is nothing to "
-            "build. A project's own code goes into Docker from a compose file at the project's "
+            "build. A space's own code goes into Docker from a compose file at the space's "
             "root (docker-compose.yml or compose.yml), with Send to Docker on its Artifacts view "
             "or aerie devapp new from a session, and builds from the tree. A container written "
             "here builds from an absolute path or a git URL.")
@@ -464,7 +464,7 @@ def rename_container(name, new, instance=None):
         up = [c for c in devapp.containers().get("containers") or [] if c.get("project") == old]
     if up:
         return {"error": f"{old} is up ({len(up)} container{'s' if len(up) != 1 else ''}): take it down first, "
-                         "since the name is its compose project and its volumes' prefix"}
+                         "since the name is its compose space and its volumes' prefix"}
     return relocate.rename_job(project, slug, instance)
 
 
@@ -506,7 +506,7 @@ def set_container_owner(name, owner):
         return {"error": f"no container called {name} on this daemon now"}
     if c.get("ours"):
         return {"error": f"{c.get('name')} is part of {c.get('project')}: its "
-                         "project is set on that row"}
+                         "space is set on that row"}
     owner = str(owner or "").strip()[:100]
     if owner == devapp.SYSTEM:
         return {"error": f"{devapp.SYSTEM} is AerieOS's own: the deployment that writes a "
@@ -527,7 +527,7 @@ def set_container_owner(name, owner):
         row = devapp.row_named(cname)
         if row:
             return {"error": f"{cname} is the name of {devapp.owner_of(*row) or row[0]}'s container: "
-                             "rename this one before putting it under a project"}
+                             "rename this one before putting it under a space"}
         for nid, held in devapp._owners().items():
             if nid != node and held.get(cname) == owner:
                 return {"error": f"{owner} already has a container called {cname} on "
@@ -552,11 +552,11 @@ def not_ours(what, sess=""):
     """The refusal for a container that does not belong to the caller's
     project. The owner is not named: to a session that would be another
     project's name, which is the thing it may not read."""
-    return (f"{what} does not belong to {sess}: a session reaches its own project's "
-            "containers, and an administrator sets which project each belongs to on "
+    return (f"{what} does not belong to {sess}: a session reaches its own space's "
+            "containers, and an administrator sets which space each belongs to on "
             "the Containers page" if sess else
-            f"{what} does not belong to one of your projects: an administrator sets "
-            "which project each container belongs to on the Containers page")
+            f"{what} does not belong to one of your spaces: an administrator sets "
+            "which space each container belongs to on the Containers page")
 
 
 def _answer(r):
@@ -706,14 +706,14 @@ def tab_verb(act, name, req, seen):
     mine = seen()
     clash = next((p for p in mine if devapp._slug(p) == devapp._slug(name)), "")
     if name and clash:
-        return {"error": f"that is the project {clash}: a "
+        return {"error": f"that is the space {clash}: a "
                          f"container written here needs a name "
                          f"of its own"}, 400
     # The project it belongs to, when one is picked: only a project this
     # account can see, or none.
     under = field(req, "owner")
     if under and under not in mine:
-        return {"error": f"not a project: {under}"}, 400
+        return {"error": f"not a space: {under}"}, 400
     r = create_container(name, req.get("compose") or "",
                          req.get("env") or "", field(req, "node"), under)
     # Made for a project: its sessions may reach it (R79).

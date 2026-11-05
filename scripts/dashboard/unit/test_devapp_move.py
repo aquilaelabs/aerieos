@@ -100,9 +100,9 @@ class Move(unittest.TestCase):
         self.assertEqual(devapp.compose_file("MediaReducer", "mediareducer-dev").parent.name, "MediaReducer")
 
     def test_what_it_refuses(self):
-        self.assertIn("project picker", devapp.move_instance("mediareducer-test-plex", "main", "MediaReducer")["error"])
+        self.assertIn("space picker", devapp.move_instance("mediareducer-test-plex", "main", "MediaReducer")["error"])
         self.assertIn("no compose file", devapp.move_instance("MediaReducer-Dev", "main", "Bare")["error"])
-        self.assertIn("another project", devapp.move_instance("MediaReducer-Dev", "main", "MediaReducer-Dev")["error"])
+        self.assertIn("another space", devapp.move_instance("MediaReducer-Dev", "main", "MediaReducer-Dev")["error"])
         self.assertIn("no instance", devapp.move_instance("MediaReducer-Dev", "nope", "MediaReducer")["error"])
         (Path(self.tmp) / "ws" / "Far").mkdir()
         (Path(self.tmp) / "ws" / "Far" / "compose.yml").write_text("services: {}\n")

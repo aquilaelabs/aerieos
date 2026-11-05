@@ -35,14 +35,14 @@ await page.waitForSelector('#rnReadsField:not([hidden])', { timeout: 10000 });
 const rows = await page.$$eval('#rnReads label.lrow', ls => ls.map(l => [l.querySelector('input').value, l.querySelector('input').checked]));
 ok(rows.length >= 2 && !rows.some(([n]) => n === 'alpha') && rows.map(([n]) => n).join() === rows.map(([n]) => n).sort().join()
    && rows.every(([, on]) => !on),
-   `the project's settings offer every other project as a listbox row, alphabetical, none ticked yet (${rows.map(([n]) => n).join(', ')})`);
+   `the space's settings offer every other space as a listbox row, alphabetical, none ticked yet (${rows.map(([n]) => n).join(', ')})`);
 const look = await page.$eval('#rnReads', e => ({ overflow: getComputedStyle(e).overflowY, border: getComputedStyle(e).borderTopWidth,
   row: Math.round(e.querySelector('label.lrow').getBoundingClientRect().height), display: getComputedStyle(e.querySelector('label.lrow')).display }));
 ok(look.overflow === 'auto' && look.border === '1px' && look.row >= 38 && look.display === 'flex',
    `a listbox is a bordered box that scrolls, its rows a thumb high (${JSON.stringify(look)})`);
 // ...and no Debug grants beside them: every project's are the Debug page's
 // (R147, the operator, 26 Oct; settings.mjs). diag.mjs holds the refusals.
-ok(!(await page.$('#rnDebugField')), 'the project\'s settings carry no Debug grants: they are the Debug page\'s');
+ok(!(await page.$('#rnDebugField')), 'the space\'s settings carry no Debug grants: they are the Debug page\'s');
 // A read is a project's (R138): beta's project, ticked by its key.
 const betaKey = await page.evaluate(() => reposOf('beta'));
 await page.check(`#rnReads input[value="${betaKey}"]`);
@@ -50,7 +50,7 @@ await saveDialog(page);
 await page.evaluate(k => { window.__betaKey = k; }, betaKey);
 await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reads?.join() === window.__betaKey, { timeout: 20000 });
 ok((prefsOf('alpha').reads || []).join() === projectKey('beta'),
-   'Save keeps the ticked projects as the reads, in the settings store');
+   'Save keeps the ticked spaces as the reads, in the settings store');
 await page.evaluate(() => renameProject('alpha', 'all'));
 await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
 ok(await page.$eval(`#rnReads input[value="${betaKey}"]`, i => i.checked), '...and the dialog opens with it ticked');
@@ -58,7 +58,7 @@ await page.keyboard.press('Escape');
 const self = await api('/api/prefs', { project: 'alpha', reads: ['alpha', 'beta', 'nowhere/x', 'gamma'] });
 ok(self.status === 200 && (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.reads.join()
      === [projectKey('beta'), projectKey('gamma')].join(),
-   'a project never reads itself, a name that is not a project name is dropped, and a repository named reads as its project');
+   'a space never reads itself, a name that is not a space name is dropped, and a repository named reads as its space');
 
 // ---- the session: reads go through, writes are refused by name -----------------------
 const tok = token('alpha');
@@ -73,10 +73,10 @@ const write = await api('/api/roadmap', { project: 'beta', action: 'add', text: 
 ok(write.status === 403 && /beta is read-only from a session on alpha/.test(write.error || ''),
    `...and a write to beta's notebook is refused by name (${write.error})`);
 const own = await api('/api/roadmap', { project: 'alpha', action: 'add', text: 'from alpha itself' }, asSession(tok));
-ok(own.status === 200, `...while the same write to its own project goes through (${own.status})`);
+ok(own.status === 200, `...while the same write to its own space goes through (${own.status})`);
 const stranger = await api('/api/roadmap?project=delta', undefined, asSession(tok));
 ok(stranger.status === 400 && /not a project/.test(stranger.error || ''),
-   'a project alpha does not read is not a project to its session, as before');
+   'a space alpha does not read is not a space to its session, as before');
 await api('/api/prefs', { project: 'alpha', reads: ['beta'] });
 const dropped = await api('/api/roadmap?project=gamma', undefined, asSession(tok));
 ok(dropped.status === 400, 'a read taken away in the settings is gone from a running session at once, no new token needed');
@@ -108,10 +108,10 @@ ok(gitp.status === 403 && /acts on the project's own machines/.test(gitp.error |
 // token is for another project" read the same for both).
 const unreadR = await relay(['roadmap'], 'gamma');
 ok(unreadR.status === 403 && /alpha does not read gamma: its owner adds it under Reads/.test(unreadR.error || ''),
-   `a project the session does not read is refused by name, saying where reads are set (${unreadR.error})`);
+   `a space the session does not read is refused by name, saying where reads are set (${unreadR.error})`);
 const noneR = await relay(['roadmap'], 'nosuch');
 ok(noneR.status === 400 && /there is no project called nosuch/.test(noneR.error || ''),
-   `...and a name that is no project says so (${noneR.error})`);
+   `...and a name that is no space says so (${noneR.error})`);
 // A long command arrives whole (B3): 40 steps are 81 words, which a cap of
 // 64 cut to a --step with nothing after it; past the cap it is refused by
 // name rather than run as a shorter command.
@@ -144,7 +144,7 @@ ok(noneR.status === 400 && /there is no project called nosuch/.test(noneR.error 
 // ---- the grant carries the reads, for the view and the walls ---------------------------
 const grant = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
 ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
-   `the terminal's grant names the projects the session reads, for bb-session and Claude's walls (${JSON.stringify(grant).slice(0, 160)})`);
+   `the terminal's grant names the spaces the session reads, for bb-session and Claude's walls (${JSON.stringify(grant).slice(0, 160)})`);
 
 // ---- the places on its node a project is shown (prefs.sees, B378) ------------------------
 // A session's view is built from what it is given, so a share mounted on
@@ -153,7 +153,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const set = await api('/api/prefs', { project: 'alpha', sees: ['/mnt/media/', '/srv/samples', '/mnt/media'] });
   const kept = (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.sees;
   ok(set.status === 200 && kept.join() === '/mnt/media,/srv/samples',
-     `a project's settings keep the places on its node it is shown, each once (${set.status} ${JSON.stringify(kept)})`);
+     `a space's settings keep the places on its node it is shown, each once (${set.status} ${JSON.stringify(kept)})`);
   const bad = [['/etc', /the machine's own or AerieOS's/], ['/workspace/beta', /the machine's own or AerieOS's/],
                ['/home/builder/.ssh', /the machine's own or AerieOS's/], ['/var/lib/builderbot/appdata', /the machine's own/],
                ['/mnt/../etc', /not a place on a node/], ['mnt/media', /not a place on a node/], ['/mnt/my media', /not a place on a node/]];
@@ -163,7 +163,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
     if (!(r.status === 400 && re.test(r.error || ''))) got.push(`${p}: ${r.status} ${r.error || ''}`);
   }
   ok(got.length === 0 && (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.sees.join() === '/mnt/media,/srv/samples',
-     `a place that is the system's, the projects share, a home or the agent's is refused by name, as is a path that climbs, is relative or has a space, and the list stays as it was${got.length ? ` (not: ${got.join(' | ')})` : ''}`);
+     `a place that is the system's, the spaces share, a home or the agent's is refused by name, as is a path that climbs, is relative or has a space, and the list stays as it was${got.length ? ` (not: ${got.join(' | ')})` : ''}`);
   const many = await api('/api/prefs', { project: 'alpha', sees: Array.from({ length: 9 }, (_, i) => `/mnt/share${i}`) });
   ok(many.status === 400 && /8 places at most, not 9/.test(many.error || ''), `...and more than eight is refused with the number (${many.error})`);
   const mine = await api('/api/prefs', { project: 'alpha', sees: ['/mnt/all'] }, asSession(tok));
@@ -180,7 +180,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const g2 = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
   ok(goff.status === 200 && g2.gpu === 'project'
      && (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.gpu === 'off',
-     `a project set to leave the GPU alone has its sessions told so, and by whom (${g2.gpu})`);
+     `a space set to leave the GPU alone has its sessions told so, and by whom (${g2.gpu})`);
   const gbad = await api('/api/prefs', { project: 'alpha', gpu: 'sometimes' });
   ok(gbad.status === 400 && /gpu is one of on, off/.test(gbad.error || ''), `a value that is neither is refused (${gbad.error})`);
   await api('/api/prefs', { project: 'alpha', gpu: 'on' });
@@ -188,7 +188,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const where = (await api('/api/preamble?project=alpha&topic=where')).text || '';
   ok(/Of the shares and disks mounted on its node, this project is shown \/mnt\/media, \/srv\/samples, as the node has each/.test(said)
      && /a share or disk mounted on the\s+node, another project's build cache or container data, and the home of the\s+account sessions run as are not in its view/.test(where),
-     'the block says which shares this project is shown, and the where topic that the rest of the node is not in its view');
+     'the block says which shares this space is shown, and the where topic that the rest of the node is not in its view');
   const shown = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings'],
     { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
       WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
@@ -205,7 +205,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const field = await page.$eval('#rnSees', e => ({ value: e.value, label: document.querySelector('label[for=rnSees]').firstChild.textContent,
     help: document.querySelector('label[for=rnSees] .help')?.dataset.help || '', hint: !!document.querySelector('#rnSeesField .hint') }));
   ok(field.value === '/mnt/media, /srv/samples' && field.label === 'Also sees' && /share or a disk mounted on the node/.test(field.help) && !field.hint,
-     `the project's settings carry the places in a field under the node, labeled above, its one sentence behind the ? (${JSON.stringify(field).slice(0, 140)})`);
+     `the space's settings carry the places in a field under the node, labeled above, its one sentence behind the ? (${JSON.stringify(field).slice(0, 140)})`);
   // ...and the GPU setting with the other Claude settings, a pulldown read
   // at Save like the rest.
   ok(await page.$eval('#rnGpu', e => e.value === 'on' && [...e.options].map(o => o.value).join() === 'on,off'
@@ -250,7 +250,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const kept = (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.reaches;
   ok(set.status === 200 && JSON.stringify(kept) === JSON.stringify([{ addr: '192.168.1.50', nodes: [] },
        { addr: '192.168.1.60:8123', nodes: ['n_one', 'n_two'] }]),
-     `a project's settings keep the addresses its sessions may reach, each once with its nodes (${JSON.stringify(kept)})`);
+     `a space's settings keep the addresses its sessions may reach, each once with its nodes (${JSON.stringify(kept)})`);
   const bad = [['nas.lan', /not an address/], ['192.168.1.0/24', /a name or a range is not taken/],
                ['127.0.0.1', /this machine/], ['10.231.0.4', /sessions themselves/]];
   const got = [];
@@ -288,14 +288,14 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const t2 = token('alpha');
   const ls = await api('/api/docker?project=beta', undefined, asSession(t2));
   ok(ls.status === 200 && !/does not belong/.test(ls.error || ''),
-     `a session lists the containers of a project it reads (${ls.status} ${ls.error || 'ok'})`);
+     `a session lists the containers of a space it reads (${ls.status} ${ls.error || 'ok'})`);
   const st = await api('/api/devapp', { project: 'beta', action: 'state' }, asSession(t2));
   ok(!/does not belong to alpha/.test(st.error || '') && st.status !== 403,
      `...and reads its dev instance's state (${st.status} ${st.error || 'ok'})`);
   const rb = await api('/api/devapp', { project: 'beta', action: 'rebuild' }, asSession(t2));
   ok(rb.status === 403, `...while rebuilding it is refused (${rb.status} ${rb.error || ''})`);
   const unread = await api('/api/devapp', { project: 'gamma', action: 'state' }, asSession(t2));
-  ok(unread.status >= 400, `...and a project it does not read answers as before (${unread.status})`);
+  ok(unread.status >= 400, `...and a space it does not read answers as before (${unread.status})`);
 }
 
 // ---- the briefing names them ------------------------------------------------------------
@@ -303,7 +303,7 @@ const pre = await api('/api/preamble?project=alpha');
 const whereTopic = (await api('/api/preamble?project=alpha&topic=where')).text || '';
 ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `aerie -p NAME` in front/.test(pre.text)
    && /its containers answer from here on this project's nodes/.test(pre.text) && /Nothing there is yours to change/.test(pre.text) && /beyond the ones it reads/.test(whereTopic),
-   'the block says which projects the session reads and that nothing there is its to change; the where topic, to look for context nowhere else');
+   'the block says which spaces the session reads and that nothing there is its to change; the where topic, to look for context nowhere else');
 await api('/api/prefs', { project: 'alpha', reads: [] });
 ok(!/This project reads/.test((await api('/api/preamble?project=alpha')).text),
    '...and says nothing about reads when there are none');

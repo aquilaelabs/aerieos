@@ -36,7 +36,7 @@ function rnSessionsDraw(name, rows){
         <div class="sub">${[r.kind === "claude" ? "Claude" : "shell",
           r.node ? "on " + esc(r.node) : "", esc(r.state || "")].filter(Boolean).join(" · ")}</div></div>
       <button type="button" class="danger" data-rnsessend="${i}">End</button>
-    </div>`).join("") : `<div class="hint">No sessions on this project.</div>`;
+    </div>`).join("") : `<div class="hint">No sessions on this space.</div>`;
   list.querySelectorAll("[data-rnsessend]").forEach(b =>
     // Its own attribute: data-rnend is a section bar's End and save, which
     // the dialog's delegated click took this press for as well.

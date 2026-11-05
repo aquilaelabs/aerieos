@@ -81,7 +81,7 @@ elif verb == "add":
             body.append(a)
             i += 1
     if not name or not body:
-        fail('aerie memory add NAME --type user|feedback|project|reference --about "one line" "what to remember"')
+        fail('aerie memory add NAME --type user|feedback|space|reference --about "one line" "what to remember"')
     if mtype not in TYPES:
         fail(f"--type is one of: {', '.join(TYPES)}")
     if not about:

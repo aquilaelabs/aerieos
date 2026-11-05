@@ -556,11 +556,11 @@ class OsImageMixin:
         else:
             path = str(cfg.get("path") or "")
             if not path.startswith("/") or ".." in path.split("/"):
-                job.say("refused: a projects folder is named by its path\n")
+                job.say("refused: a spaces folder is named by its path\n")
                 return "failed", 64
             names = [str(n) for n in (cfg.get("names") or []) if isinstance(n, str) and n and "/" not in n and not n.startswith(".")][:500]
             rc = self._sh(job, ["bash", tool, "projects", path, *names], timeout=6 * 3600)
-        self.hello_again("the projects folder changed")
+        self.hello_again("the spaces folder changed")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _apply_os_update(self, job, cfg):

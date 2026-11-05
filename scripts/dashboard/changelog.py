@@ -225,8 +225,8 @@ def rules():
     return ("an entry goes under a category: --cat NAME, one of\n" + "\n".join(lines) + "\n"
             "When two fit, the one a reader would look under: a bug's fix is Fixed even\n"
             "if fixing it added a button. Something nobody using the product would\n"
-            "notice gets no entry at all. A project that files its own way names its own\n"
-            "category (this is a default, and a house rule is where a project says so).")
+            "notice gets no entry at all. A space that files its own way names its own\n"
+            "category (this is a default, and a house rule is where a space says so).")
 
 
 def _clean_name(n):

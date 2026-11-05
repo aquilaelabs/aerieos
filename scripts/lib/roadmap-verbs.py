@@ -303,7 +303,7 @@ elif op == "apply":
     if rest[0] != "-" and os.environ.get("BB_RELAYED"):
         real, top = os.path.realpath(rest[0]), os.path.realpath(os.getcwd())
         if not real.startswith(top + os.sep):
-            print(f"[builderbot] ERROR: {rest[0]} is not a file in this project: give one inside it, or - for stdin",
+            print(f"[builderbot] ERROR: {rest[0]} is not a file in this space: give one inside it, or - for stdin",
                   file=sys.stderr); sys.exit(1)
     try:
         doc = records.load(sys.stdin.read() if rest[0] == "-" else open(rest[0], encoding="utf-8").read())
@@ -484,7 +484,7 @@ elif op == "unshelve":
                        why=" ".join(rest[1:]).strip()); bail(r)
     if r.get("held"):
         print(f"asked to take {R(n)} off the shelf: held for approval on the notebook, "
-              "where a person on the project allows or denies it. Carry on with something "
+              "where a person on the space allows or denies it. Carry on with something "
               "else meanwhile")
     else:
         print(f"{R(n)} is off the shelf")
@@ -719,7 +719,7 @@ elif op == "pending":
         lead = "  ↳ " if r.get("after") is not None else "  "
         print(f"{lead}{when}  {tag:<5} {r.get('summary', '')}")
     g = pending.mode(proj, "roadmap")
-    print(f"  (this project's setting for new roadmap items from a session: {g})")
+    print(f"  (this space's setting for new roadmap items from a session: {g})")
 elif op in ("history", "log"):
     # Narrowed on the way out, not on the way in: this is read by sessions as
     # often as by people, and a whole log pasted into a conversation costs

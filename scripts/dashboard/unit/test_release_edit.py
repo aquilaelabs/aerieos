@@ -108,7 +108,7 @@ class Base(unittest.TestCase):
         (app / "loose.png").write_bytes(b"png")
         (app / "dist" / "app-0.5.4-dev.1-abc1234-release-signed.apk").write_bytes(b"apk" * 400)
         (app / "dist" / "app-0.5.4-dev.1-abc1234-dirty.apk").write_bytes(b"apk")
-        (self.tmp / "secret.txt").write_text("not the project's")
+        (self.tmp / "secret.txt").write_text("not the space's")
         (self.tmp / "gitcreds").mkdir()
 
         def wj(path, d):
@@ -284,7 +284,7 @@ class Ask(unittest.TestCase):
                                        "attach a-signed.apk (22.7 MB, signed)"])
         self.assertNotIn("principal", mine)
         self.assertFalse([x for x in phone.requests_open("u_00000009", True) if x["id"] == r["id"]],
-                         "an administrator who does not own the project is not the one asked")
+                         "an administrator who does not own the space is not the one asked")
 
     def test_allow_makes_the_edit_and_says_it(self):
         r = phone.ask_release_edit("the APKs", "app", self.plan, "u_00000002", "ada", principal="session:app")

@@ -47,7 +47,7 @@ class JobLogs(unittest.TestCase):
         self.assertEqual(swept, [], "the probe swept nothing")
         self.job("jr")
         nodes.job_result(self.n, "jr", "succeeded", 0)
-        self.assertEqual(swept, ["p"], "a queued job sweeps its own project")
+        self.assertEqual(swept, ["p"], "a queued job sweeps its own space")
 
     def test_a_running_jobs_log_keeps_its_start_and_its_end(self):
         self.job("j1")

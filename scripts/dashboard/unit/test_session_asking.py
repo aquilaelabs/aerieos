@@ -40,7 +40,7 @@ class Maps(unittest.TestCase):
         got = projsessions.maps(self.sessions, ["app"])
         self.assertTrue(all("secret" not in m for m in got.values()), got)
         self.assertIn("secret", projsessions.maps(self.sessions)["claude_asking"],
-                      "an account that sees every project sees it")
+                      "an account that sees every space sees it")
 
 
 if __name__ == "__main__":

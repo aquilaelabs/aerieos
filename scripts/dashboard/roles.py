@@ -29,24 +29,24 @@ NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 # is not listed on its own below: the notebook, a Claude session, settings,
 # builds and tests, the phone it is lent.
 CAPS = {
-    "read": ("projects", "read a project: its notebook, code and state"),
-    "work": ("projects", "work on a project: the notebook, an agent's session, its settings, builds and tests"),
-    "version": ("projects", "move a project's version and release it"),
-    "lock": ("projects", "nothing any more: a project's owner or an administrator locks it (deprecated, goes in 0.8.0)"),
-    "rename": ("projects", "rename a project"),
-    "trash": ("projects", "delete a project"),
-    "git-auth": ("projects", "change how a project authenticates to its remote"),
+    "read": ("projects", "read a space: its notebook, code and state"),
+    "work": ("projects", "work on a space: the notebook, an agent's session, its settings, builds and tests"),
+    "version": ("projects", "move a space's version and release it"),
+    "lock": ("projects", "nothing any more: a space's owner or an administrator locks it (deprecated, goes in 0.8.0)"),
+    "rename": ("projects", "rename a space"),
+    "trash": ("projects", "delete a space"),
+    "git-auth": ("projects", "change how a space authenticates to its remote"),
     "docker-write": ("projects", "start, stop and rebuild containers"),
     "command-pin": ("projects", "move the pinned commands, one set for everybody"),
-    "ftp": ("projects", "turn on a project's file access over FTP, its port, and who may sign in to it"),
-    "node": ("nodes", "set which node a project builds on"),
+    "ftp": ("projects", "turn on a space's file access over FTP, its port, and who may sign in to it"),
+    "node": ("nodes", "set which node a space builds on"),
     "toolchains-write": ("nodes", "install and remove toolchains on a node"),
     "jobs": ("nodes", "run a command on a node as a job"),
     "terminal": ("nodes", "a shell on a node"),
-    "create": ("controller", "make a project"),
+    "create": ("controller", "make a space"),
     "runner": ("controller", "the CI runner page and its settings"),
     "admin": ("controller", "everything else an administrator does: nodes, toolchains, settings, accounts"),
-    "debug": ("controller", "debug mode, the controller's diagnostics and nodes' logs, and granting them to a project's sessions"),
+    "debug": ("controller", "debug mode, the controller's diagnostics and nodes' logs, and granting them to a space's sessions"),
 }
 # Granted by name only (the operator, 6 Oct): `*` does not reach these, so
 # the built-in admin and a role that grants everything leave them out, and
@@ -56,7 +56,7 @@ NAMED_ONLY = frozenset({"debug", "ftp"})
 # The capabilities whose scope is over NODES (step 3): every node, the
 # nodes of the account's projects, or named ones.
 NODE_CAPS = frozenset(c for c, (g, _) in CAPS.items() if g == "nodes")
-GROUPS = (("projects", "On a project"), ("nodes", "On a node"), ("controller", "The controller"))
+GROUPS = (("projects", "On a space"), ("nodes", "On a node"), ("controller", "The controller"))
 # What `work` does not cover: each needs a grant of its own.
 OWN_CAPS = frozenset(c for c in CAPS if c not in ("read", "work"))
 SCOPES = ("mine", "all")           # or a list of project names
@@ -68,8 +68,8 @@ SCOPES = ("mine", "all")           # or a list of project names
 # that one); global areas only through a Global role, which only an
 # administrator gives. Each sentence is what the Roles tab shows.
 AREAS = (
-    ("projects", "Projects", "project", "its notebook and code", "an agent's session, edits, builds and tests"),
-    ("settings", "Project settings", "project", "the settings", "change them, lock, rename and delete"),
+    ("projects", "Spaces", "project", "its notebook and code", "an agent's session, edits, builds and tests"),
+    ("settings", "Space settings", "project", "the settings", "change them, lock, rename and delete"),
     ("releases", "Releases and versions", "project", "versions and releases", "move the version and release"),
     ("gitauth", "Git authentication", "project", "how it authenticates", "change the credential"),
     ("files", "File access", "project", "the files over FTP or in an editor", "save, upload, rename and delete them"),
@@ -78,7 +78,7 @@ AREAS = (
     # starts, stops, snapshots and removes them.
     ("vms", "VMs", "project", "its VMs and their state", "make, start, stop, snapshot and remove them"),
     ("terminal", "Terminal", "project", "the shielded agent console", "the full tmux shell"),
-    ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a project's sessions reach"),
+    ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
     # What the Library and the Installed page do (R174, the operator, 28
     # Oct): Install and Configure on a node, each grantable node by node,
     # and Curate, the catalog's own entries, which every node shares. Before
@@ -93,7 +93,7 @@ AREAS = (
     ("schedules", "Schedules", "global", "the Schedules page and its runs", "add, change and run schedules"),
     ("runner", "CI runner", "global", "the runner tab", "install and configure runners"),
     ("accounts", "Accounts and roles", "global", "the Users and Roles pages", "add accounts, give roles"),
-    ("newprojects", "New projects", "global", "the nodes a project may be made on", "make a project, and own it"),
+    ("newprojects", "New spaces", "global", "the nodes a space may be made on", "make a space, and own it"),
     ("controller", "Controller", "global", "settings and diagnostics", "settings, debug, pinned commands"),
     # The Storage tab (R169): what every node's disks hold, by project.
     # Read sees it; Write measures a node again now.
@@ -370,7 +370,7 @@ def set_role(name, scope="projects", perms=None, note="", grants=None, nodes=Non
     r["note"] = str(note or "")[:200]
     if r["scope"] == "projects" and any(a not in PROJECT_AREAS for a in r["perms"]):
         bad = ", ".join(a for a in r["perms"] if a not in PROJECT_AREAS)
-        return {"error": f"a role on the user's projects holds project areas only, not {bad}: "
+        return {"error": f"a role on the user's spaces holds space areas only, not {bad}: "
                          "make it an Everywhere role for those"}
     with _lock:
         d = _load()

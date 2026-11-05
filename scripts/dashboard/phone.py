@@ -630,7 +630,7 @@ def push(nid, node, rel, size, project, apk, uid, name, by="phone"):
         return {"error": f"already pushing {_push['what']}; stop it first"}
     dev = phone_on(nid)
     if not dev:
-        return {"error": "no phone is connected on this project's node"}
+        return {"error": "no phone is connected on this space's node"}
     tc = ((node or {}).get("reported") or {}).get("toolchains") or {}
     if not (isinstance(tc, dict) and tc.get("web-ext")):
         return {"error": f"web-ext is not on {(node or {}).get('name') or 'that node'}: "
@@ -815,8 +815,8 @@ def ask(why, argv, nid, node_name, project, by="claude", asker="", asker_uid="")
     if len(argv) > 40 or any(len(a) > 500 for a in argv):
         return {"error": "that command is too long to put in front of somebody"}
     if not nid:
-        return {"error": f"{project or 'this project'} has no node, so there is no phone "
-                         "to reach: a phone is driven from the project's node"}
+        return {"error": f"{project or 'this space'} has no node, so there is no phone "
+                         "to reach: a phone is driven from the space's node"}
     rec = _rec(nid)
     if not rec or not phone_on(nid):
         return {"error": f"no phone is connected on {node_name or nid}: somebody "
@@ -993,8 +993,8 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
     if len(argv) > 40 or any(len(a) > 500 for a in argv):
         return {"error": "that command is too long to put in front of somebody"}
     if not nid:
-        return {"error": f"{project or 'this project'} has no node, so there is no machine "
-                         "to run anything on as root: root is asked for on the project's node"}
+        return {"error": f"{project or 'this space'} has no node, so there is no machine "
+                         "to run anything on as root: root is asked for on the space's node"}
     if not sandbox:
         return {"error": f"{node_name or nid} was not provisioned as an AerieOS sandbox, so "
                          "root there is its owner's and not something this can ask for"}
@@ -1668,7 +1668,7 @@ def install_apk(nid, node, rel, size, project, label="", by="phone"):
             return {"error": f"already installing {_install['what']}"}
     dev = phone_on(nid)
     if not dev:
-        return {"error": "no phone is connected on this project's node"}
+        return {"error": "no phone is connected on this space's node"}
     dest = install_dest(node, project, rel)
     with _lock:
         _install.update(running=True, what=label or Path(rel).name,
@@ -1782,7 +1782,7 @@ def verb(action, req, who, fresh):
             # session that asked can see what it asked for.
             under = field(req, "for") or (who.get("session") or "")
             if under and under not in project_names(who):
-                return {"error": f"not a project: {under}"}, 400
+                return {"error": f"not a space: {under}"}, 400
             # ...and it lands on that project's node: a node named that
             # is not the project's is refused now, since a container
             # anywhere else is out of reach of the project's sessions
@@ -1846,8 +1846,8 @@ def verb(action, req, who, fresh):
                     return {"error": f"no node called {rname}"}, 400
                 hosts = list(project_hosts(proj) or []) if project_hosts is not None and proj else []
                 if rn["id"] != pnid and rn["id"] not in hosts:
-                    return {"error": f"{rn['name']} is not {proj or 'this project'}'s: root is asked for on the "
-                                     f"project's node or on a hosting node ticked under its settings' "
+                    return {"error": f"{rn['name']} is not {proj or 'this space'}'s: root is asked for on the "
+                                     f"space's node or on a hosting node ticked under its settings' "
                                      f"Also works on"}, 400
             r = ask_root(field(req, "why"), req.get("cmd"), rn["id"] if rn else "",
                          rn["name"] if rn else "", proj,
@@ -1883,7 +1883,7 @@ def verb(action, req, who, fresh):
         # phone is its owner's call each time, not a project's setting.
         proj = who.get("session") or field(req, "project")
         if not proj or (not who.get("session") and not users.may_see(who, proj)):
-            return {"error": "which project's phone?"}, 400
+            return {"error": "which space's phone?"}, 400
         op = field(req, "op")
         if op == "status" or not who.get("session"):
             # A touch beyond the lease's apps (anyapp) is only ever its
@@ -1942,7 +1942,7 @@ def artifact_verb(project, act, req, *, uid, me, by):
     if act in ("push", "install"):
         if not node:
             return {"error": f"{project} has no node, and a phone is "
-                             "driven from the project's node"}, 400
+                             "driven from the space's node"}, 400
         if not phone_on(nid):
             return {"error": f"no phone is connected on {node['name']}: "
                              "connect one in the Phone page, on that node"

@@ -147,7 +147,7 @@ function agExtras(a){
   const pl = a.id === "claude" ? (agYours.plugins || []) : [];
   const mcp = (agYours.mcp || {})[a.id] || [];
   const one = p => `<code>${esc(p.id.replace(/@claude-plugins-official$/, ""))}</code>${p.version ? ` ${esc(p.version)}` : ""}${
-    p.scope === "project" ? ` (${esc(p.project ? projLabel(p.project) : "a project")})` : ""}${p.enabled === false ? ` <span class="dim">off</span>` : ""}`;
+    p.scope === "project" ? ` (${esc(p.project ? projLabel(p.project) : "a space")})` : ""}${p.enabled === false ? ` <span class="dim">off</span>` : ""}`;
   const rows = [
     a.id === "claude" ? ["your plugins", pl.length ? pl.map(one).join(", ") : "none", {html: true}] : null,
     ["your MCP servers", mcp.length ? mcp.map(x => `<code>${esc(x)}</code>`).join(", ") : "none", {html: true}],
@@ -223,7 +223,7 @@ function instConfigField(f, v, key){
     case "choice": return `<div class="field setrow col ctlrow">${label}<select id="${id}" ${at}>${(f.choices || []).map(c => `<option value="${esc(c.value)}"${c.value === v ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select></div>`;
     case "projects": {
       const all = (inst?.rows || []).find(x => x.kind === "service")?.all_projects || [];
-      return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div><div class="chips">${all.length ? all.map(p => `<label class="chip"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no projects yet</span>`}</div></div>`;
+      return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div><div class="chips">${all.length ? all.map(p => `<label class="chip"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no spaces yet</span>`}</div></div>`;
     }
     case "list": {
       const rows = (v || []).map((row, j) => `<div class="field ctlrow icrow" data-iclist="${esc(f.name)}" data-icrow="${j}">${
@@ -272,7 +272,7 @@ function instServiceLines(r){
   if (!r.installed) return `<span class="sub">Install deploys it as a written container once something is behind it: a provider key, an endpoint of your own, or Ollama.</span>`;
   const models = (st.models || []).filter(m => !m.wild);
   const pulled = (st.ollama?.models || []).map(m => `<div class="row"><span class="grow">${esc(m)}</span><button type="button" data-instsvc="ollama-remove" data-instmodel="${esc(m)}">Remove</button></div>`).join("");
-  return `<span class="sub">LiteLLM answers at <code>${esc(st.url || "")}/v1</code> for the projects allowed, each with a key of its own.</span>
+  return `<span class="sub">LiteLLM answers at <code>${esc(st.url || "")}/v1</code> for the spaces allowed, each with a key of its own.</span>
     <div class="actbar"><span class="state">${models.length ? `${models.length} model${models.length === 1 ? "" : "s"} known${st.models_at ? `, read ${esc(ago(st.models_at))}` : ""}` : "no models read yet"}${
       Object.keys(st.spend || {}).length ? ` · spent ${Object.entries(st.spend).map(([p, s]) => `${esc(p)} $${Number(s).toFixed(2)}`).join(", ")}` : ""}</span>
       <button type="button" data-instsvc="models">Read the models</button><button type="button" data-instsvc="spend">Read the spend</button></div>
@@ -392,7 +392,7 @@ async function instAct(b, act, kind, name){
   if (!r) return;
   const where = (nodesList || []).find(x => x.id === instNode)?.name || "this node";
   if (kind === "service"){
-    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? Its keys stay here sealed; the projects lose their way to it.`, {verb: "Remove", danger: true})) return;
+    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? Its keys stay here sealed; the spaces lose their way to it.`, {verb: "Remove", danger: true})) return;
     busy(b, act === "remove" ? "Removing" : "Deploying");
     const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
     if (j.error) notify(j.error, true);

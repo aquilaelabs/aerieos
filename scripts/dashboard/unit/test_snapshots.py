@@ -106,7 +106,7 @@ class Snap(unittest.TestCase):
         f.unlink()
         n = len(self.objects())
         snapshots.daily()
-        self.assertFalse(old.exists(), "a day older than the project keeps goes")
+        self.assertFalse(old.exists(), "a day older than the space keeps goes")
         self.assertEqual(len(self.objects()), n - 1, "and the object only it named")
         self.keep["alpha"] = 0
         snapshots.daily()

@@ -90,7 +90,7 @@ function rolesAccessFields(name){
   // Accounts and roles Read alone: the same fields, to read (B34).
   const ro = !d.admin && !!d.readonly, dead = ro ? " disabled" : "";
   const everywhere = Object.values(d.roles || {}).filter(r => r.scope === "global" && r.name !== "owner");
-  const global = d.admin || ro ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every project and on AerieOS itself, as far as each one's areas say")}
+  const global = d.admin || ro ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every space and on AerieOS itself, as far as each one's areas say")}
       <div class="upick" id="rolesGlobal">${everywhere.map(r => `<label class="pick"><input type="checkbox" data-rglobal="${esc(r.name)}"${
         dr.roles.includes(r.name) ? " checked" : ""}${dead}> ${esc(r.label || r.name)}</label>`).join("")}</div></div>` : "";
   // The projects it is on, and only those: holding a role on a project is
@@ -104,7 +104,7 @@ function rolesAccessFields(name){
       <b class="rprojname">${esc(projLabel(pn))}</b>
       <span class="upick">${rolesOnProject(pn).map(r => `<label class="pick"><input type="checkbox" data-rprole="${esc(r.name)}"${
         have.includes(r.name) ? " checked" : ""}${dead}> ${esc(r.label || r.name)}</label>`).join("")}</span>
-      ${ro ? "" : rmIcon(`data-rprojoff="${esc(pn)}"`, `Take ${p.name} off ${projLabel(pn)}`, {title: "take off this project: every role there goes"})}
+      ${ro ? "" : rmIcon(`data-rprojoff="${esc(pn)}"`, `Take ${p.name} off ${projLabel(pn)}`, {title: "take off this space: every role there goes"})}
     </div>`;
   }).join("");
   // The projects it is not on that offer a role (another project's owner
@@ -115,14 +115,14 @@ function rolesAccessFields(name){
   // No role on a project it could join: there is nothing to put it on a
   // project with, and the place that makes one is named instead of an
   // empty picker.
-  const add = ro ? "" : notOn.length && !off.length ? `<div class="sub dim raddon">No role on a project yet: one made on the ${pageLink("roles", "Roles page")} puts ${esc(p.name)} on a project.</div>`
+  const add = ro ? "" : notOn.length && !off.length ? `<div class="sub dim raddon">No role on a space yet: one made on the ${pageLink("roles", "Roles page")} puts ${esc(p.name)} on a space.</div>`
     : off.length ? `<div class="raddon">
-      <select id="rolesAddProj" aria-label="the project">${optionList(off.map(pn => [pn, projLabel(pn)]), addPn)}</select>
+      <select id="rolesAddProj" aria-label="the space">${optionList(off.map(pn => [pn, projLabel(pn)]), addPn)}</select>
       <select id="rolesAddRole" aria-label="the role there">${optionList(rolesOnProject(addPn).map(r => [r.name, r.label || r.name]))}</select>
-      <button type="button" id="rolesAddOn"${rolesOnProject(addPn).length ? "" : " disabled"}>Add to project</button></div>` : "";
+      <button type="button" id="rolesAddOn"${rolesOnProject(addPn).length ? "" : " disabled"}>Add to space</button></div>` : "";
   return `${global}
-    <div class="setrow col ctlrow">${lbl("", d.admin || ro ? "Projects" : "Your projects", "a role on a project puts the account on it; taken off, it is not on it")}
-      <div class="rprojects">${rows || `<div class="empty">on no project yet</div>`}</div>${add}</div>
+    <div class="setrow col ctlrow">${lbl("", d.admin || ro ? "Spaces" : "Your spaces", "a role on a space puts the account on it; taken off, it is not on it")}
+      <div class="rprojects">${rows || `<div class="empty">on no space yet</div>`}</div>${add}</div>
     ${rolesCanDo(p.name, dr)}`;
 }
 
@@ -194,17 +194,17 @@ function rolesCanDo(name, dr){
   const projKeys = areas.filter(a => a[2] !== "global").map(a => a[0]);
   const globKeys = areas.filter(a => a[2] === "global").map(a => a[0]);
   const on = (d.projects || []).filter(pn => (dr.project_roles[pn] || []).length);
-  const cols = [{label: "Every project", got: glob}, ...on.map(pn => ({label: projLabel(pn), pn, got: per([...dr.roles, ...dr.project_roles[pn]])}))];
+  const cols = [{label: "Every space", got: glob}, ...on.map(pn => ({label: projLabel(pn), pn, got: per([...dr.roles, ...dr.project_roles[pn]])}))];
   const keys = projKeys.filter(k => cols.some(c => c.got[k]));
   const tcols = [{label: "Area"}, ...cols.map(c => ({label: c.label, w: "minmax(5rem,.5fr)"}))];
   const grid = keys.length ? tblWrap(tcols, keys.map(k => `<div class="row" data-rcan="${esc(k)}">${tblLine(tcols, [esc(nm(k)),
       ...cols.map(c => c.got[k] ? `<span class="rlvl ${c.got[k]}"${c.pn ? ` data-rcanp="${esc(c.pn)}"` : ""}>${ROLES_LVL[c.got[k]]}</span>` : `<span class="dim">·</span>`)])}</div>`).join(""), "rcan")
-    : `<div class="empty">nothing on any project</div>`;
+    : `<div class="empty">nothing on any space</div>`;
   const w = globKeys.filter(k => glob[k] === "write"), r = globKeys.filter(k => glob[k] === "read");
   const beyond = [w.length ? `writes ${w.map(nm).join(", ")}` : "", r.length ? `reads ${r.map(nm).join(", ")}` : ""].filter(Boolean).join("; ");
   return `<div class="setrow col ctlrow">${lbl("", `What ${name} can do`, "worked out from the boxes above, saved or not")}
     ${grid}
-    <div class="sub">${beyond ? `<b>Beyond projects</b>: ${esc(beyond)}` : `<span class="dim">nothing beyond projects</span>`}</div></div>`;
+    <div class="sub">${beyond ? `<b>Beyond spaces</b>: ${esc(beyond)}` : `<span class="dim">nothing beyond spaces</span>`}</div></div>`;
 }
 
 function rolesPeopleDirty(){
@@ -299,15 +299,15 @@ function rolesRoleBody(){
   // built in first, then the ones made here, each with its kind, and the
   // projects' owner roles, one per project and each the same shape, folded
   // into one row at the end that opens on them.
-  const kind = x => x.builtin ? "built in" : x.scope === "global" ? "everywhere" : "on a project";
+  const kind = x => x.builtin ? "built in" : x.scope === "global" ? "everywhere" : "on a space";
   const owners = names.filter(n => !d.roles[n].builtin && d.roles[n].project);
   const plain = names.filter(n => !owners.includes(n));
   const ownersOpen = rolesOwnersOpen || owners.includes(rolesPick) && !r?.fresh;
   const list = plain.map(n => row(n, d.roles[n].label || n, kind(d.roles[n]))).join("")
     + (r?.fresh ? `<button type="button" class="rrow on" aria-current="true"><span class="rline"><span class="name">${esc(r.name)}</span></span><span class="rfacts">new, not saved</span></button>` : "")
     + (owners.length ? `<button type="button" class="rrow rfold" data-rowners aria-expanded="${ownersOpen ? "true" : "false"}">
-        <span class="rline"><span class="name">Project owners <span class="rchev" aria-hidden="true">${ownersOpen ? "▾" : "▸"}</span></span></span>
-        <span class="rfacts">one per project, ${owners.length} project${owners.length === 1 ? "" : "s"}</span></button>`
+        <span class="rline"><span class="name">Space owners <span class="rchev" aria-hidden="true">${ownersOpen ? "▾" : "▸"}</span></span></span>
+        <span class="rfacts">one per space, ${owners.length} space${owners.length === 1 ? "" : "s"}</span></button>`
        + (ownersOpen ? owners.map(n => row(n, projLabel(d.roles[n].project), "", " rsub")).join("") : "") : "");
   if (!r) return rolesSplit("roles", list, `<div class="empty">no role picked</div>`);
   const who = r.fresh ? [] : holders(r.name);
@@ -345,12 +345,12 @@ function rolesRoleBody(){
   // Why some rows are gray, said once above the table: how the form works,
   // not a fault, so in the hint's voice (the operator, 21 Oct).
   const why = !ro && (d.areas || []).some(([, , group]) => offOf(group))
-    ? `<div class="sub" id="rolesWhyOff">The gray areas are not about one project: only an Everywhere role holds them.</div>` : "";
+    ? `<div class="sub" id="rolesWhyOff">The gray areas are not about one space: only an Everywhere role holds them.</div>` : "";
   const areas = why + tblWrap(ROLE_AREA_COLS, rows, "rareas");
   return rolesSplit("roles", list, `${pick}
-    <div class="setrow col ctlrow">${lbl("rolesScope", "Kind", "On a project: given per project under People, and holds there. Everywhere: given to the account, holds on every project and is the only kind that reaches the nodes, toolchains and the controller")}
+    <div class="setrow col ctlrow">${lbl("rolesScope", "Kind", "On a space: given per space under People, and holds there. Everywhere: given to the account, holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
       <select id="rolesScope"${ro ? " disabled" : ""}>
-        <option value="projects"${r.scope !== "global" ? " selected" : ""}>On a project</option>
+        <option value="projects"${r.scope !== "global" ? " selected" : ""}>On a space</option>
         <option value="global"${r.scope === "global" ? " selected" : ""}>Everywhere</option>
       </select></div>
     ${ro ? "" : `<div class="setrow col ctlrow">${lbl("rolesNote", "What this role is for")}<input id="rolesNote" value="${esc(r.note)}" autocomplete="off"></div>`}
@@ -384,8 +384,8 @@ function rolesNewOpen(){
   }
   m.innerHTML = `<div class="box"><h3>New role</h3>
     <div class="field">${lbl("rolesNewName", "Its name")}<input id="rolesNewName" autocomplete="off"></div>
-    <div class="field">${lbl("rolesNewScope", "Kind", "On a project: given per project, and holds there. Everywhere: holds on every project and is the only kind that reaches the nodes, toolchains and the controller")}
-      <select id="rolesNewScope"><option value="projects">On a project</option><option value="global">Everywhere</option></select></div>
+    <div class="field">${lbl("rolesNewScope", "Kind", "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
+      <select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select></div>
     ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`;
   // Make it wakes once a name is typed that no role has (the operator, 18
   // Oct).
@@ -425,7 +425,7 @@ function renderRolesInto(i){
     // are the page's own; who holds what is on its way.
     const split = detail => `<div class="rsplit"><div class="rlist">${skRows(4)}</div><div class="rdetail">${detail}</div></div>`;
     const field = skField;
-    d.list.innerHTML = skTpl(pageHead({facts: [["Roles", GHOST], ["For projects", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas")));
+    d.list.innerHTML = skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas")));
     loadRoles();
     return;
   }
@@ -439,7 +439,7 @@ function renderRolesInto(i){
   const all = Object.values(rolesData.roles || {});
   d.list.innerHTML = `
     ${rolesErr ? `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>` : ""}
-    ${pageHead({facts: [["Roles", String(all.length)], ["For projects", String(all.filter(r => r.scope === "projects").length)]], actions: newRole})}
+    ${pageHead({facts: [["Roles", String(all.length)], ["For spaces", String(all.filter(r => r.scope === "projects").length)]], actions: newRole})}
     <div class="rsplit${rolesPhoneOpen ? " open" : ""}">
       <div class="rlist">${ro.list}</div>
       <div class="rdetail">${ro.detail}</div>

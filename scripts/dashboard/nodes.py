@@ -2095,7 +2095,7 @@ def _clean_config(cfg):
         if path.rstrip("/") == "/workspace" or path.startswith("/workspace/"):
             # The node's own synced copy of its projects is there (R163): a
             # mount would cover it, and no node mounts the controller's disk.
-            return None, "/workspace holds this node's synced copy of its projects; nothing is mounted there"
+            return None, "/workspace holds this node's synced copy of its spaces; nothing is mounted there"
         if kind not in MOUNT_TYPES:
             return None, f"a mount is nfs or virtiofs, not {kind!r}"
         if kind == "nfs" and (":" not in src or src.startswith(":") or src.endswith(":")):
@@ -2269,7 +2269,7 @@ def node_session_net(principal, node_id, on):
     in 0.9.0 (R146, the operator, 26 Oct): every session is, on every node
     that runs them."""
     del principal, node_id, on
-    return {"error": "every session is kept to its own project's network now: the switch went in 0.9.0"}
+    return {"error": "every session is kept to its own space's network now: the switch went in 0.9.0"}
 
 
 def node_vm_of(node_id, host_id):
@@ -2399,7 +2399,7 @@ def node_container_net(principal, node_id, on):
     """The switch went in 0.9.0 (R146): every project's containers are kept
     to their own network on every node."""
     del principal, node_id, on
-    return {"error": "every project's containers are kept to their own network now: the switch went in 0.9.0"}
+    return {"error": "every space's containers are kept to their own network now: the switch went in 0.9.0"}
 
 
 def ports_local_on(node_id):
@@ -2508,7 +2508,7 @@ def node_log_read(principal, asking_id, target_id, stream="agent", lines=200,
     if not debug_on:
         return {"error": "debug mode is off, so a machine's logs are not offered "
                          "to any session. Controller settings turns it on, and "
-                         "each project is then granted the nodes it may read"}
+                         "each space is then granted the nodes it may read"}
     if not asking_id:
         return {"error": "this session is not on a node, and the grant is a "
                          "node's; a controller session reads its own log with "
@@ -2517,7 +2517,7 @@ def node_log_read(principal, asking_id, target_id, stream="agent", lines=200,
     if not tgt:
         return {"error": "no such node"}
     if target_id not in (grants or ()):
-        return {"error": f"{project or 'this project'} has not been granted {tgt['name']}'s "
+        return {"error": f"{project or 'this space'} has not been granted {tgt['name']}'s "
                          "machine logs: Debug in its settings grants them"}
     spec = LOG_STREAMS.get(stream)
     if not spec:
@@ -2897,7 +2897,7 @@ def room_short(nid, floor_gb, roles=("docker", "root"), need_mb=0):
             return ""
         if need_mb > keep:
             return (f"{n.get('name') or nid} has {round(free / 1024, 1)} GB free for {ROOM_WHAT.get(role, role)}, "
-                    f"and this project's last build took {round(need_mb / 1024, 1):g} GB: free some first "
+                    f"and this space's last build took {round(need_mb / 1024, 1):g} GB: free some first "
                     "(its Storage page says what holds it)")
         return (f"{n.get('name') or nid} has {round(free / 1024, 1)} GB free for {ROOM_WHAT.get(role, role)}, "
                 f"under the {round(keep / 1024, 1):g} GB a node keeps for itself: free some first (its Storage page says what holds it)")
@@ -4128,10 +4128,10 @@ def workspace_held():
         if not s.get("stick"):
             return ""
         if s.get("projects_home") == "held":
-            return ("this machine runs from a stick, and the projects are never kept on it: on This machine, create or adopt "
-                    "a pool and name it the system pool, or name the folder on its disks the projects are in")
+            return ("this machine runs from a stick, and the spaces are never kept on it: on This machine, create or adopt "
+                    "a pool and name it the system pool, or name the folder on its disks the spaces are in")
         if s.get("projects_home") == "folder" and not s.get("projects_bound"):
-            return f"the projects folder {s.get('projects') or ''} is waiting for its disks to mount"
+            return f"the spaces folder {s.get('projects') or ''} is waiting for its disks to mount"
         return ""
     return ""
 
@@ -4170,7 +4170,7 @@ def node_projects_folder(principal, node_id, path="", release=False):
         return {"error": "no such node"}
     rep = n.get("reported") or {}
     if not own_machine(n) or not (rep.get("os_stick") or {}).get("stick"):
-        return {"error": "a projects folder of the machine's own is a stick's: this machine does not run AerieOS from a stick"}
+        return {"error": "a spaces folder of the machine's own is a stick's: this machine does not run AerieOS from a stick"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot name a folder"}
     cfg = {"release": True}
@@ -4183,10 +4183,10 @@ def node_projects_folder(principal, node_id, path="", release=False):
         if not inside:
             return {"error": "name a folder inside the disks this machine adopted, a pool or the array (a share, as /mnt/user/projects)"}
         if not any(places[p] for p in inside):
-            return {"error": "those disks were adopted read only, so the projects could not be written there: adopt them writable first"}
+            return {"error": "those disks were adopted read only, so the spaces could not be written there: adopt them writable first"}
         cfg = {"path": path, "names": sorted(str(x) for x in (project_names() or []))[:500]}
     elif not (rep.get("os_stick") or {}).get("projects"):
-        return {"error": "no folder of the machine's own is the projects folder"}
+        return {"error": "no folder of the machine's own is the spaces folder"}
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -4572,7 +4572,7 @@ def node_to_sync(principal, node_id):
         return {"error": "only an agent node holds a synced copy"}
     conf = dict(n.get("config") or {})
     if (conf.get("workspace") or "sync") == "sync":
-        return {"error": f"{n['name']} already holds its projects as a synced copy"}
+        return {"error": f"{n['name']} already holds its spaces as a synced copy"}
     if conf.get("clean") and not sync_cleaned(n):
         return {"error": f"{n['name']} is still removing its last copy; move it once that is done"}
     if node_locked(n):
@@ -4638,7 +4638,7 @@ def node_sync_stop(principal, node_id):
         return no
     conf = dict(n.get("config") or {})
     if (conf.get("workspace") or "sync") != "sync":
-        return {"error": f"{n['name']} holds no projects to stop syncing"}
+        return {"error": f"{n['name']} holds no spaces to stop syncing"}
     if conf.get("leaving"):
         return {"error": f"{n['name']} is already leaving its synced copy"}
     ended = []

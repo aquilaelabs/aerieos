@@ -73,7 +73,7 @@ for (const who of CAST) {
   // own list; a user sees exactly what was granted.
   const expect = isAdmin ? null : who.projects.slice().sort();
   ok(isAdmin ? ALL.every(p => st.projects.includes(p)) : JSON.stringify(st.projects) === JSON.stringify(expect),
-     `${tag} sees ${isAdmin ? 'every project' : 'exactly the projects granted'} (${st.projects.join(', ') || 'none'})`);
+     `${tag} sees ${isAdmin ? 'every space' : 'exactly the spaces granted'} (${st.projects.join(', ') || 'none'})`);
   ok(st.admin === isAdmin && await page.evaluate(() => !!document.querySelector('#rail [data-rail="people"]')) === isAdmin,
      `${tag} People is ${isAdmin ? 'on the rail' : 'not on the rail'}, and state.admin agrees`);
   ok((st.can.terminal !== false) === isAdmin, `${tag} a shell is ${isAdmin ? 'offered' : 'not offered'}`);
@@ -86,12 +86,12 @@ for (const who of CAST) {
       await sleep(350);
     }
   }
-  ok(true, `${tag} opened all ${VIEWS.length} notebook views of ${mine.length ? mine.join(' and ') : 'no project'}`);
+  ok(true, `${tag} opened all ${VIEWS.length} notebook views of ${mine.length ? mine.join(' and ') : 'no space'}`);
   // A project not granted is not there for a user, by any door.
   if (!isAdmin) {
     const other = ALL.find(p => !who.projects.includes(p));
     const r = await api(page, `/api/roadmap?project=${other}`);
-    ok(r.status === 400 && /not a project/.test(r.error || ''), `${tag} ${other}'s notebook answers "not a project", as if it did not exist (${r.status})`);
+    ok(r.status === 400 && /not a project/.test(r.error || ''), `${tag} ${other}'s notebook answers "not a space", as if it did not exist (${r.status})`);
   }
 
   // The tabs: an administrator opens each. A user has no door to them (the
@@ -216,7 +216,7 @@ for (const who of CAST) {
     state.sessions = was; if (row) row.label = lbl;
     return r.join(' | '); });
   ok(shown === 'sh: alpha-shown | sh: alpha-shown',
-     `...and its label names the project as it is shown, not its directory (${shown})`);
+     `...and its label names the space as it is shown, not its directory (${shown})`);
   await Promise.all([owner, user1, user2].map(p => refreshUntil(p.page,
     () => ((state.projects || []).find(p => p.name === 'alpha')?.yours?.model || '') === 'sonnet',
     { timeout: 20000 }).catch(() => {})));
@@ -235,11 +235,11 @@ for (const who of CAST) {
 {
   const u2 = await pageFor(CAST.find(c => c.name === 'w.user2'));
   const own = await api(u2, '/api/prefs', { project: 'alpha', capture_days: 9 });
-  ok(own.status === 403, `a member without Project settings is refused a project setting (${own.status} ${own.error || ''})`);
+  ok(own.status === 403, `a member without Space settings is refused a space setting (${own.status} ${own.error || ''})`);
   const mine = await api(u2, '/api/prefs', { project: 'alpha', reply: 'short' });
   ok(mine.status === 200, `...and still sets what is their own on it (${mine.status} ${mine.error || ''})`);
   const row = await u2.evaluate(() => (state.projects || []).find(p => p.name === 'alpha')?.may_settings);
-  ok(row === false, `...and the page is told the project's settings are not theirs to change (${row})`);
+  ok(row === false, `...and the page is told the space's settings are not theirs to change (${row})`);
   const view = await api(u2, '/api/members', { action: 'view', project: 'alpha' });
   ok(view.status === 200 && Array.isArray(view.accounts) && view.accounts.length === 0 && view.may_invite === false,
      `a member who may not invite is not handed every account's name (${(view.accounts || []).length} named)`);
@@ -308,7 +308,7 @@ for (const who of CAST) {
     return html;
   });
   ok(/No role on a project yet/.test(b35) && !/rolesAddOn/.test(b35),
-     'with only another project\'s owner role, Add to project is not drawn dead: the way to a role is named (B35)');
+     'with only another space\'s owner role, Add to space is not drawn dead: the way to a role is named (B35)');
 
   // B38: a plain account by link.
   await user3.page.evaluate(() => { usersList = null; usersErr = ''; openUsersTab(); });
@@ -328,7 +328,7 @@ for (const who of CAST) {
     arg: tabOf(panes[0])?.arg || '', loading: !!document.querySelector('#pane0 .loading, #pane0 .skboot'),
     mem: !!document.querySelector(`#pane0 [data-project="${p}"]`) }), notTheirs);
   ok(!nb.loading && !nb.mem && nb.arg !== notTheirs,
-     `a plain account sent to a project not theirs by link is not left on a notebook loading forever (${JSON.stringify(nb)})`);
+     `a plain account sent to a space not theirs by link is not left on a notebook loading forever (${JSON.stringify(nb)})`);
 }
 
 await done(browser);

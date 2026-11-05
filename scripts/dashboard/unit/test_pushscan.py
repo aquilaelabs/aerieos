@@ -102,7 +102,7 @@ class Okayed(unittest.TestCase):
         pushscan.okay("alpha", got[:2], "ada")
         left = pushscan.fresh("alpha", got)
         self.assertEqual([f["line"] for f in left], [15, 1])
-        self.assertEqual(len(pushscan.fresh("beta", got)), 4, "another project's list is its own")
+        self.assertEqual(len(pushscan.fresh("beta", got)), 4, "another space's list is its own")
         changed = pushscan.scan(DIFF.replace("ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD", "ghp_zyxwvutsrqponmlkjihgfedcba9876543210DCBA"))
         self.assertEqual([f["line"] for f in pushscan.fresh("alpha", changed)], [2, 15, 1], "the changed token is asked about again")
         rec = pushscan._load()["alpha"][got[0]["key"]]

@@ -748,11 +748,11 @@ def may(project, part, by="claude"):
         return None
     if pol == "locked":
         return (f"{project}'s version is locked to the operator. They can "
-                f"change that on the project's Artifacts view.")
+                f"change that on the space's Artifacts view.")
     if pol == "start":
         return (f"{project}'s policy is 'start': a session may give it its first "
                 f"version and no more. Moving it is the operator's, on the "
-                f"project's Artifacts view.")
+                f"space's Artifacts view.")
     return (f"{project}'s policy is '{pol}', so a session may move "
             f"{' or '.join(_ALLOWS[pol]) or 'nothing'} but not {part}.")
 
@@ -960,7 +960,7 @@ def release_plan(project, comp="", dev=False, stable=False):
         # controller's holds a change nobody there can see (B628).
         rows = dirty.splitlines()
         shown = ", ".join(r.strip() for r in rows[:6]) + (f" and {len(rows) - 6} more" if len(rows) > 6 else "")
-        return {"error": "there are uncommitted changes in the project directory: commit or "
+        return {"error": "there are uncommitted changes in the space directory: commit or "
                          f"discard them first, so the tag marks what is actually in the commit ({shown})"}
     # A dev build is no release an install upgrades from, so it needs no
     # snapshot, as release() has it; planned with one, it was refused.
@@ -1120,7 +1120,7 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
         # The tag is made either way: a project with no push rights still
         # gets its marker, and the sentence says what is missing rather than
         # undoing the half that worked.
-        out["note"] = (f"{name} is on this commit here. This project has no push "
+        out["note"] = (f"{name} is on this commit here. This space has no push "
                        f"rights, so nothing was pushed.")
         return out
     return _push_tag(project, name, out, env)
@@ -1304,7 +1304,7 @@ def init(project, value, by="claude", comp="", env=None):
     """
     if by != "operator" and policy(project) not in _MAY_INIT:
         return {"error": f"{project}'s version is locked to the operator. They can "
-                         f"give it one on the project's Artifacts view, or set an agent's "
+                         f"give it one on the space's Artifacts view, or set an agent's "
                          f"access there to 'may start one'."}
     value = str(value or "").strip()
     if not TARGET_RE.match(value):
@@ -1318,7 +1318,7 @@ def init(project, value, by="claude", comp="", env=None):
         # One level, matching where components() looks and candidates()
         # offers: a VERSION created deeper would sit orphaned: real on disk,
         # invisible on the tab, unrollable from anywhere.
-        return {"error": "a component lives one level under the project, and "
+        return {"error": "a component lives one level under the space, and "
                          f"{rel_dir or comp} is somewhere the tab would never "
                          "show"}
     p = where / VERSION_FILE

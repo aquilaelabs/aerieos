@@ -89,7 +89,7 @@ async function holds(c, m, said){
       if (!(who?.project_roles?.[keyOf(p)] || []).includes(r)) missing.push(`${n}'s ${r} on ${p}`);
     }
   for (const p of m.projects){
-    if (!(roles.projects || []).includes(keyOf(p))) missing.push(`project ${p}`);
+    if (!(roles.projects || []).includes(keyOf(p))) missing.push(`space ${p}`);
     const ids = ((await get(`/api/roadmap?project=${p}`)).items || []).map(i => i.id);
     for (const id of m.roadmap[p]) if (!ids.includes(id)) missing.push(`${p} roadmap ${id}`);
     const bugs = ((await get(`/api/bugs?project=${p}`)).bugs || []).map(b => b.id);
@@ -105,7 +105,7 @@ async function holds(c, m, said){
     const have = (users.find(u => u.name === n)?.devices || []).map(d => d.name);
     for (const d of ds) if (!have.includes(d)) missing.push(`${n}'s device ${d}`);
   }
-  ok(!missing.length, `${said}: every account, role, project, notebook entry, tool pack and device is there`
+  ok(!missing.length, `${said}: every account, role, space, notebook entry, tool pack and device is there`
      + (missing.length ? ` (missing: ${missing.join(', ')})` : ''));
   const refused = [];
   for (const [n, pw] of Object.entries(m.passwords)){

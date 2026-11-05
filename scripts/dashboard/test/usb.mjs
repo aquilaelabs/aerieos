@@ -167,14 +167,14 @@ await page.evaluate(n => renameProject(n), 'alpha');
 await page.waitForSelector('#rnmodal:not([hidden]) #rnTestNode', { timeout: 10000 });
 const tn = await page.$eval('#rnTestNode', e => ({ hidden: e.closest('#rnTestNodeF').hidden, opts: [...e.options].map(o => o.value), words: [...e.options].map(o => o.textContent) }));
 ok(!tn.hidden && tn.opts.includes(minted.id) && tn.words.some(w => /usbbox/.test(w)) && tn.opts[0] === '',
-   `the settings dialog offers the project's nodes as its test node, the session's own first (${tn.words.join(' | ')})`);
+   `the settings dialog offers the space's nodes as its test node, the session's own first (${tn.words.join(' | ')})`);
 await page.selectOption('#rnTestNode', minted.id);
 await saveDialog(page);
 await refreshUntil(page, new Function(`return ((state.projects || []).find(p => p.name === 'alpha') || {}).prefs?.test_node === ${JSON.stringify(minted.id)}`), { timeout: 20000 }).catch(() => {});
 const kept = await page.evaluate(() => ((state.projects || []).find(p => p.name === 'alpha') || {}).prefs?.test_node || '');
 ok(kept === minted.id, `...and saving it writes the setting (${kept || 'nothing'})`);
 const refused = await call('/api/prefs', { project: 'alpha', test_node: 'n_00000000' });
-ok(/one of the project's nodes/.test(refused.error || ''), `a node outside the project's set is refused (${refused.error})`);
+ok(/one of the project's nodes/.test(refused.error || ''), `a node outside the space's set is refused (${refused.error})`);
 await call('/api/prefs', { project: 'alpha', test_node: '' });
 await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); });
 await call('/api/v1/nodes', { action: 'retire', id: minted.id });

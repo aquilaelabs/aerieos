@@ -776,12 +776,12 @@ def not_yours(repo, action, args, uid, kind="", admin=False):
         who = names.get(owner) or "the owner"
         what, ask = tree
         if not admin:
-            return {"error": f"the project directory is {who}'s working tree: only {who} can {what}"}
+            return {"error": f"the space directory is {who}'s working tree: only {who} can {what}"}
         if WORKING and WORKING(Path(repo).name, owner):
-            return {"error": f"{who}'s Claude session is working in the project directory: "
+            return {"error": f"{who}'s Claude session is working in the space directory: "
                              f"{what} when it is waiting"}
         if not args.get("confirmed"):
-            return {"confirm": f"{ask.format(who=who)}\n\nThe project directory is {who}'s working tree."}
+            return {"confirm": f"{ask.format(who=who)}\n\nThe space directory is {who}'s working tree."}
     if action == "merge":
         name = str(args.get("name") or "")
         into = str(args.get("into") or "") or (status(repo).get("branch") or "")
@@ -1011,7 +1011,7 @@ def act(repo, action, args, env=None, may_push=True):
         return _done(r, "pulled", repo)
     if action == "push":
         if not may_push:
-            return {"error": "this project has no push rights: they are granted in the clone dialog, once"}
+            return {"error": "this space has no push rights: they are granted in the clone dialog, once"}
         st = status(repo)
         branch = st.get("branch") or ""
         if not branch or branch == "(detached)":
@@ -1089,7 +1089,7 @@ def act(repo, action, args, env=None, may_push=True):
                 # are neither main nor master. The name was interpolated
                 # empty and the refusal read "or on :".
                 if not main:
-                    return {"error": f"this project has no main or master branch, so there is "
+                    return {"error": f"this space has no main or master branch, so there is "
                                      f"nothing to merge into: a merge from here lands on {here}"}
                 return {"error": f"a merge from here lands on {here}, or on {main}: "
                                  f"Switch to {into} to merge into it"}
@@ -1202,7 +1202,7 @@ def act(repo, action, args, env=None, may_push=True):
         # HERE and not only in the view, because what the row says and what
         # the button does have to be the same fact.
         if not may_push:
-            return {"error": "this project has no push rights: they are granted in the clone dialog, once"}
+            return {"error": "this space has no push rights: they are granted in the clone dialog, once"}
         full = str(args.get("name") or "")
         remote, _, branch = full.partition("/")
         if not REMOTE_RE.fullmatch(remote) or not _ok_branch(branch):
@@ -1212,7 +1212,7 @@ def act(repo, action, args, env=None, may_push=True):
             return {"error": f"there is no {full} here; Fetch first"}
         main = _main_branch(repo)
         if not main:
-            return {"error": "this project has no main or master branch to judge a delete against"}
+            return {"error": "this space has no main or master branch to judge a delete against"}
         if branch in ("main", "master", "HEAD"):
             return {"error": f"{full} is the main branch on the host; it stays"}
         if _run(repo, "merge-base", "--is-ancestor", ref, main, index=False)["code"]:
@@ -1321,11 +1321,11 @@ def _no_cred_why(repo, out):
         host = m.group(1)
     where = f"{host} " if host else ""
     if _creds(repo):
-        return (f"{where}rejected the token stored for this project: it is expired, revoked "
-                "or made for another scope. The project's settings dialog takes a new one "
+        return (f"{where}rejected the token stored for this space: it is expired, revoked "
+                "or made for another scope. The space's settings dialog takes a new one "
                 "under Access token.")
-    return (f"this project has no access token stored, and {where}asks for one: put it in the "
-            "project's settings dialog under Access token, or point the remote at ssh. "
+    return (f"this space has no access token stored, and {where}asks for one: put it in the "
+            "space's settings dialog under Access token, or point the remote at ssh. "
             "Git said it had no credential and no terminal to ask at.")
 
 

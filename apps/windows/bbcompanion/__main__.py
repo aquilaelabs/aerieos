@@ -46,7 +46,7 @@ def companion():
         _say("not signed in: python -m bbcompanion signin URL USER")
         return None
     if not s["picked"]:
-        _say("no project picked: python -m bbcompanion add PROJECT FOLDER")
+        _say("no space picked: python -m bbcompanion add PROJECT FOLDER")
         return None
     return core.Companion(c["url"], c["token"], s["picked"], settings.data_dir(), pin=s.get("pin", ""),
                           lend=s.get("lend"))

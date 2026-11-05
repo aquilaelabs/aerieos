@@ -59,12 +59,12 @@ await page.waitForSelector('#rnmodal:not([hidden])');
 // (auto)" first, which is what it reads until something is set here.
 const opts = await page.$$eval('#rnGateRoadmap option', os => os.map(o => o.value));
 const inh = await page.$eval('#rnGateRoadmap option', o => o.textContent);
-ok(opts.join(',') === 'inherit,auto,ask,deny' && inh === 'as the project (auto)'
+ok(opts.join(',') === 'inherit,auto,ask,deny' && inh === 'as the space (auto)'
    && await page.$eval('#rnGateRoadmap', e => e.value) === 'inherit'
    && await page.$eval('#rnGateRules', e => e.value) === 'inherit'
    && await page.$eval('#rnGateSettings', e => e.value) === 'inherit'
    && await page.$eval('#rnGateDesign', e => e.value) === 'inherit',
-   `the dialog offers as the project, auto, ask and deny per tab, for build and test and for the design, and reads as the project (auto) until something is set (${opts.join(',')}; ${inh})`);
+   `the dialog offers as the space, auto, ask and deny per tab, for build and test and for the design, and reads as the space (auto) until something is set (${opts.join(',')}; ${inh})`);
 await page.selectOption('#rnGateRoadmap', 'ask');
 await page.selectOption('#rnGateBugs', 'ask');
 await page.selectOption('#rnGateRules', 'deny');
@@ -72,7 +72,7 @@ await page.selectOption('#rnGateSettings', 'ask');
 await saveDialog(page);
 const gate = () => file('claude-prefs.json').projects?.alpha?.gate || {};
 ok(gate().roadmap === 'ask' && gate().bugs === 'ask' && gate().rules === 'deny' && gate().settings === 'ask',
-   'saving writes the four words beside the project\'s other settings');
+   'saving writes the four words beside the space\'s other settings');
 await page.waitForFunction(() => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.gate?.rules === 'deny',
                            null, { timeout: 30000 });
 await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
@@ -149,11 +149,11 @@ await page.click('#bBell');
 await page.waitForSelector('#bellPanel:not([hidden])');
 const row = await page.$eval('#bellPanel .bnote.ask', e => e.textContent.replace(/\s+/g, ' '));
 ok(/waiting for your approval/.test(row) && /7 changes from a session in alpha/.test(row),
-   'the bell carries one row per project, not per change');
+   'the bell carries one row per space, not per change');
 await page.click('#bellPanel [data-bpend="alpha"]');
 await page.waitForSelector('#pendModal:not([hidden])', { timeout: 10000 });
 ok(/alpha/.test(await page.$eval('#pendTitle', e => e.textContent)),
-   '...and its Review opens the project\'s list');
+   '...and its Review opens the space\'s list');
 
 // ---- the review modal -------------------------------------------------------
 await page.waitForFunction(() => document.querySelectorAll('#pendList .prow').length === 7,
@@ -178,7 +178,7 @@ await page.click('#pendApprove');
 await page.waitForFunction(() => document.querySelectorAll('#pendList .prow').length === 3,
                            null, { timeout: 15000 });
 ok(file('claude-prefs.json').projects?.alpha?.test === 'echo held-test',
-   'Approve replays the settings change: the test command lands in the project\'s settings');
+   'Approve replays the settings change: the test command lands in the space\'s settings');
 ok(bugs().some(b => b.title === 'the picker loses focus' && /seen on chrome too/.test(b.notes || '')
                     && String(b.id) === bnum && b.by === 'claude')
    && roadmapItems().some(r => r.text === 'a second held item'),

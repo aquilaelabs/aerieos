@@ -93,7 +93,7 @@ const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, c
   ok(read['ed.rw'].data && read['ed.r'].data && read['ed.cap'].data
      && read['ed.none'].status === 403 && /no file access/.test(read['ed.none'].error)
      && read['ed.out'].status === 400 && /not a project/.test(read['ed.out'].error),
-     `a read is the server's to allow: rw, r and the capped read; no access is refused with why, and a project not theirs is not one (${
+     `a read is the server's to allow: rw, r and the capped read; no access is refused with why, and a space not theirs is not one (${
        read['ed.none'].error} | ${read['ed.out'].error})`);
   const data = Buffer.from('written from an editor\n').toString('base64');
   const w = {};
@@ -109,10 +109,10 @@ const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, c
   const held = await as(c['ed.rw'], 'alpha', 'write', { path: 'editor-probe.txt', data, overwrite: true });
   await admin('/api/lock', { name: 'alpha', locked: false });
   ok(!lk.error && held.status === 403 && /read-only/.test(held.error || ''),
-     `a locked project refuses ed.rw's write through the Files API (${held.error || JSON.stringify(lk)})`);
+     `a locked space refuses ed.rw's write through the Files API (${held.error || JSON.stringify(lk)})`);
   const st = await as(c['ed.r'], 'alpha', 'stat', { path: 'editor-probe.txt' });
   ok(st.readonly === true && (await as(c['ed.rw'], 'alpha', 'stat', { path: '' })).readonly === false,
-     '...and stat tells the editor which, so a read-only project opens read-only');
+     '...and stat tells the editor which, so a read-only space opens read-only');
   const rows = execFileSync('python3', ['-c', `
 import sqlite3, sys
 db = sqlite3.connect(sys.argv[1])
@@ -130,7 +130,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const link = await as(rw, 'alpha', 'list', { path: 'editor-escape' });
   const listed = await as(rw, 'alpha', 'list', { path: '' });
   ok(up.status === 400 && git.status === 403 && link.status === 403 && !listed.entries.some(([n]) => n === '.git'),
-     `a path out of the project, through .git or through a symlink leading out is refused, and .git is never listed (${
+     `a path out of the space, through .git or through a symlink leading out is refused, and .git is never listed (${
        up.status} ${git.status} ${link.status})`);
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
   const r = await fetch(base + '/api/v1/files', { method: 'POST', body: JSON.stringify({ action: 'list', project: 'alpha', path: '' }),
@@ -174,7 +174,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const shut = await as(c['ed.rw'], 'alpha', 'list', { path: '' });
   await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: true });
   ok(gone.status === 403 && off.status === 400 && shut.status === 403 && /off in its settings/.test(shut.error),
-     `access taken away holds on the next request with the same sign-in: the role's File access, the project, the editor's switch (${gone.status} ${off.status} ${shut.status})`);
+     `access taken away holds on the next request with the same sign-in: the role's File access, the space, the editor's switch (${gone.status} ${off.status} ${shut.status})`);
   execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'passwd', 'ed.rw'], { input: 'edrwpass2\nedrwpass2\n', encoding: 'utf8', env });
   const out = await as(c['ed.rw'], 'alpha', 'list', { path: '' });
   ok(out.status === 401 && /Sign In/.test(out.error), `...and a password change signs the extension out (${out.status}: ${out.error})`);
@@ -236,7 +236,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const s = await provider.stat(uri('/editor-probe.txt'));
   ok(dir.some(([n, t]) => n === 'editor-probe.txt' && t === 1) && !dir.some(([n]) => n === '.git')
      && /Claude saved/.test(text) && s.type === 1 && !s.permissions,
-     `the extension's file system lists, reads and stats a project as VS Code asks it to (${dir.length} entries)`);
+     `the extension's file system lists, reads and stats a space as VS Code asks it to (${dir.length} entries)`);
   await provider.writeFile(uri('/from-vscode.txt'), Buffer.from('saved in VS Code\n'), { create: true, overwrite: false });
   ok(readFileSync(`${tree}/from-vscode.txt`, 'utf8') === 'saved in VS Code\n', '...and a save lands in the project\'s tree');
   writeFileSync(`${tree}/editor-probe.txt`, 'Claude again\n');
@@ -249,7 +249,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   await commands['aerieos.search']();
   const ed = opened[0];
   ok(!errors.length && ed && /^\/alpha\//.test(ed.uri.path) && ed.selection?.active.character - ed.selection?.anchor.character === 'again'.length,
-     `...Search Project Files opens the match it picked with the word selected (${errors[0] || ed?.uri.path})`);
+     `...Search Space Files opens the match it picked with the word selected (${errors[0] || ed?.uri.path})`);
   const w = provider.watch(uri('/'), { recursive: true, excludes: [] });
   await new Promise(r => setTimeout(r, 1500));
   writeFileSync(`${tree}/watched.txt`, 'appears\n');

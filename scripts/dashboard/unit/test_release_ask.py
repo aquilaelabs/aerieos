@@ -33,7 +33,7 @@ class ReleaseAsk(unittest.TestCase):
         self.assertEqual(mine[0]["cmd"], ["version", "release", "v0.5.4 on eb9d75f"])
         self.assertNotIn("principal", mine[0], "the listing never carries who to act as")
         self.assertFalse([x for x in phone.requests_open("u_00000009", True) if x["id"] == r["id"]],
-                         "an administrator who does not own the project is not the one asked")
+                         "an administrator who does not own the space is not the one asked")
 
     def test_approve_runs_the_release_and_says_what_it_made(self):
         r = phone.ask_release("0.5.4 for testers", "app", "", PLAN, "u_00000002", "ada",

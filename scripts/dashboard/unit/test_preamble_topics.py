@@ -16,7 +16,7 @@ TEMPLATE = """Intro line.
 
 <!-- BUILDERBOT:CORE-END -->
 
-## This project
+## This space
 
 Per-project line.
 
@@ -50,7 +50,7 @@ class Split(unittest.TestCase):
         self.assertNotIn("How the machine works", text)
         self.assertIn("## Kept in the block", text)
         self.assertIn("A section with no marker stays", text)
-        self.assertIn("## This project\n\nPer-project line.", text)
+        self.assertIn("## This space\n\nPer-project line.", text)
         self.assertNotIn("\n\n\n", text)
 
     def test_a_template_without_topics_is_itself(self):

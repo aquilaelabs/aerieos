@@ -422,7 +422,7 @@ let r = await row();
 ok(await page.$eval('#devRow .top .pill', e => e.textContent.trim()) === 'docker'
    && await page.$eval('#devRow .top b', e => e.textContent.trim()) === 'docker-compose.yml'
    && !!await page.$('#devRow #devSend'),
-   'a project with a compose file gets a row for it: kind on the pill, the file in bold, and Send');
+   'a space with a compose file gets a row for it: kind on the pill, the file in bold, and Send');
 // What the row does NOT say: anything about a container made from it. That
 // is the Docker tab's, and the row that said "down" read as a second place
 // to run it (the operator, 10 Oct): no state, no build, no Open, no ports.
@@ -469,7 +469,7 @@ async function saveEdit(){
 await openEdit();
 ok(await page.$eval('#cYml', e => e.value) === readFileSync(`${D}/docker-compose.yml`, 'utf8')
    && await page.$eval('#cTabForm', e => e.hidden),
-   'Edit opens on the project\'s own compose file, beside its env, with no form for an image');
+   'Edit opens on the space\'s own compose file, beside its env, with no form for an image');
 // Its name is its own, not the project's (the operator, 11 Oct): live in
 // the dialog while it is down, opening on what the row calls it, and the
 // boxes and Save live with it.
@@ -477,7 +477,7 @@ ok(await page.evaluate(() => {
      const n = document.getElementById('cName'), row = (dockerList?.instances || []).find(d => d.instance === 'main' && d.source !== 'file' && !d.running);
      return !n.disabled && !!row && n.value === row.name && !document.getElementById('cGo').disabled
        && !document.getElementById('cEnv').readOnly && /Its name is its own/.test(document.getElementById('cNameHint').textContent);
-   }), 'a project\'s container that is down offers its own name to change, with its boxes and Save live');
+   }), 'a space\'s container that is down offers its own name to change, with its boxes and Save live');
 // ...and one that runs is for reading: Save ghosted, both boxes read-only
 // and still scrollable (the operator, 11 Oct).
 ok(await page.evaluate(() => {
@@ -670,7 +670,7 @@ ok(!r.rebuild && /the code has moved since/.test(r.text) === false,
   }, sandboxId);
   const onIts = await list(sandboxId);
   ok(onIts.some(x => x === 'ep.silon|main'),
-     `an unbound instance is listed under its project's node (${onIts.join(', ')})`);
+     `an unbound instance is listed under its space's node (${onIts.join(', ')})`);
   const elsewhere = await list('n_notanodehere');
   ok(!elsewhere.some(x => x === 'ep.silon|main'),
      `...and nowhere else (${elsewhere.join(', ') || 'no rows'})`);
@@ -709,10 +709,10 @@ ok(!r.rebuild && /the code has moved since/.test(r.text) === false,
     writeFileSync(store, JSON.stringify(d));
   }
   ok(nodeOf('ep.silon', 'main') === '',
-     'a built instance with no node of its own follows its project');
+     'a built instance with no node of its own follows its space');
   const said = await setNode('ep.silon', 'n_somewhereelse');
   ok(nodeOf('ep.silon', 'main') === sandboxId,
-     `moving the project pins its built instance to the node it is on (${
+     `moving the space pins its built instance to the node it is on (${
        nodeOf('ep.silon', 'main') || 'unpinned'})`);
   ok((said.pinned || []).includes('main'),
      `...and the answer names what it pinned, rather than doing it silently (${
@@ -735,7 +735,7 @@ ok(!r.rebuild && /the code has moved since/.test(r.text) === false,
   await setNode('ep.silon', sandboxId);
   await setNode('ep.silon', 'n_somewhereelse');
   ok(nodeOf('ep.silon', 'fresh') === '',
-     `an instance that was never built is left to move with the project (${
+     `an instance that was never built is left to move with the space (${
        nodeOf('ep.silon', 'fresh') || 'unpinned'})`);
   // Put the fixture back, and in this order: a node change is itself a
   // pin, so the store is tidied after the last one, and the project ends on
@@ -890,7 +890,7 @@ await saveEdit();
   await page.fill('#cYml', was + '# edited on the Containers page\n');
   await saveEdit();
   ok(readFileSync(`${D}/docker-compose.yml`, 'utf8') === was + '# edited on the Containers page\n',
-     'a compose file saved from Edit is the project\'s own file, changed in its tree');
+     'a compose file saved from Edit is the space\'s own file, changed in its tree');
   writeFileSync(`${DIR}/dockerstate/config.fail`, '');
   await openEdit();
   await page.fill('#cYml', 'services: [nonsense\n');
@@ -1135,7 +1135,7 @@ await nudge();
 await sleep(1500);
 const probs = await devLines("bad");
 ok(probs.length === 0 && !/will not work as written/.test(await page.$eval('#devRow', r => r.textContent)),
-   `a bind into the project is one the node's synced copy has, so nothing is said against it (${probs.join(' | ').slice(0, 80)})`);
+   `a bind into the space is one the node's synced copy has, so nothing is said against it (${probs.join(' | ').slice(0, 80)})`);
 
 // A compose that reserves the NVIDIA GPU on a node that cannot hand it to a
 // container (R102): Docker's own answer is "could not select device driver
@@ -1171,7 +1171,7 @@ await page.waitForFunction(() => /asks for more than its own directory/.test(
 ok(true, 'a compose reaching past its own directory says so on the row');
 const risked = await devLines("risk");
 ok(risked.length === 2 && /runs privileged/.test(risked[0]) && /mounts \/ of the host: the node's own system/.test(risked[1]),
-   `...one line each: the flag, and the mount that reaches outside the project, which is root on the node for the asking (${risked.join(' | ').slice(0, 100)})`);
+   `...one line each: the flag, and the mount that reaches outside the space, which is root on the node for the asking (${risked.join(' | ').slice(0, 100)})`);
 
 let seen = page.dialogs.length;
 await dmClick('up');
@@ -1262,7 +1262,7 @@ const g = JSON.parse(guard.trim().split('\n').pop());
 ok(!g.git && !g.version && !g.ours,
    'git, docker version and a named compose call are what may run');
 ok(g.unnamed && g.trailing && g.bare,
-   '...and a compose call naming no project, or naming it nowhere, or any other '
+   '...and a compose call naming no space, or naming it nowhere, or any other '
    + 'docker verb, are not');
 // B192: the module built a run its own guard refused, on every poll, because
 // the mount rule wanted one component and this node reports its appdata store
@@ -1645,7 +1645,7 @@ ok([SL.second_up, SL.rebuild_during_up, SL.down_during_up]
      .every(r => /one at a time/.test(r.error || '')),
    '...and every other verb on that instance is refused while it is queued or running, not only a build');
 ok(SL.other_instance.ok && SL.queued[0].join() === 'j_2,up,staging,n_sandbox,operator',
-   '...while another instance of the same project queues behind it: one at a time is per instance');
+   '...while another instance of the same space queues behind it: one at a time is per instance');
 ok(SL.view && SL.view.running && SL.view.step === 'queued' && SL.view.action === 'up'
    && SL.view.node === 'n_sandbox',
    'the row reads its job from the queue: running, on the step "queued", with the node');
@@ -1868,14 +1868,14 @@ print(json.dumps(out))
 `], { encoding: 'utf8' });
 const NM = JSON.parse(nm.trim().split('\n').pop());
 ok(NM.after_a_project.name === 'ep-silon',
-   'a container may be named after a project: they are separate name groups');
+   'a container may be named after a space: they are separate name groups');
 ok(/already alpha/.test(NM.twice.error || ''),
-   '...but not twice, because that is one compose project with two rows on it');
+   '...but not twice, because that is one compose space with two rows on it');
 ok(Object.keys(NM.owner)[0] === 'alpha'
    && Object.keys(NM.owner.alpha)[0] === 'ep-silon',
    '...and the store keeps whose it is, which is what the name never decides');
 ok(/already alpha/.test(NM.project_told),
-   'a project whose own name was taken is told by whom, not quietly merged into it');
+   'a space whose own name was taken is told by whom, not quietly merged into it');
 
 // Making a compose file's bind directories. Docker creates a missing bind
 // source itself (as root, then chowning it), which on a share that squashes
@@ -2055,16 +2055,16 @@ print(json.dumps(out))
 const ij = JSON.parse(inst.trim().split('\n').pop());
 ok(JSON.stringify(ij.loaded) === JSON.stringify(
      { alpha: { main: { rev: 'abc1234', daemon: 'tcp://x', risks_ack: 'deadbeef' } } }),
-   'the store reads back as {project: {instance: record}}');
+   'the store reads back as {space: {instance: record}}');
 ok(JSON.stringify(ij.instances) === JSON.stringify(['main']),
-   '...and main is the instance the project has');
+   '...and main is the instance the space has');
 // The project is no longer spelled into the name. A default instance is
 // named for its project because nobody typed a name for it; a named one is
 // called what it was called, which is the whole of the change. The old
 // scheme rendered MediaReducer-Dev's instance of the same name as
 // mediareducer-dev-mediareducer-dev.
 ok(ij.pnames[0] === 'alpha' && ij.pnames[1] === 'staging',
-   'a default instance is named for its project, a named one for itself');
+   'a default instance is named for its space, a named one for itself');
 ok(ij.pnames[2] === 'two-words',
    '...slugged, so a name with spaces cannot reach a compose call');
 ok(ij.envpaths[0] !== ij.envpaths[1],
@@ -2380,16 +2380,16 @@ print(json.dumps(m.session_net_own('n1')))
   const same = (a, b) => JSON.stringify(Object.keys(a).sort().map(k => [k, a[k]])) === JSON.stringify(Object.keys(b).sort().map(k => [k, b[k]]));
   ok(same(own.alpha, { compose: ['aux'], hosts: ['192.168.1.40'], names: [],
        peers: [['192.168.1.17', 8088], ['192.168.1.17', 8443], ['192.168.1.17', 32400]] }),
-     `a project's sessions on one node reach its containers' published ports on its other node and its Mac whole (${JSON.stringify(own.alpha)})`);
+     `a space's sessions on one node reach its containers' published ports on its other node and its Mac whole (${JSON.stringify(own.alpha)})`);
   ok(same(withReads.alpha, { compose: ['aux', 'beta'], hosts: ['192.168.1.40'], names: [],
        peers: [['192.168.1.17', 1234], ['192.168.1.17', 8088], ['192.168.1.17', 8443], ['192.168.1.17', 32400]] })
      && same(withReads.beta, own.beta),
-     `a project that reads others reaches their containers here and on its own other nodes, never on a node it is not on, and the read project's own set is unchanged (${JSON.stringify(withReads.alpha)})`);
+     `a space that reads others reaches their containers here and on its own other nodes, never on a node it is not on, and the read space's own set is unchanged (${JSON.stringify(withReads.alpha)})`);
   ok(same(withReach.beta, { compose: ['beta'], hosts: ['192.168.1.50'], names: [], peers: [['192.168.1.60', 8123]] })
      && same(withReach.alpha, own.alpha),
-     `Also reaches gives a project's sessions a whole machine or one port on one, and nobody else's (${JSON.stringify(withReach.beta)})`);
+     `Also reaches gives a space's sessions a whole machine or one port on one, and nobody else's (${JSON.stringify(withReach.beta)})`);
   ok(same(own.beta, { compose: ['beta'], hosts: [], names: [], peers: [] }) && !own.gamma,
-     `...a project on this node alone reaches nothing else, and one not on this node is not named at all (${JSON.stringify(own.beta)}; gamma ${JSON.stringify(own.gamma)})`);
+     `...a space on this node alone reaches nothing else, and one not on this node is not named at all (${JSON.stringify(own.beta)}; gamma ${JSON.stringify(own.gamma)})`);
 }
 
 // ---- a container an administrator let onto the LAN (R178) ------------------
@@ -2415,7 +2415,7 @@ print(json.dumps({'n1': sorted(m.lans('n1')), 'n2': sorted(m.lans('n2'))}))
 `], { encoding: 'utf8' });
   const [own, after] = got.trim().split('\n').slice(-2).map(l => JSON.parse(l));
   ok(own.alpha?.lan === true && own.plex?.lan === true && !own.beta?.lan && own.loose?.lan === true && own.loose.owner === '',
-     `a container let onto the LAN is marked so on the wall's map, an instance by its compose project, a given container and one with no project by name, and no other (${JSON.stringify(own)})`);
+     `a container let onto the LAN is marked so on the wall's map, an instance by its compose space, a given container and one with no space by name, and no other (${JSON.stringify(own)})`);
   ok(JSON.stringify(after) === JSON.stringify({ n1: ['alpha'], n2: ['beta'] }),
      `...kept per node, and switched off it is taken out again (${JSON.stringify(after)})`);
 }
@@ -2485,7 +2485,7 @@ ok(/PORT=8080/.test(await page.$eval('#dnEnv', e => e.value)),
         offer.hint.slice(0, 70)}; has ${have.join(', ')})`);
   const fresh = await (await fetch(URL.replace(/\/$/, '') + '/api/artifacts?project=beta',
     { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
-  ok(fresh.send_as === 'beta', `...and a project with none is offered its own name (${fresh.send_as})`);
+  ok(fresh.send_as === 'beta', `...and a space with none is offered its own name (${fresh.send_as})`);
 }
 // The project's own name still means the project's own container: asked for
 // when the project already has one, the answer says so and where it is,
@@ -2998,7 +2998,7 @@ ok(/--env-file/.test(dockerLog()),
 const both = await page.$$eval('.dmtab .row[data-inst^="ep.silon|"]',
   rs => rs.map(r => r.dataset.inst));
 ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
-   '...beside the one the project already had');
+   '...beside the one the space already had');
 // The tab at a glance (R216): tiles under the bar count what runs of what
 // is here, and a container's row carries its facts as a grid with a
 // dotted state pill rather than a run-on line.
@@ -3014,7 +3014,7 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
   const head = await page.$eval('.dmtab .row[data-inst="ep.silon|staging-two"]', r => ({
     origin: r.querySelector('.dmorigin')?.textContent.replace(/\s+/g, ' ').trim() || '',
     pills: [...r.querySelectorAll('.fpill .k')].map(k => k.textContent.trim()) }));
-  ok(head.origin.length > 0 && head.pills.includes('Project'),
+  ok(head.origin.length > 0 && head.pills.includes('Space'),
      `...and a row says what it is on one line under its name, its settings as pills (${head.origin} | ${head.pills.join(', ')})`);
   // The pill on screen, waited for: read once, the first match could be a
   // redraw's fading copy, or a row in a pane not yet drawn, whose dot has no
@@ -3141,13 +3141,13 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
   const chips = await page.$$eval('.dmtab .chips .chip', cs => cs.map(c => c.dataset.dmchip));
   if (chips.length){
     const mine = await page.$$eval('.dmtab .chips .chip', cs => cs.find(c => c.dataset.dmchip === 'ep.silon')?.textContent || '');
-    ok(chips[0] === '' && /ep\.silon/.test(mine), `the chips start with All and count each project (${chips.join('|')})`);
+    ok(chips[0] === '' && /ep\.silon/.test(mine), `the chips start with All and count each space (${chips.join('|')})`);
     await page.click('.dmtab .chips .chip[data-dmchip="ep.silon"]');
     await page.waitForFunction(() => document.querySelector('.dmtab .chip.on')?.dataset.dmchip === 'ep.silon', null, { timeout: 5000 });
     await faded(page);
     const shown = await page.$$eval('.dmtab .dmgroup b', bs => bs.map(b => b.textContent.trim()));
     ok(shown.length === 1 && /ep\.silon|epsilon/i.test(shown[0]),
-       `...a chip narrows the list to that project's group alone (${shown.join('|')})`);
+       `...a chip narrows the list to that space's group alone (${shown.join('|')})`);
     await page.click('.dmtab .chips .chip[data-dmchip=""]');
     await page.waitForFunction(() => document.querySelector('.dmtab .chip.on')?.dataset.dmchip === '', null, { timeout: 5000 });
     ok(await page.$$eval('.dmtab .dmgroup', gs => gs.length) > 1, '...and All puts every group back');
@@ -3170,7 +3170,7 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
     ok(kept.at > 0 && Math.abs(kept.now - kept.at) <= 1,
        `...and a chip row scrolled along stays where it was when a chip is pressed (${JSON.stringify(kept)})`);
   } else {
-    ok(true, 'one project here, so no chips: a chip row of one is not drawn');
+    ok(true, 'one space here, so no chips: a chip row of one is not drawn');
   }
   // A published port is the address it answers at (R216): the card's Open,
   // its main action (the operator's concept, 17 Oct), or a stack's service's.
@@ -3200,7 +3200,7 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
     body: !!d.querySelector('.dmbody .dmhead') }));
   ok(!line.open && /staging-two/.test(line.name || '') && /7475/.test(line.facts || '') && line.body
      && /^Container\|State\|Project\|Ports\|Address\|Image$/.test(line.head),
-     `in list view a container is one line of a table under its project, its name, state and facts in columns, with its card behind it (${JSON.stringify(line)})`);
+     `in list view a container is one line of a table under its space, its name, state and facts in columns, with its card behind it (${JSON.stringify(line)})`);
   // Pressed on its name: the line's middle is its Ports column, and a port
   // there is a link that answers the press itself.
   await page.click('.dmtab details.dmline[data-inst="ep.silon|staging-two"] > summary.dmsum .td.lead');
@@ -3261,7 +3261,7 @@ const slides = page.waitForFunction(
 await page.click('#cTabEnv');
 await slides;
 ok(!await page.$eval('#cEnvField', e => e.hidden),
-   '...and the segment swaps them, on the same slide as the project dialog');
+   '...and the segment swaps them, on the same slide as the space dialog');
 // An empty compose is refused rather than written: the placeholder is not
 // a value, and nothing here invents one.
 await page.click('#cTabYml');
@@ -3290,7 +3290,7 @@ await page.click('#cGo');
 // checked the file before this Create had reached the server.
 await page.waitForFunction(() => document.getElementById('cmodal').hidden, null, { timeout: 20000 });
 ok(existsSync(`${DIR}/state/containers/radarr/docker-compose.yml`),
-   'one that parses is written to /config, where no project scan can see it');
+   'one that parses is written to /config, where no space scan can see it');
 await page.waitForSelector('.dmtab .row[data-inst="radarr|main"]', { timeout: 20000 });
 // Its name is editable while it is down (the operator, 11 Oct): the Edit
 // dialog's Name field is live for a container with nothing running, and
@@ -3394,7 +3394,7 @@ await page.waitForSelector('.dmtab .row[data-inst="radarr|main"]', { timeout: 20
              sideways: t.scrollWidth > t.clientWidth + 2,
              actsVisible: !!acts && acts.getBoundingClientRect().height > 0 };
   });
-  ok(!narrow.fold, `on a phone the row's detail and its Project picker are on the row, no fold (${JSON.stringify(narrow)})`);
+  ok(!narrow.fold, `on a phone the row's detail and its Space picker are on the row, no fold (${JSON.stringify(narrow)})`);
   ok(!narrow.sideways && narrow.actsVisible, '...nothing scrolls sideways, and the row keeps its buttons');
   // At 360 and 344 the bar's buttons stay on one line with nothing past the
   // screen's edge (the search takes the row's first line and the buttons go
@@ -3489,7 +3489,7 @@ ok(/written here/.test(await page.$eval(
        .filter(h => h.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING);
      return /No project/.test(heads.pop()?.textContent || '');
    }),
-   '...and the manager says which kind it is on the row, under No project, since none was picked');
+   '...and the manager says which kind it is on the row, under No space, since none was picked');
 // Editing one: what it is changes far more often than it is created, and
 // without this the only way to move a port was to remove it and retype it.
 await pressIn('.dmtab .row[data-inst="radarr|main"] [data-dm="edit"]');
@@ -3526,7 +3526,7 @@ await page.fill('#cName', 'alpha');
 await page.click('#cGo');
 await page.waitForSelector('#cErrWrap:not([hidden])', { timeout: 15000 });
 ok(/the project alpha/.test(await page.$eval('#cErr', e => e.textContent)),
-   'a name a project already has is refused');
+   'a name a space already has is refused');
 await page.fill('#cName', '');
 await page.click('#cCancel');
 
@@ -3541,7 +3541,7 @@ await page.fill('#cName', 'ep-silon');
 await page.click('#cGo');
 await page.waitForSelector('#cErrWrap:not([hidden])', { timeout: 15000 });
 ok(/ep\.silon/.test(await page.$eval('#cErr', e => e.textContent)),
-   '...as is one that only collides once it is slugged, naming the project it hit');
+   '...as is one that only collides once it is slugged, naming the space it hit');
 ok(!existsSync(`${DIR}/state/containers/ep-silon`),
    '...and nothing is written for it');
 await page.click('#cCancel');
@@ -3562,7 +3562,7 @@ await page.fill('#dnName', 'staging-two');
 await page.click('#dnGo');
 await page.waitForSelector('#dnErrWrap:not([hidden])', { timeout: 10000 });
 ok(/already has an instance/.test(await page.$eval('#dnErr', e => e.textContent)),
-   'a name the project already uses is refused, in place');
+   'a name the space already uses is refused, in place');
 await page.click('#dnCancel');
 
 // Removing takes it down and drops it from the list, and the project's
@@ -3577,7 +3577,7 @@ ok(/compose --project-name staging-two .*down/.test(dockerLog()),
    '...taking it down first, rather than orphaning its containers');
 await showRow();
 ok(await page.$('#devSend'),
-   '...and the project can still send another: the artifact row persists');
+   '...and the space can still send another: the artifact row persists');
 
 // Copy or move (the operator, 10 Oct): a row's button opens a dialog with
 // the node it is on left out, the project's own nodes grouped first, and its
@@ -3623,7 +3623,7 @@ ok(await page.$('#devSend'),
     return [...sel.querySelectorAll('optgroup')].map(g => [g.label.split(':')[0], [...g.children].map(o => o.value)]);
   });
   ok(JSON.stringify(grouped) === '[["ep.silon\'s nodes",["b"]],["Other nodes",["a"]]]',
-     `the node picker puts the project's own nodes first and leaves out the one it is on (${JSON.stringify(grouped)})`);
+     `the node picker puts the space's own nodes first and leaves out the one it is on (${JSON.stringify(grouped)})`);
   // The projects a container may be put under, sent from or moved to: the
   // account's own list, whatever its role, and a row's own project kept.
   const picked = await page.evaluate(() => {
@@ -3634,7 +3634,7 @@ ok(await page.$('#devSend'),
     return r;
   });
   ok(JSON.stringify(picked) === '["mine1","rowsown"]',
-     `the project pickers offer only the account's own projects, and the row's current one (${JSON.stringify(picked)})`);
+     `the space pickers offer only the account's own spaces, and the row's current one (${JSON.stringify(picked)})`);
 }
 
 // Every compose file in the repository is a row with its own Send (the
@@ -3734,7 +3734,7 @@ ok(await page.$('#devSend'),
 
   const bad = await api({ project: 'ep.silon', instance: 'main', action: 'ref', ref: 'nope' });
   ok(bad.status === 400 && /no branch or commit/.test(bad.error || ''),
-     `a ref the project does not have is refused here, not at build time (${
+     `a ref the space does not have is refused here, not at build time (${
         String(bad.error).slice(0, 50)})`);
   const set = await api({ project: 'ep.silon', instance: 'main', action: 'ref', ref: 'sidebranch' });
   ok(set.ok && set.ref === 'sidebranch', `an instance can be pinned to a branch (${
@@ -3795,11 +3795,11 @@ ok(await page.$('#devSend'),
   ok(!built.error, `the rebuild is taken (${JSON.stringify(built).slice(0, 60)})`);
   await idle();
   ok(existsSync(`${DIR}/ws/ep-silon-main-build/ONLY-ON-SIDE.txt`),
-     'the build tree is a worktree of that branch, beside the project');
+     'the build tree is a worktree of that branch, beside the space');
   ok(existsSync(`${DIR}/ws/ep-silon-main-build/.bbignore`),
-     '...marked so the projects list does not take it for one');
+     '...marked so the spaces list does not take it for one');
   ok(new RegExp(`--project-directory ${DIR}/ws/ep-silon-main-build`).test(dockerLog()),
-     `...and compose built from it rather than from the project (${
+     `...and compose built from it rather than from the space (${
         (dockerLog().match(/--project-directory \S+/g) || []).slice(-1)[0] || 'none'})`);
   ok(sideSha.length === 7, `the branch had its own commit (${sideSha})`);
   // NOW it is true, and the line says it: the ref is stamped by the build that
@@ -3853,16 +3853,16 @@ ok(await page.$('#devSend'),
     let moved = '';
     try { G('checkout', '-q', 'sidebranch'); }
     catch (e) { moved = String(e.stderr || e).split('\n')[0]; }
-    ok(!moved, `the project's own checkout can still move onto the branch a build tree was made from${
+    ok(!moved, `the space's own checkout can still move onto the branch a build tree was made from${
        moved ? `: ${moved.slice(0, 90)}` : ''}`);
     const again = await api({ project: 'ep.silon', instance: 'main', action: 'rebuild' });
-    ok(!again.error, `a branch the project itself is standing on still builds (${
+    ok(!again.error, `a branch the space itself is standing on still builds (${
        JSON.stringify(again).slice(0, 70)})`);
     await idle();
     ok(existsSync(`${DIR}/ws/ep-silon-main-build/ONLY-ON-SIDE.txt`),
        '...from that branch, rather than from whatever else was lying around');
     ok(G('rev-parse', '--abbrev-ref', 'HEAD').trim() === 'sidebranch',
-       '...with the project left standing exactly where it was');
+       '...with the space left standing exactly where it was');
     const head = execFileSync('git', ['-C', `${DIR}/ws/ep-silon-main-build`,
                                       'rev-parse', '--abbrev-ref', 'HEAD'],
                               { env, encoding: 'utf8' }).trim();
@@ -3871,7 +3871,7 @@ ok(await page.$('#devSend'),
     G('checkout', '-q', '-');
   }
   const off = await api({ project: 'ep.silon', instance: 'main', action: 'ref', ref: '' });
-  ok(off.ok && off.ref === '', '...and clearing it puts the build back on the project itself');
+  ok(off.ok && off.ref === '', '...and clearing it puts the build back on the space itself');
   // The worktree first: git refuses to delete a branch that one has checked
   // out, which is the same protection that makes this design safe at all.
   try { G('worktree', 'remove', '--force', `${DIR}/ws/ep-silon-main-build`); }
@@ -3910,7 +3910,7 @@ ok(await page.$('#devSend'),
   // artifact row to the Docker tab and this sentence stayed behind, pointing
   // a session at a tab that no longer has it.
   ok(off.status === 403 && /project's settings, Agents may: Run its container/.test(off.error || ''),
-     `a session cannot rebuild until the project says so, and is told where the setting is (${
+     `a session cannot rebuild until the space says so, and is told where the setting is (${
         JSON.stringify(off).slice(0, 90)})`);
   // The two verbs that make and unmake a container are not on the dial at
   // all: they are docker-write, which a session's principal never has, so
@@ -3950,7 +3950,7 @@ ok(await page.$('#devSend'),
     for (const act of ['rebuild', 'test']){
       const r = await asSession({ project: 'ep.silon', action: act, instance: 'main' });
       ok(r.status === 403 && /on another node/.test(r.error || ''),
-         `a session may not ${act} an instance left on the node the project moved off (${
+         `a session may not ${act} an instance left on the node the space moved off (${
            String(r.error).slice(0, 56)})`);
     }
     // ...and it can still SEE it, which is how it knows to say so rather than
@@ -4025,14 +4025,14 @@ ok(await page.$('#devSend'),
        `on auto a session sets its container's env and reads it back (${set.status}, ${got.status})`);
     const made = await asSession({ project: 'ep.silon', action: 'new', instance: 'fresh' });
     ok(made.status === 200 && made.instance === 'fresh',
-       `...and creates its project's own container (${made.error || made.instance})`);
+       `...and creates its space's own container (${made.error || made.instance})`);
     const under = await asSession({ project: 'ep.silon', action: 'new', instance: 'elsewhere', owner: 'alpha' });
-    ok(under.status === 403, `...but not one belonging to another project (${under.status})`);
+    ok(under.status === 403, `...but not one belonging to another space (${under.status})`);
     // ...nor one sent to a node its project does not name under Hosts its
     // containers on (prefs.hosts, the operator, 10 Oct): that is a person's.
     const away = await asSession({ project: 'ep.silon', action: 'new', instance: 'away', node: 'nowhere-node', ship: true });
     ok(away.status === 403 && /unless the node is ticked under Also works on/.test(away.error || ''),
-       `...nor one shipped to a node its project's settings do not name, said with where to name it (${away.status})`);
+       `...nor one shipped to a node its space's settings do not name, said with where to name it (${away.status})`);
     // ...and one shipped to a node the settings DO name under Hosts its
     // containers on keeps that node and is marked shipped: the session branch
     // blanked the node after the gate had let it through, so the container
@@ -4183,7 +4183,7 @@ ok(await page.$('#devSend'),
     // makes it, pins it and builds it from there.
     {
       const G = (...a) => execFileSync('git', ['-C', D, ...a], { env, encoding: 'utf8' });
-      ok(insts().includes('main'), `the project has its own container to send another beside (${insts().join(', ')})`);
+      ok(insts().includes('main'), `the space has its own container to send another beside (${insts().join(', ')})`);
       const second = await asSession({ project: 'ep.silon', action: 'new' });
       const third = await asSession({ project: 'ep.silon', action: 'new' });
       ok(second.status === 200 && second.instance === 'ep-silon-2' && third.instance === 'ep-silon-3',
@@ -4243,7 +4243,7 @@ ok(await page.$('#devSend'),
   // auto set through the API above is this repository's own.
   ok(await page.$eval('#rnGateDocker', e => e.value === 'auto' && !e.closest('label').hidden
                         && [...e.options].map(o => o.value).join() === 'inherit,auto,ask,deny'),
-     "the project's settings carry it, on auto, with the other Agents may dials");
+     "the space's settings carry it, on auto, with the other Agents may dials");
   // The Claude section holds the test-run setting too (25 Sep): what a
   // change asked for during a run does, saved with the rest of the dialog,
   // under the section's heading since the dialog was put in sections (1 Oct).
@@ -4281,10 +4281,10 @@ ok(await page.$('#devSend'),
   // link to where it is changed.
   ok(/Tests ?on the node/.test(
        await page.$eval('.dmtab .row[data-inst^="ep.silon|"]', r => r.textContent.replace(/\s+/g, ' '))),
-     'the row says where this project\'s tests run, in words: on the node unless the project says otherwise (B241)');
+     'the row says where this space\'s tests run, in words: on the node unless the space says otherwise (B241)');
   ok(await page.$('.dmtab [data-dmtestgo="ep.silon"]') !== null
      && await page.$('.dmtab [data-dmtest="ep.silon"]') === null,
-     '...and links to the project settings rather than carrying the control');
+     '...and links to the space settings rather than carrying the control');
   // ...and the control is there, offered only where there is a container to
   // run in: a project with no compose file is not asked the question.
   await page.evaluate(() => { openProjectsTab(); });
@@ -4293,7 +4293,7 @@ ok(await page.$('#devSend'),
   ok(await page.$eval('#rnTestWhere', e => !e.hidden)
      && await page.$eval('#rnDevTest', e => [...e.options].map(o => o.value).join() === 'node,up,only'
                                           && e.value === 'node'),
-     'the project settings dialog carries where its tests run, beside its node and command');
+     'the space settings dialog carries where its tests run, beside its node and command');
   await page.selectOption('#rnDevTest', 'only');
   await saveDialog(page);
   await refreshUntil(page, () => ((state.projects || [])
@@ -4303,7 +4303,7 @@ ok(await page.$('#devSend'),
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   ok(await page.$eval('#rnTestWhere', e => e.hidden),
-     '...while a project with no compose file is not asked the question at all');
+     '...while a space with no compose file is not asked the question at all');
   await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); openDocker(); });
   await page.waitForSelector('.dmtab', { timeout: 15000 });
 
@@ -4425,12 +4425,12 @@ ok(await page.$('#devSend'),
   await setTest('printf "TEST-RAN-%s\\n"');
   const nocmd = await asSession({ project: 'ep.silon', action: 'test', args: ['one', 'two'] });
   ok(nocmd.status === 200 && nocmd.started && /^j_/.test(nocmd.job || ''),
-     `a session runs the project's tests inside its instance with the dial on deny (${JSON.stringify(nocmd).slice(0, 80)})`);
+     `a session runs the space's tests inside its instance with the dial on deny (${JSON.stringify(nocmd).slice(0, 80)})`);
   const j1 = await finished(nocmd.job);
   ok(j1.state === 'succeeded' && /TEST-RAN-one\n.*TEST-RAN-two/s.test(j1.log || ''),
      `...the recorded command runs there with the arguments as positional parameters (${j1.state}: ${(j1.log || '').replace(/\n/g, ' / ').slice(-160)})`);
   ok(/exec -T -e BB_TEST_TIMING=1 -e BB_IN_INSTANCE=1 -e BB_TEST_WORKERS app sh -c printf/.test(j1.log || ''),
-     '...through compose exec into the service the project builds, with timing on for the registry, and no working directory when nothing mounts the project');
+     '...through compose exec into the service the space builds, with timing on for the registry, and no working directory when nothing mounts the space');
   // A compose that mounts the project (or the whole share it sits in) puts
   // the tests in the project's directory inside the container: the first
   // run of AerieOS's own suite inside its instance ran at / instead.
@@ -4438,7 +4438,7 @@ ok(await page.$('#devSend'),
     volumes: [{ type: 'bind', source: `${DIR}/ws`, target: '/workspace' }] } } }));
   const j1b = await finished((await asSession({ project: 'ep.silon', action: 'test', args: ['wd'] })).job);
   ok(/exec -T -e BB_TEST_TIMING=1 -e BB_IN_INSTANCE=1 -e BB_TEST_WORKERS -w \/workspace\/ep\.silon app sh -c/.test(j1b.log || ''),
-     `...and in the project's directory inside the container when the compose mounts it (${(j1b.log || '').match(/exec [^\n]*/)?.[0]?.slice(0, 90)})`);
+     `...and in the space's directory inside the container when the compose mounts it (${(j1b.log || '').match(/exec [^\n]*/)?.[0]?.slice(0, 90)})`);
   // BB_IN_INSTANCE is how run.sh tells "these tests ARE the container's" from
   // "these tests were run around it": a dev instance is a container and so is
   // the controller, so the suite cannot work it out for itself, and without it
@@ -4474,7 +4474,7 @@ ok(await page.$('#devSend'),
     const inside = bbTest();
     ok(inside.code === 0 && /the tests run inside it, as its settings say/.test(inside.out)
        && /TEST-RAN-where/.test(inside.out),
-       `...and inside the instance where the project says up (${inside.out.replace(/\s+/g, ' ').slice(0, 140)})`);
+       `...and inside the instance where the space says up (${inside.out.replace(/\s+/g, ' ').slice(0, 140)})`);
     await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project: 'ep.silon', tests_in: 'node' }) }));
   }
@@ -4489,7 +4489,7 @@ ok(await page.$('#devSend'),
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'ep.silon', action: 'state' }) })).json()));
   ok((only.state || only).name === 'ep-silon' || (only.state || only).instance === 'main',
-     `a request naming no instance is answered for the project's only one (${JSON.stringify(only.state || only).slice(0, 60)})`);
+     `a request naming no instance is answered for the space's only one (${JSON.stringify(only.state || only).slice(0, 60)})`);
   // ...and one named by the compose name aerie devapp ls shows it under is
   // that one too, where --instance took only `main` (B396).
   const byName = await page.evaluate(async () => (await (await fetch('/api/devapp', {
@@ -4599,10 +4599,10 @@ print(json.dumps(out))
   const made = await api('/api/container', { action: 'create', name: 'helper-for-eps', owner: 'ep.silon',
                                             compose: 'services:\n  app:\n    image: alpine\n', env: '' });
   ok(made.ok && made.project === 'helper-for-eps',
-     `a container written here can be made for a project (${JSON.stringify(made).slice(0, 80)})`);
+     `a container written here can be made for a space (${JSON.stringify(made).slice(0, 80)})`);
   const bad = await api('/api/container', { action: 'create', name: 'helper-for-nobody', owner: 'no-such-project',
                                            compose: 'services:\n  app:\n    image: alpine\n', env: '' });
-  ok(/not a project: no-such-project/.test(bad.error || ''), 'a project nobody can see is refused');
+  ok(/not a project: no-such-project/.test(bad.error || ''), 'a space nobody can see is refused');
   // Sent with "no project" picked, a project's own container belongs to none,
   // which is not the same as sending it with nothing said.
   const loose = await api('/api/devapp', { project: 'ep.silon', action: 'new', instance: 'loose', owner: '' });
@@ -4611,7 +4611,7 @@ print(json.dumps(out))
   ok(loose.ok && row('helper-for-eps', 'main').owner === 'ep.silon' && row('ep.silon', 'main').owner === 'ep.silon'
      && row('ep.silon', 'loose').owner === ''
      && (listed.containers || []).find(c => c.name === 'someone-elses')?.owner === '',
-     `the manager's answer says whose each row is: a written one its pick, a project's its own unless sent with no project, another's nobody's (${
+     `the manager's answer says whose each row is: a written one its pick, a space's its own unless sent with no space, another's nobody's (${
        JSON.stringify((listed.instances || []).map(d => [d.name, d.owner]))})`);
 
   // ---- a project's own container moved to another project (8 Oct) ------------
@@ -4622,7 +4622,7 @@ print(json.dumps(out))
   for (const p of ['alpha', 'gamma']) await api('/api/prefs', { project: p, node: epNode, nodes: epNode ? [epNode] : [] });
   writeFileSync(`${DIR}/ws/alpha/docker-compose.yml`, 'services:\n  app:\n    image: alpha-dev\n');
   const nowhere = await api('/api/devapp', { project: 'ep.silon', action: 'move', instance: 'loose', to: 'no-such' });
-  ok(nowhere.status === 400 && /no project called no-such/.test(nowhere.error || ''), `a move names a project there is (${nowhere.error})`);
+  ok(nowhere.status === 400 && /no project called no-such/.test(nowhere.error || ''), `a move names a space there is (${nowhere.error})`);
   const moveTok = execFileSync('bash', [fileURLToPath(new globalThis.URL('../../aerie', import.meta.url)), 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const bySess = await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST',
@@ -4648,7 +4648,7 @@ print(json.dumps(out))
   const gone1 = await api('/api/trash', { name: 'gamma' });
   const whileGone = await api('/api/docker');
   ok(zc.ok && gone1.ok && zrow(whileGone).owner === '' && JSON.stringify(gone1.unassigned || []).includes('helper-for-gamma'),
-     `a deleted project's container keeps running, given to no project (${JSON.stringify(zrow(whileGone)).slice(0, 120)} ${zc.error || gone1.error || ''})`);
+     `a deleted space's container keeps running, given to no space (${JSON.stringify(zrow(whileGone)).slice(0, 120)} ${zc.error || gone1.error || ''})`);
   await openManager();
   await page.waitForFunction(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No project/.test(b.textContent)), null, { timeout: 15000 }).catch(() => {});
   ok(await page.evaluate(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No project/.test(b.textContent))),
@@ -4673,10 +4673,10 @@ print(json.dumps(out))
                              null, { timeout: 20000 });
   let g = await groups();
   const heads = g.map(x => x.head);
-  const named = heads.filter(h => h !== 'No project');
-  ok(heads[heads.length - 1] === 'No project'
+  const named = heads.filter(h => h !== 'No space');
+  ok(heads[heads.length - 1] === 'No space'
      && JSON.stringify(named) === JSON.stringify([...named].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))),
-     `the manager groups rows by project, alphabetically, with no project last (${heads.join(' | ')})`);
+     `the manager groups rows by space, alphabetically, with no space last (${heads.join(' | ')})`);
   // Each heading is a band that stands out from the rows under it (the
   // operator, 24 Sep): tinted and barred down its left, in the project's
   // own color when it has one, and plain for No project.
@@ -4685,8 +4685,8 @@ print(json.dumps(out))
     bg: getComputedStyle(h).backgroundColor, bar: getComputedStyle(h).boxShadow })));
   let b = await bands();
   const eps = b.find(x => x.head === 'ep.silon');
-  ok(eps && !/rgba\(0, 0, 0, 0\)/.test(eps.bg) && /inset/.test(eps.bar) && b.find(x => x.head === 'No project')?.none,
-     `a project's heading is a tinted band with a bar down its left, and No project is marked plain (${JSON.stringify(eps)})`);
+  ok(eps && !/rgba\(0, 0, 0, 0\)/.test(eps.bg) && /inset/.test(eps.bar) && b.find(x => x.head === 'No space')?.none,
+     `a space's heading is a tinted band with a bar down its left, and No space is marked plain (${JSON.stringify(eps)})`);
   await api('/api/project-color', { name: 'ep.silon', color: 'teal' });
   await refreshUntil(page, () => (state.projects || []).find(p => p.name === 'ep.silon')?.color === 'teal',
                      { timeout: 20000 });
@@ -4701,12 +4701,12 @@ print(json.dumps(out))
   };
   const teal = await page.waitForFunction(tealBar, false, { timeout: patience(10000) })
     .then(h => h.jsonValue(), () => page.evaluate(tealBar, true));
-  ok(/57, 181, 176/.test(teal || ''), `...in the project's own color once it has one (${teal})`);
+  ok(/57, 181, 176/.test(teal || ''), `...in the space's own color once it has one (${teal})`);
   await api('/api/prefs', { project: 'ep.silon', color: '' });
   const under = h => (g.find(x => x.head === h) || { rows: [] }).rows;
   ok(under('ep.silon').includes('ep.silon|main') && under('ep.silon').includes('helper-for-eps|main')
-     && under('No project').includes('ep.silon|loose') && under('No project').includes('someone-elses'),
-     `...a project's own container and one written for it together, and the rest under No project (${
+     && under('No space').includes('ep.silon|loose') && under('No space').includes('someone-elses'),
+     `...a space's own container and one written for it together, and the rest under No space (${
        JSON.stringify(g)})`);
   // ...and the project is a setting on the row, staged and applied.
   const R = '.dmtab .row[data-ctr="someone-elses"]';
@@ -4714,7 +4714,7 @@ print(json.dumps(out))
   await page.waitForSelector(`${R} [data-dmapply]`, { timeout: 15000 });
   ok(await page.$eval(`${R} [data-dmapply]`, b => b.disabled)
      && await page.$eval(`${R} [data-dmown]`, e => e.value === '' && [...e.options].some(o => o.value === 'ep.silon')),
-     'a container somebody else started carries a Project setting, on no project, with Apply asleep');
+     'a container somebody else started carries a Space setting, on no space, with Apply asleep');
   await page.selectOption(`${R} [data-dmown]`, 'ep.silon');
   ok(!await page.$eval(`${R} [data-dmapply]`, b => b.disabled), '...which a pick wakes');
   await page.click(`${R} [data-dmapply]`);
@@ -4727,7 +4727,7 @@ print(json.dumps(out))
   // Its Claude pill says what the project's sessions may do with it (the
   // operator's concept, 17 Oct: settings read as pills).
   ok(/Agent\s*(start · stop|asks first|reads its log)/.test(await page.$eval(R, r => r.textContent)),
-     "...and Apply moves it under that project, saying what the project's sessions may do with it");
+     "...and Apply moves it under that space, saying what the space's sessions may do with it");
   ok(JSON.parse(readFileSync(`${DIR}/state/docker-owners.json`, 'utf8'))
        && Object.values(JSON.parse(readFileSync(`${DIR}/state/docker-owners.json`, 'utf8')))
          .some(n => n['someone-elses'] === 'ep.silon'),
@@ -4751,7 +4751,7 @@ print(json.dumps(out))
     tiles: [...v.querySelectorAll('#dkHint .tile')].map(t => t.textContent.replace(/\s+/g, ' ').trim()) }));
   ok(view.rows.includes('helper-for-eps|main') && view.rows.includes('ep.silon|main')
      && view.rows.includes('someone-elses') && !view.rows.includes('ep.silon|loose'),
-     `the project's Docker view lists what belongs to it, and not its own container sent to no project (${view.rows.join(' ')})`);
+     `the space's Docker view lists what belongs to it, and not its own container sent to no space (${view.rows.join(' ')})`);
   ok(view.buttons.includes('up') && view.buttons.includes('rebuild'),
      `...with the manager's own rows and controls (${view.buttons.join(' ')})`);
   ok(/\d+ running of \d+ containers?/.test(view.hint.replace(/\s+/g, ' ')) && /\bon \S/.test(view.hint),
@@ -4759,7 +4759,7 @@ print(json.dumps(out))
   // As the Containers page draws them, scoped to the project (the operator,
   // 19 Oct): its own card under its tiles, no row loose on the page.
   ok(view.cards.length === 1 && view.loose === 0 && view.tiles.some(t => /running/.test(t)) && !view.tiles.some(t => /projects/.test(t)),
-     `...in the project's own card under its tiles, as the Containers page draws a group (${JSON.stringify({cards: view.cards, loose: view.loose, tiles: view.tiles})})`);
+     `...in the space's own card under its tiles, as the Containers page draws a group (${JSON.stringify({cards: view.cards, loose: view.loose, tiles: view.tiles})})`);
   // Idle, the view re-reads nothing (B727): it followed the status poll, and
   // on an agent node each docker read moved the nodes token, which ran the
   // status poll, which read docker again, 134 requests in 30 s.
@@ -4769,7 +4769,7 @@ print(json.dumps(out))
   const dkIdle = await page.evaluate(() => window.__dk);
   // At most one: the manager's token may move once in the window (a job from
   // the checks above ending), and that one read is the re-read wanted.
-  ok(dkIdle <= 1, `the project's Docker view, left alone for 8 s, reads the manager ${dkIdle} time${dkIdle === 1 ? '' : 's'} (at most 1: it re-reads on the devapp token, never on the status poll)`);
+  ok(dkIdle <= 1, `the space's Docker view, left alone for 8 s, reads the manager ${dkIdle} time${dkIdle === 1 ? '' : 's'} (at most 1: it re-reads on the devapp token, never on the status poll)`);
 
   // ---- what its session can reach ------------------------------------------------
   const tok = execFileSync('bash', [`${fileURLToPath(new globalThis.URL('../../../', import.meta.url))}scripts/aerie`,
@@ -4789,13 +4789,13 @@ print(json.dumps(out))
      && !(seen.instances || []).some(d => d.instance === 'loose')
      && JSON.stringify((seen.containers || []).map(c => c.name)) === '["someone-elses"]'
      && JSON.stringify(seen.refs) === '{}',
-     `a session lists only what belongs to its project, on its node (${JSON.stringify([
+     `a session lists only what belongs to its space, on its node (${JSON.stringify([
        (seen.instances || []).map(d => d.name), (seen.containers || []).map(c => c.name)])})`);
   // Anybody else naming the project reads the same node (aerie devapp ls outside a session).
   const byProject = await api('/api/docker?project=ep.silon');
   const noProject = await api('/api/docker?project=no-such-project');
   ok(byProject.node === seen.node && noProject.status === 400,
-     `naming the project reads its node, as its session does, and a project that is not one is refused (${
+     `naming the space reads its node, as its session does, and a space that is not one is refused (${
        byProject.node} ${seen.node} ${noProject.status})`);
   const st = await as('/api/devapp', { container: 'helper-for-eps', action: 'state' });
   // A written container has no repository: its row asks no git about a
@@ -4805,7 +4805,7 @@ print(json.dumps(out))
   ok(gitWarned.length === 0, `a written container's row runs no git where it has no tree (${gitWarned.length}: ${gitWarned[0] || ''})`);
   const theirs = await as('/api/devapp', { project: 'ep.silon', instance: 'loose', action: 'state' });
   ok(st.status === 200 && theirs.status === 403 && /does not belong to ep\.silon/.test(theirs.error || ''),
-     `...reads one written for it by name, and not its own project's container sent to no project (${st.status}, ${theirs.error})`);
+     `...reads one written for it by name, and not its own space's container sent to no space (${st.status}, ${theirs.error})`);
   const log = await as('/api/dockerctl', { action: 'logs', container: 'someone-elses' });
   ok(/hello from someone-elses/.test(log.text || ''), `...reads the log of one somebody else started, put under it (${log.status})`);
   // ...and one of its own by the name aerie devapp ls prints, which is the
@@ -4871,7 +4871,7 @@ print(json.dumps(out))
                                BB_TOKEN: tok, BB_PROJECT: 'ep.silon', XDG_CACHE_HOME: cache },
       stdio: ['ignore', 'pipe', 'pipe'] });
   ok(/helper-for-eps\s+written here/.test(ls) && /someone-elses\s+not ours/.test(ls) && !/loose/.test(ls),
-     `aerie devapp ls lists what belongs to the project and nothing else (${ls.trim().replace(/\s+/g, ' ').slice(0, 120)})`);
+     `aerie devapp ls lists what belongs to the space and nothing else (${ls.trim().replace(/\s+/g, ' ').slice(0, 120)})`);
   // An administrator not on a project acts on none of its containers, as
   // anybody (R274): the server refuses, and the page draws its group after
   // the administrator's own, dimmed, its controls dead and the way onto it
@@ -4894,7 +4894,7 @@ print(json.dumps(out))
     await api('/api/users', { action: 'projects', name: 'test', projects: mine });
     await page.evaluate(() => refresh());
     ok(refused.status === 403 && /not on your list of projects/.test(refused.error || '') && read.status === 200,
-       `an administrator not on a project may read its containers and not act on them (${refused.status}: ${refused.error}; read ${read.status})`);
+       `an administrator not on a space may read its containers and not act on them (${refused.status}: ${refused.error}; read ${read.status})`);
     ok(drawn && /not on your list/.test(drawn.why) && drawn.live === 0 && drawn.after,
        `...and the Containers page draws them after their own, dimmed, dead, and says why (${JSON.stringify(drawn)})`);
   }
@@ -4905,9 +4905,9 @@ print(json.dumps(out))
   const gone2 = await as('/api/devapp', { container: 'helper-for-eps', action: 'state' });
   ok(gone.status === 403 && gone2.status === 403 && !/someone-elses|helper-for-eps/.test(
        JSON.stringify(await as('/api/docker'))),
-     `...and one put under no project is out of its reach and off its list (${gone.status}, ${gone2.status})`);
+     `...and one put under no space is out of its reach and off its list (${gone.status}, ${gone2.status})`);
   const nope = await api('/api/dockerctl', { action: 'owner', container: 'someone-elses', owner: 'no-such-project' });
-  ok(nope.status === 400 && /no project called/.test(nope.error || ''), `a project that does not exist is refused (${nope.error})`);
+  ok(nope.status === 400 && /no project called/.test(nope.error || ''), `a space that does not exist is refused (${nope.error})`);
   await dial('deny');
   for (const [p, i] of [['helper-for-eps', 'main'], ['ep.silon', 'loose']])
     await api('/api/devapp', { project: p, instance: i, action: 'remove' });
@@ -4973,7 +4973,7 @@ print(json.dumps({'before': before}))
 `], { encoding: 'utf8' });
   const R = JSON.parse(out.trim().split('\n').pop());
   ok(JSON.stringify(R.before) === JSON.stringify(['media', '', 'media', '']),
-     `a container belongs to its project by default, to none when sent to none, and to its pick when written here (${R.before})`);
+     `a container belongs to its space by default, to none when sent to none, and to its pick when written here (${R.before})`);
 }
 
 // ---- a container compose refuses never reaches the list (B239) ----------------
@@ -5080,7 +5080,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
              sandbox: nodesList.find(n => n.name === 'sandbox')?.id || '', dflt: nodesDefault };
   });
   ok(ids.spare && ids.dflt === ids.sandbox,
-     `the node listing names the node the Containers page opens on, derived from the projects (${ids.dflt})`);
+     `the node listing names the node the Containers page opens on, derived from the spaces (${ids.dflt})`);
   const setNodes = async (proj, list) => {
     await post('/api/prefs', { project: proj, nodes: list, node: list[0] || '' });
     await page.waitForFunction(([p, want]) =>
@@ -5099,7 +5099,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
   await setNodes('ep.silon', []);
   const none = await sendDialog();
   ok(none.go && /ep\.silon has no node: set one in its settings first/.test(none.hint),
-     `a project with no node has nowhere to send: Create is dead and the field says why (${none.hint.slice(0, 50)})`);
+     `a space with no node has nowhere to send: Create is dead and the field says why (${none.hint.slice(0, 50)})`);
   const bare = await post('/api/devapp', { project: 'ep.silon', action: 'new', instance: 'nowhere' });
   ok(/has no node, so there is nowhere to make its container/.test(bare.error || ''),
      `...and the server refuses a new for it (${String(bare.error).slice(0, 60)})`);
@@ -5147,7 +5147,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
     });
     ok(/One of epsilon-shown's nodes/.test(said.hint) && !/ep\.silon/.test(said.hint)
        && said.called === 'epsilon-shown/nosuch',
-       `the Send dialog and the confirms name the project as it is shown (${said.hint.slice(0, 40)}; ${said.called})`);
+       `the Send dialog and the confirms name the space as it is shown (${said.hint.slice(0, 40)}; ${said.called})`);
   }
   const off = await post('/api/devapp', { project: 'ep.silon', action: 'new', instance: 'elsewhere', node: 'n_notanode' });
   ok(/ep\.silon works on spare, sandbox, and a container for it anywhere else/.test(off.error || ''),
@@ -5160,10 +5160,10 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
   await setNodes('alpha', [ids.spare]);
   const give = await post('/api/devapp', { project: 'ep.silon', instance: 'reach', action: 'owner', owner: 'alpha' });
   ok(/reach is on sandbox and alpha works on spare: its sessions could not reach it/.test(give.error || ''),
-     `a container is not given to a project that works elsewhere (${String(give.error).slice(0, 70)})`);
+     `a container is not given to a space that works elsewhere (${String(give.error).slice(0, 70)})`);
   await setNodes('alpha', [ids.spare, ids.sandbox]);
   const given = await post('/api/devapp', { project: 'ep.silon', instance: 'reach', action: 'owner', owner: 'alpha' });
-  ok(given.ok, `...and is, once that project works there too (${given.error || 'given'})`);
+  ok(given.ok, `...and is, once that space works there too (${given.error || 'given'})`);
   await post('/api/devapp', { project: 'ep.silon', instance: 'reach', action: 'remove' });
   // The New container dialog on the Docker tab: any node until a project is
   // picked, and then that project's nodes only, its primary first.
@@ -5178,7 +5178,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
   });
   ok(picked.before.node === ids.sandbox && picked.before.n >= 2 && picked.after.node === ids.spare && picked.after.n === 2
      && /One of ep\.silon's nodes/.test(picked.after.hint),
-     `New container follows the project picked to that project's nodes (${picked.before.n} then ${picked.after.n}, ${picked.after.node})`);
+     `New container follows the space picked to that space's nodes (${picked.before.n} then ${picked.after.n}, ${picked.after.node})`);
   // Opened before the page has fetched its nodes, the way the Artifacts
   // tab's Send is: the picker arrives when the list does, filled.
   await page.evaluate(() => { nodesList = null; openSendToDocker('ep.silon'); });

@@ -222,7 +222,7 @@ def _row_value(field, v, was):
     if kind == "projects":
         v = [] if v is None else v
         if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
-            return None, f"{field['label']} lists project names"
+            return None, f"{field['label']} lists space names"
         return sorted({x for x in v if x})[:200], ""
     if kind == "list":
         v = [] if v is None else v

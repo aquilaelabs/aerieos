@@ -40,7 +40,7 @@ for (const [where, vp] of [['at a desk', { viewport: { width: 1280, height: 900 
     return { steps, rail: vis('#rail'), panes: vis('#panes'), jump: vis('#jump'), bell: vis('#bBell'),
              about: !document.getElementById('aboutModal').hidden, width: Math.round(page.width), inner: innerWidth };
   });
-  ok(frame.steps.map(s => s.title).join(' | ') === 'Your first node | Your name and email | Claude Code on your node | A first project',
+  ok(frame.steps.map(s => s.title).join(' | ') === 'Your first node | Your name and email | Claude Code on your node | A first space',
      `the setup page is four steps, in order, ${where} (${frame.steps.map(s => s.title).join(' | ')})`);
   ok(frame.steps.every(s => /^(to do|waiting|done)$/.test(s.state || '')),
      `...each with its state as a pill (${frame.steps.map(s => s.state).join(', ')})`);
@@ -338,7 +338,7 @@ await firstRun(false);
       setupDisks.own = { ...keepD, node: n.id, pools: [], array: null, shares: [] };
       setupSig = ''; drawSetup();
       const out = { titles: [...panel().querySelectorAll('.setstep h3')].map(h => h.textContent),
-        projectDead: step('A first project')?.querySelector('[data-setproject]')?.disabled, why: step('A first project')?.innerText.replace(/\s+/g, ' ') };
+        projectDead: step('A first space')?.querySelector('[data-setproject]')?.disabled, why: step('A first space')?.innerText.replace(/\s+/g, ' ') };
       // The pools are made: the fast one is the place, by itself, once.
       n.reported = { ...n.reported, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
       setupDisks.own = { ...setupDisks.own, pools: [{ name: 'tank', mount: '/mnt/tank' }, { name: 'fast', mount: '/mnt/fast' }] };
@@ -348,7 +348,7 @@ await firstRun(false);
       out.exportOn = document.getElementById('setShareExport')?.checked;
       n.reported = { ...n.reported, os_stick: { ...n.reported.os_stick, pool: '/mnt/fast', ready: true } };
       setupSig = ''; drawSetup();
-      out.placed = step('Where the projects and containers go')?.querySelector('.pill')?.textContent; out.projectLive = !step('A first project')?.querySelector('[data-setproject]')?.disabled;
+      out.placed = step('Where the spaces and containers go')?.querySelector('.pill')?.textContent; out.projectLive = !step('A first space')?.querySelector('[data-setproject]')?.disabled;
       // Left unticked, a share is made and not exported.
       step('Shares').querySelector('[data-setshares]').click();
       await sleep_(500);
@@ -361,13 +361,13 @@ await firstRun(false);
       function sleep_(ms){ return new Promise(r => setTimeout(r, ms)); }
     });
     await page.unroute('**/api/v1/nodes'); await page.unroute('**/api/v1/jobs?id=j_y');
-    ok(fresh.titles.includes('Where the projects and containers go') && fresh.projectDead === true && /Once the projects have a place/.test(fresh.why),
-       `a new start on a stick has a step for where the projects go, and a project waits for it (B666) (${fresh.titles.join(' | ')})`);
+    ok(fresh.titles.includes('Where the spaces and containers go') && fresh.projectDead === true && /Once the projects have a place/.test(fresh.why),
+       `a new start on a stick has a step for where the spaces go, and a space waits for it (B666) (${fresh.titles.join(' | ')})`);
     const named = posted.filter(b => b.action === 'system-pool');
     ok(named.length === 1 && named[0].path === '/mnt/fast', `...and the fast pool is named by itself, once (${JSON.stringify(named)})`);
     ok(fresh.pill === 'optional' && fresh.exportOn === false && /stays on this machine until you export it/.test(fresh.card),
        `a share says what it is, is optional, and is not exported unless asked (${fresh.card?.slice(0, 160)})`);
-    ok(fresh.placed === 'done' && fresh.projectLive, '...the step turns done and a project can be made');
+    ok(fresh.placed === 'done' && fresh.projectLive, '...the step turns done and a space can be made');
     const shares = posted.filter(b => b.action === 'storage-share');
     ok(shares.length === 2 && shares.every(b => b.smb.on === false) && shares[0].path.startsWith('/mnt/tank/'),
        `...and left unticked, the shares are made on the main pool, one at a time, and not served (${JSON.stringify(shares).slice(0, 200)})`);
@@ -386,7 +386,7 @@ await firstRun(false);
       const words = t => step(t)?.textContent.replace(/\s+/g, ' ') || '';
       const stick = { stick: true, pool: '', ready: false, on_stick: [], written_kb: 1, boot_written_kb: 1 };
       const redraw = rep => { n.reported = { ...was, os_stick: stick, ...rep }; setupSig = ''; drawSetup(); };
-      setupWalk = ''; setupLand = { fresh: true, owner: true, stick: true, held: 'the projects need a place first' };
+      setupWalk = ''; setupLand = { fresh: true, owner: true, stick: true, held: 'the spaces need a place first' };
       state.firstboot = { ...(keep || {}), at: 1, done: [], waiting: [], failed: [], apps_from: { docker: { image: 'x' }, vms: {} },
         adopt: { want: { data: [{ slot: 'disk1', id: 'WD_Red_WD-B', fs: 'xfs' }], parity: [], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u' }] }, skipped: [] } };
       redraw({});
@@ -399,20 +399,20 @@ await firstRun(false);
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
-      out.stuck = words('Where the projects and containers go'); out.doneDisks = pill("The old system's disks");
-      out.pick0 = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
+      out.stuck = words('Where the spaces and containers go'); out.doneDisks = pill("The old system's disks");
+      out.pick0 = [...(step('Where the spaces and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
       // A btrfs cache adopted writable is a pool to pick (B663); a data disk is not.
       redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }, { where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
-      out.pick = [...(step('Where the projects and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
+      out.pick = [...(step('Where the spaces and containers go')?.querySelectorAll('#stickPool option') || [])].map(o => o.value);
       out.backRw = words('If you go back');
       // A projects folder named: the way back says to give it back first, and how
       // from the old system (B665); the step says what it costs before it is pressed.
-      out.costs = words('Where the projects and containers go');
+      out.costs = words('Where the spaces and containers go');
       stick.projects = '/mnt/user/development/projects'; stick.projects_bound = true; setupSig = ''; drawSetup();
       out.backFolder = words('If you go back');
       stick.projects = ''; stick.projects_bound = false;
       stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
-      out.placed = pill('Where the projects and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
+      out.placed = pill('Where the spaces and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
       setupLand = { fresh: true, owner: true, stick: true, held: 'kept back for a reason' }; setupSig = ''; drawSetup();
       out.heldSaid = /kept back for a reason/.test(words('Land the controller'));
@@ -445,7 +445,7 @@ await firstRun(false);
       await page.setViewportSize({ width: 1280, height: 720 }); await sleep(200);
     }
     await page.evaluate(() => { try{ localStorage.removeItem('bb.setupWalk'); }catch(e){} setupWalk = ''; setupLand = null; state.firstboot = null; loadNodes(); setupSig = ''; drawSetup(); });
-    ok(walk.walking && walk.head === 'Moving here' && walk.titles.join(' | ') === "Have these with you | This machine | The old system's disks | Where the projects and containers go | Land the controller | After it lands | If you go back",
+    ok(walk.walking && walk.head === 'Moving here' && walk.titles.join(' | ') === "Have these with you | This machine | The old system's disks | Where the spaces and containers go | Land the controller | After it lands | If you go back",
        `a stick whose plan names disks opens on the walk, its steps in the order they have to happen (${walk.titles.join(' | ')})`);
     ok(walk.firstPill === 'read first' && /Move token/.test(walk.first) && /The bundle/.test(walk.first) && /off now/.test(walk.first) && /boot the old system's stick/.test(walk.first),
        `...the token and the bundle said first, that the old controller may be off, and how to go and make them (${walk.first.slice(0, 200)})`);
@@ -458,13 +458,13 @@ await firstRun(false);
     ok(/Its disks are as they were/.test(walk.back) && /parity sync/.test(walk.backRw) && /Forget it/.test(walk.back),
        `...the way back says what it costs as it stands, and to forget a prepared move (${walk.backRw.slice(0, 200)})`);
     ok(/old system cannot read them until they are given back/.test(walk.costs) && /Projects page stays empty until the controller lands/.test(walk.costs),
-       `...naming a projects folder says what it costs and when the projects show (${walk.costs.slice(0, 260)})`);
+       `...naming a spaces folder says what it costs and when the spaces show (${walk.costs.slice(0, 260)})`);
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
-    ok(walk.plain.titles.join(' | ') === "Have these with you | This machine | Your disks | Where the projects and containers go | Land the controller | After it lands | If you go back"
+    ok(walk.plain.titles.join(' | ') === "Have these with you | This machine | Your disks | Where the spaces and containers go | Land the controller | After it lands | If you go back"
        && !/old system/.test(walk.plain.text) && /its address is enough/.test(walk.plain.text) && /Nothing here has touched the old controller/.test(walk.plain.text),
        `...a plain stick takes the same walk with its own disks and no word of an old system (${walk.plain.titles.join(' | ')}; ${(walk.plain.text.match(/.{40}old system.{40}/) || [''])[0]})`);
         ok(walk.fresh.head === 'Set up AerieOS' && walk.fresh.kept === 'fresh' && walk.fresh.ask === 'Walk me through it' && walk.backIn === 'Moving here',

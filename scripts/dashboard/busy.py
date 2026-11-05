@@ -60,7 +60,7 @@ def verdict(sample, jobs, sessions_working, now=None):
     if float(sample.get("gpu_pct") or 0) >= 30:
         why.append(f"the card at {sample.get('gpu_pct'):g}%")
     if others:
-        why.append(f"{len(others)} job{'s' if len(others) != 1 else ''} of other projects")
+        why.append(f"{len(others)} job{'s' if len(others) != 1 else ''} of other spaces")
     # What is merely THERE decides nothing on its own: Gradle leaves its
     # daemons idling after a build, an emulator sits at its home screen, and
     # a session can be working with nothing running here. The machine said

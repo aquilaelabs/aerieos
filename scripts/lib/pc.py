@@ -41,7 +41,7 @@ if not args or args[0] in ("ls", "list"):
     fail(d)
     print(f"Use a lent PC: {d.get('mode')}")
     if not d.get("pcs"):
-        print("no PC lends anything to this project now: its person sets it up in the Windows companion, "
+        print("no PC lends anything to this space now: its person sets it up in the Windows companion, "
               "which lends it while it runs")
     for p in d.get("pcs") or []:
         print(f"{p['name']} ({p['account']}): {', '.join(p['verbs'])}")
@@ -71,6 +71,6 @@ while time.time() < end:
         if res.get("text"):
             sys.stdout.write(res["text"] if res["text"].endswith("\n") else res["text"] + "\n")
         if res.get("picture"):
-            print(f"[builderbot] the picture is {res['picture']} in the project")
+            print(f"[builderbot] the picture is {res['picture']} in the space")
         sys.exit(0 if res.get("ok") else 1)
 sys.exit(f"[builderbot] ERROR: {d['pc']} took longer than 15 minutes; aerie pc result is not kept past that")

@@ -67,7 +67,7 @@ class Controller(unittest.TestCase):
         self.assertEqual(vms.hardware({"hw": {"mem_max_mb": 0}}, "web", "n1", False, 2048)[0]["mem_max_mb"], 2048)
         sh = vms.hardware({"hw": {"share": {"path": "data/in", "ro": True}}}, "web", "n1", False, 2048)[0]["share"]
         self.assertEqual(sh, {"path": "/workspace/web/data/in", "tag": "project", "ro": True})
-        self.assertIn("inside the project", vms.hardware({"hw": {"share": {"path": "../api"}}}, "web", "n1", False, 2048)[1])
+        self.assertIn("inside the space", vms.hardware({"hw": {"share": {"path": "../api"}}}, "web", "n1", False, 2048)[1])
         dev = {"devices": [{"type": "usb", "vendor": "046d", "product": "c52b"}]}
         self.assertIn("administrator", vms.hardware({"hw": dev}, "web", "n1", False, 2048)[1])
         self.assertEqual(vms.hardware({"hw": dev}, "web", "n1", True, 2048)[0]["devices"], dev["devices"])
@@ -619,7 +619,7 @@ class Agent(unittest.TestCase):
         with mock.patch.object(hw.os.path, "realpath", side_effect=real):
             self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/root"}}, 2, 2048, project="web")[1])
             self.assertIn("leads out", hw.clean({"share": {"path": "/workspace/web/other"}}, 2, 2048, project="web")[1])
-            self.assertIn("project's own", hw.clean({"share": {"path": "/workspace/api/x"}}, 2, 2048, project="web")[1])
+            self.assertIn("space's own", hw.clean({"share": {"path": "/workspace/api/x"}}, 2, 2048, project="web")[1])
             got, why = hw.clean({"share": {"path": "/workspace/web/data"}}, 2, 2048, project="web")
             self.assertEqual((why, got["share"]["path"]), ("", "/workspace/web/store/data"))
 

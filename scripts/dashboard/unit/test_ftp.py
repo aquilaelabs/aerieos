@@ -188,9 +188,9 @@ class Ftp(unittest.TestCase):
         self.assertEqual(ftp.save("alpha", {"on": True, "port": free, "access": {"u_3": "r"}}, "boss")[1], 200)
 
     def test_setting_it_up_is_the_project_owners_or_an_admins_and_never_a_sessions(self):
-        self.assertEqual(users.may(users.get("boss"), "ftp", "alpha"), "", "the project's owner")
+        self.assertEqual(users.may(users.get("boss"), "ftp", "alpha"), "", "the space's owner")
         self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator (R152)")
-        self.assertIn("project's owner or an administrator", users.may(users.get("ann"), "ftp", "alpha"))
+        self.assertIn("space's owner or an administrator", users.may(users.get("ann"), "ftp", "alpha"))
         sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "uid": "u_1"}
         self.assertIn("session", users.may(sess, "ftp", "alpha"))
 

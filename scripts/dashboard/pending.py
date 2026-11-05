@@ -146,7 +146,7 @@ def refusal(kind):
     label = {"roadmap": "Add to roadmap", "bugs": "File bugs", "rules": "Add rules",
              "settings": "Fill in build and test", "design": "Add to the design",
              "wiki": "Write the wiki"}.get(kind, kind)
-    return (f"this project's setting Agents may: {label} is deny, so this "
+    return (f"this space's setting Agents may: {label} is deny, so this "
             f"was not filed: say it in your reply instead, and the operator adds it "
             "if they agree")
 

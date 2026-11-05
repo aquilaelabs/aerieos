@@ -243,14 +243,14 @@ def address(project, name, url):
                 raise Refused(
                     f"{project}'s push rights name a repository but not a host, so the relay "
                     "cannot tell this remote from one with the same path somewhere else. "
-                    "Re-grant them in the project's remote dialog, which records both")
+                    "Re-grant them in the space's remote dialog, which records both")
             if got["path"].lower() != str(rec["repo"]).lower() or host != want:
                 raise Refused(
                     f"remote {name} points at {got['host']}/{got['path']}, but {project}'s push rights "
                     f"were granted on {rec.get('host') or 'its host'}/{rec['repo']}, and the controller's "
                     "credentials reach only that repository. A public remote needs none: fetch it with "
-                    "plain git on the node; a private one that is another project here is read by "
-                    f"adding that project to {project}'s Reads, then from /workspace/NAME in a new session")
+                    "plain git on the node; a private one that is another space here is read by "
+                    f"adding that space to {project}'s Reads, then from /workspace/NAME in a new session")
         return "net", url
     path = url[len("file://"):] if url.startswith("file://") else url
     if path.startswith("/"):
@@ -271,10 +271,10 @@ def address(project, name, url):
         if on_share and (mine or (bare and not inside_tree)):
             return "local", str(p)
         if on_share and inside_tree:
-            raise Refused(f"remote {name} is another project's repository on the share: a session reaches "
-                          f"its own project and its worktrees only")
-        raise Refused(f"remote {name} is a local path that is not a repository on the projects share")
-    raise Refused(f"remote {name}'s address is not https, ssh or a repository on the projects share")
+            raise Refused(f"remote {name} is another space's repository on the share: a session reaches "
+                          f"its own space and its worktrees only")
+        raise Refused(f"remote {name} is a local path that is not a repository on the spaces share")
+    raise Refused(f"remote {name}'s address is not https, ssh or a repository on the spaces share")
 
 
 # ---- the controller's own repository ---------------------------------------
@@ -397,7 +397,7 @@ def _lock(project):
                 break
             except BlockingIOError:
                 if time.monotonic() > deadline:
-                    raise Refused("another git operation on this project is still running") from None
+                    raise Refused("another git operation on this space is still running") from None
                 time.sleep(0.2)
         yield
     finally:
@@ -653,7 +653,7 @@ def _run(project, cwd, verb, args, scan=True, uid="", token_why="", workflows=Tr
         if verb == "push" and not workflows:
             changed = _workflow_files(d, name, pos, head_ref, branch, tree_refs)
             if changed:
-                raise Refused(f"this push changes CI workflow files ({', '.join(changed[:4])}), and this project "
+                raise Refused(f"this push changes CI workflow files ({', '.join(changed[:4])}), and this space "
                               "does not let a session change them (Permissions, On the git host: Change CI "
                               "workflow files); push without them, or ask its owner to turn it on")
         if verb == "push" and scan:

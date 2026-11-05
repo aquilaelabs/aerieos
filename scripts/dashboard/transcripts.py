@@ -342,7 +342,7 @@ def render(uid, project, sid, tz=None, tail=0):
     outran `aerie transcripts show`'s wait and printed nothing."""
     f = _find(uid, project, sid)
     if f is None:
-        return None, "no such conversation of yours on this project"
+        return None, "no such conversation of yours on this space"
     if agent_of(f) != "claude":
         return _agent_render(f, agent_of(f), project, sid, tz, tail)
     try:
@@ -421,7 +421,7 @@ def turns(uid, project, sid, tz=None, tail=0):
     same records render() writes the text download from."""
     f = _find(uid, project, sid)
     if f is None:
-        return {"error": "no such conversation of yours on this project"}, 404
+        return {"error": "no such conversation of yours on this space"}, 404
     if agent_of(f) != "claude":
         got, partial = _agent_turns(f, agent_of(f), tz, tail)
         a = agent_of(f)

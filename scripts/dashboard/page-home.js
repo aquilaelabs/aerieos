@@ -118,7 +118,7 @@ function homeHref(key){
           // node, which no one node's page holds: they are listed
           // on Home's own Attention card, so the tile brings that into view (B73).
           updates: "#/home", backups: "#/machines/storage",
-          ci: c ? `#/projects/${encodeURIComponent(c.project)}/git` : "#/projects", sessions: "#"}[key] || "#";
+          ci: c ? `#/spaces/${encodeURIComponent(c.project)}/git` : "#/spaces", sessions: "#"}[key] || "#";
 }
 function homeTilesHtml(tiles){
   return `<div class="field"><div class="tiles hometiles">${tiles.map(t => `
@@ -142,7 +142,7 @@ function homeJobsHtml(){
 function homeGlanceHtml(){
   // Not an archived one (the operator, 18 Oct), pinned or not.
   const pinned = projectList().filter(c => c.pinned && !c.archived);
-  if (!pinned.length) return `<div class="empty">no project is pinned: the pin by a project's name on the Projects page puts it here</div>`;
+  if (!pinned.length) return `<div class="empty">no space is pinned: the pin by a space's name on the Spaces page puts it here</div>`;
   // In groups, in the Projects page's order, each group's name over its
   // cards (R273): the page this glances at is sorted so. Each opens its
   // first repository's page (R138).
@@ -200,7 +200,7 @@ function homeStartHtml(){
     canNodes ? ["Your first node", !!s.node, `<button type="button" data-hstart="node">Nodes page</button>`] : null,
     ["Your name and email", s.git, `<button type="button" data-hstart="git">Profile</button>`],
     canNodes ? ["Claude Code on your node", !!s.claude, `<button type="button" data-hstart="claude"${s.node ? "" : " disabled"}>Library</button>`] : null,
-    ["A first project", s.project, `<button type="button" data-hstart="project">New project</button>`],
+    ["A first space", s.project, `<button type="button" data-hstart="project">New space</button>`],
     // What a move from an old system leaves for after it lands.
     state?.held?.held ? ["Start this machine: nothing runs until then", false, `<button type="button" data-hstart="machine">This machine</button>`] : null,
     state?.firstboot?.apps_from ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="machine">This machine</button>`] : null,
@@ -224,7 +224,7 @@ function homeCards(jobs){
               <button type="button" data-brestore>Show again</button></div>` : ""}</section>
         <section class="hcard"><h3>Last jobs</h3>${jobs}</section>
       </div></div>
-      <div class="field"><section class="hsect"><h3>Projects at a glance</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
+      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
 }
 
 // The Attention card brought into view and marked a moment: where the

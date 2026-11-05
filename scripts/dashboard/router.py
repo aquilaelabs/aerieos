@@ -73,7 +73,7 @@ def pack():
     section asked before, written to packs/services/model-router by
     tools/packs-export.py and held to this by aerie lint."""
     return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
-            "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the projects you allow: "
+            "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the spaces you allow: "
                      "each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
             "service": {"kind": "router"},
             "config": [{"name": pid, "label": p["label"], "kind": "secret", "help": f"{p['label']}'s API key, written into the router's compose file on this node and never into a session's view"}
@@ -84,8 +84,8 @@ def pack():
                                      {"name": "key", "label": "API key", "kind": "secret"}]},
                          {"name": "ollama", "label": "Run Ollama beside it", "kind": "switch",
                           "help": "on this node's card where it has one, else its CPU and memory; its models one more provider (ollama/NAME)"},
-                         {"name": "projects", "label": "Projects that may use it", "kind": "projects",
-                          "help": "each handed the address and its own key at a session's start; a session of any other project cannot reach it"}]}
+                         {"name": "projects", "label": "Spaces that may use it", "kind": "projects",
+                          "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it"}]}
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
 
@@ -447,7 +447,7 @@ def allow(nid, project, by=""):
     the next hello."""
     project = str(project or "")
     if project_names and project not in set(project_names()):
-        return {"error": "no such project"}
+        return {"error": "no such space"}
     rec = record(nid)
     if not rec.get("deployed"):
         return {"error": "the router is not deployed on this node yet"}

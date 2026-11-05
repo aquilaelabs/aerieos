@@ -33,9 +33,9 @@ d["users"]["${NAME}"] = {"uid": u.mint_uid(), "role": "user", "projects": [],
               "image_seen": "abc1234def5678901234567890abcdef12345678"},
     "password": u.hash_password("${PW}"), "created": 0, "seen": 0}
 u._save(d)`], { encoding: 'utf8' });
-const made = await api('/api/roles', { action: 'set', name: 'rdread', scope: 'projects', perms: { projects: 'read' }, note: 'reads a project' });
+const made = await api('/api/roles', { action: 'set', name: 'rdread', scope: 'projects', perms: { projects: 'read' }, note: 'reads a space' });
 const given = await api('/api/roles', { action: 'assign', name: NAME, project_roles: { alpha: ['rdread'] } });
-ok(made.status === 200 && given.status === 200, `a role giving Projects Read alone, held on alpha (${made.status} ${given.status} ${given.error || ''})`);
+ok(made.status === 200 && given.status === 200, `a role giving Spaces Read alone, held on alpha (${made.status} ${given.status} ${given.error || ''})`);
 
 const browser = await launch();
 const auth = 'Basic ' + Buffer.from(`${NAME}:${PW}`).toString('base64');
@@ -57,7 +57,7 @@ await page.waitForSelector('.pgrid .pcard[data-row="alpha"]', { timeout: 15000 }
 const bar = await page.evaluate(() => ({ np: document.querySelector('.doc.on #bNewProjTab')?.checkVisibility(),
   bin: document.querySelector('.doc.on #bTrashTab')?.checkVisibility(),
   why: [...document.querySelectorAll('.doc.on .deadwhy, .doc.on .notice.bad')].map(e => e.textContent) }));
-ok(bar.np === false && bar.bin === false, 'New project and the trash are not drawn for an account without them');
+ok(bar.np === false && bar.bin === false, 'New space and the trash are not drawn for an account without them');
 ok(!bar.why.length, `...and nothing on the page says why (${bar.why.join(' | ')})`);
 // The bin, opened all the same: a refusal is said, not read as empty.
 await page.evaluate(() => openTrash());
@@ -139,7 +139,7 @@ await sleep(1500);
 const st = await page.evaluate(() => ({ del: document.querySelector('#rnDelete')?.hidden,
   snap: !document.querySelector('#rnSnapField')?.hidden, sess: !document.querySelector('#rnSessField')?.hidden,
   why: document.querySelectorAll('.deadwhy').length }));
-ok(st.del === true && !st.why, `Settings: no Delete project, nothing said (${st.why})`);
+ok(st.del === true && !st.why, `Settings: no Delete space, nothing said (${st.why})`);
 const refusedAsks = asked.slice(before).filter(u => /\/api\/(snapshots|project-sessions)/.test(u));
 ok(refusedAsks.length === 0, `...and Snapshots and Running sessions are not asked for (${refusedAsks.join(', ') || 'none'})`);
 ok(!st.snap && !st.sess, '...nor drawn');

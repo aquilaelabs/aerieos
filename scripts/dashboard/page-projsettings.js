@@ -116,7 +116,7 @@ function rnDialChoices(p, f, modes, dflt){
   const gate = f.startsWith("gate.") ? f.slice(5) : "";
   const pd = p?.prefs?.project_dials, v = (gate ? pd?.gate?.[gate] : pd?.[f]) || dflt;
   const word = (modes.find(([m]) => m === v) || [v, v])[1];
-  return [["inherit", `as the project (${word})`], ...modes];
+  return [["inherit", `as the space (${word})`], ...modes];
 }
 
 // A project's settings as the form holds them, from its row: what the form
@@ -191,7 +191,7 @@ function rnFillPrefs(p){
 // hold Project settings (B19): every control in them dead, and why said on
 // each in red, not in a tooltip. Just for you stays live, being the
 // account's own; Snapshots and Running sessions say their own reasons.
-const RN_LOCKED_SAID = "Read only for you: changing these needs a role that holds Project settings on this project.";
+const RN_LOCKED_SAID = "Read only for you: changing these needs a role that holds Space settings on this space.";
 function rnLockSettings(p){
   const locked = p?.may_settings === false;
   document.querySelectorAll("details.rngroup").forEach(d => {
@@ -520,7 +520,7 @@ function rnFillPrefsRest(p){
     const pv = p?.prefs?.project_dials?.test_change || "wait";
     if (inh && !opt) el.insertAdjacentHTML("afterbegin", `<option value="inherit"></option>`);
     else if (!inh && opt) opt.remove();
-    if (inh) el.querySelector('option[value="inherit"]').textContent = `as the project (${pv === "restart" ? "interrupts" : "waits"})`;
+    if (inh) el.querySelector('option[value="inherit"]').textContent = `as the space (${pv === "restart" ? "interrupts" : "waits"})`;
     el.dataset.inherit = inh ? pv : "";
     el.value = rnDialVal(p, "test_change", "wait");
   }
@@ -697,7 +697,7 @@ const RN_LIST = {
   claude: "what its sessions do on their own, ask about, or may not",
   yours: "your replies, questions and commit name here",
   repo: "how it pushes and pulls", runs: "where it builds, tests and runs",
-  build: "commands, outputs, and what is kept", sees: "other projects, shares, addresses",
+  build: "commands, outputs, and what is kept", sees: "other spaces, shares, addresses",
   tools: "the toolchains and tool packs its sessions use",
   files: "its files over FTP and in an editor", snapshots: "the days kept, and putting one back",
   sessions: "every account's sessions here, to end",
@@ -761,14 +761,14 @@ function renameProject(name, mode = "all"){
   $("rnNameField").hidden = git || proj;
   const ph = $("rnProjectHead");
   ph.hidden = !proj;
-  ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is project P${p.pid}` : ""}${
+  ph.firstElementChild.textContent = `${projectName(name)}${p?.pid ? ` is space P${p.pid}` : ""}${
     p?.work ? `; its folder is /workspace/${name}` : ""}. Its name is changed on its card's back.`;
   const pn = $("rnProjectNote");
   pn.hidden = !proj;
   pn.firstElementChild.textContent = p?.work
-    ? "A project with no repository: its sessions build containers and VMs in its own folder, and have no git and no notebook. Add repository on its card makes it a coding project."
+    ? "A space with no repository: its sessions build containers and VMs in its own folder, and have no git and no notebook. Add repository on its card makes it a coding space."
     : `Git, build and test, file access and snapshots are each repository's: open its notebook's Settings. ${
-        (state?.repos?.[reposOf(name)]?.members || []).length > 1 ? "These settings are the project's as a whole." : ""}`.trim();
+        (state?.repos?.[reposOf(name)]?.members || []).length > 1 ? "These settings are the space's as a whole." : ""}`.trim();
   // The node picker and the two credential blocks have hidden rules of their
   // own further down, and each of those consults the mode too.
   $("rnName").value = projLabel(name);
@@ -795,12 +795,12 @@ function renameProject(name, mode = "all"){
   // per the site-text rule: the reasoning lives here and in the README.
   $("rnTokenHint").textContent = how === "key"
     ? p?.has_token
-      ? "This project pushes with a deploy key and already has a token stored; "
+      ? "This space pushes with a deploy key and already has a token stored; "
         + "the switch below decides which git uses."
-      : "This project pushes with a deploy key, so a token here does nothing "
+      : "This space pushes with a deploy key, so a token here does nothing "
         + "until the switch below says to use it."
     : p?.has_token
-      ? "Replaces this project's token. Kept for it alone; a shell here can read it."
+      ? "Replaces this space's token. Kept for it alone; a shell here can read it."
       : "Kept for this repository alone; a shell here can read it.";
   // Nothing to set is an answer, not an empty box: a linked project with no
   // token and no push rights has a remote it can only read.
@@ -906,9 +906,9 @@ function rnDrawPeople(){
   setHidden($("rnPeopleField").closest("details"), false);
   $("rnPeople").innerHTML = `
     <div class="setrow ctlrow">${v.may_manage
-      ? `<label class="ndcap" for="rnOwner">Project owner</label>
+      ? `<label class="ndcap" for="rnOwner">Space owner</label>
          <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
-      : `<span>Project owner: ${esc(v.owner || "AerieOS's owner")}</span>`}</div>
+      : `<span>Space owner: ${esc(v.owner || "AerieOS's owner")}</span>`}</div>
     ${v.may_manage && !v.bb_owner && d.owner && d.owner !== v.owner
       ? `<div class="sub">Saving offers it to ${esc(d.owner)}, who becomes its owner on accepting from their bell.</div>` : ""}
     ${v.offer ? `<div class="rninvite">Ownership offered to ${esc(v.offer.name)} <span class="dim">${esc(ago(v.offer.at))}, waiting for them to accept</span>
@@ -924,7 +924,7 @@ function rnDrawPeople(){
       <select id="rnInviteWho" aria-label="account to invite">${invitable.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <select id="rnInviteRole" aria-label="the role they are invited as">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <button type="button" id="rnInviteGo">Invite</button></div>`
-      : `<div class="sub warn">no role on this project to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`;
+      : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`;
   const o = $("rnOwner");
   if (o) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
   // What each person holds (R152): a name opens their roles, which a
@@ -1014,15 +1014,15 @@ function rnDrawFtp(){
     : st.why ? `<div class="hint bad">Not running: ${esc(st.why)}</div>`
     : `<div class="hint">Starting on its node.</div>`;
   box.innerHTML = `
-    <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this project's files over FTPS</label>
+    <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this space's files over FTPS</label>
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
-    ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the project gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
+    ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
     ${v.node || !on ? "" : `<div class="hint bad">It has no node to run on: pick one under Nodes.</div>`}
     <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpFor">Keep it on</label>
       <select id="rnFtpFor" aria-label="how long FTP stays on">${optionList([
         ...(v.on && v.until ? [["", `until ${new Date(v.until * 1000).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit"})}, then off`]] : []),
         ["0", "until turned off"], ["3600", "for an hour"], ["86400", "for a day"], ["604800", "for a week"]], String(d.for ?? (v.on && v.until ? "" : "0")))}</select></div>
-    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; projects on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
+    <div class="logdays setrow ctlrow"${on ? "" : " hidden"}><label class="ndcap" for="rnFtpPort">Port<span class="help" data-help="the port and the ${v.span - 1} after it, which carry the data; spaces on one node are kept ${v.span} ports apart" tabindex="0">?</span></label>
       <input id="rnFtpPort" type="number" min="1024" max="65526" step="1" inputmode="numeric" value="${esc(String(port))}" aria-label="the port its FTP server listens on">
       <span class="dim">and the ${v.span - 1} after it</span></div>
     ${status}
@@ -1218,12 +1218,12 @@ function rnDrawStore(name){
     esc(g.host || host)} token${g.login ? `, as ${esc(g.login)}` : ""}${g.live ? "" : `<span class="dim"> (signed out: not in use)</span>`}</span>${
     g.mine ? `<button type="button" data-rnunlink="1">Take it back</button>` : ""}</div>`).join("");
   const said = givers.length
-    ? `<div class="hint">${givers.length === 1 ? "One person has" : givers.length + " people have"} given this project a token; each is used for their own pushes and pulls while they are signed in${
+    ? `<div class="hint">${givers.length === 1 ? "One person has" : givers.length + " people have"} given this space a token; each is used for their own pushes and pulls while they are signed in${
         me ? "" : ", and yours is not among them"}.</div>`
-    : `<div class="hint">Nobody has given this project a token: pushes and pulls wait until somebody does.</div>`;
+    : `<div class="hint">Nobody has given this space a token: pushes and pulls wait until somebody does.</div>`;
   const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${
     esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}</span>
-    <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this project"}</button></div>`).join("");
+    <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
   box.innerHTML = said + who + rows;
   box.hidden = !(said || who || rows);
   box.querySelectorAll("[data-rnstore]").forEach(b => b.onclick = async () => {
@@ -1334,7 +1334,7 @@ function rnDrawAuth(){
     : (rnAuthNow === "ssh"
         ? "Pushes use the deploy key. "
       : rnAuthNow === "https"
-        ? "Pushes use this project's access token. "
+        ? "Pushes use this space's access token. "
         : "Nothing is set, so a push is refused. ")
       + (changed
           ? (rnAuthPick === "https"
@@ -1392,7 +1392,7 @@ const rnAuthSet = m => { if (rnAuthPick === m) return; rnAuthPick = m; rnDrawAut
 // 8 Oct): the name shown is a label, the folder is the project's for good.
 function rnFolderLine(name){
   const pid = (state?.projects || []).find(p => p.name === name)?.pid;
-  return `Folder: /workspace/${name}${pid ? ` · project #${pid}` : ""}. Renaming changes the name shown, never the folder.`;
+  return `Folder: /workspace/${name}${pid ? ` · space #${pid}` : ""}. Renaming changes the name shown, never the folder.`;
 }
 
 // A shown name by GitHub's rules for a repository's, as the server keeps it
@@ -1415,8 +1415,8 @@ function rnShow(){
   // Said as it is typed: the name it will be, when GitHub's rule changes it.
   const as = raw && raw !== typed;
   $("rnPreview").hidden = !taken && !!raw && !as;
-  $("rnPreview").textContent = !raw ? "A project needs a name: letters, digits, - _ or ."
-    : taken ? `${raw} is already a project's name`
+  $("rnPreview").textContent = !raw ? "A space needs a name: letters, digits, - _ or ."
+    : taken ? `${raw} is already a space's name`
     : `Saved as ${raw}: names follow GitHub's rule, letters, digits, - _ and . only`;
 }
 
@@ -1798,8 +1798,8 @@ async function deleteProject(name){
   // What keeps running with no project while it is in the trash (the
   // operator, 26 Oct), said before it is asked.
   const own = await postJSON("/api/repos", {action: "owned", name}).then(r => r.json()).catch(() => ({}));
-  const left = [own.containers?.length ? `Its container${own.containers.length === 1 ? "" : "s"} ${own.containers.join(", ")} keep${own.containers.length === 1 ? "s" : ""} running, given to no project until it is put back.` : "",
-                own.vms?.length ? `Its VM${own.vms.length === 1 ? "" : "s"} ${own.vms.join(", ")} keep${own.vms.length === 1 ? "s" : ""} running under No project, an administrator's to act on.` : ""].filter(Boolean).join(" ");
+  const left = [own.containers?.length ? `Its container${own.containers.length === 1 ? "" : "s"} ${own.containers.join(", ")} keep${own.containers.length === 1 ? "s" : ""} running, given to no space until it is put back.` : "",
+                own.vms?.length ? `Its VM${own.vms.length === 1 ? "" : "s"} ${own.vms.join(", ")} keep${own.vms.length === 1 ? "s" : ""} running under No space, an administrator's to act on.` : ""].filter(Boolean).join(" ");
   if (!await askYes(`Delete ${projLabel(name)}?\n\n`
       + `It moves to /workspace/.trash/${name}, with every file kept. Its `
       + `roadmap, bugs, versions and memories stay where they are, `

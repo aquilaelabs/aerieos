@@ -28,9 +28,9 @@ const stub = ((await api('/api/v1/nodes')).nodes || []).find(n => n.kind === 'ag
 const bound = stub ? await api('/api/prefs', { project: 'beta', nodes: [stub.id], node: stub.id }) : { error: 'no agent node online' };
 const first = await api('/api/scanners');
 const node = (first.nodes || []).find(n => !n.host_only && (n.projects || []).length);
-ok(!!node && !node.deployed, `a node holds projects and has no scanners yet (${node ? node.name + ': ' + node.projects.join(', ') + (node.deployed ? ', deployed already' : '') : 'none: ' + (bound.error || JSON.stringify((first.nodes || []).map(n => [n.name, n.projects])))})`);
+ok(!!node && !node.deployed, `a node holds spaces and has no scanners yet (${node ? node.name + ': ' + node.projects.join(', ') + (node.deployed ? ', deployed already' : '') : 'none: ' + (bound.error || JSON.stringify((first.nodes || []).map(n => [n.name, n.projects])))})`);
 ok((first.uncovered || []).some(u => u.project === (node?.projects || [])[0] && /no scanners on/.test(u.why)),
-   'its projects are listed as not covered, with why');
+   'its spaces are listed as not covered, with why');
 
 // Deploy on it: a compose job the stub takes; the section says deployed with its versions.
 await page.click(`.scannerstab [data-scandeploy="${node.node}"]`);
@@ -55,14 +55,14 @@ ok(fin?.state === 'succeeded' && /semgrep sent up/.test(fin.log || ''), `the stu
 const after = await until(async () => { const v = await api('/api/scanners'); const n = v.nodes.find(x => x.node === node.node); return Object.keys(n.reports || {}).length >= 3 ? n : null; });
 ok(!!after && after.last.state === 'succeeded', `the node's section has its three reports and the run as done (${after ? Object.keys(after.reports).join(', ') : ''})`);
 const found = await until(async () => { const f = await api('/api/findings'); return f.available && (f.reports || []).some(r => r.findings.some(x => x.project === node.projects[0])) ? f : null; });
-ok(!!found, `the Analysis page reads what was sent up, by project (${found ? found.reports.map(r => r.tool).join(', ') : 'nothing'})`);
+ok(!!found, `the Analysis page reads what was sent up, by space (${found ? found.reports.map(r => r.tool).join(', ') : 'nothing'})`);
 await page.evaluate(() => loadScanners());
 await page.waitForFunction(id => /done|succeeded/.test(document.querySelector(`.scannerstab details[data-sect="scanners:node-${id}"]`)?.textContent || ''), node.node, { timeout: patience(15000) });
 ok(true, 'the node\'s section says its last run');
 
 // Not covered: nothing of that node's now; a project with no node still is.
 const un = (await api('/api/scanners')).uncovered || [];
-ok(!un.some(u => u.project === node.projects[0]), 'its projects are covered now');
+ok(!un.some(u => u.project === node.projects[0]), 'its spaces are covered now');
 
 // Remove takes it off, with its reports.
 const rm = await api('/api/scanners', { action: 'remove', node: node.node });

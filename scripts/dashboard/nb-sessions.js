@@ -62,7 +62,7 @@ function nbSessionsView({$, nb, project, root}){
       mine.length ? "yours alone unless you make one visible: each is the whole exchange" : "");
     // What the view is for is its empty state (the a-notebook/views rule).
     list.innerHTML = (mine.length ? `<div class="field mineconv">${convRows(project, mine)}</div>`
-      : `<div class="field"><div class="hint nbempty">Your sessions on this project, once you have had one: each is listed here for you alone, to resume, read, download or make visible to every session here.</div></div>`)
+      : `<div class="field"><div class="hint nbempty">Your sessions on this space, once you have had one: each is listed here for you alone, to resume, read, download or make visible to every session here.</div></div>`)
       // ...and others' they made visible, which any session here reads too.
       + (theirs.length ? docSection("sessions", "visible", "Made visible by others", String(theirs.length),
           `<div class="field theirconv">${convRows(project, theirs, true)}</div>`) : "");
@@ -92,7 +92,7 @@ function nbSessionsView({$, nb, project, root}){
     try{
       const j = await (await postJSON("/api/transcripts", {project, id, action})).json();
       if (j.error) notify(j.error, true);
-      else notify({delete: "deleted", share: "visible to every session on this project", unshare: "yours alone again"}[action]);
+      else notify({delete: "deleted", share: "visible to every session on this space", unshare: "yours alone again"}[action]);
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
     await loadSessions();
   }

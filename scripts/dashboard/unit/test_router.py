@@ -213,7 +213,7 @@ class Router(unittest.TestCase):
         self.assertTrue(router.record("n1")["deployed"])
         self.assertIn("router-gpu-box", self.containers.written)
         # A project allowed: a key of its own from the router, sealed here.
-        self.assertIn("no such project", router.allow("n1", "nope")["error"])
+        self.assertIn("no such space", router.allow("n1", "nope")["error"])
         self.assertTrue(router.allow("n1", "web", "ann")["ok"])
         path, auth, body = next(x for x in FakeLiteLLM.seen if x[0] == "/key/generate")
         self.assertTrue(auth.startswith("Bearer sk-"))
@@ -225,7 +225,7 @@ class Router(unittest.TestCase):
         self.assertEqual(router.peers_for("web"), [("127.0.0.1", self.port)])
         own = router.with_peers({"web": {"compose": set(), "names": set(), "peers": set(), "hosts": set()}})
         self.assertIn(("127.0.0.1", self.port), own["web"]["peers"])
-        self.assertIn(("127.0.0.1", self.port), router.with_peers({})["web"]["peers"], "a project with nothing else here still gets the router")
+        self.assertIn(("127.0.0.1", self.port), router.with_peers({})["web"]["peers"], "a space with nothing else here still gets the router")
         self.assertNotIn("app", router.with_peers({}))
         # The models with their context and price, the spend by project.
         m = router.refresh_models("n1")

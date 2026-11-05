@@ -33,7 +33,7 @@ const isBroken = p => p.issues.some(i => i.level === "error");
 // while the others are not.
 const gitReadyFor = p => (p.git_ready !== undefined ? p.git_ready : state?.git_ready) !== false;
 const heldWhy = p => p.held || (!gitReadyFor(p) && !myLiveSession(p.name)
-  ? "set your commit name and email on your Profile (the gear) or in this project's settings first"
+  ? "set your commit name and email on your Profile (the gear) or in this space's settings first"
   : "");
 
 // The handlers for projectActions' buttons, one list for the Projects page's
@@ -81,7 +81,7 @@ function wireProjectRows(root){
 // sees why it is not theirs on its tip, and the lease on the row's line.
 function phoneWhy(p){
   const ph = p.phone;
-  if (!p.node_name) return "no node: a phone is connected on a project's node, and this one has none";
+  if (!p.node_name) return "no node: a phone is connected on a space's node, and this one has none";
   if (!ph) return `no phone is connected on ${p.node_name}: connect yours in the Phone page, on that node`;
   if (!ph.mine) return `the phone on ${p.node_name} is ${ph.owner}'s: only they lend it`;
   if (ph.lease && ph.lease.project !== p.name) return `your phone is lent to ${projLabel(ph.lease.project)}: take it back there first`;
@@ -246,7 +246,7 @@ async function setArchived(name, on){
     const j = await (await postJSON("/api/archive", {name, archived: on})).json();
     if (j.error){ notify(j.error, true); return; }
     applyNow((p, k) => { if (k === key) p.archived = !!j.archived; });
-    notify(on ? `${projectName(key)} archived: in Archived at the foot of the Projects page, and working as before`
+    notify(on ? `${projectName(key)} archived: in Archived at the foot of the Spaces page, and working as before`
               : `${projectName(key)} unarchived`);
   }catch(e){ notify("archive failed: " + failWords(e), true); }
   refresh();
@@ -265,9 +265,9 @@ async function setLocked(name, on){
   if (on && !await askYes(held
       ? `Lock ${name} as an administrator?\n\n${running}\n\nNobody starts a session in it or `
         + `changes it, ${p.owner_name || "its owner"} included, until an administrator unlocks it. `
-        + `It stays on the Projects page with its lock mark.`
+        + `It stays on the Spaces page with its lock mark.`
       : `Lock ${name}?\n\nEvery session here but yours ends now. Nobody but you starts a session `
-        + `in it or changes it until you unlock it. It stays on the Projects page with its lock mark.`)) return;
+        + `in it or changes it until you unlock it. It stays on the Spaces page with its lock mark.`)) return;
   try{
     const j = await (await postJSON("/api/lock", {name: key, locked: on})).json();
     if (j.error){ notify(j.error, true); return; }

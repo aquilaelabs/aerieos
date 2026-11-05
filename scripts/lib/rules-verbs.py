@@ -77,11 +77,11 @@ elif op == "show":
         for g in reg.ALWAYS:
             if g["name"] == want:
                 print(g["text"] + "\nrefuses: " + ", ".join(g["refuse"])
-                      + "\n(the briefing's, refused in every project)")
+                      + "\n(the briefing's, refused in every space)")
                 break
         else:
             names = ", ".join(r["name"] for r in reg.effective(proj)) or "none"
-            sys.exit(f"no rule called {want} here; this project has: {names}")
+            sys.exit(f"no rule called {want} here; this space has: {names}")
 elif op == "add":
     if len(rest) < 2:
         sys.exit('usage: aerie rules add <name> "the rule" [--files GLOB,...] [--words W,...] '
@@ -168,7 +168,7 @@ elif op == "pending":
         when = time.strftime("%d %b %H:%M", time.localtime(r.get("at", 0)))
         lead = "  ↳ " if r.get("after") is not None else "  "
         print(f"{lead}{when}  {r.get('summary', '')}")
-    print(f"  (this project's setting for new rules from a session: "
+    print(f"  (this space's setting for new rules from a session: "
           f"{pending.mode(proj, 'rules')})")
 elif op == "history":
     rows = reg.history(proj, limit=20)
@@ -188,7 +188,7 @@ elif op == "list":
     if fmt != "text":
         dump_rules(rs); sys.exit(0)
     if not rs:
-        print("no house rules on this project yet. The operator writes them on "
+        print("no house rules on this space yet. The operator writes them on "
               "the notebook's Briefing tab; `aerie rules add NAME \"...\"` leaves "
               "one of yours there, marked as a session's.")
         sys.exit(0)

@@ -265,7 +265,7 @@ function attRow(a){
     return `<div class="bnote att">
       <div class="bt">${esc(projLabel(a.project))} can be deleted</div>
       <div class="bsum">${esc(a.why)}</div>
-      <div class="bfoot"><span>on the Projects page</span>
+      <div class="bfoot"><span>on the Spaces page</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bleftover="${esc(a.project)}">Delete it</a></span></div></div>`;
   }

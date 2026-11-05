@@ -196,7 +196,7 @@ ok((await api('/api/phone', { action: 'ask', why: '', cmd: ['shell', 'ls'], proj
    'an ask with no reason is refused: Allow on an unexplained command is a guess');
 const noNode = await api('/api/phone', { action: 'ask', why: 'look around', cmd: ['shell', 'ls'], project: 'beta' });
 ok(/has no node/.test(noNode.body.error || ''),
-   'a project with no node has no phone to ask for, and is told so');
+   'a space with no node has no phone to ask for, and is told so');
 // The companion app's live connection (R125): a wait held open answers the
 // moment an ask lands, rather than at the app's next alarm.
 const since = (await api('/api/phone/wait?since=')).body.token;
@@ -216,7 +216,7 @@ await page.evaluate(() => phFetch());
 await page.waitForSelector('.phask', { timeout: 15000 });
 ok(/read the Firefox version/.test(await page.$eval('.phask', e => e.textContent))
    && /alpha on sandbox/.test(await page.$eval('.phask', e => e.textContent)),
-   'the owner\'s tab shows the request with its reason, its project and its node');
+   'the owner\'s tab shows the request with its reason, its space and its node');
 ok(/left to answer/.test(await page.$eval('.phask', e => e.textContent)),
    '...and how long is left, since an Allow that has quietly stopped working is worse than one that says it has gone');
 // The rows' own list: the page's surface wears .phonetab too, around its bar.
@@ -296,7 +296,7 @@ print(u.mint_session("${proj}"))`], { encoding: 'utf8' }).trim();
   const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
   const peek = await api('/api/phone', { action: 'outcome', id: asked.body.id }, beta);
   ok(peek.body.error && peek.body.out === undefined,
-     "another project's session cannot read the outcome of a request it did not make");
+     "another space's session cannot read the outcome of a request it did not make");
   const before = (await api('/api/v1/jobs')).body.jobs.length;
   const r = await fetch(base + '/api/phone?node=' + encodeURIComponent(sandbox.id) + '&probe=1', { headers: beta });
   ok(r.status === 200 && (await api('/api/v1/jobs')).body.jobs.length === before,
@@ -325,7 +325,7 @@ const instUntil = async (state) => {
   return await instState();
 };
 const inst = await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' });
-ok(inst.status === 200 && !inst.body.error, `Install on a project whose node holds a phone starts (${JSON.stringify(inst.body).slice(0, 60)})`);
+ok(inst.status === 200 && !inst.body.error, `Install on a space whose node holds a phone starts (${JSON.stringify(inst.body).slice(0, 60)})`);
 const first = await instUntil('done');
 ok(first.state === 'done' && first.error === '', `Install runs on the node and reports no error (${JSON.stringify(first)})`);
 await api('/api/artifacts', { action: 'install', project: 'alpha', path: 'dist/streamlift-1.3-clash.apk' });
@@ -420,7 +420,7 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
   ok(bad.status === 400 && /only the account that connected/.test(bad.body.error),
      `only the owner lends it, an administrator included (${bad.body.error})`);
   const lent = await api('/api/phone', { action: 'lend', node: sandbox.id, project: 'alpha', hours: 1 });
-  ok(lent.status === 200, `the owner lends it to a project on its node (${lent.status} ${lent.body.error || ''})`);
+  ok(lent.status === 200, `the owner lends it to a space on its node (${lent.status} ${lent.body.error || ''})`);
   await page.evaluate(() => phFetch());
   await page.waitForSelector('.phonetab .phlease', { timeout: 15000 });
   ok(/Lent to alpha/.test(await page.$eval('.phonetab .phlease', e => e.textContent)) && !!(await page.$('.phonetab #phTakeBack')),
@@ -434,7 +434,7 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
   ok(await page.evaluate(() => { const d = document.createElement('div');
        d.innerHTML = projectActions(state.projects.find(p => p.name === 'alpha'));
        const b = d.querySelector('[data-ph]'); return !!b && !b.disabled && /Take your phone back/.test(b.textContent); }),
-     "the project's card shows the lease, and its repository's menu offers the owner Take your phone back");
+     "the space's card shows the lease, and its repository's menu offers the owner Take your phone back");
   await page.evaluate(() => openPhoneTab());       // back to the tab the rest reads
   const first = await use('shot');
   ok(first.status === 200 && first.body.asked > 0, `a lent phone's command is an ask, not a run (${JSON.stringify(first.body)})`);

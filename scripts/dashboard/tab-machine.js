@@ -108,7 +108,7 @@ function olderVersionsSection(n){
   return docSection("nodes", "older", "Older versions", k.booted ? `visiting ${k.booted}` : String(k.versions.length), `<div class="field">
       ${k.booted ? `<div class="hint warn">This boot is a visit to ${esc(k.booted)}. Restart to go back to the version it came from; updates wait until then.</div>` : ""}
       ${rows}${busy ? `<div class="sub dim">Working on it now.</div>` : !n.live ? `<div class="sub dim">Its agent is not dialing in.</div>` : ""}</div>
-      <div class="field"><div class="hint">Each version an update replaced, kept to boot once from the boot menu's Older versions; your projects, shares and VMs are not part of it${
+      <div class="field"><div class="hint">Each version an update replaced, kept to boot once from the boot menu's Older versions; your spaces, shares and VMs are not part of it${
         helpIcon("A visit lasts one boot. If the configuration has moved on further than that version reads, the copy from when it was left is used, and yours comes back when you restart. How many are kept is under Update window.")}</div></div>`);
 }
 function wireOlderVersions(root){
@@ -130,7 +130,7 @@ function wireOlderVersions(root){
 // what writes all day (docker, the VMs, the toolchains, the projects) is on
 // the system pool picked here, or waits for one. What still lives on the
 // stick and what it has written, in the facts voice.
-const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the projects"};
+const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces"};
 // The system pool's picker: The stick's own, and the first-run walk's.
 function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
   // An adopted pool counts whatever its filesystem (B663): the census's
@@ -160,13 +160,13 @@ function stickSection(n){
     ["Runs from", "memory: the stick is read at boot"],
     ["On the stick", (s.on_stick || []).length ? `the configuration, and ${s.on_stick.map(k => STICK_WORDS[k] || k).join(", ")}` : "the configuration alone"],
     ["Docker and the VMs", s.ready ? `on ${s.pool}` : s.pool ? `waiting for ${s.pool} to mount` : "waiting for a system pool", {cls: s.ready ? "ok" : "warn"}],
-    ["The projects", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
+    ["The spaces", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
   ];
   const pick = stickPoolPick(n, s);
-  return docSection("nodes", "stick", "Pool and projects", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. Until one is picked, Docker and the VMs wait and no project can be made.</div></div>${projectsFolderField(n, s, admin)}`,
+  return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -184,26 +184,26 @@ function projectsFolderField(n, s, admin){
   const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
   const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
   const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
-  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Projects folder</span><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
+  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
       value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}></label>
       <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
       <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
-    <div class="hint">Only if the projects already sit on these disks: the controller works there, and nothing is copied${
+    <div class="hint">Only if the spaces already sit on these disks: the controller works there, and nothing is copied${
       helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
 }
 function wireStick(root){
   root.querySelectorAll("[data-projfolder]").forEach(pb => pb.onclick = () => pressing(pb, async () => {
     const release = pb.dataset.projfolder === "release", path = (root.querySelector("#projFolder")?.value || "").trim();
-    if (!release && !path) return notify("name the folder the projects are in first", true);
+    if (!release && !path) return notify("name the folder the spaces are in first", true);
     if (!await askYes(release
-        ? "Let the projects folder go?\n\nThe controller restarts on the pool's projects folder (or the stick's). The folder and its files stay where they are, given back to who had them."
-        : `Take ${path} as the projects folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: the system that had it can no longer read it until it is given back. Who had it is kept in the folder, in ${path}/.aerieos-give-back.sh: Let it go runs that, and so can root on that system. Their owner changes, nothing in them does, and a share of this folder stops serving other people.`,
+        ? "Let the spaces folder go?\n\nThe controller restarts on the pool's spaces folder (or the stick's). The folder and its files stay where they are, given back to who had them."
+        : `Take ${path} as the spaces folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: the system that had it can no longer read it until it is given back. Who had it is kept in the folder, in ${path}/.aerieos-give-back.sh: Let it go runs that, and so can root on that system. Their owner changes, nothing in them does, and a share of this folder stops serving other people.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
     busy(pb, release ? "Letting go" : "Taking it");
     const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "taking the folder: the job says which projects it found, and the controller restarts on it", !!j.error);
+    notify(j.error || "taking the folder: the job says which spaces it found, and the controller restarts on it", !!j.error);
     await loadNodes();
   }));
   const b = root.querySelector("[data-stickpool]"), sel = root.querySelector("#stickPool");
@@ -211,7 +211,7 @@ function wireStick(root){
   b.onclick = () => pressing(b, async () => {
     const path = sel.value;
     if (!path) return notify("pick a pool first", true);
-    if (!await askYes(`Put docker, the VMs, the toolchains and the projects on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, and the stick keeps the configuration alone.`,
+    if (!await askYes(`Put docker, the VMs, the toolchains and the spaces on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, and the stick keeps the configuration alone.`,
         {title: "Use this pool?", verb: "Move"})) return;
     busy(b, "Moving");
     const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path})).json().catch(() => ({error: "no answer"}));

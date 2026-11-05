@@ -117,8 +117,8 @@ def _setup(project):
         raise Refused(f"{project} is not on github.com, so there is no hosted run to read")
     token = _token(project)
     if not token:
-        raise Refused("the controller has no GitHub token for this project: give it one under the "
-                      "project's settings (Git), or sign gh in on the controller")
+        raise Refused("the controller has no GitHub token for this space: give it one under the "
+                      "space's settings (Git), or sign gh in on the controller")
     return repo, token
 
 

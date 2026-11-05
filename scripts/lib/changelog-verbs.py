@@ -71,7 +71,7 @@ if argv and argv[0] == "add":
         print(changelog.rules(), file=sys.stderr)
         raise SystemExit(1)
     if not changelog.standard(changelog.canonical(cat)):
-        print(f"filed under {cat!r}, which is this project's own category rather than one "
+        print(f"filed under {cat!r}, which is this space's own category rather than one "
               "of the six; kept as typed", file=sys.stderr)
     # Stamped with HEAD: the instruction in the template is to log after
     # committing, so the sha names the commit the entry describes.

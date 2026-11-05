@@ -58,14 +58,14 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
      && d.presets.schemes.length >= 12 && d.presets.templates.some(t => t.key === 'dashboard')
      && d.presets.platforms.map(p => p.key).join(',') === 'web,android,ios,linux,macos,windows'
      && d.file.exists === false,
-     `a project starts with an empty design: no theme, no page, no rule, no choice of type, corners, space or motion, no file, and the vocabulary comes with it (${
+     `a space starts with an empty design: no theme, no page, no rule, no choice of type, corners, space or motion, no file, and the vocabulary comes with it (${
         d.presets.schemes.length} schemes, ${d.presets.templates.length} templates)`);
   // Nothing designed beforehand: the briefing says so, and what to do after.
   const pre0 = await api(`/api/preamble?project=${P}`);
   ok(/The notebook's Design view is empty: no theme, no page, no design rule\. Build as you would and choose the look yourself; then put what you arrived at into the design with `aerie design save`/.test(pre0.text)
      && /the type, corners, space and motion you settled on/.test(pre0.text)
      && /Under the project's dial Agents may: Add to the design, a save of yours lands\./.test(pre0.text),
-     'the briefing of an undesigned project says to build as usual and put the look into the design afterwards, and what the dial does with that');
+     'the briefing of an undesigned space says to build as usual and put the look into the design afterwards, and what the dial does with that');
   ok(d.presets.schemes[0].key === 'default' && d.presets.schemes.slice(1).map(s => s.key).join()
        === d.presets.schemes.slice(1).map(s => s.key).sort().join(),
      'the schemes lead with Default and are alphabetical after it');
@@ -366,7 +366,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
      'a choice that is made says what it means, and the ones still open are named as open');
   const pre1 = await api(`/api/preamble?project=${P}`);
   ok(/This project's notebook holds a design already:[^.]*type, corners, space not chosen yet/.test(pre1.text),
-     '...and the briefing of a designed project names the choices still open');
+     '...and the briefing of a designed space names the choices still open');
   // The briefing a session is started with is the verb's, run as a process
   // of its own: it read no design store and said "empty" of every designed
   // project, while the Briefing tab, asking the server, said otherwise (B355).
@@ -374,7 +374,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } });
   ok(/This project's notebook holds a design already:/.test(told) && !/Design view is empty/.test(told),
-     'aerie preamble, which is what a session is started with, says the same of a designed project');
+     'aerie preamble, which is what a session is started with, says the same of a designed space');
   await page.selectOption(`${NB} #dst-0-font`, 'system');
   await page.selectOption(`${NB} #dst-0-corners`, 'soft');
   await page.selectOption(`${NB} #dst-0-density`, 'comfortable');
@@ -939,7 +939,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
     }
     return false;
   };
-  const drawn = await drawAs('a role that reads this project and does not write it');
+  const drawn = await drawAs('a role that reads this space and does not write it');
   const ro = await page.$eval(`${NB} .nbview[data-view="design"]`, v => ({
     shown: [...v.querySelectorAll('button')].filter(b => b.checkVisibility() && !b.closest('summary') && !b.hasAttribute('aria-expanded')).map(b => b.textContent.trim()),
     fields: v.querySelectorAll('input:disabled, textarea:disabled').length,

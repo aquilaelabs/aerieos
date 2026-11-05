@@ -41,8 +41,8 @@ TIMEOUT = 20
 MAX_DEST = 12
 MAX_ROWS = 12                # rows in one message
 KINDS = ("asks", "needs", "ci", "invites", "sync", "disk", "power", "host", "backup")
-KIND_WORDS = {"asks": "a session asking for your answer", "needs": "what a node or a project needs",
-              "ci": "a red CI run", "invites": "an invitation to a project", "sync": "a file changed in two places",
+KIND_WORDS = {"asks": "a session asking for your answer", "needs": "what a node or a space needs",
+              "ci": "a red CI run", "invites": "an invitation to a space", "sync": "a file changed in two places",
               "disk": "a disk failing or hot, a pool or an array slot gone, on this machine",
               "power": "this machine on its UPS battery, or the UPS not answering", "host": "security updates to this machine's own packages, or a restart they need",
               "backup": "a backup of this machine that failed or has not run in two days"}

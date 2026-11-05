@@ -52,7 +52,7 @@ await beat();
 const rows = (await call('/api/project-sessions?project=alpha')).sessions || [];
 const row = n => rows.find(r => r.name === n);
 ok(row(here[0]) && row(here[1]) && row(nodeShell)?.node_id === box.id,
-   `an administrator sees every account's sessions on the project, here and on a node (${
+   `an administrator sees every account's sessions on the space, here and on a node (${
      rows.map(r => r.name).join(', ')})`);
 ok(row(here[0])?.who === 'w.sess' && row(here[0]).kind === 'claude' && row(here[1])?.kind === 'shell'
    && row(nodeShell)?.node === 'sessbox',
@@ -74,7 +74,7 @@ ok(asSession.status === 403, `...and neither can a session, the owner's included
 // ---- ending one: this project's, by an administrator -------------------------
 const wrong = await call('/api/project-sessions', { project: 'alpha', action: 'end', session: here[2] });
 ok(wrong.status === 400 && /no such session on this project/.test(wrong.error || ''),
-   `another project's session cannot be ended from this one (${wrong.error})`);
+   `another space's session cannot be ended from this one (${wrong.error})`);
 const keys = await call('/api/send', { session: here[0], macro: 'lx-ls' });
 ok(keys.status === 403, `typing into another account's session is still refused, administrator or not (B172, ${keys.status})`);
 const ended = await call('/api/project-sessions', { project: 'alpha', action: 'end', session: nodeShell, node: box.id });
@@ -101,7 +101,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
     .filter(x => x.node_id === box.id).map(x => x.name);
   const watch = await listed(PLAIN), own = await listed(H);
   ok(!watch.length && own.includes('claude-alpha'),
-     `the owner's Claude session on a node is listed for the owner, bare, and for nobody else given the project (owner ${JSON.stringify(own)}, w.watch ${JSON.stringify(watch)})`);
+     `the owner's Claude session on a node is listed for the owner, bare, and for nobody else given the space (owner ${JSON.stringify(own)}, w.watch ${JSON.stringify(watch)})`);
   await sample([]);
 }
 
@@ -115,7 +115,7 @@ await page.waitForFunction(() => !document.getElementById('rnSessField').hidden
   && document.querySelectorAll('#rnSessList .rnsess').length > 0, null, { timeout: 15000 });
 const drawn = await page.$$eval('#rnSessList .rnsess', rs => rs.map(r => r.textContent.replace(/\s+/g, ' ').trim()));
 ok(drawn.some(t => /w\.sess/.test(t) && /Claude/.test(t)) && drawn.some(t => /w\.sess/.test(t) && /shell/.test(t)),
-   `the project's settings list its sessions, whose and what (${drawn.join(' | ')})`);
+   `the space's settings list its sessions, whose and what (${drawn.join(' | ')})`);
 // The last field showing, in the dialog's sections since they came (1 Oct).
 const last = await page.$eval('#rnmodal .box', b => [...b.querySelectorAll('.field:not([hidden]):not(.rnhead)')]
   .filter(f => f.offsetParent).pop()?.id);
@@ -159,7 +159,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
       sessions: [{ name: onNode, attached: false, cwd: '/workspace/gamma', title: '' }] }, running: [], wait: 0 }) });
   const del = await call('/api/trash', { name: 'gamma' });
   ok(r.ok && del.status === 409 && del.error?.includes(onNode),
-     `a project with a session running on a node is refused Delete, naming the session (${del.status} ${del.error})`);
+     `a space with a session running on a node is refused Delete, naming the session (${del.status} ${del.error})`);
   await beat();
 }
 

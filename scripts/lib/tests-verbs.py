@@ -87,7 +87,7 @@ elif op == "projection":
     if rest[:1] == ["--secs"] or "--secs" in rest:
         print(f"{wall:.0f}")
     elif not wall:
-        print("no projection yet; nothing measured on this project, and this run records the first")
+        print("no projection yet; nothing measured on this space, and this run records the first")
     else:
         print(f"projected {wall:.0f}s, {took}; "
               f"one past {2 * wall:.0f}s is stuck, not slow")

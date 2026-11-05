@@ -106,7 +106,7 @@ function userRow(u){
     <span class="rline"><span class="name">${esc(u.name)}</span>${u.name === usersMeta.me ? `<span class="pill">you</span>` : ""}${
       roles.map(r => `<span class="pill${r === "owner" ? " ok" : ""}">${esc(usersMeta.role_labels?.[r] || r)}</span>`).join("")}</span>
     <span class="rfacts">${[roles.length ? "" : (u.projects || []).length
-      ? `a role on ${u.projects.length} project${u.projects.length === 1 ? "" : "s"}` : "no role", u.seen ? `seen ${ago(u.seen)}` : "never seen"].filter(Boolean).map(esc).join(" · ")}</span></button>`;
+      ? `a role on ${u.projects.length} space${u.projects.length === 1 ? "" : "s"}` : "no role", u.seen ? `seen ${ago(u.seen)}` : "never seen"].filter(Boolean).map(esc).join(" · ")}</span></button>`;
 }
 
 // The picked account's settings, saved together: its name, its roles and
@@ -121,7 +121,7 @@ function usersDetail(u){
     `<div class="setcell">${lbl(id, label, help)}<input id="${id}" data-ufield="${key}" type="${type}" value="${esc(e[key] || "")}"
        autocomplete="off" spellcheck="false" ${extra}${ro ? " disabled" : ""}></div>`;
   const facts = [agentLogins(u) || "signed in to no agent yet", u.seen ? `seen ${esc(ago(u.seen))}` : "never seen",
-                 u.projects?.length ? `on ${u.projects.length} project${u.projects.length === 1 ? "" : "s"}` : "on no project yet"];
+                 u.projects?.length ? `on ${u.projects.length} space${u.projects.length === 1 ? "" : "s"}` : "on no space yet"];
   const access = rolesData === null ? `<div class="sub dim">reading its roles…</div>` : rolesAccessFields(u.name);
   return `<div class="rhead" data-uback><span class="shback" role="img" aria-label="Back to People">\u2039</span><b>${esc(u.name)}</b> <span class="dim">${facts.join(" · ")}</span></div>
     ${u.claude_shared_with?.length ? `<div class="sub warn">the same Claude account as ${u.claude_shared_with.map(esc).join(", ")
@@ -135,14 +135,14 @@ function usersDetail(u){
       ${f("ueGitEmail", "git_email", "Git email", "email", "", "on their commits. Blank means their email")}
       ${f("uePw", "pw", "New password", "password", 'autocomplete="new-password"', "blank keeps the current one. Set without the old one, which is the way back in for somebody locked out")}
     </div>
-    <div class="setrow col ueaccess ctlrow">${lbl("", "Roles and projects", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
+    <div class="setrow col ueaccess ctlrow">${lbl("", "Roles and spaces", "what this account may do; what each role holds is on the Roles page")}<div id="ueAccess">${access}</div></div>
     <div class="sub bad" id="ueErr" hidden></div>
     ${ro ? "" : saveBar({save: 'id="ueSave"', revert: 'id="ueRevert"', state: usersDirty() ? "unsaved" : "", dead: !usersDirty()})}
     ${u.devices ? `<div class="uedevices"><span class="lbl">Devices${helpIcon("the apps signed in as this account on its machines; Disconnect cuts one off for them, as a lost laptop needs")}</span>${
       profileDevices(u.devices, u.name)}</div>` : ""}
     ${ro ? "" : `<div class="rfoot">${isOwner ? `<span class="sub dim">The owner cannot be deleted: rename it instead.</span>`
       : `<button type="button" class="danger" id="ueRemove">Remove ${esc(u.name)}</button>`}${
-      state?.can?.admin ? `<button type="button" class="danger" id="uePurge" title="their own key, the forges they linked, and the projects linked to it">Purge key store</button>` : ""}</div>`}`;
+      state?.can?.admin ? `<button type="button" class="danger" id="uePurge" title="their own key, the forges they linked, and the spaces linked to it">Purge key store</button>` : ""}</div>`}`;
 }
 
 function renderUsersInto(i){
@@ -163,7 +163,7 @@ function renderUsersInto(i){
     // labels are the page's own; the accounts are on their way.
     const field = label => skField(label, 16);
     d.list.innerHTML = skTpl(`${pageHead({facts: [["Accounts", GHOST], ["Administrators", GHOST]], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
-      field("Account name") + field("Their name") + field("Roles and projects")}</div></div>`);
+      field("Account name") + field("Their name") + field("Roles and spaces")}</div></div>`);
     loadUsers();
     wireUsersBar(d.el);
     return;

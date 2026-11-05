@@ -122,7 +122,7 @@ class TheImage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             with mock.patch.dict(os.environ, {"BB_SP_NO_MOUNT": "1"}):
                 r = self.tool(d, "apply")
-                self.assertIn("the projects are held", r.stdout)
+                self.assertIn("the spaces are held", r.stdout)
                 self.assertEqual(json.loads(self.tool(d, "status").stdout)["projects_home"], "held")
                 os.makedirs(f"{d}/share/projects")
                 self.tool(d, "projects", f"{d}/share/projects")
@@ -165,17 +165,17 @@ class TheImage(unittest.TestCase):
             self.assertEqual(run("projects", "relative").returncode, 2)
             self.assertEqual(run("projects", f"{d}/mnt/user/../user/projects").returncode, 2, "no .. in the path")
             self.assertIn("is not a folder", run("projects", f"{d}/nowhere").stderr)
-            self.assertIn("the projects folder itself", run("projects", f"{d}/ws/left").stderr)
+            self.assertIn("the spaces folder itself", run("projects", f"{d}/ws/left").stderr)
             self.assertEqual(run("projects", share, stick=False).returncode, 2, "a stick's alone")
             r = run("projects", share, "alpha", "beta", "gamma")
             self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertIn("holds 2 of the controller's 3 projects; not there: gamma", r.stdout)
+            self.assertIn("holds 2 of the controller's 3 spaces; not there: gamma", r.stdout)
             self.assertIn("stays underneath", r.stdout, "what the folder held before is said, never deleted")
             self.assertTrue(os.path.isdir(f"{d}/ws/left"))
             got = json.loads(run("status").stdout)
             self.assertEqual(got["projects"], share)
             self.assertNotIn("projects", got["on_stick"], "the named folder is no longer the stick's to hold")
-            self.assertIn(f"the projects are {share}", run("apply").stdout)
+            self.assertIn(f"the spaces are {share}", run("apply").stdout)
             # Who had it is kept on the disks, and Let it go gives it back
             # (B665); the second naming writes nothing over the first's record.
             back = f"{share}/.aerieos-give-back.sh"
@@ -186,7 +186,7 @@ class TheImage(unittest.TestCase):
             self.assertIn(back, run("projects", share).stdout)
             os.chmod(share, 0o750)
             r = run("projects", "--release")
-            self.assertIn("no longer the projects folder; its files stay", r.stdout)
+            self.assertIn("no longer the spaces folder; its files stay", r.stdout)
             self.assertIn("given back to who had it", r.stdout)
             self.assertEqual(os.stat(share).st_mode & 0o7777, was)
             self.assertFalse(os.path.exists(back), "the record goes with the giving back")
@@ -253,7 +253,7 @@ class TheAgentsProjectsFolder(unittest.TestCase):
                 a = A()
                 self.assertEqual(a._apply_projects_folder(Job(), {"path": "/mnt/user/projects", "names": ["alpha", "../x", ".hidden", 3]}),
                                  ("succeeded", 0))
-                self.assertEqual(a.ran[-3:], ["projects", "/mnt/user/projects", "alpha"], "only plain project names reach the tool")
+                self.assertEqual(a.ran[-3:], ["projects", "/mnt/user/projects", "alpha"], "only plain space names reach the tool")
                 a._apply_projects_folder(Job(), {"release": True})
                 self.assertEqual(a.ran[-2:], ["projects", "--release"])
 

@@ -20,7 +20,7 @@ const sp = await page.evaluate(() => ({ hash: location.hash, on: document.queryS
   head: [...document.querySelectorAll('.sesstbl .thead .th')].map(h => h.textContent.trim()).filter(Boolean),
   bar: document.querySelector('#mSessions'), panel: document.getElementById('sespanel') }));
 ok(sp.hash === '#/sessions' && sp.on && sp.head.join(',') === 'Session,Project,Node,Started' && !sp.bar && !sp.panel,
-   `the rail's Sessions opens its page at #/sessions, a table of Session, Project, Node, Started, the old panel gone (${JSON.stringify(sp)})`);
+   `the rail's Sessions opens its page at #/sessions, a table of Session, Space, Node, Started, the old panel gone (${JSON.stringify(sp)})`);
 const row = n => page.locator('.sesstbl .sessrow', { has: page.locator(`[data-go="${n}"]`) });
 // ...and a session on the controller itself says when it started, as a
 // node's does: its Started was blank for every one here (B149).
@@ -84,7 +84,7 @@ await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 
 ok(!(await gitBtn()).dis, 'in a repository the git commands are live');
 await row('shell-ep_silon').locator('[data-go]').click();
 await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-ep_silon');
-ok(!(await gitBtn()).dis, '...a dotted project name included');
+ok(!(await gitBtn()).dis, '...a dotted space name included');
 // Tidy the strip for the sections below: these two tabs were this block's.
 await page.evaluate(() => { for (const s of ['shell-alpha', 'shell-ep_silon']){
   const t = tabs.find(x => sessionOf(x.arg) === s); if (t) hideTab(t.id); } });
@@ -100,7 +100,7 @@ ok(page.dialogs.length === nd + 1 && page.dialogs[nd].includes('Claude'), 'End a
 // B58: by the project's name, as its row is, never the tmux name.
 const alphaLabel = await page.evaluate(() => projLabel('alpha'));
 ok(page.dialogs[nd].includes(`Claude session on ${alphaLabel}?`) && !page.dialogs[nd].includes('claude-alpha'),
-   `...the question names the project, not the tmux session (${page.dialogs[nd].split('\n')[0]})`);
+   `...the question names the space, not the tmux session (${page.dialogs[nd].split('\n')[0]})`);
 // B54: focus is not left on another row's End, where a keyboard Enter would
 // end a second session.
 await sleep(300);
@@ -147,7 +147,7 @@ await page.waitForSelector('.pane .nb [data-view="analysis"]:not([hidden]) .rule
 ok(true, 'a notebook opens on its Analysis view when asked by name');
 ok(await page.$eval('#linux [data-m]', b => b.disabled), 'macros grayed on a notebook tab');
 ok(await page.$$eval('.pane .nb .rule .rid .pill', ps => ps.length > 0),
-   '...with the findings for that project alone, worst level first');
+   '...with the findings for that space alone, worst level first');
 
 // The same filters the Analysis tab carries, project-fixed: one slice of
 // narrowing shared by both surfaces, so learning one is learning the other.
@@ -256,15 +256,15 @@ await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'shell-9'))
 tmuxNew('claude-ep_silon');
 await page.evaluate(() => { railGo('sessions'); refresh(); });
 await page.waitForFunction(() => document.querySelector('.sesstbl [data-go="claude-ep_silon"]'), { timeout: 15000 });
-ok((await page.$eval('.sesstbl [data-go="claude-ep_silon"]', el => el.textContent.trim())) === 'Claude: ep.silon', 'dotted project: session labeled by its project name');
+ok((await page.$eval('.sesstbl [data-go="claude-ep_silon"]', el => el.textContent.trim())) === 'Claude: ep.silon', 'dotted space: session labeled by its space name');
 ok((await page.$eval('.sesstbl .sessrow[data-sess="claude-ep_silon"] .td:nth-child(2)', el => el.textContent.trim())) === 'ep.silon',
-   '...and its Project column names the project, dot and all');
+   '...and its Space column names the space, dot and all');
 // `on`, not `primary`: the row's controls are icons now, and a live one is
 // lit by color rather than by being a filled button.
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.pgrid .pcard[data-row="ep.silon"] [data-c]', { timeout: 15000 });
 ok(await page.$eval('.pgrid .pcard[data-row="ep.silon"] [data-c]', b => b.textContent.trim() === 'Manage agent' && b.classList.contains('primary')),
-   'dotted project: the agent button knows the session is running (Manage agent, green)');
+   'dotted space: the agent button knows the session is running (Manage agent, green)');
 {
   const idle = await page.evaluate(() => [...document.querySelectorAll('.pgrid .pcard [data-c]')]
     .filter(b => !liveSessions().has(myClaude(b.dataset.c))).map(b => [b.textContent.trim(), b.classList.contains('primary')]));
@@ -274,7 +274,7 @@ ok(await page.$eval('.pgrid .pcard[data-row="ep.silon"] [data-c]', b => b.textCo
 await page.evaluate(() => railGo('sessions'));
 await page.click('.sesstbl [data-go="claude-ep_silon"]');
 await page.waitForFunction(() => tabs.some(t => t.arg === 'claude:ep.silon'));
-ok(true, 'dotted project: reopening from Sessions maps back to claude:ep.silon');
+ok(true, 'dotted space: reopening from Sessions maps back to claude:ep.silon');
 ok(await page.evaluate(() => sessionOf('claude:ep.silon') === 'claude-ep_silon' && sessionOf('sh:2:ep.silon') === 'shell-ep_silon-2'), 'sessionOf applies the tmux rewrite');
 // ...and another account's session on the same project, which its owner's
 // lock ends (R119): every session but the owner's goes, wherever it runs,
@@ -308,7 +308,7 @@ const gone = n => { for (let i = 0; i < 20; i++){ try { execFileSync('tmux', ['h
 const lockGone = [gone(`${lockUid}~claude-ep_silon`), gone('claude-ep_silon')];
 ok(lockSaid === 'Lock' && page.dialogs.length === ndx + 1 && /Every session here but yours ends now/.test(page.dialogs[ndx]) && /Lock ep\.silon\?/.test(page.dialogs[ndx])
    && lockGone[0] && !lockGone[1],
-   `dotted project: its owner locking it asks, ends the other account's session and keeps the owner's (${lockSaid}; ${page.dialogs.length - ndx} asked; gone ${lockGone}; ${lockSaidBack.slice(0, 200)}; ${(page.dialogs[ndx] || '').split('\n')[2]})`);
+   `dotted space: its owner locking it asks, ends the other account's session and keeps the owner's (${lockSaid}; ${page.dialogs.length - ndx} asked; gone ${lockGone}; ${lockSaidBack.slice(0, 200)}; ${(page.dialogs[ndx] || '').split('\n')[2]})`);
 await page.evaluate(() => setLocked('ep.silon', false));      // and unlock it again
 tmuxKill('claude-ep_silon');                                  // what follows starts with none
 // Its Claude button back: Start Claude, or Install Claude where the stub
@@ -513,7 +513,7 @@ writeFileSync(`${DIR}/home/.claude/projects/${`${DIR}/ws/alpha`.replace(/\//g, '
 const lastCodex = await phone.waitForFunction(() => (state?.projects || []).find(x => x.name === 'alpha')?.last_agents?.codex?.id || null,
                                               null, { timeout: 20000 }).then(h => h.jsonValue()).catch(() => null);
 ok(lastCodex === '01a168f4-0000-7000-8000-00000000c0de',
-   `a project's row carries ChatGPT's last conversation for its Resume (${lastCodex})`);
+   `a space's row carries ChatGPT's last conversation for its Resume (${lastCodex})`);
 const chooserReady = () => phone.evaluate(() => {
   const p = (state?.projects || []).find(x => x.name === 'alpha');
   return { last_claude: !!p?.last_claude, why: p?.session_why || '',
@@ -539,7 +539,7 @@ const chooser = await phone.$eval('.resumemenu', el => ({ shown: getComputedStyl
   start: [...el.querySelectorAll('.rmline:not(.rmconv) button')].map(b => b.textContent.trim()),
   resume: [...el.querySelectorAll('.rmconv button')].map(b => b.textContent.trim()), text: el.textContent.trim().slice(0, 120) }));
 ok(chooser.shown && chooser.start.join() === 'New' && chooser.resume.length >= 1 && chooser.resume.every(b => b === 'Resume'),
-   `phone: Claude on a project with history shows New, and its conversations to resume under it (${chooser.start.join(' | ')}; ${chooser.resume.length} to resume; ${chooser.text})`);
+   `phone: Claude on a space with history shows New, and its conversations to resume under it (${chooser.start.join(' | ')}; ${chooser.resume.length} to resume; ${chooser.text})`);
 // ...where it can be seen. The sidebar scrolls, the chooser is placed inside
 // the card, and pressing Claude on a project whose session has ended opens
 // this and NOTHING ELSE, so one drawn below the fold is a press with no

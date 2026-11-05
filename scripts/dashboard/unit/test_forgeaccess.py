@@ -160,7 +160,7 @@ class Override(Base):
         self.pol = {"pr_write": "deny"}
         ok, why = forgeaccess.may("app", "pr_write")
         self.assertFalse(ok)
-        self.assertIn("turned off for this project", why)
+        self.assertIn("turned off for this space", why)
 
     def test_an_allow_never_gives_what_the_token_lacks(self):
         self.pol = {"issues_write": "allow"}
@@ -178,7 +178,7 @@ class Override(Base):
         self.assertIn("as bot", text)
         self.assertIn("You may: ", text)
         self.assertIn("Not: open, comment on, label and close issues; ask the person to give the token Issues: Read and write", text)
-        self.assertIn("Not: merge pull requests (turned off for this project", text)
+        self.assertIn("Not: merge pull requests (turned off for this space", text)
 
     def test_a_verb_is_refused_by_either_and_says_why(self):
         body, code = forgeaccess.run("app", "issue create", {"flags": {"title": "x"}})

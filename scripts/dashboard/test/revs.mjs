@@ -64,7 +64,7 @@ ok(orphan.length === 0,
      orphan.length ? `; never sent: ${orphan.join(', ')}` : ''} (${
      bare.watched.length} watched)`);
 ok(!bare.served.some(k => k.includes(':')),
-   'a page with no notebook open is sent no per-project tokens');
+   'a page with no notebook open is sent no per-space tokens');
 
 // The per-project half, which only a notebook watches, and the state in
 // which every token has somebody watching it, since three of the global ones
@@ -88,7 +88,7 @@ ok(orphan.length === 0,
      open.watched.length} watched)`);
 const per = open.served.filter(k => k.includes(':'));
 ok(per.length > 0 && per.every(k => k.endsWith(':alpha')),
-   `...and the per-project tokens are the open notebook's alone (${
+   `...and the per-space tokens are the open notebook's alone (${
      per.join(', ') || 'none'})`);
 
 // The six halves, named, because "the notebook re-reads" is the claim and a

@@ -44,7 +44,7 @@ def status():
         sys.exit(f"[builderbot] ERROR: {d['error']}")
     st = d.get("state") if isinstance(d.get("state"), dict) else d
     if not st.get("compose"):
-        print("no compose file at this project's root (docker-compose.yml or compose.yml), so there is "
+        print("no compose file at this space's root (docker-compose.yml or compose.yml), so there is "
               "no dev instance: with one there, aerie devapp new builds it from this tree")
         raise SystemExit(0)
     # Its own name, and the one the Containers page lists it under where it
@@ -73,7 +73,7 @@ def status():
         # Kept by AerieOS for this container, never a file in the project.
         print(f"  {'env':<12} missing " + ", ".join(miss[:6])
               + (" …" if len(miss) > 6 else "") + "; aerie devapp env prints it and aerie devapp env set "
-              "replaces it where the project's settings allow, else the operator's Env on the Containers page")
+              "replaces it where the space's settings allow, else the operator's Env on the Containers page")
     job = st.get("job") or {}
     if job.get("running"):
         print(f"  {'job':<12} {job.get('step') or 'working'}")
@@ -266,12 +266,12 @@ def _watch(look, was, auth, job_id=""):
                      else "not running"))
             if st.get("await_env"):
                 print("[builderbot] its env is not filled in: aerie devapp env set FILE writes it where "
-                      "the project's settings allow, else the operator's Env on the Containers page",
+                      "the space's settings allow, else the operator's Env on the Containers page",
                       file=sys.stderr)
             raise SystemExit(0)
         if waited >= 21:
             sys.exit("[builderbot] ERROR: no build appeared within twenty seconds; "
-                     "this project's row on the Containers page has what happened")
+                     "this space's row on the Containers page has what happened")
     sys.exit(f"[builderbot] ERROR: the {what} is still going after an hour; its row on the Containers page has it")
 
 
@@ -339,7 +339,7 @@ def test():
         # The one refusal that does not mean nothing happened.
         if "timed out" in str(r["error"]).lower():
             sys.exit(f"[builderbot] ERROR: the controller did not answer within {START_WAIT}s. The run MAY "
-                     "HAVE STARTED anyway: `aerie jobs` lists a `test` job on this project if it did, "
+                     "HAVE STARTED anyway: `aerie jobs` lists a `test` job on this space if it did, "
                      "`aerie jobs ID` is its log, and starting another run on top of it breaks both")
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     jid = r.get("job") or ""
@@ -498,7 +498,7 @@ def ls():
         st = st.get("state") if isinstance(st.get("state"), dict) else st
         if st.get("compose"):
             print(f"nothing belongs to {proj} on any node yet: aerie devapp new builds its dev instance "
-                  "from the compose file at this project's root and starts it")
+                  "from the compose file at this space's root and starts it")
         else:
             print(f"nothing belongs to {proj} on any node: a compose file at its root "
                   "(docker-compose.yml or compose.yml) and aerie devapp new make its dev instance, "
@@ -514,7 +514,7 @@ def ls():
     if blind:
         print("[builderbot] the daemon did not answer, so what is running is not known", file=sys.stderr)
     print("[builderbot] aerie devapp log NAME reads one; aerie devapp start|stop|restart NAME, and "
-          "--container NAME on the other verbs, act on one where the project's settings allow",
+          "--container NAME on the other verbs, act on one where the space's settings allow",
           file=sys.stderr)
 
 

@@ -229,7 +229,7 @@ def save(project, req, by):
             rec["port"] = free_port(project, node, d)
         if rec["on"]:
             if not node:
-                return {"error": "this project has no node to run its file access on: "
+                return {"error": "this space has no node to run its file access on: "
                                  "pick one under Nodes in its settings"}, 400
             why = _port_why(project, rec["port"], node, d)
             if why:
@@ -353,8 +353,8 @@ def login(node, project, name, password, addr):
         # Audit page tells this from a wrong password: the server's own
         # words stay the same, since they say no more than a sign-in page.
         audit(f"ftp:{addr}", "ftp-login-refused", project,
-              {"name": str(name or "")[:60], "why": "file access is off for the project" if not rec["on"]
-               else "the login came through another node's agent than the project's"})
+              {"name": str(name or "")[:60], "why": "file access is off for the space" if not rec["on"]
+               else "the login came through another node's agent than the space's"})
         return denied
     if _throttled(addr):
         return {"access": "", "why": "Too many failed logins from this address; try again in a few minutes."}
@@ -380,10 +380,10 @@ def access_for(u, project, door):
     A session is never a person and has the tree already: none."""
     rec = get(project)
     if not u or u.get("session"):
-        return "", "This account has no file access to this project."
+        return "", "This account has no file access to this space."
     if not rec["on" if door == "ftp" else "editor"]:
-        return "", ("File access over FTPS is off for this project." if door == "ftp" else
-                    "Opening this project in an editor is off in its settings (File access).")
+        return "", ("File access over FTPS is off for this space." if door == "ftp" else
+                    "Opening this space in an editor is off in its settings (File access).")
     access = rec["access"].get(users.uid_of(u), "")
     # Taken off the project since: its access went with it.
     if access and not users.may_see(u, project):
@@ -398,11 +398,11 @@ def access_for(u, project, door):
     if door == "editor" and not rec["access"].get(users.uid_of(u)) and users.may_see(u, project):
         access = {"write": "rw", "read": "r"}.get(lvl, "")
     if access and not lvl:
-        return "", "Your roles give no file access to this project."
+        return "", "Your roles give no file access to this space."
     if access == "rw" and lvl == "read":
         access = "r"
     if not access:
-        return "", "This account has no file access to this project."
+        return "", "This account has no file access to this space."
     # A project locked against this account (R119) is read here as it is on
     # the page: nothing of it changes, through this door either (B263).
     if access == "rw" and locked_out(project, users.uid_of(u)):

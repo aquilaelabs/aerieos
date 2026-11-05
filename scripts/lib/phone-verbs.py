@@ -21,7 +21,7 @@ def status():
     rows = d.get("nodes") or []
     proj = os.environ.get("BB_PHONE_PROJECT", "")
     if not rows:
-        print("phone:   no node of this project's to drive a phone from: the project's settings name its node")
+        print("phone:   no node of this space's to drive a phone from: the space's settings name its node")
     for n in rows:
         p = n.get("phone")
         who = (n.get("owner") or {}).get("name")
@@ -38,7 +38,7 @@ def status():
             elif lease.get("project"):
                 print(f"{'':<16} lent to {lease['project']}, not {proj}")
             else:
-                print(f"{'':<16} not lent to {proj}: {who} lends it from the project's row or the Phone page; aerie phone run --why asks them for one command meanwhile")
+                print(f"{'':<16} not lent to {proj}: {who} lends it from the space's row or the Phone page; aerie phone run --why asks them for one command meanwhile")
         elif p and not who:
             print(f"{'':<16} seen by adb but connected outside the Phone page, so nobody answers for it: connect it there")
     for a in d.get("asks") or []:

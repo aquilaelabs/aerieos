@@ -104,7 +104,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   ok(pad === 'rgb(250, 250, 250)' && padThere === 'rgb(44, 20, 22)',
      `the room around the text changes color with the terminal (${pad} then ${padThere})`);
   ok(mine.size === 16 && mine.cursor === 'bar' && mine.bg === '#fafafa' && said === 200 && there.bg === '#2c1416' && there.size === 16,
-     `a terminal takes its person's look, and their colors for its project over it (${JSON.stringify(mine)} then ${JSON.stringify(there)})`);
+     `a terminal takes its person's look, and their colors for its space over it (${JSON.stringify(mine)} then ${JSON.stringify(there)})`);
   await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: '' }) }));
 }

@@ -44,7 +44,7 @@ put('bugs.json', { projects: {} });
 let p = await pre();
 ok((p.parts || []).map(x => x.name).join(',') === 'core,rules,briefing,live'
    && /## What holds every time/.test(p.text) && /\(global\)/.test(p.text) && (p.notes || []).length === 0,
-   `a project with nothing set still gets the briefing's core and the shipped global rules (${
+   `a space with nothing set still gets the briefing's core and the shipped global rules (${
      (p.parts || []).map(x => x.name).join(',') || 'none'}, ${p.bytes} bytes)`);
 // The rest of the briefing is topics (R202): the block carries the index
 // and aerie help TOPIC the text, so a session pays for the manual only where

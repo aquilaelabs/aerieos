@@ -522,7 +522,7 @@ in_view() {
     [ "${BB_GPU:-on}" = on ] || reads+=(--cuda off)
     why="$("$SESSION_BIN" plan --project "$proj" --account "${account:-}" --home "$HOME" \
                --cwd "$dir" "${reads[@]}" 2>&1 >/dev/null)" \
-        || bad "This node keeps each session to its own project, and could not for this one:" "$why"
+        || bad "This node keeps each session to its own space, and could not for this one:" "$why"
     RUN=(sudo -n "$SESSION_BIN" enter --project "$proj" --account "${account:-}" --home "$HOME"
          --cwd "$dir" "${reads[@]}" --env "$envf" -- "$@")
 }
@@ -1229,7 +1229,7 @@ need_author() {
     [ "$git_ready" = false ] || return 0
     bad "You have no name and email for commits yet, so $1 does not start." \
         "Set them on your Profile (the gear in the dashboard's header) and" \
-        "open this again. Every project here is a repository, and a commit" \
+        "open this again. Every space here is a repository, and a commit" \
         "needs an author."
 }
 # no_credential_here: what a session's own git says when it reaches the
@@ -1543,7 +1543,7 @@ case "$target" in
         git_identity "$proj"
         need_author "a shell"
         [ "$proj" = "$(basename -- "$proj")" ] && [ "$proj" != "." ] && [ "$proj" != ".." ] && [ -d "$dir" ] \
-            || bad "No such project: ${proj}"
+            || bad "No such space: ${proj}"
         in_view "$proj" "$dir"
         start "$(sess "shell-${proj}-${num}")" "$dir" "${RUN[@]}"
         ;;
@@ -1617,7 +1617,7 @@ case "$target" in
         # Checked against the PROJECT, before session_dir may answer with a
         # worktree: the name is what has to be real.
         if [ "$proj" != "$(basename -- "$proj")" ] || [ "$proj" = "." ] || [ "$proj" = ".." ] || [ ! -d "$dir" ]; then
-            echo "No such project: ${proj}" >&2
+            echo "No such space: ${proj}" >&2
             echo "Available:" >&2
             # Same rule the dashboard lists by: a directory holding
             # .bbignore is not a project, so offering it here as one would
@@ -1647,7 +1647,7 @@ case "$target" in
            && [ "$want_boot" != "$(boot_id)" ] && [ "$want_boot" != "$(boot_id_by_btime)" ]; then
             bad "This tab is from before ${BB_NODE:-the container} restarted." \
                 "Its conversation is still on disk. Open ${agent_name} on ${proj} from" \
-                "the dashboard's Projects card to pick it up again. Starting a" \
+                "the dashboard's Spaces card to pick it up again. Starting a" \
                 "session is a decision, and a reconnecting tab is not one."
         fi
         # A tab coming back to a Claude session already running here attaches
@@ -1724,7 +1724,7 @@ case "$target" in
             BB_ROUTER_MODELS="$(jq -c '[.models[]? | {id, context}]' <<<"$rk" 2>/dev/null || true)"
             if [ -z "$BB_ROUTER_URL" ] || [ -z "$BB_ROUTER_KEY" ]; then
                 bad "No model router allows ${proj}: a node's Model router section (its page" \
-                    "under Machines, Nodes) deploys one and ticks the projects that may use it."
+                    "under Machines, Nodes) deploys one and ticks the spaces that may use it."
             fi
             export BB_ROUTER_URL BB_ROUTER_KEY BB_ROUTER_MODELS
         fi
@@ -1760,7 +1760,7 @@ case "$target" in
             if on_node && [ -n "$tf" ] && [ -L "$tf" ] && [ ! -e "$tf" ]; then
                 bad "This account's ${agent_name} sign-in is kept sealed on ${BB_NODE:-this node}, and it opens" \
                     "only when you open one of your terminals there from the dashboard. Open this" \
-                    "session's tab, or a shell on this project, and it starts."
+                    "session's tab, or a shell on this space, and it starts."
             fi
             if on_node; then
                 bad "This account is not signed in to ${agent_name} on ${BB_NODE:-this node}." \
@@ -2037,7 +2037,7 @@ case "$target" in
         else
             # Say so rather than starting an unconfined session that looks
             # identical to a confined one.
-            echo "WARNING: could not build the project scope for '${proj}'." >&2
+            echo "WARNING: could not build the space scope for '${proj}'." >&2
             echo "This session is NOT restricted to its own directory." >&2
         fi
         # An existing session is attached to rather than replaced, so clicking
@@ -2106,7 +2106,7 @@ case "$target" in
             # worth more than one that refuses to start at all, which is what
             # passing the block here would produce for any real roadmap.
             echo "WARNING: could not write the launcher for '${proj}'," >&2
-            echo "so this session starts without the project's roadmap and bugs," >&2
+            echo "so this session starts without the space's roadmap and bugs," >&2
             echo "and on claude's own model rather than the one set for it." >&2
             echo "Everything else about it is the same. Check that ${HOME:-\$HOME}/.cache" >&2
             echo "is writable." >&2
@@ -2142,7 +2142,7 @@ case "$target" in
         dir="$WORKSPACE/$proj"
         git_identity "$proj"
         [ "$proj" = "$(basename -- "$proj")" ] && [ "$proj" != "." ] && [ "$proj" != ".." ] && [ -d "$dir" ] \
-            || bad "No such project: ${proj}"
+            || bad "No such space: ${proj}"
         in_view "$proj" "$dir"
         start "$(sess "shell-${proj}")" "$dir" "${RUN[@]}"
         ;;

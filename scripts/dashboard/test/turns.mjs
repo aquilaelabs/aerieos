@@ -207,9 +207,9 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   const asOwner = body => call('/api/v1/hook', { kind: 'seen', ...body }, bearer(toks[0]));
   await rep('the first report');
   const noRule = await asOwner({ node: 'nodeA' });
-  ok(!/diagnostics/.test(noRule.line || ''), `a project without the rule hears nothing of reports (${(noRule.line || 'no line').slice(0, 60)})`);
+  ok(!/diagnostics/.test(noRule.line || ''), `a space without the rule hears nothing of reports (${(noRule.line || 'no line').slice(0, 60)})`);
   await relay(['rules', 'add', 'watch-diagnostics', 'After each prompt, read aerie diag reports for new ones.']);
-  await rep('a report while the project may not read them');
+  await rep('a report while the space may not read them');
   const ungranted = await asOwner({ node: 'nodeA' });
   ok(!/diagnostics/.test(ungranted.line || ''),
      `with the rule but no grant, the notice names nothing (${(ungranted.line || 'no line').slice(0, 60)})`);
@@ -224,7 +224,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await rep('a third report');
   const plain = await sess({ node: 'nodeA' });
   ok(!/diagnostics/.test(plain.line || ''),
-     `...and a plain account's session on the same project is told nothing (${(plain.line || 'no line').slice(0, 60)})`);
+     `...and a plain account's session on the same space is told nothing (${(plain.line || 'no line').slice(0, 60)})`);
   await call('/api/prefs', { project: 'alpha', diag: false });
 }
 {
@@ -243,9 +243,9 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   // is not a session's to type.
   await call('/api/prefs', { project: 'beta', node: minted.id });
   const bj = await call('/api/v1/jobs', { action: 'run', project: 'beta', argv: ['true'] });
-  ok(bj.ok && /^j_/.test(bj.job || ''), `a job on another project is queued for the check (${bj.job || bj.error})`);
+  ok(bj.ok && /^j_/.test(bj.job || ''), `a job on another space is queued for the check (${bj.job || bj.error})`);
   r = await call('/api/v1/jobs', { action: 'cancel', id: bj.job }, bearer(toks[1]));
-  ok(r.status === 403 && /no such job of yours/.test(r.error || ''), `a session cannot cancel another project's job (${r.status}: ${r.error})`);
+  ok(r.status === 403 && /no such job of yours/.test(r.error || ''), `a session cannot cancel another space's job (${r.status}: ${r.error})`);
   r = await call('/api/v1/jobs', { action: 'cancel', id: bj.job });
   ok(r.ok === true || r.status === 200, `...while an administrator can (${JSON.stringify(r).slice(0, 60)})`);
   await call('/api/prefs', { project: 'beta', node: '' });

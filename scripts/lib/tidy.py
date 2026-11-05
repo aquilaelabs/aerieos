@@ -373,7 +373,7 @@ def phones_tidy(dry):
             if default is None:
                 default = default_phone()
             if name != default:
-                said.append(f"{name} is not this project's default phone and has not run for {int(idle)} days "
+                said.append(f"{name} is not this space's default phone and has not run for {int(idle)} days "
                             f"({mb(size_of(avd))}): Remove on its row under Phones on the Storage page frees it")
     return said, freed
 

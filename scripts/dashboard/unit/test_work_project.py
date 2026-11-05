@@ -41,7 +41,7 @@ class WorkFolder(unittest.TestCase):
         self.assertTrue(repos.is_work(key))
         self.assertEqual(repos.empty_keys(), [key])
         registry.sync()
-        self.assertTrue(registry.is_repos(key), "a sync leaves a project's folder as the project's")
+        self.assertTrue(registry.is_repos(key), "a sync leaves a space's folder as the space's")
         self.assertFalse(registry.is_project(key), "...and never lists it as a repository")
 
     def test_a_repository_added_makes_it_a_coding_project(self):
@@ -149,7 +149,7 @@ class Guard(unittest.TestCase):
         for cmd in ("aerie container new", "aerie devapp ls", "aerie vm ls", "aerie -p app roadmap", "aerie rules show x",
                     "aerie report 'x'", "ls"):
             self.assertIsNone(rules.refusing("media", cmd), cmd)
-        self.assertIsNone(rules.refusing("app", "git status"), "a repository's project keeps git")
+        self.assertIsNone(rules.refusing("app", "git status"), "a repository's space keeps git")
 
 
 if __name__ == "__main__":

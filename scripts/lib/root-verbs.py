@@ -36,7 +36,7 @@ def run():
         if a.startswith(("/tmp/", "/var/tmp/", "/dev/shm/")) and os.path.exists(a):
             sys.exit(f"[builderbot] ERROR: {a} is under a directory that is this session's own view; "
                      "the root command runs outside it and would not find the file there, so nobody was "
-                     "asked. A path under the project tree is seen by both.")
+                     "asked. A path under the space tree is seen by both.")
     r = post({"action": "ask", "kind": "root", "why": os.environ["BB_PHONE_WHY"], "cmd": sys.argv[2:],
               "project": os.environ.get("BB_PHONE_PROJECT", ""),
               # A node the project hosts containers on, when named (--node).

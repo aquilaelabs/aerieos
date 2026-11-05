@@ -43,7 +43,7 @@ await nbShown(page);
 await nbTab(page, 'briefing');
 await page.waitForSelector('#rulesBox .sect', { timeout: 15000 });
 ok(/No rules yet/.test(await page.$eval('#rulesBox', e => e.textContent)),
-   'a project with no rules says so, and says what a rule is for');
+   'a space with no rules says so, and says what a rule is for');
 // ---- the code base, counted, above the rules ---------------------------------
 // What git tracks in the project by language, with the files and the lines:
 // the tab's first section. alpha is a repository with one tracked file, so
@@ -77,7 +77,7 @@ const cbText = await page.$eval('#rulesBox .sect', e => e.textContent.replace(/\
 ok(/2 files and 3 lines tracked by git/.test(cbText) && /2 lines of code in 1 file\b/.test(cbText),
    `...and its body is the head's totals, then the code among them (${cbText.slice(0, 160)})`);
 const nogit = await (await fetch(URL + 'api/codebase?project=gamma', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
-ok(/not a git repository/.test(nogit.error || ''), 'a project that is not a repository says so rather than counting nothing');
+ok(/not a git repository/.test(nogit.error || ''), 'a space that is not a repository says so rather than counting nothing');
 ok(await page.$('#memList') !== null,
    '...on the same tab as the memories, which is the point of the rename');
 
@@ -100,7 +100,7 @@ await page.waitForFunction(() => document.querySelectorAll('#rulesBox .rulerow')
 const two = '#rulesBox .rulerow[data-i="1"]';
 await page.fill(`${two} .rlName`, 'agent compat');
 await page.fill(`${two} .rlText`,
-  'How the agent is versioned here.\nThe window is the project minor: add, do not change.');
+  'How the agent is versioned here.\nThe window is the space minor: add, do not change.');
 await page.fill(`${two} .rlPaths`, 'scripts/agent');
 await page.fill(`${two} .rlWords`, 'agent, protocol');
 ok((await page.$eval(`${two} .rlkind`, e => e.textContent)).includes('on its triggers'),
@@ -237,7 +237,7 @@ ok(/defined in full in docs\/design\.md/.test(bb('--prompt'))
    && /aerie rules check design/.test(bb('--prompt')),
    'the block a session is handed says where it is defined and how it is checked');
 ok(/PASS  design/.test(bb('check', 'design')),
-   'aerie rules check NAME runs the check in the project tree and reports it');
+   'aerie rules check NAME runs the check in the space tree and reports it');
 ok(/nothing changed here that a rule/.test(bb('check')),
    '...and with nothing changed under a rule\'s files, bare check has nothing to run');
 {
@@ -260,7 +260,7 @@ ok(/nothing changed here that a rule/.test(bb('check')),
     let outside = '';
     try { bb('check', 'design'); } catch (e) { outside = String(e.stdout || ''); }
     ok(/PASS  design/.test(inWt) && /FAIL  design/.test(outside),
-       `aerie rules check runs in the worktree it is called from, and in the project's tree from elsewhere (${
+       `aerie rules check runs in the worktree it is called from, and in the space's tree from elsewhere (${
          inWt.slice(-60)} / ${outside.slice(-60)})`);
     // Its orphan branch never had a commit, so it goes with the worktree.
     execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'worktree', 'remove', '--force', wt]);
@@ -422,11 +422,11 @@ print(m.mint_session('alpha'))
   const saved = await api({ action: 'save', rules: [
     { name: 'no-secrets', text: 'Never write credentials into a repository.' }] });
   ok(saved.status === 200 && (saved.body.rules || []).some(r => r.name === 'no-secrets'),
-     `the operator saves a rule that applies to every project (${saved.status})`);
+     `the operator saves a rule that applies to every space (${saved.status})`);
 
   const listed = bb();
   ok(/no-secrets/.test(listed) && /\[global\]/.test(listed),
-     `a project's rules include the global one, marked (${
+     `a space's rules include the global one, marked (${
        (listed.split('\n').find(l => /no-secrets/.test(l)) || '').trim()})`);
   ok(/no-secrets/.test(bb('--global')) && !/\bmine\b/.test(bb('--global')),
      '`aerie rules --global` lists what applies everywhere and nothing project-specific');
@@ -542,12 +542,12 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   const over = (mine?.overlaps || []).find(o => o.name === 'house-changelog');
   ok((got.global || []).some(g => g.name === 'house-changelog') && over
      && JSON.stringify(over.words) === '["changelog"]' && JSON.stringify(over.paths) === '["docs"]',
-     `a project rule is told which global rule fires where it fires, and on what (${JSON.stringify(over)})`);
+     `a space rule is told which global rule fires where it fires, and on what (${JSON.stringify(over)})`);
   ok(((got.rules || []).find(r => r.name === 'unrelated')?.overlaps || []).length === 0,
      '...and one that shares no trigger with any of them is told nothing');
   ok(!(got.rules || []).some(r => r.name === 'house-changelog')
      && (got.rules || []).some(r => r.name === 'house-changelog-2'),
-     "a project rule cannot take a global rule's name: it is suffixed, so aerie rules show NAME is never ambiguous");
+     "a space rule cannot take a global rule's name: it is suffixed, so aerie rules show NAME is never ambiguous");
   const told = execFileSync(BB, ['preamble'], { env: ENV }).toString();
   ok(/Where one of this project's rules and a global one disagree, follow the project's, and say so in your reply/.test(told),
      'a session is told which wins where they disagree, since no matching could find a disagreement in meaning');
@@ -570,7 +570,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
         r.querySelector('.btitle')?.textContent === 'our-changelog' && /shares ground/.test(r.textContent)) }));
   }
   ok(seen?.global && seen.edit === 0 && seen.pill,
-     `the project's Rules list the global ones read-only under its own, and the overlapping row says it shares ground (${JSON.stringify(seen)})`);
+     `the space's Rules list the global ones read-only under its own, and the overlapping row says it shares ground (${JSON.stringify(seen)})`);
 
   await post('/api/rules', { project: 'alpha', action: 'save', force: true, rules: first.rules || [] });
   await post('/api/global-rules', { action: 'save', rules: gWas.filter(r => !r.builtin) });

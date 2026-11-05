@@ -104,7 +104,7 @@ const BIN = `<svg viewBox="0 0 16 16" aria-hidden="true">
 // to what is pinned, so a project that is not on Home has lost nothing but
 // its place there, which is the only promise a pin makes.
 function openProjectsTab(){
-  openTab({kind: "projects", arg: "__projects", label: "Projects"});
+  openTab({kind: "projects", arg: "__projects", label: "Spaces"});
 }
 
 // What the search box narrows the grid to: a view, this browser's, never
@@ -140,7 +140,7 @@ function lockMark(p){
 // branch, that it may push, and the node it runs on.
 function projFacts(p){
   const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this project's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
+  return [p.pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
           p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
           esc(node)].filter(Boolean).join(" · ");
 }
@@ -210,13 +210,13 @@ function cardFront(c){
   const node = first ? first.node_name || first.session_at || "" : "";
   const many = c.rows.length > 1;
   return `<div class="pcname"><span class="name">${esc(c.name)}</span>${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
-    <div class="pcmeta"><span class="pcfacts">${[`<span class="pid" title="this project's id, which never changes">${esc(c.pid)}</span>`,
+    <div class="pcmeta"><span class="pcfacts">${[`<span class="pid" title="this space's id, which never changes">${esc(c.pid)}</span>`,
       esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
     <div class="pcrepos">${c.rows.length ? c.rows.map(p => `<div class="pcrepo">
       <button type="button" class="namelink" data-open="${esc(p.name)}" title="open ${esc(p.label || p.name)}'s notebook">${esc(p.label || p.name)}</button>
       <span class="pcfacts">${p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git"}</span>
     </div>${p.issues.map(i => `<div class="pnote ${cls[i.level] || ""}">${many ? esc(p.label || p.name) + ": " : ""}${esc(i.text)}</div>`).join("")}`).join("")
-      : first?.work ? `<div class="pnote dim">no repository: a session here builds containers and VMs${c.may ? "; Add repository makes it a coding project" : ""}</div>`
+      : first?.work ? `<div class="pnote dim">no repository: a session here builds containers and VMs${c.may ? "; Add repository makes it a coding space" : ""}</div>`
       : `<div class="pnote dim">no repository yet${c.may ? ": Add repository makes or clones one" : ""}</div>`}</div>
     ${first ? cardNotes(c) : ""}
     <div class="pcacts actbar">${first ? agentButton(first)
@@ -252,7 +252,7 @@ function cardBack(c){
       ${p.phone?.mine ? ic("data-ph", p.name, p.phone.lease?.project === p.name ? `Take your phone back from ${n}` : `Lend your phone to ${n}`,
                            TOOL_ICONS.phone, phoneWhy(p) ? " disabled" : "") : ""}
       ${mine ? ic("data-rrn", p.name, `Rename ${n}`, PENCIL) : ""}
-      ${may ? ic("data-rmove", p.name, `Move ${n} to another project`, MOVE) : ""}
+      ${may ? ic("data-rmove", p.name, `Move ${n} to another space`, MOVE) : ""}
       ${mine && !p.trash_why ? ic("data-del", p.name, `Delete ${n}: to the trash`, BIN, ' data-danger="1"') : ""}</div>`;
   }).join("");
   // The foot is one line of icons at every width (the operator, 25 Oct: one
@@ -267,7 +267,7 @@ function cardBack(c){
     // No bug tracker on a project with no repository (R208).
     first && first.mine !== false && !first.work ? fb("data-bug", first.name, "Report bug", BUG) : "",
     first ? fb("data-rn", first.name, "Settings", GEAR) : "",
-    may && !c.rows.length ? fb("data-pdel", c.key, "Delete project", BIN, ' data-danger="1"') : "",
+    may && !c.rows.length ? fb("data-pdel", c.key, "Delete space", BIN, ' data-danger="1"') : "",
   ].filter(Boolean).join("");
   return `<div class="pcname"><span class="name">${esc(c.name)}</span>${may ? ic("data-prn", c.key, `Rename ${c.name}`, PENCIL) : ""}
       <span class="sp"></span><span class="actbar"><button type="button" data-pedit="${esc(c.key)}" aria-expanded="true">Back</button></span></div>
@@ -336,7 +336,7 @@ function flipCard(key){
 // New project (R138): its name, and nothing else; its repositories are
 // added on its card.
 async function newProjectByName(){
-  const said = await ask({title: "New project", field: {label: "Name"}, choices: [{label: "Create", value: true}],
+  const said = await ask({title: "New space", field: {label: "Name"}, choices: [{label: "Create", value: true}],
                          text: "Spaces and punctuation are fine in its name. Its repositories are added on its card."});
   const got = said?.text?.trim();
   if (!got) return;
@@ -347,7 +347,7 @@ async function newProjectByName(){
     notify(`${j.name} made: Add repository on its card makes or clones its first one`);
     await refresh();
     showNewCard(j.key);
-  }catch(e){ notify("making the project failed: " + failWords(e), true); await refresh(); }
+  }catch(e){ notify("making the space failed: " + failWords(e), true); await refresh(); }
 }
 
 // A project just made: the page scrolls to its card wherever the order put
@@ -408,12 +408,12 @@ async function renameRepository(btn){
 async function moveRepository(btn){
   const name = btn.dataset.rmove, from = reposOf(name);
   const to = projectList().filter(c => c.key !== from && c.may && !c.archived);
-  if (!to.length){ notify("there is no other project of yours to move it to: New project makes one", true); return; }
+  if (!to.length){ notify("there is no other space of yours to move it to: New space makes one", true); return; }
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Move ${projLabel(name)} to`, ok: "Move",
                                                        options: to.map(c => c.name)});
   if (!got) return;
   const c = to.find(x => x.name.toLowerCase() === got.toLowerCase());
-  if (!c){ notify(`${got} is not a project it can move to`, true); return; }
+  if (!c){ notify(`${got} is not a space it can move to`, true); return; }
   let plan;
   try{
     plan = await (await postJSON("/api/repos", {action: "move-check", name, to: c.key})).json();
@@ -460,7 +460,7 @@ function moveConfirm(plan){
     const things = plan.things || [];
     const ctrs = things.filter(t => t.kind === "container"), vms_ = things.filter(t => t.kind === "vm");
     m.innerHTML = `<div class="box"><h3 id="mvTitle">Move ${esc(plan.label)} to ${esc(plan.to)}?</h3>
-      <div class="field"><p class="asksaid">It leaves ${esc(plan.from || "no project")}: from now on ${esc(plan.to)}'s node, people and settings apply to it. Its notebook goes with it.</p></div>
+      <div class="field"><p class="asksaid">It leaves ${esc(plan.from || "no space")}: from now on ${esc(plan.to)}'s node, people and settings apply to it. Its notebook goes with it.</p></div>
       ${plan.nodes.length ? `<div class="field"><div class="lbl">${esc(plan.from)}'s nodes</div>
         ${had.map(n => `<div class="ndcap dim">${esc(n.name)}: ${esc(plan.to)} has it already</div>`).join("")}
         ${offer.map(n => `<label class="ndcap"><input type="checkbox" data-mvnode="${esc(n.id)}"${dead ? " disabled" : " checked"}> Add ${esc(n.name)} to ${esc(plan.to)}'s ${what(n)}${
@@ -512,14 +512,14 @@ async function deleteProjectCard(key){
   // What was given to it keeps running with no project (the operator, 26 Oct).
   const own = await postJSON("/api/repos", {action: "owned", name: key}).then(r => r.json()).catch(() => ({}));
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
-    own.containers.length === 1 ? "s" : ""} running, given to no project.` : "";
-  if (!await askYes(`Delete the project ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
+    own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
+  if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
   try{
     const j = await (await postJSON("/api/repos", {action: "delete", key})).json();
     if (j.error){ notify(j.error, true); return; }
     pjEditing.delete(key);
     notify(`${n} is gone`);
-  }catch(e){ notify("deleting the project failed: " + failWords(e), true); }
+  }catch(e){ notify("deleting the space failed: " + failWords(e), true); }
   await refresh();
 }
 
@@ -546,10 +546,10 @@ function renderProjectsInto(i){
   // drawn over.
   if (!el.querySelector(".projtab")){
     const d = docSurface(i, "proj");
-    d.setBar(`<input id="pjSearch" type="search" placeholder="name, branch or node" aria-label="narrow the projects" autocomplete="off" spellcheck="false">
+    d.setBar(`<input id="pjSearch" type="search" placeholder="name, branch or node" aria-label="narrow the spaces" autocomplete="off" spellcheck="false">
         <span class="sp"></span>
-        <span class="actbar"><button type="button" id="bTrashTab" aria-label="the trash" title="projects you deleted: still on disk under .trash, and still recoverable">${BIN}</button>
-        <button type="button" class="primary" id="bNewProjTab" title="a project, by its name: its repositories are added on its card">New project</button></span>`);
+        <span class="actbar"><button type="button" id="bTrashTab" aria-label="the trash" title="spaces you deleted: still on disk under .trash, and still recoverable">${BIN}</button>
+        <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">New space</button></span>`);
     d.list.innerHTML = `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`;
     el.querySelector("#pjGrid").addEventListener("click", pjFadeArm, true);
     el.querySelector("#bNewProjTab").onclick = newProjectByName;
@@ -572,8 +572,8 @@ function renderProjectsInto(i){
   // The empty case says what to do: an empty workspace is exactly where
   // somebody is about to make their first project.
   if (!ps.length){
-    paint(grid, `<div class="empty">${state.admin ? "no project yet: New project makes one"
-                                       : "no projects are yours yet: an administrator grants them on the Users page"}</div>`);
+    paint(grid, `<div class="empty">${state.admin ? "no space yet: New space makes one"
+                                       : "no spaces are yours yet: an administrator grants them on the Users page"}</div>`);
     return;
   }
   // The pinned first, each part by name (the operator, 18 Oct, where on 7
@@ -610,7 +610,7 @@ function renderProjectsInto(i){
           state.session ? "" : `<button type="button" class="eye bare" data-pjgrename="${esc(g)}" aria-label="Rename the group ${esc(g)}" title="Rename">${PENCIL}</button>`
         }</h3>${grid_(list)}</section>`;
       }).join("")
-    + (gone.length ? docSection("projects", "archived", "Archived", `${gone.length} project${gone.length === 1 ? "" : "s"}`,
+    + (gone.length ? docSection("projects", "archived", "Archived", `${gone.length} space${gone.length === 1 ? "" : "s"}`,
                                 grid_(gone), {open: false, cls: "dim", fold: true}) : "");
   // Any rearrangement slides (the operator, 26 Oct): a rename, a pin, an
   // archive, a group, a project made or gone, another person's change on
@@ -665,7 +665,7 @@ async function renameProjectGroup(btn){
     const j = await (await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got})).json();
     if (j.error){ notify(j.error, true); return; }
     applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
-    notify(gone ? `${was} is gone: its projects are in no group` : `${was} is now ${got}`);
+    notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
   }catch(e){ notify("group: " + failWords(e), true); }
   refresh();
 }
@@ -698,9 +698,9 @@ const devClaudeMode = name => {
 // type in it. `focus` stays in PMODES because it is also the name of the
 // field that mode leads with, which pDraw uses.
 const PMODES = {
-  init:  { title: () => pInto ? `Add a repository to ${projectName(pInto)}` : "New project", btn: "Create", focus: "pName",
+  init:  { title: () => pInto ? `Add a repository to ${projectName(pInto)}` : "New space", btn: "Create", focus: "pName",
            fields: ["pSrcField", "pNameField", "pVersionField", "pNodeField", "pGateField", "pArchiveField", "pAboutField"] },
-  clone: { title: () => pInto ? `Add a repository to ${projectName(pInto)}` : "New project", btn: "Create", focus: "pUrl",
+  clone: { title: () => pInto ? `Add a repository to ${projectName(pInto)}` : "New space", btn: "Create", focus: "pUrl",
            fields: ["pSrcField", "pNameField", "pNodeField", "pGateField", "pUrlField", "pForgeField",
                     "pPushField", "pTokenField", "pKeyField"] },
   link:  { title: () => `Link ${projLabel(pLink)} to a git host`, btn: "Link", focus: "pUrl",
@@ -779,7 +779,7 @@ function pDraw(){
     ? "The directory to clone into; change it to keep two checkouts of one repository."
     : "Anything a git host cannot use in a name becomes a dash.";
   $("pPushHint").textContent =
-    "Off is read-only. It cannot be turned on later, and only one project may push to a repository.";
+    "Off is read-only. It cannot be turned on later, and only one space may push to a repository.";
   $("pTokenHint").textContent = pMode === "link"
     ? `Used for ${projLabel(pLink)} only.` + (fg.creates ? ` Checked with ${fg.name} first.` : "")
     : "Leave empty for a public repository. Kept for this repository alone.";
@@ -1048,7 +1048,7 @@ function pNameShow(){
   $("pNamePreview").classList.toggle("bad", empty);
   $("pNamePreview").hidden = !empty && as === typed && !numbered;
   $("pNamePreview").textContent = empty ? "A name needs at least one letter or digit in it"
-    : as !== eff ? `${eff} is already a project's name, so this one is shown as ${as}`
+    : as !== eff ? `${eff} is already a space's name, so this one is shown as ${as}`
     : numbered ? `Shown as ${as}, in the folder ${dir}: ${heldBy
         // A live project holding the folder is named, not called deleted
         // (B93: rcclone-2 typed said a deleted project had it while it was

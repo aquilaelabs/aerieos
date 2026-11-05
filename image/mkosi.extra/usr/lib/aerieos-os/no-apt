@@ -5,5 +5,5 @@
 # gone at the next boot without a word. An update brings the next image
 # whole (docs/image.md); a tool a project needs is a toolchain, installed
 # from the Toolchains page onto the node's store.
-echo "$(basename "$0"): not on AerieOS. Packages come with the image, and an update brings the next ones; a tool for a project is a toolchain (the Toolchains page)." >&2
+echo "$(basename "$0"): not on AerieOS. Packages come with the image, and an update brings the next ones; a tool for a space is a toolchain (the Toolchains page)." >&2
 exit 1

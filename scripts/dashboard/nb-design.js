@@ -82,7 +82,7 @@ function nbDesignView({$, nb, project, root}){
     w.disabled = !!nb.dsDirty;
     w.hidden = dsRo();
     w.title = nb.dsDirty ? "Save first: the file is written from what is saved"
-      : "write docs/design-language.md into the project from what is saved here; a session commits it with the work";
+      : "write docs/design-language.md into the space from what is saved here; a session commits it with the work";
   }
 
   function drawAdd(){
@@ -228,12 +228,12 @@ function nbDesignView({$, nb, project, root}){
         <button type="button" id="dsThemeAdd" ${themes.length >= (P.themes_max || 8) ? "disabled" : ""}>Add theme</button>
       </div></div>
       <div class="field">${ctl("dsScope", "Governs",
-            "what the language covers when the project is more than one product: the web app in site/",
+            "what the language covers when the space is more than one product: the web app in site/",
             `<textarea id="dsScope" class="proseline" rows="1" maxlength="120">${esc(L.scope || "")}</textarea>`, true)}</div>
       ${themes.length ? `<div class="field"><div class="dsrow">
         ${pick("dsThemePick", "Theme", rows, String(nb.dsShow.theme), "each a named set of colors, dark or light, with its own type, corners, space, motion and rules; the first is the default, whose choices and rules are the design's")}
       </div></div>` : ""}
-      ${t ? themeBand(t, nb.dsShow.theme, themes.length) : `<div class="field"><div class="hint">No theme yet. Add one, or leave it: a session that builds the project chooses the colors, the type, corners, space and motion, and puts them here.</div></div>`}`;
+      ${t ? themeBand(t, nb.dsShow.theme, themes.length) : `<div class="field"><div class="hint">No theme yet. Add one, or leave it: a session that builds the space chooses the colors, the type, corners, space and motion, and puts them here.</div></div>`}`;
     return docSection("design", "themes", "Themes", `${themes.length} theme${themes.length === 1 ? "" : "s"}${status ? " · " + status : ""}`,
                       body + nb.sectBar("design:themes"));
   }

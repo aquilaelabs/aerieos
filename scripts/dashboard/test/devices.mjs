@@ -77,7 +77,7 @@ const none = await signin('dv.none', people['dv.none'], 'NONE-PC');
 const theirs = await dev(rOnly.token, 'projects', {}), nobody = await dev(none.token, 'projects', {});
 ok(mine.projects?.some(p => p.project === 'alpha' && p.access === 'rw') && theirs.projects?.some(p => p.project === 'alpha' && p.access === 'r')
    && !nobody.projects?.length,
-   `a device lists the projects its person may edit or read through the editor's door, and no others (${JSON.stringify([mine.projects, theirs.projects, nobody.projects])})`);
+   `a device lists the spaces its person may edit or read through the editor's door, and no others (${JSON.stringify([mine.projects, theirs.projects, nobody.projects])})`);
 const shut = await dev(none.token, 'sync', { action: 'state', project: 'alpha' });
 ok(shut.status === 403, `...and a person with no editor access syncs nothing (${shut.status})`);
 
@@ -85,7 +85,7 @@ ok(shut.status === 403, `...and a person with no editor access syncs nothing (${
 const st = await dev(a.token, 'sync', { action: 'state', project: 'alpha' });
 const paths = (st.files || []).map(f => f[0]);
 ok(st.status === 200 && paths.includes('device-probe.txt') && !paths.some(p => p.split('/').includes('.git')),
-   `the state lists the project's files with their hashes and no .git (${paths.length} files, rev ${st.rev})`);
+   `the state lists the space's files with their hashes and no .git (${paths.length} files, rev ${st.rev})`);
 const tar = await fetch(`${base}/api/v1/device/sync-tar?project=alpha`, { headers: { Authorization: `Bearer ${a.token}` } });
 const tarText = Buffer.from(await tar.arrayBuffer()).toString('latin1');
 ok(tar.status === 200 && tarText.includes('device-probe.txt') && !tarText.includes('.git/config') && !tarText.includes('ghp_secret'),
@@ -100,11 +100,11 @@ const put = (tok, path, body, baseSha = '') => dev(tok, 'sync-put', undefined,
   { method: 'POST', query: `?project=alpha&path=${encodeURIComponent(path)}&base=${baseSha}`, raw: body });
 const up = await put(a.token, 'from-device.txt', 'written on the PC\n');
 ok(up.status === 200 && up.ok && readFileSync(`${tree}/from-device.txt`, 'utf8') === 'written on the PC\n',
-   `a file changed on the device goes up and lands in the project (${JSON.stringify(up)})`);
+   `a file changed on the device goes up and lands in the space (${JSON.stringify(up)})`);
 const clash = await put(a.token, 'device-probe.txt', 'the PC\'s version\n', '0'.repeat(64));
 const kept = readdirSync(tree).filter(f => /^device-probe\.conflict-TEST-PC-/.test(f));
 ok(clash.status === 200 && clash.conflict && kept.length === 1 && readFileSync(`${tree}/device-probe.txt`, 'utf8') === 'from the controller\n',
-   `a change made from an older version is kept beside the project's as a conflict copy named for the device (${JSON.stringify({ conflict: clash.conflict, kept })})`);
+   `a change made from an older version is kept beside the space's as a conflict copy named for the device (${JSON.stringify({ conflict: clash.conflict, kept })})`);
 const gitUp = await put(a.token, '.git/hooks/post-checkout', '#!/bin/sh\n');
 const readOnly = await put(rOnly.token, 'reader.txt', 'no\n');
 ok(gitUp.status === 400 && !existsSync(`${tree}/.git/hooks/post-checkout`) && readOnly.status === 403 && !existsSync(`${tree}/reader.txt`),
@@ -159,7 +159,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     writeFileSync(`${folder}/made-on-pc.txt`, 'from the folder\n');
     let up = false;
     for (let i = 0; i < 60 && !up; i++) { up = existsSync(`${tree}/made-on-pc.txt`); if (!up) await new Promise(r => setTimeout(r, 500)); }
-    ok(up && readFileSync(`${tree}/made-on-pc.txt`, 'utf8') === 'from the folder\n', 'a file made in the folder goes up to the project within seconds');
+    ok(up && readFileSync(`${tree}/made-on-pc.txt`, 'utf8') === 'from the folder\n', 'a file made in the folder goes up to the space within seconds');
     const c2 = await signin('dv.rw', people['dv.rw'], 'ELSEWHERE');
     await put(c2.token, 'made-elsewhere.txt', 'from another device\n');
     let down = false;
@@ -181,7 +181,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     const denied = await pcApi({ action: 'run', verb: 'build' });
     ok(/build/.test(lent.out) && pcs.pcs?.[0]?.verbs.includes('build') && pcs.pcs[0].verbs.includes('log')
        && denied.status === 403 && /Use a lent PC/.test(denied.error || ''),
-       `a PC lends what its person set up, and a session is refused while the project says Deny (${JSON.stringify(pcs.pcs?.[0]?.verbs)}; ${denied.status})`);
+       `a PC lends what its person set up, and a session is refused while the space says Deny (${JSON.stringify(pcs.pcs?.[0]?.verbs)}; ${denied.status})`);
     await admin('/api/prefs', { project: 'alpha', pc: 'auto' });
     const runPc = async verb => {
       const asked = await pcApi({ action: 'run', verb, why: 'checking the build' });
@@ -192,7 +192,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     const build = await runPc('build'), log = await runPc('log');
     ok(build.got.state === 'done' && build.got.result?.ok && /built in \/workspace\/alpha/.test(build.got.result.text || '')
        && /opened \/workspace\/alpha\/Main\.tscn/.test(log.got.result?.text || ''),
-       `on Auto the PC runs them, its folder written as the project's path (${JSON.stringify([build.got.result?.text, log.got.result?.text]).slice(0, 160)})`);
+       `on Auto the PC runs them, its folder written as the space's path (${JSON.stringify([build.got.result?.text, log.got.result?.text]).slice(0, 160)})`);
     await admin('/api/prefs', { project: 'alpha', pc: 'ask' });
     const asked = await runPc('build');
     ok(asked.got.state === 'refused' && /without a window/.test(asked.got.result?.text || ''),

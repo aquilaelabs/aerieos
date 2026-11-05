@@ -53,9 +53,9 @@ function renderDebugInto(i){
         <div class="field"><div class="actbar"><span class="sp"></span>
           <button type="button" class="primary" id="dbgDevSave"${debugDev === null ? " disabled" : ""}>Save</button></div></div>`)
     + docSection("debug", "grants", "What sessions may read", nodesList === null ? "" : `${granted} granted`,
-        `<div class="field"><div class="hint">A project's sessions read what is ticked for it, and only while their account holds the debug grant.</div></div>
+        `<div class="field"><div class="hint">A space's sessions read what is ticked for it, and only while their account holds the debug grant.</div></div>
         ${nodesList === null ? skRows(2)
-          : rows.length ? rows.map(row).join("") : `<div class="empty">No project with a repository yet.</div>`}
+          : rows.length ? rows.map(row).join("") : `<div class="empty">No space with a repository yet.</div>`}
         <div class="field"><div class="actbar"><span class="sp"></span>
           <button type="button" class="primary" id="dbgSave"${staged ? "" : " disabled"}>Save</button>
           <button type="button" class="caution" id="dbgRevert"${staged ? "" : " disabled"}>Revert</button></div></div>`);

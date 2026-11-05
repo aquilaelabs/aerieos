@@ -374,7 +374,7 @@ def pin(project, rel, on, by=""):
     if on and f is None:
         return {"error": "no such artifact"}, 404
     if rel.split("/")[1:2] and rel.split("/")[1] in _capture.CAPTURE_DIRS:
-        return {"error": "a capture goes by the project's days; pin what the project ships"}, 400
+        return {"error": "a capture goes by the space's days; pin what the space ships"}, 400
     with _pins_lock:
         d = _pins_all()
         mine = d.get(project) if isinstance(d.get(project), dict) else {}
@@ -552,7 +552,7 @@ def source_download(name):
     except (OSError, subprocess.SubprocessError) as e:
         return {"error": str(e)}, 500
     if got is None:
-        return {"error": "no such project"}, 404
+        return {"error": "no such space"}, 404
     if isinstance(got, dict):
         return got, 413
     return got, 200

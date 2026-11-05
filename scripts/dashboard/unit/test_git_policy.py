@@ -19,7 +19,7 @@ def policy(rec):
 class GitPolicy(unittest.TestCase):
     def test_no_rights_says_so_first(self):
         out = policy({"gitpol": {"push": "allow"}, "push": {"rights": False, "auth": "token"}})
-        self.assertTrue(out.startswith("push at all:     no: this project was given no push rights"), out)
+        self.assertTrue(out.startswith("push at all:     no: this space was given no push rights"), out)
         self.assertIn("push its branch: allow", out)
 
     def test_https_with_no_credential_says_so(self):
@@ -36,7 +36,7 @@ class GitPolicy(unittest.TestCase):
 
     def test_the_hold_on_a_sensitive_push(self):
         self.assertIn("hold a sensitive push: hold", policy({"gitpol": {}}))
-        self.assertIn("hold a sensitive push: off (the project's policy lets a push go unread)",
+        self.assertIn("hold a sensitive push: off (the space's policy lets a push go unread)",
                       policy({"gitpol": {"scan": "off"}}))
 
 

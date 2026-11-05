@@ -100,7 +100,7 @@ def _why(project, tag, name):
         if isinstance(f, dict) and f.get("why"):
             return f"the controller could not sign it: {f['why']}"
         # Said to a person on the bell: where they look, not a session's verb.
-        return "the controller has not signed it yet: the project's Signing view says why and looks again"
+        return "the controller has not signed it yet: the space's Signing view says why and looks again"
     return "CI did not attach it: the release's run on the git host says why"
 
 

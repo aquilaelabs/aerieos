@@ -106,7 +106,7 @@ ok(got.code === 0 && steps.length > 10, `bb-session plans a view for a session w
 ok(has('tmpfs', ws, 'mode=0755') && bound(join(ws, 'alpha')) && bound(join(ws, '.worktrees', 'alpha'))
    && bound(join(ws, '.claude', me)) && !bound(join(ws, 'beta')) && !bound(join(ws, 'alpha-two'))
    && !bound(join(ws, '.claude', other)),
-   'the projects share in the view holds the project, its worktrees and the account\'s Claude share, and no other project or account');
+   'the spaces share in the view holds the space, its worktrees and the account\'s Claude share, and no other space or account');
 // Not there at all, not even by name (B379): the account's transcripts are
 // covered and only this project's are put back over the cover.
 const back = t => steps.some(x => x[0] === 'bindmine' && x[2] === t);
@@ -116,7 +116,7 @@ ok(coverAt > 0 && back(join(tr, slug(join(ws, 'alpha')))) && back(join(tr, slug(
    && !steps.some(x => x[2] === join(tr, slug(join(ws, 'beta'))) || x[1] === join(tr, slug(join(ws, 'beta'))))
    && !steps.some(x => x[2] === join(tr, slug(join(ws, 'alpha-two'))) || x[1] === join(tr, slug(join(ws, 'alpha-two'))))
    && !steps.some(x => x[2] === join(tr, slug(join(ws, '.worktrees', 'alpha-two', me)))),
-   '...and the other projects\' transcripts are not in the view even by name, a project whose name starts another\'s included, while its own are put back over the cover');
+   '...and the other spaces\' transcripts are not in the view even by name, a space whose name starts another\'s included, while its own are put back over the cover');
 // A project this one reads (prefs.reads) is in the view too, read-only and
 // nothing of it but the tree; itself, or a name that is no project, refused.
 {
@@ -124,16 +124,16 @@ ok(coverAt > 0 && back(join(tr, slug(join(ws, 'alpha')))) && back(join(tr, slug(
   const rs = r.code === 0 ? JSON.parse(r.out) : [];
   ok(r.code === 0 && rs.some(x => x[0] === 'bindro' && x[1] === `${STAGE}/ws/beta` && x[2] === join(ws, 'beta'))
      && !rs.some(x => (x[0] === 'bind' || x[0] === 'bindmap') && x[2] === join(ws, 'beta')) && !rs.some(x => x[2] === join(ws, '.worktrees', 'beta')),
-     `--reads binds that project's tree into the view read-only, and none of its worktrees (${r.code})`);
+     `--reads binds that space's tree into the view read-only, and none of its worktrees (${r.code})`);
   // The account's own conversations on a read project are there to read,
   // read-only, while every other project's stay empty (29 Sep).
   const betaTr = join(tr, slug(join(ws, 'beta')));
   ok(rs.some(x => x[0] === 'bindro' && x[2] === betaTr && x[1] === `${STAGE}/ws/.claude/${me}/projects/${slug(join(ws, 'beta'))}`)
      && !rs.some(x => (x[0] === 'hide') && x[1] === betaTr) && !rs.some(x => x[2] === join(tr, slug(join(ws, 'alpha-two')))),
-     "...and the account's transcripts on that project are bound read-only over the cover, the other projects' still not there");
+     "...and the account's transcripts on that space are bound read-only over the cover, the other spaces' still not there");
   const self = plan({ reads: 'alpha' }), none = plan({ reads: 'nowhere' });
   ok(self.code !== 0 && /not a project this one could read/.test(self.out) && none.code !== 0 && /is not a project directory/.test(none.out),
-     `...and refuses itself or a name that is no project (${self.out.trim().slice(0, 60)})`);
+     `...and refuses itself or a name that is no space (${self.out.trim().slice(0, 60)})`);
 }
 // ...and applying it makes the target under the fresh /workspace before
 // the read-only bind, as the writable bind always did: the first session
@@ -182,11 +182,11 @@ ok(has('tmpfs', users, 'mode=0755') && has('bind', `${STAGE}/home`, myHome),
 ok(has('tmpfs', myCache, 'mode=0700,owned') && bound(join(myCache, 'u', me, 'project', 'alpha')) && bound(join(myCache, 'u', me, 'account'))
    && !bound(join(myCache, 'u', me, 'project', 'beta'))
    && has('tmpfs', rootCache, 'mode=0700,owned') && bound(join(rootCache, 'machine')) && !bound(join(rootCache, 'u', me, 'project', 'gamma')),
-   'the cache keeps this project\'s folder, the account\'s and the machine\'s, so no other project\'s token or launcher is there');
+   'the cache keeps this space\'s folder, the account\'s and the machine\'s, so no other space\'s token or launcher is there');
 ok(has('tmpfs', data, 'mode=0755') && bound(join(data, 'emu', 'alpha')) && !bound(join(data, 'emu', 'beta')) && bound(join(data, 'ci-logs', 'alpha'))
    && !bound(join(data, 'ci-logs', 'beta')) && !bound(join(data, 'jobs')) && !bound(join(data, 'compose'))
    && bound(join(art, 'alpha')) && !bound(join(art, 'beta')) && hidden(runner) && hidden(devdata),
-   'the agent\'s stores keep its own emulator folder, its own CI logs and artifacts; another project\'s emulator, jobs, compose files, the runner and dev data are gone');
+   'the agent\'s stores keep its own emulator folder, its own CI logs and artifacts; another space\'s emulator, jobs, compose files, the runner and dev data are gone');
 ok(has('bindro', pkg, pkg) && !bound(join(pkg, 'jdk')) && !steps.some(x => x[0] === 'bindrw' && x[1] === join(pkg, 'jdk')),
    'the whole toolchain store is read-only in the view, the bundle and every toolchain, so a session cannot plant a command a job or another session runs (B157, B163)');
 // A toolchain the project's settings switch off (R77): its directory hidden
@@ -320,7 +320,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
   const at = kept.findIndex(x => x[0] === 'bind' && x[2] === `/tmp/claude-${uid}`);
   ok(at > kept.findIndex(x => x[0] === 'tmpfs' && x[1] === '/tmp') && at < kept.length - 1
      && kept[at][1].startsWith(`${STAGE}/cache`) && kept[at][1].endsWith(`/u/${me}/project/alpha/scratch`),
-     `the conversation's folder in the project's cache is bound over /tmp/claude-${uid}, after /tmp is made (${JSON.stringify(kept[at] || null)})`);
+     `the conversation's folder in the space's cache is bound over /tmp/claude-${uid}, after /tmp is made (${JSON.stringify(kept[at] || null)})`);
   rmSync(scratch, { recursive: true, force: true });
   symlinkSync(join(ws, 'beta'), scratch);
   ok(!JSON.parse(plan().out).some(x => x[2] === `/tmp/claude-${uid}`),
@@ -338,7 +338,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
   const ra = own.findIndex(x => x[0] === 'bind' && x[2] === `${home}/.claude/sessions`);
   ok(home && ra > own.findIndex(x => x[0] === 'bind' && x[1] === `${STAGE}/home`)
      && own[ra][1].endsWith(`/u/${me}/project/alpha/claude-sessions`),
-     `the project's own sessions folder is bound over ~/.claude/sessions, after the home (${JSON.stringify(own[ra] || null)})`);
+     `the space's own sessions folder is bound over ~/.claude/sessions, after the home (${JSON.stringify(own[ra] || null)})`);
   rmSync(reg, { recursive: true, force: true });
 }
 {
@@ -413,10 +413,10 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
   const mnt = join(M, 'mnt');
   ok(r.code === 0 && is('tmpfs', mnt, 'mode=0755') && is('tmpfs', mstate, 'mode=0755')
      && ['auxiliary', 'workspace-dev', 'devdata', 'made-by-hand', 'srv'].every(n => is('hide', join(M, n))),
-     `what holds one of the view's own places is covered so that place can be put back, and what holds none is hidden whole: a share, the dev instance's projects, a directory made by hand (${r.code}: ${r.out.slice(0, 80)})`);
+     `what holds one of the view's own places is covered so that place can be put back, and what holds none is hidden whole: a share, the dev instance's spaces, a directory made by hand (${r.code}: ${r.out.slice(0, 80)})`);
   ok(!st.some(x => ['etc', 'usr', 'opt', 'lost+found', 'bin', 'swap.img', 'home', 'var'].some(n => x[x.length - 1] === join(M, n)))
      && !is('hide', mws) && st.filter(x => x[0] === 'tmpfs' && x[1] === mws).length === 1,
-     '...while the system\'s own names, a link and a file at the top are left as they are, and the projects share is covered once, by its own rule');
+     '...while the system\'s own names, a link and a file at the top are left as they are, and the spaces share is covered once, by its own rule');
   const back = st.filter(x => x[0].startsWith('bind') && (String(x[2]).startsWith(mnt + '/') || String(x[2]).startsWith(mstate + '/'))).map(x => x[2]);
   ok(is('bindro', `${STAGE}/store`, mstore) && is('bind', mstore, `${STAGE}/store`)
      && is('tmpfs', mdata, 'mode=0755') && is('bind', `${STAGE}/data/ci-logs/alpha`, join(mdata, 'ci-logs', 'alpha'))
@@ -424,7 +424,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
      && is('bind', join(share, 'toolchains', 'shared'), `${STAGE}/store-shared`)
      && is('bindro', `${STAGE}/store-shared`, join(share, 'toolchains', 'shared'))
      && !back.some(b => /appdata|packages|media|cache|agent|runner|windows/.test(b.slice(M.length))),
-     `inside the covers the toolchain store, what every scope of it shares (the system images it links to) and this project's part of the two stores are put back, and nothing of another project's container data, the build caches, the agent's tools, another machine's toolchains or a share nobody named (${
+     `inside the covers the toolchain store, what every scope of it shares (the system images it links to) and this space's part of the two stores are put back, and nothing of another space's container data, the build caches, the agent's tools, another machine's toolchains or a share nobody named (${
        back.map(b => b.slice(M.length)).join(' ')})`);
   ok(ix('bind', mstore, `${STAGE}/store`) < ix('tmpfs', mnt, 'mode=0755') && ix('tmpfs', mnt, 'mode=0755') < ix('tmpfs', mws, 'mode=0755')
      && ix('tmpfs', mnt, 'mode=0755') < ix('bindro', `${STAGE}/store`, mstore) && ix('tmpfs', mstate, 'mode=0755') < ix('tmpfs', mdata, 'mode=0755'),
@@ -438,7 +438,7 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
        join(M, 'mnt', 'packages'), join(M, 'mnt', 'with space'), join(mstate, 'packages'), join(M, 'workspace-dev'),
        join(M, 'gone-stale')].sort())
      && let_.every(m => ix('letgo', m) < ix('tmpfs', mnt, 'mode=0755') && ix('letgo', m) > ix('bind', mstore, `${STAGE}/store`)),
-     `the mounts inside them are let go, the topmost of each, one with a space in its name and one at the top that nothing can read any more, so the mount table names no export either; the machine's own and the projects share stay (${
+     `the mounts inside them are let go, the topmost of each, one with a space in its name and one at the top that nothing can read any more, so the mount table names no export either; the machine's own and the spaces share stay (${
        let_.map(m => m.slice(M.length)).join(' ')})`);
 
   ok(st.filter(x => x[0] === 'hidefile' && x[1] === join(M, 'run', 'docker.sock')).length === 1
@@ -470,11 +470,11 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
      && six('bind', films, `${STAGE}/sees0`) < six('tmpfs', mnt, 'mode=0755')
      && !ss.some(x => x[x.length - 1] === join(M, 'mnt', 'media', 'private') || x[x.length - 1] === join(M, 'mnt', 'media')
                       && x[0] !== 'letgo'),
-     `a place the project is set to see is put back inside the cover, and what is beside it is not (${s.code}: ${s.out.slice(0, 80)})`);
+     `a place the space is set to see is put back inside the cover, and what is beside it is not (${s.code}: ${s.out.slice(0, 80)})`);
   ok(!ss.some(x => x[x.length - 1] === dev) && ss.some(x => x[0] === 'hide' && x[1] === join(M, 'auxiliary'))
      && !ss.some(x => String(x[x.length - 1]).includes('not-on-this-node')),
      '...one at the top of the machine is left whole, mounted as the node has it, the rest still hidden; and one this node does not have is passed over');
-  const no = [[join(M, 'etc'), 'the system\'s'], [join(mws, 'beta'), 'another project'], [mhome, 'the base home'],
+  const no = [[join(M, 'etc'), 'the system\'s'], [join(mws, 'beta'), 'another space'], [mhome, 'the base home'],
               [join(mstate, 'cache'), 'the agent\'s'], [mnt, 'what holds the stores'], [join(share, 'data'), 'a store'],
               [`${M}/mnt/media/../../made-by-hand`, 'a path that climbs'], ['relative/path', 'a relative path'],
               [join(M, 'mnt', 'with space'), 'a name with a space']]
@@ -484,10 +484,10 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
 }
 
 const refusals = [
-  [plan({ cwd: join(ws, 'alpha', '..', 'beta') }), /not inside alpha/, 'a working directory that climbs out of the project'],
+  [plan({ cwd: join(ws, 'alpha', '..', 'beta') }), /not inside alpha/, 'a working directory that climbs out of the space'],
   [plan({ home: join(users, other) }), /is not u_0000abcd's home/, 'another account\'s home'],
-  [plan({ project: 'linked', cwd: join(ws, 'linked') }), /not a project directory/, 'a project that is a link to another'],
-  [plan({ project: '../beta' }), /not a project name/, 'a project name with a path in it'],
+  [plan({ project: 'linked', cwd: join(ws, 'linked') }), /not a project directory/, 'a space that is a link to another'],
+  [plan({ project: '../beta' }), /not a project name/, 'a space name with a path in it'],
   [plan({ account: 'nobody' }), /names no account/, 'a session with no account'],
 ];
 const bad = refusals.filter(([r, re]) => !(r.code === 2 && re.test(r.out))).map(([r, , what]) => `${what}: ${r.code} ${r.out.slice(0, 60)}`);
@@ -509,13 +509,13 @@ ok(bad.length === 0, `the plan refuses ${refusals.map(r => r[2]).join('; ')}${ba
   ok(r.code === 0 && covers.length === 1 && covers[0][1] === rootCache
      && binds.includes(`u/${linked}/project/alpha`) && binds.includes('machine')
      && !binds.some(b => b.endsWith('/project/gamma')),
-     `an account whose .cache links to the base home's gets that one folder covered once, keeping this project's and the machine's (${covers.length} cover, kept ${binds.join(', ')})`);
+     `an account whose .cache links to the base home's gets that one folder covered once, keeping this space's and the machine's (${covers.length} cover, kept ${binds.join(', ')})`);
   const planted = 'u_3333abcd', plantedHome = join(users, planted);
   mkdirSync(join(plantedHome, '.cache'), { recursive: true });
   symlinkSync(rootCache, join(plantedHome, '.cache', 'builderbot'));
   const refused = plan({ account: planted, home: plantedHome, cwd: join(ws, 'alpha') });
   ok(refused.code === 2 && /is not a directory, so the view could not leave other projects out/.test(refused.out),
-     `...and a cache that is itself a link is refused, never left untrimmed with other projects' tokens in it (${refused.out.trim().slice(0, 60)})`);
+     `...and a cache that is itself a link is refused, never left untrimmed with other spaces' tokens in it (${refused.out.trim().slice(0, 60)})`);
 }
 
 // A network of its own (R79). Where the agent has turned it on, the view

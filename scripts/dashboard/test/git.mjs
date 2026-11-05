@@ -101,7 +101,7 @@ ok((await api('what=compare&branch=' + main)).error && (await api('what=compare&
    '...and main itself, or a branch that is not there, is refused');
 ok((await api('what=status').then(() => fetch(URL.replace(/\/$/, '') + '/api/git?project=nope&what=status',
   { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } }))).status === 400,
-   'a project that is not one is refused');
+   'a space that is not one is refused');
 
 // ---- the view ---------------------------------------------------------------
 await page.evaluate(() => openNotebook('beta', 'git'));
@@ -236,7 +236,7 @@ ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 
   // Push sets the upstream the first time; fetch and pull talk to it after.
   const p1 = await act('push');
-  ok(p1.status === 200 && p1.ok, `Push sends the branch up with the project's credentials (${p1.out || p1.error})`);
+  ok(p1.status === 200 && p1.ok, `Push sends the branch up with the space's credentials (${p1.out || p1.error})`);
   ok(execFileSync('git', [`--git-dir=${origin}`, 'log', '-1', '--format=%s'], { encoding: 'utf8' }).trim() === 'Dashboard commit',
      '...and the remote has it');
   ok((await api('what=status')).upstream === `origin/${main}`, '...with the upstream set for next time');
@@ -275,7 +275,7 @@ print(json.dumps(next((a for a in seen if "fetch" in a), [])))
 `], { encoding: 'utf8' }).trim();
     const plain = JSON.parse(argvFor(false));
     ok(!plain.some(a => String(a).startsWith('credential.helper=')),
-       `a project with no stored token names no helper (${plain.slice(0, 3).join(' ')})`);
+       `a space with no stored token names no helper (${plain.slice(0, 3).join(' ')})`);
     mkdirSync(`${DIR}/state/gitcreds`, { recursive: true });
     writeFileSync(`${DIR}/state/gitcreds/beta`, 'https://oauth2:tok@example.invalid\n', { mode: 0o600 });
     const withTok = JSON.parse(argvFor(true));
@@ -338,7 +338,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   ok(pl.ok && git('log', '-1', '--format=%s') === 'Pushed from elsewhere',
      'Pull fast-forwards to what the remote gained');
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({}));
-  ok(/no push rights/.test((await act('push')).error || ''), 'a project without push rights is told so, not pushed');
+  ok(/no push rights/.test((await act('push')).error || ''), 'a space without push rights is told so, not pushed');
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({ beta: { repo: 'owner/beta', how: 'key' } }));
 
   // Branches: made, switched to, guarded, deleted.
@@ -834,7 +834,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
      'aerie git policy reads the defaults: a session may push its branch and not main');
   const setPol = await post('/api/prefs', { project: 'beta', gitpol: { push: 'deny' } });
   ok(setPol.status === 200 && setPol.gitpol?.push === 'deny' && setPol.gitpol?.main === 'deny',
-     'the Git view saves the policy into the project\'s settings');
+     'the Git view saves the policy into the space\'s settings');
   ok(/push its branch: deny/.test(bb('git', 'policy')), '...and aerie git policy says so to a session');
   ok((await post('/api/prefs', { project: 'beta', gitpol: { push: 'maybe' } })).error
      && (await post('/api/prefs', { project: 'beta', gitpol: { merge: 'allow' } })).error,
@@ -975,7 +975,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   const noRights = await relay(['git', 'push', 'origin', 'topic']);
   writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({ beta: { repo: 'owner/beta', how: 'key' } }));
   ok(noRights.status === 403 && /no push rights/.test(noRights.error || ''),
-     `a project without push rights is refused on the relay, not left to a hook in its tree (${noRights.error})`);
+     `a space without push rights is refused on the relay, not left to a hook in its tree (${noRights.error})`);
   await post('/api/prefs', { project: 'beta', gitpol: { push: 'allow', main: 'deny' } });
 
   // The relay never runs git in the tree a session can write (B148). Every
@@ -1212,7 +1212,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     const j = await (await fetch('/api/forge-access?project=beta')).json();
     return j.rows?.find(r => r.id === 'pr_write')?.set === 'deny' && j.rows;
   }, null, { timeout: 10000 }).then(() => true, () => false);
-  ok(saved, '...and Apply keeps a Deny as the project\'s own, over whatever the token allows');
+  ok(saved, '...and Apply keeps a Deny as the space\'s own, over whatever the token allows');
   await page.evaluate(() => postJSON('/api/prefs', {project: 'beta', forgepol: {pr_write: 'allow'}}));
   // ...and the section goes home: Settings has the form whole, Agents may
   // in it but not in its list.
@@ -1270,7 +1270,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   const listed = execFileSync('bash', [`${REPO}/scripts/aerie`, 'projects'],
     { encoding: 'utf8', env: { ...process.env, WORKSPACE: `${DIR}/ws`, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/beta-wt\s+git: wtcheck/.test(listed) && !/toolstore/.test(listed) && !/beta-wt.*not a git repo/.test(listed),
-     `aerie projects skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
+     `aerie spaces skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
   git('worktree', 'remove', '--force', `${DIR}/ws/beta-wt`);
   git('branch', '-D', 'wtcheck');
 }
@@ -1429,7 +1429,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   await page.evaluate(() => openNotebook('gamma', 'git'));
   await page.waitForSelector('.nb[data-project="gamma"] .nbview[data-view="git"] [data-gitinit]', { timeout: 20000 });
   ok(/no repository yet/.test(await page.$eval('.nb[data-project="gamma"] #gitHint', e => e.textContent)),
-     'a project with no repository says so on the Git view, with an Init button under it');
+     'a space with no repository says so on the Git view, with an Init button under it');
   await page.click('.nb[data-project="gamma"] .nbview[data-view="git"] [data-gitinit]');
   await page.waitForFunction(() => document.querySelector('.nb[data-project="gamma"] #gitPicker .gbpickname')?.textContent === 'main',
                              null, { timeout: 20000 });
@@ -1438,7 +1438,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   const again = await g('init');
   ok(again.status !== 200 || again.error, `...and a second Init is refused (${again.error || '?'})`);
   ok(readFileSync(`${DIR}/ws/gamma/.git/info/exclude`, 'utf8').split('\n').includes('.bb-map/'),
-     '...and the repository it makes keeps the code map out, as a created project does');
+     '...and the repository it makes keeps the code map out, as a created space does');
   // B234: two branches with no commit in common, the shape a project that
   // began without a repository ends up in. Joined only when asked.
   const G = `${DIR}/ws/gamma`;

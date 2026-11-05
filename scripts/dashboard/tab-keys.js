@@ -216,7 +216,7 @@ const KS_FOR = [[900, "a quarter of an hour"], [3600, "an hour"], [28800, "eight
 const KS_WHY = {push: "a push", fetch: "a fetch", pull: "a pull", "ls-remote": "a look at the remote", read: "a read",
                 git: "git", ci: "watching CI", release: "a release", wiki: "the wiki", unlocked: "unlocked", locked: "locked",
                 "the window ended": "the window ended", "signed out everywhere": "signed out everywhere", purged: "purged",
-                "moved to the project": "moved to the project's own keeping", "moved under your own key": "moved under your own key",
+                "moved to the space": "moved to the space's own keeping", "moved under your own key": "moved under your own key",
                 "given back to this AerieOS": "given back to this AerieOS", "the controller restarted": "the controller restarted"};
 
 function keyStoreHeld(m){
@@ -232,7 +232,7 @@ function keyMineSection(){
         esc(f.scheme === "http" ? "http://" + f.host : f.host), esc(f.login || "not said"),
         esc((f.projects || []).join(", ") || "nothing now"),
         (f.projects || []).length ? "" : `<button type="button" data-ksunlink="${esc(f.id)}">Remove</button>`])}</div>`).join(""), "ksforges")
-    : `<div class="hint">No token yet. One you give a project's repository, in its settings or when you clone or link it, is kept here under your key.</div>`;
+    : `<div class="hint">No token yet. One you give a space's repository, in its settings or when you clone or link it, is kept here under your key.</div>`;
   const until = m.locked ? "locked" : m.until ? `until ${fmtTime(m.until * 1000, {hour: "numeric", minute: "2-digit"})}` : m.own ? "while signed in" : "";
   const locked = m.own && m.locked;
   const body = `${m.has || m.own ? factGrid([["Key", m.fingerprint, {cls: "keyfp"}], ["Held by", keyStoreHeld(m)],
@@ -241,7 +241,7 @@ function keyMineSection(){
       ? `<div class="notice">The key before this one is kept while ${m.previous_on_nodes} of your sign-in${
         m.previous_on_nodes === 1 ? "" : "s"} on the nodes ${m.previous_on_nodes === 1 ? "is" : "are"} still sealed under it.</div>` : ""}${locked
       ? `<div class="notice">Locked: nothing of yours opens until you unlock it, your pushes and pulls wait, and a terminal you open on a node asks for it first.</div>`
-      : m.own ? `<div class="hint">Not even this AerieOS's owner opens what is here without ${m.how === "passkey" ? "your passkey" : "the key you keep"}. Forgetting it means signing in to every agent again and giving each project a token again; Purge still works without it.</div>` : ""}
+      : m.own ? `<div class="hint">Not even this AerieOS's owner opens what is here without ${m.how === "passkey" ? "your passkey" : "the key you keep"}. Forgetting it means signing in to every agent again and giving each space a token again; Purge still works without it.</div>` : ""}
     ${forgesHtml}
     <div class="actbar"><label class="pick"><span class="pickw">Unlock for</span>
         <select id="ksFor">${KS_FOR.map(([v, l]) => `<option value="${v}"${v === m.for ? " selected" : ""}>${l}</option>`).join("")}</select></label>
@@ -309,7 +309,7 @@ async function keyStoreOwn(b){
   const prfKeys = (pre.passkeys || []).filter(k => k.prf);
   const bg = pre.projects || [];
   const costs = "Not even this AerieOS's owner opens your store without it. Forgetting it means signing in to every agent "
-    + "again and giving each project a token again; Purge still works without it, an administrator's too.";
+    + "again and giving each space a token again; Purge still works without it, an administrator's too.";
   const how = await ask({title: "Hold the key yourself?",
     text: costs + (window.PublicKeyCredential ? (prfKeys.length ? "\n\nYour passkey can hold it: the authenticator gives a secret the page only relays."
                                                  : "\n\nNone of your passkeys answers PRF, which holding a key needs: add one that does under Two-factor sign-in, or keep a key yourself.")
@@ -319,10 +319,10 @@ async function keyStoreOwn(b){
   let keep = [];
   if (bg.length){
     const list = bg.map(p => `${p.label} (${p.host}${p.login ? ", as " + p.login : ""})`).join(", ");
-    const pick = await ask({title: "The tokens projects run with in the background?",
-      text: `${bg.length === 1 ? "One project runs" : bg.length + " projects run"} CI watching and releases with a token of yours: ${list}.\n\n`
-        + "Moved to each project's own keeping, that work goes on while your store is locked; kept under your key, it waits for you to unlock.",
-      choices: [{label: "Move them to the projects", value: "move"}, {label: "Keep them under my key", value: "keep"}]});
+    const pick = await ask({title: "The tokens spaces run with in the background?",
+      text: `${bg.length === 1 ? "One space runs" : bg.length + " spaces run"} CI watching and releases with a token of yours: ${list}.\n\n`
+        + "Moved to each space's own keeping, that work goes on while your store is locked; kept under your key, it waits for you to unlock.",
+      choices: [{label: "Move them to the spaces", value: "move"}, {label: "Keep them under my key", value: "keep"}]});
     if (!pick) return;
     keep = pick === "keep" ? bg.map(p => p.project) : [];
   }
@@ -339,7 +339,7 @@ async function keyStoreOwn(b){
   if (!got) return;
   busy(b, "Moving");
   const j = await postKeys({action: "own-key", ...got, keep});
-  if (!j.error) notify(`your key store is under ${how === "passkey" ? "your passkey" : "the key you keep"}${(j.moved || []).length ? `; ${j.moved.length} project${j.moved.length === 1 ? "" : "s"} keep their own token now` : ""}`);
+  if (!j.error) notify(`your key store is under ${how === "passkey" ? "your passkey" : "the key you keep"}${(j.moved || []).length ? `; ${j.moved.length} space${j.moved.length === 1 ? "" : "s"} keep their own token now` : ""}`);
   loadKeyMine();
 }
 
@@ -356,7 +356,7 @@ async function keyStorePurge(account = ""){
   if (!ok) return null;
   const j = await postKeys(account ? {action: "purge-for", account} : {action: "purge"});
   if (!j.error) notify(`${account ? account + "'s" : "your"} key store purged${(j.unlinked || []).length
-    ? `; ${j.unlinked.length} project${j.unlinked.length === 1 ? "" : "s"} unlinked` : ""}`);
+    ? `; ${j.unlinked.length} space${j.unlinked.length === 1 ? "" : "s"} unlinked` : ""}`);
   return j;
 }
 

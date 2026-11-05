@@ -139,7 +139,7 @@ function nbGitView({$, nb, project}){
     const tokenSaid = !git.remote || !git.push ? ""
       : tk.mine && tk.live ? "pushes and pulls use your token"
       : tk.why ? tk.why
-      : tk.name ? `pushes and pulls use ${esc(tk.name)}'s token; yours is given in the project's settings` : "";
+      : tk.name ? `pushes and pulls use ${esc(tk.name)}'s token; yours is given in the space's settings` : "";
     const said = [tree.notMine ? `${tree.owner}'s working tree` : "", st.branch ? "" : "on no branch",
       commits.length ? "" : "no commits yet", tokenSaid,
       // Without push rights and without an upstream there is nothing to pull
@@ -237,7 +237,7 @@ function nbGitView({$, nb, project}){
           title="write ${esc(f.fix.to)} on that line, in the working tree; you commit it">Fix</button>` : ""}</div>`).join("");
     const run = ci.run?.id ? ` The newest run on ${esc(ci.run.branch)} ${esc(ci.run.ended || "ended " + ci.run.conclusion)}.` : "";
     const body = `<div class="sub dim">${ci.at ? `Checked ${esc(ago(ci.at))}${ci.repo ? ` at ${esc(ci.repo)} on GitHub` : ""}.${run}` :
-        "Not checked yet."}${none ? " The tree has no workflow in .github/workflows, .gitea/workflows or .forgejo/workflows, so there is no CI here to watch." : ""} Checked once a day and when the project is linked; a session reads a run with aerie ci-log.</div>${
+        "Not checked yet."}${none ? " The tree has no workflow in .github/workflows, .gitea/workflows or .forgejo/workflows, so there is no CI here to watch." : ""} Checked once a day and when the space is linked; a session reads a run with aerie ci-log.</div>${
       ci.error ? `<div class="sub bad">${esc(ci.error)}</div>` : ""}${rows}
       <div class="actbar"><button type="button" id="gitCiLook">Check now</button>${ci.run?.id
         ? `<button type="button" data-cilog="${esc(String(ci.run.id))}" title="its jobs and the end of each one's log, in the dock">Its log</button>` : ""}</div>`;
@@ -284,14 +284,14 @@ function nbGitView({$, nb, project}){
         <div class="body gdiff">${keptBody("file", f.path, fileKey(f), skel("lines", 5))}</div>
         ${locked || tree.barred ? "" : `<div class="body"><div class="actbar">
           ${tree.notMine ? "" : `<button type="button" data-gitaskfile="${esc(f.path)}"
-            title="hand this change to the project's session">Send to ${esc(sendAgent(project).name)}</button>`}
+            title="hand this change to the space's session">Send to ${esc(sendAgent(project).name)}</button>`}
           <button type="button" class="danger" data-gitdiscard="${esc(f.path)}"
             title="put the file back as the last commit has it; the change is lost">Discard</button>
         </div></div>`}
       </details>`).join("");
     // Adding goes at the top: the commit's form is the section's first
     // band, above the files it will take.
-    const treeNote = tree.notMine ? `<div class="sub dim">${esc(tree.owner)}'s uncommitted changes in the project directory${
+    const treeNote = tree.notMine ? `<div class="sub dim">${esc(tree.owner)}'s uncommitted changes in the space directory${
       tree.barred ? `; only ${esc(tree.owner)} commits or discards them` : ""}</div>` : "";
     const commitBar = files.length && !locked && !tree.barred ? `<div class="addbar gcommitbar ctlrow" data-add="commit">
         <textarea id="gitMsg" class="proseline" rows="1" maxlength="200" placeholder="what changed, for the log"
@@ -380,7 +380,7 @@ function nbGitView({$, nb, project}){
          ...(b.name === main || !b.main_ahead ? [] : [...(barred(b) ? [] : [["merge", `Ask ${esc(sendAgent(project).name)} to merge it into ${esc(main)}`],
               ...(b.main_behind ? [["rebase", `Ask ${esc(sendAgent(project).name)} to rebase it onto ${esc(main)}`]] : [])]),
               ["review", `Ask ${esc(sendAgent(project).name)} to review it`]].map(([k, w]) => `<button type="button" data-gitaskbranch="${esc(b.name)}" data-gitaskkind="${k}"${
-              k === "review" ? "" : whoAttr(b)} title="hand this branch to the project's session with this ask">${w}</button>`)),
+              k === "review" ? "" : whoAttr(b)} title="hand this branch to the space's session with this ask">${w}</button>`)),
          b.head || b.name === main || barred(b) ? "" : `<button type="button" class="danger"
             data-gitdelete="${esc(b.name)}" title="${b.merged ? "delete the branch; everything on it is in " + esc(main) : "delete the branch: refused while it holds commits no other branch has"}">Delete</button>`];
     // A branch with work main lacks opens its comparison, a page of its own,
@@ -420,7 +420,7 @@ function nbGitView({$, nb, project}){
     const conflictBar = conflicts.length && !locked ? `<div class="actbar gconflict">
         <span class="state bad">${conflicts.length} file${conflicts.length === 1 ? "" : "s"} in conflict: the merge is not finished</span>
         <button type="button" class="primary" data-gitask="conflicts"
-          title="hand the merge to the project's session to finish">Resolve with ${esc(sendAgent(project).name)}</button>
+          title="hand the merge to the space's session to finish">Resolve with ${esc(sendAgent(project).name)}</button>
       </div>` : "";
     body.innerHTML = docSection("git", "changes", gitTitle("changes"), files.length ? String(files.length) : "none",
         conflictBar + (files.length ? treeNote : "") + commitBar + (files.length ? fileRows : `<div class="empty">nothing changed since the last commit</div>`))
@@ -680,7 +680,7 @@ function nbGitView({$, nb, project}){
           ? `nothing here that ${esc(main)} does not already have`
           : `${commits.length} commit${s_(commits.length)} into ${esc(main)}${ahead}; push ${esc(main)} to ${esc(host)} afterwards`}</span>
         <button type="button" data-gitaskbranch="${esc(name)}" data-gitaskkind="review"
-          title="hand this branch to the project's session to review">Ask ${esc(sendAgent(project).name)} to review it</button>
+          title="hand this branch to the space's session to review">Ask ${esc(sendAgent(project).name)} to review it</button>
         ${barred || !commits.length ? "" : `<button type="button" class="primary" data-gitmerge="${esc(name)}" data-gitinto="${esc(main)}"${
           theirs ? ` data-gitwho="${esc(b.who)}"` : ""} title="merge ${esc(name)} into ${esc(main)}">Merge into ${esc(main)}</button>`}
       </div>`;
@@ -723,7 +723,7 @@ function nbGitView({$, nb, project}){
           <select data-gitaskkind aria-label="what to ask"><option value="review">review</option>
             <option value="explain">explain</option><option value="revert">revert</option></select>
           <button type="button" data-gitaskcommit="${esc(c.sha)}"
-            title="hand this commit to the project's session with the ask picked">Send to ${esc(sendAgent(project).name)}</button>
+            title="hand this commit to the space's session with the ask picked">Send to ${esc(sendAgent(project).name)}</button>
           ${treeOf().barred ? "" : `<button type="button" data-gitbranchat="${esc(c.sha)}" title="a new branch starting at this commit">Branch here</button>
           <button type="button" data-gitrevert="${esc(c.sha)}" title="a new commit that undoes this one; nothing is rewritten">Revert</button>`}
         </div>`}

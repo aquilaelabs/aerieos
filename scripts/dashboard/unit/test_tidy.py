@@ -152,7 +152,7 @@ class Phones(unittest.TestCase):
 
     def test_only_a_spare_two_weeks_idle_is_named_and_none_removed(self):
         said, _ = tidy.phones_tidy(False)
-        named = [x for x in said if "not this project's default" in x]
+        named = [x for x in said if "not this space's default" in x]
         self.assertEqual(len(named), 1)
         self.assertIn("builderbot-35", named[0])
         self.assertTrue(os.path.isdir(os.path.join(self.d, "builderbot-35.avd")))

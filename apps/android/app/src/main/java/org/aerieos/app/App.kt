@@ -28,7 +28,7 @@ class App : Application() {
         // old persistent note was taken out for.
         nm.createNotificationChannel(NotificationChannel(CH_HELD, "While it lasts",
             NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Your phone lent to a project, or a session allowed to drive it; tap to end it"
+            description = "Your phone lent to a space, or a session allowed to drive it; tap to end it"
             setShowBadge(false) })
         // The live connection's own note, which Android requires while it
         // runs: as quiet as a note can be.

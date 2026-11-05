@@ -91,14 +91,14 @@ function nbRulesView({$, nb, project}){
               <div>${lbl("", "Files it covers")}<input class="grPaths" autocomplete="off" spellcheck="false" value="${esc((ed.r.paths || []).join(", "))}" aria-label="paths"></div>
               <div>${lbl("", "Words that raise it")}<input class="grWords" autocomplete="off" spellcheck="false" value="${esc((ed.r.words || []).join(", "))}" aria-label="words"></div>
             </div>
-            <div class="actbar macts"><span class="state">Save writes it for every project</span>
+            <div class="actbar macts"><span class="state">Save writes it for every space</span>
               <button type="button" class="stop grCancel">Cancel</button>
               <button type="button" class="primary grSave">Save</button></div>` : `
             <div class="bfield"><label>rule</label><div class="bval">${esc(g.text || "")}</div></div>${
             (g.paths || []).length ? `<div class="bfield rltrig"><label>files</label><div class="bval">${esc(g.paths.join(", "))}</div></div>` : ""}${
             (g.words || []).length ? `<div class="bfield rltrig"><label>words</label><div class="bval">${esc(g.words.join(", "))}</div></div>` : ""}
-            <div class="bfield"><label class="ndcap"><input type="checkbox" class="grHere"${here ? " checked" : ""}${g.disabled || ro ? " disabled" : ""}> On for this project</label>${
-              g.disabled ? `<div class="sub">An administrator has turned it off for every project.</div>` : ""}</div>
+            <div class="bfield"><label class="ndcap"><input type="checkbox" class="grHere"${here ? " checked" : ""}${g.disabled || ro ? " disabled" : ""}> On for this space</label>${
+              g.disabled ? `<div class="sub">An administrator has turned it off for every space.</div>` : ""}</div>
             <div class="actbar macts"><span class="state">${g.builtin ? "shipped with AerieOS" : "an administrator's"}${here ? "" : " · Save applies the switch"}</span>${
               may ? (g.builtin
                 ? `<button type="button" class="grEvery">${g.disabled ? "On everywhere" : "Off everywhere"}</button>`
@@ -107,8 +107,8 @@ function nbRulesView({$, nb, project}){
         </details>`;
     };
     const adding = ed && ed.i === -1 ? row(ed.r, -1) : "";
-    return `<div class="addline"><div class="sub dim ggroup">Global rules: every project's sessions are handed these. Switch one off for this project here${
-        may ? "; as an administrator you also change them for every project" : ""}.</div>${
+    return `<div class="addline"><div class="sub dim ggroup">Global rules: every space's sessions are handed these. Switch one off for this space here${
+        may ? "; as an administrator you also change them for every space" : ""}.</div>${
       may && !(ed && ed.i === -1) ? `<div class="addbar ctlrow" data-add="global"><button type="button" id="grAddHere">Add a global rule</button></div>` : ""}</div>
       <div class="field" id="rlGlobal">${adding}${gs.map(row).join("")}</div>`;
   }
@@ -170,7 +170,7 @@ function nbRulesView({$, nb, project}){
     // rule, and no Edit or Remove on a row.
     const ro = projWriteWhy(project);
     const body = `
-      <div class="addline"><div class="hint">How you want this project worked on. A session reads these at the start and cannot change yours.</div>
+      <div class="addline"><div class="hint">How you want this space worked on. A session reads these at the start and cannot change yours.</div>
       ${ro ? "" : `<div class="addbar ctlrow" data-add="rule"><button type="button" id="rlAdd">Add a rule</button></div>`}</div>
       <div class="field" id="rlList">${rows.map((r, i) => `
         <details class="bug chev rulerow${nb.ruleEditing.has(i) ? " editing" : ""}" data-i="${i}"${
@@ -216,7 +216,7 @@ function nbRulesView({$, nb, project}){
               <input class="rlRefuse" autocomplete="off" spellcheck="false"
                 placeholder="./gradlew assemble, npm publish"
                 value="${esc((r.refuse || []).join(", "))}" aria-label="commands it refuses"></div>
-              <div>${lbl("", "In place of", "a global rule this one replaces here; a session in this project reads only this one")}
+              <div>${lbl("", "In place of", "a global rule this one replaces here; a session in this space reads only this one")}
               <select class="rlRepl" aria-label="the global rule it replaces">
                 ${optionList([["", "no global rule"], ...(d.global || []).map(g => g.name)], r.replaces || "")}
               </select></div>
@@ -375,7 +375,7 @@ function nbRulesView({$, nb, project}){
       on(".grEdit", () => { nb.globalEditing = {i, r: {...g, paths: [...(g.paths || [])], words: [...(g.words || [])]}}; drawRules(); });
       on(".grCancel", () => { nb.globalEditing = null; drawRules(); });
       on(".grRm", async ev => {
-        if (!await askYes(`Remove the global rule ${g.name}? Every project's sessions stop being handed it.`)) return;
+        if (!await askYes(`Remove the global rule ${g.name}? Every space's sessions stop being handed it.`)) return;
         busy(ev.target, "Removing");
         await saveGlobal(own => { const k = own.findIndex(x => x.name === g.name); if (k >= 0) own.splice(k, 1); });
       });

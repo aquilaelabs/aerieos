@@ -53,10 +53,10 @@ await page.waitForSelector('.nb .nbview[data-view="sessions"] .cvlogs .artrow', 
 const SESS = '.nb .nbview[data-view="sessions"]';
 const rows = await page.$$eval(`${SESS} .cvlogs .artrow`, els => els.map(e => ({
   text: e.textContent.replace(/\s+/g, ' ').trim(), href: e.querySelector('a.btn')?.getAttribute('href') || '' })));
-ok(rows.length >= 2, `the Sessions view lists the account's conversations on the project (${rows.length})`);
+ok(rows.length >= 2, `the Sessions view lists the account's conversations on the space (${rows.length})`);
 ok(/Please tick the roadmap item off/.test(rows[0].text), `the newest first, with the first thing typed: ${rows[0].text.slice(0, 70)}`);
-ok(rows[0].href === `/api/transcript?project=alpha&id=conv-one-2026&tz=${encodeURIComponent(ZONE)}`, `its Download is the transcript by project and id, in this browser's zone: ${rows[0].href}`);
-ok(rows.some(r => /An earlier chat from the worktree/.test(r.text)), 'a worktree session of the same project is listed with it');
+ok(rows[0].href === `/api/transcript?project=alpha&id=conv-one-2026&tz=${encodeURIComponent(ZONE)}`, `its Download is the transcript by space and id, in this browser's zone: ${rows[0].href}`);
+ok(rows.some(r => /An earlier chat from the worktree/.test(r.text)), 'a worktree session of the same space is listed with it');
 const i1 = rows.findIndex(r => /conv-one-2026/.test(r.href)), i2 = rows.findIndex(r => /conv-two-2025/.test(r.href));
 ok(i1 >= 0 && i2 > i1, 'newest first');
 ok(await page.$eval(`${SESS} .cvlogs .artrow a.btn`, a => a.hasAttribute('download') && a.getBoundingClientRect().height >= 30),
@@ -69,8 +69,8 @@ const got = await page.evaluate(async href => {
   return { status: r.status, type: r.headers.get('content-type'), disp: r.headers.get('content-disposition'), text: await r.text() };
 }, rows[0].href);
 ok(got.status === 200 && /^text\/plain/.test(got.type), `the download is plain text (${got.status} ${got.type})`);
-ok(/attachment; filename="claude-alpha-\d{8}-\d{4}-conv-one.txt"/.test(got.disp), `named for the project, the time and the session: ${got.disp}`);
-ok(/^Conversation on alpha, session conv-one-2026/.test(got.text), 'headed with the project and the session');
+ok(/attachment; filename="claude-alpha-\d{8}-\d{4}-conv-one.txt"/.test(got.disp), `named for the space, the time and the session: ${got.disp}`);
+ok(/^Conversation on alpha, session conv-one-2026/.test(got.text), 'headed with the space and the session');
 ok(got.text.includes(`You (${AT}):\nPlease tick the roadmap item off for me`), `what you said, stamped in local time (${AT})`);
 ok(got.text.includes(`Claude (${AT}):\nReading the roadmap first.`), 'what Claude said');
 ok(/\$ aerie roadmap show R4\n  \(Read item four\)/.test(got.text), 'a shell command as typed, with what it was for');
@@ -127,7 +127,7 @@ ok(miss === 404, `an id the account has no transcript for is not found (${miss})
 const bad = await page.evaluate(async () => (await fetch('/api/transcript?project=alpha&id=..%2F..%2Fconv-one-2026')).status);
 ok(bad === 404, `a path in the id is not found either (${bad})`);
 const none = await page.evaluate(async () => (await fetch('/api/transcript?project=nosuch&id=conv-one-2026')).status);
-ok(none === 400, `a project that is not one is refused as not a project (${none})`);
+ok(none === 400, `a space that is not one is refused as not a space (${none})`);
 
 // ---- a session reads its account's own conversations, on its project and on a read ----
 // The operator's ask (29 Sep): a session on alpha, with beta among alpha's
@@ -145,7 +145,7 @@ const asSession = { headers: { Authorization: 'Bearer ' + token } };
 const sfetch = (path, opts = {}) => fetch(URL.replace(/\/$/, '') + path, { ...opts, headers: { ...(opts.headers || {}), ...asSession.headers } });
 await page.evaluate(async () => { await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', reads: ['beta'] }) }); });
 const own = await (await sfetch('/api/transcripts?project=alpha')).json();
-ok(own.rows?.some(r => r.id === 'conv-one-2026'), `a session lists the account's conversations on its own project (${(own.rows || []).length})`);
+ok(own.rows?.some(r => r.id === 'conv-one-2026'), `a session lists the account's conversations on its own space (${(own.rows || []).length})`);
 // Make visible and Delete are the person's, from the Sessions view's ⋯
 // (the operator, 22 Oct): a session reads conversations, it does not share
 // or delete them.
@@ -176,29 +176,29 @@ await page.waitForFunction(sel => /visible to every session/.test(document.query
 const shared = await page.evaluate(async () => ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || [])
   .find(r => r.id === 'conv-two-2025')?.shared);
 ok(shared === true && /visible to every session/.test(await page.$eval(rowOf('conv-two-2025'), e => e.textContent)),
-   `Make visible marks it visible to every session on the project (${shared})`);
+   `Make visible marks it visible to every session on the space (${shared})`);
 await pressInMenu('conv-two-2025', '[data-cvdel]');
 await page.waitForFunction(id => !document.querySelector(`[data-cvresume="${id}"]`), 'conv-two-2025', { timeout: 10000 }).catch(() => {});
 const gone = await page.evaluate(async () => ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || []).map(r => r.id));
 ok(!gone.includes('conv-two-2025') && gone.includes('conv-one-2026'), `Delete removes that conversation and no other (${gone.join(', ')})`);
 const onRead = await (await sfetch('/api/transcripts?project=beta')).json();
 ok(onRead.rows?.length === 1 && onRead.rows[0].id === 'beta-chat-1' && /Make the beta page blue/.test(onRead.rows[0].first),
-   `...and on a project its own reads (${JSON.stringify(onRead.rows?.[0] || onRead)})`);
+   `...and on a space its own reads (${JSON.stringify(onRead.rows?.[0] || onRead)})`);
 const readText = await sfetch('/api/transcript?project=beta&id=beta-chat-1&as=json');
 const rj = await readText.json();
 ok(readText.status === 200 && /You \(.*\):\nMake the beta page blue/.test(rj.text) && /Claude \(.*\):\nBlue it is\./.test(rj.text),
    'and reads one there as text, the same text the Profile downloads');
 const notRead = await sfetch('/api/transcripts?project=delta');
-ok(notRead.status === 400, `a project alpha does not read is not a project to the session (${notRead.status})`);
+ok(notRead.status === 400, `a space alpha does not read is not a space to the session (${notRead.status})`);
 const cli = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8',
   env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
 const listed = cli('-p', 'beta', 'transcripts');
 ok(/^your conversations on beta, every agent's, newest first:\n  beta-chat-1  Claude /.test(listed) && /Make the beta page blue/.test(listed),
-   `bb -p NAME transcripts lists the account's conversations on a read project, each marked with its agent (${listed.split('\n')[1]?.trim()})`);
+   `bb -p NAME transcripts lists the account's conversations on a read space, each marked with its agent (${listed.split('\n')[1]?.trim()})`);
 const shown = cli('-p', 'beta', 'transcripts', 'show', 'beta-chat-1', '--tz', 'Asia/Tokyo');
 ok(/^Conversation on beta, session beta-chat-1/.test(shown) && /You \(2026-09-28 19:15\):\nMake the beta page blue/.test(shown),
    'aerie transcripts show ID prints one, stamped in the zone asked for');
-ok(/^your conversations on alpha, every agent's/.test(cli('transcripts', 'list')), 'and with no -p it is the session\'s own project');
+ok(/^your conversations on alpha, every agent's/.test(cli('transcripts', 'list')), 'and with no -p it is the session\'s own space');
 // A memory saved by a session is the account's on that repository, the one
 // the Memory view reads and every agent's briefing carries (R152).
 const added = cli('memory', 'add', 'alpha-deploys', '--type', 'project', '--about', 'alpha deploys from its main branch', 'Deploys come from main; a tag starts one.');

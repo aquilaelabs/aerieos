@@ -257,7 +257,7 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
      'start tells a session what it may do, rather than reading as the operator only');
   t = sb('init', '0.1.0');
   ok(t.code === 0 && readFileSync(`${S}/VERSION`, 'utf8').trim() === '0.1.0',
-     '...and a session may give the project its first version');
+     '...and a session may give the space its first version');
   t = sb('bump', 'patch');
   ok(t.code !== 0 && /first version and no more/.test(t.out)
      && readFileSync(`${S}/VERSION`, 'utf8').trim() === '0.1.0',
@@ -349,7 +349,7 @@ const yb = (...a) => {
   } catch (e) { return { out: (e.stdout + '' + e.stderr).toString(), code: e.status }; }
 };
 ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added').code === 0,
-   'a change can be logged before the project has a VERSION at all');
+   'a change can be logged before the space has a VERSION at all');
 // An entry goes under a category, and the tool is where a session learns
 // which there are: twenty-one of twenty-two unreleased entries in this
 // repository's own changelog had none, because nothing anywhere said what the
@@ -368,7 +368,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
   const body = readFileSync(`${Y}/CHANGELOG.md`, 'utf8');
   ok(own.code === 0 && /### Upgrading/.test(body) && body.indexOf('### Added') < body.indexOf('### Fixed')
      && body.indexOf('### Fixed') < body.indexOf('### Upgrading'),
-     "a project's own category is kept as typed and goes on the end, while the six keep their usual order among themselves");
+     "a space's own category is kept as typed and goes on the end, while the six keep their usual order among themselves");
   // The verb stamps HEAD, and an entry that names HEAD itself was written
   // with the hash twice (B336): a stamp typed on the end is the entry's own.
   const head = execFileSync('git', ['-C', Y, 'rev-parse', '--short=7', 'HEAD'], { env }).toString().trim();
@@ -400,7 +400,7 @@ const bare = (...a) => {
   } catch (e) { return { out: (e.stdout + '' + e.stderr).toString(), code: e.status }; }
 };
 ok(bare('--code').out === '1',
-   'a project with no VERSION file still has an ordinal: it is pure git');
+   'a space with no VERSION file still has an ordinal: it is pure git');
 // Asked from one of the project's worktrees, the answer is that tree's: a
 // session building in its worktree was handed the main checkout's commit as
 // its package name and shipped nothing rather than a file named after code
@@ -414,7 +414,7 @@ ok(bare('--code').out === '1',
   execFileSync('git', ['-C', WT, 'commit', '-qm', 'side work'], { env });
   const inWt = (...a) => execFileSync('bash', [BB, 'version', ...a], { cwd: WT, env }).toString().trim();
   ok(inWt('--code') === '2' && bare('--code').out === '1',
-     `aerie version asked from a worktree answers for that tree (${inWt('--code')} there, ${bare('--code').out} in the project directory)`);
+     `aerie version asked from a worktree answers for that tree (${inWt('--code')} there, ${bare('--code').out} in the space directory)`);
   ok(inWt('--file') !== bare('--file').out,
      '...so a package built there is named after the commit it holds');
   execFileSync('git', ['-C', BARE, 'worktree', 'remove', '--force', WT], { env });
@@ -458,19 +458,19 @@ ok(mb('--code').out === '4' && mb('--for', 'extension', '--code').out === '1',
 ok(mb('--for', 'extension', '--semver').out.startsWith('2.1.0-dev.1+'),
    '...so an untouched product stops moving when its neighbor is edited');
 ok(mb('--semver').out.startsWith('0.4.0-dev.4+'),
-   '...while the project keeps its own count');
+   '...while the space keeps its own count');
 ok(/two-products\/extension\s+2\.1\.0/.test(mb('--list').out)
    && /two-products\s+0\.4\.0/.test(mb('--list').out),
    '--list shows every version the repo carries');
 // `comp` reaches this from a browser, so it must not read arbitrary files.
 ok(mb('--for', '../../..', '--code').code !== 0 && mb('--for', 'nope', '--code').code !== 0,
-   'a component outside the project is refused, not resolved');
+   'a component outside the space is refused, not resolved');
 // Bumping one must leave the other alone; that is the entire point.
 setPolicyFor('two-products', 'open');
 ok(mb('--for', 'extension', 'bump', 'minor').out.includes('2.1.0 -> 2.2.0'),
    'a component bumps on its own');
 ok(readFileSync(`${M}/VERSION`, 'utf8').trim() === '0.4.0',
-   "...leaving the project's own target untouched");
+   "...leaving the space's own target untouched");
 ok(execFileSync('git', ['-C', M, 'show', '--stat', '--format=', 'HEAD'], { env })
      .toString().includes('extension/VERSION'),
    '...committing the component file, not the root one');
@@ -489,12 +489,12 @@ const cl = (...a) => {
   } catch (e) { return { out: (e.stdout + '' + e.stderr).toString(), code: e.status }; }
 };
 ok(/no CHANGELOG\.md here yet/.test(cl().out),
-   'a project with no changelog says so, and how to start one');
+   'a space with no changelog says so, and how to start one');
 ok(cl('add', 'Pairing works across screen switches', '--cat', 'Changed').code === 0,
    'a session can log a user-facing change');
 cl('add', 'The app no longer forgets its settings', '--cat', 'Changed', '--for', 'extension');
 ok(/Pairing works/.test(cl().out) && !/forgets its settings/.test(cl().out),
-   "an entry lands in the changelog it was logged to, not the project's");
+   "an entry lands in the changelog it was logged to, not the space's");
 ok(/forgets its settings \([0-9a-f]{7}\)/.test(cl('--for', 'extension').out),
    '...stamped with the commit it describes');
 ok(cl('add', '', '--cat', 'Changed').code !== 0, 'an empty entry is refused');
@@ -719,7 +719,7 @@ const rolled = cl().out;
 ok(/## 2\.2\.1: \d{4}-\d{2}-\d{2}\n\n- Pairing works/.test(rolled)
    === false && /## 0\.4\.1: \d{4}-\d{2}-\d{2}/.test(rolled)
    && /- Pairing works/.test(rolled) && !/## Unreleased/.test(rolled),
-   "the project's bump dates its Unreleased section");
+   "the space's bump dates its Unreleased section");
 ok(/## Unreleased/.test(cl('--for', 'extension').out),
    "...and leaves the extension's still accruing");
 ok(/nothing unreleased/.test(cl('unreleased').out)
@@ -790,7 +790,7 @@ ok(repoAfter.startsWith(repoBefore.split('-')[0] + '-'),
 ok(mb('--for', 'extension', 'bump', 'minor').out.includes('2.1.0 -> 2.2.0'),
    '...and forward again afterwards');
 ok(/2\.2\.0-dev\./.test(mb('--for', 'extension', '--semver').out),
-   "a project tag matching a component's number does not release the component");
+   "a space tag matching a component's number does not release the component");
 execFileSync('git', ['-C', M, 'tag', '-a', 'extension-v2.2.0', '-m', 'r'], { env });
 // startsWith, not equals: the flow above leaves an uncommitted changelog
 // entry in the tree, so the released form honestly carries +dirty.
@@ -991,7 +991,7 @@ const rows = () => page.$$eval(`${NB} #verBox .verln`,
 const boxText = () => page.$eval(`${NB} #verBox`, e => e.textContent.replace(/\s+/g, ' '));
 let r0 = await rows();
 ok(r0['building towards'] === '0.4.0',
-   'the tab says what the project is building towards');
+   'the tab says what the space is building towards');
 // Build and Version are sections of this tab, and a shut one still answers:
 // the node on the first, the number on the second. They were three unnamed
 // bands stacked, which on a phone is one scroll with nothing labeling it.
@@ -1080,7 +1080,7 @@ const noVer = await page.evaluate(async () => {
   return await r.json();
 });
 ok(noVer.target === null && noVer.forms.quad === null,
-   'a project with no VERSION file reports no target');
+   'a space with no VERSION file reports no target');
 ok(noVer.next.patch === null,
    '...and offers no next value to bump to, rather than inventing 0.0.1');
 
@@ -1104,7 +1104,7 @@ for (let t = 0; t < 30 && !polOpts.length; t++){
   await sleep(300);
 }
 ok(polOpts.join(",") === "locked,start,patch,minor,open",
-   `a project with no version still offers the policy, the one that delegates `
+   `a space with no version still offers the policy, the one that delegates `
    + `the first version and nothing else included (${polOpts.join(", ") || "nothing"})`);
 
 // The harness's tab state survives between test files, so an earlier file
@@ -1149,13 +1149,13 @@ ok((await page.$$(`${NB} #verBox [data-verbump]`)).length === 0,
 ok((await page.$$(`${NB} #verBox [data-verinit]`)).length === 1,
    '...but offering to create one, since nothing else can');
 ok((await page.$$(`${NB} #verBox [data-verask]:not([data-verask="@fold"])`)).length === 1,
-   '...and offering to put the question to the project\u2019s own session');
+   '...and offering to put the question to the space\u2019s own session');
 // Two products with different maturities is a state a fresh project can
 // already be in (StreamLift proposed 0.2.0 for the app and 0.1.0 for its
 // extension while neither file existed), so the component door has to be
 // visible before the root version is, not only after.
 ok(await page.$(`${NB} #verBox .veradd .vdir`) !== null,
-   'the component fold is offered before the project has any version at all');
+   'the component fold is offered before the space has any version at all');
 
 // A starting number is arbitrary (nothing can derive it), so it is the one
 // value here that is typed. Which means it has to be checked.
@@ -1166,7 +1166,7 @@ ok(!existsSync(`${B}/VERSION`), 'a malformed starting version is refused, not wr
 await initWith('0.2.0');
 await waitTarget('0.2.0');
 ok(readFileSync(`${B}/VERSION`, 'utf8').trim() === '0.2.0',
-   'the tab can give a project its first version');
+   'the tab can give a space its first version');
 const lastMsg = execFileSync('git', ['-C', B, 'log', '-1', '--format=%s'], { env }).toString().trim();
 ok(lastMsg === 'Add VERSION at 0.2.0',
    `...committing it, with no "(session)" mark since the operator did it (got: ${lastMsg})`);
@@ -1396,7 +1396,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     await page.setViewportSize({ width: 393, height: 851 });
         await sleep(600);
     const long = 'A minor version moves the compatibility window, so every '
-      + "project bound to a node is held until that node's agent is updated, "
+      + "space bound to a node is held until that node's agent is updated, "
       + "and the sessions running on it end when the bump lands";
     await page.$eval(`${NB} .clog .clrow textarea.cltext`, (ta, v) => {
       ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1452,7 +1452,7 @@ const askPane = tmuxCapture('claude-alpha');
 ok(askPane.includes("Artifacts view"),
    '...and the prompt is what actually lands in that pane');
 ok(!/\/model/.test(askPane) && !/\/effort/.test(askPane),
-   '...with no slash command ahead of it, whatever the project is set to');
+   '...with no slash command ahead of it, whatever the space is set to');
 await page.evaluate(async () => {
   await fetch('/api/prefs', {method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -1562,12 +1562,12 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
     return { one: one.window_cost, other: other.window_cost };
   });
   ok(cost.one && (cost.one.projects || []).includes('alpha'),
-     `the project that moves the window says which projects a move would hold (${
+     `the space that moves the window says which spaces a move would hold (${
        JSON.stringify(cost.one || {}).slice(0, 90)})`);
   ok(cost.one.window && /^\d+\.\d+$/.test(cost.one.window),
      `...and the window they are all on, which is the one that would move (${cost.one.window})`);
   ok(!cost.other,
-     '...while a project that moves nobody\'s window says nothing, rather than warning about a cost it has not got');
+     '...while a space that moves nobody\'s window says nothing, rather than warning about a cost it has not got');
   await page.evaluate(async () => {
     await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ project: 'alpha', node: '' }) });
@@ -1583,7 +1583,7 @@ const askDead = await page.evaluate(async () => {
   return await r.json();
 });
 ok(/no session is running/.test(askDead.error || ''),
-   'asking a project with no session reports it instead of failing quietly');
+   'asking a space with no session reports it instead of failing quietly');
 
 ok((await page.errors).every(e => /400/.test(e)),
    '...and the only failed request afterwards is the refusal just asked for');

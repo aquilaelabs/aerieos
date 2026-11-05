@@ -98,9 +98,9 @@ DOCKER = os.environ.get("BB_DOCKER_BIN", "docker")
 # from being visible anywhere but here.
 # What a session is told when its project's dial (Agents may: Run its
 # container) says deny, wherever the refusal is made.
-RUN_DENIED = ("running this project's containers is the operator's: rebuilding, "
+RUN_DENIED = ("running this space's containers is the operator's: rebuilding, "
               "starting and stopping them, changing their env, creating one and removing "
-              "one are handed over in the project's settings, Agents may: Run its container")
+              "one are handed over in the space's settings, Agents may: Run its container")
 
 MAIN = "main"
 # The owner of a container AerieOS deploys itself (R180): the nginx tab's
@@ -993,7 +993,7 @@ def available():
         have = [n for n in (queue.docker_nodes() if queue else []) if n.get("kind") != "local"]
         if have:
             return {"on": False,
-                    "why": "this project has no node, so it has no daemon: pick one on its "
+                    "why": "this space has no node, so it has no daemon: pick one on its "
                            "notebook's Settings (" + ", ".join(n["name"] for n in have[:3]) + ")"} | source()
         return {"on": False, "why": _no_daemon_why()} | source()
     if not addr.startswith("ssh://"):
@@ -2811,7 +2811,7 @@ def starter(project, instance=MAIN):
         return ""
     if not example.strip():
         return ""
-    return ("# Started from this project's .env.example. Fill in the values\n"
+    return ("# Started from this space's .env.example. Fill in the values\n"
             "# and press Save; nothing is written until you do.\n\n"
             + example.rstrip() + "\n")
 
@@ -3206,7 +3206,7 @@ def on_project_node(whose, node="", ship=False):
         return "", str(node or "")
     if not own:
         return (f"{whose} has no node, so there is nowhere to make its container: "
-                "set its node in the project's settings first", "")
+                "set its node in the space's settings first", "")
     if ship and node:
         return "", str(node)
     if node and str(node) not in own:
@@ -3399,13 +3399,13 @@ def move_instance(project, instance, to):
     project picker (set_owner) instead."""
     to = str(to or "").strip()
     if not to or to == project:
-        return {"error": "name another project to move it to"}
+        return {"error": "name another space to move it to"}
     rec = _read_rec(project, instance)
     if not rec:
         return {"error": f"no instance {instance} of {project}"}
     if rec.get("source") == "file":
         return {"error": "a container written here is built from its own compose file, not a "
-                         "project's: give it to another project with its project picker"}
+                         "space's: give it to another space with its space picker"}
     if not project_has_compose(to):
         return {"error": f"{to} has no compose file at its root to build this from"}
     node = _instance_node(project, instance)
@@ -4509,10 +4509,10 @@ def _beside_gate(project, instance=MAIN, yes=""):
         if rec.get("beside") != now:
             _set_beside(project, instance, now)
         return ""
-    return (f"the project's compose now runs {', '.join(new)} beside the app, which its last build did not "
+    return (f"the space's compose now runs {', '.join(new)} beside the app, which its last build did not "
             "ship: a person says whether that is part of the app by pressing Rebuild on its row on the "
             "Containers page, where it is named; if it is not, it is a container of its own (aerie container new), "
-            "not a service in the project's compose file")
+            "not a service in the space's compose file")
 
 
 # The variables that would make compose read another file, another stack or
@@ -4533,7 +4533,7 @@ def compose_control(text):
 
 def compose_control_refusal(names):
     return (f"{', '.join(names)} {'is' if len(names) == 1 else 'are'} not an env setting here: what a container "
-            "runs is its compose file (and, for a project's, its branch), so the services it starts are the "
+            "runs is its compose file (and, for a space's, its branch), so the services it starts are the "
             "file's to say; take the line out of its env (Env)")
 
 

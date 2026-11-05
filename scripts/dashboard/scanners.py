@@ -216,7 +216,7 @@ def deploy(nid, by=""):
     if not n:
         return {"error": "no such node"}
     if (n.get("config") or {}).get("host_only"):
-        return {"error": f"{n.get('name') or nid} hosts containers only: it holds no project to scan"}
+        return {"error": f"{n.get('name') or nid} hosts containers only: it holds no space to scan"}
     with _lock:
         d = _load()
         rec = dict(d["nodes"].get(str(nid)) or {})
@@ -401,7 +401,7 @@ def run_now(by="", nid=""):
             out[n] = {"error": "its last run is still going"}
             continue
         if not held.get(n):
-            out[n] = {"error": "no project is bound to it"}
+            out[n] = {"error": "no space is bound to it"}
             continue
         out[n] = _run_on(n, held[n], by)
     with _lock:

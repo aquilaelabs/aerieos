@@ -65,7 +65,7 @@ class Paths(unittest.TestCase):
         self.assertEqual(os.stat(self.root / "deep" / "snaps").st_mode & 0o777, 0o700)
 
     def test_refused(self):
-        for bad, why in ((str(self.root / "ws" / "alpha" / "x"), "inside the projects"),
+        for bad, why in ((str(self.root / "ws" / "alpha" / "x"), "inside the spaces"),
                          ("relative/path", "absolute"), ("/etc", "system"), (f"{self.root}/../x", "absolute")):
             self.assertIn(why, paths.set_path("gitview", bad).get("error", ""), bad)
         full = self.root / "full"

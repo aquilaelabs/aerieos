@@ -46,7 +46,7 @@ class PushAsk(unittest.TestCase):
         o = phone.outcome(r["id"], "alpha")
         self.assertEqual((o["state"], o["code"], o["out"]), ("done", 0, "pushed\n"))
         self.assertEqual(o["apply"], {"upstream": [["topic", "origin", "refs/heads/topic"]]})
-        self.assertIn("no such request", phone.outcome(r["id"], "beta")["error"], "another project cannot read it")
+        self.assertIn("no such request", phone.outcome(r["id"], "beta")["error"], "another space cannot read it")
 
     def test_deny_runs_nothing(self):
         r = phone.ask_push("alpha", "/workspace/alpha", [], FOUND, asker_uid="u_00000002", asker_name="ada")

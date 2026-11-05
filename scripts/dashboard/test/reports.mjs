@@ -31,7 +31,7 @@ ok(made.status === 200 && made.ok && made.id > 0, `a session reports a problem w
 const stored = JSON.parse(readFileSync(`${DIR}/state/reports.json`, 'utf8')).reports.find(r => r.id === made.id) || {};
 ok(stored.project === 'alpha' && !('state' in stored) && /redacted/.test(stored.repro)
    && !/bbs_abcdefgh/.test(JSON.stringify(stored)),
-   `...stored as the project's, a line in a log, with anything shaped like a credential redacted (${stored.repro})`);
+   `...stored as the space's, a line in a log, with anything shaped like a credential redacted (${stored.repro})`);
 const empty = await call('/api/reports', { action: 'add', text: '   ' }, ALPHA);
 ok(empty.status === 400 && /say what happened/.test(empty.error || ''), 'a report with no words is refused');
 
@@ -80,7 +80,7 @@ const own = bb(['bug', 'add', 'aerie devapp status says the env is the operator\
                { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(own.status !== 0 && /^\[builderbot\] not filed yet\. Send it with aerie report .*or add --here/.test(own.stderr)
    && own.stderr.indexOf('aerie report') < 60 && own.stderr.indexOf('--here') < 200 && bugsNow() === had,
-   `a bug that names AerieOS, filed in another project, is not filed there, and both ways on are in the first of what it says (${own.stderr.trim().slice(0, 110)})`);
+   `a bug that names AerieOS, filed in another space, is not filed there, and both ways on are in the first of what it says (${own.stderr.trim().slice(0, 110)})`);
 const colon = bb(['bug', 'add', 'bb: tests preflight runs every suite', '--sev', 'high'],
                  { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(colon.status !== 0 && bugsNow() === had,
@@ -94,10 +94,10 @@ ok(byRepro.status === 0 && /filed B\d+/.test(byRepro.stdout) && bugsNow() === ha
 const helped = bb(['bug', 'add', '-h'], { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(helped.status === 0 && /aerie bug/.test(helped.stdout) && bugsNow() === had + 1,
    '...and aerie bug add -h prints the help rather than filing a bug called -h');
-const mine2 = bb(['bug', 'add', 'aerie build fails because this project pins an old compiler', '--here'],
+const mine2 = bb(['bug', 'add', 'aerie build fails because this space pins an old compiler', '--here'],
                  { ...admin, DASHBOARD_AUTH: '', BB_BUG_PROJECT: 'alpha' });
 ok(mine2.status === 0 && /filed B\d+/.test(mine2.stdout) && bugsNow() === had + 2,
-   `...while --here files one that is the project's own (${mine2.stdout.trim().slice(0, 80)})`);
+   `...while --here files one that is the space's own (${mine2.stdout.trim().slice(0, 80)})`);
 // ---- off for a project, in its settings -------------------------------------------
 // Agents may: Report AerieOS bugs. AerieOS's own project has it off:
 // its problems go into its own tracker, so its sessions are not sent to
@@ -115,7 +115,7 @@ const noNudge = bb(['bug', 'add', 'aerie devapp status is wrong about the env'],
 ok(noNudge.status === 0 && !/not filed yet/.test(noNudge.stderr),
    '...and a bug naming AerieOS filed there is not pointed at it');
 ok(prefsOf('alpha').report === 'deny',
-   '...stored on the project as the one word that differs from the default');
+   '...stored on the space as the one word that differs from the default');
 await setReport('auto');
 
 // ...and the setting is in the project's settings dialog, with the others.
@@ -127,7 +127,7 @@ await page.evaluate(() => renameProject('alpha'));
 await page.waitForSelector('#rnmodal:not([hidden]) #rnGateReport', { timeout: 15000 });
 // A repository's door offers "as the project" first (R208 step 6); the auto set above is alpha's own.
 ok(await page.$eval('#rnGateReport', e => e.value === 'auto' && [...e.options].map(o => o.value).join() === 'inherit,auto,deny'),
-   "the project's settings carry it under Agents may, on auto, with nothing to ask");
+   "the space's settings carry it under Agents may, on auto, with nothing to ask");
 await page.selectOption('#rnGateReport', 'deny');
 await saveDialog(page);
 await page.waitForFunction(async () => {
@@ -206,7 +206,7 @@ ok(page.dialogs.length === 0, '...and with none kept, it says so rather than ask
   await page.waitForSelector('#reportModal:not([hidden]) #reportCat', { timeout: 10000 });
   ok(/alpha/.test(await page.$eval('#reportTitle', e => e.textContent))
      && (await page.$$eval('#reportCat option', os => os.length)) >= 8,
-     'the bug on a project\'s row opens Report a bug, for that project, with a category to pick');
+     'the bug on a space\'s row opens Report a bug, for that space, with a category to pick');
   await page.click('#reportSend');
   ok(await page.$eval('#reportErrWrap', e => !e.hidden), '...and Send with nothing said is refused in the dialog');
   await page.selectOption('#reportCat', 'The notebook');
@@ -239,7 +239,7 @@ ok(page.dialogs.length === 0, '...and with none kept, it says so rather than ask
   await page.waitForSelector('#reportConvField:not([hidden])', { timeout: 10000 });
   ok(/make the wiki keep my edit/.test(await page.$eval('#reportConvWhich', e => e.textContent))
      && !(await page.$eval('#reportConv', e => e.checked)),
-     'a project\'s report offers the latest conversation, named, and off until ticked');
+     'a space\'s report offers the latest conversation, named, and off until ticked');
   await page.check('#reportConv');
   await page.fill('#reportText', 'the session lost the edit');
   await page.click('#reportSend');
@@ -270,7 +270,7 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
   await page.click('#bReport');
   await page.waitForSelector('#reportModal:not([hidden]) #reportCat', { timeout: 10000 });
   ok(await page.$eval('#reportTitle', e => e.textContent) === 'Report a bug',
-     'the header\'s bug opens Report a bug for no project');
+     'the header\'s bug opens Report a bug for no space');
   await page.selectOption('#reportCat', 'The dashboard');
   await page.fill('#reportText', 'the header is crowded on a phone');
   await page.click('#reportSend');
@@ -279,7 +279,7 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'list' }) })).json()));
   const gen = (all.reports || []).find(r => r.text === 'the header is crowded on a phone');
   ok(gen && gen.project === '' && gen.area === 'The dashboard' && /from the dashboard/.test(gen.by),
-     `...and Send puts it in the diagnostics with no project, marked as from the dashboard (${JSON.stringify(gen || {}).slice(0, 160)})`);
+     `...and Send puts it in the diagnostics with no space, marked as from the dashboard (${JSON.stringify(gen || {}).slice(0, 160)})`);
 }
 
 // ...and only from a project the person works on (the operator, 2 Oct): an
@@ -296,9 +296,9 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
     body: JSON.stringify({ action: 'projects', name: 'repadmin', projects: ['beta'] }) }));
   const refused = await send('alpha');
   ok(refused.status === 403 && /not on alpha/.test(refused.body.error || ''),
-     `an administrator not on a project is refused a report from it (${refused.status} ${refused.body.error})`);
+     `an administrator not on a space is refused a report from it (${refused.status} ${refused.body.error})`);
   const fine = await send('beta');
-  ok(fine.status === 200 && fine.body.ok, '...and sends one from a project it is on');
+  ok(fine.status === 200 && fine.body.ok, '...and sends one from a space it is on');
   // The row draws its bug button from the project's `mine`, which says the
   // same thing to the page.
   const st = await (await fetch(URL.replace(/\/$/, '') + '/api/status', { headers: as })).json();

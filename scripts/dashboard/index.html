@@ -5948,7 +5948,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="chips relchips" id="roadmapVers"></div>
     </div>
     <div class="field" id="roadmapEmpty" hidden>
-      <div class="hint nbempty">What goes here is read at the start of every Claude session in this project.</div>
+      <div class="hint nbempty">What goes here is read at the start of every Claude session in this space.</div>
     </div>
     <!-- Somebody else wrote this item while it was being edited here. Above
          the list rather than in a toast: the typing it is about is still on
@@ -6102,7 +6102,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          suite, where one slow test is a fact about one test. -->
     <div class="nbview" data-view="tests" hidden>
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
-        <span class="actbar"><button type="button" id="tstOut" hidden title="the last run's output in this project's shell, following it while it runs">Open the run's output</button></span></div>
+        <span class="actbar"><button type="button" id="tstOut" hidden title="the last run's output in this space's shell, following it while it runs">Open the run's output</button></span></div>
       <!-- The glance (R109): passing, failing, the time in tests, what is
            flagged and undescribed, and a run going on the line under them. -->
       <div class="nbglance" id="tstHint" data-tiles="5"></div>
@@ -6190,7 +6190,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <span class="actbar" id="gitNet" hidden>
           <button type="button" data-gitact="fetch" title="bring the remote's branches down without touching this one">Fetch</button>
           <button type="button" data-gitact="pull" title="fast-forward this branch to its upstream">Pull</button>
-          <button type="button" data-gitact="push" class="primary" title="send this branch up, with the project's credentials">Push</button>
+          <button type="button" data-gitact="push" class="primary" title="send this branch up, with the space's credentials">Push</button>
         </span>
       </div>
       <!-- The glance: not committed, the branches, what is to push and to
@@ -6210,7 +6210,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            docs/design-language.md say one thing. -->
       <div class="field nbhead vbar docbarrow"><span class="nbsaidslot"></span><span class="sp"></span>
         <span class="actbar"><button type="button" id="dsWrite"
-          title="write docs/design-language.md into the project from what is saved here; a session commits it with the work">Write the file</button></span></div>
+          title="write docs/design-language.md into the space from what is saved here; a session commits it with the work">Write the file</button></span></div>
       <!-- The glance (R109): its pages and themes, and the file's state. -->
       <div class="nbglance" id="dsHint" data-tiles="2"></div>
       <!-- Why Write the file and every control below are dead (B101). -->
@@ -6401,7 +6401,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
      against. -->
 <div id="rnmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="rnTitle">
   <div class="box" data-sects>
-    <h3 id="rnTitle">Project settings</h3>
+    <h3 id="rnTitle">Space settings</h3>
     <!-- In sections, each titled and each hiding itself when none of its
          fields is shown (the chain's door shows the remote alone): what
          the project is and who it belongs to, where it runs, what a
@@ -6426,7 +6426,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          owner and Invite only are staged until Save; Invite and Withdraw are
          actions and act on the press. -->
     <div class="field" id="rnPeopleField" hidden>
-      <label id="rnPeopleLabel">People<span class="help" data-help="its owner, who is on it, and who is invited. Any administrator can add people, themselves included; invite only means people join by accepting an invitation, and its owner decides that. A role on this project puts somebody on it; the Roles page sets who holds which." tabindex="0">?</span></label>
+      <label id="rnPeopleLabel">People<span class="help" data-help="its owner, who is on it, and who is invited. Any administrator can add people, themselves included; invite only means people join by accepting an invitation, and its owner decides that. A role on this space puts somebody on it; the Roles page sets who holds which." tabindex="0">?</span></label>
       <div id="rnPeople" role="group" aria-labelledby="rnPeopleLabel"></div>
     </div>
     </div></details>
@@ -6471,11 +6471,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
              when there is none, remove it (devbuild; the Docker row says
              what it is set to). Deny by default. -->
         <label class="pick">Run its container <select id="rnGateDocker"
-          aria-label="rebuilding, changing the env of, creating or removing this project's container, from a session"></select></label>
+          aria-label="rebuilding, changing the env of, creating or removing this space's container, from a session"></select></label>
         <!-- Its VMs (R91): aerie vm new, start, stop, snapshot, rm from a
              session, read as Run its container is. Deny by default. -->
         <label class="pick">Make VMs <select id="rnGateVms"
-          aria-label="making, starting, stopping, snapshotting and removing this project's VMs, from a session"></select></label>
+          aria-label="making, starting, stopping, snapshotting and removing this space's VMs, from a session"></select></label>
         <!-- A pack from the vetted catalog (R169 step 5): aerie tool install
              from a session. Ask by default: a pack joins every node's
              catalog, so a person who may curate it answers. -->
@@ -6504,7 +6504,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
              which the session never receives. Ask by default; Ask waits for
              the project's owner. -->
         <label class="pick">Sign a build <select id="rnGateSign"
-          aria-label="signing an APK or bundle with this project's keys, from a session"></select></label>
+          aria-label="signing an APK or bundle with this space's keys, from a session"></select></label>
         <!-- A new generated key, or an app's package mapped to a key, from a
              session (R106 step 6). Ask by default: a new sideload key is an
              app's identity for good. -->
@@ -6522,7 +6522,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
              version locked (report #48, 3 Oct). Its own words, not
              Auto/Ask/Deny: a policy says how far, not whether to ask. -->
         <label class="pick">Move the version <select id="rnGateVersion"
-          aria-label="moving the project's version, from a session"></select></label>
+          aria-label="moving the space's version, from a session"></select></label>
       </div>
       <label id="rnGateBbLabel" class="rnsub">AerieOS itself</label>
       <div class="prefrow ctlrow" role="group" aria-labelledby="rnGateBbLabel">
@@ -6541,12 +6541,12 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <label id="rnAgentsLabel">Coding agents <span class="sub">besides Claude, which always may: one left unticked does not start here</span></label>
       <div class="lbox" id="rnAgents" role="group" aria-labelledby="rnAgentsLabel"></div>
       <div class="prefrow ctlrow"><label class="pick wide">Start opens <select id="rnAgentDefault"
-        aria-label="the coding agent the project's Start opens"></select></label></div>
-      <div class="hint">the agent the project's Start agent button opens</div>
+        aria-label="the coding agent the space's Start opens"></select></label></div>
+      <div class="hint">the agent the space's Start agent button opens</div>
       <!-- How many sessions of one agent each person may run here at once
            (R143): each its own tree and branch. -->
       <div class="prefrow ctlrow"><label class="pick wide">Sessions of one agent, each person <select id="rnAgentSlots"
-        aria-label="how many sessions of one coding agent each person may run on this project at once">
+        aria-label="how many sessions of one coding agent each person may run on this space at once">
         <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option>
         <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
         <option value="9">9</option></select></label></div>
@@ -6564,7 +6564,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          model and as git's environment for the author. -->
     <div class="field" id="rnMineField">
       <label id="rnMineLabel">Your sessions and commits<span class="help" data-help="yours alone: your sessions and your commits here" tabindex="0">?</span></label>
-      <div class="hint">Yours alone; the other sections are the project's, for everybody on it.</div>
+      <div class="hint">Yours alone; the other sections are the space's, for everybody on it.</div>
       <div class="prefrow ctlrow" role="group" aria-labelledby="rnMineLabel">
         <label class="pick">Replies <select id="rnReply"
           aria-label="how wordy Claude's replies to you are here">
@@ -6582,7 +6582,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
              a project told apart at a glance, a production one red. Drawn
              while AerieOS's own terminal is on. -->
         <label class="pick" id="rnTermSchemeRow">Terminal colors <select id="rnTermScheme"
-          aria-label="the colors of your terminals in this project">
+          aria-label="the colors of your terminals in this space">
           <option value="">your Profile's</option>
           <option value="amber">amber</option>
           <option value="blue">blue</option>
@@ -6695,7 +6695,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          wanted. Send-to-Docker preselects it, and an instance still remembers
          the node it was actually created on. -->
     <div class="field" id="rnNodeField" hidden>
-      <label for="rnNode">Node<span class="help" data-help="where this project's work runs: builds, tests, CI, the emulator" tabindex="0">?</span></label>
+      <label for="rnNode">Node<span class="help" data-help="where this space's work runs: builds, tests, CI, the emulator" tabindex="0">?</span></label>
       <select id="rnNode"></select>
       <div class="hint" id="rnNodeHint">Builds, tests, CI, containers and the emulator run here.</div>
       <!-- One list for the rest of the set and the hosting-only nodes (the
@@ -6704,14 +6704,14 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            the rest prefs.nodes. Drawn by rnFillNodesMore. -->
       <label id="rnNodesLabel" hidden>Also works on</label>
       <div class="lbox" id="rnNodesMore" role="group" aria-labelledby="rnNodesLabel" hidden></div>
-      <div class="hint" id="rnNodesMoreHint" hidden>A session can start on any of these, and its containers may live on any of them. One marked Hosting only takes containers alone, built on the project's node and sent there; its sessions may make, rebuild and remove them there under Agents may: Run its container. A hosting node not ticked is yours to copy to and rebuild on from the Containers page.</div>
+      <div class="hint" id="rnNodesMoreHint" hidden>A session can start on any of these, and its containers may live on any of them. One marked Hosting only takes containers alone, built on the space's node and sent there; its sessions may make, rebuild and remove them there under Agents may: Run its container. A hosting node not ticked is yours to copy to and rebuild on from the Containers page.</div>
       <!-- What the project may use there (R102): the card, and where its
            tests run when it has a dev instance. -->
       <div class="prefrow ctlrow">
         <label class="pick wide">The node's GPU <select id="rnGpu"
-          aria-label="whether this project's sessions, builds and tests may compute on its node's NVIDIA card">
+          aria-label="whether this space's sessions, builds and tests may compute on its node's NVIDIA card">
           <option value="on">may be computed on, where the node has one and allows it</option>
-          <option value="off">is not for this project: it runs as if the machine had none</option>
+          <option value="off">is not for this space: it runs as if the machine had none</option>
         </select></label>
       </div>
       <!-- Where the tests run, which is this project's business and used to
@@ -6729,7 +6729,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <!-- The node its suites run on (R151): one of the project's, or the
            session's own, which is the default and was the only way. -->
       <div id="rnTestNodeF">
-        <label for="rnTestNode">Test node<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the project's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain" tabindex="0">?</span></label>
+        <label for="rnTestNode">Test node<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain" tabindex="0">?</span></label>
         <select id="rnTestNode"><option value="">the session's own node</option></select>
       </div>
     </div>
@@ -6752,7 +6752,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric" aria-label="days a capture is kept"> <span class="dim">days</span></div>
       <!-- The project's daily snapshots (R165): what a node gone wrong, or
            compromised, through its synced copy is undone from. -->
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the project's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none. Restored from Snapshots below" tabindex="0">?</span></label>
+      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none. Restored from Snapshots below" tabindex="0">?</span></label>
         <input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric" aria-label="days a snapshot is kept"> <span class="dim">days</span></div>
       <!-- ...and whether one is taken each day (R105): on unless switched
            off; off takes none, and what is kept ages out by the days. -->
@@ -6767,10 +6767,10 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          to bb from inside them, every write refused. The operator's to
          name, never a session's. -->
     <div class="field" id="rnReadsField" hidden>
-      <label id="rnReadsLabel">Reads<span class="help" data-help="other projects a session here may read, code and notebook alike, and never change" tabindex="0">?</span></label>
+      <label id="rnReadsLabel">Reads<span class="help" data-help="other spaces a session here may read, code and notebook alike, and never change" tabindex="0">?</span></label>
       <div class="lbox" id="rnReads" role="group" aria-labelledby="rnReadsLabel"></div>
-      <div class="hint">A session here reads these projects, code and notebook, read-only; only a session on that project changes them.</div>
-      <div class="hint" id="rnReadsWhy" hidden>Only AerieOS's owner chooses which other projects a project's sessions may read.</div>
+      <div class="hint">A session here reads these spaces, code and notebook, read-only; only a session on that space changes them.</div>
+      <div class="hint" id="rnReadsWhy" hidden>Only AerieOS's owner chooses which other spaces a space's sessions may read.</div>
     </div>
     <!-- The places on its node a session here is shown (prefs.sees). A
          session's view is built from what it is given, so a share mounted
@@ -6785,7 +6785,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          7 Oct): a machine, or one port on it, without making the project
          read another. An administrator's; applied without a restart. -->
     <div class="field" id="rnReachField" hidden>
-      <label id="rnReachLabel">Also reaches<span class="help" data-help="other machines a session here may still reach outside its project's network: an address for the whole machine, or address:port for one service, on the nodes you tick. Running sessions get it at once" tabindex="0">?</span></label>
+      <label id="rnReachLabel">Also reaches<span class="help" data-help="other machines a session here may still reach outside its space's network: an address for the whole machine, or address:port for one service, on the nodes you tick. Running sessions get it at once" tabindex="0">?</span></label>
       <div id="rnReachRows" role="group" aria-labelledby="rnReachLabel"></div>
       <div class="rnreachadd"><button type="button" id="rnReachAdd">Add an address</button></div>
       <div class="hint" id="rnReachHint"></div>
@@ -6799,7 +6799,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     <div class="field" id="rnToolsField">
       <label id="rnToolsLabel">Its sessions use<span class="help" data-help="what a session here has on its PATH and in its view of the toolchain store; one left off is not there for it, and aerie says this setting is why. A session started after the save takes it" tabindex="0">?</span></label>
       <div class="lbox" id="rnTools" role="group" aria-labelledby="rnToolsLabel"></div>
-      <div class="hint" id="rnToolsHint">Shipped toolchains start on and tool packs off: a pack an administrator adds reaches no project until it is ticked here.</div>
+      <div class="hint" id="rnToolsHint">Shipped toolchains start on and tool packs off: a pack an administrator adds reaches no space until it is ticked here.</div>
     </div>
     </div></details>
     <details class="sect rngroup" data-sect="rn:files"><summary><span class="t">File access</span></summary><div class="body">
@@ -6808,7 +6808,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          ftp grant (the owner, until a role names it); anybody else sees
          whether it is on and where. Staged until Save, like the rest. -->
     <div class="field" id="rnFtpField" hidden>
-      <label id="rnFtpLabel">Over FTP<span class="help" data-help="its tree over FTPS from the project's node, and in VS Code or the Windows companion through this controller; each account signs in with its own AerieOS name and password and gets the access picked below" tabindex="0">?</span></label>
+      <label id="rnFtpLabel">Over FTP<span class="help" data-help="its tree over FTPS from the space's node, and in VS Code or the Windows companion through this controller; each account signs in with its own AerieOS name and password and gets the access picked below" tabindex="0">?</span></label>
       <div id="rnFtp" role="group" aria-labelledby="rnFtpLabel"></div>
     </div>
     </div></details>
@@ -6817,7 +6817,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          restoring the whole tree or one file acts on the press, after a
          confirmation, and snapshots the tree first so it can be undone. -->
     <div class="field" id="rnSnapField" hidden>
-      <label id="rnSnapLabel">Days kept<span class="help" data-help="each a copy of every file the project's nodes can change, as it was that day; a restore writes it back on the controller and every node follows" tabindex="0">?</span></label>
+      <label id="rnSnapLabel">Days kept<span class="help" data-help="each a copy of every file the space's nodes can change, as it was that day; a restore writes it back on the controller and every node follows" tabindex="0">?</span></label>
       <div id="rnSnapRows" role="group" aria-labelledby="rnSnapLabel"></div>
       <div class="hint" id="rnSnapHint"></div>
     </div>
@@ -6847,7 +6847,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
            not being found (the operator, 15 Sep). Same confirm, same
            /api/trash: every file kept under /workspace/.trash. -->
       <button id="rnDelete" class="danger" hidden
-        title="move it to .trash; everything is kept">Delete project…</button>
+        title="move it to .trash; everything is kept">Delete space…</button>
       <button id="rnUnlink" class="danger" hidden>Unlink</button>
     </div>
     <!-- Why Delete project is dead for this account (B86), under it. -->
@@ -6901,7 +6901,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          that project's, listed in its notebook and reachable by its
          sessions. Changed later on the row, so not shown when editing. -->
     <div class="field" id="cUnderField">
-      <label for="cUnder">Project<span class="help" data-help="the project it belongs to: its sessions can see it and work on it. No project keeps it from every session" tabindex="0">?</span></label>
+      <label for="cUnder">Space<span class="help" data-help="the space it belongs to: its sessions can see it and work on it. No space keeps it from every session" tabindex="0">?</span></label>
       <select id="cUnder"></select>
     </div>
     <div class="field">
@@ -6967,13 +6967,13 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="hint" id="dnPreview" hidden></div>
     </div>
     <div class="field">
-      <label for="dnUnder">Project<span class="help" data-help="the project it belongs to, its own by default: its sessions can see it and work on it. No project keeps it from every session" tabindex="0">?</span></label>
+      <label for="dnUnder">Space<span class="help" data-help="the space it belongs to, its own by default: its sessions can see it and work on it. No space keeps it from every session" tabindex="0">?</span></label>
       <select id="dnUnder"></select>
     </div>
     <div class="field" id="dnNodeField" hidden>
       <label for="dnNode">Node<span class="help" data-help="which docker host it runs on" tabindex="0">?</span></label>
       <select id="dnNode"></select>
-      <div class="hint" id="dnNodeHint">The project's node unless picked; an instance stays where it was made.</div>
+      <div class="hint" id="dnNodeHint">The space's node unless picked; an instance stays where it was made.</div>
     </div>
     <!-- Which branch it builds from. Offered here as well as on the row
          because this is the gesture that makes a SECOND instance, and a
@@ -7015,7 +7015,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <input id="rlName" maxlength="60" autocomplete="off" spellcheck="false">
     </div>
     <div class="field" id="rlNodeField">
-      <label for="rlNode">Node<span class="help" data-help="where it goes: the project's own nodes first; any other gets its image shipped, never the codebase" tabindex="0">?</span></label>
+      <label for="rlNode">Node<span class="help" data-help="where it goes: the space's own nodes first; any other gets its image shipped, never the codebase" tabindex="0">?</span></label>
       <select id="rlNode"></select>
       <div class="hint" id="rlNodeHint"></div>
     </div>
@@ -7070,11 +7070,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 </div>
 <div id="tmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="tTitle">
   <div class="box">
-    <h3 id="tTitle">Deleted projects</h3>
+    <h3 id="tTitle">Deleted spaces</h3>
     <!-- In a .field like every other line in every other modal here: that is
          where the band inset lives, and a bare .hint sat flush against the
          box while the list below it was indented. -->
-    <div class="field"><div class="hint">Deleted projects sit in <code>.trash</code> with their notebooks; Put back restores everything.</div></div>
+    <div class="field"><div class="hint">Deleted spaces sit in <code>.trash</code> with their notebooks; Put back restores everything.</div></div>
     <div id="tList" class="field"></div>
     <div class="foot"><span class="sp"></span>
       <button type="button" id="tClose">Close</button></div>
@@ -7152,13 +7152,13 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     <div class="field">
       <label for="reportRepro">How to make it happen <span class="dim">(optional)</span></label>
       <textarea id="reportRepro" maxlength="2000" placeholder="the steps, if you know them"></textarea>
-      <div class="hint" id="reportHint">It goes to the diagnostics with this project, its node and the build it was seen on, where whoever maintains AerieOS reads it.</div>
+      <div class="hint" id="reportHint">It goes to the diagnostics with this space, its node and the build it was seen on, where whoever maintains AerieOS reads it.</div>
     </div>
     <!-- A project's report can carry the reporter's latest conversation on
          it (the operator, 2 Oct): what Claude was doing is usually the
          bug. Off unless ticked; the line under says which one it is. -->
     <div class="field" id="reportConvField" hidden>
-      <label class="ndcap"><input type="checkbox" id="reportConv"> Include my latest conversation on this project</label>
+      <label class="ndcap"><input type="checkbox" id="reportConv"> Include my latest conversation on this space</label>
       <div class="sub" id="reportConvWhich"></div>
     </div>
     <div class="field" id="reportErrWrap" hidden><div class="hint bad" id="reportErr"></div></div>
@@ -7177,10 +7177,10 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
     <div class="field">
       <label for="briefText">Brief</label>
       <textarea id="briefText" spellcheck="false" aria-describedby="briefHint"></textarea>
-      <div class="hint" id="briefHint">Build it starts the session on this. The brief then leaves the project, and its notebook keeps it.</div>
+      <div class="hint" id="briefHint">Build it starts the session on this. The brief then leaves the space, and its notebook keeps it.</div>
     </div>
     <div class="field">
-      <label id="briefMineLabel">Yours on this project</label>
+      <label id="briefMineLabel">Yours on this space</label>
       <div class="prefrow ctlrow" role="group" aria-labelledby="briefMineLabel">
         <label class="pick">Model <select id="briefModel"
           aria-label="model your sessions here start on"></select></label>
@@ -7198,7 +7198,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 </div>
 <div id="pmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="pTitle">
   <div class="box">
-    <h3 id="pTitle">New project</h3>
+    <h3 id="pTitle">New space</h3>
     <div class="field" id="pSrcField">
       <label id="pSrcLabel">Source</label>
       <div class="pseg" role="group" aria-labelledby="pSrcLabel">
@@ -7225,7 +7225,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <label for="pVersion">Starting version</label>
       <input id="pVersion" value="0.1.0" maxlength="40" autocomplete="off" spellcheck="false"
              placeholder="0.1.0" inputmode="decimal">
-      <div class="hint">Committed as the project's first version. Leave it blank to commit nothing yet.</div>
+      <div class="hint">Committed as the space's first version. Leave it blank to commit nothing yet.</div>
     </div>
     <!-- Where it runs. A project born with no node has no builds, no
          tests and no Claude session until its settings are opened, which
@@ -7245,7 +7245,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <!-- The dials start at their defaults and live on the project's
            Settings view (R245): a dialog is for what cannot wait. The
            selects stay, hidden, since the submit reads them. -->
-      <div class="sub dim">The defaults: auto for its notebook, its build and test fields and reports to AerieOS; ask for its container, a signed build, a release and its keys. Each is changed on the project's Settings.</div>
+      <div class="sub dim">The defaults: auto for its notebook, its build and test fields and reports to AerieOS; ask for its container, a signed build, a release and its keys. Each is changed on the space's Settings.</div>
       <div class="prefrow ctlrow" role="group" aria-labelledby="pGateLabel" hidden>
         <label class="pick">Add to roadmap <select id="pGateRoadmap"
           aria-label="new roadmap items from a session"></select></label>
@@ -7260,11 +7260,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <label class="pick">Fill in build and test <select id="pGateSettings"
           aria-label="the build, test and outputs fields from a session"></select></label>
         <label class="pick">Run its container <select id="pGateDocker"
-          aria-label="rebuilding, changing the env of or creating this project's container, from a session"></select></label>
+          aria-label="rebuilding, changing the env of or creating this space's container, from a session"></select></label>
         <!-- The rest of the project settings' Agents may, so a project is
              born with every one of them chosen rather than found later. -->
         <label class="pick">Sign a build <select id="pGateSign"
-          aria-label="signing an APK or bundle with this project's keys, from a session"></select></label>
+          aria-label="signing an APK or bundle with this space's keys, from a session"></select></label>
         <label class="pick">Tag and publish a release <select id="pGateRelease"
           aria-label="tagging a commit and publishing the release, from a session"></select></label>
         <label class="pick">Manage signing keys <select id="pGateKeys"
@@ -7392,8 +7392,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
        a project, a container or a node; the rows under it as you type, the
        first on Enter. It does not search inside notebooks. -->
   <div class="jump" role="search">
-    <input id="jump" type="search" placeholder="jump to a page, project, container or node"
-           aria-label="jump to a page, project, container or node" autocomplete="off" spellcheck="false">
+    <input id="jump" type="search" placeholder="jump to a page, space, container or node"
+           aria-label="jump to a page, space, container or node" autocomplete="off" spellcheck="false">
     <div id="jumpList" class="jumplist" role="listbox" hidden></div>
   </div>
   <span class="spacer"></span>

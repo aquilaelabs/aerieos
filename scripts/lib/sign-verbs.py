@@ -16,7 +16,7 @@ import waits
 auth = os.environ["BB_SIGN_AUTH"]
 project = os.environ.get("BB_SIGN_PROJECT", "")
 if not project:
-    sys.exit("[builderbot] ERROR: run aerie sign inside a project's tree")
+    sys.exit("[builderbot] ERROR: run aerie sign inside a space's tree")
 
 
 def ago(at):
@@ -70,7 +70,7 @@ def release_verb(why):
     if r.get("error"):
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     if r.get("id") and not r.get("ok"):
-        print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}), waiting up to "
+        print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
         o = waits.outcome(auth, r["id"], "the look was not allowed")
         if o.get("code"):
@@ -120,7 +120,7 @@ def keys_verb(sub, route, why, rest):
         for pkg, k in (d.get("map") or {}).items():
             print(f"  {pkg} -> {k}")
         if not d.get("keys"):
-            print("  no keys yet: an administrator adds one in the project's Signing view (Ship)")
+            print("  no keys yet: an administrator adds one in the space's Signing view (Ship)")
         return
     if sub == "--rotate":
         if len(rest) != 2:
@@ -138,12 +138,12 @@ def keys_verb(sub, route, why, rest):
     if r.get("error"):
         sys.exit(f"[builderbot] ERROR: {r['error']}")
     if r.get("id") and not r.get("keys") and not r.get("key"):
-        print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}), waiting up to "
+        print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
         o = waits.outcome(auth, r["id"], "the change was not allowed")
         if o.get("code"):
             sys.exit(f"[builderbot] ERROR: {o.get('out') or 'it was not made'}")
-    print("[builderbot] done: aerie sign keys says what the project has now", file=sys.stderr)
+    print("[builderbot] done: aerie sign keys says what the space has now", file=sys.stderr)
 
 
 if sys.argv[1] == "--status":
@@ -167,7 +167,7 @@ if r.get("error"):
     sys.exit(f"[builderbot] ERROR: {r['error']}")
 job = r.get("job") or ""
 if not job and r.get("id"):
-    print(f"[builderbot] asked {r.get('to') or 'the project owner'} (#{r['id']}), waiting up to "
+    print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
           "15 minutes for Approve in their bell", file=sys.stderr)
     o = waits.outcome(auth, r["id"], "the signing was not allowed")
     if o.get("code"):
@@ -175,7 +175,7 @@ if not job and r.get("id"):
     job = o.get("out") or ""
 if not job:
     sys.exit("[builderbot] ERROR: the controller started no signing and said nothing about why")
-print(f"[builderbot] signing {file} for {route} on the project's node ({job})", file=sys.stderr)
+print(f"[builderbot] signing {file} for {route} on the space's node ({job})", file=sys.stderr)
 for _ in range(600):
     time.sleep(2)
     j = bbapi.call(f"/api/v1/jobs?id={job}", auth=auth)

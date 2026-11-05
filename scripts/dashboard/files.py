@@ -92,7 +92,7 @@ def _path(project, rel):
     project after every symlink is followed, and never through .git."""
     parts = [p for p in str(rel or "").replace("\\", "/").split("/") if p not in ("", ".")]
     if ".." in parts:
-        raise Refused(400, "a path inside the project, with no ..")
+        raise Refused(400, "a path inside the space, with no ..")
     if any(p in HIDDEN for p in parts):
         raise Refused(403, ".git is not served: its config can carry a token, and history "
                            "is the Git view's")
@@ -100,7 +100,7 @@ def _path(project, rel):
     p = root.joinpath(*parts)
     real = p.resolve(strict=False)
     if real != root and root not in real.parents:
-        raise Refused(403, "that path leads outside the project")
+        raise Refused(403, "that path leads outside the space")
     if any(x in HIDDEN for x in real.relative_to(root).parts):
         raise Refused(403, ".git is not served")
     return root, p, "/".join(parts)
@@ -200,7 +200,7 @@ def _read(project, req, access, by):
 
 def _needs_rw(access):
     if access != "rw":
-        raise Refused(403, "your file access to this project is read-only")
+        raise Refused(403, "your file access to this space is read-only")
 
 
 def _write_v(project, req, access, by):
@@ -243,7 +243,7 @@ def _delete(project, req, access, by):
     _needs_rw(access)
     root, p, rel = _path(project, req.get("path"))
     if p == root:
-        raise Refused(403, "not the project itself")
+        raise Refused(403, "not the space itself")
     if not p.exists() and not p.is_symlink():
         raise Refused(404, "no such file")
     if p.is_dir() and not p.is_symlink():
@@ -263,7 +263,7 @@ def _rename(project, req, access, by):
     root, a, ra = _path(project, req.get("path"))
     _, b, rb = _path(project, req.get("to"))
     if a == root or b == root:
-        raise Refused(403, "not the project itself")
+        raise Refused(403, "not the space itself")
     if not a.exists():
         raise Refused(404, "no such file")
     if b.exists() and not _flag(req, "overwrite"):

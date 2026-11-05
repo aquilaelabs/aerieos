@@ -14,9 +14,9 @@ class StaleNote(unittest.TestCase):
         self.addCleanup(lambda: setattr(hooks, "behind", None))
 
     def test_said_with_what_changed_and_what_to_do(self):
-        hooks.behind = lambda p, u, a, s: ["docs added to its project since it started"]
+        hooks.behind = lambda p, u, a, s: ["docs added to its space since it started"]
         said, names = hooks.stale_note("app", "u_00000001", "claude", 1)
-        self.assertIn("Your briefing is out of date: docs added to its project", said)
+        self.assertIn("Your briefing is out of date: docs added to its space", said)
         self.assertIn("tell the person", said)
         self.assertIn("Restart", said)
         self.assertEqual(len(names), 1)

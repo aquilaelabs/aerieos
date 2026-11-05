@@ -326,16 +326,16 @@ function nbBugsView({$, nb, project}){
               ? `<button type="button" class="bFix">Mark fixed</button>
                  ${actMore([`<button type="button" class="bWont">Won't fix</button>`,
                    `<button type="button" class="bNa" title="it was real and stopped applying: the feature went away">Not applicable</button>`,
-                   `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong project">Remove</button>`])}`
+                   `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
               : `<button type="button" class="bReopen">Reopen</button>
                  <!-- Last, because it is the one that cannot be undone. -->
                  <button type="button" class="danger bRm"
-                   title="for a report that should not exist: mis-filed, a duplicate, the wrong project">Remove</button>`}
+                   title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`}
           </div>`}
         </div>
       </details>`).join("")
       // What the tracker is for, as its empty state (R119 step 4).
-      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this project.</div>`);
+      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`);
     paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length, more: () => drawBugs()});
     wireMore(list);
     list.querySelectorAll(".bug").forEach(d => {

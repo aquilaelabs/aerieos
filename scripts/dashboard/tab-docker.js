@@ -426,7 +426,7 @@ function dnNodeSay(){
   const says = () => {
     const ship = !set.includes($("dnNode").value);
     say.textContent = ship
-      ? `Not one of ${called}'s nodes: the image is built on ${called}'s node and shipped there, so the codebase never goes to it; binds into the project's tree are refused, and ${called}'s sessions can rebuild it.`
+      ? `Not one of ${called}'s nodes: the image is built on ${called}'s node and shipped there, so the codebase never goes to it; binds into the space's tree are refused, and ${called}'s sessions can rebuild it.`
       : set.length > 1
         ? `One of ${called}'s nodes, its primary unless picked; an instance stays where it was made.`
         : `${called}'s node, ${row?.node_name || ""}: where its sessions can reach it.`;
@@ -463,7 +463,7 @@ function openSendToDocker(project, sendAs, have, compose){
   // nothing to fill.
   const refs = dockerList?.refs?.[project] || [];
   $("dnRefField").hidden = !refs.length;
-  $("dnRef").innerHTML = optionList([["", "whatever the project is on"], ...refs]);
+  $("dnRef").innerHTML = optionList([["", "whatever the space is on"], ...refs]);
   $("dnmodal").hidden = false;
   // Fetched per open, and only shown when the project actually declares an
   // example: a blank Environment box on a project with nothing to fill in is
@@ -586,7 +586,7 @@ function openRelocate(project, instance){
       rlFor.envWas = j.text || "";
       rlFor.seeded = !!j.seeded;
       $("rlEnvHint").textContent = j.seeded
-        ? "It has no env of its own: this is its project's .env.example, written as its env only if you change it."
+        ? "It has no env of its own: this is its space's .env.example, written as its env only if you change it."
         : "Its env as it is now: change what the new node needs (a port, an address) before it starts there.";
     }).catch(() => { $("rlEnvHint").textContent = "its env could not be read: what is written here becomes it"; });
 }
@@ -845,9 +845,9 @@ function dmRefLine(d){
   // onto a line of its own, where it read as a stray mark belonging to
   // nothing.
   return `<div class="setcell dmref">${lbl("dmr-" + key, "Branch",
-      "The next build uses that branch. The project's checkout, env and data stay as they are.")}
+      "The next build uses that branch. The space's checkout, env and data stay as they are.")}
     <select id="${esc("dmr-" + key)}" data-dmref="${esc(key)}" aria-label="which branch to build">
-      ${optionList([["", "whatever the project is on"], ...refs], pick || "")}</select></div>`;
+      ${optionList([["", "whatever the space is on"], ...refs], pick || "")}</select></div>`;
 }
 
 // The compose file laid over the instance's own (the operator, 17 Oct): any
@@ -900,7 +900,7 @@ function dmClaudeSaid(d, other = false){
   const says = other ? {auto: "start · stop", ask: "asks first", deny: "reads its log"}
     : own ? {auto: "rebuild · env · create", ask: "asks first", deny: "may not rebuild"}
     : {auto: "rebuild · env", ask: "asks first", deny: "may not rebuild"};
-  return `<a href="#" data-dmtestgo="${esc(d.owner)}" title="the project's settings, where Agents may: Run its container is set">${esc(says[mode] || says.deny)}</a>`;
+  return `<a href="#" data-dmtestgo="${esc(d.owner)}" title="the space's settings, where Agents may: Run its container is set">${esc(says[mode] || says.deny)}</a>`;
 }
 
 // The row's settings as one grid with one Apply at its foot (R210, the
@@ -974,19 +974,19 @@ function dmOwnerLine(r, key){
   const saved = r.owner || "";
   // System's is the deployment's to set (R180): said, with nothing to pick.
   if (saved === "System")
-    return `<div class="setcell ro dmowner">${lbl("", "Project",
-      "AerieOS deployed this itself, so it is System's: no project's session sees it, "
+    return `<div class="setcell ro dmowner">${lbl("", "Space",
+      "AerieOS deployed this itself, so it is System's: no space's session sees it, "
       + "and the network lets it reach every container on this node.")}<div class="val">System</div></div>`;
   const pick = dmOwnDraft[key] ?? saved;
   // A project since deleted is still what the row says until it is changed.
   const names = myProjectNames(saved);
   const shown = n => n === saved && r.owner_gone ? `${r.owner_label || n} (deleted)` : projLabel(n);
   const id = "dmo-" + key;
-  return `<div class="setcell dmowner">${lbl(id, "Project",
-      "Its project's sessions can see it and, as that project's Run its container setting allows, "
-      + "work on it. No project keeps it from every session.")}
-    <select id="${esc(id)}" data-dmown="${esc(key)}" aria-label="which project it belongs to">
-      ${optionList([["", "no project"], ...names.map(n => [n, shown(n)])], pick || "")}</select></div>`;
+  return `<div class="setcell dmowner">${lbl(id, "Space",
+      "Its space's sessions can see it and, as that space's Run its container setting allows, "
+      + "work on it. No space keeps it from every session.")}
+    <select id="${esc(id)}" data-dmown="${esc(key)}" aria-label="which space it belongs to">
+      ${optionList([["", "no space"], ...names.map(n => [n, shown(n)])], pick || "")}</select></div>`;
 }
 
 // Which project a project's own instance is built from, and Move to put it
@@ -1004,7 +1004,7 @@ function dmMoveLine(d){
   return `<div class="setcell dmmove">${lbl(id, "Built from",
       "The repository whose compose file and tree it is built from. Another one, applied, moves it "
       + "there, keeping its name, env and data; it then builds from that repository's tree.")}
-    <select id="${esc(id)}" data-dmmove="${esc(key)}" aria-label="the project it is built from">${
+    <select id="${esc(id)}" data-dmmove="${esc(key)}" aria-label="the space it is built from">${
       optionList(names.map(n => [n, gone && n === d.project ? `${n} (deleted)` : projLabel(n)]), pick)}</select></div>`;
 }
 
@@ -1013,7 +1013,7 @@ function dmTestSaid(d){
   // linking to where it is changed.
   if (d.source === "file") return "";
   const mode = devTestMode(d.project);
-  return `<a href="#" data-dmtestgo="${esc(d.project)}" title="the project's settings, where its node and its test command are">${
+  return `<a href="#" data-dmtestgo="${esc(d.project)}" title="the space's settings, where its node and its test command are">${
     mode === "only" ? "in its container only" : mode === "up" ? "in its container when up" : "on the node"}</a>`;
 }
 
@@ -1038,9 +1038,9 @@ function dmInstPills(d, managed){
   const url = r?.url ? `<a href="${esc(r.url)}" target="_blank" rel="noreferrer"${r.ready ? "" : ' class="dim"'}>${esc(r.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>` : "";
   const refs = dockerList?.refs?.[d.project] || [];
   return [
-    ["Project", d.owner ? esc(d.owner === "System" ? "System" : projLabel(d.owner)) : "none"],
+    ["Space", d.owner ? esc(d.owner === "System" ? "System" : projLabel(d.owner)) : "none"],
     d.source !== "file" && d.owner && d.project !== d.owner ? ["Built from", esc(projLabel(d.project))] : null,
-    d.source !== "file" && refs.length ? ["Branch", d.ref ? esc(d.ref) : "follows project"] : null,
+    d.source !== "file" && refs.length ? ["Branch", d.ref ? esc(d.ref) : "follows space"] : null,
     d.override ? ["Override", esc(d.override)] : null,
     d.gpu ? ["GPU", d.gpu === "nvidia" ? "NVIDIA card" : "AMD card or APU"] : null,
     r && (mode || url) ? ["Reached via", [esc(mode), url].filter(Boolean).join(" · ")] : null,
@@ -1437,7 +1437,7 @@ function myProjectNames(keep){
 
 function fillUnderSelect(sel, picked){
   const names = myProjectNames(picked);
-  sel.innerHTML = optionList([["", "no project"], ...names.map(n => [n, projLabel(n)])], picked);
+  sel.innerHTML = optionList([["", "no space"], ...names.map(n => [n, projLabel(n)])], picked);
 }
 
 // The node follows the project picked: a container of a project belongs on
@@ -1889,7 +1889,7 @@ function dmRowsHtml(ins, job, blind){
             title="a shell inside ${esc(c.service || c.name)}, in the dock">Shell in ${esc(c.service || c.name)}</button>`) : []),
           managed || !mayDocker() ? "" : `<button type="button" data-dm="edit" data-src="${d.source === "file" ? "file" : "project"}"
             title="${d.source === "file" ? "edit this container's compose file and env"
-                    : "edit the project's compose file and this container's env"}">Compose and env</button>`,
+                    : "edit the space's compose file and this container's env"}">Compose and env</button>`,
           !mayDocker() || managed ? "" : `<button type="button" data-dmrel ${busy || d.relocating?.busy ? "disabled" : ""}
             title="to another node, its data with it: a copy beside it, or this one moved">Copy or move…</button>`,
           !mayDocker() ? "" : `<button type="button" class="danger" data-dm="remove" ${
@@ -1908,7 +1908,7 @@ function dmRowsHtml(ins, job, blind){
         // The notices, each a line (the words rule): what is wrong and the
         // one thing to do about it.
         d.astray ? `<div class="sub warn dmastray">Out of reach: ${esc(projLabel(d.owner || d.project))}'s sessions run on ${
-          esc(d.astray)}, which does not host its containers. Tick this node under the project's Also works on, or Remove it and send it again.</div>` : ""}
+          esc(d.astray)}, which does not host its containers. Tick this node under the space's Also works on, or Remove it and send it again.</div>` : ""}
         ${d.await_env ? `<div class="sub warn">built: fill in the env, then Up</div>`
           : (d.missing_env || []).length ? `<div class="sub warn dmenv">the env is missing ${esc(d.missing_env.join(", "))}: press Env</div>` : ""}
         ${d.nginx_to ? `<div class="sub warn dmnginx">nginx:${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
@@ -1951,7 +1951,7 @@ let dmView = (() => { try{ return localStorage.getItem("bb.dmview") === "list" ?
 // rule): the container, its state, whose it is, where it answers (its
 // published ports as links, the address nginx routes to it) and its image,
 // each line opening into the card.
-const DM_COLS = [{label: "Container"}, {label: "State", w: "8.5rem"}, {label: "Project", w: "minmax(0,.7fr)"},
+const DM_COLS = [{label: "Container"}, {label: "State", w: "8.5rem"}, {label: "Space", w: "minmax(0,.7fr)"},
                  {label: "Ports", w: "minmax(0,.6fr)"}, {label: "Address", w: "minmax(0,.9fr)"},
                  {label: "Image", w: "minmax(0,1.2fr)"}];
 function dmLineWrap(key, cls, cells, inner){
@@ -2292,7 +2292,7 @@ function dmWireRows(el, list = dockerList){
     if (j.error){ notify(j.error, true); return; }
     delete dmRefDraft[key];
     notify(ref ? `${dmCalled(project, instance)} builds from ${ref} now`
-               : `${dmCalled(project, instance)} builds from the project's own checkout again`);
+               : `${dmCalled(project, instance)} builds from the space's own checkout again`);
   };
   // Start, stop, restart and the log, on any container the daemon reported,
   // including the ones AerieOS did not create (R68 steps 1 and 2). The
@@ -2373,7 +2373,7 @@ function dmWireRows(el, list = dockerList){
     const j = await r.json();
     if (j.error){ notify(j.error, true); return; }
     delete dmOwnDraft[key];
-    notify(owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no project now`);
+    notify(owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`);
   };
 
   // Built from: staged on the pick, moved by Apply, asked first since what it
@@ -2522,15 +2522,15 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
   // Each group a card at a desk (R262): its heading and its rows together.
   const card = (html, cls = "") => `<section class="dmcard${cls}">${html}</section>`;
   return owners.map(o => gone(o)
-      ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another project", null) + group(o))
+      ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another space", null) + group(o))
       : o === "System"
         ? card(head("System", "AerieOS's own · no session sees these", null) + group(o))
         : notMine(o)
           ? card(head(projLabel(o), "", colorTone(projectColor(o)))
-              + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of projects: add it to your own list on ${
+              + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of spaces: add it to your own list on ${
                   pageLink("users", "the Users page")} to work on these</div>` + group(o), " notmine")
           : card(head(projLabel(o), "", colorTone(projectColor(o))) + group(o))).join("")
-    + (loose ? card(head("No project", "no session sees these", null) + group("")) : "");
+    + (loose ? card(head("No space", "no session sees these", null) + group("")) : "");
 }
 
 // The groups the chips offer: each project with containers here, by its
@@ -2544,7 +2544,7 @@ function dmChipGroups(ins, cs){
   const groups = owners.map(o => ({key: o, label: label(o), count: all.filter(r => (r.owner || "") === o).length}))
     .sort((a, b) => byName(a.label, b.label));
   const loose = all.filter(r => !r.owner).length;
-  return loose ? [...groups, {key: "none", label: "No project", count: loose}] : groups;
+  return loose ? [...groups, {key: "none", label: "No space", count: loose}] : groups;
 }
 
 // A container AerieOS did not start: what the daemon says about it,
@@ -2612,7 +2612,7 @@ function dmOtherRowsHtml(cs){
             title="what it prints, in a tab of the dock, read again as it goes on">Log</button>` : ""])}
         </div>
         </div>
-        ${dmSetPills([["Project", c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "none"],
+        ${dmSetPills([["Space", c.owner ? esc(c.owner === "System" ? "System" : projLabel(c.owner)) : "none"],
                         ["", c.boot ? "✓ Starts on boot" : "not on boot", c.boot ? "ok" : ""],
                         ["Agent", dmClaudeSaid(c, true)]])}
         ${dmEditing.has("ctr:" + (c.name || c.id)) || dmRowDirty("ctr:" + (c.name || c.id))
@@ -2658,7 +2658,7 @@ function dmBar(b){
   // The node is the Containers group's header's (R178): the search takes
   // the picker's room.
   return `<div class="field docbarrow dmpick"><input${ghost ? "" : ` id="dmSearch"`} type="search"
-        placeholder="${isPhone() ? "search" : "name, image, port or project"}" autocomplete="off" aria-label="narrow the containers: name, image, port or project" value="${esc(dmSearch)}"${dead}><span class="sp"></span>
+        placeholder="${isPhone() ? "search" : "name, image, port or space"}" autocomplete="off" aria-label="narrow the containers: name, image, port or space" value="${esc(dmSearch)}"${dead}><span class="sp"></span>
       ${dmViewSeg(dead)}
       ${mayDocker() ? `<span class="actbar">${
       b?.blind ? "" : `<button type="button"${ghost ? "" : ` id="bDockerCheck"`}${dead || (featureOff("image-updates") ? " disabled" : "")}>${barSaid("Check for updates", "Check")}</button>`}${
@@ -2699,7 +2699,7 @@ function dmTiles(t){
       : `of ${t.all}${matchMedia("(max-width:440px)").matches ? "" : ` container${t.all === 1 ? "" : "s"}`}`,
      tone: !g && t.all && !t.running ? "warn" : ""},
     {label: !g && t.behind === 1 ? "update due" : "updates due", value: g ? GHOST : t.behind, tone: !g && t.behind ? "warn" : "", omit: !g && !t.checked && !t.behind},
-    {label: "projects", value: g ? GHOST : t.projects, omit: !g && t.projects === undefined},
+    {label: "spaces", value: g ? GHOST : t.projects, omit: !g && t.projects === undefined},
     {label: "not ours", value: g ? 0 : t.notOurs, omit: g || !t.notOurs, title: "on this daemon, started by nobody here"},
   ]);
 }

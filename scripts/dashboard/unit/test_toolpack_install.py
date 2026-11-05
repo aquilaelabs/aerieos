@@ -104,8 +104,8 @@ class Install(unittest.TestCase):
         self.env["BB_TOOLCHAINS_OFF"] = "hexkit"
         r = self.bb("tool", "hexkit", "dump", "x")
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("hexkit is switched off for this project", r.stderr)
-        self.assertIn("aerie tool hexkit dump ...   (switched off for this project", self.bb("tool").stdout,
+        self.assertIn("hexkit is switched off for this space", r.stderr)
+        self.assertIn("aerie tool hexkit dump ...   (switched off for this space", self.bb("tool").stdout,
                       "the listing says so too")
 
 

@@ -45,7 +45,7 @@ class PerPerson(unittest.TestCase):
         self.assertEqual(gitcreds.linked_to("web"), (ADA, self.ada), "the first giver, for what read the one link")
         self.assertEqual(gitcreds.linked_projects(BOB), ["web"])
         raw = (self.d / "gitcreds" / "web").read_text()
-        self.assertNotIn("ghp_", raw, "the project's file names entries, never a token")
+        self.assertNotIn("ghp_", raw, "the space's file names entries, never a token")
         self.assertTrue(gitcreds.unlink_person("web", ADA))
         self.assertEqual(gitcreds.givers("web"), [(BOB, self.bob)])
         self.assertFalse(gitcreds.unlink_person("web", ADA))
@@ -59,7 +59,7 @@ class PerPerson(unittest.TestCase):
         gitcreds.link_account("web", ADA, self.ada)
         new = "https://ada:ghp_adaNEWNEWNEWNEWNEW2@github.com"
         got = accountkeys.link_forge(ADA, "github.com", new, "ada")[0]
-        self.assertEqual(got["id"], self.ada, "the same entry, so its projects keep working")
+        self.assertEqual(got["id"], self.ada, "the same entry, so its spaces keep working")
         fs = [e for e in accountkeys._entries(ADA).values() if e["host"] == "github.com"]
         self.assertEqual(len(fs), 1)
         self.assertEqual(accountkeys.open_entry_with(ADA, self.ada, accountkeys.key_of(ADA)), new)
@@ -75,18 +75,18 @@ class PerPerson(unittest.TestCase):
         gitcreds.link_account("api", ADA, "oldone")
         mig.run({"state": str(self.d)})
         self.assertEqual(sorted(accountkeys._entries(ADA)), [self.ada], "the newest is kept, the older dropped")
-        self.assertEqual(gitcreds.givers("api"), [(ADA, self.ada)], "its project moved to the one kept")
+        self.assertEqual(gitcreds.givers("api"), [(ADA, self.ada)], "its space moved to the one kept")
         mig.run({"state": str(self.d)})
         self.assertEqual(sorted(accountkeys._entries(ADA)), [self.ada], "and a second run changes nothing")
 
     def test_a_token_is_used_only_while_its_person_is_signed_in(self):
         gitcreds.link_account("web", ADA, self.ada)
         self.assertEqual(gitcreds.read_line("web", uid=ADA), "", "signed out everywhere: nothing")
-        self.assertEqual(gitcreds.helpers("web", ADA), [], "no handout of their own while signed out, and the project keeps no line")
+        self.assertEqual(gitcreds.helpers("web", ADA), [], "no handout of their own while signed out, and the space keeps no line")
         lid = logins.mint(ADA, "a browser")
         self.assertTrue(logins.live(ADA))
         self.assertEqual(gitcreds.read_line("web", uid=ADA), ADA_LINE)
-        self.assertEqual(len(gitcreds.helpers("web", ADA)), 1, "their handout; the project keeps no line of its own")
+        self.assertEqual(len(gitcreds.helpers("web", ADA)), 1, "their handout; the space keeps no line of its own")
         logins.drop(ADA, lid)
         self.assertFalse(logins.live(ADA))
         self.assertEqual(gitcreds.read_line("web", uid=ADA), "")
@@ -101,7 +101,7 @@ class PerPerson(unittest.TestCase):
         self.assertEqual(gitcreds.read_line("web", uid=""), "", "nobody signed in: nothing, and CI watching pauses")
         logins.mint(BOB, "phone")
         self.assertEqual(gitcreds.read_line("web", uid=""), BOB_LINE)
-        self.assertEqual(gitcreds.read_line("web", uid=ADA), BOB_LINE, "Ada signed out: Bob's, as the project's helper gives it")
+        self.assertEqual(gitcreds.read_line("web", uid=ADA), BOB_LINE, "Ada signed out: Bob's, as the space's helper gives it")
         logins.mint(ADA, "desk")
         self.assertEqual(gitcreds.read_line("web", uid=ADA), ADA_LINE, "signed in: her own first")
         # The acting account, set per request, is the default.
@@ -117,7 +117,7 @@ class PerPerson(unittest.TestCase):
         u = gitcreds.usable("web", ADA)
         self.assertEqual((u["mine"], u["live"]), (True, False))
         self.assertIn("aerie git waits for you to sign in", u["why"])
-        self.assertIn("nobody who gave this project a token is signed in", gitcreds.usable("web", BOB)["why"])
+        self.assertIn("nobody who gave this space a token is signed in", gitcreds.usable("web", BOB)["why"])
         logins.mint(ADA)
         self.assertEqual(gitcreds.usable("web", ADA), {"by": ADA, "mine": True, "live": True, "given": True, "why": ""})
         u = gitcreds.usable("web", BOB)

@@ -29,7 +29,7 @@ class Star(unittest.TestCase):
         boss = users.get("boss")
         self.assertTrue(users.sees_all(boss))
         self.assertTrue(users.may_see(boss, "alpha"))
-        self.assertFalse(users.may_work(boss, "alpha"), "a star is not a project taken on")
+        self.assertFalse(users.may_work(boss, "alpha"), "a star is not a space taken on")
 
     def test_migrate_star_gives_the_owner_the_projects_that_exist(self):
         self.assertEqual(users.migrate_star(["beta", "alpha"]), 1)
@@ -37,7 +37,7 @@ class Star(unittest.TestCase):
         self.assertEqual(users.get("adm")["projects"], ["beta"], "an explicit list is left alone")
         self.assertEqual(users.migrate_star(["alpha"]), 0, "nothing to move the second time")
         self.assertTrue(users.may_work(users.get("boss"), "alpha"))
-        self.assertFalse(users.may_work(users.get("boss"), "gamma"), "a project made later is taken on like any")
+        self.assertFalse(users.may_work(users.get("boss"), "gamma"), "a space made later is taken on like any")
 
     def test_take_on_adds_to_any_list(self):
         self.assertEqual(users.take_on("boss", "gamma")["projects"], ["*", "gamma"])

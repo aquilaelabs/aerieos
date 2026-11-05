@@ -535,7 +535,7 @@ class VmsMixin:
         if want and action != "create" and not action.startswith("iso-") and action != "vbios":
             owner = self._vm_owner(name, who)
             if owner is not None and owner != want:
-                job.say(f"refused: {name} is {owner or 'another project'}'s VM, not {want}'s\n")
+                job.say(f"refused: {name} is {owner or 'another space'}'s VM, not {want}'s\n")
                 return "failed", 77
         job.say(f"vm {action} {name}{' as the root agent' if not who and os.geteuid() == 0 else ''}\n")
         state, code = getattr(self, "_vm_" + action.replace("-", "_"))(job, spec, name, who)
@@ -644,7 +644,7 @@ class VmsMixin:
         except ValueError:
             ok = False
         if not ok:
-            job.say("refused: the network is not a project's (bbvm-NAME on a /24)\n")
+            job.say("refused: the network is not a space's (bbvm-NAME on a /24)\n")
             return False
         if subprocess.run(VIRSH + ["net-info", net], capture_output=True, check=False, **who).returncode != 0:
             with tempfile.NamedTemporaryFile("w", suffix=".xml", dir=VM_DIR, delete=False) as f:
@@ -702,7 +702,7 @@ class VmsMixin:
                 and all(1 <= g <= MAX_DISK_GB for g in extra_gb)
                 and (not iso or ISO_RE.fullmatch(iso)) and (not mac or MAC_RE.fullmatch(mac))
                 and (not vnc_pw or VNC_PW_RE.fullmatch(vnc_pw))):
-            job.say("refused: the VM's project, account, keys, size, disks, ISO, address or console password are not what a VM takes\n")
+            job.say("refused: the VM's space, account, keys, size, disks, ISO, address or console password are not what a VM takes\n")
             return "failed", 64
         if self._vm_exists(name, who):
             job.say(f"refused: {name} is there already\n")

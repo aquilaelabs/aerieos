@@ -375,7 +375,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if ho != bool(self.state.get("host_only")):
                 self.state["host_only"] = ho
                 save_state(self.state)
-                log("hosting only: containers, and nothing of a project or a session" if ho
+                log("hosting only: containers, and nothing of a space or a session" if ho
                     else "no longer hosting only")
                 if ho:
                     self.session_stop()

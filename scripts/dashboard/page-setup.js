@@ -100,7 +100,7 @@ function drawSetup(){
   el.innerHTML = `<div class="setuppage">
     <div class="setuphead">
       <h2>Set up AerieOS</h2>
-      <p>AerieOS works on nodes: machines you enroll, where projects are kept, built and worked on. One is all it needs to start.</p>
+      <p>AerieOS works on nodes: machines you enroll, where spaces are kept, built and worked on. One is all it needs to start.</p>
       <div class="setwalkask"><span class="grow">Moving a controller or an old system here?</span><button type="button" data-setwalk="move">Walk me through it</button></div>
     </div>
     ${s.own ? card(1, "This machine", !!s.node, !s.node, s.node
@@ -128,15 +128,15 @@ function drawSetup(){
            <div class="setrow col ctlrow">${lbl("setEmail", "Your email")}<input id="setEmail" type="email" autocomplete="email" placeholder="ada@example.com"></div></div>`,
       s.git ? "" : `<button type="button" class="primary" data-setgit disabled>Save</button>`)}
     ${card(next++, "Claude Code on your node", !!s.claude, false, s.claude
-      ? `<p>${esc(s.claude)} on ${nodeName}. A project's Start agent signs you in there the first time.</p>`
+      ? `<p>${esc(s.claude)} on ${nodeName}. A space's Start agent signs you in there the first time.</p>`
       : s.node
       ? `<p>What a Claude session on ${nodeName} runs. It installs as a job on the node, a minute or two.</p>`
       : `<p>What a Claude session runs, installed on the node.</p><div class="sub bad setwhy">Once your node answers.</div>`,
       s.claude ? "" : `<button type="button" class="primary" data-setclaude${s.node ? "" : " disabled"}>Install</button>`)}
-    ${card(next++, "A first project", s.project, false, s.project
-      ? `<p>The Projects page holds it, and every one after it.</p>`
-      : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the projects have a place, in step 3.</div>`}`,
-      s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New project</button>`)}
+    ${card(next++, "A first space", s.project, false, s.project
+      ? `<p>The Spaces page holds it, and every one after it.</p>`
+      : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the spaces have a place, in step 3.</div>`}`,
+      s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New space</button>`)}
     <div class="setfinish">
       <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
@@ -254,18 +254,18 @@ function setupPlaceCard(num, s, moving){
     : "Nothing to pick yet: the step before gives this one its disks.");
   const roOnly = adopted && !had.writable && !(had.mounts || []).some(m => !m.ro);
   const moved = (n?.jobs || []).some(j => j.apply === "system-pool");
-  if (!moving && !old) return setupCard(num, "Where the projects and containers go", placed, moved || (!!stick.pool && !placed),
-    placed ? `<p>Docker, the VMs, the toolchains and your projects live on <b>${esc(stick.pool || stick.projects)}</b>, not on the stick.</p>`
+  if (!moving && !old) return setupCard(num, "Where the spaces and containers go", placed, moved || (!!stick.pool && !placed),
+    placed ? `<p>Docker, the VMs, the toolchains and your spaces live on <b>${esc(stick.pool || stick.projects)}</b>, not on the stick.</p>`
     : moved ? `<p>Moving them to the pool. Docker and the VMs are stopped until it ends.</p>`
     : `<p>They write all day, so they live on a pool and never on the stick. This is done by itself when your first pool is made.</p>${
        (n?.reported?.pools || []).length ? pick : ""}`);
-  return setupCard(num, "Where the projects and containers go", placed, false,
+  return setupCard(num, "Where the spaces and containers go", placed, false,
     `<p>They write all day, so they live on the disks and never on the stick. There are two choices here.</p>
      ${factGrid([["System pool", `where Docker, the VMs and the toolchains write: ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}`],
-                 ["Projects folder", `only if your projects already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
-     <p>${moving ? "The Projects page stays empty until the controller lands: its list comes with the move. " : ""}Where they are now:</p>
+                 ["Spaces folder", `only if your spaces already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
+     <p>${moving ? "The Spaces page stays empty until the controller lands: its list comes with the move. " : ""}Where they are now:</p>
      ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
-                 ["The projects", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
+                 ["The spaces", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
                   {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
      ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
      ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`);
@@ -374,7 +374,7 @@ function setupWalkHtml(s){
                  ["This build", `${state?.image?.version || "unstamped"}. A move never lands on a build older than the one that packed it, so update here first if the old controller is newer`]], "stickfacts")}
      ${old ? `<p>If the old controller ran on this machine it is off now: its address does not answer, so the bundle is the only way. Prepare to move left one in the move folder of its config folder, on these disks, with what it held at that moment.</p>`
            : `<p>While the old controller still runs, its address is enough: the bundle is pulled from it, packed at that moment. If it is off, the bundle is the only way.</p>`}
-     <p>If your projects are already on disks this machine holds, leave the repositories unticked when you prepare: they are found where they are. Otherwise tick them, and they come with the bundle.</p>
+     <p>If your spaces are already on disks this machine holds, leave the repositories unticked when you prepare: they are found where they are. Otherwise tick them, and they come with the bundle.</p>
      <p>Missing either one? ${old ? esc(setupBootBack(had)) : "Open the old controller."} Make them there, then come back.</p>
      ${old ? `<p>Not moving a controller, only the disks? Leave the controller step and press Finish at the foot of this page.</p>` : ""}`,
     "", "read first"));
@@ -383,13 +383,13 @@ function setupWalkHtml(s){
     : `<p>Its agent is coming up. The steps below need it, and this turns to done by itself.</p>`));
   const parts = n && (plan || had?.mounts?.length) ? adoptParts(n) : null;
   if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
-    `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your projects are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the projects folder.</p>`}${parts.body}`));
+    `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick) cards.push(setupPlaceCard(++i, s, true));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
-    : `<p>The moved controller's accounts, nodes, projects and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed)}`;
+    : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
   cards.push(setupCard(++i, "After it lands", false, false,
     `${factGrid([["Sign in", "with an account the old controller had"],
@@ -397,7 +397,7 @@ function setupWalkHtml(s){
                  ...(state?.firstboot?.apps_from ? [["Containers and VMs", "This machine reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
                  ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
-  cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the projects folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
+  cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
        <pre class="setcmd">bash ${esc(stick.projects)}/.aerieos-give-back.sh</pre>` : ""}
      <p>${old ? esc(setupBootBack(had)) : "Nothing here has touched the old controller."}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home. Once a move has landed the old controller stays read-only for good, and going back is another move.</p>`, "", "any time"));
   return `<div class="setuppage">
@@ -494,7 +494,7 @@ function setupDiskPlan(disks, {lose = 1, layout = ""} = {}){
     const flay = fastSrc.length >= 2 && fsame ? "mirror" : "single";
     out.fast = {kind: "zfs", layout: flay, disks: fastSrc.map(d => d.name), usable_mb: flay === "mirror" ? Math.min(...fastSrc.map(d => d.size_mb || 0)) : fastSrc.reduce((a, d) => a + (d.size_mb || 0), 0),
                 may_fail: flay === "mirror" ? fastSrc.length - 1 : 0,
-                why: "Your SSDs are a fast pool of their own for apps, VMs and projects, never a cache"
+                why: "Your SSDs are a fast pool of their own for apps, VMs and spaces, never a cache"
                   + (flay === "single" ? ": with one SSD it is backed up to the main pool nightly." : ".")};
   }
   return out;

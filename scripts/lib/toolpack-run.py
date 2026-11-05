@@ -32,7 +32,7 @@ if name == "--list":
         # One this project's settings switch off is said so here, where a
         # session looks first, not only when it is run.
         print(f"  aerie tool {p['name']} {'|'.join(sorted(p.get('verbs') or {}))} ..."
-              + ("   (switched off for this project: its settings' Toolchains group turns it on)" if p["name"] in off else ""))
+              + ("   (switched off for this space: its settings' Toolchains group turns it on)" if p["name"] in off else ""))
     raise SystemExit(0)
 row = next((p for p in sdkmeta.catalog() if p.get("name") == name), None)
 if not row or not row.get("pack"):
@@ -55,7 +55,7 @@ if not rest or rest[0] in ("-h", "--help"):
     raise SystemExit(0)
 verb, args = rest[0], rest[1:]
 if name in os.environ.get("BB_TOOLCHAINS_OFF", "").split():
-    die(f"{name} is switched off for this project: its settings' Toolchains group turns it on")
+    die(f"{name} is switched off for this space: its settings' Toolchains group turns it on")
 spec = verbs.get(verb)
 if not spec:
     die(f"{name} has no verb {verb}: " + ", ".join(sorted(verbs)) + f" (aerie tool {name})")

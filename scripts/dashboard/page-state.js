@@ -22,7 +22,7 @@
 // A new layout opens on the projects, with the controller's shell beside
 // them: the shell first was a raw prompt for a newcomer, and on a setup
 // whose work runs on nodes, one that could not even start (R119, 4 Oct).
-let tabs = [{id:"pj", kind:"projects", arg:"__projects", label:"Projects"},
+let tabs = [{id:"pj", kind:"projects", arg:"__projects", label:"Spaces"},
             {id:"ws", kind:"term", arg:"shell", label:"sh: workspace"}];
 // The windows terminals were popped out into (R8), by tab id: this browser's
 // own handles, which is the only way a page can know a popped window still
@@ -110,7 +110,7 @@ const myTmux = s => (state?.tmux_prefix || "") + s;
 // are off and the server refuses them; it is a seatbelt against editing the
 // wrong project, not a wall, because an administrator has a shell.
 const notMine = p => p.mine === false;
-const NOT_MINE_WHY = "read-only: you hold no role on this project; its owner or an "
+const NOT_MINE_WHY = "read-only: you hold no role on this space; its owner or an "
   + "administrator gives you one to work on it";
 // Why this account may not change a project, or "" (B86): not taken on, or
 // a role that gives Projects Read and not Write, as the server words it on

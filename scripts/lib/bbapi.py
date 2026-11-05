@@ -50,7 +50,7 @@ def keep_token(tok):
         raw = tok[len("bbs_"):]
         project = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode().split("|")[0]
         if not project or "/" in project:
-            return "the token names no project"
+            return "the token names no space"
         home = os.environ.get("HOME", "")
         d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
             or f"/tmp/bb-scope-{os.getuid()}"

@@ -52,7 +52,7 @@ if sub == "add":
               "reproduces": got.get("reproduces", "")})
     fail(d)
     print(f"[builderbot] reported #{d['id']}: it is in AerieOS's diagnostics now, not this "
-          "project's tracker, and nothing more is needed from this session")
+          "space's tracker, and nothing more is needed from this session")
 else:
     if not args:
         sys.exit("usage: aerie report conversation N")

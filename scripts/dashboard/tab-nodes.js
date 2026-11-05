@@ -456,7 +456,7 @@ function nodeSyncRow(n){
   if ((conf.workspace || "sync") !== "sync"){
     const c = n.reported?.sync_clean || {};
     const done = conf.clean && c.token === conf.clean;
-    return `<div class="sub">This node holds no projects, so no session starts here${
+    return `<div class="sub">This node holds no spaces, so no session starts here${
       !conf.clean ? "." : !done ? "; its copies are being removed." : c.error
         ? `; its copies could not all be removed: <span class="bad">${esc(c.error)}</span>`
         : `; its copies were removed, ${esc(gb(Math.round((c.freed || 0) / 1048576)))} freed.`}</div>
@@ -858,7 +858,7 @@ function nodeDoorRow(n){
   // project's (the operator, 18 Oct, asked whether each project needed one).
   return `<div class="field nddoor">
       <div class="sub">The SSH door lets you into this machine itself, as <code>${esc(n.config?.user || "bb")}</code>; ${
-        d.kind === "cloudflared" ? "Cloudflare Access decides who reaches it" : "the tailnet's ACLs decide who reaches it"}. The projects it hosts need none of their own.</div>
+        d.kind === "cloudflared" ? "Cloudflare Access decides who reaches it" : "the tailnet's ACLs decide who reaches it"}. The spaces it hosts need none of their own.</div>
       ${known && d.installed ? `<div class="actbar"><span class="sp"></span><button type="button" data-nd="door" data-on="${d.active ? "0" : "1"}" ${n.live ? "" : "disabled"}>${d.active ? "Shut the door" : "Open the door"}</button></div>` : ""}
       ${known && d.installed && d.active ? (d.kind === "cloudflared" ? nodeDoorConfig(n, d) : `<pre class="ndcmd">${cmd}</pre>`) : ""}
     </div>`;
@@ -867,12 +867,12 @@ function nodeDoorRow(n){
 function nodeHostRow(n){
   if (n.kind !== "agent") return "";
   return n.config?.host_only
-    ? `<div class="sub">It hosts containers only: no project lists it, no session or synced copy runs here,
+    ? `<div class="sub">It hosts containers only: no space lists it, no session or synced copy runs here,
         and its agent may ask the controller for nothing but its own jobs, an image shipped to it
         and a container's data in a copy or a move.</div>
        ${n.config?.tunnel?.kind === "public"
          ? `<div class="sub dim ndhostfixed">It reaches the controller through a public hostname, so it stays hosting only.</div>`
-         : `<div><button type="button" data-nd="host-off">Let projects use it again</button></div>`}`
+         : `<div><button type="button" data-nd="host-off">Let spaces use it again</button></div>`}`
     : `<div class="sub dim">A node that only runs containers sent to it (a web-facing one) can be made
         hosting only: no code, no sessions, and nothing of it comes back but its own jobs.</div>
        <div><button type="button" data-nd="host-only" ${n.live ? "" : "disabled"}>Make it hosting only</button></div>`;
@@ -918,7 +918,7 @@ function openUnenroll(n){
   body.innerHTML = clean ? `<div class="field">
       <div class="hint">Are you sure? AerieOS is uninstalled from ${esc(n.name)}, then the node is removed here. Its job account is <code>${esc(n.config?.user || "bb")}</code>.</div>
       ${unenrollWhat(false)}
-      <label class="ndcap"><input type="checkbox" id="ndUnStores"> Also delete the stores on its disk: the toolchains, the caches, the artifacts, dev instance data, and the synced project copies</label>
+      <label class="ndcap"><input type="checkbox" id="ndUnStores"> Also delete the stores on its disk: the toolchains, the caches, the artifacts, dev instance data, and the synced space copies</label>
       <label class="ndcap"><input type="checkbox" id="ndUnConf"> Also undo what was set up from the dashboard after enrolling: the mounts and their fstab lines, the runners, the GPU display</label>
       <label class="ndcap"><input type="checkbox" id="ndUnDoors"${host ? " checked" : ""}> Also shut what it was given as a host: the SSH door with its token, the port 22 rule, and the nginx container</label>
     </div>
@@ -961,7 +961,7 @@ function nodeProjectsSection(n){
       <div class="grow"><div class="name"><button type="button" class="namelink" data-ndopen="${esc(p.name)}" title="open its notebook">${esc(projLabel(p.name))}</button>${
           primary ? ` <span class="dim">· primary</span>` : ""}</div>
         ${sync ? `<div class="sub">${sync}</div>` : ""}
-        ${p.mine ? "" : `<div class="sub dim">Not one of your repositories: add yourself to its project to change its nodes.</div>`}</div>
+        ${p.mine ? "" : `<div class="sub dim">Not one of your repositories: add yourself to its space to change its nodes.</div>`}</div>
       ${p.mine ? `<button type="button" data-ndproj="${esc(p.name)}" title="its nodes are set in its settings, under where it builds, tests and runs">Settings</button>` : ""}
     </div>`;
   }).join("");
@@ -972,7 +972,7 @@ function nodeProjectsSection(n){
   // The sentence and the button on one line: copies you cannot see may still
   // be here, so the button stands whether or not any row does.
   const body = rows ? `${rows}${stop ? `<div class="field"><div class="actbar"><span class="sp"></span>${stop}</div></div>` : ""}`
-    : `<div class="field"><div class="actbar"><span class="grow sub">No repository you can see is on this node. A project's settings add one.</span>${stop}</div></div>`;
+    : `<div class="field"><div class="actbar"><span class="grow sub">No repository you can see is on this node. A space's settings add one.</span>${stop}</div></div>`;
   return docSection("nodes", "projects", ndTitle("projects"), list.length ? `${list.length}` : "none", body);
 }
 
@@ -996,7 +996,7 @@ function nodeSessionsSection(n){
     // The coding agents here, each with its version (the operator, 23 Oct:
     // their own section said less than this line, and said it apart).
     ["Coding agents", ready ? (nodeAgentsHere(n).map(a => `${a.product} ${a.version}`).join(", ") || "none installed yet") : ""],
-    ["Each session", ready && iso ? (iso.sessions ? "sees only its own project" : "can read other projects") : ""],
+    ["Each session", ready && iso ? (iso.sessions ? "sees only its own space" : "can read other spaces") : ""],
     ["Open now", ready && list.length ? list.map(x => x.name).join(", ") : ""],
     ["Reaches the controller", reach],
     ["SSH door", door],
@@ -1014,7 +1014,7 @@ function nodeSessionsSection(n){
   } else {
     const shared = !!iso && !iso.sessions;
     if (!se.boot) notes.push(["the agent could not read this machine's boot id, which a terminal here is checked against", "bad"]);
-    if (shared) notes.push([`Sessions here can read each other's projects: ${iso.why || "this machine cannot build a session's view"}.`, "warn"]);
+    if (shared) notes.push([`Sessions here can read each other's spaces: ${iso.why || "this machine cannot build a session's view"}.`, "warn"]);
     [status, cls] = !se.boot ? ["blocked", "bad"]
       : [`${list.length ? `${list.length} open` : "ready"}${shared ? ", not isolated" : ""}`, shared ? "warn" : "ok"];
   }
@@ -1098,7 +1098,7 @@ function nodeHostRootRow(n){
   }
   return `<div class="field">
     <label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
-      let a session of a project that hosts containers here ask for a root command (aerie root run --node ${esc(n.name)}), which a person then allows or denies</label>
+      let a session of a space that hosts containers here ask for a root command (aerie root run --node ${esc(n.name)}), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
   </div>`;
 }
@@ -1159,7 +1159,7 @@ function nodeSessNetRow(n){
       ? ""
     : on && !sn.can ? `<div class="sub bad">Not in force: ${esc(sn.why || "this node cannot do it")}.</div>`
     : on && sn.error ? `<div class="sub bad">Not in force, so no session starts here until it is: ${esc(sn.error)}.</div>`
-    : on && sn.active ? `<div class="sub">Sessions started here reach the internet, the controller and their own project's containers at this node's address, and nothing else.</div>`
+    : on && sn.active ? `<div class="sub">Sessions started here reach the internet, the controller and their own space's containers at this node's address, and nothing else.</div>`
     : on ? `<div class="sub dim">Setting it up.</div>`
     : sn.sessions ? `<div class="sub dim">${sn.sessions} session${sn.sessions === 1 ? "" : "s"} started while it was on keep their own network until they end.</div>`
     : "";
@@ -1167,7 +1167,7 @@ function nodeSessNetRow(n){
   // what keeps a session there off the controller's own ports; said on the
   // row, muted, rather than a box that refuses at Save.
   const own = !!n.config?.own;
-  return `<div class="field"><div class="sub">Each session here is kept to its own project's network${
+  return `<div class="field"><div class="sub">Each session here is kept to its own space's network${
       own ? ", which is what keeps one off the controller's own ports" : ""}.</div>
     ${line}</div>
     <div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
@@ -1246,7 +1246,7 @@ function nodeAdvancedSection(n, stale, inflight){
       <div class="sub">${say}</div></div><div class="acts actbar">${btn}</div></div>`;
   const body = `
     <div class="ndname actbar ctlrow">
-      <div class="setrow col grow ctlrow">${lbl("", "Name in AerieOS", "its name in the pickers, on the project cards and as a runner label; its name on the network is under Name and time")}
+      <div class="setrow col grow ctlrow">${lbl("", "Name in AerieOS", "its name in the pickers, on the space cards and as a runner label; its name on the network is under Name and time")}
       <input data-k="name" value="${esc(c.draft.nameText)}" spellcheck="false" autocomplete="off"
         maxlength="60" aria-label="node name"></div>
       <button type="button" data-nd="rename"${!String(c.draft.nameText || "").trim() || String(c.draft.nameText).trim() === n.name ? " disabled" : ""}
@@ -1273,7 +1273,7 @@ function nodeAdvancedSection(n, stale, inflight){
     ${n.kind !== "agent" || !n.reported?.stores?.toolchains ? "" : act("Version check",
         "How often the Library asks what is newer for what this node holds; Check for updates on the Library asks at once.",
         `<select data-ndcheck aria-label="version check">${optionList([["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off"]], n.config?.check_versions || "weekly")}</select>`)}
-    ${act("Clear cache", stale ? esc(staleWhy(n)) : "Drops every project's build cache here; the next build fetches again.",
+    ${act("Clear cache", stale ? esc(staleWhy(n)) : "Drops every space's build cache here; the next build fetches again.",
         `<button type="button" data-nd="cache-clear" ${stale || inflight("cache-clear") ? "disabled" : ""}>${inflight("cache-clear") ? "Clearing…" : "Clear cache"}</button>`)}
     ${act(n.state === "disabled" ? "Enable" : "Disable",
         n.state === "disabled" ? "Disabled: off every picker and handed no work or session. Enable offers it again." : "Keeps it enrolled and configured, but off every picker and handed no work or session until Enable.",
@@ -1539,7 +1539,7 @@ function nodeConfSections(n){
   }).join("");
   const STORE_ABOUT = {
     data: "job workspaces and AVDs", toolchains: "toolchains installed here",
-    cache: "build caches, per project", artifacts: "what projects built, per project",
+    cache: "build caches, per space", artifacts: "what spaces built, per space",
   };
   const stores = ["data", "toolchains", "cache", "artifacts"].map(role => {
     const r = rep.stores?.[role];

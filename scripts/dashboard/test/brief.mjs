@@ -29,7 +29,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
 }, [path, body]);
 const made = await api('/api/create', { name: 'briefly', mode: 'init', about: BRIEF, version: '' });
 const made2 = await api('/api/create', { name: 'briefless', mode: 'init', about: 'set this aside', version: '' });
-ok(made.ok && made2.ok, `two projects made with a brief (${made.error || made2.error || 'ok'})`);
+ok(made.ok && made2.ok, `two spaces made with a brief (${made.error || made2.error || 'ok'})`);
 await refreshUntil(page, () => state?.projects?.find(p => p.name === 'briefless')?.brief === true, { timeout: 20000 });
 const tabsFor = name => page.evaluate(n => tabs.filter(t => t.kind === 'term' && t.arg.startsWith('claude:' + n)).length, name);
 
@@ -94,7 +94,7 @@ const said = execFileSync('bash', [`${REPO}/scripts/aerie`, 'brief'], { encoding
   env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: base, BB_TOKEN: tok, BB_PROJECT: 'briefly',
          XDG_CACHE_HOME: `${DIR}/cache-brief` } });
 ok(/was started from this brief, sent to the first session/.test(said) && said.includes('Added in the dialog.'),
-   `aerie brief prints the brief the project was started from (${said.split('\n')[0].slice(0, 80)})`);
+   `aerie brief prints the brief the space was started from (${said.split('\n')[0].slice(0, 80)})`);
 await refreshUntil(page, () => state?.projects?.find(p => p.name === 'briefly')?.brief === false, { timeout: 20000 });
 await page.evaluate(() => { tabs.filter(t => t.arg?.startsWith('claude:briefly')).forEach(t => dropTab(t.id)); });
 await page.evaluate(() => startClaude('briefly', null, ''));

@@ -279,7 +279,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
     await page.waitForSelector('.pgrid .pcard', { timeout: 15000 }).catch(() => {});
     const got = await page.evaluate(cards);
     ok(tpl.length && got.length && JSON.stringify(tpl) === JSON.stringify(got),
-       `a reload on the Projects page waits as its cards ${where} (template ${JSON.stringify(tpl)}, page ${JSON.stringify(got)})`);
+       `a reload on the Spaces page waits as its cards ${where} (template ${JSON.stringify(tpl)}, page ${JSON.stringify(got)})`);
   }
   await page.close();
 }

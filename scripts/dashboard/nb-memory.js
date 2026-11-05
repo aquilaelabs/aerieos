@@ -161,7 +161,7 @@ function nbMemoryView({$, nb}){
     </details>`).join("")
       // Said in the list, where every other view says it, rather than by
       // hiding the list and leaving a heading over nothing.
-      || `<div class="empty">none yet: sessions write these as they learn the project; Write a memory adds one by hand</div>`;
+      || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`;
     paginate($("memList"), ":scope > .mem", {noun: "memories"});
     // The fold, driven rather than left to the browser's instant one: the same
     // height tween every fold uses (slideDetails), so a memory opens the way a

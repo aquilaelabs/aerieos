@@ -276,7 +276,7 @@ elif op == "add":
             if rep.get(k) and not flags.get(k):
                 flags[k] = rep[k]
         flags["notes"] = "\n\n".join(x for x in (
-            f"From diagnostics report #{want}: {rep.get('project') or 'no project'}"
+            f"From diagnostics report #{want}: {rep.get('project') or 'no space'}"
             + (f", {rep['by']}'s session" if rep.get("by") else "")
             + (f" on {rep['node']}" if rep.get("node") else "")
             + (f", build {rep['build']}" if rep.get("build") else "")
@@ -393,7 +393,7 @@ elif op == "pending":
         tag = B(r["number"]) if r.get("number") is not None else ""
         lead = "  ↳ " if r.get("after") is not None else "  "
         print(f"{lead}{when}  {tag:<5} {r.get('summary', '')}")
-    print(f"  (this project's setting for new bug reports from a session: "
+    print(f"  (this space's setting for new bug reports from a session: "
           f"{pending.mode(proj, 'bugs')})")
 elif op in ("history", "log"):
     # The same filters `aerie roadmap history` takes, because whoever learned one

@@ -94,7 +94,7 @@ class Ship(unittest.TestCase):
         self.assertEqual(self.q.jobs[r["job"]]["node"], "n1", "built on the owner's node, not the container's own name's")
         b = devactions._ship_build_spec("web", "main", "j_9")
         argv = " ".join(b["plan"][0]["argv"])
-        self.assertNotIn(str(self.ws / "web"), argv, "no tree of its own is named as the project directory")
+        self.assertNotIn(str(self.ws / "web"), argv, "no tree of its own is named as the space directory")
         self.assertIn("web", argv[argv.index("--project-directory"):], "its own data directory is")
 
     def test_only_on_purpose(self):
@@ -107,7 +107,7 @@ class Ship(unittest.TestCase):
         self.assertTrue(devactions.shipped("alpha", r["instance"]))
         own = devapp.create_instance("alpha", "own", "n1", ship=True)
         self.assertFalse(devapp._read_rec("alpha", own["instance"]).get("ship"),
-                         "one of the project's own nodes builds there, and ships nothing")
+                         "one of the space's own nodes builds there, and ships nothing")
 
     def test_the_two_plans(self):
         inst = self.make()["instance"]
@@ -166,7 +166,7 @@ class Ship(unittest.TestCase):
         self.make()
         own = devapp.session_net_own("n1")
         self.assertIn(("10.0.0.2", 8080), [tuple(x) for x in own["alpha"]["peers"]],
-                      "a session on the project's node reaches the shipped container's published port")
+                      "a session on the space's node reaches the shipped container's published port")
 
     def test_a_hosting_only_node_is_never_opened_whole(self):
         # It says it is no sandbox, which would open its whole address: a

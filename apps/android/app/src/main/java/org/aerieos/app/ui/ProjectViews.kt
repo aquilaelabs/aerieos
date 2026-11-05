@@ -198,7 +198,7 @@ fun DesignView(api: Api, project: String) {
             Column(Modifier.padding(16.dp, 8.dp)) {
                 if (ds.error != null) Problem(ds.error)
                 if (d != null && themes.isEmpty() && pages.isEmpty() && rules.isEmpty())
-                    Dim("nothing designed yet: a session that builds this project chooses the look and puts it here, or it is laid out on the dashboard's Design view")
+                    Dim("nothing designed yet: a session that builds this space chooses the look and puts it here, or it is laid out on the dashboard's Design view")
                 if (lang != null && (themes.isNotEmpty() || pages.isNotEmpty() || rules.isNotEmpty())) {
                     // A choice nobody has made is left out: a design starts with none.
                     val made = listOf(lang.str("font"), lang.str("corners").let { if (it.isBlank()) "" else "$it corners" },
@@ -281,7 +281,7 @@ fun DockerView(api: Api, project: String) {
         AlertDialog(onDismissRequest = { ask = null },
             title = { Text(when (action) { "up" -> "Start"; "down" -> "Stop"; else -> "Rebuild" } + " ${row.str("name")}?") },
             text = { Text(when (action) {
-                "rebuild" -> "It is built from the project's compose file on its node and started. That takes minutes, and what runs there now stops for it."
+                "rebuild" -> "It is built from the space's compose file on its node and started. That takes minutes, and what runs there now stops for it."
                 "down" -> "Its containers stop. Their data stays."
                 else -> "Its containers start as they were last built."
             }) },
@@ -312,7 +312,7 @@ fun DockerView(api: Api, project: String) {
                 if (busy && job != null) Mono((job.str("step").ifBlank { "working" }) + " " + job.str("name"))
                 if (job != null && job.str("error").isNotBlank()) Text(job.str("error"), color = Bad)
                 if (dk.value != null && rows.isEmpty())
-                    Dim("no container belongs to this project: a compose file at its root and Send to Docker on the dashboard make one")
+                    Dim("no container belongs to this space: a compose file at its root and Send to Docker on the dashboard make one")
             }
         }
         items(rows) { r ->
@@ -360,7 +360,7 @@ fun TestsView(api: Api, project: String) {
             Column(Modifier.padding(16.dp, 8.dp)) {
                 if (ts.error != null) Problem(ts.error)
                 if (t != null && t.int("n") == 0)
-                    Dim("no tests on record: a run on the project's node, read in with aerie tests ingest, lists them here")
+                    Dim("no tests on record: a run on the space's node, read in with aerie tests ingest, lists them here")
                 if (t != null && t.int("n") > 0) {
                     Text("${t.int("n")} tests", color = Ink, fontWeight = FontWeight.SemiBold)
                     Dim(listOf("${secs(t.int("total_ms"))} measured",

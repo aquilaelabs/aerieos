@@ -1,5 +1,5 @@
 {
- "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the projects you allow: each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
+ "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the spaces you allow: each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
  "config": [
   {
    "help": "Anthropic's API key, written into the router's compose file on this node and never into a session's view",
@@ -62,9 +62,9 @@
    "name": "ollama"
   },
   {
-   "help": "each handed the address and its own key at a session's start; a session of any other project cannot reach it",
+   "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it",
    "kind": "projects",
-   "label": "Projects that may use it",
+   "label": "Spaces that may use it",
    "name": "projects"
   }
  ],

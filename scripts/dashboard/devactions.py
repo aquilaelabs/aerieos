@@ -1278,7 +1278,7 @@ def test(project, instance=devapp.MAIN, cmd="", args=()):
     cmd = str(cmd or "").strip()
     if not cmd:
         return {"error": f"no test command is set for {project}: aerie settings set test "
-                         "'...' fills it in, or the operator does on the project's "
+                         "'...' fills it in, or the operator does on the space's "
                          "notebook Settings (Build and test)"}
     bad = [a for a in args if not _ARG.fullmatch(str(a))]
     if bad:

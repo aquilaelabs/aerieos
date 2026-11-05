@@ -85,9 +85,9 @@ class Clients(unittest.TestCase):
         self.assertLess(r.stdout.index("v0.7.0"), r.stdout.index("v0.6.9"), "newest first")
 
     def test_status_of_one_tag_and_what_would_stop_one(self):
-        ANSWER["release"] = (200, {"release": status()["release"] | {"why": "the project has no sideload key"}})
+        ANSWER["release"] = (200, {"release": status()["release"] | {"why": "the space has no sideload key"}})
         r = self.sign("--status", "", "", "v0.7.0")
-        self.assertIn("NOT READY: the project has no sideload key", r.stdout)
+        self.assertIn("NOT READY: the space has no sideload key", r.stdout)
         self.assertIn("v0.7.0: signed", r.stdout)
         self.assertNotIn("v0.6.9", r.stdout)
         r = self.sign("--status", "", "", "v9.9.9")

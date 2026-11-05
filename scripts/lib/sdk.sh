@@ -243,7 +243,7 @@ sdk_status() {
         # honest list is empty rather than this container's own store,
         # which holds the browsers its boot put there and is --local's.
         if [ -z "$node" ]; then
-            log "this project has no node: toolchains are installed on a node (the Nodes page), and a project with none cannot compile here"
+            log "this space has no node: toolchains are installed on a node (the Nodes page), and a space with none cannot compile here"
             log "aerie toolchains --local lists this container's own store: what its boot keeps for aerie capture shot, nothing to install"
             return 0
         fi

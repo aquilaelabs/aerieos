@@ -39,7 +39,7 @@ await api('/api/prefs', { project: 'alpha', node: sandbox.id });
 ok((await api('/api/phone', { action: 'ask', kind: 'root', why: '', cmd: ['id'], project: 'alpha' })).body.error,
    'a root ask with no reason is refused: Allow on an unexplained root command is a guess');
 ok(/has no node/.test((await api('/api/phone', { action: 'ask', kind: 'root', why: 'look', cmd: ['id'], project: 'beta' })).body.error || ''),
-   'a project with no node has no machine to ask for root on, and is told so');
+   'a space with no node has no machine to ask for root on, and is told so');
 ok((await api('/api/phone', { action: 'ask', kind: 'root', why: 'look', cmd: [], project: 'alpha' })).body.error,
    '...and an ask with nothing to run is refused');
 ok(/empty argument/.test((await api('/api/phone', { action: 'ask', kind: 'root', why: 'look', cmd: ['mv', 'a', ''], project: 'alpha' })).body.error || ''),
@@ -187,14 +187,14 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
      '...while any administrator can answer it');
   const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
   const sess = await api('/api/phone', { action: 'ask', kind: 'root', why: 'from a session', cmd: ['true'] }, alpha);
-  ok(sess.status === 200 && sess.body.id > 0, `a session token may ask for root on its project's node (${sess.status})`);
+  ok(sess.status === 200 && sess.body.id > 0, `a session token may ask for root on its space's node (${sess.status})`);
   const mine = (await api('/api/phone', undefined, alpha)).body.asks || [];
   ok(mine.some(a => a.id === sess.body.id) && !mine.some(a => a.project !== 'alpha'),
-     "...and reading the list from a session shows its own project's waiting requests and no other's, which is what aerie root prints");
+     "...and reading the list from a session shows its own space's waiting requests and no other's, which is what aerie root prints");
   ok((await api('/api/phone', { action: 'allow', id: sess.body.id }, alpha)).status === 403,
      '...but may not answer its own question');
   ok((await api('/api/phone', { action: 'outcome', id: sess.body.id }, beta)).body.error,
-     "...and another project's session cannot read its outcome");
+     "...and another space's session cannot read its outcome");
   await api('/api/phone', { action: 'deny', id: sess.body.id });
 }
 

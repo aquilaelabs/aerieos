@@ -248,7 +248,7 @@ def check_failed(project):
     _write_run(project, rec)
     fails = [ln.strip() for ln in (rec.get("fails") or out.splitlines()) if ln.lstrip().startswith("FAIL")][:8]
     return ("The house rules' checks that ran in the background when you last handed back "
-            "failed on that tree (bb-check-relay; this project's new asks cut a test run, so "
+            "failed on that tree (bb-check-relay; this space's new asks cut a test run, so "
             "the hand-back was not held for them). Fix what failed, or say plainly why it cannot "
             "pass:\n" + ("\n".join(fails) if fails else out.strip()[-800:]))
 

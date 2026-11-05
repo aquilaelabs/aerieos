@@ -42,7 +42,7 @@ class Storage(unittest.TestCase):
         a, b = got["projects"]["alpha"], got["projects"]["beta"]
         self.assertEqual((a["cache"], a["artifacts"], a["emulator"], a["workspace"], a["builds"]), (2, 1, 1, 1, 2))
         self.assertEqual((b["appdata"], b["builds"]), (3, 1))
-        self.assertNotIn("emu", got["projects"], "the data store's emu/ is a folder of projects, not one")
+        self.assertNotIn("emu", got["projects"], "the data store's emu/ is a folder of spaces, not one")
         self.assertGreaterEqual(got["stores"]["appdata"]["used_mb"], 3)
         self.assertEqual(agent.storage.last()["at"], got["at"])
         self.assertTrue(got["homes"]["mb"] >= 3)

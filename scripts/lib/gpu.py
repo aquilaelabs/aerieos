@@ -79,7 +79,7 @@ def may():
     """("" when this session may compute on the card, else why not)."""
     who = os.environ.get("BB_GPU", "on")
     if who == "project":
-        return "this project's settings say the node's GPU is not for it (The node's GPU)"
+        return "this space's settings say the node's GPU is not for it (The node's GPU)"
     if who == "node":
         return "this node's GPU is switched off for sessions and jobs (Nodes page, GPU)"
     return ""

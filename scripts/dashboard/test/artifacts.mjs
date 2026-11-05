@@ -170,7 +170,7 @@ const names = await page.$$eval('.artrow b', bs => bs.map(b => b.textContent));
   const two = await devNow();
   ok(/dev builds kept is a number of builds/.test(bad.error || '') && two.keep === 2
      && two.names.join() === 'alpha-1.2.0-dev.6-abcdef6-debug.apk,alpha-1.2.0-dev.7-abcdef7-debug.apk',
-     `the project's Dev builds kept says how many of each stay (2: ${two.names.join(', ')}), and a value that is not a count is refused`);
+     `the space's Dev builds kept says how many of each stay (2: ${two.names.join(', ')}), and a value that is not a count is refused`);
   await setKeep(0);
   const t2 = Math.floor(Date.now() / 1000);
   for (const n of [8, 9]){
@@ -188,7 +188,7 @@ ok(names.includes('streamlift-1.2.apk') && names.includes('companion-0.2.0.xpi')
    `dist/ is listed, subdirectories included (${names.join(', ')})`);
 ok(await page.$eval('#artBuild', e => !e.hidden && /No node/.test(e.textContent)
      && /Reading and editing the code needs no node/.test(e.textContent)),
-   'the tab says a project with no node cannot be compiled for, and what is left');
+   'the tab says a space with no node cannot be compiled for, and what is left');
 ok(!names.some(n => /provenance/.test(n)),
    '...and the provenance records beside them are not artifacts');
 ok(await page.$eval('#artList', e => /built by j_fixture1 on n_fixture from snapshot abababababab/.test(e.textContent)),
@@ -214,11 +214,11 @@ ok(acts.every(a => a.dl), '...and everything can be downloaded');
   const shipped = await page.$$eval('#artList .artrow b', bs => bs.map(b => b.textContent));
   ok(!shipped.some(n => /sheet\.png|shot-1\.png|loose\.png|frames\.json|^walk$/.test(n))
      && !(art.artifacts || []).some(a => /^dist\/(reel|emu)\//.test(a.path)),
-     `a reel's sheet and an emulator shot are not listed among what the project ships (${shipped.join(', ')})`);
+     `a reel's sheet and an emulator shot are not listed among what the space ships (${shipped.join(', ')})`);
   const ats = (art.captures || []).map(c => c.at);
   ok(capNames.length === 3 && ['shot-1.png', 'walk', 'loose.png'].every(n => capNames.includes(n))
      && ats.every((t, i) => !i || t <= ats[i - 1]) && art.capture_days === 7,
-     `...they are the captures, newest first, and the project keeps them 7 days (${capNames.join(', ')}; ${art.capture_days})`);
+     `...they are the captures, newest first, and the space keeps them 7 days (${capNames.join(', ')}; ${art.capture_days})`);
   ok(!existsSync(`${DIR}/ws/alpha/dist/reel/stale`),
      'the ten-day-old reel was swept on that read: by age, never by need');
   const walk = art.captures.find(c => c.name === 'walk'), loose = art.captures.find(c => c.name === 'loose.png');
@@ -342,9 +342,9 @@ import sys, zipfile
 print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))`, zipPath], { encoding: 'utf8' }).trim().split('\n');
   const head = execFileSync('cat', [hdrs], { encoding: 'utf8' });
   ok(/content-type: application\/zip/i.test(head) && /filename="alpha-source-[^"]+\.zip"/.test(head),
-     `it is a zip named for the project (${(head.match(/filename="[^"]+"/) || [''])[0]})`);
+     `it is a zip named for the space (${(head.match(/filename="[^"]+"/) || [''])[0]})`);
   ok(names.includes('alpha/README.md') && names.every(n => n.startsWith('alpha/')),
-     `the tree is inside one directory named for the project (${names.length} entries)`);
+     `the tree is inside one directory named for the space (${names.length} entries)`);
   ok(!names.some(n => n.startsWith('alpha/dist/') || n.startsWith('alpha/.git/')),
      '...with neither dist/ nor .git in it');
 }
@@ -356,7 +356,7 @@ page.errors = [];
 // The install and the push themselves, and the signature clash said in
 // words, are phone.mjs's, where a fixture node holds the phone.
 ok(await page.$eval('[data-artinstall]', b => b.disabled && /Phone page/.test(saidOf(b))),
-   'with no phone on the project\'s node, Install is ghosted and says where to connect one');
+   'with no phone on the space\'s node, Install is ghosted and says where to connect one');
 ok(await page.$eval('[data-artpush]', b => b.disabled && /Phone page/.test(saidOf(b))),
    'Push is there for the extension, ghosted for the same reason');
 const pushed = await page.evaluate(async () => {
@@ -378,7 +378,7 @@ const post = body => page.evaluate(async b => {
 for (const [what, body] of [
   ['pushing the APK, which is not an extension', { action: 'push', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' }],
   ['pushing a path outside dist/', { action: 'push', project: 'alpha', path: '../beta/x.xpi' }],
-  ['a project that does not exist', { action: 'push', project: 'nosuch', path: 'dist/a.xpi' }],
+  ['a space that does not exist', { action: 'push', project: 'nosuch', path: 'dist/a.xpi' }],
   ['an action nobody offers', { action: 'delete', project: 'alpha' }],
   ['installing the xpi, which is not an APK', { action: 'install', project: 'alpha', path: 'dist/companion-0.2.0.xpi' }],
   ['installing a path outside dist/', { action: 'install', project: 'alpha', path: '../beta/x.apk' }],
@@ -401,7 +401,7 @@ await nbGo(page, 'artifacts', '.pane .stack > .doc.on .nb');
 // dev builds) before them.
 await page.waitForFunction(() => [...document.querySelectorAll('.pane .nb [data-view="artifacts"] #artList .hint')]
   .some(h => /Nothing in dist\//.test(h.textContent)), null, { timeout: 15000 });
-ok(true, 'a project with no dist/ is told the convention, not shown a blank');
+ok(true, 'a space with no dist/ is told the convention, not shown a blank');
 
 // ---- a build on a branch, in an account's own worktree (B237) -------------
 // A second account's session builds in its worktree and its outputs land in

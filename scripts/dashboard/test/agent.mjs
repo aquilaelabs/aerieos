@@ -387,7 +387,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   // Whether a session there sees only its own project (R35), in the
   // helper's own answer: an agent that is not root cannot build a view.
   ok(n.reported.isolation && n.reported.isolation.sessions === false && /root/.test(n.reported.isolation.why || ''),
-     `...and says whether its sessions are kept to their own project, and why not (${JSON.stringify(n.reported.isolation)})`);
+     `...and says whether its sessions are kept to their own space, and why not (${JSON.stringify(n.reported.isolation)})`);
   // single use
   let again = '';
   try {
@@ -774,7 +774,7 @@ print(json.dumps({
            '/home/builder/users/u_0000abcd/.cache/builderbot/u/u_0000abcd/project/alpha/claude-run.sh', '--respawn']),
          `a respawn hands tmux the view's launcher line word by word, since one string with spaces is a program nobody has (${out.respawn.slice(4, 6).join(' ')})`);
       ok(out.iso.sessions === false && /root/.test(out.iso.why),
-         `an agent that is not root says its sessions are not kept to their project, and why (${out.iso.why})`);
+         `an agent that is not root says its sessions are not kept to their space, and why (${out.iso.why})`);
     }
     // Each session kept to its own project's network (R79). The halves that
     // need no root, driven directly: the resolvers a session's namespace can
@@ -879,11 +879,11 @@ print(json.dumps({
       ok(sn.ctrsys[1].some(p => p[0] === 'br-dddddddddddd' && p[1] === 'br-cccccccccccc')
          && sn.ctrsys[2].some(p => p[0] === 'br-dddddddddddd' && p[1] === 9000)
          && !sn.ctrsys[1].some(p => p[0] === 'br-aaaaaaaaaaaa' && p[1] === 'br-dddddddddddd'),
-         `a System-owned compose project reaches every bridge and port here, the stranger's included, and nobody reaches it back (${JSON.stringify(sn.ctrsys[1])})`);
+         `a System-owned compose space reaches every bridge and port here, the stranger's included, and nobody reaches it back (${JSON.stringify(sn.ctrsys[1])})`);
       ok(JSON.stringify(sn.ctr[0]) === JSON.stringify(['br-aaaaaaaaaaaa', 'br-bbbbbbbbbbbb', 'br-cccccccccccc'])
          && JSON.stringify(sn.ctr[1]) === JSON.stringify([['br-aaaaaaaaaaaa', 'br-aaaaaaaaaaaa'], ['br-aaaaaaaaaaaa', 'br-bbbbbbbbbbbb'], ['br-bbbbbbbbbbbb', 'br-bbbbbbbbbbbb'], ['br-cccccccccccc', 'br-cccccccccccc']])
          && JSON.stringify(sn.ctr[2]) === JSON.stringify([['br-aaaaaaaaaaaa', 5432], ['br-aaaaaaaaaaaa', 8080], ['br-bbbbbbbbbbbb', 5432], ['br-cccccccccccc', 9000]]),
-         `a project's containers reach their own bridge and ports and those of the projects it reads, a stranger its own alone (R178) (${JSON.stringify(sn.ctr)})`);
+         `a space's containers reach their own bridge and ports and those of the spaces it reads, a stranger its own alone (R178) (${JSON.stringify(sn.ctr)})`);
       ok(/add element inet builderbot_ctrnet pairs \{ "br-aaaaaaaaaaaa" \. "br-aaaaaaaaaaaa" \}/.test(sn.ctrfill) && /ownports \{ "br-aaaaaaaaaaaa" \. 8080 \}/.test(sn.ctrfill)
          && /typeof iifname \. oifname/.test(sn.ctrtable) && /tcp dport \{ 80, 443 \} accept/.test(sn.ctrtable) && /oifname @bridges drop/.test(sn.ctrtable),
          '...the sets are written as nft reads them, and the table drops a bridge to another bridge and lets the node\'s 80 and 443 through');
@@ -891,14 +891,14 @@ print(json.dumps({
          && /iifname @lanok accept\n\t\tip daddr @local reject/.test(sn.ctrtable) && !/lanok/.test(sn.ctrtable.split('chain input')[1]),
          `a container let onto the LAN passes the private ranges' reject on its own bridge alone, and gains nothing into the node (${JSON.stringify(sn.ctrlan[3])})`);
       ok(JSON.stringify(sn.pairs) === JSON.stringify([['10.231.0.2', '172.18.0.2'], ['10.231.0.2', '172.19.0.5'], ['10.231.0.6', '172.20.0.3']]),
-         `each session may reach its own project's containers, by compose project and by the name the operator gave, and no other (${JSON.stringify(sn.pairs)})`);
+         `each session may reach its own space's containers, by compose space and by the name the operator gave, and no other (${JSON.stringify(sn.pairs)})`);
       ok(/^flush set inet builderbot_sessnet ctl\nflush set inet builderbot_sessnet dns\nflush set inet builderbot_sessnet own\n/.test(sn.fill)
          && sn.fill.includes('add element inet builderbot_sessnet own { 10.231.0.2 . 172.18.0.2, 10.231.0.2 . 172.19.0.5, 10.231.0.6 . 172.20.0.3 }')
          && sn.fill.includes('ctl { 192.168.1.15 . 7680 }'),
          '...written as one transaction that replaces the sets whole, the controller and the resolvers with them');
       ok(JSON.stringify(sn.peers) === JSON.stringify([['10.231.0.2', '192.168.1.17', 8088], ['10.231.0.2', '192.168.1.17', 32400]])
          && JSON.stringify(sn.hosts) === JSON.stringify([['10.231.0.2', '192.168.1.40']]),
-         `a session reaches its project's published ports on the project's other nodes, and a Mac there whole; a bad address or port is dropped (${JSON.stringify(sn.peers)})`);
+         `a session reaches its space's published ports on the space's other nodes, and a Mac there whole; a bad address or port is dropped (${JSON.stringify(sn.peers)})`);
       ok(sn.fill.includes('add element inet builderbot_sessnet peers { 10.231.0.2 . 192.168.1.17 . 8088, 10.231.0.2 . 192.168.1.17 . 32400 }')
          && sn.fill.includes('add element inet builderbot_sessnet hosts { 10.231.0.2 . 192.168.1.40 }')
          && /@peers goto pass/.test(sn.table) && /ip saddr \. ip daddr @hosts goto pass/.test(sn.table)
@@ -910,7 +910,7 @@ print(json.dumps({
          && /iifname "bbs\*" reject/.test(sn.table) && /masquerade/.test(sn.table),
          '...the table lets through what the sets name before it refuses the rest that is not the internet, marks what it passes, and lets nothing start a connection into a session or at the node');
       ok(sn.live.length === 1 && sn.live[0].project === 'alpha',
-         `a session whose link is gone is over, and a file that names no real project is nobody's (${JSON.stringify(sn.live)})`);
+         `a session whose link is gone is over, and a file that names no real space is nobody's (${JSON.stringify(sn.live)})`);
       ok(sn.clash[0] === '' && /10\.231\.4\.1\/24 on virbr0/.test(sn.clash[1]) && /a route to 10\.0\.0\.0\/8 on tun0/.test(sn.clash[2]),
          `a node whose own network already uses the range is not offered it, and says which address or route (a VM bridge: ${sn.clash[1]}; a VPN: ${sn.clash[2]}), while a session's own link is no clash`);
       ok(/chain output \{[^}]*oifname "bbs\*" meta l4proto \{ tcp, udp \} ct state new reject/.test(sn.table),
@@ -1019,7 +1019,7 @@ print(json.dumps(sorted(os.listdir(d))))
   {
     const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha'],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-    ok(/^bbs_/.test(tok), `aerie users token mints a session token for a project (${tok.slice(0, 8)}…)`);
+    ok(/^bbs_/.test(tok), `aerie users token mints a session token for a space (${tok.slice(0, 8)}…)`);
     const relay = async (body, auth = 'Bearer ' + tok) => {
       const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
         headers: { Authorization: auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1040,11 +1040,11 @@ print(json.dumps(sorted(os.listdir(d))))
     ok((await relay({ argv: ['findings', '-a'], cwd: `${DIR}/ws/alpha` })).status === 403,
        '...by the short flag too, which is the same door');
     ok((await relay({ argv: ['findings'], cwd: `${DIR}/ws/alpha` })).status === 200,
-       '...while its own project\'s findings go through');
+       '...while its own space\'s findings go through');
 
     const listed = await relay({ argv: ['roadmap'] });
     ok(listed.code === 0 && /relayed from a node/.test(listed.out),
-       '...against the project the token was minted for, with no cwd sent at all');
+       '...against the space the token was minted for, with no cwd sent at all');
 
     // ---- renewal: a session in use never runs out ------------------------
     // A token lasts twelve hours and a working session ran past it overnight:
@@ -1071,7 +1071,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const fresh = raw.headers.get('x-bb-session') || '';
       ok(raw.status === 200 && /^bbs_/.test(fresh) && expOf(fresh) - expOf(short) > 6 * 3600
          && Buffer.from(fresh.slice(4), 'base64url').toString().startsWith('alpha|'),
-         `an answer to a token past half its life carries a fresh one for the same project (${fresh.slice(0, 8)}…)`);
+         `an answer to a token past half its life carries a fresh one for the same space (${fresh.slice(0, 8)}…)`);
       const full = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({ argv: ['roadmap'] }) });
@@ -1098,10 +1098,10 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const settings = await relay({ argv: ['settings', '--json'] });
     ok(settings.code === 0 && JSON.parse(settings.out).project === 'alpha'
        && typeof JSON.parse(settings.out).locked === 'boolean',
-       'aerie settings --json relays the project\'s settings, lock included: what bb-tty and aerie build read on a node');
+       'aerie settings --json relays the space\'s settings, lock included: what bb-tty and aerie build read on a node');
     const other = await relay({ argv: ['roadmap'], project: 'ep.silon' });
     ok(other.status === 403 && /alpha does not read ep\.silon/.test(other.error),
-       `a token for alpha cannot ask about another project, and says it does not read it (${other.error})`);
+       `a token for alpha cannot ask about another space, and says it does not read it (${other.error})`);
     const sdk = await relay({ argv: ['sdk'] });
     ok(sdk.status === 400 && /not relayed/.test(sdk.error),
        'aerie toolchains is refused: it answers for the machine the session is on');
@@ -1146,7 +1146,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     ok((await where())[minted.id]?.email === 'tester@example.com',
        '...which is what that node\'s row names, for that account');
     await api({ email: 'tester@example.com', plan: 'max', signed_in: true, node: 'n_somebody_elses' });
-    ok(!('n_somebody_elses' in await where()), 'a session cannot report for a node that is not one of its project\'s');
+    ok(!('n_somebody_elses' in await where()), 'a session cannot report for a node that is not one of its space\'s');
     // Another Anthropic account on this node is another sign-in there, not
     // a refusal: the login is the machine's, and the row says which.
     const two = await api({ email: 'two@example.invalid', signed_in: true });
@@ -1220,7 +1220,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const anon = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
       { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'x@example.invalid', signed_in: true }) });
-    ok(anon.status === 403, 'a token for the project alone cannot speak for an account');
+    ok(anon.status === 403, 'a token for the space alone cannot speak for an account');
 
     // ...and the AGENT can say it too, on its heartbeat, without a session
     // having to run (B104): a node signed in with nothing running reads as
@@ -1432,7 +1432,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       hook('bb-prompt-relay', ['alpha', 'ignored'], JSON.stringify({ prompt: 'refactor the picker <system-reminder>x</system-reminder>' }));
       const asked = (await feed()).slice(n0);
       ok(asked.length === 1 && asked[0].kind === 'asked' && /test asked: refactor the picker$/.test(asked[0].text),
-         `a prompt typed in a session on the node lands in the project's feed, under the token's account (${asked[0]?.text})`);
+         `a prompt typed in a session on the node lands in the space's feed, under the token's account (${asked[0]?.text})`);
       hook('bb-prompt-relay', ['--started', 'alpha', 'ignored'], '');
       const started = (await feed()).slice(-1)[0];
       ok(started?.kind === 'did' && /test started a Claude session on alpha \(agentbox\)/.test(started?.text || ''),
@@ -1503,7 +1503,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const bad = await fetch(URL.replace(/\/$/, '') + '/api/v1/hook', { method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'asked', text: 'hi' }) });
-      ok(bad.status === 403, 'a token for the project alone, with no account, may not post as anybody');
+      ok(bad.status === 403, 'a token for the space alone, with no account, may not post as anybody');
     }
 
     // ---- the node's sessions are on the Sessions card (roadmap #24) --------
@@ -1529,7 +1529,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
          '...with its directory and its Claude state, like a local one');
       const cw = (await api('/api/status')).claude_with || {};
       ok((cw.alpha || []).includes('test'),
-         '...and the project row counts it: the account has a session on alpha');
+         '...and the space row counts it: the account has a session on alpha');
       // The read-only console's line reaches a node's session through the
       // poll: the agent types it into the pane.
       const said = await api('/api/say', { session: 'claude-alpha', node: onNode?.node_id,
@@ -1616,7 +1616,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
 
     const outside = await relay({ argv: ['version'], cwd: '/etc' });
     ok(outside.status === 200 && outside.code === 0 && !/etc/.test(outside.out),
-       'a cwd outside the project\'s trees is ignored: the verb runs in the project directory');
+       'a cwd outside the space\'s trees is ignored: the verb runs in the space directory');
     // The verbs bb relays and the verbs the server accepts are one contract
     // in one file, lib/relay-verbs, and this is what keeps both reading it.
     const verbs = readFileSync(`${REPO}/scripts/lib/relay-verbs`, 'utf8').split(/\s+/).filter(Boolean);
@@ -2058,13 +2058,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // missing and names the fallback, and never suggests building here.
     ok(/has no node/.test(nonode.error || '') && /notebook Settings/.test(nonode.error || '')
        && /Reading and editing the code needs no node/.test(nonode.error || ''),
-       `a project with no node set is refused, and told where to set one (${JSON.stringify(nonode).slice(0, 160)})`);
+       `a space with no node set is refused, and told where to set one (${JSON.stringify(nonode).slice(0, 160)})`);
     const onlocal = await api('/api/v1/jobs', { action: 'run', project: 'alpha', node: 'local', argv: ['true'] });
     ok(/runs no agent/.test(onlocal.error || ''), 'local is not a build node: it has no workspace of its own');
     const pr = await api('/api/prefs', { project: 'alpha', node: minted.id,
       build: 'cat hello.txt && mkdir -p out && echo built > out/app-1.0.apk', outputs: ['out/*.apk'] });
     ok(pr.ok && pr.node === minted.id && /hello/.test(pr.build),
-       'the project record takes a build node, a build command and its outputs');
+       'the space record takes a build node, a build command and its outputs');
 
     // ---- the terminal goes to the node (roadmap #24, phase 10b) --------------
     // alpha is bound to agentbox now, whose census says its session half is
@@ -2078,7 +2078,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         return p?.session_at === 'agentbox' && p?.session_why === '' ? p : null;
       }, 60000);
       ok(copied && existsSync(`${SHARE}/alpha`),
-         `the node's agent copies the project it is bound to into its own /workspace, and the button goes live once it has (${
+         `the node's agent copies the space it is bound to into its own /workspace, and the button goes live once it has (${
            copied ? 'ready' : ((await api('/api/status')).projects.find(x => x.name === 'alpha')?.session_why || '').slice(0, 80)})`);
       // What a terminal would be, asked plainly: a refusal and why, or
       // that a websocket is asked for, which is a terminal that opens.
@@ -2092,7 +2092,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const rows = (await api('/api/status')).projects;
       const alpha = rows.find(p => p.name === 'alpha');
       ok(alpha?.session_at === 'agentbox' && alpha?.session_why === '',
-         `the project row says where its sessions run (${alpha?.session_at})`);
+         `the space row says where its sessions run (${alpha?.session_at})`);
       // In this harness the "node" is a process in the same container, so
       // its boot id IS this container's; what is asserted is that the row
       // carries the node's own answer, not that the two differ.
@@ -2130,7 +2130,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         'echo "W:$BB_ACCOUNT_UID:$BB_ACCOUNT_NAME:$BB_TREE_OWNER:${BB_TOKEN%%_*}:$BUILDERBOT_ROLE:$(command -v aerie | sed s,.*/.bb/,,)"\r', auth, /W:u_[0-9a-f]+:[^\s]*\s/);
       const said = (sh.out.match(/W:u_[0-9a-f]+:[^\s]*/g) || []).pop() || '';
       ok(said === `W:${uid}:test:1:bbs:node:current/scripts/aerie`,
-         `a project shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
+         `a space shell on alpha opens on agentbox as the account, with its name, the owner mark, a session token, the node's role and its bb through .bb/current (${
            said || sh.why || sh.out.slice(-160)})`);
       const root = await term('shell');
       ok(root.status === 400 && OPENS.test(root.body),
@@ -2142,7 +2142,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const nonode = await term('claude:beta');
       ok(nonode.status === 503 && /no node to run a coding agent's session on: pick one/.test(nonode.body)
          && /enroll one on the Nodes page/.test(nonode.body),
-         `a project with no node is refused a session, and told why (${
+         `a space with no node is refused a session, and told why (${
            (nonode.body || '').slice(0, 60)})`);
       // Bound to a node that cannot take one yet: the sandbox's session
       // half is up but it reports no synced copy of the project (R163), so
@@ -2153,7 +2153,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const beta = (await api('/api/status')).projects.find(p => p.name === 'beta');
       ok(beta?.session_at === 'sandbox' && /beta is being copied to sandbox/.test(beta?.session_why || '')
          && /the session starts once the copy is there/.test(beta?.session_why || ''),
-         `a project bound to a node that has no copy of it yet carries the reason on its row (${(beta?.session_why || '').slice(0, 60)})`);
+         `a space bound to a node that has no copy of it yet carries the reason on its row (${(beta?.session_why || '').slice(0, 60)})`);
       const refused = await term('claude:beta');
       ok(refused.status === 503 && /being copied to sandbox/.test(refused.body),
          '...and one bound to a node that cannot take it yet is refused with that node\'s reason');
@@ -2169,11 +2169,11 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // neither. That is unchanged; what R47 changed is the NO-node case.
       const shellRefused = await term('shell:beta');
       ok(shellRefused.status === 503 && /being copied to sandbox/.test(shellRefused.body),
-         '...and a shell on that project follows the node, so it is refused too');
+         '...and a shell on that space follows the node, so it is refused too');
       await api('/api/prefs', { project: 'beta', node: '' });
       const shellHere = await term('shell:beta');
       ok(shellHere.status === 400 && OPENS.test(shellHere.body),
-         'a shell on a project with NO node still opens here: only Claude moved');
+         'a shell on a space with NO node still opens here: only Claude moved');
       await api('/api/prefs', { project: 'beta', node: '' });
     }
     const run = await api('/api/v1/jobs', { action: 'run', project: 'alpha',
@@ -2383,7 +2383,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     ok(listed.some(a => a.name === 'app-1.0.apk' && a.prov?.job === run.job) && !listed.some(a => /provenance/.test(a.path)),
        'the Artifacts listing carries the provenance and hides the record itself');
     ok(!existsSync(`${DIR}/agentdata/jobs/${run.job}`) && existsSync(`${DIR}/agentcache/alpha/x`),
-       'a finished workspace is gone; the project cache beside it persists');
+       'a finished workspace is gone; the space cache beside it persists');
     // the same tree again transfers nothing
     const again = await api('/api/v1/jobs', { action: 'run', project: 'alpha', argv: ['true'] });
     const afin = await until(async () => {
@@ -2408,7 +2408,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
     }, 30000);
     ok(cfin && cfin.state === 'succeeded' && !existsSync(`${DIR}/agentcache/alpha`),
-       'Clear cache drops the project caches through a job');
+       'Clear cache drops the space caches through a job');
     const n2 = await nodeById(minted.id);
     ok(typeof n2.reported.stores.cache.used_mb === 'number' && typeof n2.reported.toolchains === 'object',
        'the census reports the cache store\'s size and the toolchains it finds');
@@ -2465,7 +2465,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // one the file keeps its own name, which the check below it holds.
       const plain = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
         { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: onNode, stdio: 'pipe' });
-      ok(/into dist\/: app-1\.0\.apk/.test(plain), 'on a node, a build of a project with no version keeps its file\'s own name');
+      ok(/into dist\/: app-1\.0\.apk/.test(plain), 'on a node, a build of a space with no version keeps its file\'s own name');
       const hadGit = existsSync(`${DIR}/ws/alpha/.git`), hadVersion = existsSync(`${DIR}/ws/alpha/VERSION`);
       if (!hadVersion) writeFileSync(`${DIR}/ws/alpha/VERSION`, '1.2.0\n');
       const git = (...a) => execFileSync('git', ['-C', `${DIR}/ws/alpha`, '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...a], { stdio: 'pipe' });
@@ -2483,13 +2483,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       rmSync(`${DIR}/ws/alpha/dist/app-1.0.apk`, { force: true });
       const m = /into dist\/: (alpha-[0-9][^\s]*-app-1\.0\.apk)/.exec(b);
       ok(!!m && existsSync(`${DIR}/ws/alpha/dist/${m[1]}`),
-         `on a node, aerie build names what it puts in dist/ with the project and its version (${m ? m[1] : b.trim().split('\n').pop().slice(0, 90)})`);
+         `on a node, aerie build names what it puts in dist/ with the space and its version (${m ? m[1] : b.trim().split('\n').pop().slice(0, 90)})`);
       if (m) rmSync(`${DIR}/ws/alpha/dist/${m[1]}`, { force: true });
     }
     const built = execFileSync('bash', [`${REPO}/scripts/aerie`, 'build'],
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env }).toString();
     ok(/hi from the tree/.test(built) && /into dist\/: app-1.0.apk/.test(built),
-       'aerie build runs the project\'s build command on its build node and names what came back');
+       'aerie build runs the space\'s build command on its build node and names what came back');
     let failed = '';
     try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'test'], { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env, stdio: 'pipe' }); }
     catch (e) { failed = String(e.stderr) + String(e.stdout); }
@@ -2928,7 +2928,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       files: ['dist/missing.apk'] });
     ok(/not a file in alpha's dist/.test(nofile.error || ''), 'an input that is not in dist/ is refused up front');
     const ej = await api('/api/v1/jobs', { action: 'emu', project: 'alpha', argv: ['emu', 'list'] });
-    ok(ej.ok && ej.node === minted.id, `aerie emu list is queued on the project's node (${ej.job || ej.error})`);
+    ok(ej.ok && ej.node === minted.id, `aerie emu list is queued on the space's node (${ej.job || ej.error})`);
     const efin = await until(async () => {
       const r = await api(`/api/v1/jobs?id=${ej.job}`);
       return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
@@ -2947,7 +2947,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     }, 60000);
     ok(ifin && /fetched dist\/app-1.0.apk \(6 bytes\) into/.test(ifin.log)
        && existsSync(`${DIR}/agentartifacts/alpha/app-1.0.apk`),
-       'an input lands in the node\'s artifacts store, under the project it belongs to');
+       'an input lands in the node\'s artifacts store, under the space it belongs to');
     // ...and a second run of the same build copies nothing: the node has it.
     const io2 = await api('/api/v1/jobs', { action: 'emu', project: 'alpha',
       argv: ['version', '--help'], files: ['dist/app-1.0.apk'] });
@@ -2962,7 +2962,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
       { encoding: 'utf8', cwd: `${DIR}/ws/alpha`, env: { ...process.env, DASHBOARD_AUTH: 'test:test', BB_TOKEN: '',
         DASHBOARD_PORT: new globalThis.URL(URL).port, DASHBOARD_STATE: `${DIR}/state`, BB_PROJECT: 'alpha' } });
     ok(/aerie emu list on agentbox/.test(cli) && /API levels with a system image here/.test(cli) && /succeeded/.test(cli),
-       `aerie emu from a shell goes to the project's node and streams the answer back (${cli.replace(/\s+/g, ' ').slice(0, 120)})`);
+       `aerie emu from a shell goes to the space's node and streams the answer back (${cli.replace(/\s+/g, ' ').slice(0, 120)})`);
   }
 
   // ---- Tailscale Funnel, the route's second mode (phase 8) ---------------------
@@ -3122,7 +3122,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
   {
     const asked = await api('/api/phone', { action: 'ask', kind: 'root', why: 'prove the root path on the real agent',
                                             cmd: ['sh', '-c', 'echo root job ran; id -un'], project: 'alpha' });
-    ok(asked.id > 0, `a root ask for the project on this node is queued (${asked.id || asked.error})`);
+    ok(asked.id > 0, `a root ask for the space on this node is queued (${asked.id || asked.error})`);
     const al = await api('/api/phone', { action: 'allow', id: asked.id });
     ok(!al.error, `an administrator allows it (${al.error || 'ok'})`);
     const rfin = await until(async () => {
@@ -3942,7 +3942,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
   ok(/^\d+\.\d+\.\d+$/.test(av),
      `the agent's version is WINDOW.BUILD (${av || 'unset'})`);
   ok(win === minor || win === ahead,
-     `...and its window is the project's minor: bump one and you bump both (${
+     `...and its window is the space's minor: bump one and you bump both (${
        win} against ${minor} from VERSION ${proj})`);
   // The agent's is the only other copy of the window there is. There used
   // to be a second, the CLAUDE.md template's BUILDERBOT:ENV:WINDOW line, and

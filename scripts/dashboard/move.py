@@ -320,13 +320,13 @@ def pieces():
     def piece(key, label, about, path, on, fixed=False, leave=()):
         size, over = _size_of(path, leave)
         return {"key": key, "label": label, "about": about, "size": size, "over": over, "on": on, "fixed": fixed}
-    out = [piece("state", "The state", "accounts, nodes, projects, settings, the notebooks, the database, what is sealed", STATE, True, True, LEAVE)]
+    out = [piece("state", "The state", "accounts, nodes, spaces, settings, the notebooks, the database, what is sealed", STATE, True, True, LEAVE)]
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)):
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
         out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
-    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the projects folder", WORKSPACE, False))
+    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     return out
 
@@ -863,7 +863,7 @@ def room_for(size, where):
     gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
     return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
             "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
-            "the folder they are in as the projects folder on This machine")
+            "the folder they are in as the spaces folder on This machine")
 
 
 def fetch_bundle(old_url, token, dest):
@@ -1231,7 +1231,7 @@ def _own_node_handed_on(state_dir, old, new):
             tmp = f.with_name(f.name + ".new")
             tmp.write_text(json.dumps(d))
             os.replace(tmp, f)
-            said.append(f"{moved} project{'' if moved == 1 else 's'} that ran on the old controller's machine run on this one now")
+            said.append(f"{moved} space{'' if moved == 1 else 's'} that ran on the old controller's machine run on this one now")
     except (OSError, ValueError):
         pass
     f = Path(state_dir) / "move.json"

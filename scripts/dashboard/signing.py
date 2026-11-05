@@ -409,7 +409,7 @@ def listing(project):
     which keys exist and their fingerprints is what lets a person check a
     signed build."""
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     keys = {}
     for k in key_names(project):
         keys[k] = {r: (_public(rec) if (rec := _record(project, r, k)) else None) for r in ROUTES}
@@ -470,7 +470,7 @@ def needs_lock(project):
 
 def _check(project, route, key):
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     if route not in ROUTES:
         return {"error": f"a key is for {' or '.join(ROUTES)}, not {route!r}"}, 400
     if not _ok_key(key):
@@ -528,7 +528,7 @@ def set_map(project, package, key):
     """Map an app's package to one of the project's keys, or unmap it with
     an empty key, which signs it with `default` again. (payload, status)."""
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     if not PACKAGE.fullmatch(package or ""):
         return {"error": f"{package!r} is not an Android package name (com.example.app)"}, 400
     m = mapping(project)
@@ -572,7 +572,7 @@ def rotate(project, old, new, by=""):
     kept, since the proof and every device before Android 9 still need it;
     and the apps mapped to the old key mapped to the new. (payload, status)."""
     if not _ok_project(project) or not _ok_key(old) or not _ok_key(new):
-        return {"error": "unknown project or key"}, 400
+        return {"error": "unknown space or key"}, 400
     if old == new:
         return {"error": "a key is rotated to another key"}, 400
     a, b = _record(project, "sideload", old), _record(project, "sideload", new)
@@ -614,7 +614,7 @@ def rotate(project, old, new, by=""):
 
 def remove(project, route, key=DEFAULT):
     if not _ok_project(project) or route not in ROUTES or not _ok_key(key):
-        return {"error": "unknown project, key or route"}, 400
+        return {"error": "unknown space, key or route"}, 400
     if route == "sideload" and (_record(project, "sideload", key) or {}).get("retired_for"):
         return {"error": f"{key}'s sideload key was rotated to {(_record(project, 'sideload', key) or {})['retired_for']}, "
                          "and the proof, and every device before Android 9, still need it: it is kept"}, 409
@@ -658,7 +658,7 @@ def backup(project, route, key=DEFAULT, password=""):
     the zip is wrapped under it and password.txt never holds a password, so
     a copy of the file is no key without it (R111)."""
     if not _ok_project(project) or route not in ROUTES or not _ok_key(key):
-        return {"error": "unknown project, key or route"}, 400
+        return {"error": "unknown space, key or route"}, 400
     rec = _record(project, route, key)
     if rec and rec.get("locked"):
         return {"error": rec["locked"]}, 409
@@ -682,7 +682,7 @@ def backup(project, route, key=DEFAULT, password=""):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr(f"{base}.p12", wrapped)
-            z.writestr("password.txt", "keystore and key password: this project's backup password\n"
+            z.writestr("password.txt", "keystore and key password: this space's backup password\n"
                                        f"alias: {rec.get('alias')}\nSHA-256: {rec.get('sha256')}\n")
         return (f"{base}.zip", buf.getvalue()), 200
     rec["backed_up"] = int(time.time())
@@ -739,7 +739,7 @@ def _read_backup(blob):
     if not pw:
         return no("the backup's password.txt names no password")
     # Wrapped under its project's backup password (R111): the one typed in.
-    if pw == "this project's backup password":
+    if pw == "this space's backup password":
         pw = ""
     return ks, pw, line("alias"), line("SHA-256"), stores[0], ""
 
@@ -751,7 +751,7 @@ def import_backup(project, route, blob_b64, key="", password="", alias="", filen
     Refused over a slot that holds a different key. The password goes into
     the key's record and nowhere else. (payload, status)."""
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     if (no := needs_lock(project)):
         return no
     try:
@@ -826,7 +826,7 @@ def set_backup_password(project, current, new, by=""):
     asked for whenever there is one. (payload, status)."""
     import users
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     was = backup_locked(project)
     if was and not users.check_password(was["hash"], current or ""):
         return {"error": "that is not the backup password now"}, 403
@@ -896,7 +896,7 @@ def release_key(project, package=""):
     only sideload key, followed through a rotation to the newest; or
     ("", None, why) said in words when there is none to use."""
     if not _ok_project(project):
-        return "", None, "unknown project"
+        return "", None, "unknown space"
     held = [k for k in key_names(project) if _record(project, "sideload", k)]
     if not held:
         return "", None, (f"{project} has no sideload signing key, which signs its releases: an "
@@ -1144,7 +1144,7 @@ def refusal(project, rel, route, key=""):
     one is queued. With no key named, any key holding the route will do
     here: which one is decided on the node, by the build's package."""
     if not _ok_project(project):
-        return {"error": "unknown project"}, 400
+        return {"error": "unknown space"}, 400
     if route not in ROUTES:
         return {"error": f"a build is signed for {' or '.join(ROUTES)}, not {route!r}"}, 400
     if key and not _record(project, route, key):

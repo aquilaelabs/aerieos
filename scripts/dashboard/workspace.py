@@ -102,7 +102,7 @@ def snapshot(project):
     """The tree, now, as one tar; {digest, files, bytes, tar} or {error}."""
     root = WORKSPACE / project
     if not root.is_dir():
-        return {"error": f"no project directory for {project}"}
+        return {"error": f"no space directory for {project}"}
     files = _files(root)
     snaps = _snaps()
     snaps.mkdir(parents=True, exist_ok=True)
@@ -216,7 +216,7 @@ def artifact_put(job, name, stream, length, extra=None):
     project = (job or {}).get("project") or ""
     root = WORKSPACE / project
     if not project or not root.is_dir():
-        return {"error": "the job has no project directory to land in"}
+        return {"error": "the job has no space directory to land in"}
     if not 0 < length <= ARTIFACT_MAX:
         return {"error": f"an artifact is between 1 byte and {ARTIFACT_MAX >> 20}MB"}
     dest = root / "dist" / rel

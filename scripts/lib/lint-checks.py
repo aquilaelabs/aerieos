@@ -52,7 +52,7 @@ def runner():
                   f"({', '.join(loose[:6])}{', …' if len(loose) > 6 else ''})")
             print("         their runs-on matches every AerieOS runner, so GitHub sends the")
             print("         job to whichever is idle, which may be a machine without the")
-            print("         toolchain. To land on this project's node:")
+            print("         toolchain. To land on this space's node:")
             print(f"           runs-on: [self-hosted, {label}]")
 
 

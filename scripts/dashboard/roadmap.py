@@ -1999,7 +1999,7 @@ def send(project, item_id, step=None, sessions=(), also_told=False, note="", pre
 # session is mid-task all the time, and a session that downed tools to go and
 # read them every time would be worse than one that never read them at all.
 LOOK = {
-    "roadmap": "the shared to-do list for this project (`aerie roadmap`)",
+    "roadmap": "the shared to-do list for this space (`aerie roadmap`)",
     "memory": ("my notes about how you work here "
                "(`cat ~/.claude/projects/$(pwd | tr / -)/memory/*.md`)"),
 }
@@ -2213,7 +2213,7 @@ def brief(project):
     parked = len(rows) - len(live)
     mine = sum(1 for r in live if r.get("by") == "claude")
     n = len(live)
-    return (f"The operator keeps a shared to-do list for this project: {n} open item{'s' if n != 1 else ''}"
+    return (f"The operator keeps a shared to-do list for this space: {n} open item{'s' if n != 1 else ''}"
             + (f", {mine} of them a session added" if mine else "")
             + (f", and {parked} parked by the operator" if parked else "")
             + ". `aerie roadmap` lists them by number (R4, the operator's too, which never changes) and "

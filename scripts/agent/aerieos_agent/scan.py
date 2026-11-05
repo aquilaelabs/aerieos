@@ -53,7 +53,7 @@ class ScanMixin:
         if missing:
             job.say(f"not here, so not scanned: {', '.join(missing)}\n")
         if not held:
-            job.say("nothing to scan: none of the projects has a copy on this node\n")
+            job.say("nothing to scan: none of the spaces has a copy on this node\n")
             return "failed", 75
         job.say(f"scanning {', '.join(held)} with {', '.join(spec.get('scanners') or SERVICES)}\n")
         env = {k: v for k, v in os.environ.items() if k not in ("HOME", "USER", "LOGNAME")}

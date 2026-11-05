@@ -34,7 +34,7 @@ def main(argv):
             print(f"{r['name']:<24} {r.get('kind', 'pack'):<6} {r.get('tier') or '':<9} {r.get('about') or ''}{mark}")
         if d.get("more"):
             print(f"... and {d['more']} more: add words to narrow it")
-        print("\nbb tool install NAME --why \"what it is for\" asks for one, as this project's Install a tool pack setting says")
+        print("\nbb tool install NAME --why \"what it is for\" asks for one, as this space's Install a tool pack setting says")
         return
     rest = argv[1:]
     why = ""

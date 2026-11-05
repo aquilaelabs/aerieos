@@ -248,9 +248,9 @@ def claim_repos(name):
         d = _load()
         shown = title(name)
         if not shown or not any(ch.isalnum() for ch in shown):
-            return {"error": "a project's name needs at least one letter or digit in it"}
+            return {"error": "a space's name needs at least one letter or digit in it"}
         if live_named(shown, kind="repos"):
-            return {"error": f"{shown} is already a project's name"}
+            return {"error": f"{shown} is already a space's name"}
         key = new_dir(clean_name(shown) or "project")
         r = _add(d, key, shown, "repos")
         _save(d)
@@ -348,7 +348,7 @@ def set_name(dirname, name):
         d = _load()
         r = d["projects"].get(dirname)
         if r is None or r.get("state") not in NAMED:
-            return {"error": f"{dirname} is not a project"}
+            return {"error": f"{dirname} is not a space"}
         kind = r.get("state")
         name = title(name) if kind == "repos" else clean_name(name)
         if not name or not any(ch.isalnum() for ch in name):

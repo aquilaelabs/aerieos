@@ -178,14 +178,14 @@ class Sync(unittest.TestCase):
         out, code = put(".git/config", fine)
         self.assertEqual(code, 200, out)
         self.assertEqual(read(f"{self.ws}/alpha/.git/config"), fine.decode())
-        self.assertEqual(put("src/link", link="../a.txt")[1], 200, "a link inside the project is fine")
+        self.assertEqual(put("src/link", link="../a.txt")[1], 200, "a link inside the space is fine")
         # B531: a link to "." reads harmless, and a link under it to ".."
         # read as inside by its path landed at the top and named the parent.
         self.assertEqual(put("p", link=".")[1], 200)
         out, code = put("p/q", link="..")
         self.assertEqual(code, 403, out)
         self.assertFalse(os.path.lexists(f"{self.ws}/alpha/q"), "no link to the workspace was made")
-        self.assertEqual(put("p/escaped.txt", b"x")[1], 200, "a file through a link inside the project lands inside it")
+        self.assertEqual(put("p/escaped.txt", b"x")[1], 200, "a file through a link inside the space lands inside it")
 
     def test_a_git_config_the_controller_already_holds_comes_back_as_already_so(self):
         """B732: the controller writes the project's own credential helper
@@ -328,8 +328,8 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(f"{up}/work.py"), "x = 1\n")
         self.assertEqual(read(f"{up}/.git"), f"gitdir: {self.ws}/alpha/.git/worktrees/u_87654321\n",
                          "the controller writes git's own line; the node's is never taken")
-        self.assertIn("is not a project", ctl_sync.may("n9", ".worktrees/alpha/u_87654321"),
-                      "a worktree is its project's nodes' alone")
+        self.assertIn("is not a space", ctl_sync.may("n9", ".worktrees/alpha/u_87654321"),
+                      "a worktree is its space's nodes' alone")
 
     def test_a_nodes_index_wins_over_one_refreshed_here(self):
         # B617: git status on the controller rewrote .git/index; the node's
@@ -445,7 +445,7 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(f"{self.ws}/alpha/{kept[0]}"), "was here first\n")
 
     def test_a_node_not_bound_to_the_project_is_refused(self):
-        self.assertIn("not a project this node", ctl_sync.state("n9", "alpha")[0]["error"])
+        self.assertIn("not a space this node", ctl_sync.state("n9", "alpha")[0]["error"])
         self.assertEqual(ctl_sync.file_path("n1", "alpha", "../escape")[1][1], 400)
         self.assertEqual(ctl_sync.file_path("n1", "alpha", "node_modules/x/index.js")[1][1], 400)
 

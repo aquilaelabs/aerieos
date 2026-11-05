@@ -264,7 +264,7 @@ setup_ssh_agent() {
     if ! command -v socat >/dev/null 2>&1; then
         warn "socat is missing: sessions cannot reach the root-owned agent, so"
         warn "the shielded keys will be unusable. Use ~/.ssh, or give the"
-        warn "project a token in the dashboard's clone dialog instead."
+        warn "space a token in the dashboard's clone dialog instead."
         return 0
     fi
 
@@ -280,7 +280,7 @@ setup_ssh_agent() {
     done
 
     if [ -S "$user_sock" ]; then
-        log "ssh-agent: ${added} shielded key(s) loaded; sessions can use them, not read them; a project's settings can add a deploy key"
+        log "ssh-agent: ${added} shielded key(s) loaded; sessions can use them, not read them; a space's settings can add a deploy key"
     else
         warn "ssh-agent proxy failed to start; shielded keys will be unusable"
     fi
@@ -448,7 +448,7 @@ seed_home() {
     # not a repair; it is a surprise. The Projects card reports it instead.
     if is_mountpoint "$WORKSPACE"; then
         run_as_builder test -w "$WORKSPACE" \
-            || warn "$WORKSPACE is not writable by ${PUID}:${PGID}: new projects cannot be created there (chown it on the host)"
+            || warn "$WORKSPACE is not writable by ${PUID}:${PGID}: new spaces cannot be created there (chown it on the host)"
     else
         chown "$PUID:$PGID" "$WORKSPACE" 2>/dev/null || true
     fi

@@ -77,11 +77,11 @@ const AB_CREDITS = [
     ["xterm.js", "every terminal in the dock", "MIT", "https://github.com/xtermjs/xterm.js"],
     ["noVNC and pako", "a VM's Screen in the dock", "MPL-2.0, MIT", "https://github.com/novnc/noVNC"],
     ["Python", "the dashboard's server and the node agent", "PSF-2.0", "https://www.python.org/"],
-    ["Node.js", "the page's tests and the projects' JavaScript", "MIT", "https://nodejs.org/"],
+    ["Node.js", "the page's tests and the spaces' JavaScript", "MIT", "https://nodejs.org/"],
     ["Playwright", "the browser that tests the page and takes its pictures", "Apache-2.0", "https://playwright.dev/"],
-    ["Docker CLI, Compose and Buildx", "a project's containers, on its node's Docker", "Apache-2.0", "https://www.docker.com/"],
+    ["Docker CLI, Compose and Buildx", "a space's containers, on its node's Docker", "Apache-2.0", "https://www.docker.com/"],
     ["cloudflared", "the controller's own tunnel from home", "Apache-2.0", "https://github.com/cloudflare/cloudflared"],
-    ["Git and Git LFS", "every project's history", "GPL-2.0, MIT", "https://git-scm.com/"],
+    ["Git and Git LFS", "every space's history", "GPL-2.0, MIT", "https://git-scm.com/"],
     ["GitHub CLI", "pull requests and CI logs", "MIT", "https://cli.github.com/"],
     ["tmux", "the sessions that outlive a closed tab", "ISC", "https://github.com/tmux/tmux"],
     ["SQLite", "the controller's record of nodes and jobs", "public domain", "https://sqlite.org/"],
@@ -95,7 +95,7 @@ const AB_CREDITS = [
   ["On a node", [
     ["Claude Code", "what a Claude session runs, by Anthropic", "Anthropic's terms", "https://www.anthropic.com/claude-code"],
     ["Codex CLI", "what a ChatGPT session runs, by OpenAI", "Apache-2.0", "https://github.com/openai/codex"],
-    ["Docker Engine", "a project's containers and nginx", "Apache-2.0", "https://www.docker.com/"],
+    ["Docker Engine", "a space's containers and nginx", "Apache-2.0", "https://www.docker.com/"],
     ["QEMU, KVM and libvirt", "the VMs", "GPL-2.0, LGPL-2.1+", "https://libvirt.org/"],
     ["EDK II (OVMF)", "a VM's UEFI firmware", "BSD-2-Clause-Patent", "https://github.com/tianocore/edk2"],
     ["cloud-init", "a cloud image's first boot", "Apache-2.0 or GPL-3.0", "https://cloud-init.io/"],
@@ -105,7 +105,7 @@ const AB_CREDITS = [
     ["LiteLLM", "the model router a node runs for any model", "MIT", "https://github.com/BerriAI/litellm"],
     ["Ollama", "local models beside the router, where you turn it on", "MIT", "https://ollama.com/"],
     ["OpenCode", "a session on any model through the router", "MIT", "https://opencode.ai/"],
-    ["Semgrep, Trivy and mobsfscan", "the static analysis scanners a node runs over its projects", "LGPL-2.1, Apache-2.0, LGPL-3.0", "https://semgrep.dev/"],
+    ["Semgrep, Trivy and mobsfscan", "the static analysis scanners a node runs over its spaces", "LGPL-2.1, Apache-2.0, LGPL-3.0", "https://semgrep.dev/"],
     ["WireGuard", "a node's tunnel to the controller, where it enrolls through one", "GPL-2.0", "https://www.wireguard.com/"],
   ]],
   ["In AerieOS and the bare-metal install", [
@@ -120,7 +120,7 @@ const AB_CREDITS = [
   ]],
   ["The official catalog's toolchains", [
     ["Temurin JDK, Go, Rust, Node.js, Python (uv), .NET, Swift, Zig, Flutter, the Android SDK's tools, Playwright's browsers, PyTorch, FFmpeg, LibreOffice, PlantUML, Mermaid, pandoc, piper and whisper",
-     "what the Library installs on a node for a project to build with, each fetched from its publisher", "each its own", ""],
+     "what the Library installs on a node for a space to build with, each fetched from its publisher", "each its own", ""],
   ]],
   ["Where a VM comes from", [
     ["Ubuntu, Debian, Fedora, Rocky Linux, AlmaLinux, CentOS Stream, Arch Linux, openSUSE, Gentoo and Alpine",

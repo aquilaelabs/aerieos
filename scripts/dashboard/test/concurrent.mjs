@@ -148,7 +148,7 @@ print(json.dumps(c.feed("alpha")))`], { encoding: 'utf8' }).trim().split('\n').p
   const text = JSON.stringify(feed);
   const asked = sessions.flatMap(([who]) => [0, 1, 2].map(i => `cc ${who} asked ${i}`));
   const missing = asked.filter(a => !text.includes(a));
-  ok(missing.length === 0, `every question a session asked is in the project's feed (${asked.length}${missing.length ? `, missing: ${missing.slice(0, 3).join(', ')}` : ''})`);
+  ok(missing.length === 0, `every question a session asked is in the space's feed (${asked.length}${missing.length ? `, missing: ${missing.slice(0, 3).join(', ')}` : ''})`);
 }
 
 await done();

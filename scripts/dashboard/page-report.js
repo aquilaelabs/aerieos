@@ -31,8 +31,8 @@ function openReport(project, repos = []){
   $("reportRepoField").hidden = repos.length < 2;
   pick.onchange = () => { reportProject = pick.value; reportConvFor(pick.value); };
   $("reportHint").textContent = project
-    ? "It goes to the diagnostics with this project, its node and the build it was seen on, where whoever maintains AerieOS reads it."
-    : "It goes to the diagnostics with the build it was seen on, where whoever maintains AerieOS reads it. A problem in one project is better sent from that project's row.";
+    ? "It goes to the diagnostics with this space, its node and the build it was seen on, where whoever maintains AerieOS reads it."
+    : "It goes to the diagnostics with the build it was seen on, where whoever maintains AerieOS reads it. A problem in one space is better sent from that space's row.";
   const cat = $("reportCat");
   if (!cat.options.length)
     cat.innerHTML = REPORT_CATS.map(c => `<option>${esc(c)}</option>`).join("");

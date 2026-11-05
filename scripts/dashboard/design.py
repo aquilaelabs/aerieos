@@ -1134,7 +1134,7 @@ def page_text(page):
 def prompt(lang, page=None):
     """What a session is asked to do, in full: the text the tab shows under
     a page and `aerie design show` prints. The language alone when no page."""
-    scope = lang.get("scope") or "the project's user interface"
+    scope = lang.get("scope") or "the space's user interface"
     # Whose the file is, said outright: a session read "keep it in step",
     # found no file in the tree, and had to guess whether to make one (B344).
     keep = (f"{FILE_PATH} is yours to write and commit with the work, from what is saved here: "
@@ -1144,7 +1144,7 @@ def prompt(lang, page=None):
                 f"stylesheet reads. {keep}")
         return head + "\n\n" + language_text(lang)
     target = page["name"] or "this page"
-    head = (f"Build or restyle {target} to this layout, in the project's design language. "
+    head = (f"Build or restyle {target} to this layout, in the space's design language. "
             f"Keep what the blocks are for, at every width. {keep}")
     return head + "\n\n" + page_text(page) + "\n\n" + language_text(lang, page["platform"])
 
@@ -1155,7 +1155,7 @@ def file_text(rec):
     it cannot say what the notebook no longer does."""
     lang, pages = rec["language"], rec["pages"]
     out = ["# The design language", "",
-           "What this project looks like, in one place. Written by AerieOS's Design view "
+           "What this space looks like, in one place. Written by AerieOS's Design view "
            "from the notebook, so edit it there, or edit here and say so in the notebook. "
            "Every surface follows it; a change to the look is a change to this file first.", ""]
     if lang.get("scope"):
@@ -1236,7 +1236,7 @@ def problems(lang, pages):
     try:
         _clean_language(lang)
         if len(pages) > MAX_PAGES:
-            _bad(f"a project holds at most {MAX_PAGES} pages, and this has {len(pages)}")
+            _bad(f"a space holds at most {MAX_PAGES} pages, and this has {len(pages)}")
         keys = [str(p.get("key") or "").strip().lower() for p in pages if isinstance(p, dict)]
         for k in sorted({k for k in keys if k and keys.count(k) > 1}):
             _bad(f"two pages carry the key {k}")
@@ -1293,7 +1293,7 @@ def schema_text():
         "A rule of a theme's or a page's own reaches a session as HOLDER/NAME.",
         "",
         "A save is refused whole, with every problem it found listed; nothing is dropped silently. "
-        "A session's save goes through the project's dial, Agents may: Add to the design.",
+        "A session's save goes through the space's dial, Agents may: Add to the design.",
     ])
 
 

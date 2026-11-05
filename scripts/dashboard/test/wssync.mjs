@@ -60,7 +60,7 @@ for (const name of ['syncone', 'synctwo']){
     { env, encoding: 'utf8', stdio: 'pipe' });
   // A node enrolls holding its projects as a synced copy: the one way (R163).
   const conf = (await api('/api/v1/nodes')).nodes.find(n => n.id === minted.id)?.config || {};
-  ok(conf.workspace === 'sync', `${name} holds its projects as a synced copy from enrollment (${JSON.stringify(conf.workspace)})`);
+  ok(conf.workspace === 'sync', `${name} holds its spaces as a synced copy from enrollment (${JSON.stringify(conf.workspace)})`);
   nodes[name] = { id: minted.id, ws: `${home}/workspace/${P}`, log: `${home}/agent.log` };
   agents.push(spawn('python3', [RUN, 'run'], { env, stdio: ['ignore', openSync(nodes[name].log, 'a'), openSync(nodes[name].log, 'a')] }));
 }
@@ -87,7 +87,7 @@ try {
     const rows = (await api('/api/v1/nodes')).nodes.filter(n => [nodes.syncone.id, nodes.synctwo.id].includes(n.id));
     return rows.every(n => n.reported?.sync?.[P]?.ready) ? rows : null;
   }, 40000);
-  ok(ready, `each node reports the project ready on its heartbeat (${JSON.stringify(ready?.map(n => n.reported.sync))})`);
+  ok(ready, `each node reports the space ready on its heartbeat (${JSON.stringify(ready?.map(n => n.reported.sync))})`);
 
   // A save on one node: up to the controller, down to the other.
   const t0 = Date.now();
@@ -137,7 +137,7 @@ try {
     const at = n => `${DIR}/${n}/workspace/${R}/shared.txt`;
     const came = await until(() => Object.keys(nodes).every(n => read(at(n)) === 'read me\n'), 60000);
     ok(!made2.error && !set.error && came,
-       `a project ${P} reads comes down to both nodes (${JSON.stringify(set).slice(0, 60)})${came ? '' : '\n' + logs()}`);
+       `a space ${P} reads comes down to both nodes (${JSON.stringify(set).slice(0, 60)})${came ? '' : '\n' + logs()}`);
     write(at('syncone'), 'changed on a node\n');
     write(`${DIR}/ws/${R}/shared.txt`, 'changed on the controller\n');
     const back = await until(() => Object.keys(nodes).every(n => read(at(n)) === 'changed on the controller\n'), 30000);

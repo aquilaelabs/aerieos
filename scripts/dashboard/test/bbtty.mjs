@@ -193,7 +193,7 @@ ok(genv('GIT_CONFIG_COUNT') === 'GIT_CONFIG_COUNT=4'
 // ...and the toolchains its project's settings switch off (R77), which bb
 // reads as not there and the view leaves out.
 ok(genv('BB_TOOLCHAINS_OFF') === 'BB_TOOLCHAINS_OFF=hexkit flutter',
-   `the session carries the toolchains its project switches off (${genv('BB_TOOLCHAINS_OFF') || 'unset'})`);
+   `the session carries the toolchains its space switches off (${genv('BB_TOOLCHAINS_OFF') || 'unset'})`);
 const cmd = paneCmd();
 ok(cmd.length < 200 && /project\/alpha\/claude-run\.sh$/.test(cmd),
    '...because tmux was handed a launcher, not the command');
@@ -230,7 +230,7 @@ ok(launcher().includes(tokWritten),
   // B497: `bb -p NAME` repoints BB_PROJECT at the project being read; the
   // kept copy is still found by the project the token was minted for.
   ok(ask({ BB_TOKEN: dead, BB_PROJECT: 'beta' }) === tokWritten,
-     '...and finds it under bb -p too, by the project the token names, not the one being read');
+     '...and finds it under bb -p too, by the space the token names, not the one being read');
   // ...and `aerie token keep` is how a token gets INTO that file for a session
   // nobody is typing in. A session that is talking slides its own forward on
   // every answer it gets; one idle past twelve hours has nothing to slide it,
@@ -266,7 +266,7 @@ ok(argv.includes('--append-system-prompt-file') && prefPath && pref.length > 400
 // The session is named as the briefing names the project, its shown name
 // and its id, never its folder: that is what the Claude app lists it under.
 const rcName = argv.split('\0')[argv.split('\0').indexOf('--remote-control') + 1];
-ok(rcName === 'Alpha-Shown (P7)', `...and is named for Remote Control as the project is shown, with its id (${rcName})`);
+ok(rcName === 'Alpha-Shown (P7)', `...and is named for Remote Control as the space is shown, with its id (${rcName})`);
 // The operator's rules go in front of the list: how they want this worked on
 // before what there is to work on. Asserted by ORDER, not presence, since
 // either would be "in" the block.
@@ -290,7 +290,7 @@ ok(/and \d+ more open\./.test(prefFile()) && prefFile().includes('the bugs block
 out = connect(0);
 await sleep(400);
 ok(alive('claude-alpha') && /project\/alpha\/claude-run\.sh$/.test(paneCmd()),
-   'a project with no roadmap starts the same way');
+   'a space with no roadmap starts the same way');
 
 // A locked project. Enforced HERE rather than by graying the button out,
 // because a terminal's URL can be asked for directly and a rule only the page honors
@@ -304,7 +304,7 @@ out = connect(0);
 const refusedIn = Date.now() - refusedAt;
 await sleep(400);
 ok(/locked/.test(out) && !alive('claude-alpha'),
-   'a locked project refuses a Claude session, whatever the URL asks for');
+   'a locked space refuses a Claude session, whatever the URL asks for');
 // A refusal holds the terminal open for ten seconds so the browser can show
 // the reason: the terminal closes the moment this exits. Only when
 // something is holding one: called from here, with stderr on a pipe, there is
@@ -370,7 +370,7 @@ connect(0);
 await sleep(400);
 let a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
 ok(/--model\0sonnet\0/.test(a) && /--effort\0xhigh\0/.test(a),
-   "a project's model and effort reach claude as launch flags");
+   "a space's model and effort reach claude as launch flags");
 ok(!/--resume/.test(a),
    '...and an ordinary open is a fresh conversation, not a resumed one');
 
@@ -522,9 +522,9 @@ tmuxKill('claude-alpha');
     shell(`u:${ownerUid}:claude:${proj}:b:${boot}`);
     await sleep(400);
     ok(alive(`claude-${proj}`),
-       'the owner opens a Claude session under the bare project name');
+       'the owner opens a Claude session under the bare space name');
     ok(tmuxFmt(`claude-${proj}`, '#{pane_start_path}') === src,
-       '...working in the project directory itself, as it always has');
+       '...working in the space directory itself, as it always has');
 
     shell(`u:${other}:claude:${proj}:b:${boot}`);
     await sleep(400);
@@ -582,10 +582,10 @@ sleep 60
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       await sleep(400);
       ok(alive(`codex-${proj}`) && alive(`claude-${proj}`),
-         'the owner opens a Codex session beside their Claude one on the same project: two agents at once');
+         'the owner opens a Codex session beside their Claude one on the same space: two agents at once');
       const cwt = join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-codex`);
       ok(tmuxFmt(`codex-${proj}`, '#{pane_start_path}') === cwt && existsSync(join(cwt, 'README.md')),
-         `...in a worktree of its own, not the project directory the Claude session is in (${cwt})`);
+         `...in a worktree of its own, not the space directory the Claude session is in (${cwt})`);
       ok(/branch refs\/heads\/codex\//.test(git(['worktree', 'list', '--porcelain'])),
          '...on a codex/ branch of its own, so the two meet through git as two people do');
       ok(/project\/wtproj\/codex-run\.sh$/.test(tmuxFmt(`codex-${proj}`, '#{pane_start_command}')),
@@ -602,7 +602,7 @@ sleep 60
       // A tab coming back to it puts the answer back if it went, and says
       // the running session started without it, as Claude's does (R95 step 19).
       const cxToml = join(HOMEDIR, '.codex', 'config.toml');
-      writeFileSync(cxToml, toml.replace(`[projects."${cwt}"]\ntrust_level = "trusted"\n`, ''));
+      writeFileSync(cxToml, toml.replace(`[spaces."${cwt}"]\ntrust_level = "trusted"\n`, ''));
       const cxNoted = shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       ok(/was not trusted in .*config\.toml/.test(cxNoted) && /until it is restarted/.test(cxNoted)
          && readFileSync(cxToml, 'utf8').includes(`[projects."${cwt}"]`),
@@ -691,14 +691,14 @@ sleep 60
       const wts = git(['worktree', 'list', '--porcelain']);
       ok(alive(`codex-${proj}`) && alive(`codex-${proj}~2`) && tmuxFmt(`codex-${proj}~2`, '#{pane_start_path}') === cwt2
          && /refs\/heads\/codex\/[^\n]*-2\n/.test(wts + '\n'),
-         `a second Codex session on the project is its own slot: codex-${proj}~2 beside the first, in ${cwt2} on a codex/NAME-2 branch`);
+         `a second Codex session on the space is its own slot: codex-${proj}~2 beside the first, in ${cwt2} on a codex/NAME-2 branch`);
       ok(existsSync(cx2Run) && /export BB_SLOT=2/.test(readFileSync(cx2Run, 'utf8'))
          && /export BB_SLOT=1/.test(readFileSync(join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, 'codex-run.sh'), 'utf8'))
          && /codex-2-run\.sh$/.test(tmuxFmt(`codex-${proj}~2`, '#{pane_start_command}')),
          '...through a launcher of its own that names its slot to its hooks, the first slot\'s left as it was');
       ok(alive(`claude-${proj}~2`) && tmuxFmt(`claude-${proj}~2`, '#{pane_start_path}') === clt2
          && tmuxFmt(`claude-${proj}`, '#{pane_start_path}') === join(DIR, 'ws', proj),
-         `...and the owner's second Claude works in a worktree (${clt2}), the project directory staying the first's`);
+         `...and the owner's second Claude works in a worktree (${clt2}), the space directory staying the first's`);
       const noSlot = shell(`u:${ownerUid}:codex:${proj}:s:0:b:${boot}`);
       ok(/Not a slot/.test(noSlot), '...and a slot out of range opens nothing, saying so');
       tmuxKill(`codex-${proj}~2`); tmuxKill(`claude-${proj}~2`);
@@ -729,7 +729,7 @@ sleep 60
          `...and its guards are Copilot's own hooks, in a file of AerieOS's in its hooks folder (${Object.keys(cph.hooks || {}).join(', ')})`);
       ok(dirs && existsSync(join(dirs, 'AGENTS.md')) && /THE HOUSE RULES/.test(readFileSync(join(dirs, 'AGENTS.md'), 'utf8'))
          && !dirs.startsWith(src),
-         `...handed the briefing as an AGENTS.md in a folder of its own, outside the project's tree (${dirs})`);
+         `...handed the briefing as an AGENTS.md in a folder of its own, outside the space's tree (${dirs})`);
       const cpRaw = readFileSync(join(HOMEDIR, '.copilot', 'config.json'), 'utf8');
       const cpConf = cpRaw.startsWith(cpHead) ? JSON.parse(cpRaw.slice(cpHead.length)) : {};
       ok((cpConf.trustedFolders || []).includes(join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-copilot`))
@@ -796,7 +796,7 @@ sleep 60
       // were the same token (B176).
       const whose = t => { try { return Buffer.from(t.slice(4), 'base64url').toString().split('|')[2] || ''; } catch { return ''; } };
       ok(a && b && a !== b && whose(a) === ownerUid && whose(b) === other,
-         `two accounts with a session on one project keep their own token, each naming its account (${
+         `two accounts with a session on one space keep their own token, each naming its account (${
            whose(a) || 'none'} vs ${whose(b) || 'none'})`);
       ok(!existsSync(join(HOMEDIR, '.cache', 'builderbot', 'project', proj, 'token')),
          '...and nothing is left in the shared folder they used to share');
@@ -808,7 +808,7 @@ sleep 60
       join(HOMEDIR, '.cache', 'builderbot', 'u', other, 'project', proj, 'claude-scope.json'), 'utf8'));
     const deny = scope.permissions.deny.join(' ');
     ok(deny.includes(`Edit(${src}/**)`),
-       '...with the project directory itself denied to it, being another tree');
+       '...with the space directory itself denied to it, being another tree');
     ok(!deny.includes(`Edit(${wt}/**)`),
        '...and its own not denied, which a blanket rule on .worktrees would have done');
     // Edit covers every writing tool, and Claude Code warns at the top of the
@@ -1016,10 +1016,10 @@ print(uid)`);
       const across = shOut(`u:${ownerUid}:sh:12:viewproj`, [`tok:${ownerTok}`]);
       ok(/was refused/.test(across) && /this token is for wtproj/.test(across)
          && !alive(`${ownerUid}~shell-viewproj-12`),
-         `...a token for one project does not open another (${across.trim().slice(0, 90)})`);
+         `...a token for one space does not open another (${across.trim().slice(0, 90)})`);
       const nowhere = shOut(`u:${ownerUid}:sh:13:`, [`tok:${ownerTok}`]);
       ok(/was refused/.test(nowhere) && !alive(`${ownerUid}~shell-13`),
-         '...and a shell that is no project\'s, which the proxy never sends to a node, is refused there');
+         '...and a shell that is no space\'s, which the proxy never sends to a node, is refused there');
       // The server opens an account with no shell read-only; bb-tty started
       // writable by hand does not take it either.
       const plainOut = (() => { try {
@@ -1063,7 +1063,7 @@ print(uid)`);
     const nodeHome = join(HOMEDIR, 'users', otherUid);
     ok(lstatSync(join(nodeHome, '.claude', 'projects')).isSymbolicLink()
        && readlinkSync(join(nodeHome, '.claude', 'projects')) === join(DIR, 'ws', '.claude', otherUid, 'projects'),
-       'the home\'s ~/.claude/projects is a link to the account\'s directory on the projects share');
+       'the home\'s ~/.claude/projects is a link to the account\'s directory on the spaces share');
     // ...and the walls: other accounts' transcripts denied, this one's not.
     const scopeN = JSON.parse(readFileSync(join(nodeHome, '.cache', 'builderbot', 'u', otherUid, 'project', proj, 'claude-scope.json'), 'utf8'));
     const denyN = scopeN.permissions.deny.join(' ');
@@ -1085,7 +1085,7 @@ print(uid)`);
     } catch { /* the attach fails without a terminal */ }
     await sleep(400);
     ok(tmuxFmt(`${ownerUid}~claude-${proj}`, '#{pane_start_path}') === join(DIR, 'ws', proj),
-       'told it is the owner, the session works in the project directory itself, as on the controller');
+       'told it is the owner, the session works in the space directory itself, as on the controller');
     const envOf = k => { try {
       return execFileSync('tmux', ['show-environment', '-t', `${ownerUid}~claude-${proj}`, k],
         { encoding: 'utf8', env: process.env }).trim();
@@ -1159,7 +1159,7 @@ print(uid)`);
       // home has to be in it: tmux's -e is overridden by it (report #54).
       const gh = envRaw.split('\0').find(l => l.startsWith('GRADLE_USER_HOME=')) || '';
       ok(gh === `GRADLE_USER_HOME=${vhome}/.cache/builderbot/u/${ownerUid}/project/${vproj}/gradle-home`,
-         `...and in it the project's own Gradle home, not the account's ~/.gradle (${gh.slice(0, 90)})`);
+         `...and in it the space's own Gradle home, not the account's ~/.gradle (${gh.slice(0, 90)})`);
       tmuxKill(`${ownerUid}~claude-${vproj}`);
       // The projects this one reads (prefs.reads) ride the grant: one
       // --reads each for the helper, and Claude's walls let it Read them
@@ -1191,7 +1191,7 @@ print(uid)`);
         ok(rcmd.includes(` --cwd ${join(DIR, 'ws', vproj)} --reads alpha --env `)
            && !deny.includes(`Read(${join(DIR, 'ws', 'alpha')}/**)`) && deny.includes(`Edit(${join(DIR, 'ws', 'alpha')}/**)`)
            && deny.includes(`Read(${join(DIR, 'ws', 'beta')}/**)`),
-           `a project the session reads goes to the helper as --reads and stays a wall to Edit alone (${rcmd.slice(rcmd.indexOf('--cwd'), rcmd.indexOf('--cwd') + 160)}; BB_READS ${
+           `a space the session reads goes to the helper as --reads and stays a wall to Edit alone (${rcmd.slice(rcmd.indexOf('--cwd'), rcmd.indexOf('--cwd') + 160)}; BB_READS ${
              readFileSync(envf, 'utf8').split('\0').find(l => l.startsWith('BB_READS=')) || 'unset'}; deny ${deny.filter(d => /alpha|beta/.test(d)).join(' ')})`);
         tmuxKill(`${ownerUid}~claude-${vproj}`);
         setReads([]);
@@ -1210,7 +1210,7 @@ print(uid)`);
         await sleep(400);
         const scmd = tmuxFmt(`${ownerUid}~claude-${vproj}`, '#{pane_start_command}');
         ok(scmd.includes(` --cwd ${join(DIR, 'ws', vproj)} --sees /mnt/media --sees /srv/samples --env `),
-           `a place the project is set to see goes to the helper as --sees (${scmd.slice(scmd.indexOf('--cwd'), scmd.indexOf('--cwd') + 160)})`);
+           `a place the space is set to see goes to the helper as --sees (${scmd.slice(scmd.indexOf('--cwd'), scmd.indexOf('--cwd') + 160)})`);
         tmuxKill(`${ownerUid}~claude-${vproj}`);
         writeFileSync(helper, helperSrc(false), { mode: 0o755 });
         setSees([]);
@@ -1220,7 +1220,7 @@ print(uid)`);
       const refused = runView(`u:${ownerUid}:shell:${vproj}`);
       await sleep(300);
       ok(/could not for this one/.test(refused) && /not this one/.test(refused) && !alive(`${ownerUid}~shell-${vproj}`),
-         `...and a project shell the helper cannot plan a view for is refused with its reason, never opened without one (${refused.replace(/\s+/g, ' ').slice(0, 90)})`);
+         `...and a space shell the helper cannot plan a view for is refused with its reason, never opened without one (${refused.replace(/\s+/g, ' ').slice(0, 90)})`);
     }
     const otherTok = tok(proj, otherUid);
     // Claude Code's first-run questions are answered before it asks them:

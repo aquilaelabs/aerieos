@@ -265,8 +265,8 @@ function resumeConversation(name, id, when, ev, agent = "claude"){
   // Nowhere to start it (placeResumeMenu found no Start agent to open under):
   // said, rather than a press that does nothing.
   if (resumeFor !== name)
-    notify(claude && claudeInstall(p) ? `Claude Code is not installed on ${p.node_name || "this project's node"}: install it from the Library, then resume`
-      : "a session cannot start on this project now: its Start agent says why", true);
+    notify(claude && claudeInstall(p) ? `Claude Code is not installed on ${p.node_name || "this space's node"}: install it from the Library, then resume`
+      : "a session cannot start on this space now: its Start agent says why", true);
 }
 
 // The agent a send on a project reaches: the running session the server
@@ -687,7 +687,7 @@ function placeResumeMenu(){
   // picked's state and its press beside it; a plain name when there is one.
   const startBand = () => {
     const list = here();
-    if (!list.length) return `<div class="rmstate">No coding agent this project uses is installed on ${esc(n.name || "its node")}.</div>`;
+    if (!list.length) return `<div class="rmstate">No coding agent this space uses is installed on ${esc(n.name || "its node")}.</div>`;
     if (rmAgent.project !== p.name || !list.some(a => a.id === rmAgent.agent)) rmAgent = {project: p.name, agent: list[0].id};
     const a = list.find(x => x.id === rmAgent.agent);
     return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "");

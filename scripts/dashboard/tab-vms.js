@@ -168,7 +168,7 @@ function vmOthersHtml(rows){
 // grouped and chipped as No project.
 // ...and the machine's own (R165 step 3): the NAS's apps and desktops, no
 // project's, grouped and chipped as such.
-const vmOwner = p => p === "machine" ? "This machine's own" : (vmsData?.unowned || []).includes(p) ? "No project" : projLabel(p);
+const vmOwner = p => p === "machine" ? "This machine's own" : (vmsData?.unowned || []).includes(p) ? "No space" : projLabel(p);
 function vmGroupsHtml(rows){
   const byName = (a, b) => a.localeCompare(b, undefined, {sensitivity: "base"});
   const owners = [...new Set(rows.map(v => v.project))].sort((a, b) => byName(vmOwner(a), vmOwner(b)));
@@ -188,7 +188,7 @@ function vmBar(ghost){
   const hosts = ghost ? null : vmsData?.hosts || [];
   return `<div class="field docbarrow dmpick">${
       hosts && hosts.length < 2 ? "" : nodePick("vmPickNode", hosts && [{id: "", name: "Every node"}, ...hosts], vmsNode)}<input${ghost ? "" : ` id="vmSearch"`} type="search"
-      placeholder="${isPhone() ? "search" : "name, OS or project"}" autocomplete="off" aria-label="narrow the VMs: name, OS or project" value="${esc(vmsSearch)}"${dead}><span class="sp"></span>
+      placeholder="${isPhone() ? "search" : "name, OS or space"}" autocomplete="off" aria-label="narrow the VMs: name, OS or space" value="${esc(vmsSearch)}"${dead}><span class="sp"></span>
       ${viewSeg("vmview", vmView, "each VM as a card", "one line per VM, opening into its card", dead)}${
       (any || ghost) && !featureOff("vms") ? `<span class="actbar"><button type="button"${ghost ? "" : ` id="bVmNew"`} class="primary"${
         dead || !(vmsData?.hosts || []).length ? " disabled" : ""}>${barSaid("New VM", "New")}</button></span>` : ""}</div>`;
@@ -202,7 +202,7 @@ function vmTiles(vms, projects){
   return statTiles([
     {label: "running", value: running, sub: `of ${vms.length}${matchMedia("(max-width:440px)").matches ? "" : ` VM${vms.length === 1 ? "" : "s"}`}`,
      tone: vms.length && !running ? "warn" : ""},
-    {label: "projects", value: projects},
+    {label: "spaces", value: projects},
     {label: "snapshots", value: vms.reduce((n, v) => n + (v.snapshots || []).length, 0)},
     {label: broke === 1 ? "needs a look" : "need a look", value: broke, tone: "bad", omit: !broke,
      title: "failed, crashed, or not on its node"},
@@ -222,7 +222,7 @@ function renderVmsInto(i){
   if (!vmsData){
     el.__vmHtml = "";
     el.innerHTML = `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${statTiles([{label: "running", value: GHOST, sub: GHOST},
-        {label: "projects", value: GHOST}, {label: "snapshots", value: GHOST}])}
+        {label: "spaces", value: GHOST}, {label: "snapshots", value: GHOST}])}
       <section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(2)}</section>`)}</div>`;
     loadVms();
     return;
@@ -245,7 +245,7 @@ function renderVmsInto(i){
     : !hosts.length ? `<div class="empty vmnone">No node has VM host yet: its Features section on the ${pageLink("nodes", "Nodes page")} installs it, where the machine has /dev/kvm.</div>`
     : !(vmsData.vms || []).length ? `<div class="empty vmnone">No VM yet. ${Object.values(vmsData.can || {}).includes("write")
         ? "Press <b>New VM</b>, or ask the agent in a session for one: <code>aerie vm new NAME --os debian</code>."
-        : "A project's sessions make them with <code>aerie vm new</code> where its settings allow it."}</div>`
+        : "A space's sessions make them with <code>aerie vm new</code> where its settings allow it."}</div>`
     : !rows.length ? `<div class="empty">No VM matches “${esc(vmsSearch)}”.</div>` : "";
   const head = off || vmsErr || !onNode.length ? "" : vmTiles(onNode, chips.length) + chipBar(chips, vmsChip, "data-vmchip");
   // A reload that lands while the search is being typed in keeps the box's
@@ -380,7 +380,7 @@ function openNewVm(forProject = ""){
   m.innerHTML = `<div class="box"><h3>New VM</h3>
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmName", "Name")}<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db"></div>
-      <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a project, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, vmOwner(p)]), forProject)}</select></div>
+      <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, vmOwner(p)]), forProject)}</select></div>
     </div>
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmNode", "Node", "a node with VM host installed")}<select id="vmNode">${optionList(hosts.map(h => [h.id, h.name]))}</select></div>
@@ -540,11 +540,11 @@ function vmHwFields(host, hw, admin){
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmHwMemMax", "Memory ceiling, GB", "it starts with its memory and may balloon up to this; empty for none")}
         <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
-      <div class="setrow col ctlrow">${lbl("vmHwNet", "Network", "its project's own network, or your LAN as a machine of its own")}
-        <select id="vmHwNet">${optionList([["project", "Its project's network"], ["lan", "The LAN"]], hw?.net || "project")}</select></div>
+      <div class="setrow col ctlrow">${lbl("vmHwNet", "Network", "its space's own network, or your LAN as a machine of its own")}
+        <select id="vmHwNet">${optionList([["project", "Its space's network"], ["lan", "The LAN"]], hw?.net || "project")}</select></div>
     </div>
     <div class="prefrow ctlrow">
-      <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the project, seen inside the VM by: mount -t virtiofs project /mnt; empty for none, a dot for the whole project")}
+      <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
         <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
       <label class="ndcap"><input type="checkbox" id="vmHwShareRo"${sh.ro ? " checked" : ""}> read-only</label>
     </div>

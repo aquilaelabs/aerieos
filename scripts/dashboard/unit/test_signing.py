@@ -123,7 +123,7 @@ class Signing(unittest.TestCase):
         self.assertEqual(st, 200)
         z = zipfile.ZipFile(io.BytesIO(data))
         said = z.read("password.txt").decode()
-        self.assertIn("this project's backup password", said)
+        self.assertIn("this space's backup password", said)
         rec = signing._record("app", "sideload", "watch")
         self.assertNotIn(rec["store_pass"], said, "the key's own password is not in the backup")
         ks = next(n for n in z.namelist() if n.endswith(".p12"))

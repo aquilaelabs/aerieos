@@ -261,9 +261,9 @@ function phonePanel(n){
     const ps = n.lendable || [];
     rows.push(`<div class="row phlend">
        <div class="grow">
-         <div class="name">Lend to a project</div>
+         <div class="name">Lend to a space</div>
          <div class="prefrow ctlrow">
-           <label class="pick">Project <select id="phLendTo" aria-label="the project to lend the phone to"${ps.length ? "" : " disabled"}>${
+           <label class="pick">Space <select id="phLendTo" aria-label="the space to lend the phone to"${ps.length ? "" : " disabled"}>${
              optionList(ps.map(p => [p, projLabel(p)]), phLendTo)}</select></label>
            <label class="pick">For <select id="phLendFor" aria-label="how long">
              <option value="1"${phLendFor === "1" ? " selected" : ""}>1 hour</option>
@@ -272,7 +272,7 @@ function phonePanel(n){
          </div>
          <div class="actbar"><span class="state">its sessions then install, run, see and touch its own app here without asking; anything else still asks you</span>
            <button type="button" id="phLend"${ps.length ? "" : " disabled"}>Lend</button></div>
-         ${ps.length ? "" : `<div class="sub bad">No project of yours runs on ${esc(n.name)}, so there is none to lend it to.</div>`}
+         ${ps.length ? "" : `<div class="sub bad">No space of yours runs on ${esc(n.name)}, so there is none to lend it to.</div>`}
        </div></div>`);
   }
   // The phones this node has paired or connected, newest first. The pairing
@@ -358,7 +358,7 @@ function wirePhoneTab(root){
     // An administrator ending somebody else's connection is told whose it
     // is, and that its lease goes with it (R120).
     const other = document.getElementById("phDisconnect")?.dataset.other;
-    if (other && !await askYes(`Disconnect ${other}'s phone? Its lease to a project ends too.`)) return;
+    if (other && !await askYes(`Disconnect ${other}'s phone? Its lease to a space ends too.`)) return;
     phBusy = "disconnecting"; phRev++; drawPanes();
     phFetch({action: "disconnect"});
   });
@@ -392,7 +392,7 @@ function wirePhoneTab(root){
   if (lf) lf.onchange = () => { phLendFor = lf.value; };
   on("phLend", () => {
     const project = lt?.value || "";
-    if (!project) return notify("pick the project to lend it to", true);
+    if (!project) return notify("pick the space to lend it to", true);
     phBusy = "lending"; phRev++; drawPanes();
     phFetch({action: "lend", project, hours: Number(lf?.value || 1)});
   });

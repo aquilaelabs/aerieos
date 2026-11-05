@@ -91,7 +91,7 @@ function drawChatList(el){
     const n = notMine(p) ? 0 : unread["p:" + p.name] || 0;
     return `<button type="button" class="row chatrow${notMine(p) ? " notmine" : ""}${
       n ? " unread" : ""}${cur === "p:" + p.name ? " on" : ""}" data-proj="${esc(p.name)}"
-       ${notMine(p) ? `title="you have not taken this project on; you can read it"` : ""}>
+       ${notMine(p) ? `title="you have not taken this space on; you can read it"` : ""}>
        <span class="grow">#${esc(projLabel(p.name))}</span>
        ${n ? `<span class="pill">${n}</span>` : ""}
      </button>`;
@@ -113,7 +113,7 @@ function drawChatThread(el){
   if (!c || !c.people){ chatDrawn = ""; return paint(el, ""); }
   if (!chatWith){
     chatDrawn = "";
-    return paint(el, `<div class="hint chatpick">a person or a project's channel, from the list</div>`);
+    return paint(el, `<div class="hint chatpick">a person or a space's channel, from the list</div>`);
   }
   // A person's name carries when they were last here, as it does in the list.
   const lastIn = n => new Set(c.online || []).has(n) ? "here now"
@@ -138,7 +138,7 @@ function drawChatThread(el){
       <button type="button" class="link" id="chatBack">‹ all</button>
       <b class="grow">${esc(title)}</b>
     </div>
-    ${chatWith.project ? `<div class="sub chatnote">everyone on this project sees this</div>` : ""}
+    ${chatWith.project ? `<div class="sub chatnote">everyone on this space sees this</div>` : ""}
     <div class="chatlog" id="chatlog">${chatMsgs.map(m => `
       <div class="chatmsg${m.kind === "did" || m.kind === "asked" ? " ev" : ""}">
         <span class="dim">${esc(m.who || "?")} · ${ago(m.at)}</span>

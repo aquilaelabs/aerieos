@@ -103,7 +103,7 @@ fun ProjectScreen(store: Store, name: String) {
         val held = if (on) !row.bool("owner_mine") else row.bool("locked_admin")
         androidx.compose.material3.AlertDialog(onDismissRequest = { locking = false },
             title = { Text(if (on) (if (held) "Lock it as an administrator?" else "Lock it?") else "Unlock it?") },
-            text = { Text(if (!on) "Everybody on the project works in it again."
+            text = { Text(if (!on) "Everybody on the space works in it again."
                           else if (held) "Every session here ends now. Nobody starts a session in it or changes it, " +
                                "${row.str("owner_name").ifBlank { "its owner" }} included, until an administrator unlocks it."
                           else "Every session here but yours ends now. Nobody but you starts a session in it or changes it until you unlock it.") },
@@ -148,7 +148,7 @@ fun ProjectScreen(store: Store, name: String) {
                             scope.launch {
                                 said = try {
                                     api.archive(name, on).str("error").ifBlank {
-                                        if (on) "archived: under Archived at the foot of Projects, and working as before" else "unarchived" }
+                                        if (on) "archived: under Archived at the foot of Spaces, and working as before" else "unarchived" }
                                 } catch (e: Exception) { e.message ?: "it did not change" }
                                 reloadStatus()
                             }
@@ -225,7 +225,7 @@ private fun Roadmap(api: org.aerieos.app.Api, project: String) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Column(Modifier.padding(16.dp, 8.dp)) {
-                if (live) Dim("a session is open on this project: $to")
+                if (live) Dim("a session is open on this space: $to")
                 OutlinedTextField(text, { text = it }, label = { Text("Add to the roadmap") }, modifier = Modifier.fillMaxWidth())
                 Row { Spacer(Modifier.weight(1f)); Button(enabled = text.isNotBlank(), onClick = { scope.launch {
                     said = try { api.roadmapAdd(project, text.trim()); text = ""; "added" } catch (e: Exception) { e.message ?: "" }
@@ -339,7 +339,7 @@ private fun Briefing(api: org.aerieos.app.Api, project: String) {
         item {
             Column(Modifier.padding(16.dp, 8.dp)) {
                 if (rl.error != null) Problem(rl.error)
-                if (rl.value != null) Dim("${rl.value.int("standing")} standing rule${if (rl.value.int("standing") == 1) "" else "s"}, ${rl.value.int("conditional")} conditional · edited on the project's Overview in the dashboard")
+                if (rl.value != null) Dim("${rl.value.int("standing")} standing rule${if (rl.value.int("standing") == 1) "" else "s"}, ${rl.value.int("conditional")} conditional · edited on the space's Overview in the dashboard")
                 if (rl.value != null && rules.isEmpty()) Dim("no house rules here")
             }
         }
@@ -358,7 +358,7 @@ private fun Briefing(api: org.aerieos.app.Api, project: String) {
         if (globals.isNotEmpty()) item {
             Column(Modifier.padding(16.dp, 12.dp)) {
                 Text("Global rules", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Dim("handed to every project's sessions; switched off for this project on the dashboard's Briefing")
+                Dim("handed to every space's sessions; switched off for this space on the dashboard's Briefing")
             }
         }
         items(globals) { g ->
@@ -438,7 +438,7 @@ private fun Artifacts(api: org.aerieos.app.Api, project: String) {
                             .filter { it.isNotBlank() }.joinToString(" · "))
                     if (v.str("warn").isNotBlank()) Text(v.str("warn"), color = Warn, style = MaterialTheme.typography.bodySmall)
                 }
-                if (b != null) Dim(if (b.str("node").isNotBlank()) "builds on ${b.str("name")}" else "no node: nothing compiles for this project")
+                if (b != null) Dim(if (b.str("node").isNotBlank()) "builds on ${b.str("name")}" else "no node: nothing compiles for this space")
                 if (said.isNotBlank()) Text(said, color = Bad)
                 if (ar.value != null && rows.isEmpty()) Dim("nothing in dist/ yet")
             }
@@ -504,7 +504,7 @@ private fun Settings(api: org.aerieos.app.Api, project: String, status: org.json
     val changed = yours != null && (keys.any { picks[it] != yours.str(it) } || (prefs != null && tone != prefs.str("color")))
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp, 8.dp)) {
         if (status == null) Loading()
-        if (prefs == null && status != null) Dim("this project has no settings here")
+        if (prefs == null && status != null) Dim("this space has no settings here")
         if (prefs != null) {
             // The project's color: the bar its row wears here and its tab
             // wears on the dashboard. Staged like the rest, until Save.

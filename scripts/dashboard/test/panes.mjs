@@ -146,7 +146,7 @@ for (const k of ['projects', 'docker', 'library']){
 await page.evaluate(() => { openTab({kind: 'notebook', arg: 'alpha', label: 'a'});
                             openTab({kind: 'notebook', arg: 'beta', label: 'b'}); });
 ok(await kindCount('notebook') >= 2,
-   '...while notebooks are one per project, which is the whole point of them');
+   '...while notebooks are one per space, which is the whole point of them');
 
 // Every tab kind the page knows must be one the SERVER will keep. A kind
 // missing from TAB_KINDS is dropped from the saved layout without a word, so

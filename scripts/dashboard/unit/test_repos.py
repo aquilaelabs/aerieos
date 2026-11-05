@@ -51,8 +51,8 @@ class Repos(unittest.TestCase):
                          "spaces and punctuation kept, and nothing in it yet")
         self.assertTrue(registry.is_repos(got["key"]) and not (self.ws / got["key"]).exists())
         registry.sync()
-        self.assertEqual(registry.label(got["key"]), "Shop front, v2!", "a sync keeps a project's name as typed")
-        self.assertIn("already a project's name", repos.create("shop front, V2!")["error"])
+        self.assertEqual(registry.label(got["key"]), "Shop front, v2!", "a sync keeps a space's name as typed")
+        self.assertIn("already a space's name", repos.create("shop front, V2!")["error"])
         self.assertIn("letter or digit", repos.create("  ?! ")["error"])
 
     def test_a_repository_made_after_a_session_started_is_named(self):
@@ -75,7 +75,7 @@ class Repos(unittest.TestCase):
         self.assertTrue(repos.move("reader", key).get("ok"))
         self.assertEqual(repos.made_since("app", 200), ["docs", "reader"])
         self.assertTrue(other)
-        self.assertEqual(repos.made_since("loner", 0), [], "a repository in no project has none beside it")
+        self.assertEqual(repos.made_since("loner", 0), [], "a repository in no space has none beside it")
 
     def test_a_project_and_its_repository_may_share_a_name(self):
         key = self.project("app", "app")
@@ -91,7 +91,7 @@ class Repos(unittest.TestCase):
         got = repos.move("server", tools)
         self.assertEqual((got["was"], repos.members(shop), repos.members(tools)), (shop, ["app"], ["docs", "server"]))
         self.assertIn("already in Tools", repos.move("server", tools)["error"])
-        self.assertIn("is not a project", repos.move("server", "nowhere")["error"])
+        self.assertIn("is not a space", repos.move("server", "nowhere")["error"])
         self.assertEqual(repos.members(tools), ["docs", "server"], "a refused move leaves it where it was")
 
     def test_a_repository_in_no_project_is_given_one_of_its_own(self):
@@ -101,7 +101,7 @@ class Repos(unittest.TestCase):
         self.assertEqual(set(keys), {"app", "docs", "reader"}, "every live repository not in one, and only those")
         self.assertEqual(registry.label(keys["docs"]), "docs")
         self.assertEqual(registry.label(keys["app"]), f"app ({registry.pid('app')})",
-                         "a name that is a project's already gets the repository's id beside it")
+                         "a name that is a space's already gets the repository's id beside it")
         self.assertEqual((repos.members(keys["app"]), repos.project_of("server")), (["app"], shop))
         self.assertEqual(repos.place(), [], "a second time, nothing to place")
 
@@ -112,7 +112,7 @@ class Repos(unittest.TestCase):
         shop = self.project("Shop", "app")
         (self.ws / "cart").mkdir()
         projects._claim("cart", "cart", shop)
-        self.assertEqual(repos.place({"cart"}), [], "no project made for it")
+        self.assertEqual(repos.place({"cart"}), [], "no space made for it")
         self.assertEqual(repos.project_of("cart"), shop)
         self.assertTrue(repos.add(shop, "cart").get("ok"), "the dialog's own add after it is a no-op")
 
@@ -132,13 +132,13 @@ class Repos(unittest.TestCase):
         shop = self.project("Shop", "app", "server")
         repos.detach("app")
         made = repos.place()
-        self.assertNotIn("app", [d for _, d in made], "no project made for it")
+        self.assertNotIn("app", [d for _, d in made], "no space made for it")
         self.assertEqual(repos.project_of("app"), shop, "back where it was deleted from")
 
     def test_a_project_is_deleted_only_with_nothing_in_it(self):
         shop = self.project("Shop", "app")
         self.assertIn("move or delete its repositories first", repos.delete(shop)["error"])
-        self.assertEqual(repos.detach("app"), shop, "to the trash, out of its project")
+        self.assertEqual(repos.detach("app"), shop, "to the trash, out of its space")
         self.assertEqual((repos.project_of("app"), registry.last_project("app")), ("", shop),
                          "its record keeps where it was, for the trash and a restore")
         self.assertTrue(repos.delete(shop)["ok"])
@@ -149,7 +149,7 @@ class Repos(unittest.TestCase):
         # R151 step 1: the node the suites run on is one of the project's
         # own, "" for the session's own; stored only when picked.
         prefs.set_prefs("app", node="n1", nodes=["n1", "n2"])
-        self.assertIn("one of the project's nodes", prefs.set_prefs("app", test_node="n9")["error"])
+        self.assertIn("one of the space's nodes", prefs.set_prefs("app", test_node="n9")["error"])
         self.assertTrue(prefs.set_prefs("app", test_node="n2").get("ok", True))
         self.assertEqual(prefs.get("app")["test_node"], "n2")
         prefs.set_prefs("app", test_node="")
@@ -166,11 +166,11 @@ class Repos(unittest.TestCase):
         # set from a repository's notebook is that repository's own override
         # (R208 step 6), and the project's default is set on its own door.
         self.assertEqual((s["node"], s["devbuild"], s["repos_of"]), ("n1", "deny", key),
-                         "the project's node from any repository; a dial set there is that repository's alone")
+                         "the space's node from any repository; a dial set there is that repository's alone")
         self.assertEqual((prefs.get("app")["devbuild"], prefs.get("app")["overrides"]), ("auto", ["devbuild"]))
         prefs.set_prefs("app", scope="project", devbuild="ask")
         self.assertEqual((prefs.get("app")["devbuild"], prefs.get("server")["devbuild"]), ("auto", "ask"),
-                         "the project's default reaches the repository that inherits, not the one that overrides")
+                         "the space's default reaches the repository that inherits, not the one that overrides")
         self.assertEqual((s["build"], prefs.get("app")["build"]), ("make server", "make app"),
                          "a repository's own build stays its own")
 
@@ -178,9 +178,9 @@ class Repos(unittest.TestCase):
         key = self.project("Shop", "app")
         prefs.set_prefs("app", scope="project", devbuild="auto")
         repos.add(key, "docs")
-        self.assertEqual(prefs.all_projects()["docs"]["devbuild"], "auto", "the status row reads the project's dial")
+        self.assertEqual(prefs.all_projects()["docs"]["devbuild"], "auto", "the status row reads the space's dial")
         prefs.set_prefs("app", makevms="auto")             # app's own override: the project keeps no record of it
-        self.assertEqual(prefs.all_projects()["docs"]["makevms"], "deny", "...and a repository's override is not the project's")
+        self.assertEqual(prefs.all_projects()["docs"]["makevms"], "deny", "...and a repository's override is not the space's")
 
     def test_reads_go_by_the_project_and_take_in_a_repository_added_later(self):
         prefs.set_prefs("reader", reads=["app"])
@@ -209,7 +209,7 @@ class Briefing(unittest.TestCase):
         preamble.repos_fn = lambda p: ("Shop", "P9", [("app", "app"), ("server", "server")]) if p in ("app", "server") else None
         self.addCleanup(lambda: setattr(preamble, "repos_fn", None))
         text = preamble.repos_part("app")
-        self.assertIn("Shop (P9), a project of 2 repositories", text)
+        self.assertIn("Shop (P9), a space of 2 repositories", text)
         self.assertIn("### Repository server", text)
         for want in ("rules of server", "roadmap of server", "bugs of server"):
             self.assertIn(want, text)
@@ -239,10 +239,10 @@ class Briefing(unittest.TestCase):
         self.assertIn("own to work in, commit to and push", who)
         reads = preamble.reads_line("app")
         self.assertIn("elsewhere", reads)
-        self.assertNotIn("server", reads, "its own project's repository is not called read-only")
+        self.assertNotIn("server", reads, "its own space's repository is not called read-only")
         preamble.repos_fn = lambda p: None
         preamble.project_fn = lambda p: ("Shop", "P9")
-        self.assertIn("shown as Shop", preamble.identity_line("app"), "a project of one is briefed as the project")
+        self.assertIn("shown as Shop", preamble.identity_line("app"), "a space of one is briefed as the space")
 
     def test_bb_preamble_briefs_the_project(self):
         """aerie preamble (preamble-verbs.py), which every session's briefing
@@ -265,7 +265,7 @@ class Briefing(unittest.TestCase):
         r = subprocess.run([sys.executable, os.path.join(here, "..", "..", "lib", "preamble-verbs.py"),
                             os.path.join(here, ".."), "app", ""], capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
-        self.assertIn("This project is shown as Shop", r.stdout)
+        self.assertIn("This space is shown as Shop", r.stdout)
         self.assertIn("server at /workspace/server", r.stdout)
         self.assertNotIn("reads server", r.stdout)
 
@@ -292,7 +292,7 @@ class Briefing(unittest.TestCase):
         other = preamble.memory_part("app", "u_1", "codex")[0]
         self.assertIn("Fact of app", other)
         self.assertIn("Fact of server", other)
-        self.assertIn("one about the project as a whole goes on app", other)
+        self.assertIn("one about the space as a whole goes on app", other)
         self.assertEqual(preamble.memory_part("app", "", "codex"), ("", ""), "no account, nothing to read")
         preamble.repos_fn = lambda p: None
         self.assertEqual(preamble.memory_part("app", "u_1", "claude")[0], "", "a lone repository's Claude session is told nothing new")

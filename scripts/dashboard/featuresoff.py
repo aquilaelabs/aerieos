@@ -17,7 +17,7 @@ from html import escape
 # Each feature, and what it is in the words Settings lists it by.
 FEATURES = {
     "tunnel": "the controller's tunnel from home",
-    "ftp": "FTP access to projects",
+    "ftp": "FTP access to spaces",
     "phone": "pairing and lending a phone",
     "devices": "signing in from the apps on a person's own devices",
     "apps": "the apps' downloads",

@@ -120,10 +120,10 @@ class Store(unittest.TestCase):
         gitcreds.write_line("web", "https://x:projtoken123@github.com")
         c = gitcreds.git_c("web", UID)
         self.assertEqual(c[:2], ["-c", "credential.helper="], "the tree's own helpers are reset first")
-        self.assertEqual(len([x for x in c if x.startswith("credential.helper=!")]), 1, "the project's own line")
+        self.assertEqual(len([x for x in c if x.startswith("credential.helper=!")]), 1, "the space's own line")
         gitcreds.link_account("web", UID, self.fid)
         c = gitcreds.git_c("web", UID)
-        self.assertEqual(len([x for x in c if x.startswith("credential.helper=!")]), 2, "their handout, then the project's")
+        self.assertEqual(len([x for x in c if x.startswith("credential.helper=!")]), 2, "their handout, then the space's")
         self.assertEqual(gitcreds.git_c("nothing-here"), [])
 
     def test_their_own_work_is_handed_their_token_opened_per_use(self):
@@ -179,7 +179,7 @@ class Store(unittest.TestCase):
         self.assertEqual(gitcreds.linked_to("web")[0], UID)
         self.assertEqual(gitcreds.read_line("web"), "https://x:projtoken123@github.com")
         self.assertEqual(gitcreds.read_line("api"), "https://y:apitoken123@gitlab.com")
-        self.assertEqual(gitcreds.adopt(lambda p: UID), 0, "once: a linked project is left as it is")
+        self.assertEqual(gitcreds.adopt(lambda p: UID), 0, "once: a linked space is left as it is")
 
     def test_a_token_given_is_the_givers(self):
         self.assertTrue(gitcreds.keep_for("web", UID, "https://x:given123@github.com", "x"))

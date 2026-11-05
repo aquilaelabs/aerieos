@@ -59,7 +59,7 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
   await page.waitForSelector(`${RT} .icform`, { timeout: 10000 });
   const fields = await page.$$eval(`${RT} .icform [data-icf], ${RT} .icform [data-icadd], ${RT} .icform [data-icproj]`, es => es.map(e => e.dataset.icf || e.dataset.icadd || `proj:${e.value}`));
   ok(fields.includes('anthropic') && fields.includes('openai') && fields.includes('ollama') && fields.includes('custom') && fields.some(f => f.startsWith('proj:')),
-     `its page's Configure form is the pack's config block: the providers' keys, the endpoints, Ollama and the projects (${fields.join(', ')})`);
+     `its page's Configure form is the pack's config block: the providers' keys, the endpoints, Ollama and the spaces (${fields.join(', ')})`);
   await page.fill(`${RT} .icform [data-icf="anthropic"]`, 'sk-ant-test-0000');
   await page.click(`${RT} .icform [data-icadd="custom"]`);
   await page.waitForSelector(`${RT} .icform .icrow[data-iclist="custom"]`, { timeout: 5000 });

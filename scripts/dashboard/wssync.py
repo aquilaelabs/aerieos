@@ -174,7 +174,7 @@ def _root(project, make=False):
         # .git line git itself writes (a node never sends that file:
         # git_guard), so git on the controller finds it as the worktree it is.
         if not _there(wt[0]):
-            raise ValueError("no such project")
+            raise ValueError("no such space")
         r = _worktrees() / wt[0] / wt[2]
         if not r.is_dir():
             if not make or not (WORKSPACE / wt[0] / ".git" / "worktrees" / wt[2]).is_dir():
@@ -185,10 +185,10 @@ def _root(project, make=False):
             dot.write_text(f"gitdir: {WORKSPACE / wt[0] / '.git' / 'worktrees' / wt[2]}\n")
         return r
     if not re.fullmatch(r"[A-Za-z0-9._-]+", project or "") or project.startswith("."):
-        raise ValueError("no such project")
+        raise ValueError("no such space")
     r = WORKSPACE / project
     if not r.is_dir():
-        raise ValueError("no such project")
+        raise ValueError("no such space")
     return r
 
 
@@ -394,17 +394,17 @@ def may(nid, project, write=False):
     nodes the project is bound to, and no other."""
     wt = worktree_of(project)
     if _is_dev(nid):
-        return f"{project} is a worktree: a device syncs a project" if wt else ""
+        return f"{project} is a worktree: a device syncs a space" if wt else ""
     if wt:
         return "" if wt[0] in (bound_projects(nid) if nodes else []) \
-            else f"{wt[0]} is not a project this node holds as a synced copy"
+            else f"{wt[0]} is not a space this node holds as a synced copy"
     if project in (bound_projects(nid) if nodes else []):
         return ""
     if not write and project in read_projects(nid):
         return ""
     if project in read_projects(nid):
-        return f"{project} is read-only on this node: a project bound here reads it"
-    return f"{project} is not a project this node holds as a synced copy"
+        return f"{project} is read-only on this node: a space bound here reads it"
+    return f"{project} is not a space this node holds as a synced copy"
 
 
 _reads_of = lambda project: []   # noqa: E731 (set by configure_reads: (project) -> [projects it reads])
@@ -696,7 +696,7 @@ def git_guard(rel, link):
     if link:
         up = os.path.normpath(os.path.join(os.path.dirname(rel), link))
         if up == ".." or up.startswith("../"):
-            return "a link out of the project is not synced"
+            return "a link out of the space is not synced"
     if ".git" not in parts:
         return ""
     i = parts.index(".git")
@@ -738,7 +738,7 @@ def put(nid, project, q, stream, length):
         with contextlib.suppress(OSError):
             mode = (root / rel).stat().st_mode & 0o7777
     if link and os.path.isabs(link):
-        return {"error": "a link out of the project is not synced"}, 400
+        return {"error": "a link out of the space is not synced"}, 400
     if (why := git_guard(rel, link)):
         _refused(nid, project, rel, why)
         return {"error": why}, 403
@@ -749,8 +749,8 @@ def put(nid, project, q, stream, length):
     # then a link under it to ".." put the project's parent in reach, every
     # other project's tree read and written through it (B531).
     if not _inside(root, target.parent) or (link and not _inside(root, os.path.join(os.path.realpath(target.parent), link))):
-        _refused(nid, project, rel, "a path or a link that leads out of the project")
-        return {"error": "a path or a link that leads out of the project is not synced"}, 403
+        _refused(nid, project, rel, "a path or a link that leads out of the space")
+        return {"error": "a path or a link that leads out of the space is not synced"}, 403
     who = _who(nid)
     tmp = None
     try:

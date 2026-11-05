@@ -93,7 +93,7 @@ def fetch(verb, auth, q, authed):
             return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
         path = workspace.file_path(j.get("project") or "", q.get("path", [""])[0])
         if path is None:
-            return {"error": "no such file in the project's dist/"}, 404
+            return {"error": "no such file in the space's dist/"}, 404
         return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
     if verb == "iso":
         # An installer's ISO uploaded on the VMs page (R99), for the node

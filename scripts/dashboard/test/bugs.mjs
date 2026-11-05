@@ -204,7 +204,7 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   bbZ('add', 'stamped on arrival', '--sev', 'low');
   const z = zread()[0];
   ok(typeof z.seen_in === 'string' && z.seen_in.length > 0,
-     `a report is stamped with the project's version when it is filed (${z.seen_in})`);
+     `a report is stamped with the space's version when it is filed (${z.seen_in})`);
   ok(new RegExp(`seen in: ${z.seen_in.replace(/[.+]/g, '\\$&')}`).test(bbZ('show', '1')),
      '...and aerie bug show prints it');
   execFileSync('git', ['-C', Z, 'commit', '-q', '--allow-empty', '-m', 'two'], { env: genv });
@@ -358,18 +358,18 @@ ok(read().some(b => b.id === 3), 'Cancel closes it and deletes nothing');
 await page.click('#bugList .bug[data-id="3"] .macts .more > button');   // an open report's Remove is under More (R254 step 7)
 await page.click('#bugList .bug[data-id="3"] .bRm');
 await page.waitForSelector('.bug .dropbox textarea', { timeout: 10000 });
-await page.fill('.bug .dropbox textarea', 'filed against the wrong project');
+await page.fill('.bug .dropbox textarea', 'filed against the wrong space');
 await page.click('.bug .dropbox .danger');
 await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2,
                            { timeout: 10000 });
 ok(!read().some(b => b.id === 3), 'Delete it takes the row for good');
-ok(/wrong project/.test(bbBug('history', '--find', 'wrong project')),
+ok(/wrong project/.test(bbBug('history', '--find', 'wrong space')),
    '...leaving the reason in the log, which is all that is left of it');
 
 // A session can do the same, for the case that prompted it: a mis-filed report.
 bbBug('add', 'filed by a session in error');
 const oops = String(read().at(-1).id);
-bbBug('rm', oops, 'a mis-file: the session meant the other project');
+bbBug('rm', oops, 'a mis-file: the session meant the other space');
 ok(!read().some(b => String(b.id) === oops),
    'aerie bug rm deletes one, for the mis-file that closing would lie about');
 
@@ -620,12 +620,12 @@ ok(log.body.history.some(e => e.act === 'sent' && String(e.id) === String(first)
 
 // ---- what the server refuses ------------------------------------------------
 for (const [what, body] of [
-  ['a project that does not exist', { action: 'add', project: 'nosuch', title: 'x' }],
-  ['a project name that is really a path', { action: 'add', project: '../etc', title: 'x' }],
+  ['a space that does not exist', { action: 'add', project: 'nosuch', title: 'x' }],
+  ['a space name that is really a path', { action: 'add', project: '../etc', title: 'x' }],
   ['a bug with no title', { action: 'add', project: 'alpha', title: '  ' }],
   ['a severity nobody defined', { action: 'add', project: 'alpha', title: 'x', severity: 'catastrophic' }],
   ['a status nobody defined', { action: 'status', project: 'alpha', id: 1, status: 'maybe' }],
-  ['a bug history request for a project that does not exist',
+  ['a bug history request for a space that does not exist',
    { action: 'history', project: 'nosuch' }],
   ['a bug nobody has', { action: 'status', project: 'alpha', id: 999, status: 'fixed' }],
   ['an action nobody offers', { action: 'purge', project: 'alpha' }],

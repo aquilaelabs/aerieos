@@ -26,7 +26,7 @@ class SignAsk(unittest.TestCase):
         self.assertEqual(mine[0]["kind"], "sign")
         self.assertEqual(mine[0]["cmd"], ["sign", "app-release.apk", "--for", "sideload"])
         self.assertFalse([x for x in phone.requests_open("u_00000009", True) if x["id"] == r["id"]],
-                         "an administrator who does not own the project is not the one asked")
+                         "an administrator who does not own the space is not the one asked")
 
     def test_approve_starts_it_as_the_session_asked(self):
         r = phone.ask_sign("for testers", "app", "app-release.apk", "sideload", "u_00000002", "ada",

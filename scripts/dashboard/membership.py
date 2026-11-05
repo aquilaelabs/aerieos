@@ -349,7 +349,7 @@ def invite(me, project, name, role=""):
         return {"error": f"no account called {name}"}, 400
     r = roles.get(role) if role else None
     if not r or r.get("scope") != "projects":
-        return {"error": "pick the role they are invited as: a role on a project"}, 400
+        return {"error": "pick the role they are invited as: a role on a space"}, 400
     if name in members(project):
         return {"error": f"{name} is on {project} already"}, 400
     with _lock:
@@ -380,7 +380,7 @@ def withdraw(me, iid):
         if not r:
             return {"error": "no such invitation"}, 404
         if r.get("by") != users.uid_of(me) and not may_manage(me, p):
-            return {"error": "only who invited them, or the project's owner, withdraws it"}, 403
+            return {"error": "only who invited them, or the space's owner, withdraws it"}, 403
         d["projects"][p] = [x for x in d["projects"][p] if x.get("id") != iid]
         _write("invites.json", d)
     return view(me, p), 200
@@ -448,7 +448,7 @@ def verb(me, req):
         except (TypeError, ValueError):
             return {"error": "which invitation?"}, 400
     if not project:
-        return {"error": "which project?"}, 400
+        return {"error": "which space?"}, 400
     if act == "view":
         return view(me, project), 200
     if act == "set":

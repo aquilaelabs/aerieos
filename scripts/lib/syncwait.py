@@ -33,7 +33,7 @@ def _read(f):
         return None
 
 
-def up(project, why="the controller acts on this project's tree"):
+def up(project, why="the controller acts on this space's tree"):
     """Every change made here has reached the controller: a tick that began
     after this was asked saw nothing left to send. False, said, when it
     did not happen in time."""

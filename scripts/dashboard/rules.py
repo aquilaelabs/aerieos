@@ -196,7 +196,7 @@ BUILTIN = [
              " in the reply. Anything else is filed and left. One level deep:"
              " a bug found while fixing one of those is filed, not chased."},
     {"name": "prove-in-the-app",
-     "text": "Tests passing is not done: where the project has a dev instance"
+     "text": "Tests passing is not done: where the space has a dev instance"
              " (`aerie devapp`) or an app on the emulator, use the change there the way"
              " a person would before calling it done (`aerie capture shot` or `reel`"
              " to see it), and say what you saw."},
@@ -230,7 +230,7 @@ ALWAYS = [
      "text": "Start a build, a test run, a probe or a dev instance's rebuild in the background,"
              " the way your tool runs one detached (Claude Code's run_in_background), and wait on its"
              " notification, answering meanwhile: one in the foreground holds every reply until it"
-             " ends, so a new ask cannot cut into it the way the project's While a test runs setting"
+             " ends, so a new ask cannot cut into it the way the space's While a test runs setting"
              " says. The unit tier (aerie tests unit) is quick enough to run either way.",
      # A probe is a run against the kept fixture, a rebuild is minutes of a
      # job, and a build can be longer than either (the operator, 16 Oct:
@@ -262,7 +262,7 @@ ALWAYS = [
     # (commit, branch, log, a worktree) is the session's own.
     {"name": "git-through-bb",
      "text": "A session reaches a remote only through aerie git: `aerie git push`, `aerie git fetch`, `aerie git pull`"
-             " and `aerie git ls-remote`, which the controller runs with the project's credential, under"
+             " and `aerie git ls-remote`, which the controller runs with the space's credential, under"
              " its git policy and its scan for secrets. git's own push, fetch, pull, ls-remote and"
              " remote update are refused, with a token or without; everything local to the repository"
              " is git's as ever.",
@@ -662,9 +662,9 @@ def add(project, name, text, paths="", words="", by="claude", doc="", check="", 
 # Said the way `aerie toolchains install` says its refusal: a sentence a session
 # can quote back, naming who does it and where, rather than a door that looks
 # like a fault.
-_NOT_YOURS = ("a global rule reaches every project on this AerieOS, so only "
+_NOT_YOURS = ("a global rule reaches every space on this AerieOS, so only "
               "the operator adds or changes one. Say in your reply what you "
-              "would add and why, and they add it from a project's Briefing")
+              "would add and why, and they add it from a space's Briefing")
 
 
 def _replaces_bad(project, replaces):
@@ -674,7 +674,7 @@ def _replaces_bad(project, replaces):
     if not n:
         return ""
     if project == GLOBAL:
-        return "a global rule applies everywhere; only a project's rule replaces one"
+        return "a global rule applies everywhere; only a space's rule replaces one"
     if n not in {r["name"] for r in globals_now()}:
         return (f"there is no global rule called {n}; `aerie rules --global` lists them")
     return ""
@@ -730,7 +730,7 @@ def _mine(rs, name, by):
             if by == "claude" and r.get("by") != "claude":
                 return None, ("that rule is the operator's: you can read it and "
                               "cannot change it. Say what you think is wrong with "
-                              "it in your reply; they edit it on the project's Overview")
+                              "it in your reply; they edit it on the space's Overview")
             return i, ""
     return None, f"no rule called {name} here"
 
@@ -741,7 +741,7 @@ def edit(project, name, *, text=None, paths=None, words=None, by="claude",
         return {"error": _NOT_YOURS}
     if project == GLOBAL and str(name or "").strip().lower() in _builtin_names():
         return {"error": "that rule ships with AerieOS and is read-only: turn "
-                         "it off for a project, or for every project, from a project's Briefing"}
+                         "it off for a space, or for every space, from a space's Briefing"}
     bad = _replaces_bad(project, replaces)
     if bad:
         return {"error": bad}
@@ -773,7 +773,7 @@ def remove(project, name, why="", by="claude"):
         return {"error": _NOT_YOURS}
     if project == GLOBAL and str(name or "").strip().lower() in _builtin_names():
         return {"error": "that rule ships with AerieOS and is read-only: turn "
-                         "it off for a project, or for every project, from a project's Briefing"}
+                         "it off for a space, or for every space, from a space's Briefing"}
     with _lock:
         d = load()
         p = _project(d, project)
@@ -843,15 +843,15 @@ def _block(rs, triggers):
            " you may change or drop with `aerie rules`; the rest are the"
            " operator's, and you cannot change them, so say in your reply if"
            " one seems wrong."
-           + (" A rule marked (global) is set for every project on this"
+           + (" A rule marked (global) is set for every space on this"
               " AerieOS." if any(r.get("scope") == "global" for r in rs) else "")
            # Specific beats general, and it is said rather than computed: a
            # project's rule and a global one that disagree cannot be found by
            # matching their words, and a session is the one reader here that
            # can tell when two pieces of prose contradict. "Say so" is what
            # tells the operator about a conflict nobody spotted while writing.
-           + (" Where one of this project's rules and a global one disagree,"
-              " follow the project's, and say so in your reply."
+           + (" Where one of this space's rules and a global one disagree,"
+              " follow the space's, and say so in your reply."
               if any(r.get("scope") == "global" for r in rs)
               and any(r.get("scope") != "global" for r in rs) else "")
            + "\n"]
@@ -965,7 +965,7 @@ work_of = None
 # notebook's writes, since it has none. The reason is the rule's text.
 WORK_GUARD = {
     "name": "no-repository",
-    "text": "This project has no repository: nothing here is under git, there is no code to build or test, "
+    "text": "This space has no repository: nothing here is under git, there is no code to build or test, "
             "no map, and no notebook to write to (its roadmap, bugs, rules, wiki, design and memories do not "
             "exist). Its folder holds what a container or a VM needs, and the work is `aerie container new` "
             "and `aerie vm`. What you would have put on the record goes in your reply.",
@@ -1015,7 +1015,7 @@ def said(hit, *, path="", again=False):
     elif path:
         lead = f"House rules cover {path}, which you are about to edit:"
     else:
-        lead = "House rules for this project cover what you are about to do:"
+        lead = "House rules for this space cover what you are about to do:"
     out = [lead]
     for r in hit:
         who = ("* a note a session left, yours to change" if r.get("by") == "claude"

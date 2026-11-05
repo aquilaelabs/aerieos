@@ -275,11 +275,11 @@ await ready(page);
     jobTitle({ type: 'tell', spec: { session: 'u_525cbd90~claude-hello', text: 'Polish the header' } }),
     jobTitle({ type: 'tell', spec: { session: 'claude-hello', text: 'go' } })]);
   ok(tell.every(t => /^tell Claude on hello: "/.test(t) && !/u_525cbd90|claude-hello/.test(t)),
-     `a tell job names the session as Claude on its project (${tell.join(' | ')})`);
+     `a tell job names the session as Claude on its space (${tell.join(' | ')})`);
   // ...and another agent's by that agent, as the bell's asking row is
   // (it read "Claude on codex-hello" for a ChatGPT session).
   const other = await page.evaluate(() => [agentSessionWords('u_525cbd90~codex-hello'), jobSessionWords('codex-hello')]);
-  ok(other.every(t => t === 'ChatGPT on hello'), `a ChatGPT session is ChatGPT on its project (${other.join(' | ')})`);
+  ok(other.every(t => t === 'ChatGPT on hello'), `a ChatGPT session is ChatGPT on its space (${other.join(' | ')})`);
   // ...and at 1280 the table gives its room to the Job column: no word is
   // cut, Node and By are whole, and no blank band is left at the right.
   const cols = await page.evaluate(() => {
@@ -345,7 +345,7 @@ await ready(page);
     catch (e) { return (e.stdout || '') + (e.stderr || ''); } };
   const mineOut = bbs();
   ok(!theirs.some(id => mineOut.includes(id)) && (theirs.length ? /no such job/.test(bbs(theirs[0])) : true),
-     `a session's aerie jobs lists its own project's jobs and answers "no such job" for another project's (${
+     `a session's aerie jobs lists its own space's jobs and answers "no such job" for another space's (${
         theirs.length} of others' kept out; ${mineOut.trim().split('\n')[0].slice(0, 70)})`);
   // A container written for alpha (aerie container new --for alpha) carries
   // its own name as its jobs' project, and those are alpha's to see (B321):
@@ -363,7 +363,7 @@ await ready(page);
   await settled(box.job); await settled(own.job);
   const withBox = bbs();
   ok(withBox.includes(box.job) && /exec true/.test(withBox),
-     `a session sees the jobs of a container written for its project (${box.job})`);
+     `a session sees the jobs of a container written for its space (${box.job})`);
   ok(!/no such job/.test(bbs(box.job)), '...and reads one of those by id');
   const two = bbs('-n', '2').trim().split('\n').filter(l => /^\s*j_/.test(l));
   ok(two.length === 2 && two.some(l => l.includes(box.job)) && two.some(l => l.includes(own.job)),

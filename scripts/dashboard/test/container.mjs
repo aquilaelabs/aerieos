@@ -26,7 +26,7 @@ const api = async (path, body, headers = owner) => {
 };
 const COMPOSE = 'services:\n  app:\n    image: alpine\n    command: sleep 1\n';
 const ask = (extra, headers = owner) => api('/api/phone', {
-  action: 'ask', kind: 'container', why: 'a sonarr to test the media project against',
+  action: 'ask', kind: 'container', why: 'a sonarr to test the media space against',
   name: 'sonarr-for-alpha', compose: COMPOSE, env: 'PUID=99\nSECRET=hunter2\n',
   project: 'alpha', ...extra }, headers);
 
@@ -48,7 +48,7 @@ ok(/hand over the compose file/.test((await ask({ compose: '   ' })).body.error 
 ok(/no node called nowhere/.test((await ask({ node: 'nowhere' })).body.error || ''),
    '...and one naming a machine that is not a node, before it reaches anybody');
 ok(/not a project: zeta/.test((await ask({ for: 'zeta' })).body.error || ''),
-   '...and one for a project the asker cannot see');
+   '...and one for a space the asker cannot see');
 
 // ---- a second account, of the kind that is never asked --------------------
 execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--role', 'user'],
@@ -135,7 +135,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   const bySession = await ask({ name: 'sonarr-by-session', project: '' },
     { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok });
   const row = (await api('/api/phone')).body.asks.find(a => a.id === bySession.body.id);
-  ok(row && row.for === 'alpha', `a session's ask belongs to its own project when it names none (${row?.for})`);
+  ok(row && row.for === 'alpha', `a session's ask belongs to its own space when it names none (${row?.for})`);
   await api('/api/phone', { action: 'deny', id: bySession.body.id });
   // ...and it is under the project's Agents may: Run its container (B250,
   // the operator, 24 Sep): refused at deny, made at once at auto when it is
@@ -150,11 +150,11 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   const made = await ask({ name: 'sonarr-auto', project: '' }, S);
   ok(made.status === 200 && !made.body.id && made.body.name === 'sonarr-auto'
      && (await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-auto' && i.owner === 'alpha'),
-     `at auto it is made at once, nobody asked, and the Containers page lists it as the project's (${JSON.stringify(made.body).slice(0, 80)})`);
+     `at auto it is made at once, nobody asked, and the Containers page lists it as the space's (${JSON.stringify(made.body).slice(0, 80)})`);
   const forOther = await ask({ name: 'sonarr-for-beta', project: '', for: 'beta' }, S);
   const onNode = await ask({ name: 'sonarr-on-node', project: '', node: 'sandbox' }, S);
   ok(!forOther.body.id && forOther.body.error && onNode.body.id > 0,
-     `while one on a node it names is asked at auto all the same, and one for another project is refused, since a session sees only its own (${
+     `while one on a node it names is asked at auto all the same, and one for another space is refused, since a session sees only its own (${
        String(forOther.body.error).slice(0, 40)})`);
   await api('/api/phone', { action: 'deny', id: onNode.body.id });
   await api('/api/prefs', { project: 'alpha', devbuild: 'ask' });

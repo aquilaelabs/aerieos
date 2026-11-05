@@ -119,7 +119,7 @@ object Watch {
             if (invites.isEmpty()) nm.cancel(base + ID_INVITES)
             else nm.notify(base + ID_INVITES, NotificationCompat.Builder(context, App.CH_NOTE)
                 .setSmallIcon(R.drawable.ic_stat_bb)
-                .setContentTitle(from + (if (invites.size == 1) inviteLine(invites[0]) else "${invites.size} invitations to projects"))
+                .setContentTitle(from + (if (invites.size == 1) inviteLine(invites[0]) else "${invites.size} invitations to spaces"))
                 .setContentText("Accept or Decline on Approvals")
                 .setContentIntent(openApp(context, "approvals"))
                 .setAutoCancel(true)
@@ -368,24 +368,24 @@ object Watch {
 
     fun askTitle(a: JSONObject): String = when (a.str("kind")) {
         "root" -> "Root on ${a.str("node_name")}"
-        "rebuild" -> "Rebuild in ${a.str("project").ifBlank { "a project" }}"
+        "rebuild" -> "Rebuild in ${a.str("project").ifBlank { "a space" }}"
         "container" -> "Container ${a.str("name")} on ${a.str("node_name").ifBlank { "the default node" }}"
         // Signing (R106): asked of the project's owner.
-        "sign" -> "Sign a build of ${a.str("project").ifBlank { "a project" }}"
-        "sign-key" -> "A signing key change in ${a.str("project").ifBlank { "a project" }}"
-        "release" -> "Release ${a.str("project").ifBlank { "a project" }} ${a.str("tag")}"
-        "release-edit" -> "Edit the ${a.str("tag")} release of ${a.str("project").ifBlank { "a project" }}"
-        "release-remove" -> "Remove files from the ${a.str("tag")} release of ${a.str("project").ifBlank { "a project" }}"
-        "release-sign" -> "Sign the release APKs of ${a.str("project").ifBlank { "a project" }} again"
+        "sign" -> "Sign a build of ${a.str("project").ifBlank { "a space" }}"
+        "sign-key" -> "A signing key change in ${a.str("project").ifBlank { "a space" }}"
+        "release" -> "Release ${a.str("project").ifBlank { "a space" }} ${a.str("tag")}"
+        "release-edit" -> "Edit the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }}"
+        "release-remove" -> "Remove files from the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }}"
+        "release-sign" -> "Sign the release APKs of ${a.str("project").ifBlank { "a space" }} again"
         // A release taken back with its tag (R190), always its owner's answer.
-        "release-withdraw" -> "Withdraw the ${a.str("tag")} release of ${a.str("project").ifBlank { "a project" }} and its tag"
+        "release-withdraw" -> "Withdraw the ${a.str("tag")} release of ${a.str("project").ifBlank { "a space" }} and its tag"
         // A push held for the lines in it that look like a secret (R219).
-        "push" -> "A push from ${a.str("project").ifBlank { "a project" }} looks sensitive"
+        "push" -> "A push from ${a.str("project").ifBlank { "a space" }} looks sensitive"
         // A session asking to use its person's own phone, lent or not.
-        "phone-use" -> "Your phone, from ${a.str("project").ifBlank { "a project" }}"
+        "phone-use" -> "Your phone, from ${a.str("project").ifBlank { "a space" }}"
         // A VM a session asks to make, start or remove (R91), under its
         // project's Make VMs setting.
-        "vm" -> "A VM in ${a.str("project").ifBlank { "a project" }}"
+        "vm" -> "A VM in ${a.str("project").ifBlank { "a space" }}"
         else -> "The phone on ${a.str("node_name")}"
     }
     fun askCommand(a: JSONObject): String = when (a.str("kind")) {

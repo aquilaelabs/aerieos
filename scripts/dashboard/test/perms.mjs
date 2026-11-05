@@ -50,7 +50,7 @@ await page.fill('#rnewmodal #rolesNewName', 'deployer');
 await page.click('#rnewmodal #rolesAdd');
 await page.waitForSelector('[data-rread="releases"]');
 ok(await page.$eval('[data-rwrite="releases"]', c => c.disabled) && await page.$eval('[data-rread="nodes"]', c => c.disabled),
-   'a new role on a project: Write waits for Read, and the global areas are off');
+   'a new role on a space: Write waits for Read, and the global areas are off');
 ok(/only an Everywhere role holds them/.test(await page.$eval('#rolesWhyOff', e => e.textContent)),
    '...saying why, once, above them');
 await page.check('[data-rread="projects"]');
@@ -99,21 +99,21 @@ await page.waitForSelector('.userstab #ueAccess .setrow', { timeout: 15000 });
 // Holding a role on a project is being on it (R155): no separate box, and
 // a project role is not offered among the Everywhere ones.
 ok(!(await page.$$('[data-ron]')).length && !(await page.$$('[data-rglobal="deployer"]')).length,
-   'a project role is given on a project alone, and there is no separate "on it" box');
+   'a space role is given on a space alone, and there is no separate "on it" box');
 // Only the projects an account is on are listed; Add to project puts it on
 // one with a role there (R255 step 9).
 // By the project's key (R138): a role is given on a project, not on one of
 // its repositories.
 ok(!(await page.$$('.userstab [data-rproject]')).length && await page.$eval('#rolesAddProj', (s, k) => [...s.options].some(o => o.value === k), projectKey('alpha')),
-   'an account on no project lists none, and Add to project offers them');
+   'an account on no space lists none, and Add to space offers them');
 await page.selectOption('#rolesAddProj', projectKey('alpha'));
 await page.selectOption('#rolesAddRole', 'deployer');
 await page.click('#rolesAddOn');
 const AK = projectKey('alpha');
 await page.waitForSelector(`.userstab [data-rproject="${AK}"] [data-rprole="deployer"]:checked`);
 await page.waitForFunction(k => document.querySelector(`[data-rcan="releases"] [data-rcanp="${k}"]`)?.textContent === 'Write'
-  && document.querySelector(`[data-rcan="projects"] [data-rcanp="${k}"]`)?.textContent === 'Read', AK);
-ok(true, 'What dep can do says it in its grid, alpha writing Releases and reading Projects, before Save');
+  && document.querySelector(`[data-rcan="spaces"] [data-rcanp="${k}"]`)?.textContent === 'Read', AK);
+ok(true, 'What dep can do says it in its grid, alpha writing Releases and reading Spaces, before Save');
 await page.click('.userstab #ueSave');
 await page.waitForFunction(k => rolesData?.people?.find(p => p.name === 'dep')?.project_roles?.[k], AK, { timeout: 10000 });
 const onAlpha = await api('/api/version', { project: 'alpha', action: 'nothing-much' }, depAuth);
@@ -127,7 +127,7 @@ ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 &&
   ok(JSON.stringify(p.projects) === JSON.stringify([AK]), `...and being on alpha follows the role (${JSON.stringify(p.projects)})`);
   const glob = await api('/api/roles', { action: 'assign', name: 'dep', roles: ['deployer'] });
   ok(glob.status === 400 && /on a project: give it on the project/.test(glob.body.error || ''),
-     `a project role given among the Everywhere ones is refused by name (${glob.body.error})`);
+     `a space role given among the Everywhere ones is refused by name (${glob.body.error})`);
   const kind = await api('/api/roles', { action: 'set', name: 'deployer', scope: 'global', perms: { projects: 'read' } });
   ok(kind.status === 400 && /dep holds deployer/.test(kind.body.error || ''),
      `...and a held role keeps its kind (${kind.body.error})`);
@@ -142,7 +142,7 @@ const asOwner = await api('/api/roles', undefined, depAuth);
 ok(asOwner.status === 200 && JSON.stringify(asOwner.body.projects) === JSON.stringify([AK]) && !asOwner.body.admin,
    `alpha's owner opens the tab with alpha alone (${asOwner.status} ${JSON.stringify(asOwner.body.projects)})`);
 ok(Object.keys(asOwner.body.roles).includes('alpha_owner') && !Object.keys(asOwner.body.roles).includes('admin'),
-   '...offered the roles on a project, its owner role among them, and no Global one');
+   '...offered the roles on a space, its owner role among them, and no Global one');
 const gl = await api('/api/roles', { action: 'assign', name: 'dep', roles: ['admin'] }, depAuth);
 ok(gl.status === 403, `...and refused a Global role (${gl.status})`);
 const elsewhere = await api('/api/roles', { action: 'assign', name: 'dep', project_roles: { beta: ['deployer'] } }, depAuth);
@@ -168,7 +168,7 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
   await page.waitForSelector('#rolesScope');
   await page.waitForSelector('[data-rexp="newprojects"]');
   ok(!(await page.$('[data-rexp="accounts"]')) && !(await page.$('[data-rexp="projects"]')),
-     'only an area with instances opens on them: not Accounts, not a project area');
+     'only an area with instances opens on them: not Accounts, not a space area');
   await page.click('[data-rexp="newprojects"]');
   await page.waitForSelector(`[data-riread="newprojects|${sandbox.id}"]`);
   // The area's own Read ticks every node, and clearing it clears them.
@@ -190,12 +190,12 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
   const cr = (await api('/api/roles')).body.roles.creator;
   ok(cr.scope === 'global' && cr.perms.newprojects === 'write'
      && JSON.stringify(cr.only) === JSON.stringify({ newprojects: { [sandbox.id]: 'write' } }),
-     `an Everywhere role saves New projects to write on the node ticked alone (${JSON.stringify(cr)})`);
+     `an Everywhere role saves New spaces to write on the node ticked alone (${JSON.stringify(cr)})`);
   await api('/api/roles', { action: 'assign', name: 'dep', roles: ['creator'] });
   const elsewhere = await api('/api/create', { name: 'nowhere-made', node: 'n_nowhere' }, depAuth);
   const nowhere = await api('/api/create', { name: 'nowhere-made' }, depAuth);
   ok(elsewhere.status === 403 && /goes on/.test(elsewhere.body.error || '') && nowhere.status === 403,
-     `a project on another node, or on none, is refused by name (${elsewhere.status} ${elsewhere.body.error || ''})`);
+     `a space on another node, or on none, is refused by name (${elsewhere.status} ${elsewhere.body.error || ''})`);
   const here = await api('/api/create', { name: '', node: sandbox.id }, depAuth);
   ok(here.status !== 403, `...and on the node the role names it passes the gate (${here.status} ${here.body.error || ''})`);
   // Nodes Write on one node: the Nodes tab's verbs held to the node they
@@ -227,7 +227,7 @@ await api('/api/members', { action: 'set', project: 'alpha', owner: 'test' });
   ok(tc.status === 200 && us.status === 403 && /no Accounts and roles Read/.test(us.body.error || ''),
      `the server answers the area it may read and refuses one it may not by name (toolchains ${tc.status}, users ${us.status}: ${us.body.error || ''})`);
   ok(nd.status === 200 && (nd.body.nodes || []).length === 0,
-     `...and without Nodes Read the nodes answer only for its own projects, here none (${(nd.body.nodes || []).length})`);
+     `...and without Nodes Read the nodes answer only for its own spaces, here none (${(nd.body.nodes || []).length})`);
   const st = (await api('/api/status', undefined, depAuth)).body.areas || {};
   // Toolchains is the Install area since R174, its old name an alias.
   ok(st.install === 'read' && st.nodes === '' && st.jobs === '', `the status carries each area's level (${JSON.stringify(st)})`);

@@ -91,7 +91,7 @@ class Scanners(unittest.TestCase):
         self.assertIn("still going", scanners.run_now("ann")["nodes"]["n1"]["error"])
         scanners.deploy("n3")
         self.bound["api"] = ""
-        self.assertIn("no project", scanners.run_now("ann", "n3")["nodes"]["n3"]["error"])
+        self.assertIn("no space", scanners.run_now("ann", "n3")["nodes"]["n3"]["error"])
         # Who is not covered, and why.
         un = {u["project"]: u["why"] for u in scanners.uncovered()}
         self.assertEqual(un["lone"], "no node")

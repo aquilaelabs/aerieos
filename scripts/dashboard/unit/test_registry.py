@@ -33,7 +33,7 @@ class Registry(unittest.TestCase):
         self.assertEqual((ps["old-2"]["name"], ps["old-2"]["state"], ps["old-2"].get("legacy")),
                          ("old", "trashed", True), "a numbered delete from before ids was the name without it")
         (self.ws / "byhand").mkdir()
-        self.assertNotIn("byhand", registry.sync()["projects"], "a folder made by hand is no project")
+        self.assertNotIn("byhand", registry.sync()["projects"], "a folder made by hand is no space")
         self.assertFalse(registry.is_project("byhand"))
         self.assertTrue(registry.is_project("alpha"))
         self.assertEqual(registry.new_dir("byhand"), "byhand-2", "...and its name is not handed out")

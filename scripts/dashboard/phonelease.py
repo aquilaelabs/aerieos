@@ -96,7 +96,7 @@ def lend(nid, who, project, hours):
     if hours not in HOURS:
         return {"error": "lend it for 1 or 4 hours, or until you take it back"}
     if not project or (may_see and not may_see(who, project)):
-        return {"error": f"not a project of yours: {project}"}
+        return {"error": f"not a space of yours: {project}"}
     if project_node(project) != nid:
         return {"error": f"{project} runs on another node, so its sessions cannot reach this phone"}
     now = int(time.time())

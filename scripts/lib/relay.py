@@ -25,9 +25,9 @@ tree = bool(argv) and argv[0] in TREE and bool(project)
 if tree:
     import syncwait
     if not syncwait.up(project) and argv[0] == "git":
-        sys.exit("[builderbot] ERROR: not sent: the controller's copy of this project is behind this one, "
+        sys.exit("[builderbot] ERROR: not sent: the controller's copy of this space is behind this one, "
                  "and git there would act on the older tree. Try again once the node is in step "
-                 "(the Nodes page's Sessions section says each project's state)")
+                 "(the Nodes page's Sessions section says each space's state)")
 # The tree a tree verb is about: where the caller stands, or, standing in the
 # project's own directory, the tree BB_REPO names, as preflight and the test
 # runner read it (B233, B274).

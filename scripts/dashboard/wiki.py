@@ -59,7 +59,7 @@ class Refused(Exception):
 
 # What a session is told under Agents may: Write the wiki is hidden, for a
 # read as for a write: the wiki is the people's alone on this project.
-HIDDEN = ("this project's wiki is hidden from its agents (Agents may: Write the wiki is hidden), "
+HIDDEN = ("this space's wiki is hidden from its agents (Agents may: Write the wiki is hidden), "
           "so it can be neither read nor written from a session; ask the person if you need what is in it")
 
 
@@ -454,7 +454,7 @@ def push(project, replace=False):
     if not rem:
         raise Refused(f"{project} has no remote: export the wiki instead")
     if not rem.get("auth"):
-        raise Refused(f"{project} has no push rights on {rem['label']}: grant them in the project's "
+        raise Refused(f"{project} has no push rights on {rem['label']}: grant them in the space's "
                       "remote dialog, then push")
     if not _has_head(project):
         raise Refused(f"{project}'s wiki has no pages yet")
@@ -469,7 +469,7 @@ def push(project, replace=False):
                 raise Refused(f"{rem['label']}'s wiki has changes this one has not taken in: Pull, then "
                               "push, or replace it with this one")
             if "403" in err or "denied" in err or "permission" in err or "authentication" in err:
-                raise Refused(f"{rem['label']} refused the push: the project's token may not reach its "
+                raise Refused(f"{rem['label']} refused the push: the space's token may not reach its "
                               "wiki. GitHub's fine-grained tokens cannot write a wiki; a classic token "
                               "with the repo scope can")
             raise Refused("the push failed: " + (r.stderr or r.stdout).strip().splitlines()[-1][:200])

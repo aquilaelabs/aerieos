@@ -269,9 +269,9 @@ const flips = await page.evaluate(async () => {
   return { real, ex };
 });
 ok(flips.real.steps === 6 && flips.real.turned && flips.real.ringed && !flips.real.sample && flips.real.back,
-   `the Projects tour turns the first card over for its back's steps, ringing each part, and turns it back after (${JSON.stringify(flips.real)})`);
+   `the Spaces tour turns the first card over for its back's steps, ringing each part, and turns it back after (${JSON.stringify(flips.real)})`);
 ok(flips.ex.front && flips.ex.ringed && flips.ex.turned && flips.ex.ringedBack && flips.ex.foot && flips.ex.gone,
-   `...and with no project, an example card, its front then its back as it turns over (${JSON.stringify(flips.ex)})`);
+   `...and with no space, an example card, its front then its back as it turns over (${JSON.stringify(flips.ex)})`);
 
 // Every page on the rail has a tour, and each step's part is on the page as
 // it is now (R142): a step whose part went with a redesign is left out by

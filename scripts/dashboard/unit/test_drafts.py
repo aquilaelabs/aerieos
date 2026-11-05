@@ -68,7 +68,7 @@ class TheSigningAttach(unittest.TestCase):
             sent.append((method, body))
             return {"id": 7, "draft": True, "body": "notes", "assets": [], "html_url": "u"} if method == "GET" else {}
         with mock.patch.object(forgerelease, "_req", req):
-            releasesign._attach("p", REPO, "tok", "v1.0.0-dev.3", [], ["signed with the project's key"])
+            releasesign._attach("p", REPO, "tok", "v1.0.0-dev.3", [], ["signed with the space's key"])
         self.assertEqual(sent[-1][0], "PATCH")
         self.assertIs(sent[-1][1]["draft"], True)
 

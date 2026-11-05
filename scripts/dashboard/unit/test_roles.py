@@ -88,7 +88,7 @@ class Model(unittest.TestCase):
         with mock.patch.object(users, "get", lambda n: u), mock.patch.object(registry, "FILE", None):
             got = users.what_may("o")
         self.assertEqual(got["roles"], ["Owner of alpha"])
-        self.assertIn(["Projects", "Write"], got["may"])
+        self.assertIn(["Spaces", "Write"], got["may"])
         self.assertNotIn("Nodes", [a for a, _ in got["may"]])
 
     def test_a_project_gone_is_not_said(self):
@@ -111,7 +111,7 @@ class Model(unittest.TestCase):
                 mock.patch.object(registry, "is_project", lambda p: p == "alpha"), \
                 mock.patch.object(registry, "label", str):
             got = users.what_may("o")
-        self.assertEqual(got["may"], [["Projects", "Read"]], "a gone project's grant adds nothing")
+        self.assertEqual(got["may"], [["Spaces", "Read"]], "a gone space's grant adds nothing")
 
     def test_an_owner_role_is_named_by_the_project_s_shown_name(self):
         # B102: a project whose folder is not its name (syncwalk-mv1bm36p,
@@ -151,16 +151,16 @@ class Model(unittest.TestCase):
         r = roles.set_role("tester", "projects", {"projects": "write", "containers": "write", "bogus": "write",
                                                   "terminal": "x"})
         self.assertEqual(r["perms"], {"projects": "write", "containers": "write"}, "unknown areas and levels dropped")
-        self.assertIn("project areas only", roles.set_role("bad", "projects", {"nodes": "read"})["error"])
+        self.assertIn("space areas only", roles.set_role("bad", "projects", {"nodes": "read"})["error"])
         # Given on a project, held there (R155); through the account's own
         # list a role on a project holds nowhere.
         t = {"name": "t", "role": "user", "roles": [], "projects": ["alpha"],
              "project_roles": {"alpha": ["tester"]}}
         self.assertTrue(self.g(t, "docker-write", "alpha"))
         self.assertFalse(self.g(t, "trash", "alpha"), "nothing it did not say")
-        self.assertFalse(self.g(t, "docker-write", "beta"), "the project it is given on only")
+        self.assertFalse(self.g(t, "docker-write", "beta"), "the space it is given on only")
         listed = {"name": "l", "role": "user", "roles": ["tester"], "projects": ["alpha"]}
-        self.assertFalse(self.g(listed, "docker-write", "alpha"), "a project role on the account's list holds nowhere")
+        self.assertFalse(self.g(listed, "docker-write", "alpha"), "a space role on the account's list holds nowhere")
         roles.set_role("ops", "global", {"nodes": "write", "jobs": "read"})
         o = {"name": "o", "role": "user", "roles": ["ops"], "projects": []}
         self.assertTrue(self.g(o, "node"))
@@ -330,13 +330,13 @@ class R155(unittest.TestCase):
         boss = self.users.get("boss")
         r, st = self.users.assign(boss, "ann", ["ops", "dev"], None)
         self.assertEqual(st, 400)
-        self.assertIn("on a project", r["error"])
+        self.assertIn("on a space", r["error"])
         r, st = self.users.assign(boss, "ann", None, {"alpha": ["ops"]})
         self.assertEqual(st, 400)
         self.assertIn("holds everywhere", r["error"])
         r, st = self.users.assign(boss, "ann", ["ops"], {"alpha": ["dev"], "beta": [], "gamma": []})
         self.assertEqual(st, 200, r)
-        self.assertEqual(self.users.get("ann")["projects"], ["alpha"], "on a project is holding a role there")
+        self.assertEqual(self.users.get("ann")["projects"], ["alpha"], "on a space is holding a role there")
 
     def test_accounts_write_through_a_role_gives_roles_but_not_admin(self):
         # B66: Accounts and roles Write held through a role of one's own
@@ -389,7 +389,7 @@ class SessionAndAccount(unittest.TestCase):
         may = self.users.may
         self.assertEqual(may(self.sess("u_3", "beta"), "work", "beta"), "", "the account works on beta")
         why = may(self.sess("u_3", "alpha"), "work", "alpha")
-        self.assertIn("ann's roles give no Projects Write on alpha", why)
+        self.assertIn("ann's roles give no Spaces Write on alpha", why)
         self.assertIn("a session does no more than its account", why)
         self.assertEqual(may(self.sess("u_3", "alpha"), "read", "alpha"), "", "...though it reads there")
         self.assertEqual(may(self.sess("u_1", "alpha"), "work", "alpha"), "", "the owner's session as ever")
@@ -406,9 +406,9 @@ class SessionAndAccount(unittest.TestCase):
     def test_a_project_it_reads_needs_the_account_to_read_it(self):
         may = self.users.may
         self.assertEqual(may(self.sess("u_3", "beta", reads=("alpha",)), "read", "alpha"), "")
-        self.assertIn("nobody's roles give no Projects Read on alpha",
+        self.assertIn("nobody's roles give no Spaces Read on alpha",
                       may(self.sess("u_4", "alpha"), "read", "alpha"))
 
     def test_a_person_without_a_role_may_do_nothing(self):
-        self.assertIn("your roles give no Projects Write on alpha",
+        self.assertIn("your roles give no Spaces Write on alpha",
                       self.users.may(self.users.get("nobody"), "work", "alpha"))

@@ -80,10 +80,10 @@ const job = await (async () => { for (let i = 0; i < 40; i++){
 } return null; })();
 ok(job?.spec?.action === 'create' && job.spec.domain === 'bbvm-alpha-db' && job.spec.image.url.startsWith('https://cloud.debian.org/')
    && job.spec.subnet === '10.232.0.0/24' && job.node === minted.id,
-   `Make it queues the node's vm job: create, its domain, the image and the project's network (${JSON.stringify({ a: job?.spec?.action, d: job?.spec?.domain, s: job?.spec?.subnet })})`);
+   `Make it queues the node's vm job: create, its domain, the image and the space's network (${JSON.stringify({ a: job?.spec?.action, d: job?.spec?.domain, s: job?.spec?.subnet })})`);
 await page.waitForFunction(() => /being made/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 15000 });
 ok(await page.$eval('.vmtab', e => !!e.querySelector('.dmcard .dmgroup') && /alpha/.test(e.querySelector('.dmgroup').textContent)),
-   '...and the row stands in its project\'s card, being made');
+   '...and the row stands in its space\'s card, being made');
 
 // The agent takes it, it succeeds, and its census says it runs with an address.
 const took = await agent('work', { running: [], wait: 0 });
@@ -139,7 +139,7 @@ const nv = await page.evaluate(() => {
            row: !!v.querySelector('[data-vm-key="alpha/db"]'), newVm: !v.querySelector('#nvNew').hidden };
 });
 ok(nv.ship === 'artifacts,docker,vms,signing' && nv.row && nv.newVm,
-   `a project's notebook has VMs beside Docker in Ship, its own VM's row and New VM in its head (${JSON.stringify(nv)})`);
+   `a space's notebook has VMs beside Docker in Ship, its own VM's row and New VM in its head (${JSON.stringify(nv)})`);
 await page.evaluate(() => openVmsTab());
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 10000 });
 
@@ -161,15 +161,15 @@ await page.fill('.pane .doc.on .vmtab #vmSearch', '');
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 5000 });
 const top = await page.$eval('.vmtab', t => ({ tiles: [...t.querySelectorAll('.tiles .tile .tl')].map(x => x.textContent).join(),
   chips: [...t.querySelectorAll('[data-vmchip]')].map(c => c.textContent.replace(/\d+$/, '').trim()) }));
-ok(/^running,projects,snapshots/.test(top.tiles), `the VMs page counts what runs, its projects and snapshots in tiles, as Containers does (${JSON.stringify(top)})`);
+ok(/^running,projects,snapshots/.test(top.tiles), `the VMs page counts what runs, its spaces and snapshots in tiles, as Containers does (${JSON.stringify(top)})`);
 if (top.chips.length > 2){
   const other = await page.$eval('.vmtab [data-vmchip]:not([data-vmchip=""]):not([data-vmchip="alpha"])', c => c.dataset.vmchip);
   await page.click(`.vmtab [data-vmchip="${other}"]`);
   await page.waitForFunction(() => !document.querySelector('.vmtab [data-vm-key="alpha/db"]'), null, { timeout: 5000 });
-  ok(true, `...and a project's chip narrows the VMs to its own (${top.chips.join(', ')})`);
+  ok(true, `...and a space's chip narrows the VMs to its own (${top.chips.join(', ')})`);
   await page.click('.vmtab [data-vmchip=""]');
   await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 5000 });
-} else ok(top.chips.length === 0, `...with no chips while only one project has VMs (${top.chips.join(', ')})`);
+} else ok(top.chips.length === 0, `...with no chips while only one space has VMs (${top.chips.join(', ')})`);
 await page.click('.vmtab [data-vmview="list"]');
 await page.waitForSelector('.vmtab .dmtbl details.dmline[data-vm-key="alpha/db"] > summary', { timeout: 5000 });
 const line = await page.$eval('.vmtab details.dmline[data-vm-key="alpha/db"]', d => ({ open: d.open, sum: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim() }));
@@ -217,9 +217,9 @@ await call('/api/prefs', { project: 'alpha', makevms: 'auto' });
 const win = await call('/api/vms', { action: 'new', name: 'w2', os: 'windows', keys: [KEY], why: 'x' }, S);
 ok(/a person's to do/.test(win.error || ''), `even at auto a session does not make Windows (${win.error})`);
 const other = await call('/api/vms', { action: 'new', project: 'beta', name: 'x', os: 'debian', keys: [KEY], why: 'x' }, S);
-ok(other.status === 403 && /alpha's VMs alone/.test(other.error || ''), "a session works on its own project's VMs alone");
+ok(other.status === 403 && /alpha's VMs alone/.test(other.error || ''), "a session works on its own space's VMs alone");
 const madeNow = await call('/api/vms', { action: 'new', name: 'w3', os: 'ubuntu 24.04', keys: [KEY], why: 'x' }, S);
-ok(madeNow.ok && madeNow.domain === 'bbvm-alpha-w3', `at auto its own project's VM is made now (${madeNow.domain || madeNow.error})`);
+ok(madeNow.ok && madeNow.domain === 'bbvm-alpha-w3', `at auto its own space's VM is made now (${madeNow.domain || madeNow.error})`);
 await call('/api/prefs', { project: 'alpha', makevms: 'deny' });
 
 // Remove asks, says what goes, and its job's success takes the record.
@@ -306,6 +306,6 @@ const hwj = await (async () => { for (let i = 0; i < 40; i++){
   await sleep(250);
 } return null; })();
 ok(hwj && hwj.spec.hw.cpuset.length === 0 && hwj.spec.hw.mem_max_mb === 4096 && hwj.spec.hw.net === 'project',
-   `Save queues the hardware job: unpinned, a 4 GB ceiling, its project's network (${JSON.stringify(hwj?.spec?.hw)})`);
+   `Save queues the hardware job: unpinned, a 4 GB ceiling, its space's network (${JSON.stringify(hwj?.spec?.hw)})`);
 await call('/api/v1/nodes', { action: 'retire', id: minted.id });
 await done(browser);

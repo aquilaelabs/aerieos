@@ -153,7 +153,7 @@ def wait_result(project, rid, wait=0):
         while True:
             r = REQS.get(str(rid or ""))
             if not r or r["project"] != project:
-                return {"error": "no such request for this project"}, 404
+                return {"error": "no such request for this space"}, 404
             if r["state"] in ("done", "refused") or time.time() >= end:
                 if r["state"] == "waiting" and time.time() - r["at"] > RESULT_WAIT:
                     r["state"] = "lapsed"

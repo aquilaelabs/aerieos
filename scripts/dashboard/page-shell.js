@@ -34,7 +34,7 @@ const RAIL_ICONS = {
 // group with several draws them as the page's sub-nav.
 const RAIL = [
   {key: "home", label: "Home", icon: "home", tools: [["home", "Home"]]},
-  {key: "projects", label: "Projects", icon: "projects", tools: [["projects", "Projects"], ["findings", "Analysis"]]},
+  {key: "projects", label: "Spaces", icon: "projects", tools: [["projects", "Spaces"], ["findings", "Analysis"]]},
   {key: "build", label: "Build", icon: "toolchains", tools: [["library", "Library"], ["emulator", "Emulator"], ["phone", "Phone"], ["runner", "CI runner"], ["entry", "Library"]]},
   // nginx and the scanners are reached from their containers' Configure on
   // the Containers page (R181, the operator, 29 Oct): pages of the group, by
@@ -197,9 +197,12 @@ function navPush(fn){
   if (to && to !== was){ history.replaceState(null, "", was || location.pathname + location.search); shellPush(to); }
 }
 
-// The address a tab is reached at: #/group, #/group/tool, #/projects/NAME,
+// The address a tab is reached at: #/group, #/group/tool, #/spaces/NAME,
 // with a node page's node and the open wiki page on the end. A terminal has
-// none.
+// none. A group's address is its key but for the spaces', whose key is
+// projects as the code knows them; #/projects/... still opens (routeIn).
+const ADDR_OF = {projects: "spaces"};
+const routeIn = hash => String(hash || "").replace(/^#\/spaces(?=\/|$)/, "#/projects");
 function routeOf(t){
   if (!t) return "";
   if (t.kind === "notebook"){
@@ -208,7 +211,7 @@ function routeOf(t){
     const n = notebooks.get(t.arg), v = n?.where?.() || "";
     // ...and a branch's comparison, its own page (R269 step 2).
     const page = v === "wiki" ? n?.wikiPage?.() || "" : v === "git" && n?.gitPage?.() ? "compare/" + encodeURIComponent(n.gitPage()) : "";
-    return "#/projects/" + encodeURIComponent(t.arg) + (v ? "/" + (v === "briefing" ? "overview" : v) : "")
+    return "#/spaces/" + encodeURIComponent(t.arg) + (v ? "/" + (v === "briefing" ? "overview" : v) : "")
       + (page ? "/" + (v === "git" ? page : encodeURIComponent(page)) : "");
   }
   if (!isToolKind(t.kind)) return "";
@@ -229,11 +232,13 @@ function routeOf(t){
   // A page named as its group is (Jobs, beside Schedules since R117) keeps
   // the group's own address, #/jobs/failed as Home links it, never
   // #/jobs/jobs; the reader takes a segment that is no page's for its node.
-  return ((g.tools || []).length > 1 && t.kind !== g.key ? `#/${g.key}/${t.kind}` : `#/${g.key}`) + (node ? "/" + encodeURIComponent(node) : "");
+  const at = ADDR_OF[g.key] || g.key;
+  return ((g.tools || []).length > 1 && t.kind !== g.key ? `#/${at}/${t.kind}` : `#/${at}`) + (node ? "/" + encodeURIComponent(node) : "");
 }
 
 // Open what an address names; nothing happens for one that names nothing.
 function openRoute(hash){
+  hash = routeIn(hash);
   const m = /^#\/([a-z]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?/.exec(hash || "");
   if (!m) return false;
   const [, key, a, b, c, d] = m;
@@ -403,6 +408,7 @@ function shellCame(from, to){
 }
 // The page kind an address names, or "".
 function kindOfRoute(hash){
+  hash = routeIn(hash);
   const m = /^#\/([a-z]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?/.exec(hash || "");
   if (!m) return "";
   if (m[1] === "machines" && m[2] === "installed" && m[4]) return "thing";
@@ -651,7 +657,7 @@ function jumpItems(q){
       rows.push([label, g.tools.length > 1 ? `${g.label} page` : "page", () => railGo(g.key, k)]);
   }
   for (const p of state?.projects || [])
-    rows.push([projLabel(p.name), "project", () => { railWant = "projects"; openNotebook(p.name); }]);
+    rows.push([projLabel(p.name), "space", () => { railWant = "projects"; openNotebook(p.name); }]);
   for (const n of nodesList || [])
     rows.push([n.name || n.id, "node", () => { railGo("machines", "nodes"); openNodesTab(n.id); }]);
   for (const c of dmJumpRows())
@@ -713,7 +719,7 @@ function wireJump(){
     const room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
     const ctx = (said.ctx ||= document.createElement("canvas").getContext("2d"));
     ctx.font = cs.font;
-    const hint = ["jump to a page, project, container or node", "jump to a page, project or node", "jump to…"]
+    const hint = ["jump to a page, space, container or node", "jump to a page, space or node", "jump to…"]
       .find(t => ctx.measureText(t).width <= room) || "jump to…";
     if (inp.placeholder !== hint) inp.placeholder = hint;
   };

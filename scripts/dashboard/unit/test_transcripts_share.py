@@ -41,7 +41,7 @@ class Share(unittest.TestCase):
         self.assertEqual([r["id"] for r in transcripts.visible("bob", "web")], ["ann-1"])
         self.assertEqual([r["id"] for r in transcripts.visible("ann", "web")], [], "not your own twice")
         self.assertTrue(next(r for r in transcripts.mine("ann", ["web"]) if r["id"] == "ann-1")["shared"])
-        self.assertIsNone(transcripts.owner_of("bob", "other", "ann-1"), "on its own project alone")
+        self.assertIsNone(transcripts.owner_of("bob", "other", "ann-1"), "on its own space alone")
         transcripts.set_shared("ann", "web", "ann-1", False)
         self.assertIsNone(transcripts.owner_of("bob", "web", "ann-1"))
 

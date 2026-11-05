@@ -158,7 +158,7 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   mine1 = await keys({ action: 'mine' });
   const appTok = (mine1.forges || []).find(f => f.host === 'lan.example.test:3000');
   ok(!gave.error && appTok?.scheme === 'http' && JSON.stringify(appTok.projects) === '["app"]',
-     `a token given in a project's settings is the giver's, with its scheme (${gave.error || JSON.stringify(appTok)})`);
+     `a token given in a space's settings is the giver's, with its scheme (${gave.error || JSON.stringify(appTok)})`);
   ok(!JSON.stringify(mine1).includes('apptoken0123456789') && !JSON.stringify(mine1).includes('plaintoken123'),
      '...and nothing the page reads carries a token');
   ok(!readFileSync(`${w}/config/account-secrets.json`, 'utf8').includes('apptoken0123456789'), '...kept sealed on disk');
@@ -176,7 +176,7 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
      `Your key store lists each token with what uses it (${store.rows.join(' | ')})`);
   ok(!store.form && !store.buttons.some(w => /show|download|backup|link/i.test(w)),
      `...with no form to add one and no Show, Download or backup (${store.buttons.join(', ')})`);
-  ok((await keys({ action: 'unlink-forge', id: appTok.id })).error, '...and a token a project uses is not removed from under it');
+  ok((await keys({ action: 'unlink-forge', id: appTok.id })).error, '...and a token a space uses is not removed from under it');
   // The project dialog offers a token of the giver's for its own host only.
   const auth = await (await fetch(base + '/api/project-auth', { method: 'POST', headers: H, body: JSON.stringify({ name: 'web' }) })).json();
   ok(auth.linked?.id === webTok.id && auth.linked?.host === 'github.com' && auth.linked?.mine, `web's settings say whose store its token is in (${JSON.stringify(auth.linked)})`);
@@ -193,7 +193,7 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   ok(!purged.forges.length && !purged.has, `Purge empties it after a plain confirmation, no password or code asked (${JSON.stringify(purged)})`);
   ok(page.dialogs.some(t => /Purge your key store/.test(t)), '...the confirmation it asked');
   const gone = (await (await fetch(base + '/api/project-auth', { method: 'POST', headers: H, body: JSON.stringify({ name: 'app' }) })).json());
-  ok(!gone.token, `...and the projects that used it have no token now (${JSON.stringify({ token: gone.token, linked: gone.linked })})`);
+  ok(!gone.token, `...and the spaces that used it have no token now (${JSON.stringify({ token: gone.token, linked: gone.linked })})`);
   await fetch(base + '/api/rename', { method: 'POST', headers: H, body: JSON.stringify({ name: 'app', token: 'apptoken0123456789' }) });
   const adm = await keys({ action: 'purge-for', account: OWNER.username });
   ok(adm.ok && !(await keys({ action: 'mine' })).forges.length, 'an administrator purges an account\'s key store from its name');

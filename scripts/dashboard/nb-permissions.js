@@ -57,7 +57,7 @@ function nbPermsView({$, nb, project, root}){
           <label class="pick">Hold a push that looks sensitive<span class="help" data-help="a push whose added lines look like a token, key, password, email or IP address waits until a person reads it and approves it" tabindex="0">?</span> <select data-gitpol="scan"${locked ? " disabled" : ""}>${optionList(["hold", "off"], pol.scan || "hold")}</select></label>
         </div>
         <div class="actbar">
-          <span class="state">${locked ? "this project is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>
+          <span class="state">${locked ? "this space is locked: its owner changes these" : `its own branches, one at a time ${helpIcon("Applies to pushes only. Tags, deletions and remote-only branches stay yours; commits and merges here are always allowed.")}`}</span>
           <button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>
         </div></div></div>`;
     const html = docSection("permissions", "push", "Pushing", `${pol.push || "allow"} · ${pol.main || "deny"}${pol.scan === "off" ? " · unheld" : ""}`, body);
@@ -110,7 +110,7 @@ function nbPermsView({$, nb, project, root}){
       : host.error ? `<div class="field"><div class="sub bad">${esc(host.error)}</div></div>`
       : `<div class="row stack2"><div class="grow">${m && m.at ? `<div>${esc(m.forge || m.host || "")} ${esc(m.repo || "")}${m.login ? ` as <b>${esc(m.login)}</b>` : ""}${m.token ? `, a ${esc(m.token)} token` : ""}${m.expires ? `, expiring ${esc(m.expires)}` : ""}</div>
           <div class="sub">measured ${esc(ago(m.at))}${m.error ? ` · <span class="bad">${esc(m.error)}</span>` : ""}</div>${(m.notes || []).map(n => `<div class="sub">${esc(n)}</div>`).join("")}`
-          : `<div class="sub">${m?.error ? esc(m.error) : "not measured yet: Measure asks the host what this project's token may do, changing nothing"}</div>`}</div>
+          : `<div class="sub">${m?.error ? esc(m.error) : "not measured yet: Measure asks the host what this space's token may do, changing nothing"}</div>`}</div>
           <div class="actbar"><button type="button" class="permHostMeasure"${locked ? " disabled" : ""}>Measure</button></div></div>`;
     const list = rows.map(r => {
       const set = hostDraft[r.id] || r.set;
@@ -123,7 +123,7 @@ function nbPermsView({$, nb, project, root}){
         ${r.fixed ? `<span class="state">${esc(r.fixed)}</span>`
           : `<label class="pick"><select aria-label="${esc(r.label)}" data-forgepol="${esc(r.id)}"${locked ? " disabled" : ""}>${optionList(["allow", "deny"], set)}</select></label>`}</div>`;
     }).join("");
-    const foot = rows.length ? `<div class="row"><div class="grow"><span class="state">${locked ? "this project is locked: its owner changes these"
+    const foot = rows.length ? `<div class="row"><div class="grow"><span class="state">${locked ? "this space is locked: its owner changes these"
       : "a Deny here takes an ability away whatever the token allows; the token decides what is possible"}</span></div>
       <div class="actbar"><button type="button" class="permHostApply"${dirty && !locked ? "" : " disabled"}>Apply</button></div></div>` : "";
     const on = rows.filter(r => r.token !== false && (r.fixed || (hostDraft[r.id] || r.set) === "allow")).length;

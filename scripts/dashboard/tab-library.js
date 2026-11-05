@@ -203,7 +203,7 @@ function devHow(name){
   return {
     android: `Install it, open it and sign in at ${at} with your name and password.`,
     vscode: `In VS Code: Extensions, the ⋯ menu, Install from VSIX; then AerieOS: Connect, at ${at}.`,
-    companion: `Run it, sign in at ${at} with your name and password, and pick a project and a folder.`,
+    companion: `Run it, sign in at ${at} with your name and password, and pick a space and a folder.`,
   }[name] || "";
 }
 
@@ -541,7 +541,7 @@ async function libAct(b, act, kind, name){
     return;
   }
   if (kind === "agent"){
-    if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the project rows.`)) return;
+    if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
     busy(b, "Asking");
     const j = await (await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
     if (j.error) notify(j.error, true);

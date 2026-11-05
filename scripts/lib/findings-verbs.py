@@ -63,7 +63,7 @@ def history():
     h = fx.history(proj, limit=limit, since=since, find=find)
     if not h:
         print(f"nothing in {proj}'s findings log matches that")
-        print("the first scan of a project is its starting point rather than an "
+        print("the first scan of a space is its starting point rather than an "
               "entry, so this fills in from the second one onwards")
     for e in h:
         when = time.strftime("%d %b %H:%M", time.localtime(e.get("at", 0)))
@@ -116,7 +116,7 @@ def sample():
     # Relayed, it runs on the controller: a path is the project's own, or
     # a session could write over the controller's state (/config/users.json).
     if os.environ.get("BB_RELAYED") and not _in_project(args[0]):
-        sys.exit(f"[builderbot] ERROR: {args[0]} is not a file in this project; write it inside the project")
+        sys.exit(f"[builderbot] ERROR: {args[0]} is not a file in this space; write it inside the space")
     with open(args[0], "w") as f:
         json.dump(doc, f, indent=1)
     print(f"{len(results)} sample findings, one each in {', '.join(names)} "

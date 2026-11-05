@@ -17,7 +17,7 @@ await page.goto(URL);
 await ready(page);
 
 ok(await page.evaluate(() => railGroups().some(g => g.key === 'projects' && g.tools.some(([k]) => k === 'findings')) && railAllows('findings')),
-   'the scanner report, Analysis, is a page under Projects on the rail');
+   'the scanner report, Analysis, is a page under Spaces on the rail');
 
 // ---- the API, as the page asks it ---------------------------------------
 // {status, ...the answer}: a refusal's status is part of what is checked.
@@ -608,13 +608,13 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   const ndk = by['android:ndk;29.0.14206865'], bt = by['android:build-tools;36.0.0'], plat = by['android:platforms;android-37'];
   ok(ndk && !ndk.installed && /^Needed by alpha \(app\/build\.gradle\.kts\)/.test(ndk.about) && /lacks it/.test(ndk.about)
      && ndk.label === 'Android NDK 29.0.14206865' && ndk.terms.length,
-     `an NDK a project pins and the store lacks is a row to install, named for the project (${JSON.stringify(ndk || got).slice(0, 160)})`);
+     `an NDK a space pins and the store lacks is a row to install, named for the space (${JSON.stringify(ndk || got).slice(0, 160)})`);
   ok(bt && !bt.installed && bt.label === 'Android SDK Build-Tools 36.0.0',
      `...and so is a build-tools version (${bt?.label})`);
   ok(plat && plat.installed && plat.label === 'Android SDK Platform 37' && /holds it/.test(plat.about),
      `...while a compileSdk the store holds (android-37.0) reads installed (${plat?.about?.slice(-30)})`);
   ok(!Object.keys(by).some(k => /system-images/.test(k)),
-     'no image row: the level a project compiles against is the Emulator page\'s question (B720)');
+     'no image row: the level a space compiles against is the Emulator page\'s question (B720)');
   await toLibrary();
   await page.evaluate(() => loadLibrary());
   const PIN = '.doc .librarytab .lcard[data-lrow="toolchain:android:ndk;29.0.14206865"]';
@@ -701,11 +701,11 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.evaluate(() => renameProject('alpha', 'all'));
   await page.waitForSelector('#rnTools input[data-pack][value="hexkit"]', { timeout: 20000 });
   ok(!await page.$eval('#rnTools input[data-pack][value="hexkit"]', i => i.checked),
-     'a project\'s Toolchains group offers the new pack switched off');
+     'a space\'s Toolchains group offers the new pack switched off');
   await page.$eval('#rnTools input[data-pack][value="hexkit"]', i => { i.checked = true; i.dispatchEvent(new Event('change')); });
   const saveErr = await sectSave(page, 'tools');
   const packsOn = ((await api('/api/status')).projects || []).find(p => p.name === 'alpha')?.prefs?.packs_on || [];
-  ok(!saveErr && packsOn.join() === 'hexkit', `...and switched on and saved, the project's sessions may use it (${saveErr || packsOn.join() || 'none kept'})`);
+  ok(!saveErr && packsOn.join() === 'hexkit', `...and switched on and saved, the space's sessions may use it (${saveErr || packsOn.join() || 'none kept'})`);
   await page.evaluate(() => closeRename());
   await api('/api/prefs', { project: 'alpha', packs_on: '' });
   // An update (R77 step 6): the repository moves on, and Edit looks for a
@@ -840,7 +840,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   const group = await page.evaluate(() => ({ dirty: !document.querySelector('.rnbar[data-rnbar="tools"] [data-rnsave]')?.disabled,
     said: document.querySelector('.rnbar[data-rnbar="tools"]')?.textContent.replace(/\s+/g, ' ').trim() || '' }));
   ok(!group.dirty && !/changed/.test(group.said),
-     `...and a project that used it opens its Toolchains group with nothing unsaved (${JSON.stringify(group)})`);
+     `...and a space that used it opens its Toolchains group with nothing unsaved (${JSON.stringify(group)})`);
   await page.evaluate(() => closeRename());
   await api('/api/prefs', { project: 'alpha', packs_on: '' });
 

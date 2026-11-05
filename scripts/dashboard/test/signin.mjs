@@ -59,7 +59,7 @@ await page.waitForSelector('.pgrid .pcard[data-row="beta"] [data-c]', { timeout:
 const PC = '.pgrid .pcard[data-row="beta"] [data-c]';
 const btn = await page.$eval(PC, b => ({ dead: b.disabled, tip: saidOf(b) }));
 ok(!btn.dead && /not signed in on signbox/.test(btn.tip) && /Press for its sign-in/.test(btn.tip),
-   `the Claude button of a project whose node has no sign-in stays live and says what a press offers (${btn.tip})`);
+   `the Claude button of a space whose node has no sign-in stays live and says what a press offers (${btn.tip})`);
 await page.evaluate(id => openInstalledOn(id), sandbox.id);
 await page.waitForSelector(`.installedtab [data-instnode="${sandbox.id}"]`, { timeout: 20000 });
 const terms = () => page.evaluate(() => tabs.filter(t => t.kind === 'term').length);
@@ -161,7 +161,7 @@ await page.evaluate(() => openProjectsTab());
 await page.waitForFunction(sel => !/not signed in/.test(saidOf(document.querySelector(sel))), PC, { timeout: 15000 }).catch(() => {});
 const tip = await page.$eval(PC, b => saidOf(b));
 ok(!/not signed in/.test(tip) && await page.evaluate(id => claudeSigninFirst('beta', id), box.id) === false,
-   `the project's Claude button goes to a session again (${tip.slice(0, 50)})`);
+   `the space's Claude button goes to a session again (${tip.slice(0, 50)})`);
 await page.evaluate(id => openInstalledOn(id, 'claude'), box.id);   // back to Claude Code's page on the node
 
 // ---- signing out, on this node ----------------------------------------------
@@ -254,7 +254,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   // opens named in its title and first in its chooser.
   await refreshUntil(page, () => (b => !!b && /^ChatGPT:/.test(saidOf(b)))(document.querySelector('.pgrid .pcard[data-row="beta"] [data-c]')));
   ok(!set.error && await page.$eval(PC, b => b.textContent.trim() === 'Start agent' && /^ChatGPT:/.test(saidOf(b))),
-     `a project whose settings name ChatGPT says Start agent on its card, its title naming ChatGPT (${set.error || 'saved'})`);
+     `a space whose settings name ChatGPT says Start agent on its card, its title naming ChatGPT (${set.error || 'saved'})`);
   // Every agent in the table starts a session now (Any model since R144), so
   // the one that cannot is one the table does not have.
   const refused = await call('/api/prefs', { project: 'beta', agent_default: 'nope' });
@@ -276,7 +276,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   const offeredCodex = await page.$('#resumemenu [data-asignin="codex"], #resumemenu [data-anew="codex"]');
   await page.evaluate(() => { resumeFor = null; drawProjects(state.projects); });
   ok(term.status >= 400 && /do not allow ChatGPT sessions/.test(term.error) && !offeredCodex,
-     `an agent the project switches off is refused at its terminal and missing from its chooser (${term.status} ${term.error.slice(0, 60)})`);
+     `an agent the space switches off is refused at its terminal and missing from its chooser (${term.status} ${term.error.slice(0, 60)})`);
   await call('/api/prefs', { project: 'beta', agents_off: '' });
 }
 
@@ -326,7 +326,7 @@ await call('/api/users', { action: 'edit', name: 's.user', profile: { full_name:
   const cc = await up.evaluate(async () => (await (await fetch('/api/status')).json()).claude_code || {});
   ok(Object.keys(cc.nodes || {}).join() === box.id && 'latest' in cc,
      `the Claude Code versions it is sent are those nodes' too, so the section reads what an administrator's does (${Object.keys(cc.nodes || {}).length} node)`);
-  ok(seen.picker.join() === 'signbox', `its node picker lists the nodes its own projects are on, and no others (${seen.picker.join()})`);
+  ok(seen.picker.join() === 'signbox', `its node picker lists the nodes its own spaces are on, and no others (${seen.picker.join()})`);
   ok(seen.open && seen.live.includes('in') && seen.pickerLive,
      `its chooser's sign-in lands on Claude Code's page, where its own Sign in is live (${seen.live.join()})`);
   ok(seen.installs === 0 && !/administrator/i.test(seen.said),

@@ -53,7 +53,7 @@ const byId = Object.fromEntries((mine?.plugins || []).map(p => [p.id.split('@')[
 ok(mine && byId['code-simplifier']?.enabled === true && byId['pyright-lsp']?.enabled === false
    && byId['feature-dev']?.scope === 'project' && byId['feature-dev']?.project === 'alpha'
    && byId['feature-dev']?.enabled === null,
-   `aerie login --list names each account's plugins, on or off, and a project's by name (${Object.keys(byId).join(', ')})`);
+   `aerie login --list names each account's plugins, on or off, and a space's by name (${Object.keys(byId).join(', ')})`);
 ok(!JSON.stringify(mine).includes('/x') && !JSON.stringify(mine).includes('c447c32'),
    '...and not where they live on the disk or what commit they came from');
 ok(none && none.plugins === null, 'an account that never installed one says none');
@@ -92,7 +92,7 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
   const text = await read('claude-code');
   ok(/your plugins\s*code-simplifier 1\.0\.0, feature-dev 1\.0\.0 \(alpha\), pyright-lsp 1\.0\.0 off/.test(text)
      && /your MCP servers\s*github/.test(text) && /\/plugin and \/mcp in a Claude session/.test(text),
-     `Claude Code's page on the node lists your plugins and MCP servers on that node, a project's plugin with its name and one switched off marked so (${text.slice(0, 140)})`);
+     `Claude Code's page on the node lists your plugins and MCP servers on that node, a space's plugin with its name and one switched off marked so (${text.slice(0, 140)})`);
   await page.evaluate(id => openThing(id, 'agent:codex-cli'), minted.id);
   await page.waitForSelector(`${PAGE('codex-cli')} .agextras`, { timeout: 15000 });
   const cx = await read('codex-cli');
@@ -119,7 +119,7 @@ await beat([{ ...mine, email: '' }]);
   const r = await call('/api/diag', { sections: ['plugins'] });
   const row = (r.plugins || []).find(x => x.node === 'plugbox');
   ok(row && row.account === 'test' && row.plugins.includes('pyright-lsp@claude-plugins-official 1.0.0 (off)')
-     && row.plugins.includes('feature-dev@claude-plugins-official 1.0.0 (project alpha)'),
+     && row.plugins.includes('feature-dev@claude-plugins-official 1.0.0 (space alpha)'),
      `aerie diag names every account's plugins on every node (${row ? row.plugins.length : 'none'})`);
   const out = execFileSync('bash', [BB, 'diag', 'plugins'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_CONTROLLER: base, DASHBOARD_AUTH: 'test:test' } });

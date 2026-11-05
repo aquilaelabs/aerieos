@@ -30,7 +30,7 @@ class SystemOwner(unittest.TestCase):
     def test_the_map_gives_system_everything_and_nobody_system(self):
         m = devapp.container_net_own("n1")
         self.assertEqual(m["nginx-n1"]["to"], ["nginx-n1"])
-        self.assertTrue(m["nginx-n1"].get("all"), "`all` reaches every compose project, the ones the controller never named included")
+        self.assertTrue(m["nginx-n1"].get("all"), "`all` reaches every compose space, the ones the controller never named included")
         self.assertEqual(sorted(m["alpha"]["to"]), ["alpha", "beta", "radarr"], "alpha reads beta, and nothing of System's")
         self.assertNotIn("all", m["alpha"])
 
