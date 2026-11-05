@@ -5748,9 +5748,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   /* ...and they share the bar rather than each taking its text's width: on a
      344px fold cover four of them did not fit and Chat was cut off at the
      edge, inside a bar that clips. */
-  /* Shared by what each says, not in equal parts (B460): Keys and Chat are
-     short words, Commands and Sessions were cut at 390px in equal quarters. */
-  .mobar button{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  /* In equal parts: two buttons since Chat and Sessions went to the dock, and
+     halves hold Commands whole down to a 344px fold cover. Shared by what
+     each said (B460) was for four, which cut two of them in equal quarters,
+     and with two it left Keys and Commands uneven. */
+  .mobar button{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .mobar button[hidden]{display:none}
   .mobar[hidden]{display:none}
   .mobar{border:0;border-top:var(--hair) solid var(--line);border-radius:0}   /* its foot is the bottom bar's line */

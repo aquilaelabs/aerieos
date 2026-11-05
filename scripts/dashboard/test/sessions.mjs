@@ -352,7 +352,9 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state && Array
 const mob = await phone.waitForFunction(() => {
   if (!tabs.some(t => t.kind === 'term')) openTab({kind: 'term', arg: argForSession('shell-alpha'), label: 'shell-alpha'});
   const k = document.getElementById('mKeys');
-  window.__seen = { tabs: tabs.map(t => t.kind), keys: !!k && !k.hidden && k.offsetParent !== null,
+  const bw = [...document.querySelectorAll('#mobar button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
+  window.__seen = { tabs: tabs.map(t => t.kind), keys: !!k && !k.hidden && k.offsetParent !== null, widths: bw,
+                    whole: [...document.querySelectorAll('#mobar button')].every(b => b.scrollWidth <= b.clientWidth),
                     display: getComputedStyle(document.getElementById('mobar')).display,
                     bKeys: !!document.getElementById('bKeys'), w: innerWidth };
   return window.__seen.keys && window.__seen;
@@ -360,6 +362,8 @@ const mob = await phone.waitForFunction(() => {
   .catch(async () => (await phone.evaluate(() => window.__seen)) || {});
 ok(mob.display === 'flex' && !mob.bKeys,
    `the phone bar carries the keys, and the strip has no ⌨ anywhere to hide (${JSON.stringify(mob)})`);
+ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
+   `...its two buttons share the bar in equal halves, each word whole (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
 // About control carries the word instead, and exactly one of the two, never
 // both: showing the label on a desktop as well stacked it under the version
