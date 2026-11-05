@@ -123,6 +123,7 @@
 - A person keeps one token for each git host and sign-in: a new one replaces the one before in place, every project using it moves to the new one, and the older tokens an install already kept for the same host are let go at the upgrade (fb7bd4d)
 - Controller settings' Update checks is the clocks alone: when each check last looked and how often it runs; Check for updates stays on each thing's own page (Containers, nginx, Scanners, the Library) (801c19e)
 - Move this controller reads as facts (new home, armed, nodes heard, last packed, what is in the bundle, the ask) with one line under them, and a dozen dense hints across the pages say their one thing in a line with the rest behind a help mark (1f42d65)
+- Projects are called spaces, since a space can hold code or only containers and VMs: every page, dialog and message says space, the Spaces page is at #/spaces, and a link to #/projects still opens it (da5e87e, e6e48f0)
 
 ### Fixed
 
@@ -179,3 +180,4 @@
 - The command is aerie, and bb is gone
 - The image is ghcr.io/aquilaelabs/aerieos, the repositories are github.com/aquilaelabs/aerieos and aerieos-catalog, and every download is named aerieos-*
 - The Android app is org.aerieos.app and the VS Code extension aquilaelabs.aerieos: install them new and pair or sign in again
+- Nothing to do for the rename to spaces: aerie's verbs and --project, the API's paths and fields and what an install stores keep their names, and old #/projects links open the new page (da5e87e, e6e48f0)
