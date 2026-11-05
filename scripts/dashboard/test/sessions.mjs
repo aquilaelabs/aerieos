@@ -19,7 +19,7 @@ await page.waitForFunction(() => document.querySelectorAll('.sesstbl .sessrow').
 const sp = await page.evaluate(() => ({ hash: location.hash, on: document.querySelector('[data-rail="sessions"]')?.classList.contains('on'),
   head: [...document.querySelectorAll('.sesstbl .thead .th')].map(h => h.textContent.trim()).filter(Boolean),
   bar: document.querySelector('#mSessions'), panel: document.getElementById('sespanel') }));
-ok(sp.hash === '#/sessions' && sp.on && sp.head.join(',') === 'Session,Project,Node,Started' && !sp.bar && !sp.panel,
+ok(sp.hash === '#/sessions' && sp.on && sp.head.join(',') === 'Session,Space,Node,Started' && !sp.bar && !sp.panel,
    `the rail's Sessions opens its page at #/sessions, a table of Session, Space, Node, Started, the old panel gone (${JSON.stringify(sp)})`);
 const row = n => page.locator('.sesstbl .sessrow', { has: page.locator(`[data-go="${n}"]`) });
 // ...and a session on the controller itself says when it started, as a

@@ -1889,7 +1889,7 @@ await page.click('#rnCancel');
      && await page.$('#bellPanel [data-bsign="alpha"]') !== null && await page.$('#bellPanel [data-bdismiss="rsign:alpha@x"]') !== null,
      'a release that could not be signed is said on the bell before it, with Dismiss and the way to the Signing view');
   await page.click('#bellPanel [data-bsign="alpha"]');
-  await page.waitForFunction(() => /\/projects\/alpha\/signing$/.test(location.hash), null, { timeout: 10000 });
+  await page.waitForFunction(() => /\/spaces\/alpha\/signing$/.test(location.hash), null, { timeout: 10000 });
   ok(true, '...whose Signing view link opens it');
   await freePoll(page);
   rmSync(`${wsA}/.github/workflows/r106-apk.yml`, { force: true });

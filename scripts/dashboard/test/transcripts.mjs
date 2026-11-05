@@ -206,7 +206,7 @@ const mem = await page.evaluate(async () => ((await (await fetch('/api/memory?pr
   .map(m => ({ name: m.name, hook: m.hook, type: m.type })));
 ok(/^saved alpha-deploys\.md on alpha/.test(added) && mem.some(m => m.name === 'alpha-deploys' && m.hook === 'alpha deploys from its main branch' && m.type === 'project'),
    `aerie memory add saves one on the repository with its index line, and the Memory view has it (${added.trim()} ${JSON.stringify(mem)})`);
-ok(/alpha-deploys  \[space\]  alpha deploys from its main branch/.test(cli('memory')) && /Deploys come from main/.test(cli('memory', 'show', 'alpha-deploys')),
+ok(/alpha-deploys  \[project\]  alpha deploys from its main branch/.test(cli('memory')) && /Deploys come from main/.test(cli('memory', 'show', 'alpha-deploys')),
    'aerie memory lists the index and aerie memory show prints one whole');
 ok(/^your memories on beta|^no memories of yours on beta/.test(cli('-p', 'beta', 'memory')), 'bb -p NAME memory answers for another repository');
 ok(/^forgot alpha-deploys\.md on alpha/.test(cli('memory', 'forget', 'alpha-deploys'))

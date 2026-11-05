@@ -112,7 +112,7 @@ await page.click('#rolesAddOn');
 const AK = projectKey('alpha');
 await page.waitForSelector(`.userstab [data-rproject="${AK}"] [data-rprole="deployer"]:checked`);
 await page.waitForFunction(k => document.querySelector(`[data-rcan="releases"] [data-rcanp="${k}"]`)?.textContent === 'Write'
-  && document.querySelector(`[data-rcan="spaces"] [data-rcanp="${k}"]`)?.textContent === 'Read', AK);
+  && document.querySelector(`[data-rcan="projects"] [data-rcanp="${k}"]`)?.textContent === 'Read', AK);
 ok(true, 'What dep can do says it in its grid, alpha writing Releases and reading Spaces, before Save');
 await page.click('.userstab #ueSave');
 await page.waitForFunction(k => rolesData?.people?.find(p => p.name === 'dep')?.project_roles?.[k], AK, { timeout: 10000 });
