@@ -399,6 +399,21 @@ seed_home() {
     if [ -d /opt/aerieos/skel ]; then
         cp -rn /opt/aerieos/skel/. "$BUILDER_HOME"/ 2>/dev/null || true
     fi
+    # ...and a .bashrc a BuilderBot image seeded greets with the name and the
+    # command of today rather than bb, which is gone. Only that exact line,
+    # never anything a person wrote; the dash in it is written as its bytes.
+    local old new dash
+    dash="$(printf '\342\200\224')"
+    old="    echo \"BuilderBot ${dash} 'bb status' for an overview, 'claude' to start a session.\""
+    new="    echo \"AerieOS: 'aerie status' for an overview, 'claude' to start a session.\""
+    if [ -f "$BUILDER_HOME/.bashrc" ] && grep -qxF -- "$old" "$BUILDER_HOME/.bashrc" 2>/dev/null; then
+        python3 - "$BUILDER_HOME/.bashrc" "$old" "$new" <<'PY' 2>/dev/null || true
+import sys
+f, old, new = sys.argv[1:]
+lines = open(f, encoding="utf-8").read().split("\n")
+open(f, "w", encoding="utf-8").write("\n".join(new if ln == old else ln for ln in lines))
+PY
+    fi
 
     mkdir -p \
         "$BUILDER_HOME/.claude" \
