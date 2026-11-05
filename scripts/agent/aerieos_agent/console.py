@@ -55,7 +55,8 @@ def apply(run=subprocess.run):
         rc = run(["useradd", "-m", "-s", "/bin/bash", "-G", "sudo", USER], capture_output=True, timeout=30, check=False).returncode
         if rc != 0:
             return rc
-    return run(["usermod", "-p", h, "-U", USER], capture_output=True, timeout=10, check=False).returncode
+    # The hash replaces the lock mark; usermod refuses -U beside -p.
+    return run(["usermod", "-p", h, USER], capture_output=True, timeout=10, check=False).returncode
 
 
 class ConsoleMixin:

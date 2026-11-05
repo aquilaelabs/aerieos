@@ -40,7 +40,7 @@ class Apply(unittest.TestCase):
         c = Calls(have=False)
         self.assertEqual(console.apply(run=c), 0)
         self.assertIn(["useradd", "-m", "-s", "/bin/bash", "-G", "sudo", "admin"], c.calls)
-        self.assertIn(["usermod", "-p", H, "-U", "admin"], c.calls)
+        self.assertIn(["usermod", "-p", H, "admin"], c.calls)
         self.assertEqual(console.console_now(), {"os": True, "set": True})
 
     def test_locked_where_no_hash_is_kept(self):
