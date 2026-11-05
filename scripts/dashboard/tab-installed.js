@@ -130,7 +130,7 @@ function instActs(r, may){
   if (r.running) return "";
   if (r.kind === "service") return !may.configure ? "" : r.installed ? a("remove", "Remove", "danger")
     : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
-  if (r.machine) return r.machine.managed && r.installed && may.install ? a("remove", "Remove", "danger") : "";
+  if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
   if (r.kind === "pack" && r.pack) return `${a("edit", "Edit")}${r.installed ? a("remove", "Remove", "danger") : ""}`;
   return r.installed ? a("remove", "Remove", "danger") : "";

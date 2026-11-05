@@ -1494,6 +1494,12 @@ def payload_for_node(nid):
 DRIVER = "nvidia-driver"
 
 
+def _imaged(rep):
+    """Whether this machine runs an AerieOS image, whose driver and toolkit
+    are part of the image rather than installed on it."""
+    return bool((rep.get("os_image") or {}).get("version"))
+
+
 def driver_row(n):
     """The NVIDIA driver as a row of the Library and the Installed page (R102), or
     None where the node reports no NVIDIA card. A row like the store's, with
@@ -1507,7 +1513,8 @@ def driver_row(n):
     gd = rep.get("gpu_driver") if isinstance(rep.get("gpu_driver"), dict) else {}
     # A driver left for a card that has gone keeps its row, so it can be
     # removed: hidden, its boot-time tries at the card had no way off (B168).
-    gone = not card and gd.get("nocard") and gd.get("installed")
+    # ...not one the image carries, which no press can take off the machine.
+    gone = not card and gd.get("nocard") and gd.get("installed") and not _imaged(rep)
     if not card and not gone:
         return None
     inst, loaded, bound = gd.get("installed") or "", gd.get("loaded") or "", gd.get("bound") or ""
@@ -1521,7 +1528,7 @@ def driver_row(n):
     pv, cand = gd.get("pkg_version") or "", gd.get("candidate") or ""
     return {"name": DRIVER, "label": "NVIDIA driver", "card": str(card or ""),
             "gpu": str(rep.get("gpu") or ""), "installed": inst, "loaded": loaded,
-            "bound": bound, "state": state, "managed": bool(rep.get("sandbox")),
+            "bound": bound, "state": state, "managed": bool(rep.get("sandbox")), "imaged": _imaged(rep),
             # On the machine, whether or not it has the card yet: what a
             # tick means and what Remove is offered on.
             "here": state in ("waiting", "loaded", "update", "nocard"),
@@ -1947,7 +1954,7 @@ def container_row(n):
     gc = rep.get("gpu_container") if isinstance(rep.get("gpu_container"), dict) else {}
     inst, cand = gc.get("installed") or "", gc.get("candidate") or ""
     # Left for a card that has gone, it keeps its row to be removed (B168).
-    gone = not rep.get("gpu_card") and gc.get("nocard") and inst
+    gone = not rep.get("gpu_card") and gc.get("nocard") and inst and not _imaged(rep)
     if not rep.get("docker") or not (rep.get("gpu_card") or gone):
         return None
     drv = driver_row(n) or {}
@@ -1956,7 +1963,7 @@ def container_row(n):
              else "ready" if gc.get("runtime")
              else "unconfigured")
     return {"name": TOOLKIT, "label": "NVIDIA container toolkit", "installed": inst,
-            "state": state, "managed": bool(rep.get("sandbox")), "here": bool(inst),
+            "state": state, "managed": bool(rep.get("sandbox")), "imaged": _imaged(rep), "here": bool(inst),
             "newer": cand if inst and cand and cand != inst else "",
             # The driver on the machine, which the toolkit hands to a
             # container: without it an install is refused, by name.

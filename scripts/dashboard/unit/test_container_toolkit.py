@@ -261,5 +261,22 @@ class ComposeGate(unittest.TestCase):
         self.assertEqual(devapp.gpu_gate("p", "main", self.CFG), "")
 
 
+class TheImagesOwn(unittest.TestCase):
+    """What an AerieOS image carries is not a thing to remove."""
+    GONE = {"installed": "1.20.1", "nocard": True}
+
+    def test_no_card_on_an_image_draws_no_row(self):
+        n = node(toolkit=self.GONE, card="")
+        self.assertEqual(toolchains.container_row(n)["state"], "nocard")
+        n["reported"]["os_image"] = {"version": "0.9.0"}
+        self.assertIsNone(toolchains.container_row(n))
+
+    def test_a_card_on_an_image_keeps_its_row_marked(self):
+        n = node(toolkit={"installed": "1.20.1", "runtime": True})
+        self.assertFalse(toolchains.container_row(n)["imaged"])
+        n["reported"]["os_image"] = {"version": "0.9.0"}
+        self.assertTrue(toolchains.container_row(n)["imaged"])
+
+
 if __name__ == "__main__":
     unittest.main()

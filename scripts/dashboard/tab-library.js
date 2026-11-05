@@ -179,7 +179,7 @@ function libActs(r, may){
   if (r.kind === "service") return !may.configure || r.installed ? "" : `<button type="button" class="primary" data-libact="install" data-libkind="service" data-libname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}: set on the Installed page"` : ""}>Install</button>`;
   if (!may.install || !n) return "";
   if (r.kind === "pack" && !r.installed && r.catalog) return a("add", "Install", "primary", libHold);
-  if (r.machine && !r.machine.managed) return "";
+  if (r.machine && (!r.machine.managed || r.machine.imaged)) return "";
   // The container toolkit installed but unknown to Docker is put right by
   // installing it again, which its line on the Installed page says.
   const again = r.machine?.state === "unconfigured";
