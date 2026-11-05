@@ -371,7 +371,7 @@ function moveSection(){
       ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once${
         helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
-      ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://builderbot.new.example" autocomplete="off" spellcheck="false"></label></div>
+      ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://aerieos.new.example" autocomplete="off" spellcheck="false"></label></div>
       ${pieces}`}
       <div class="actbar"><span class="sp"></span>
         ${m.prepared ? `<a class="btn" href="/api/move-bundle" download>Download the bundle</a>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button>`
@@ -380,14 +380,14 @@ function moveSection(){
 }
 // The form that lands a move here: Controller settings' on a fresh controller,
 // and the first-run walk's last step.
-function moveLandBox(ld){
+function moveLandBox(ld, inWalk = false){
   return `<div class="field" data-movelandbox>
-      <div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
+      ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
           ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
-      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
+      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}`}
       <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://builderbot.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
+        <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>`;
 }

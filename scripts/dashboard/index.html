@@ -1229,7 +1229,7 @@ body.firstrun #panes{display:none}
 .setstepbody .setcmd{margin:6px 0 8px;padding:8px 9px;font:var(--f-data);color:var(--ink);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-control,6px);white-space:pre-wrap;overflow-wrap:anywhere}
 .setstep>.actbar{justify-content:flex-end;flex-wrap:wrap}
 .setfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--field-gap);margin-top:8px}
-.setfields input{width:100%;box-sizing:border-box;min-height:var(--ctl);padding:8px 9px;font:var(--f-field)}
+:is(.setfields,.setstepbody .fgrid) input:not([type=checkbox]):not([type=radio]):not([type=file]){width:100%;box-sizing:border-box;min-height:var(--ctl);padding:8px 9px;font:var(--f-field)}
 @media(max-width:600px){ .setfields{grid-template-columns:minmax(0,1fr)} }
 .setfinish{display:flex;flex-direction:column;gap:8px;padding-top:4px}
 .setfinish p{margin:0;font:var(--f-note)}

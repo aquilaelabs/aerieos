@@ -184,11 +184,11 @@ function projectsFolderField(n, s, admin){
   const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
   const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
   const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
-  return `<div class="field"><div class="setrow col ctlrow"><label for="projFolder">Projects folder</label><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
-      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}>
+  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Projects folder</span><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
+      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}></label>
       <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
     <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
-      <button type="button" class="primary" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
+      <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="hint">Only if the projects already sit on these disks: the controller works there, and nothing is copied${
       helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
