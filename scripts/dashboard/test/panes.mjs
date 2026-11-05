@@ -232,8 +232,18 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   await page.evaluate(() => { for (let n = 0; n < 14; n++) openTab({ kind: 'term', arg: `sh:${40 + n}:alpha`, label: `many ${n}` });
                               panes[1] = tabs.find(t => t.arg === 'sh:40:alpha').id; dockUp = false; render(); });
   await page.waitForFunction(() => document.querySelector('.dockline')?.classList.contains('chr'), null, { timeout: 10000 }).catch(() => {});
+  // The line at rest: fourteen terminals just opened go on changing their
+  // labels' widths and the line's own for a while, and each change moves the
+  // scroll under whatever reads it, which is what made this flake.
+  const settled = () => page.waitForFunction(() => new Promise(res => {
+    const l = document.querySelector('.dockline'), at = () => [l.scrollLeft, l.scrollWidth, l.childElementCount].join();
+    const a = at();
+    setTimeout(() => res(at() === a), 900);
+  }), null, { timeout: 30000 }).catch(() => {});
+  await settled();
   // From the line's start: it keeps where the tabs just opened left it.
   await page.$eval('.dockline', l => { l.scrollLeft = 0; });
+  await settled();
   await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
   const was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
   const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 10, y: b.top + b.height / 2 }; });
@@ -249,17 +259,23 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   const now = await page.$eval('.dockline', l => ({ left: l.scrollLeft, chl: l.classList.contains('chl') }));
   ok(was.chr && was.left === 0 && now.left > 0 && now.chl,
      `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })})`);
-  // Drawn again (a tab's label moved, as a session's dot does), the line
-  // stays where the press put it rather than going back to the tab in
-  // front (B322).
+  // Drawn again (something on the line moved, as a session's dot does), the
+  // line stays where the press put it rather than going back to the tab in
+  // front (B322). Chat's unread count, since a terminal's label is its
+  // session's once that answers, and a label set here was drawn only when it
+  // beat the session.
+  await settled();
   const before = await page.$eval('.dockline', l => l.scrollLeft);
-  await page.evaluate(() => { tabs.find(t => t.arg === 'sh:45:alpha').label = 'many 5 renamed'; render(); });
-  await page.waitForFunction(() => [...document.querySelectorAll('.dockline .dtab')].some(e => /renamed/.test(e.textContent)),
-                             null, { timeout: 15000 }).catch(() => {});
-  await still();
-  const after = await page.$eval('.dockline', l => ({ left: l.scrollLeft, drawn: [...l.querySelectorAll('.dtab')].some(e => /renamed/.test(e.textContent)) }));
-  ok(after.drawn && before > 0 && Math.abs(after.left - before) < 2,
-     `the dock's line drawn again keeps where it was scrolled to (${JSON.stringify({ before, after })})`);
+  const drawn = await page.evaluate(() => {
+    state.chat = { ...state.chat, unread: { ...state.chat?.unread, probe: 7 } };
+    render();
+    return /7/.test(document.querySelector('.dockline .dchat').textContent);
+  });
+  await settled();
+  const after = await page.$eval('.dockline', l => l.scrollLeft);
+  ok(drawn && before > 0 && Math.abs(after - before) < 2,
+     `the dock's line drawn again keeps where it was scrolled to (${JSON.stringify({ before, after, drawn })})`);
+  await page.evaluate(() => { if (state.chat?.unread) delete state.chat.unread.probe; });
   await page.evaluate(() => { tabs.filter(t => /^sh:(4\d|5[0-3]):alpha$/.test(t.arg)).forEach(t => dropTab(t.id)); });
 }
 
