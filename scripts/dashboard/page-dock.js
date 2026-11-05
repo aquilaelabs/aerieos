@@ -286,6 +286,9 @@ function dockDragEnd(){
 
 // The terminal in front brought into view on the line, which scrolls inside
 // itself: with more tabs than fit, the one in front sat past its end (B740).
+// Which one that was is the page's, not the bar's: a bar built anew forgot it
+// and put a line scrolled along back at the tab in front.
+let dockFront = "";
 function dockReveal(bar){
   const line = bar.querySelector(".dockline"), on = line?.querySelector(".dtab.on");
   if (!line) return;
@@ -301,8 +304,8 @@ function dockReveal(bar){
   // Only when the tab in front changed: a line scrolled along by its arrow
   // or a finger stays there while a session's dot moves (B322).
   const front = on?.dataset.id || "";
-  const moved = front !== bar.bbFront;
-  bar.bbFront = front;
+  const moved = front !== dockFront;
+  dockFront = front;
   if (on && moved){
     const lr = line.getBoundingClientRect(), r = on.getBoundingClientRect();
     if (r.left < lr.left) line.scrollLeft -= lr.left - r.left;

@@ -28,10 +28,14 @@ function paintBar(pane, t, i){
     // with a tab held in it is not drawn at all: a poll bringing a session
     // dot replaced the tab under the finger and dropped it; the drag's end
     // draws it.
-    const kept = bar.querySelector(".dockline")?.scrollLeft || 0;
+    const old = bar.querySelector(".dockline"), kept = old?.scrollLeft || 0;
+    const ends = ["chl", "chr"].filter(c => old?.classList.contains(c));
     if (!ddrag && paint(bar, dockBar())){
       const line = bar.querySelector(".dockline");
-      if (line) line.scrollLeft = kept;
+      // ...with the ends' arrows it had before the scroll is put back: an
+      // arrow moves the tabs by the line's gap (B318), so one added after
+      // moved a line scrolled along by that much at every redraw.
+      if (line){ line.classList.add(...ends); line.scrollLeft = kept; }
       wireDockBar(bar); dockReveal(bar);
     }
     return;
