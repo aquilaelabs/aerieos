@@ -1961,7 +1961,7 @@ def artifact_verb(project, act, req, *, uid, me, by):
         rel = field(req, "path")
         f = resolve_artifact(project, rel)
         if f is None or f.suffix.lower() != ".xpi":
-            return {"error": "not an .xpi in this project's dist/"}, 400
+            return {"error": "not an .xpi in this space's dist/"}, 400
         r = push(nid, node, rel, f.stat().st_size, project, field(req, "apk"),
                  uid, me, by=by)
     elif act == "install":
@@ -1972,7 +1972,7 @@ def artifact_verb(project, act, req, *, uid, me, by):
         rel = field(req, "path")
         f = resolve_artifact(project, rel)
         if f is None or f.suffix.lower() not in (".apk",):
-            return {"error": "not an .apk in this project's "
+            return {"error": "not an .apk in this space's "
                              "dist/"}, 400
         r = install_apk(nid, {"stores": (node.get("reported") or {}).get("stores") or {}},
                         rel, f.stat().st_size, project, label=rel, by=by)

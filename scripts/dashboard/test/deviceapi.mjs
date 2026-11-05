@@ -112,7 +112,7 @@ const files = async (action, extra = {}) => {
 };
 const VSCODE = {
   'POST /login': async () => ({ status: cookie ? 303 : 0, json: {} }),
-  'POST /api/v1/files spaces': () => files('projects'),
+  'POST /api/v1/files projects': () => files('projects'),
   'POST /api/v1/files stat': () => files('stat', { path: 'pin-probe.txt' }),
   'POST /api/v1/files list': () => files('list', { path: '' }),
   'POST /api/v1/files read': () => files('read', { path: 'pin-probe.txt' }),

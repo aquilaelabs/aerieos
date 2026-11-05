@@ -185,7 +185,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   await page.waitForTimeout(400);
   const inh = await page.evaluate(() => ({ first: $('rnGateDocker').options[0].value, word: $('rnGateDocker').options[0].textContent,
     value: $('rnGateDocker').value, gate: $('rnGateRoadmap').value, tc: $('rnTestChange').value }));
-  ok(inh.first === 'inherit' && /^as the project \(deny\)$/.test(inh.word) && inh.value === 'inherit' && inh.gate === 'inherit' && inh.tc === 'inherit',
+  ok(inh.first === 'inherit' && /^as the space \(deny\)$/.test(inh.word) && inh.value === 'inherit' && inh.gate === 'inherit' && inh.tc === 'inherit',
      `a new repository's Permissions start on "as the space" with the space's word beside it (${JSON.stringify(inh)})`);
   // Set one apart, and the project's default stays what it was.
   const over = await page.evaluate(async () => {
@@ -289,7 +289,7 @@ ok(await page.$eval('#pNamePreview', el => el.hidden),
   await page.evaluate(() => pTakenDirs.add('relic'));
   await page.fill('#pName', 'relic');
   ok(await page.$eval('#pNamePreview', el => !el.hidden
-       && /Shown as relic, in the folder relic-2: a deleted project had relic/.test(el.textContent)),
+       && /Shown as relic, in the folder relic-2: a deleted space had relic/.test(el.textContent)),
      '...and a name whose folder a deleted space had says it is shown as itself in the folder Name-2');
   // ...while a folder a live project is in says which, not that a deleted
   // project had it (B93).
@@ -536,7 +536,7 @@ with zipfile.ZipFile('${fx}/slip.zip', 'w') as z:
   await page.setInputFiles('#pArchive', `${fx}/slip.zip`);
   await page.click('#pCreate');
   await page.waitForFunction(() => !document.getElementById('pErrWrap').hidden, { timeout: 15000 });
-  ok(/outside the project/.test(await page.$eval('#pErr', e => e.textContent)),
+  ok(/outside the space/.test(await page.$eval('#pErr', e => e.textContent)),
      'an archive with a path escaping the directory is refused, saying so');
   ok(!existsSync(`${DIR}/ws/slip`) && !existsSync(`${DIR}/ws/evil.txt`),
      '...and leaves neither the half-made space nor the escaped file behind');
@@ -1509,7 +1509,7 @@ await page.waitForFunction(() => document.getElementById('tmodal').hidden);
   await page.waitForFunction(() => location.hash.startsWith('#/spaces/gone-front'), null, { timeout: 10000 });
   await page.evaluate(n => postJSON('/api/trash', { name: n }), made || 'gone-front');
   await refreshUntil(page, () => !tabs.some(t => t.arg === 'gone-front'), { timeout: 15000 });
-  const at = await page.waitForFunction(() => /^#\/projects(\/projects)?$/.test(location.hash) && tabOf(panes[0])?.kind === 'projects',
+  const at = await page.waitForFunction(() => /^#\/spaces(\/projects)?$/.test(location.hash) && tabOf(panes[0])?.kind === 'projects',
     null, { timeout: 10000 }).then(() => true, () => false);
   ok(at, `a notebook on show whose space is deleted lands on Spaces (${await page.evaluate(() => location.hash + ' ' + tabOf(panes[0])?.kind)})`);
 }

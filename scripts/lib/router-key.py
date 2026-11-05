@@ -14,6 +14,6 @@ import bbapi
 
 proj = os.environ.get("BB_RK_PROJECT", "")
 if not proj:
-    sys.exit("[builderbot] ERROR: no project: run it inside one, or set BB_PROJECT")
+    sys.exit("[builderbot] ERROR: no space: run it inside one, or set BB_PROJECT")
 d = bbapi.call("/api/router-key?project=" + urllib.parse.quote(proj), auth=os.environ["BB_RK_AUTH"], timeout=20)
 print(json.dumps(d))

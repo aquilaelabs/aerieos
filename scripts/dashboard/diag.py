@@ -174,7 +174,7 @@ def plugins_now():
     return [{"account": who.get(uid, uid), "node": where.get(nid, nid),
              "plugins": [p["id"] + (f" {p['version']}" if p.get("version") else "")
                          + (" (off)" if p.get("enabled") is False else "")
-                         + (f" (project {p['project']})" if p.get("scope") == "project" else "")
+                         + (f" (space {p['project']})" if p.get("scope") == "project" else "")
                          for p in rows]}
             for uid, per in sorted(plugins.everyone().items()) for nid, rows in sorted(per.items())]
 

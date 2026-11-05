@@ -1298,7 +1298,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
              mark: !!c?.querySelector('.lockmark'),
              home: (state?.projects || []).filter(p => p.pinned && !p.archived).some(p => p.name === 'alpha') };
   });
-  ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ projects?$/.test(arch.said)
+  ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ spaces?$/.test(arch.said)
      && /^Unarchive/.test(arch.unarchive) && !arch.menu.some(t => /^Group/.test(t)) && !arch.home && !arch.mark,
      `an archived space's card is folded away under Archived, Unarchive by its name and no Group on its back, not among the pinned, and not locked (${JSON.stringify(arch)})`);
 // Turned over inside the fold, its back is whole on the screen: every
@@ -1694,7 +1694,7 @@ await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the
 await page.waitForSelector('#rnmodal:not([hidden])');
 ok(await page.$eval('#rnName', el => el.value) === 'alpha',
    'the rename dialog opens on the current name');
-ok(/Folder: \/workspace\/alpha · project #\d+/.test(await page.$eval('#rnHint', e => e.textContent)),
+ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e => e.textContent)),
    'the settings say the folder the space lives in, and its id, under the name');
 {
   // Sections, every one open by default at every width, with a jump bar
@@ -1787,7 +1787,7 @@ await page.click('#rnCancel');
     sect: !!document.querySelector('details.rngroup[data-sect="rn:signing"]'), hash: location.hash,
     head: (document.querySelector(`${v} #sgHint`)?.textContent || '').replace(/\s+/g, ' ').trim(),
     empty: document.querySelector(`${v} > .nbhead > .nbsaidslot`)?.textContent.replace(/\s+/g, ' ') || '' }), V);
-  ok(where.ship === 'artifacts,docker,vms,signing' && !where.sect && /\/projects\/alpha\/signing$/.test(where.hash)
+  ok(where.ship === 'artifacts,docker,vms,signing' && !where.sect && /\/spaces\/alpha\/signing$/.test(where.hash)
      && where.head === '' && /no key yet/.test(where.empty),
      `the keys are the notebook's Signing view, last in Ship, at its own address, no tiles over its head, and the settings have no signing section (${JSON.stringify(where)})`);
   const signRows = await page.$$eval(`${V} .rnsign[data-key]`, rs => rs.map(r => r.firstElementChild.textContent.trim()));
@@ -1870,7 +1870,7 @@ await page.click('#rnCancel');
   ok(/^dev\.example\.alpha releases sign with watch AB:AB:AB/.test(relLine) && relApi.wanted
      && relApi.keys?.[0]?.key === 'watch' && /no node to sign on|is offline|has no jdk|has no Android SDK|no GitHub token|not on GitHub|^$/.test(relApi.why || ''),
      `the Signing view's Releases names the key an app's releases sign with, a retired key's successor (${relLine}; ${relApi.why || 'ready'})`);
-  ok(await page.$(`${V} #sgRelGo`) !== null && /signed on the project's node.*never in CI/s.test(await page.$eval(`${V} #sgRel`, e => e.textContent)),
+  ok(await page.$(`${V} #sgRelGo`) !== null && /signed on the space's node.*never in CI/s.test(await page.$eval(`${V} #sgRel`, e => e.textContent)),
      '...says the APK is signed on the space\'s node and not in CI, and offers a look now');
   // What keeps the project's node from a key's work is said in its words,
   // naming the node and what it lacks, never the controller's keytool (B232).
@@ -2133,7 +2133,7 @@ ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySele
 // The bin is here too, at the foot of the gear's door: on the All projects
 // tab it sits behind the row's fold on a phone, which is where it was not
 // being found. It asks first, and a declined ask moves nothing.
-ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete project/.test(await page.$eval('#rnDelete', e => e.textContent)),
+ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete space/.test(await page.$eval('#rnDelete', e => e.textContent)),
    'the settings dialog offers Delete space at its foot');
 {
   let asked = '';

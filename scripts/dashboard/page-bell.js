@@ -448,7 +448,7 @@ function attRow(a){
   return `<div class="bnote att${a.window ? " bad" : ""}">
     <div class="bt">${a.window ? `${esc(a.node)}'s agent is out of window` : `Agent update on ${esc(a.node)}`}</div>
     <div class="bsum">runs agent ${esc(a.from)} and this controller ships ${esc(a.to)}${a.window
-      ? `: ${a.projects.length ? `${a.projects.length} project${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
+      ? `: ${a.projects.length ? `${a.projects.length} space${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
                                : "nothing works there"} until it is updated` : ""}</div>
     ${a.window && a.projects.length ? `<details class="bdetail"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
       a.projects.map(esc).join(", ")}</pre></details>` : ""}

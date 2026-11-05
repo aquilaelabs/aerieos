@@ -284,7 +284,7 @@ await page.waitForFunction(() => !document.querySelector('.sendbox'),
 const sent = tmuxCapture('claude-alpha');
 ok(!/\/model/.test(sent) && !/\/effort/.test(sent),
    'a send types no slash command, even with a model set for the space');
-ok(/delete a project/.test(sent), '...and the step itself goes on its own');
+ok(/delete a space/.test(sent), '...and the step itself goes on its own');
 // Back into the notebook: sending lands you in the session's tab, and what
 // follows is about the panel.
 await page.evaluate(n => openNotebook(n), 'alpha');
@@ -1008,7 +1008,7 @@ await page.waitForFunction(id => !document.querySelector(`#roadmapList .roadmap[
 await saveList();
 ok(!read().projects.alpha.some(r => String(r.id) === mine.id),
    '...and takes it off for good');
-ok(/remove\s+R\d+\s+delete a project/.test(bbRoadmapEarly('history', '-n', '4')),
+ok(/remove\s+R\d+\s+delete a space/.test(bbRoadmapEarly('history', '-n', '4')),
    '...into the log, with or without a reason typed into the box');
 
 // ---- finishing one -------------------------------------------------------
@@ -1610,7 +1610,7 @@ await page.evaluate(() => notebooks.get('alpha').reload());
 await post({ action: 'send', project: 'alpha', id: plainToSend.id, step: null,
              tell: true });
 const told = tmuxCapture('claude-alpha');
-ok(/shared to-do list for this project/.test(told),
+ok(/shared to-do list for this space/.test(told),
    'a sent step carries what moved in the notebook, naming the to-do list');
 ok(!/notes about how you work/.test(told.slice(beforeQuiet)),
    '...and not the memories, which did not move');

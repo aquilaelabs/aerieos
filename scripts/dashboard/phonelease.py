@@ -532,10 +532,10 @@ def _dist_apk(project, rel):
         try:
             rel = str(Path(rel).relative_to(root))
         except ValueError:
-            return {"error": "install an .apk from this project's dist/"}, 400
+            return {"error": "install an .apk from this space's dist/"}, 400
     rel = rel.removeprefix("./")
     if not rel.startswith("dist/") or ".." in rel.split("/") or not rel.endswith(".apk"):
-        return {"error": "install an .apk from this project's dist/"}, 400
+        return {"error": "install an .apk from this space's dist/"}, 400
     f = root / rel
     if not f.is_file():
         return {"error": f"no {rel} in {project}"}, 404

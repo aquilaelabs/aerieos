@@ -1054,7 +1054,7 @@ function pNameShow(){
         // (B93: rcclone-2 typed said a deleted project had it while it was
         // a live project's folder).
         ? `${projLabel(heldBy)} is in the folder ${base}`
-        : `a deleted project had ${base}, and its notebook and containers stay its own`}`
+        : `a deleted space had ${base}, and its notebook and containers stay its own`}`
     : `Shown as ${as}: names follow GitHub's rule, letters, digits, - _ and . only`;
 }
 
@@ -1112,7 +1112,7 @@ async function createProject() {
     // names or one answered for before, the server reads the address.
     const forge = pForgeOf(pUrlHost(url)) ? "" : pForgeId;
     if (mode === "link" && pLinkAuth === "token" && !linkToken)
-      return fail("an access token for this project: a push has to authenticate somehow");
+      return fail("an access token for this space: a push has to authenticate somehow");
     if (mode === "link" && pLinkAuth === "key" && !key){
       const auth = await pFetch;
       // The container's PAT is GitHub's and covers nothing else, so it is not
@@ -1176,7 +1176,7 @@ async function createProject() {
   }catch(e){
     // The request may still be running server-side (a big clone or push
     // outlives a dropped connection), so say to look rather than blindly retry.
-    fail("lost the connection; check the Projects card before trying again");
+    fail("lost the connection; check the Spaces card before trying again");
   }finally{
     if (gen === pGen) unbusy(b, PMODES[pMode].btn);
   }

@@ -602,7 +602,7 @@ sleep 60
       // A tab coming back to it puts the answer back if it went, and says
       // the running session started without it, as Claude's does (R95 step 19).
       const cxToml = join(HOMEDIR, '.codex', 'config.toml');
-      writeFileSync(cxToml, toml.replace(`[spaces."${cwt}"]\ntrust_level = "trusted"\n`, ''));
+      writeFileSync(cxToml, toml.replace(`[projects."${cwt}"]\ntrust_level = "trusted"\n`, ''));
       const cxNoted = shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       ok(/was not trusted in .*config\.toml/.test(cxNoted) && /until it is restarted/.test(cxNoted)
          && readFileSync(cxToml, 'utf8').includes(`[projects."${cwt}"]`),

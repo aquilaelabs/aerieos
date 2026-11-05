@@ -174,7 +174,7 @@ await refreshUntil(page, new Function(`return ((state.projects || []).find(p => 
 const kept = await page.evaluate(() => ((state.projects || []).find(p => p.name === 'alpha') || {}).prefs?.test_node || '');
 ok(kept === minted.id, `...and saving it writes the setting (${kept || 'nothing'})`);
 const refused = await call('/api/prefs', { project: 'alpha', test_node: 'n_00000000' });
-ok(/one of the project's nodes/.test(refused.error || ''), `a node outside the space's set is refused (${refused.error})`);
+ok(/one of the space's nodes/.test(refused.error || ''), `a node outside the space's set is refused (${refused.error})`);
 await call('/api/prefs', { project: 'alpha', test_node: '' });
 await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); });
 await call('/api/v1/nodes', { action: 'retire', id: minted.id });

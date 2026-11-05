@@ -3049,7 +3049,7 @@ cmd_tests() {
             tests_verdict "$log" || rc="${rc:-1}"
         else
             echo "nothing timed, so nothing recorded. \`aerie tests run\` runs this" >&2
-            echo "project's own test command with BB_TEST_TIMING=1 in front of it;" >&2
+            echo "space's own test command with BB_TEST_TIMING=1 in front of it;" >&2
             echo "set that command in the space's settings dialog." >&2
             # No timing prefix is ordinary: another project's runner prints
             # none. No OUTPUT AT ALL with a zero exit is not: twice on 21 Sep
@@ -3995,7 +3995,7 @@ cmd_users() {
                 printf '%s\n' "$now"; return 0
             fi
             [ -n "${1:-}" ] || die "which space? aerie users token PROJECT [ACCOUNT]"
-            [ -d "$WORKSPACE/$1" ] || die "no project called $1 under $WORKSPACE"
+            [ -d "$WORKSPACE/$1" ] || die "no space called $1 under $WORKSPACE"
             # With an account name the token is FOR that account (what a
             # node-bound terminal gets) and can fetch its Claude login.
             DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/users-verbs.py" token "$py" "$1" "${2:-}"
@@ -4106,7 +4106,7 @@ cmd_run() {
             --) shift; break ;;
             -h|--help)
                 echo "aerie run [--node NAME] [--out GLOB]... [--timeout S] -- CMD..."
-                echo "  snapshot this tree, run CMD on the project's node (its settings dialog), stream the log;"
+                echo "  snapshot this tree, run CMD on the space's node (its settings dialog), stream the log;"
                 echo "  files matching --out come back into dist/. aerie build / aerie test use the"
                 echo "  commands and outputs in the space's settings dialog."
                 return 0 ;;
@@ -6250,7 +6250,7 @@ cmd_changelog() {
 # the controller's door is what refuses a project this one does not read.
 if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
     [ -n "${2:-}" ] || die "aerie -p NAME VERB: which space?"
-    case "$2" in */*|.*) die "aerie -p: '$2' is not a project name" ;; esac
+    case "$2" in */*|.*) die "aerie -p: '$2' is not a space name" ;; esac
     p_dir="$2" p_name="$2"
     # The name the dashboard shows is taken for its directory (B1), here as
     # well as at the relay, since aerie map and aerie transcripts read the tree

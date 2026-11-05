@@ -46,7 +46,7 @@ page.on('request', r => asked.push(r.url().replace(/^https?:\/\/[^/]+/, '')));
 await page.goto(URL); await ready(page); await sleep(800);
 
 const row = await page.evaluate(() => (state.projects || []).find(p => p.name === 'alpha') || {});
-ok(/no Projects Write on alpha/.test(row.write_why || '') && !!row.trash_why && !!row.settings_why,
+ok(/no Spaces Write on alpha/.test(row.write_why || '') && !!row.trash_why && !!row.settings_why,
    `the row carries why alpha is not this account's to change, delete or set up (${row.write_why})`);
 
 // ---- the Projects page (B86, B87, B88) -----------------------------------
@@ -63,7 +63,7 @@ ok(!bar.why.length, `...and nothing on the page says why (${bar.why.join(' | ')}
 await page.evaluate(() => openTrash());
 await page.waitForFunction(() => !document.querySelector('#tList .sk-row') && document.querySelector('#tList').textContent.trim(), null, { timeout: 15000 });
 const bin = await page.$eval('#tList', e => e.textContent.trim());
-ok(!/nothing deleted/.test(bin) && /deleting a project/.test(bin), `the bin, asked anyway, says the refusal and not 'nothing deleted' (${bin.slice(0, 80)})`);
+ok(!/nothing deleted/.test(bin) && /deleting a space/.test(bin), `the bin, asked anyway, says the refusal and not 'nothing deleted' (${bin.slice(0, 80)})`);
 await page.evaluate(() => { $("tmodal").hidden = true; });
 const card = await page.evaluate(() => {
   const c = document.querySelector('.pgrid .pcard[data-row="alpha"]');
@@ -218,7 +218,7 @@ await page.unroute('**/api/version?project=alpha*');
 ok(ar.ver.length > 0 && !ar.ver.some(Boolean) && ar.policy !== false && !ar.verWhy,
    `...and no bump or Release on the version, its Claude access read-only, nothing said (${ar.verSaid})`);
 const cl = await api('/api/changelog', { project: 'alpha', component: '', groups: [] }, { ...owner, Authorization: auth });
-ok(cl.status === 403 && /no Projects Write/.test(cl.error || ''), `...and the changelog's Save is refused it at the server too (${cl.status} ${cl.error || ''})`);
+ok(cl.status === 403 && /no Spaces Write/.test(cl.error || ''), `...and the changelog's Save is refused it at the server too (${cl.status} ${cl.error || ''})`);
 
 // Pending: what a session left for approval, drawn into the review dialog.
 await page.evaluate(() => { pendFor = 'alpha'; $("pendModal").hidden = false;

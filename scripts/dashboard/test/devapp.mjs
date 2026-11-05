@@ -498,7 +498,7 @@ ok(/missing against \.env\.example: PORT/.test(await page.$eval('#cEnvHint', e =
 // An empty env opens on the example rather than on a blank box under a list
 // of names the operator would have to type out.
 const seeded = await page.$eval('#cEnv', e => e.value);
-ok(/PORT=8080/.test(seeded) && /Started from this project/.test(seeded),
+ok(/PORT=8080/.test(seeded) && /Started from this space/.test(seeded),
    '...and opens on the example, seeded, when nothing is stored yet');
 ok(/nothing saved yet/.test(await page.$eval('#cEnvHint', e => e.textContent)),
    '...saying it is a draft, since a seeded box has not been written');
@@ -3199,7 +3199,7 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
     head: [...(d.closest('.dmtbl')?.querySelectorAll(':scope > .thead .th') || [])].map(t => t.textContent).join('|'),
     body: !!d.querySelector('.dmbody .dmhead') }));
   ok(!line.open && /staging-two/.test(line.name || '') && /7475/.test(line.facts || '') && line.body
-     && /^Container\|State\|Project\|Ports\|Address\|Image$/.test(line.head),
+     && /^Container\|State\|Space\|Ports\|Address\|Image$/.test(line.head),
      `in list view a container is one line of a table under its space, its name, state and facts in columns, with its card behind it (${JSON.stringify(line)})`);
   // Pressed on its name: the line's middle is its Ports column, and a port
   // there is a link that answers the press itself.
@@ -3487,7 +3487,7 @@ ok(/written here/.test(await page.$eval(
      const row = document.querySelector('.dmtab .row[data-inst="radarr|main"]');
      const heads = [...document.querySelectorAll('.dmtab .dmgroup')]
        .filter(h => h.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING);
-     return /No project/.test(heads.pop()?.textContent || '');
+     return /No space/.test(heads.pop()?.textContent || '');
    }),
    '...and the manager says which kind it is on the row, under No space, since none was picked');
 // Editing one: what it is changes far more often than it is created, and
@@ -3525,7 +3525,7 @@ await page.waitForSelector('#cmodal:not([hidden])');
 await page.fill('#cName', 'alpha');
 await page.click('#cGo');
 await page.waitForSelector('#cErrWrap:not([hidden])', { timeout: 15000 });
-ok(/the project alpha/.test(await page.$eval('#cErr', e => e.textContent)),
+ok(/the space alpha/.test(await page.$eval('#cErr', e => e.textContent)),
    'a name a space already has is refused');
 await page.fill('#cName', '');
 await page.click('#cCancel');
@@ -3909,7 +3909,7 @@ ok(await page.$('#devSend'),
   // The tab is named as well as the switch: the controls moved from the
   // artifact row to the Docker tab and this sentence stayed behind, pointing
   // a session at a tab that no longer has it.
-  ok(off.status === 403 && /project's settings, Agents may: Run its container/.test(off.error || ''),
+  ok(off.status === 403 && /space's settings, Agents may: Run its container/.test(off.error || ''),
      `a session cannot rebuild until the space says so, and is told where the setting is (${
         JSON.stringify(off).slice(0, 90)})`);
   // The two verbs that make and unmake a container are not on the dial at
@@ -4602,7 +4602,7 @@ print(json.dumps(out))
      `a container written here can be made for a space (${JSON.stringify(made).slice(0, 80)})`);
   const bad = await api('/api/container', { action: 'create', name: 'helper-for-nobody', owner: 'no-such-project',
                                            compose: 'services:\n  app:\n    image: alpine\n', env: '' });
-  ok(/not a project: no-such-project/.test(bad.error || ''), 'a space nobody can see is refused');
+  ok(/not a space: no-such-project/.test(bad.error || ''), 'a space nobody can see is refused');
   // Sent with "no project" picked, a project's own container belongs to none,
   // which is not the same as sending it with nothing said.
   const loose = await api('/api/devapp', { project: 'ep.silon', action: 'new', instance: 'loose', owner: '' });
@@ -4622,7 +4622,7 @@ print(json.dumps(out))
   for (const p of ['alpha', 'gamma']) await api('/api/prefs', { project: p, node: epNode, nodes: epNode ? [epNode] : [] });
   writeFileSync(`${DIR}/ws/alpha/docker-compose.yml`, 'services:\n  app:\n    image: alpha-dev\n');
   const nowhere = await api('/api/devapp', { project: 'ep.silon', action: 'move', instance: 'loose', to: 'no-such' });
-  ok(nowhere.status === 400 && /no project called no-such/.test(nowhere.error || ''), `a move names a space there is (${nowhere.error})`);
+  ok(nowhere.status === 400 && /no space called no-such/.test(nowhere.error || ''), `a move names a space there is (${nowhere.error})`);
   const moveTok = execFileSync('bash', [fileURLToPath(new globalThis.URL('../../aerie', import.meta.url)), 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const bySess = await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST',
@@ -4650,8 +4650,8 @@ print(json.dumps(out))
   ok(zc.ok && gone1.ok && zrow(whileGone).owner === '' && JSON.stringify(gone1.unassigned || []).includes('helper-for-gamma'),
      `a deleted space's container keeps running, given to no space (${JSON.stringify(zrow(whileGone)).slice(0, 120)} ${zc.error || gone1.error || ''})`);
   await openManager();
-  await page.waitForFunction(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No project/.test(b.textContent)), null, { timeout: 15000 }).catch(() => {});
-  ok(await page.evaluate(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No project/.test(b.textContent))),
+  await page.waitForFunction(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No space/.test(b.textContent)), null, { timeout: 15000 }).catch(() => {});
+  ok(await page.evaluate(() => [...document.querySelectorAll('.dmgroup b')].some(b => /^No space/.test(b.textContent))),
      '...drawn under No project on the Containers page');
   const back2 = await api('/api/trash-restore', { name: (gone1.to || '').split('/').pop() });
   ok(back2.ok && zrow(await api('/api/docker')).owner === 'gamma', `...and Put back gives it back to gamma (${back2.error || 'ok'})`);
@@ -4893,7 +4893,7 @@ print(json.dumps(out))
     });
     await api('/api/users', { action: 'projects', name: 'test', projects: mine });
     await page.evaluate(() => refresh());
-    ok(refused.status === 403 && /not on your list of projects/.test(refused.error || '') && read.status === 200,
+    ok(refused.status === 403 && /not on your list of spaces/.test(refused.error || '') && read.status === 200,
        `an administrator not on a space may read its containers and not act on them (${refused.status}: ${refused.error}; read ${read.status})`);
     ok(drawn && /not on your list/.test(drawn.why) && drawn.live === 0 && drawn.after,
        `...and the Containers page draws them after their own, dimmed, dead, and says why (${JSON.stringify(drawn)})`);
@@ -4907,7 +4907,7 @@ print(json.dumps(out))
        JSON.stringify(await as('/api/docker'))),
      `...and one put under no space is out of its reach and off its list (${gone.status}, ${gone2.status})`);
   const nope = await api('/api/dockerctl', { action: 'owner', container: 'someone-elses', owner: 'no-such-project' });
-  ok(nope.status === 400 && /no project called/.test(nope.error || ''), `a space that does not exist is refused (${nope.error})`);
+  ok(nope.status === 400 && /no space called/.test(nope.error || ''), `a space that does not exist is refused (${nope.error})`);
   await dial('deny');
   for (const [p, i] of [['helper-for-eps', 'main'], ['ep.silon', 'loose']])
     await api('/api/devapp', { project: p, instance: i, action: 'remove' });

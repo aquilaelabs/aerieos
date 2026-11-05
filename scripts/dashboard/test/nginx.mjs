@@ -105,7 +105,7 @@ ok(rec?.main?.source === 'file' && rec.main.node === sandbox.node && rec.main.fo
 // System is the deployment's to set and nobody's to pick: the owner verb
 // refuses the word however it is asked.
 const sysPick = await api('/api/dockerctl', { action: 'owner', container: 'nginx-sandbox', owner: 'System', node: sandbox.node });
-ok(/no project called System|AerieOS's own/.test(sysPick.error || ''),
+ok(/no space called System|AerieOS's own/.test(sysPick.error || ''),
    `...and no picker puts a container under System (${(sysPick.error || 'allowed').slice(0, 60)})`);
 // The section is drawn after the answer lands, so its Remove is waited
 // for rather than read the moment the list moved.

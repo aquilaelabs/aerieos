@@ -118,8 +118,8 @@ function scannersScheduleSection(s, deployed){
 }
 
 function scannersUncovered(rows){
-  if (!rows.length) return docSection("scanners", "uncovered", "Not covered", "every project is", `<div class="field"><div class="sub">Every project is scanned on its node.</div></div>`);
-  const cols = [{label: "Project"}, {label: "Why"}];
+  if (!rows.length) return docSection("scanners", "uncovered", "Not covered", "every space is", `<div class="field"><div class="sub">Every project is scanned on its node.</div></div>`);
+  const cols = [{label: "Space"}, {label: "Why"}];
   return docSection("scanners", "uncovered", "Not covered", String(rows.length),
     tblWrap(cols, rows.map(r => `<div class="row">${tblLine(cols, [esc(r.project), esc(r.why)])}</div>`).join(""), "scanuncovered"));
 }

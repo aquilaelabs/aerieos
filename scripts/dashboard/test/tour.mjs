@@ -48,7 +48,7 @@ ok(await page.$eval('#tourCard', c => c.hidden), '...so drawing Home again does 
 // Another page has its own, once; Skip tour with the box skips them all.
 await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('#tourCard:not([hidden])', { timeout: 15000 });
-ok(/Every project you work on/.test(await page.$eval('#tourCard .toursay', e => e.textContent)),
+ok(/Every space you work on/.test(await page.$eval('#tourCard .toursay', e => e.textContent)),
    'the first visit to another page opens that page\'s tour');
 await page.check('#tourAll');
 await page.click('#tourSkip');

@@ -161,7 +161,7 @@ await page.fill('.pane .doc.on .vmtab #vmSearch', '');
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 5000 });
 const top = await page.$eval('.vmtab', t => ({ tiles: [...t.querySelectorAll('.tiles .tile .tl')].map(x => x.textContent).join(),
   chips: [...t.querySelectorAll('[data-vmchip]')].map(c => c.textContent.replace(/\d+$/, '').trim()) }));
-ok(/^running,projects,snapshots/.test(top.tiles), `the VMs page counts what runs, its spaces and snapshots in tiles, as Containers does (${JSON.stringify(top)})`);
+ok(/^running,spaces,snapshots/.test(top.tiles), `the VMs page counts what runs, its spaces and snapshots in tiles, as Containers does (${JSON.stringify(top)})`);
 if (top.chips.length > 2){
   const other = await page.$eval('.vmtab [data-vmchip]:not([data-vmchip=""]):not([data-vmchip="alpha"])', c => c.dataset.vmchip);
   await page.click(`.vmtab [data-vmchip="${other}"]`);

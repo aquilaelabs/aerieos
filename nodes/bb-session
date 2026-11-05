@@ -502,9 +502,9 @@ def plan(c, a, uid, wall=None):
     home, cwd = a.get("home", "").rstrip("/"), a.get("cwd", "").rstrip("/")
     off = a.get("off", [])
     if not PROJECT.fullmatch(project) or project.startswith("."):
-        raise Refused(f"bb-session: '{project}' is not a project name")
+        raise Refused(f"bb-session: '{project}' is not a space name")
     if not _real_dir(f"{ws}/{project}"):
-        raise Refused(f"bb-session: {ws}/{project} is not a project directory")
+        raise Refused(f"bb-session: {ws}/{project} is not a space directory")
     if not ACCOUNT.fullmatch(account):
         raise Refused("bb-session: the session names no account, so there is no home to give it")
     users = f"{home_root}/users"
@@ -521,21 +521,21 @@ def plan(c, a, uid, wall=None):
         if not PROJECT.fullmatch(w) or w.startswith(".") or w == project:
             raise Refused(f"bb-session: '{w}' is not a repository this session could work in")
         if not _real_dir(f"{ws}/{w}"):
-            raise Refused(f"bb-session: {ws}/{w} is not a project directory")
+            raise Refused(f"bb-session: {ws}/{w} is not a space directory")
         if w not in works:
             works.append(w)
     reads = []
     for r in [x for x in a.get("reads", []) if x not in works]:
         if not PROJECT.fullmatch(r) or r.startswith(".") or r == project:
-            raise Refused(f"bb-session: '{r}' is not a project this one could read")
+            raise Refused(f"bb-session: '{r}' is not a space this one could read")
         if not _real_dir(f"{ws}/{r}"):
-            raise Refused(f"bb-session: {ws}/{r} is not a project directory")
+            raise Refused(f"bb-session: {ws}/{r} is not a space directory")
         if r not in reads:
             reads.append(r)
     inside = tuple(d for p in [project] + works for d in (f"{ws}/{p}", f"{ws}/.worktrees/{p}"))
     parts = cwd.split("/")
     if ".." in parts or not any(cwd == d or cwd.startswith(d + "/") for d in inside):
-        raise Refused(f"bb-session: {cwd} is not inside {project}, its project's other repositories or their worktrees")
+        raise Refused(f"bb-session: {cwd} is not inside {project}, its space's other repositories or their worktrees")
 
     base = home != home_root        # the account's home is under users; the base home is another's
     # AerieOS's caches, by where they really are. An account's home links
@@ -551,7 +551,7 @@ def plan(c, a, uid, wall=None):
             + ([(home_root, ("machine",))] if base else []):
         path = f"{h}/.cache/builderbot"
         if os.path.lexists(path) and not _real_dir(path):
-            raise Refused(f"bb-session: {path} is not a directory, so the view could not leave other projects out of it")
+            raise Refused(f"bb-session: {path} is not a directory, so the view could not leave other spaces out of it")
         if _real_dir(path):
             caches.setdefault(os.path.realpath(path), set()).update(keep)
     caches = sorted(caches.items())
@@ -578,10 +578,10 @@ def plan(c, a, uid, wall=None):
         p = p.rstrip("/")
         name = p[len(top):].split("/")[1] if p.startswith(top + "/") else ""
         if not SEES.fullmatch(p) or ".." in p.split("/") or not name:
-            raise Refused(f"bb-session: '{p}' is not a place a project could be shown")
+            raise Refused(f"bb-session: '{p}' is not a place a space could be shown")
         if name in SYSTEM or _inside(p, (ws, home_root, state, data, art, store)) \
                 or _holds(p, (ws, home_root, state, data, art, store)):
-            raise Refused(f"bb-session: {p} is the machine's own or AerieOS's, not a place a project could be shown")
+            raise Refused(f"bb-session: {p} is the machine's own or AerieOS's, not a place a space could be shown")
         if _real_dir(p) and not _inside(p, sees):
             sees = [s for s in sees if not _inside(s, (p,))] + [p]
 
@@ -1202,7 +1202,7 @@ def net_ready():
     except OSError as e:
         why = str(e)
     if why:
-        raise Refused("bb-session: this node keeps each session to its own project's network, and the "
+        raise Refused("bb-session: this node keeps each session to its own space's network, and the "
                       f"agent has not set that up: {why}. Its row on the Nodes page says why")
     return os.open(NET_DIR, os.O_RDONLY | os.O_DIRECTORY)
 
@@ -1426,7 +1426,7 @@ def worktree(c, argv):
     project, agent, slot, branch = argv
     if not PROJECT_DIR.fullmatch(project) or agent not in AGENT_IDS or slot not in "123456789" or len(slot) != 1 \
             or not BRANCH.fullmatch(branch) or not branch.startswith(agent + "/"):
-        raise Refused("bb-session worktree: not a project, an agent, a slot and a branch")
+        raise Refused("bb-session worktree: not a space, an agent, a slot and a branch")
     ws = c["WORKSPACE"].rstrip("/")
     src = f"{ws}/{project}"
     if not os.path.isdir(f"{src}/.git") and not os.path.isfile(f"{src}/.git"):
@@ -1471,7 +1471,7 @@ def enter(c, a, command):
     account = a.get("account", "")
     want = f"{home}/.cache/builderbot/u/{account}/project/{project}/"
     if not envfile.startswith(want):
-        raise Refused(f"bb-session: the environment file {envfile or '(none)'} is not in the project's cache folder {want}")
+        raise Refused(f"bb-session: the environment file {envfile or '(none)'} is not in the space's cache folder {want}")
     # On the controller's own machine (R90), the wall first: a session that
     # would not be walled off from the controller does not start.
     wall = wall_hold(c)
@@ -1777,7 +1777,7 @@ def main(argv):
         c = conf()
         if verb == "check":
             check(c)
-            print("ok: a session here runs in a view of its own project")
+            print("ok: a session here runs in a view of its own space")
             return 0
         if verb == "check-net":
             check_net(c)

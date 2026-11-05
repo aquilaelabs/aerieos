@@ -690,7 +690,7 @@ def repos_part(project):
         return ""
     name, pid, members = got
     ws = os.environ.get("WORKSPACE", "/workspace")
-    lines = ["## The project's repositories",
+    lines = ["## The space's repositories",
              "",
              f"This session is {name} ({pid}), a space of {len(members)} repositories, and works in every one: "
              f"each is its own repository with its own notebook, git host, CI and releases. Each tree below is "

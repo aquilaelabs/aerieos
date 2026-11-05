@@ -31,7 +31,7 @@ await page.evaluate(n => openNotebook(n), 'alpha');
 await nbShown(page);
 await nbGo(page, 'bugs');
 await page.waitForSelector('#bugList .nbempty', { timeout: 15000 });
-ok(await page.$eval('#bugList .nbempty', e => /reaches every session in this project/.test(e.textContent))
+ok(await page.$eval('#bugList .nbempty', e => /reaches every session in this space/.test(e.textContent))
    && !(await page.$('#bugHint .tile')) && await page.$eval('#bugNew', b => b.checkVisibility() && b.classList.contains('primary')),
    'the Bugs tab opens empty: no tiles of zeros, Report a bug on its control row, and where reports end up its empty state (R119 step 4, R109)');
 
@@ -363,7 +363,7 @@ await page.click('.bug .dropbox .danger');
 await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2,
                            { timeout: 10000 });
 ok(!read().some(b => b.id === 3), 'Delete it takes the row for good');
-ok(/wrong project/.test(bbBug('history', '--find', 'wrong space')),
+ok(/wrong space/.test(bbBug('history', '--find', 'wrong space')),
    '...leaving the reason in the log, which is all that is left of it');
 
 // A session can do the same, for the case that prompted it: a mis-filed report.

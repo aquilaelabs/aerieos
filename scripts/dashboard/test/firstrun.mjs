@@ -361,7 +361,7 @@ await firstRun(false);
       function sleep_(ms){ return new Promise(r => setTimeout(r, ms)); }
     });
     await page.unroute('**/api/v1/nodes'); await page.unroute('**/api/v1/jobs?id=j_y');
-    ok(fresh.titles.includes('Where the spaces and containers go') && fresh.projectDead === true && /Once the projects have a place/.test(fresh.why),
+    ok(fresh.titles.includes('Where the spaces and containers go') && fresh.projectDead === true && /Once the spaces have a place/.test(fresh.why),
        `a new start on a stick has a step for where the spaces go, and a space waits for it (B666) (${fresh.titles.join(' | ')})`);
     const named = posted.filter(b => b.action === 'system-pool');
     ok(named.length === 1 && named[0].path === '/mnt/fast', `...and the fast pool is named by itself, once (${JSON.stringify(named)})`);
@@ -394,7 +394,7 @@ await firstRun(false);
         first: words('Have these with you'), firstPill: pill('Have these with you'),
         adopt: !!step("The old system's disks")?.querySelector('[data-adopt="adopt"]') && !!step("The old system's disks")?.querySelector('input[name="adoptMode"]'),
         toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
-        heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the projects need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
+        heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the spaces need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
         back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
@@ -457,7 +457,7 @@ await firstRun(false);
     ok(walk.pick.includes('/mnt/cache') && !walk.pick.includes('/mnt/disk1'), `...a btrfs pool it adopted is a system pool to pick, a data disk is not (B663) (${walk.pick.join()})`);
     ok(/Its disks are as they were/.test(walk.back) && /parity sync/.test(walk.backRw) && /Forget it/.test(walk.back),
        `...the way back says what it costs as it stands, and to forget a prepared move (${walk.backRw.slice(0, 200)})`);
-    ok(/old system cannot read them until they are given back/.test(walk.costs) && /Projects page stays empty until the controller lands/.test(walk.costs),
+    ok(/old system cannot read them until they are given back/.test(walk.costs) && /Spaces page stays empty until the controller lands/.test(walk.costs),
        `...naming a spaces folder says what it costs and when the spaces show (${walk.costs.slice(0, 260)})`);
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
@@ -550,7 +550,7 @@ await firstRun(false);
       const sect = document.querySelector('.machinetab details[data-sect="nodes:stick"]');
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '', pick: [...(sect?.querySelectorAll('#stickPool option') || [])].map(o => o.value) };
     });
-    ok(st.there && /waiting for a system pool/.test(st.text) && /the configuration, and the projects/.test(st.text) && /3\.0 GB in its life/.test(st.text)
+    ok(st.there && /waiting for a system pool/.test(st.text) && /the configuration, and the spaces/.test(st.text) && /3\.0 GB in its life/.test(st.text)
        && st.pick.includes('/mnt/pools/fast'),
        `a stick boot's The stick says docker and the VMs wait for a system pool, what is still on the stick and what it has written, with the pools to pick (${st.text.slice(0, 160)})`);
   }

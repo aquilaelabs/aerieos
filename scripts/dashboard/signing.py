@@ -771,7 +771,7 @@ def import_backup(project, route, blob_b64, key="", password="", alias="", filen
             return {"error": why}, 400
         if not password:
             if not typed:
-                return {"error": "this backup is wrapped under its project's backup password: type that password to import it"}, 400
+                return {"error": "this backup is wrapped under its space's backup password: type that password to import it"}, 400
             password = typed
         if not key and _ok_key(alias):
             key = alias

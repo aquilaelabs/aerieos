@@ -73,7 +73,7 @@ ok(asSession.status === 403, `...and neither can a session, the owner's included
 
 // ---- ending one: this project's, by an administrator -------------------------
 const wrong = await call('/api/project-sessions', { project: 'alpha', action: 'end', session: here[2] });
-ok(wrong.status === 400 && /no such session on this project/.test(wrong.error || ''),
+ok(wrong.status === 400 && /no such session on this space/.test(wrong.error || ''),
    `another space's session cannot be ended from this one (${wrong.error})`);
 const keys = await call('/api/send', { session: here[0], macro: 'lx-ls' });
 ok(keys.status === 403, `typing into another account's session is still refused, administrator or not (B172, ${keys.status})`);

@@ -549,7 +549,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
      && (got.rules || []).some(r => r.name === 'house-changelog-2'),
      "a space rule cannot take a global rule's name: it is suffixed, so aerie rules show NAME is never ambiguous");
   const told = execFileSync(BB, ['preamble'], { env: ENV }).toString();
-  ok(/Where one of this project's rules and a global one disagree, follow the project's, and say so in your reply/.test(told),
+  ok(/Where one of this space's rules and a global one disagree, follow the space's, and say so in your reply/.test(told),
      'a session is told which wins where they disagree, since no matching could find a disagreement in meaning');
 
   // ...and on the page: the global rules are drawn, read-only, and the row says so.

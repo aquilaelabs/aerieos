@@ -132,7 +132,7 @@ ok(coverAt > 0 && back(join(tr, slug(join(ws, 'alpha')))) && back(join(tr, slug(
      && !rs.some(x => (x[0] === 'hide') && x[1] === betaTr) && !rs.some(x => x[2] === join(tr, slug(join(ws, 'alpha-two')))),
      "...and the account's transcripts on that space are bound read-only over the cover, the other spaces' still not there");
   const self = plan({ reads: 'alpha' }), none = plan({ reads: 'nowhere' });
-  ok(self.code !== 0 && /not a project this one could read/.test(self.out) && none.code !== 0 && /is not a project directory/.test(none.out),
+  ok(self.code !== 0 && /not a space this one could read/.test(self.out) && none.code !== 0 && /is not a space directory/.test(none.out),
      `...and refuses itself or a name that is no space (${self.out.trim().slice(0, 60)})`);
 }
 // ...and applying it makes the target under the fresh /workspace before
@@ -479,15 +479,15 @@ ok(has('tmpfs', '/tmp', 'mode=1777') && steps[0][0] === 'private' && steps[1][0]
               [`${M}/mnt/media/../../made-by-hand`, 'a path that climbs'], ['relative/path', 'a relative path'],
               [join(M, 'mnt', 'with space'), 'a name with a space']]
     .map(([p, what]) => [on('--sees', p), what]);
-  const let2 = no.filter(([x]) => !(x.code === 2 && /not a place a project could be shown/.test(x.out))).map(([x, what]) => `${what}: ${x.code}`);
+  const let2 = no.filter(([x]) => !(x.code === 2 && /not a place a space could be shown/.test(x.out))).map(([x, what]) => `${what}: ${x.code}`);
   ok(let2.length === 0, `--sees refuses ${no.map(x => x[1]).join(', ')}${let2.length ? ` (not: ${let2.join(' | ')})` : ''}`);
 }
 
 const refusals = [
   [plan({ cwd: join(ws, 'alpha', '..', 'beta') }), /not inside alpha/, 'a working directory that climbs out of the space'],
   [plan({ home: join(users, other) }), /is not u_0000abcd's home/, 'another account\'s home'],
-  [plan({ project: 'linked', cwd: join(ws, 'linked') }), /not a project directory/, 'a space that is a link to another'],
-  [plan({ project: '../beta' }), /not a project name/, 'a space name with a path in it'],
+  [plan({ project: 'linked', cwd: join(ws, 'linked') }), /not a space directory/, 'a space that is a link to another'],
+  [plan({ project: '../beta' }), /not a space name/, 'a space name with a path in it'],
   [plan({ account: 'nobody' }), /names no account/, 'a session with no account'],
 ];
 const bad = refusals.filter(([r, re]) => !(r.code === 2 && re.test(r.out))).map(([r, , what]) => `${what}: ${r.code} ${r.out.slice(0, 60)}`);
@@ -514,7 +514,7 @@ ok(bad.length === 0, `the plan refuses ${refusals.map(r => r[2]).join('; ')}${ba
   mkdirSync(join(plantedHome, '.cache'), { recursive: true });
   symlinkSync(rootCache, join(plantedHome, '.cache', 'builderbot'));
   const refused = plan({ account: planted, home: plantedHome, cwd: join(ws, 'alpha') });
-  ok(refused.code === 2 && /is not a directory, so the view could not leave other projects out/.test(refused.out),
+  ok(refused.code === 2 && /is not a directory, so the view could not leave other spaces out/.test(refused.out),
      `...and a cache that is itself a link is refused, never left untrimmed with other spaces' tokens in it (${refused.out.trim().slice(0, 60)})`);
 }
 

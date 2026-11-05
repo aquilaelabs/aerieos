@@ -240,7 +240,7 @@ function nodeGpuSection(n){
     ${nodriver ? "" : emuLine}
     <label class="ndcap"><input type="checkbox" data-k="gpucomp" ${c.draft.gpuComp ? "checked" : ""}>
       let sessions and jobs compute on it (CUDA, the hardware video encoder)</label>
-    ${compOn ? `<div class="sub dim">A project can turn this off for itself in its settings.</div>`
+    ${compOn ? `<div class="sub dim">A space can turn this off for itself in its settings.</div>`
              : `<div class="sub dim">A session started here from now on finds no card to compute on.</div>`}
     <div class="actbar">
       <span class="state"></span>
@@ -2043,7 +2043,7 @@ function renderNodesInto(i){
   // off this list, so an empty list is not "no node yet" (B635).
   const ownHere = state?.bare_metal ? (nodesList || []).find(x => x.config?.own && x.state !== "retired") : null;
   const none = live.length ? "" : state?.can?.admin === false
-    ? `<div class="empty ndnone">None of your projects is on a node yet. An administrator sets a project's node.</div>`
+    ? `<div class="empty ndnone">None of your spaces is on a node yet. An administrator sets a space's node.</div>`
     : ownHere ? `<div class="empty ndnone">This machine is its own node: ${pageLink("machine", "This machine")} under Controller is its page.
       Press <b>Enroll node</b> to get the command that adds another machine for builds, tests and sessions.</div>`
     : `<div class="empty ndnone">No node yet. Press <b>Enroll node</b> to get the command
@@ -2689,14 +2689,14 @@ function wireNodesTab(root){
       }
       if (act === "sync-clean"){
         const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
-        if (!await askYes(`Remove the project copies on ${name}?\n\n`
-              + "Everything there has reached the controller. The node then holds no projects until it moves to a synced copy again.")) return;
+        if (!await askYes(`Remove the space copies on ${name}?\n\n`
+              + "Everything there has reached the controller. The node then holds no spaces until it moves to a synced copy again.")) return;
       }
       if (act === "host-only"){
         const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
         if (!await askYes(`Make ${name} hosting only?\n\nIt keeps running the containers sent to it. `
-              + "No project may list it, no session or synced copy runs there, and its agent may ask "
-              + "the controller for nothing but its own jobs. A project that lists it now has to be "
+              + "No space may list it, no session or synced copy runs there, and its agent may ask "
+              + "the controller for nothing but its own jobs. A space that lists it now has to be "
               + "moved off it first.")) return;
       }
       if (act === "discard"){
@@ -2731,7 +2731,7 @@ function wireNodesTab(root){
               : `Turn the hosting firewall off on ${name}?\n\nEvery port this box and its containers publish is reachable from the internet again.`)) return;
       }
       if (act === "cache-clear"
-          && !await askYes("Clear this node's build caches? Every project's Gradle, "
+          && !await askYes("Clear this node's build caches? Every space's Gradle, "
                       + "npm and snapshot cache there goes; the next build of "
                       + "each re-downloads what it needs.")) return;
       // The verb, said on the button for the round trip and, for the
@@ -2853,7 +2853,7 @@ function wireNodesTab(root){
       }
       if (act === "to-sync"){
         const j = await nodeAct({action: "to-sync", id});
-        if (j.ok && !j.error) notify("Moved: each project is copied down now");
+        if (j.ok && !j.error) notify("Moved: each space is copied down now");
         return;
       }
       // The door's press says which way (R174); every other verb is its name.

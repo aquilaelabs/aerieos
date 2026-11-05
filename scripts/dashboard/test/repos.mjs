@@ -42,7 +42,7 @@ ok(m.status === 200 && m.ok && m.name === 'Shop & Co' && /^P\d+$/.test(m.id || '
    `a space is made with its name as typed and no repository in it (${JSON.stringify(m)})`);
 const key = m.key;
 const twin = await post('/api/repos', { action: 'create', name: 'shop & co' });
-ok(twin.status === 400 && /already a project's name/.test(twin.error || ''), `a second space of that name is refused (${twin.error})`);
+ok(twin.status === 400 && /already a space's name/.test(twin.error || ''), `a second space of that name is refused (${twin.error})`);
 
 // gamma and then ep.silon moved into it. A repository's git host link is its
 // own (its remote, token, deploy key and forge): a move leaves it as it was.
@@ -238,7 +238,7 @@ await post('/api/prefs', { project: 'ep.silon', scope: 'project', devbuild: 'den
 const rn = await post('/api/repos', { action: 'rename', key, to: 'Shop' });
 ok(rn.status === 200 && (await status()).repos[key]?.name === 'Shop', `the space is renamed (${JSON.stringify(rn)})`);
 const clash = await post('/api/repos', { action: 'rename', key, to: (await status()).repos[gammaWas]?.name || 'gamma' });
-ok(clash.status === 400 && /already a project's name/.test(clash.error || ''), `not to another space's name (${clash.error})`);
+ok(clash.status === 400 && /already a space's name/.test(clash.error || ''), `not to another space's name (${clash.error})`);
 
 // The trash names the project; with the project gone, Put back asks where.
 // A container built from it keeps running when it goes to the trash, given

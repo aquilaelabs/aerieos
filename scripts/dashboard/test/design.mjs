@@ -64,7 +64,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
   const pre0 = await api(`/api/preamble?project=${P}`);
   ok(/The notebook's Design view is empty: no theme, no page, no design rule\. Build as you would and choose the look yourself; then put what you arrived at into the design with `aerie design save`/.test(pre0.text)
      && /the type, corners, space and motion you settled on/.test(pre0.text)
-     && /Under the project's dial Agents may: Add to the design, a save of yours lands\./.test(pre0.text),
+     && /Under the space's dial Agents may: Add to the design, a save of yours lands\./.test(pre0.text),
      'the briefing of an undesigned space says to build as usual and put the look into the design afterwards, and what the dial does with that');
   ok(d.presets.schemes[0].key === 'default' && d.presets.schemes.slice(1).map(s => s.key).join()
        === d.presets.schemes.slice(1).map(s => s.key).sort().join(),
@@ -365,7 +365,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
      && /Not chosen yet: type, corners, space\. Choose each/.test(one),
      'a choice that is made says what it means, and the ones still open are named as open');
   const pre1 = await api(`/api/preamble?project=${P}`);
-  ok(/This project's notebook holds a design already:[^.]*type, corners, space not chosen yet/.test(pre1.text),
+  ok(/This space's notebook holds a design already:[^.]*type, corners, space not chosen yet/.test(pre1.text),
      '...and the briefing of a designed space names the choices still open');
   // The briefing a session is started with is the verb's, run as a process
   // of its own: it read no design store and said "empty" of every designed
@@ -373,7 +373,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
   const told = execFileSync('bash', [`${REPO}/scripts/aerie`, 'preamble'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } });
-  ok(/This project's notebook holds a design already:/.test(told) && !/Design view is empty/.test(told),
+  ok(/This space's notebook holds a design already:/.test(told) && !/Design view is empty/.test(told),
      'aerie preamble, which is what a session is started with, says the same of a designed space');
   await page.selectOption(`${NB} #dst-0-font`, 'system');
   await page.selectOption(`${NB} #dst-0-corners`, 'soft');
@@ -829,7 +829,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
      "...and the default theme is said as such, with its choices");
   const pre2 = await api(`/api/preamble?project=${P}`);
   ok(/  day\/hull: texture, hull \(the design's\)/.test(pre2.text)
-     && /This project's notebook holds a design already: 2 themes \(Night, Day\); 1 page: the home dashboard; \d+ design rules and 2 of a theme's or a page's own\./.test(pre2.text)
+     && /This space's notebook holds a design already: 2 themes \(Night, Day\); 1 page: the home dashboard; \d+ design rules and 2 of a theme's or a page's own\./.test(pre2.text)
      && /Read `aerie design show` before laying out or styling anything/.test(pre2.text),
      "the briefing names the theme's rule under it, and says the notebook holds a design, what is in it, and to read it before building");
   const file2 = bb('file');

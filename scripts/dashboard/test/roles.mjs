@@ -91,7 +91,7 @@ for (const who of CAST) {
   if (!isAdmin) {
     const other = ALL.find(p => !who.projects.includes(p));
     const r = await api(page, `/api/roadmap?project=${other}`);
-    ok(r.status === 400 && /not a project/.test(r.error || ''), `${tag} ${other}'s notebook answers "not a space", as if it did not exist (${r.status})`);
+    ok(r.status === 400 && /not a space/.test(r.error || ''), `${tag} ${other}'s notebook answers "not a space", as if it did not exist (${r.status})`);
   }
 
   // The tabs: an administrator opens each. A user has no door to them (the
@@ -307,7 +307,7 @@ for (const who of CAST) {
     [rolesData, rolesWho, rolesPeopleDraft] = was;
     return html;
   });
-  ok(/No role on a project yet/.test(b35) && !/rolesAddOn/.test(b35),
+  ok(/No role on a space yet/.test(b35) && !/rolesAddOn/.test(b35),
      'with only another space\'s owner role, Add to space is not drawn dead: the way to a role is named (B35)');
 
   // B38: a plain account by link.

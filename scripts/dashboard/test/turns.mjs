@@ -136,7 +136,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   // they land (the operator, 25 Sep).
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found one', severity: 'low' });
   const nb = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's bugs: read `aerie bug`/.test(nb.line || ''),
+  ok(/somebody else changed this space's bugs: read `aerie bug`/.test(nb.line || ''),
      `a bug the operator filed is named on the next prompt (${(nb.line || 'no line').slice(0, 90)})`);
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
   const own = await sess({ node: 'nodeA' });
@@ -153,11 +153,11 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found a second', severity: 'low' });
   await relay(['bug']);
   const afterRead = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's bugs/.test(afterRead.line || ''),
+  ok(/somebody else changed this space's bugs/.test(afterRead.line || ''),
      `...while a read of the list by the session hides nothing the operator did (${(afterRead.line || 'no line').slice(0, 90)})`);
   await call('/api/prefs', { project: 'alpha', build: 'make it' });
   const st = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's settings: read `aerie settings`/.test(st.line || ''),
+  ok(/somebody else changed this space's settings: read `aerie settings`/.test(st.line || ''),
      `a setting the operator changed is named too (${(st.line || 'no line').slice(0, 90)})`);
   await call('/api/prefs', { project: 'alpha', build: '' });
   await sess({ node: 'nodeA' });
@@ -170,12 +170,12 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   tweak.rules = [...(tweak.rules || []), { name: 'b218', text: 'A rule added in the Design view.' }];
   await call('/api/design', { project: 'alpha', action: 'save', language: tweak, pages: des.pages || [] });
   const dz = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's design: read `aerie design show`, and write docs\/design-language.md again with `aerie design file`/.test(dz.line || ''),
+  ok(/somebody else changed this space's design: read `aerie design show`, and write docs\/design-language.md again with `aerie design file`/.test(dz.line || ''),
      `...and a design saved in the Design view is told the same way, with the file to write again (${(dz.line || 'no line').slice(0, 140)})`);
   // A setting a session takes when it starts says so, once (report #81).
   await call('/api/prefs', { project: 'alpha', reads: ['beta'] });
   const rd = await sess({ node: 'nodeA' });
-  ok(/This project's Reads changed since this session started, and a session takes those when it starts: end it and start a new one/.test(rd.line || ''),
+  ok(/This space's Reads changed since this session started, and a session takes those when it starts: end it and start a new one/.test(rd.line || ''),
      `a change to Reads says a new session is needed for it (${(rd.line || 'no line').slice(0, 120)})`);
   const rd2 = await sess({ node: 'nodeA' });
   ok(!/since this session started/.test(rd2.line || ''), `...once, not on every prompt after (${(rd2.line || 'no line').slice(0, 80)})`);
@@ -186,7 +186,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   // is not, since the half counts notebook edits rather than mtimes (B269).
   await call('/api/memory', { project: 'alpha', action: 'create', name: 'op-note', title: 'the operator wrote one', hook: 'h', type: 'project', body: 'x' });
   const mem = await sess({ node: 'nodeA' });
-  ok(/somebody else changed this project's memories: read the notebook's Memory view/.test(mem.line || ''),
+  ok(/somebody else changed this space's memories: read the notebook's Memory view/.test(mem.line || ''),
      `a memory the operator wrote is named on the next prompt (${(mem.line || 'no line').slice(0, 90)})`);
   await call('/api/memory', { project: 'alpha', action: 'create', name: 'own-note', title: 'the session wrote one', hook: 'h', type: 'project', body: 'x' }, bearer(toks[1]));
   const ownMem = await sess({ node: 'nodeA' });

@@ -426,7 +426,7 @@ def edit():
         text = d.get("text") or ""
         sys.stdout.write(text if not text or text.endswith("\n") else text + "\n")
         if d.get("seeded"):
-            print("[builderbot] nothing is stored yet: that is the project's .env.example",
+            print("[builderbot] nothing is stored yet: that is the space's .env.example",
                   file=sys.stderr)
         raise SystemExit(0)
     if verb == "remove":

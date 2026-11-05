@@ -1690,7 +1690,7 @@ cmd_add_share() {
     [ "$tag" != "$spec" ] || die "add-share wants TAG:PATH, got '$spec'"
     case "$path" in /*) ;; *) die "the mountpoint must be absolute, got '$path'" ;; esac
     case "${path%/}" in /workspace|/workspace/*)
-        die "/workspace holds this node's synced copy of its projects; nothing is mounted there" ;; esac
+        die "/workspace holds this node's synced copy of its spaces; nothing is mounted there" ;; esac
     add_fstab "$tag $path virtiofs $opts,nofail 0 0" "$path" && mount_one "$path"
 }
 
@@ -1712,7 +1712,7 @@ cmd_add_nfs() {
     case "$rest" in *:*) ;; *) die "add-nfs wants HOST:EXPORT:PATH; '$spec' has no mountpoint" ;; esac
     case "$path" in /*) ;; *) die "the mountpoint must be absolute, got '$path'" ;; esac
     case "${path%/}" in /workspace|/workspace/*)
-        die "/workspace holds this node's synced copy of its projects; nothing is mounted there" ;; esac
+        die "/workspace holds this node's synced copy of its spaces; nothing is mounted there" ;; esac
     add_fstab "$host:$exp $path nfs $opts,nofail,_netdev 0 0" "$path" && mount_one "$path"
 }
 

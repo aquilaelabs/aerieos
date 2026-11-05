@@ -47,7 +47,7 @@ ok(/hand over the compose file/.test((await ask({ compose: '   ' })).body.error 
    '...and one with nothing to build');
 ok(/no node called nowhere/.test((await ask({ node: 'nowhere' })).body.error || ''),
    '...and one naming a machine that is not a node, before it reaches anybody');
-ok(/not a project: zeta/.test((await ask({ for: 'zeta' })).body.error || ''),
+ok(/not a space: zeta/.test((await ask({ for: 'zeta' })).body.error || ''),
    '...and one for a space the asker cannot see');
 
 // ---- a second account, of the kind that is never asked --------------------

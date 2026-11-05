@@ -68,7 +68,7 @@ await splitPick(page, 'reset');
 await page.click('.settingstab #setReset');
 await page.waitForSelector('#resetmodal:not([hidden]) #resetGo', { timeout: 10000 });
 ok(await page.$eval('#resetGo', b => b.disabled)
-   && await page.$eval('#resetBody .hint.bad', h => /Project files stay/.test(h.textContent)),
+   && await page.$eval('#resetBody .hint.bad', h => /Space files stay/.test(h.textContent)),
    '...which opens a dialog with a typed confirmation, the real button asleep, saying space files stay');
 await page.fill('#resetWord', 'reset');
 ok(await page.$eval('#resetGo', b => !b.disabled), '...and wakes on the word');
@@ -738,7 +738,7 @@ ok(elsewhere.git_name === 'T. Person',
   const before = await page.$eval('.settingstab input[data-path="gitview"]', i => i.value);
   ok(before === `${DIR}/state/gitview`, `...each at its default in the state directory (${before})`);
   const inWs = await post('/api/paths', { name: 'gitview', path: `${DIR}/ws/alpha/gv` });
-  ok(inWs.status === 400 && /inside the projects/.test(inWs.body.error || ''),
+  ok(inWs.status === 400 && /inside the spaces/.test(inWs.body.error || ''),
      `a path in the spaces is refused: nodes' writes land there (${inWs.body.error})`);
   mkdirSync(`${DIR}/full`, { recursive: true });
   writeFileSync(`${DIR}/full/x`, 'x');

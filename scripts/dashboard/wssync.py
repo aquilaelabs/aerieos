@@ -447,7 +447,7 @@ _names = list             # set by configure_projects: () -> [project names]
 def _there(p):
     """A project on the controller's disk: a name the settings still carry
     for a project since deleted is none, or a node holding it is told of one
-    that answers "no such project" forever (walkme on the dev controller,
+    that answers "no such space" forever (walkme on the dev controller,
     9 Oct)."""
     return bool(re.fullmatch(r"[A-Za-z0-9._-]+", p or "")) and not p.startswith(".") \
         and (WORKSPACE / p).is_dir()

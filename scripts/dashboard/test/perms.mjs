@@ -77,7 +77,7 @@ ok(dep && dep.scope === 'projects' && dep.note === 'moves versions'
    `...and Save keeps its scope, areas and note (${JSON.stringify(dep)})`);
 ok((await api('/api/roles', { action: 'set', name: 'admin', scope: 'global', perms: {} })).body.error,
    'a built-in role refuses to be changed');
-ok(/project areas only/.test((await api('/api/roles', { action: 'set', name: 'bad', scope: 'projects', perms: { nodes: 'read' } })).body.error || ''),
+ok(/space areas only/.test((await api('/api/roles', { action: 'set', name: 'bad', scope: 'projects', perms: { nodes: 'read' } })).body.error || ''),
    '...and a role on the user\'s projects refuses a global area');
 
 // Given on one project: a new account starts with nothing, then holds the
@@ -120,13 +120,13 @@ const onAlpha = await api('/api/version', { project: 'alpha', action: 'nothing-m
 const onBeta = await api('/api/version', { project: 'beta', action: 'nothing-much' }, depAuth);
 // beta is no project of dep's at all now (R155: on a project is holding a
 // role there), so it reads as absent rather than refused.
-ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 && /not a project/.test(onBeta.body.error || ''))),
+ok(onAlpha.status !== 403 && (onBeta.status === 403 || (onBeta.status === 400 && /not a space/.test(onBeta.body.error || ''))),
    `People gives the role on alpha and the gate holds it there alone (alpha ${onAlpha.status}, beta ${onBeta.status})`);
 {
   const p = (await api('/api/roles')).body.people.find(x => x.name === 'dep');
   ok(JSON.stringify(p.projects) === JSON.stringify([AK]), `...and being on alpha follows the role (${JSON.stringify(p.projects)})`);
   const glob = await api('/api/roles', { action: 'assign', name: 'dep', roles: ['deployer'] });
-  ok(glob.status === 400 && /on a project: give it on the project/.test(glob.body.error || ''),
+  ok(glob.status === 400 && /on a space: give it on the space/.test(glob.body.error || ''),
      `a space role given among the Everywhere ones is refused by name (${glob.body.error})`);
   const kind = await api('/api/roles', { action: 'set', name: 'deployer', scope: 'global', perms: { projects: 'read' } });
   ok(kind.status === 400 && /dep holds deployer/.test(kind.body.error || ''),

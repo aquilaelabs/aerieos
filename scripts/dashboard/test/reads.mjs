@@ -75,7 +75,7 @@ ok(write.status === 403 && /beta is read-only from a session on alpha/.test(writ
 const own = await api('/api/roadmap', { project: 'alpha', action: 'add', text: 'from alpha itself' }, asSession(tok));
 ok(own.status === 200, `...while the same write to its own space goes through (${own.status})`);
 const stranger = await api('/api/roadmap?project=delta', undefined, asSession(tok));
-ok(stranger.status === 400 && /not a project/.test(stranger.error || ''),
+ok(stranger.status === 400 && /not a space/.test(stranger.error || ''),
    'a space alpha does not read is not a space to its session, as before');
 await api('/api/prefs', { project: 'alpha', reads: ['beta'] });
 const dropped = await api('/api/roadmap?project=gamma', undefined, asSession(tok));
@@ -101,7 +101,7 @@ const add = await relay(['roadmap', 'add', 'from alpha'], 'beta');
 ok(add.status === 403 && /beta is read-only from a session on alpha: aerie roadmap add would change it/.test(add.error || ''),
    `...and aerie roadmap add for beta is refused, naming the words (${add.error})`);
 const gitp = await relay(['git', 'push'], 'beta');
-ok(gitp.status === 403 && /acts on the project's own machines/.test(gitp.error || ''),
+ok(gitp.status === 403 && /acts on the space's own machines/.test(gitp.error || ''),
    `...as is a verb that acts on beta's machines (${gitp.error})`);
 // A project it does not read is named, with where the reads are set, and a
 // name that is no project says that (MediaReducer, 7 Oct: "this session's
@@ -110,7 +110,7 @@ const unreadR = await relay(['roadmap'], 'gamma');
 ok(unreadR.status === 403 && /alpha does not read gamma: its owner adds it under Reads/.test(unreadR.error || ''),
    `a space the session does not read is refused by name, saying where reads are set (${unreadR.error})`);
 const noneR = await relay(['roadmap'], 'nosuch');
-ok(noneR.status === 400 && /there is no project called nosuch/.test(noneR.error || ''),
+ok(noneR.status === 400 && /there is no space called nosuch/.test(noneR.error || ''),
    `...and a name that is no space says so (${noneR.error})`);
 // A long command arrives whole (B3): 40 steps are 81 words, which a cap of
 // 64 cut to a --step with nothing after it; past the cap it is refused by
@@ -167,7 +167,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const many = await api('/api/prefs', { project: 'alpha', sees: Array.from({ length: 9 }, (_, i) => `/mnt/share${i}`) });
   ok(many.status === 400 && /8 places at most, not 9/.test(many.error || ''), `...and more than eight is refused with the number (${many.error})`);
   const mine = await api('/api/prefs', { project: 'alpha', sees: ['/mnt/all'] }, asSession(tok));
-  ok(mine.status === 403 && /a project's settings are the operator's/.test(mine.error || ''),
+  ok(mine.status === 403 && /a space's settings are the operator's/.test(mine.error || ''),
      `a session cannot name a place for itself (${mine.status} ${mine.error})`);
   const g = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
   ok(Array.isArray(g.sees) && g.sees.join() === '/mnt/media,/srv/samples',
@@ -186,8 +186,8 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   await api('/api/prefs', { project: 'alpha', gpu: 'on' });
   const said = (await api('/api/preamble?project=alpha')).text;
   const where = (await api('/api/preamble?project=alpha&topic=where')).text || '';
-  ok(/Of the shares and disks mounted on its node, this project is shown \/mnt\/media, \/srv\/samples, as the node has each/.test(said)
-     && /a share or disk mounted on the\s+node, another project's build cache or container data, and the home of the\s+account sessions run as are not in its view/.test(where),
+  ok(/Of the shares and disks mounted on its node, this space is shown \/mnt\/media, \/srv\/samples, as the node has each/.test(said)
+     && /a share or disk mounted on the\s+node, another space's build cache or container data, and the home of the\s+account sessions run as are not in its view/.test(where),
      'the block says which shares this space is shown, and the where topic that the rest of the node is not in its view');
   const shown = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings'],
     { encoding: 'utf8', env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`,
@@ -236,7 +236,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   ok(page.errors.every(e => /400/.test(e) && /api\/prefs/.test(e)), `...and nothing else went wrong on the way (${page.errors.join(' | ').slice(0, 120) || 'none'})`);
   page.errors = [];
   await api('/api/prefs', { project: 'alpha', sees: [] });
-  ok(!/this project is shown/.test((await api('/api/preamble?project=alpha')).text)
+  ok(!/this space is shown/.test((await api('/api/preamble?project=alpha')).text)
      && !(prefsOf('alpha').sees || []).length,
      '...and with none named the briefing names none');
 }
@@ -301,11 +301,11 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
 // ---- the briefing names them ------------------------------------------------------------
 const pre = await api('/api/preamble?project=alpha');
 const whereTopic = (await api('/api/preamble?project=alpha&topic=where')).text || '';
-ok(/This project reads beta: each is at \/workspace\/NAME, read-only, and `aerie -p NAME` in front/.test(pre.text)
-   && /its containers answer from here on this project's nodes/.test(pre.text) && /Nothing there is yours to change/.test(pre.text) && /beyond the ones it reads/.test(whereTopic),
+ok(/This space reads beta: each is at \/workspace\/NAME, read-only, and `aerie -p NAME` in front/.test(pre.text)
+   && /its containers answer from here on this space's nodes/.test(pre.text) && /Nothing there is yours to change/.test(pre.text) && /beyond the ones it reads/.test(whereTopic),
    'the block says which spaces the session reads and that nothing there is its to change; the where topic, to look for context nowhere else');
 await api('/api/prefs', { project: 'alpha', reads: [] });
-ok(!/This project reads/.test((await api('/api/preamble?project=alpha')).text),
+ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
    '...and says nothing about reads when there are none');
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);

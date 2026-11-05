@@ -358,7 +358,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
 {
   const none = yb('changelog', 'add', 'filed nowhere');
   ok(none.code !== 0 && /--cat NAME, one of/.test(none.out) && /Fixed\s+it was wrong, and now it is right/.test(none.out)
-     && /a house rule is where a project says so/.test(none.out),
+     && /a house rule is where a space says so/.test(none.out),
      'an entry with no category is refused, and the refusal is the six names with when each applies');
   ok(!/filed nowhere/.test(yb('changelog', 'unreleased').out), '...and nothing was written');
   ok(yb('changelog', 'add', 'A wrong thing put right', '--cat', 'bugfix').code === 0

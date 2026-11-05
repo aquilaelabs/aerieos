@@ -355,7 +355,7 @@ def set_name(dirname, name):
             return {"error": "a name needs at least one letter or digit in it"}
         other = live_named(name, but=dirname, kind=kind)
         if other:
-            return {"error": f"{name} is already a {'project' if kind == 'repos' else 'repository'}'s name"}
+            return {"error": f"{name} is already a {'space' if kind == 'repos' else 'repository'}'s name"}
         was = str(r.get("name") or dirname)
         r["name"] = name
         _save(d)

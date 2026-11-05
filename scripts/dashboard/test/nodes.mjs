@@ -1372,10 +1372,10 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
                                ROW, { timeout: 10000 });
     page.dialogs.length = 0;
     await page.click(`${ROW} [data-nd="sync-clean"]`);
-    await page.waitForFunction(sel => /holds no projects/.test(document.querySelector(sel)?.textContent || ''),
+    await page.waitForFunction(sel => /holds no spaces/.test(document.querySelector(sel)?.textContent || ''),
                                ROW, { timeout: 10000 });
     const off = await conf(), told = await asks();
-    ok(page.dialogs.length === 1 && /Remove the project copies/.test(page.dialogs[0])
+    ok(page.dialogs.length === 1 && /Remove the space copies/.test(page.dialogs[0])
        && off.workspace === 'off' && off.clean && told.mode === 'off' && told.clean === off.clean,
        `once everything is up, Clean up asks, marks the node off and hands the agent its clean-up by a token (${JSON.stringify([off.workspace, told.mode, !!told.clean])})`);
     ok(await page.$eval(`${ROW} [data-nd="to-sync"]`, b => b.disabled),
@@ -2568,7 +2568,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.click('#bBell');
   await page.waitForSelector('#bellPanel .bnote.att.bad', { timeout: 10000 });
   ok(await page.$eval('#bellPanel .bnote.att.bad', e => /agent is out of window/i.test(e.textContent)
-                                                        && /projects? cannot build, test or use the emulator/.test(e.textContent)
+                                                        && /spaces? cannot build, test or use the emulator/.test(e.textContent)
                                                         && /alpha/.test(e.querySelector('.bdetail')?.textContent || '')
                                                         && !e.querySelector('[data-bdismiss]')),
      'an agent from another window is a red alert counting the spaces it stops, naming them under its fold, and it cannot be dismissed');
@@ -2682,14 +2682,14 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.waitForFunction(id => /not isolated/.test(document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)?.textContent || ''),
                              minted.id, { timeout: 15000 }).catch(() => {});
   const shared = await rowText();
-  ok(/ready, not isolated/.test(shared) && /Sessions here can read each other's projects: bb-session is not installed on this machine/.test(shared),
+  ok(/ready, not isolated/.test(shared) && /Sessions here can read each other's spaces: bb-session is not installed on this machine/.test(shared),
      `a node whose sessions are not kept to their space says so on the Sessions status, with the reason (${(shared.match(/Sessions here can read[^.]*/) || [''])[0]})`);
   await isoCensus({ sessions: true, why: '' });
   await page.evaluate(() => { nodesList = null; openNodesTab(); });
-  await page.waitForFunction(id => /sees only its own project/.test(document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)?.textContent || ''),
+  await page.waitForFunction(id => /sees only its own space/.test(document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)?.textContent || ''),
                              minted.id, { timeout: 15000 }).catch(() => {});
   const isolated = await rowText();
-  ok(/Each session ?sees only its own project/.test(isolated) && !/not isolated/.test(isolated),
+  ok(/Each session ?sees only its own space/.test(isolated) && !/not isolated/.test(isolated),
      '...and one whose sessions are says that instead');
   await napi('/api/prefs', { project: 'alpha', node: '' });
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',

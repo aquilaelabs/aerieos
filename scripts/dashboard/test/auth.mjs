@@ -426,7 +426,7 @@ ${code}`], { encoding: 'utf8' });
     ok(shown.join() === 'talkbox', `an account that does not administer is shown the nodes its own spaces are on, and no others (${shown.join()})`);
     const elsewhere = ((await napi('/api/v1/nodes')).nodes || []).find(n => n.kind === 'agent' && n.id !== box.id);
     const stray = await as(other, '/api/signin', { node: elsewhere.id });
-    ok(stray.status === 403 && /not a node one of your projects/.test(stray.error || ''),
+    ok(stray.status === 403 && /not a node one of your spaces/.test(stray.error || ''),
        `...so it cannot start a sign-in on a node that is not one of them (${stray.error})`);
     const nonode = await as(other, '/api/signin', {});
     ok(nonode.status === 400 && /which node/.test(nonode.error || ''), `a sign-in names its node (${nonode.error})`);
@@ -525,11 +525,11 @@ ${code}`], { encoding: 'utf8' });
     const peek = await bare('/api/docker?node=' + encodeURIComponent(nodeId),
                             { headers: other });
     const body = await peek.json();
-    ok(/not a node one of your projects builds on|none of your projects/.test(body.error || ''),
+    ok(/not a node one of your spaces builds on|none of your spaces/.test(body.error || ''),
        `a node no space of theirs builds on is refused, not listed (${body.error})`);
     const pk = await (await bare('/api/toolchains?node=' + encodeURIComponent(nodeId),
                                  { headers: other })).json();
-    ok(/not a node one of your projects builds on|none of your projects/.test(pk.error || ''),
+    ok(/not a node one of your spaces builds on|none of your spaces/.test(pk.error || ''),
        '...and the same for what that node has installed');
     // ...while a project of theirs with no node is told so in the project's
     // own words, not refused as a node outside their scope (B258): there is
@@ -565,7 +565,7 @@ ${code}`], { encoding: 'utf8' });
 
     // Read-only means it: the writes refuse, by name, with the remedy.
     const r = await post(adm, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' });
-    ok(r.status === 403 && /no role on this project/.test((await r.json()).error || ''),
+    ok(r.status === 403 && /no role on this space/.test((await r.json()).error || ''),
        'an admin cannot edit the notebook of a space it has not taken on');
     ok((await post(adm, '/api/bugs', { project: 'alpha', action: 'add', title: 'x' })).status === 403,
        '...nor file a bug on it');
@@ -606,7 +606,7 @@ ${code}`], { encoding: 'utf8' });
     // another node is still an administrator's.
     const kept = await post(other, '/api/prefs', { project: 'beta', node: '', nodes: [], git_name: 'Sharer S.' });
     const moved = await post(other, '/api/prefs', { project: 'beta', node: 'elsewhere' });
-    ok(kept.status === 200 && moved.status === 403 && /which node a project builds on/.test((await moved.json()).error || ''),
+    ok(kept.status === 200 && moved.status === 403 && /which node a space builds on/.test((await moved.json()).error || ''),
        `a user saves their commit name with the node unchanged (${kept.status}), and cannot move the space to another node (${moved.status})`);
     // What is the box's rather than a project's is an administrator's: the
     // container log, the trash, the daemon's containers, the deploy keys,
@@ -875,7 +875,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   // A project they were not given does not exist, and says so in the words a
   // typo gets, never "forbidden", which would confirm it is there.
   const hidden = await (await post('/api/roadmap', { action: 'save', project: 'ep.silon', items: [] })).json();
-  ok(/not a project/.test(hidden.error || ''),
+  ok(/not a space/.test(hidden.error || ''),
      `a space they cannot see reads as absent, not refused (${hidden.error})`);
 
   // ...and on a project they DO have, the verbs that reach past it are an
@@ -992,7 +992,7 @@ ${code}`], { encoding: 'utf8' }).trim();
     && document.getElementById('uaddmodal').hidden, null, { timeout: 15000 });
   ok(true, 'Add makes an account from the tab, shuts the dialog and shows the account it made');
   // Its roles are the owner's to give at once, without a reload (B32).
-  await page.waitForFunction(() => /no project|Projects/.test(document.querySelector('.userstab #ueAccess')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  await page.waitForFunction(() => /no space|Spaces/.test(document.querySelector('.userstab #ueAccess')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
   {
     const acc = await page.$eval('.userstab #ueAccess', e => e.textContent.replace(/\s+/g, ' ').trim());
     ok(!/not yours to give/.test(acc), `...whose roles are given at once, the roles read again after the add (B32: ${acc.slice(0, 80)})`);
@@ -1039,7 +1039,7 @@ ${code}`], { encoding: 'utf8' }).trim();
     body: JSON.stringify({ action: 'set', name: 'reader', scope: 'projects', perms: { projects: 'read' } }) }); await loadRoles(); });
   await pick('tabmade');
   await page.waitForSelector('.userstab #ueAccess #rolesAddProj', { timeout: 15000 });
-  ok(!await page.$('.userstab #ueRole') && /on no project yet/.test(await page.$eval('.userstab #ueAccess', e => e.textContent)),
+  ok(!await page.$('.userstab #ueRole') && /on no space yet/.test(await page.$eval('.userstab #ueAccess', e => e.textContent)),
      'its settings set no built-in role, and say the account is on no space yet');
   ok(await page.$$eval('.userstab #ueSave, .userstab #ueRevert', bs => bs.length === 2 && bs.every(b => b.disabled)),
      'Save and Revert sleep while nothing on the account is unsaved');
@@ -1064,13 +1064,13 @@ ${code}`], { encoding: 'utf8' }).trim();
   ok(true, 'its one Save puts it on alpha with a role there');
   // Only its roles changed, and the account is read again all the same: not
   // left unsaved, its header and row saying what it holds (B33).
-  await page.waitForFunction(() => /on 1 project/.test(document.querySelector('.userstab .rdetail .rhead')?.textContent || ''),
+  await page.waitForFunction(() => /on 1 space/.test(document.querySelector('.userstab .rdetail .rhead')?.textContent || ''),
                              null, { timeout: 15000 }).catch(() => {});
   {
     const head = await page.$eval('.userstab .rdetail .rhead', e => e.textContent);
     const st = await page.$eval('.userstab .rdetail .actbar .state', e => e.textContent.trim()).catch(() => '');
     const row = await page.$eval('.userstab [data-upick="tabmade"]', e => e.textContent.replace(/\s+/g, ' '));
-    ok(/on 1 project/.test(head) && st !== 'unsaved' && !/no role/.test(row),
+    ok(/on 1 space/.test(head) && st !== 'unsaved' && !/no role/.test(row),
        `a roles-only Save reads the account again: "${st || 'saved'}", its header on 1 space, its row not "no role" (B33, B38: ${row.trim()})`);
   }
   await page.waitForSelector('.userstab [data-upick="tabmade"]', { state: 'visible', timeout: 15000 });
@@ -1138,7 +1138,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   ok(JSON.stringify((seen.projects || []).map(p => p.name)) === '["alpha"]',
      `a session token sees its own space and no other (${
        (seen.projects || []).map(p => p.name).join(', ')})`);
-  ok(/not a project/.test(((await (await post('/api/roadmap',
+  ok(/not a space/.test(((await (await post('/api/roadmap',
        { action: 'save', project: 'ep.silon', items: [] })).json()).error) || ''),
      '...and another space reads as absent, not refused');
 
@@ -1294,7 +1294,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
   const wm = await page.$eval('.profiletab', el => ({ bar: el.closest('.doc')?.querySelector('.docbarrow')?.textContent || '',
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])) }));
   // Its roles a fact of the page's head now (the operator, 25 Oct).
-  ok(/AerieOS's owner/.test(wm.facts.Roles || '') && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Projects === 'Write',
+  ok(/AerieOS's owner/.test(wm.facts.Roles || '') && wm.facts['Accounts and roles'] === 'Write' && wm.facts.Spaces === 'Write',
      `...and what it may do: its roles by name, and each area with its level (${JSON.stringify(wm).slice(0, 160)})`);
   ok(await page.evaluate(() => !!document.querySelector('#rail [data-rail="people"]') && railAllows('settings') && railAllows('users')),
      'an administrator is offered People and the controller\'s settings on the rail');
@@ -1789,7 +1789,7 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
       await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: false });
     }
     const lockBeta = await act(plainAuth, '/api/lock', { name: 'beta', locked: true });
-    ok(lockBeta.status === 400 && /not a project/.test(lockBeta.error),
+    ok(lockBeta.status === 400 && /not a space/.test(lockBeta.error),
        `...nor lock a space it was not given, which it is not told exists (${lockBeta.status})`);
     const vs = await act(sessAuth, '/api/version', { project: 'alpha', action: 'policy', policy: 'any' });
     ok(vs.status === 403 && /aerie version bump/.test(vs.error),

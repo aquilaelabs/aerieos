@@ -92,7 +92,7 @@ const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, c
   for (const n of Object.keys(people)) read[n] = await as(c[n], 'alpha', 'read', { path: 'editor-probe.txt' });
   ok(read['ed.rw'].data && read['ed.r'].data && read['ed.cap'].data
      && read['ed.none'].status === 403 && /no file access/.test(read['ed.none'].error)
-     && read['ed.out'].status === 400 && /not a project/.test(read['ed.out'].error),
+     && read['ed.out'].status === 400 && /not a space/.test(read['ed.out'].error),
      `a read is the server's to allow: rw, r and the capped read; no access is refused with why, and a space not theirs is not one (${
        read['ed.none'].error} | ${read['ed.out'].error})`);
   const data = Buffer.from('written from an editor\n').toString('base64');

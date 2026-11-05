@@ -1039,8 +1039,8 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     git('remote', 'set-url', 'origin', origin);
     writeFileSync(`${DIR}/state/push-rights.json`, JSON.stringify({ beta: { repo: 'owner/beta', how: 'key' } }));
     ok(elsewhere.status === 400 && /credentials reach only that repository/.test(elsewhere.error || '')
-       && /a private one that is another project here is read by adding that project to beta's Reads/.test(elsewhere.error || '')
-       && outside.status === 400 && /not a repository on the projects share/.test(outside.error || ''),
+       && /a private one that is another space here is read by adding that space to beta's Reads/.test(elsewhere.error || '')
+       && outside.status === 400 && /not a repository on the spaces share/.test(outside.error || ''),
        `a remote pointed at another repository, or at a local path off the share, is refused before git runs (${
          (elsewhere.error || '').slice(0, 50)} | ${(outside.error || '').slice(0, 50)})`);
 
@@ -1380,7 +1380,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
                       ['branch', { name: 'peer-topic', switch: true }]];
   const peerTree = [];
   for (const [action, args] of treeWrites) peerTree.push(await post({ project: 'beta', action, args }, PEER));
-  ok(peerTree.every(r => r.status === 403 && /the project directory is test's working tree: only test can/.test(r.error || '')),
+  ok(peerTree.every(r => r.status === 403 && /the space directory is test's working tree: only test can/.test(r.error || '')),
      `a plain account cannot commit, discard, switch, pull, revert or branch-and-switch in the owner's tree (${
        peerTree.map(r => r.status).join(',')}: ${peerTree[0].error})`);
   for (const body of [{ action: 'add', name: 'w.boss', password: 'w.boss-pass-1', role: 'admin' },
