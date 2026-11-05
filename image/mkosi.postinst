@@ -51,6 +51,11 @@ mkosi-chroot nvidia-ctk runtime configure --runtime=docker >/dev/null
 # and takes the local socket down with it (B674).
 mkosi-chroot systemctl mask libvirtd-tls.socket libvirtd-tcp.socket >/dev/null 2>&1
 
+# Debian's driver lists nvidia-drm for every boot, which fails the boot's module
+# load on a machine with no card; udev loads it where a card is instead
+# (71-aerieos-nvidia.rules).
+rm -f "$BUILDROOT/etc/modules-load.d/nvidia.conf"
+
 # The initramfs again, now that the extra tree put the init-bottom script
 # and the modules list in (the kernel's own install ran before them).
 mkosi-chroot update-initramfs -u -k all
