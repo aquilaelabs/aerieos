@@ -143,7 +143,7 @@ it, which is a paste rather than a questionnaire.
                        at PATH. Requires one: on bare metal there is nothing
                        to pass a share in, so use --nfs instead. Repeatable.
                        PATH MUST match the path AerieOS uses. `:ro` mounts
-                       it read-only. Never /workspace: a node's projects are
+                       it read-only. Never /workspace: a node's spaces are
                        a synced copy there, not a share. Leave it off a share containers keep their
                        data on.
   --nfs HOST:EXPORT:PATH[:ro]   the same thing over NFS, when a share
@@ -213,9 +213,9 @@ it, which is a paste rather than a questionnaire.
   --data PATH          the four stores, all defaulting under
   --toolchains PATH      /var/lib/builderbot/: a job's working tree and AVDs,
   --cache PATH         the toolchains installed on this node, the build
-  --artifacts PATH     caches, and this node's copy of what projects built
-                       (per project underneath, so one VM can be several
-                       projects' node). A store may be a mount (point it at
+  --artifacts PATH     caches, and this node's copy of what spaces built
+                       (per space underneath, so one VM can be several
+                       spaces' node). A store may be a mount (point it at
                        one of the --share paths), and its free space is what
                        the Nodes page reports for it. A system path is refused:
                        a store is a directory of its own, since the agent
@@ -226,7 +226,7 @@ resolved by whatever runs the container, so a share this VM mounts at the
 path AerieOS uses means the same directory on both sides and nothing has
 to translate between them. Mount it anywhere else and every compose file
 naming it becomes wrong in a way that fails silently: docker creates the
-missing directory and mounts it empty. The projects themselves are not a
+missing directory and mounts it empty. The spaces themselves are not a
 share: each node holds a synced copy at /workspace, as AerieOS does.
 EOF
 }
@@ -3767,8 +3767,8 @@ Sessions run here too, as ${SESSION_NAME}: the agent's screen relay listens on
 this machine's LAN address (port 7684) and opens a terminal for each one the
 controller carries to it (a session's, its read-only twin, or a container's
 shell as the docker account), running bb-tty from the bb the controller ships, so a session of any agent (Claude, ChatGPT, Copilot) on
-a project bound to this node lives on this machine, in its synced copy of
-the project at /workspace, which the agent makes and keeps in step with the
+a space bound to this node lives on this machine, in its synced copy of
+the space at /workspace, which the agent makes and keeps in step with the
 controller's. Each person signs in to each agent on this node from its
 row on the dashboard's Installed page (Machines, Installed), once per account.
 

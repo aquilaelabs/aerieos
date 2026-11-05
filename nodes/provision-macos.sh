@@ -217,6 +217,6 @@ $TOOLCHAINS/darwin-$(uname -m). Root is never asked for here.
   bash provision-macos.sh --remove        take it all away again
 
 Sessions on this Mac (a Claude terminal here rather than on the controller)
-need the projects share mounted at /workspace (on macOS that is one line
+need the spaces share mounted at /workspace (on macOS that is one line
 in /etc/synthetic.conf and an SMB mount), and are not set up by this script.
 EOF

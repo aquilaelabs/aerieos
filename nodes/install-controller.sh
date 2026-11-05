@@ -108,8 +108,8 @@ Actions:
                  back by hand: a release moves forward only.
   --remove       stop the controller and take its release, service, aerie and
                  wall away, and this machine's node with them. The state,
-                 the env file, the secrets, the account and the projects
-                 stay; --purge takes all but the projects too. Says what
+                 the env file, the secrets, the account and the spaces
+                 stay; --purge takes all but the spaces too. Says what
                  will go and asks; --yes does not ask.
   --stage        inside the appliance image's root as it is built
                  (image/mkosi.postinst): what --install does up to the
@@ -446,7 +446,7 @@ folders() {
     install -d -m 0700 -o "$ACCOUNT" -g "$g" "$VAR/config" "$VAR/home" "$VAR/sdk"
     if [ -d "$P$WORKSPACE_DIR" ]; then
         setpriv --reuid="$ACCOUNT" --regid="$g" --init-groups test -w "$P$WORKSPACE_DIR" 2>/dev/null \
-            || warn "$WORKSPACE_DIR is not writable by ${ACCOUNT}: new projects cannot be made there until it is"
+            || warn "$WORKSPACE_DIR is not writable by ${ACCOUNT}: new spaces cannot be made there until it is"
     else
         # The parent made if missing and never changed if it is there: install
         # -d sets a folder's mode and owner even when it exists, and the
@@ -587,8 +587,8 @@ checks() {
         chk warn "python3 here is 3.$(py_minor python3) and the controller reads 3.${PY_MIN} or newer: the packages step installs one where the family has it, and stops when it does not"
     else chk warn "no python3 yet: the packages step installs it"; fi
     case "$WORKSPACE_DIR" in
-        /workspace|/workspace/*) chk fail "--workspace ${WORKSPACE_DIR}: /workspace is this machine's node's synced copy of the projects"; fail=1 ;;
-        /*) chk ok "projects: ${WORKSPACE_DIR}" ;;
+        /workspace|/workspace/*) chk fail "--workspace ${WORKSPACE_DIR}: /workspace is this machine's node's synced copy of the spaces"; fail=1 ;;
+        /*) chk ok "spaces: ${WORKSPACE_DIR}" ;;
         *) chk fail "--workspace ${WORKSPACE_DIR} is not a path from /"; fail=1 ;;
     esac
     local who
@@ -965,9 +965,9 @@ cmd_remove() {
             userdel "$ACCOUNT" >/dev/null 2>&1 || warn "the account ${ACCOUNT} could not be removed: userdel ${ACCOUNT}"
         fi
         if [ -n "$made" ] && ! id -u "$ACCOUNT" >/dev/null 2>&1; then
-            printf '   the state, the env file, the secrets and %s are gone; the projects stay\n' "$ACCOUNT"
+            printf '   the state, the env file, the secrets and %s are gone; the spaces stay\n' "$ACCOUNT"
         else
-            printf '   the state, the env file and the secrets are gone; the account %s stays; the projects stay\n' "$ACCOUNT"
+            printf '   the state, the env file and the secrets are gone; the account %s stays; the spaces stay\n' "$ACCOUNT"
         fi
     else
         printf '   the state (%s), the env file, the secrets and %s stay: --install puts the controller back on them\n' \
