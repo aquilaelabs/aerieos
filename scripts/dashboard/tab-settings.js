@@ -380,12 +380,15 @@ function moveSection(){
 }
 // The form that lands a move here: Controller settings' on a fresh controller,
 // and the first-run walk's last step.
-function moveLandBox(ld, inWalk = false){
+// In the walk the card around it says what it is, and says it waits while the
+// step before is not done: only a hold the walk has not explained is said here.
+function moveLandBox(ld, inWalk = false, heldSaid = false){
   return `<div class="field" data-movelandbox>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
           ld.stick ? " On this stick the bundle lands on the machine's disks, in the projects' folder, never on the stick." : ""}`)}</div>
-      ${ld.held ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}`}
+`}
+      ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>

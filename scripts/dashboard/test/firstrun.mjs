@@ -394,7 +394,7 @@ await firstRun(false);
         first: words('Have these with you'), firstPill: pill('Have these with you'),
         adopt: !!step("The old system's disks")?.querySelector('[data-adopt="adopt"]') && !!step("The old system's disks")?.querySelector('input[name="adoptMode"]'),
         toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
-        heldWhy: /the projects need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
+        heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the projects need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
         back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
@@ -414,6 +414,8 @@ await firstRun(false);
       stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.placed = pill('Where the projects and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
+      setupLand = { fresh: true, owner: true, stick: true, held: 'kept back for a reason' }; setupSig = ''; drawSetup();
+      out.heldSaid = /kept back for a reason/.test(words('Land the controller'));
       setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       out.notFresh = words('Land the controller');
       // A plain stick, with no plan: the same walk with the steps it has, its own
@@ -449,6 +451,7 @@ await firstRun(false);
        `...the token and the bundle said first, that the old controller may be off, and how to go and make them (${walk.first.slice(0, 200)})`);
     ok(walk.adopt && walk.toDo === 'to do' && walk.links === 0, `...the disks adopted in place, with no link leading away (${JSON.stringify([walk.adopt, walk.toDo, walk.links])})`);
     ok(walk.landHeld === true && walk.heldWhy, '...Land waiting on the disks, saying why');
+    ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);
     ok(walk.pick.includes('/mnt/cache') && !walk.pick.includes('/mnt/disk1'), `...a btrfs pool it adopted is a system pool to pick, a data disk is not (B663) (${walk.pick.join()})`);
