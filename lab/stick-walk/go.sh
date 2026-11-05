@@ -26,4 +26,4 @@ done
 # It has to come back whole.
 timeout 25 python3 walk.py sh 'sync; systemctl reboot' >/dev/null 2>&1
 python3 -c "import time;time.sleep(60)"
-timeout 60 python3 walk.py sh 'ls /usr/local/sbin | tr "\n" " "; systemctl is-active builderbot-agent docker containerd libvirtd smbd | tr "\n" " "; systemctl show builderbot-agent -p NRestarts; zpool list -H -o name,health; findmnt -rn -o TARGET,SOURCE /home /workspace /srv/aerieos/projects'
+timeout 60 python3 walk.py sh 'ls /usr/local/sbin | tr "\n" " "; systemctl is-active builderbot-agent docker containerd libvirtd smbd | tr "\n" " "; systemctl show builderbot-agent -p NRestarts; zpool list -H -o name,health; systemctl --failed --no-legend; for m in /home /workspace /srv/aerieos/projects; do findmnt -rn -o TARGET,SOURCE -T $m | tail -1; done'

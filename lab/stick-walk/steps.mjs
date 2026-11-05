@@ -121,6 +121,7 @@ export const steps = {
     await page.click('[data-setdisksmake]'); await sleep(1200);
     await shot('12-ask');
     const m = await page.$('.modal:not([hidden])'); if (m){ console.log((await m.innerText()).slice(0, 600)); const go = await m.$('button.danger, button.primary'); await go.click(); }
+    else throw new Error('Make it asked nothing: the press was lost, and nothing was made');
     await sleep(4000); await tall('13-making', 1500);
     console.log(await page.evaluate(() => (document.querySelector('.notify, #toasts, .toast')?.innerText || '')));
   },
