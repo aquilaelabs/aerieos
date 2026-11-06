@@ -1630,7 +1630,11 @@ def _census(c):
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16),
             "progress": aw(ar.get("progress"), 40), "adopted": ar.get("adopted") is True,
-            "moves": mb(ar.get("moves")), "last_move": mb(ar.get("last_move"))}
+            "last_move": mb(ar.get("last_move"))}
+        # Each share's places, kept only from an agent that sends them.
+        if out["array"] and isinstance(ar.get("moves"), list):
+            out["array"]["moves"] = [{"share": aw(x.get("share"), 63), **{k: aw(x.get(k), 32) for k in ("land", "from", "to")}}
+                                     for x in ar["moves"][:128] if isinstance(x, dict)]
         # The last full parity check (R163 step 15), kept only from an agent that has it.
         if out["array"] and isinstance(ar.get("verify"), dict):
             v = ar["verify"]
@@ -3395,7 +3399,36 @@ def node_storage_snapshot(principal, node_id, req):
     return r
 
 
-ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "destroy")
+ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "moves", "destroy")
+# A share's places on an array taken over (R163): where its new files land,
+# and the mover's from and to; a pool by name, or the array.
+MOVE_SHARE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
+MOVE_PLACE = re.compile(r"array|[a-z][a-z0-9_-]{0,31}")
+
+
+def moves_cfg(raw, pools):
+    """Each share's places as the agent takes them, [{share, land, from,
+    to}], or an error: land a pool of `pools` or the array, the mover's from
+    and to both one of those and different, or both empty (it leaves the
+    share be). As the agent's array.moves_of holds them again."""
+    if not isinstance(raw, list) or len(raw) > 128:
+        return None, "each share's places are a list of at most 128"
+    out = {}
+    for x in raw:
+        x = x if isinstance(x, dict) else {}
+        s = str(x.get("share") or "")
+        land, frm, to = (str(x.get(k) or "") for k in ("land", "from", "to"))
+        if not MOVE_SHARE.fullmatch(s):
+            return None, f"{s or 'a share'}: not a share's name"
+        for w in (land, frm, to):
+            if w and (not MOVE_PLACE.fullmatch(w) or (w != "array" and w not in pools)):
+                return None, f"{s}: {w} is not a pool in front of the data disks ({', '.join(pools) or 'none'}) or the array"
+        if not land:
+            return None, f"{s}: where its new files land is a pool or the array"
+        if bool(frm) != bool(to) or (frm and frm == to):
+            return None, f"{s}: the mover takes files from one place to another, or is off"
+        out[s] = {"share": s, "land": land, "from": frm, "to": to}
+    return list(out.values()), ""
 ARRAY_POLICIES = ("mfs", "lfs", "epmfs", "ff")
 ARRAY_LONG = 86400
 
@@ -3407,6 +3440,12 @@ def _disk_ids(known, names):
     reboot), and the wipe would land on whichever disk took it (B527)."""
     return {d: {"by_id": str(known[d].get("by_id") or ""), "serial": str(known[d].get("serial") or "")}
             for d in names if d in known}
+
+def _adopted_pools(ad):
+    """The adopted pools by name, from the census's adopted mounts."""
+    return [str(m.get("where") or "").rsplit("/", 1)[-1] for m in ad.get("mounts") or []
+            if isinstance(m, dict) and m.get("where") and not re.fullmatch(r"/mnt/disk\d+", str(m.get("where")))]
+
 
 def node_storage_array(principal, node_id, req):
     """The array on the controller's own machine (R162 step 2): made of
@@ -3497,16 +3536,33 @@ def node_storage_array(principal, node_id, req):
         cfg["dry"] = req.get("dry") is True
         if not cfg["dry"] and str(req.get("confirm") or "") != "parity":
             return {"error": "taking the array over overwrites the old parity: it takes the word parity typed"}
-        # The mover's work, from the stick's plan: which shares come off
-        # which pools onto the data disks each night.
+        # Each share's places (where its new files land, the mover's from
+        # and to): as the person set them on the takeover, else from the
+        # stick's plan as the old system had them.
         import firstboot
-        pools = [m["where"].rsplit("/", 1)[-1] for m in ad.get("mounts") or [] if not re.fullmatch(r"/mnt/disk\d+", m.get("where") or "")]
-        cfg["moves"] = firstboot.mover_moves(pools)
+        pools = _adopted_pools(ad)
+        if "moves" in req:
+            cfg["moves"], err = moves_cfg(req.get("moves"), pools)
+            if err:
+                return {"error": err}
+        else:
+            cfg["moves"] = firstboot.mover_moves(pools)
     elif not have.get("data"):
         return {"error": "no array on the machine yet"}
     elif action == "mover":
         if not have.get("adopted"):
             return {"error": "the mover is for an array taken over from another system"}
+    elif action == "moves":
+        if not have.get("adopted"):
+            return {"error": "a share's places are for an array taken over from another system"}
+        if not isinstance(have.get("moves"), list):
+            return {"error": f"{n['name']}'s agent is from before a share's places could be set: it updates itself within the hour"}
+        ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+        cfg["moves"], err = moves_cfg(req.get("moves"), _adopted_pools(ad))
+        if err:
+            return {"error": err}
+        if not cfg["moves"]:
+            return {"error": "no share's places to set"}
     elif action == "verify":
         # Check parity (R163 step 15): an agent that has it says its last
         # one in the census, even as none yet.

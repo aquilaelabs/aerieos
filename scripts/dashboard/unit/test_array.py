@@ -280,7 +280,8 @@ class Takeover(unittest.TestCase):
 
     def test_only_the_parity_partition_is_formatted_and_the_data_disks_stay_where_they_are(self):
         self.adopt()
-        state, code, text, rec, arec = self.take({"array": "takeover", "moves": [{"share": "TV Shows", "pool": "cache"}, {"share": "x;y", "pool": "cache"}]})
+        state, code, text, rec, arec = self.take({"array": "takeover", "moves": [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"},
+                                                                                {"share": "x;y", "land": "cache"}, {"share": "isos", "land": "gone"}]})
         self.assertEqual(state, "succeeded", text)
         made = [a for a in self.ran if a[0].startswith(("mkfs", "wipefs", "sgdisk", "parted", "fdisk", "sfdisk"))]
         self.assertEqual(made, [["mkfs.xfs", "-L", "aerie-p1", "/dev/sdd1"]], "the parity partition alone, never a data disk, never a partition table")
@@ -288,7 +289,12 @@ class Takeover(unittest.TestCase):
         self.assertEqual(self.ran[-1], ["/usr/bin/snapraid", "sync"])
         self.assertTrue(rec["adopted"])
         self.assertEqual([(d["slot"], d["where"]) for d in rec["data"]], [(1, "/mnt/disk1"), (2, "/mnt/disk2")])
-        self.assertEqual(rec["moves"], [{"share": "TV Shows", "pool": "cache"}])
+        self.assertEqual(rec["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}], "a pool not in front of the disks is left out")
+        self.assertIn("TV Shows: new files land on cache; the mover takes them from cache to the array", text)
+        # Each share lands where its folder is from now on, at every boot.
+        with open(self.env["BB_ADOPT_FSTAB"]) as f:
+            user = next(ln for ln in f if " /mnt/user fuse.mergerfs" in ln)
+        self.assertIn("category.create=epff", user)
         self.assertTrue(arec["taken"] and arec["writable"])
         self.assertFalse([m for m in arec["plan"]["mounts"] if m["ro"]])
         self.assertEqual(arec["plan"]["merged"]["/mnt/user"], ["/mnt/cache=RW", "/mnt/disk1=RW", "/mnt/disk2=RW"])
@@ -338,10 +344,50 @@ class Takeover(unittest.TestCase):
                 seen.append((argv[:3], open(lst).read(), argv[-2:]))
                 return 0
         job = Job()
-        rc = M()._mover(job, [{"share": "TV Shows", "pool": "cache"}, {"share": "none", "pool": "cache"}], root=root)
+        os.makedirs(os.path.join(root, "user0", "isos"))
+        os.utime(os.path.join(root, "user0", "isos"))
+        open(os.path.join(root, "user0", "isos", "old.iso"), "w").close()
+        os.utime(os.path.join(root, "user0", "isos", "old.iso"), (1000, 1000))
+        rc = M()._mover(job, [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "none", "land": "cache", "from": "cache", "to": "array"},
+                              {"share": "isos", "land": "fast", "from": "array", "to": "fast"}, {"share": "appdata", "land": "cache", "from": "", "to": ""}], root=root)
         self.assertEqual(rc, 0)
         self.assertEqual(seen, [(["rsync", "-aHAX", "--remove-source-files"], "s1/e1.mkv\n",
-                                 [os.path.join(root, "cache", "TV Shows") + "/", os.path.join(root, "user0", "TV Shows") + "/"])])
+                                 [os.path.join(root, "cache", "TV Shows") + "/", os.path.join(root, "user0", "TV Shows") + "/"]),
+                                (["rsync", "-aHAX", "--remove-source-files"], "old.iso\n",
+                                 [os.path.join(root, "user0", "isos") + "/", os.path.join(root, "fast", "isos") + "/"])])
+        self.assertIn("isos: 1 file from the data disks to fast", job.text())
+
+    def test_a_share_lands_where_its_folder_is_and_nothing_with_files_is_touched(self):
+        root = tempfile.mkdtemp()
+        for d in ("user/TV Shows", "cache", "fast", "user0", "cache/backups", "fast/backups", "fast/TV Shows/s1", "cache/vol"):
+            os.makedirs(os.path.join(root, d), exist_ok=True)
+        os.chmod(os.path.join(root, "user", "TV Shows"), 0o2775)
+        said = []
+        mounts = {os.path.join(root, x) for x in ("cache", "fast", "user0")}
+        with mock.patch.object(self.am.os.path, "ismount", side_effect=lambda p: p in mounts), mock.patch.object(self.am.os, "chown"):
+            self.A()._landing(said.append, [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"},
+                                            {"share": "backups", "land": "array", "from": "", "to": ""},
+                                            {"share": "gone", "land": "nowhere", "from": "", "to": ""}], ["cache", "fast"], root=root)
+        self.assertTrue(os.path.isdir(os.path.join(root, "cache", "TV Shows")), "made on the pool it lands on")
+        self.assertEqual(os.stat(os.path.join(root, "cache", "TV Shows")).st_mode & 0o7777, 0o2775, "made as the share's own folder is")
+        self.assertTrue(os.path.isdir(os.path.join(root, "fast", "TV Shows", "s1")), "a folder with something in it is never touched")
+        self.assertIn("TV Shows: files are still on fast, so its new files may land there until the mover takes them\n", said)
+        self.assertTrue(os.path.isdir(os.path.join(root, "user0", "backups")), "a share landing on the array has its folder on the data disks")
+        self.assertFalse(os.path.exists(os.path.join(root, "cache", "backups")) or os.path.exists(os.path.join(root, "fast", "backups")),
+                         "and its empty folders on the pools removed")
+        self.assertFalse(os.path.exists(os.path.join(root, "nowhere")), "nothing made where no pool is mounted")
+
+    def test_a_shares_places_change_one_at_a_time(self):
+        self.adopt(taken=True)
+        with mock.patch.dict(os.environ, self.env):
+            self.am.write_record({"policy": "adopted", "adopted": True, "data": [{"slot": 1, "where": "/mnt/disk1"}], "parity": [],
+                                  "moves": [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "isos", "land": "array", "from": "", "to": ""}]})
+        state, code, text, rec, _a = self.take({"array": "moves", "moves": [{"share": "isos", "land": "cache", "from": "array", "to": "cache"}]})
+        self.assertEqual(state, "succeeded", text)
+        self.assertEqual(rec["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "isos", "land": "cache", "from": "array", "to": "cache"}])
+        for bad in ([{"share": "isos", "land": "tank"}], [{"share": "isos", "land": "cache", "from": "cache", "to": "cache"}], [{"share": "isos", "land": "cache", "from": "cache"}], []):
+            state, code, text, rec2, _a = self.take({"array": "moves", "moves": bad})
+            self.assertEqual((state, rec2["moves"]), ("failed", rec["moves"]), bad)
 
 
 class TheController(unittest.TestCase):
@@ -350,10 +396,41 @@ class TheController(unittest.TestCase):
         got = nodes._census({"array": {"policy": "mfs<b>", "mount": "/mnt/array", "mounted": True, "last_sync": "x", "last_scrub": 5, "status": "ok", "running": "",
                                        "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}, {"slot": 0}, "junk"],
                                        "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": "yes"}]}})
-        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "", "progress": "", "adopted": False, "moves": 0, "last_move": 0,
+        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "", "progress": "", "adopted": False, "last_move": 0,
                                         "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}],
                                         "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": False}]})
         self.assertEqual(nodes._census({"array": {"data": []}})["array"], {})
+
+    def test_each_shares_places_are_held_to_the_adopted_pools(self):
+        # R163: where a share's new files land and the mover's from and to,
+        # set on the takeover or later, each a pool in front of the data
+        # disks or the array.
+        import nodes
+        nodes.configure(state=tempfile.mkdtemp())
+        ad = {"mounts": [{"where": "/mnt/disk1"}, {"where": "/mnt/cache"}, {"where": "/mnt/fast"}], "taken": False, "parity": ["sdd"]}
+        n = {"id": "n1", "name": "box", "kind": "agent", "live": True, "config": {"own": True},
+             "reported": {"administers": True, "features": {"storage": {"mergerfs": True, "snapraid": True}}, "disks": DISKS, "array": {}, "adopted": ad}}
+        with mock.patch.object(nodes, "node", return_value=n), mock.patch.object(nodes, "own_machine", return_value=True), \
+             mock.patch.object(nodes, "node_locked", return_value=""), mock.patch.object(nodes, "system_job_for", return_value=None), \
+             mock.patch.object(nodes, "audit"), mock.patch.object(nodes, "job_add", side_effect=lambda *a: {"ok": True, "job": "j1", "spec": a[3]}) as add:
+            mv = [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "isos", "land": "fast", "from": "array", "to": "fast"}]
+            r = nodes.node_storage_array("user:t", "n1", {"array": "takeover", "dry": True, "moves": mv})
+            self.assertTrue(r.get("ok"), r)
+            self.assertEqual(add.call_args[0][3]["config"]["moves"], mv)
+            for bad, said in (([{"share": "isos", "land": "tank"}], "tank is not a pool"), ([{"share": "isos", "land": "cache", "from": "cache", "to": "cache"}], "from one place to another"),
+                              ([{"share": "a;b", "land": "cache"}], "not a share's name"), ([{"share": "isos", "land": ""}], "land is a pool")):
+                self.assertIn(said, nodes.node_storage_array("user:t", "n1", {"array": "takeover", "dry": True, "moves": bad}).get("error", ""), bad)
+            # Without the person's, the stick's plan as the old system had it.
+            with mock.patch("firstboot.kept_config", return_value={"shares": [{"name": "TV Shows", "cache": "yes", "pool": "cache"}]}):
+                nodes.node_storage_array("user:t", "n1", {"array": "takeover", "dry": True})
+            self.assertEqual(add.call_args[0][3]["config"]["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}])
+            # Later, one share at a time, from an agent that has it.
+            n["reported"]["array"] = {"data": [{"slot": 1}], "adopted": True, "moves": 3}
+            self.assertIn("from before", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[:1]})["error"])
+            n["reported"]["array"]["moves"] = []
+            r = nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[1:]})
+            self.assertEqual(add.call_args[0][3]["config"], {"array": "moves", "moves": mv[1:]}, r)
+            self.assertIn("no share's places", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": []})["error"])
 
     def test_the_verb_is_the_own_machines_and_holds_the_shapes(self):
         import nodes

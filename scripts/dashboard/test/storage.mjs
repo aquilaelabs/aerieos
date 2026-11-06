@@ -3,7 +3,7 @@
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
-import { URL, launch, newPage, ok, done, ready } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -168,6 +168,68 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(got.older, 'an agent from before Check parity is not offered it');
   ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
   ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
+}
+// Each share's places on an array taken over (R163): where its new files
+// land and the mover's from and to, said on its row, filled by its Edit,
+// and sent beside the share on Save.
+{
+  const got = await page.evaluate(async () => {
+    const keepOwn = ownMachine, keepPost = postJSON, posted = [];
+    ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
+    postJSON = async (url, body) => { posted.push(body); return { json: async () => ({ ok: true }) }; };
+    const n = (storageList || []).find(x => x.name === 'diskbox');
+    const lay = () => { Object.assign(n, { own: true, smb: true, nfs: false, live: true, may_measure: true, mergerfs: true, snapraid: true,
+      array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
+               moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] },
+      shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] }); storageRev++; drawPanes(); };
+    const out = {};
+    try {
+      let row = null;
+      for (let i = 0; i < 30 && !row; i++){ lay(); await new Promise(r => setTimeout(r, 100)); row = document.querySelector('.storagetab [data-share="TV Shows"]'); }
+      out.line = row?.textContent.replace(/\s+/g, ' ') || '';
+      out.hint = document.querySelector('.storagetab details[data-sect="storage:array"]')?.textContent.replace(/\s+/g, ' ') || '';
+      out.lands = [...document.querySelectorAll('#stShareLand option')].map(o => o.value);
+      out.movers = [...document.querySelectorAll('#stShareMover option')].map(o => o.value);
+      row.querySelector('[data-stshareedit="TV Shows"]').click();
+      out.filled = [$('stShareLand').value, $('stShareMover').value];
+      $('stShareLand').value = 'fast'; $('stShareMover').value = 'fast>array';
+      document.querySelector('.storagetab [data-stshare="set"]').click();
+      for (let i = 0; i < 30 && posted.length < 2; i++) await new Promise(r => setTimeout(r, 100));
+      out.posted = posted.map(b => b.action === 'storage-array' ? b : { action: b.action, share: b.share, path: b.path });
+    } finally { ownMachine = keepOwn; postJSON = keepPost; }
+    return out;
+  });
+  ok(/New files land on cache; the mover takes them from cache to the array/.test(got.line) && /the mover takes 1 share's files from one place to another/.test(got.hint),
+     `a share's row says where its new files land and what the mover does, and the array counts the shares it moves (${got.line.slice(0, 200)})`);
+  ok(JSON.stringify(got.lands) === '["cache","fast","array"]' && got.movers.includes('') && got.movers.includes('cache>array') && got.movers.includes('array>fast') && !got.movers.includes('cache>cache'),
+     `its Edit offers the pools in front of the disks and the array, and the mover from any of them to another (${JSON.stringify([got.lands, got.movers])})`);
+  if (process.env.BB_SHOTS){
+    // The share's row and its Edit's places, at a desk and on a phone.
+    const vp = page.viewportSize();
+    for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
+      await page.setViewportSize({ width: w, height: 2400 }); await sleep(400);
+      await page.evaluate(async () => {
+        window.__own = window.__own || ownMachine;
+        ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
+        const n = (storageList || []).find(x => x.name === 'diskbox');
+        Object.assign(n, { own: true, smb: true, nfs: false, live: true, may_measure: true, mergerfs: true, snapraid: true,
+          array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
+                   moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }] },
+          shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] });
+        storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+        const d = document.querySelector('.storagetab details[data-sect="storage:shares"]'); if (d) d.open = true;
+        document.querySelector('.storagetab [data-stshareedit="TV Shows"]')?.click();
+      });
+      await sleep(300);
+      await page.locator('.storagetab details[data-sect="storage:shares"]').screenshot({ path: `${process.env.BB_SHOTS}/share-moves-${name}.png` });
+    }
+    await page.evaluate(() => { ownMachine = window.__own; });
+    await page.setViewportSize(vp);
+  }
+  ok(JSON.stringify(got.filled) === '["cache","cache>array"]', `Edit fills them with the share's own (${JSON.stringify(got.filled)})`);
+  ok(got.posted?.length === 2 && got.posted[0].action === 'storage-share' && got.posted[0].path === '/mnt/user/TV Shows'
+     && JSON.stringify(got.posted[1]) === JSON.stringify({ action: 'storage-array', id: got.posted[1].id, array: 'moves', moves: [{ share: 'TV Shows', land: 'fast', from: 'fast', to: 'array' }] }),
+     `Save sends the share, then its places (${JSON.stringify(got.posted)})`);
 }
 await api('/api/v1/nodes', { action: 'retire', id: minted.id });
 

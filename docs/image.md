@@ -288,8 +288,15 @@ nothing) makes the data disks writable where they are, never formatting
 one, gives the old parity disk's first partition a filesystem for
 SnapRAID's parity, and builds the parity with a first sync, the array
 unprotected until it ends. The array then appears on the Storage page with
-its sync, scrub and Check parity, and a mover that takes each share's new
-files off the pools onto the data disks nightly, as the old system's did.
+its sync, scrub and Check parity. Each share keeps its places as the old
+system had them: where its new files land (a pool, or the array) and what
+the mover does with them, from what to what (a pool to the array, the
+array to a pool, one pool to another, or nothing). They are set before the
+takeover, starting from the old system's own settings, and changed later from each share's Edit on the Storage page. A new
+file lands on the first pool that holds its share's folder and on the data
+disks where none does, so the agent keeps each share's folder where it
+lands and removes its empty folders elsewhere; a folder with anything in it
+is never touched.
 **Going back to the old system** on This machine says the way back for the
 state the disks are in: nothing to do while they are read-only, a parity
 check there once they were written to, and a new configuration with its

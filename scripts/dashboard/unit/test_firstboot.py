@@ -102,16 +102,19 @@ class Take(unittest.TestCase):
             self.assertEqual(os.readlink(etc / "localtime"), str(Path(d, "zoneinfo", "Europe", "Berlin")))
             self.assertEqual((etc / "timezone").read_text(), "Europe/Berlin\n")
 
-    def test_the_mover_moves_what_the_old_system_kept_on_its_data_disks(self):
-        # R163 step 3: new files land on a pool first, so a share kept on the
-        # data disks comes off every pool, one cached comes off its own, and
-        # one kept on a pool stays.
+    def test_each_shares_places_start_as_the_old_system_had_them(self):
+        # R163 step 3: a share that wrote to a pool and moved later lands on
+        # the pool and moves to the array or its second pool; prefer the
+        # other way; one kept on a pool stays; the rest land on the array.
         import firstboot
         cfg = {"shares": [{"name": "TV Shows", "cache": "yes", "pool": "cache"}, {"name": "backups", "cache": "no"},
                           {"name": "appdata", "cache": "only", "pool": "cache"}, {"name": "isos", "cache": "prefer", "pool": "fast"},
-                          {"name": "elsewhere", "cache": "yes", "pool": "gone"}]}
-        self.assertEqual(firstboot.mover_moves(["cache", "fast"], cfg),
-                         [{"share": "TV Shows", "pool": "cache"}, {"share": "backups", "pool": "cache"}, {"share": "backups", "pool": "fast"}])
+                          {"name": "elsewhere", "cache": "yes", "pool": "gone"}, {"name": "scratch", "cache": "yes", "pool": "fast", "pool2": "cache"}],
+               "sharing": {"mover": "40 3 * * *"}}
+        self.assertEqual(firstboot.mover_moves(["cache", "fast"], cfg), [
+            {"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "backups", "land": "array", "from": "", "to": ""},
+            {"share": "appdata", "land": "cache", "from": "", "to": ""}, {"share": "isos", "land": "fast", "from": "array", "to": "fast"},
+            {"share": "elsewhere", "land": "array", "from": "", "to": ""}, {"share": "scratch", "land": "fast", "from": "fast", "to": "cache"}])
 
     def test_kernel_arguments_and_features_from_the_machine_it_replaces(self):
         # R163 step 16: CPUs kept for VMs and devices held for them, as the

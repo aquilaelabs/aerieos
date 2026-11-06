@@ -223,23 +223,27 @@ def kept_config():
 
 
 def mover_moves(pools, cfg=None):
-    """What the mover takes off the pools for an array taken over (R163
-    step 3): [{"share", "pool"}]. New files land on a pool first (the merged
-    tree's create policy), so a share the old system kept on its data disks
-    (its cache no) is moved off every pool, and one that wrote to a cache
-    and moved later (its cache yes) off its own; a share kept on a pool
-    (only, prefer) stays."""
+    """Each share's places on an array taken over (R163 step 3), as the
+    old system had them: [{share, land, from, to}], land where its new
+    files go (a pool, or the array) and the mover's from and to (both empty
+    when it leaves the share be). A share that wrote to a pool and moved to
+    the array or a second pool later (cache yes) lands on its pool and moves
+    off it; one kept on the array and moved onto its pool (prefer) the other
+    way; one kept on its pool (only) stays there; the rest (cache no, or a
+    pool not here) land on the array."""
     cfg = kept_config() if cfg is None else cfg
-    out = []
+    out = {}
     for s in (cfg or {}).get("shares") or []:
         if not isinstance(s, dict) or not s.get("name"):
             continue
-        c = str(s.get("cache") or "no")
-        if c == "yes" and s.get("pool") in pools:
-            out.append({"share": str(s["name"]), "pool": str(s["pool"])})
-        elif c == "no":
-            out += [{"share": str(s["name"]), "pool": p} for p in pools]
-    return out[:128]
+        name, c, p, p2 = str(s["name"]), str(s.get("cache") or "no"), str(s.get("pool") or ""), str(s.get("pool2") or "")
+        other = p2 if p2 in pools and p2 != p else "array"
+        if c in ("yes", "prefer", "only") and p in pools:
+            mv = {"yes": (p, other), "prefer": (other, p)}.get(c, ("", ""))
+            out[name] = {"share": name, "land": p, "from": mv[0], "to": mv[1]}
+        else:
+            out[name] = {"share": name, "land": "array", "from": "", "to": ""}
+    return list(out.values())[:128]
 
 
 def met(waiting, done, reported):
@@ -283,7 +287,10 @@ def view(reported=None):
     dk, vm = cfg.get("docker") if isinstance(cfg.get("docker"), dict) else {}, cfg.get("vms") if isinstance(cfg.get("vms"), dict) else {}
     nets = {str(k): {"subnet": str(v.get("subnet") or ""), "gateway": str(v.get("gateway") or "")}
             for k, v in (dk.get("networks") or {}).items() if isinstance(v, dict) and v.get("subnet")}
-    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": adopt_want(cfg),
+    aw = adopt_want(cfg)
+    return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": aw,
+            # Each share's places for the takeover to start from.
+            "moves": mover_moves([p["name"] for p in (aw or {}).get("want", {}).get("pools") or []], cfg) if aw else [],
             "shares": {"rows": rows, "notes": notes} if rows or notes else None,
             # Where the old system's containers and VMs are read from, and its
             # networks of fixed addresses (R163 steps 10, 11).

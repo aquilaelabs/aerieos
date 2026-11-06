@@ -365,7 +365,7 @@ hours during which the array is readable, or unprotected, as the job says.
 The record is AerieOS's own (`/etc/builderbot/array.json`), from which
 `snapraid.conf` and the array's fstab lines (by filesystem UUID, `nofail`)
 are written whole. Destroying the array unmounts it and forgets it: every
-data disk keeps its files, readable on any Linux. There is no cache tier and no mover (see Pools by purpose below).
+data disk keeps its files, readable on any Linux. There is no cache tier and no mover (see Pools by purpose below), except on an array taken over from another system, which keeps its pools in front of its data disks and its mover ([image.md](image.md)).
 
 **Other disks and shares** (R162): under the shares, a disk plugged into
 the machine (USB, eSATA) or a remote SMB share or NFS export, mounted at

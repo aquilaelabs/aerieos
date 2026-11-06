@@ -188,6 +188,33 @@ function storageMachineDisks(n){
   return docSection("storage", "disks", "Disks", disks.length ? `${disks.length}${failing ? `, ${failing} failing` : ""}` : "", body, {cls: failing ? "bad" : ""});
 }
 
+// A share's places on an array taken over (R163): where its new files
+// land, and what the mover does with them, from what to what; each a pool
+// in front of the data disks (the adopted ones, in their order) or the
+// array. A select's value for the mover is "FROM>TO", or "" for off.
+function movePools(){
+  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  return ((own?.reported?.adopted || {}).mounts || []).map(m => String(m.where || "")).filter(w => w && !/^\/mnt\/disk\d+$/.test(w)).map(w => w.split("/").pop());
+}
+const movePlace = p => p === "array" ? "the array" : p;
+function moveLandOpts(pools){ return [...pools.map(p => [p, `the pool ${p}`]), ["array", "the array (its data disks)"]]; }
+function moveMoverOpts(pools){
+  const all = [...pools, "array"];
+  return [["", "Off: files stay where they land"], ...all.flatMap(a => all.filter(b => b !== a).map(b => [`${a}>${b}`, `From ${movePlace(a)} to ${movePlace(b)}`]))];
+}
+function moveSaid(m){
+  return `New files land on ${movePlace(m.land)}; ${m.from ? `the mover takes them from ${movePlace(m.from)} to ${movePlace(m.to)}` : "the mover leaves them"}`;
+}
+// One share's two selects, ids made from `key`.
+function moveFields(key, pools, m){
+  return `<div class="setrow col ctlrow">${lbl(`${key}Land`, "New files land on")}<select id="${key}Land" data-moveland>${optionList(moveLandOpts(pools), m?.land || pools[0] || "array")}</select></div>
+    <div class="setrow col ctlrow">${lbl(`${key}Mover`, "The mover")}<select id="${key}Mover" data-movemover>${optionList(moveMoverOpts(pools), m?.from ? `${m.from}>${m.to}` : "")}</select></div>`;
+}
+function moveRead(share, land, mover){
+  const [from, to] = mover ? mover.split(">") : ["", ""];
+  return {share, land, from: from || "", to: to || ""};
+}
+
 // The controller's own machine's shares (R162 step 1): each as AerieOS's
 // own two files say it (the path, SMB with its users or as a guest, NFS
 // with its clients), with Remove; and a form for a new one, every press a
@@ -199,6 +226,10 @@ function storageShares(n){
   const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("machine", "Features section")} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const shares = n.shares || [];
+  // On an array taken over, each share at the top of /mnt/user has its
+  // places (where new files land, the mover's from and to).
+  const moves = n.array?.adopted && Array.isArray(n.array.moves) ? n.array.moves : null, pools = moves ? movePools() : [];
+  const moveOf = s => moves && s.path === `${n.array.mount || "/mnt/user"}/${s.name}` ? moves.find(m => m.share === s.name) || null : null;
   const lockedMounts = (n.pools || []).filter(p => p.locked && p.mount).map(p => p.mount);
   // What a share is, as a person reads it: exported or kept on this machine.
   const access = s => {
@@ -212,6 +243,7 @@ function storageShares(n){
       ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>` : ""}
       ${s.nfs?.on ? `<div class="sub">NFS${s.nfs.ro ? ", read-only" : ""}: ${(s.nfs.clients || []).map(esc).join(", ")} · ${esc(n.name)}:${esc(s.path)}</div>` : ""}
       ${s.smb?.on || s.nfs?.on ? "" : `<div class="sub">On this machine only: nothing serves it until you export it.</div>`}
+      ${moveOf(s) ? `<div class="sub">${esc(moveSaid(moveOf(s)))}.</div>` : ""}
       </div>${admin && !why ? `<span class="acts"><button type="button" data-stshareedit="${esc(s.name)}">Edit</button><button type="button" class="danger" data-stshare="remove" data-name="${esc(s.name)}">Remove</button></span>` : ""}</div>`).join("");
   // A share names the one pool it lives on, chosen when it is made (R162
   // step 6, the operator, 27 Oct): the pools and the array are the places,
@@ -245,6 +277,10 @@ function storageShares(n){
           <label class="ndcap"><input type="checkbox" id="stShareTm"> A Mac's Time Machine target</label>
         </div>
       </div>
+      ${moves ? `<div class="fgroup" id="stShareMoveGroup">
+        <div class="fgrouphead">Where its files go<span class="sub">For a share in ${esc(n.array.mount || "/mnt/user")}: the mover runs on the array's schedule.</span></div>
+        <div class="fgrid">${moveFields("stShare", pools, null)}</div>
+      </div>` : ""}
       <div class="fgroup">
         <div class="fgrouphead">NFS<span class="sub">For Linux machines and hypervisors. Most people leave this off.</span></div>
         <label class="ndcap"><input type="checkbox" id="stShareNfs"> Also export over NFS</label>
@@ -276,6 +312,8 @@ function wireStorageShares(root, n){
     sec.value = !s.smb?.guest ? "private" : (s.smb.users || []).length ? "secure" : "public";
     root.querySelectorAll("[data-stwho]").forEach(x => { x.value = (s.accounts || []).includes(x.dataset.stwho) ? "rw" : (s.readers || []).includes(x.dataset.stwho) ? "ro" : ""; });
     $("stShareTm").checked = !!s.smb?.tm; $("stShareNfs").checked = !!s.nfs?.on; $("stShareClients").value = (s.nfs?.clients || []).join(" ");
+    const m = (n.array?.moves || []).find(x => x.share === s.name);
+    if ($("stShareLand")){ $("stShareLand").value = m?.land || $("stShareLand").options[0]?.value || "array"; $("stShareMover").value = m?.from ? `${m.from}>${m.to}` : ""; }
     fit();
     $("stShareName").scrollIntoView({block: "center"}); $("stShareName").focus();
   });
@@ -295,6 +333,16 @@ function wireStorageShares(root, n){
     } else if (!await askYes(`Remove the share ${body.name}? The folder and what is in it stay; nobody reaches it over the network after.`, {title: "Remove the share?", verb: "Remove", danger: true})) return;
     busy(b, act === "set" ? "Saving" : "Removing");
     const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
+    // A share at the top of the merged tree of an array taken over has its
+    // places set beside it, once the share itself was taken.
+    const top = `${n.array?.mount || "/mnt/user"}/${body.name}`;
+    if (!j.error && act === "set" && $("stShareLand") && body.path === top){
+      const m = moveRead(body.name, $("stShareLand").value, $("stShareMover").value);
+      const k = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.node, array: "moves", moves: [m]})).json().catch(() => ({error: "no answer"}));
+      notify(k.error ? `the share is saved; where its files go was not: ${k.error}` : `saved: ${moveSaid(m).toLowerCase()}; the jobs run on the machine`, !!k.error);
+      await refresh();
+      return;
+    }
     notify(j.error || `${act === "set" ? "saved" : "removed"}: the job runs on the machine; the page follows its next check-in`, !!j.error);
     await refresh();
   }));
@@ -535,6 +583,7 @@ function storageArray(n){
     // another array has no pool in front of it to move from.
     const kindsHere = ARRAY_KINDS.filter(k => k[0] !== "mover" || a.adopted);
     const kinds = kindsHere.map(([k, label]) => { const sch = scheds.find(x => x.array === k); return `<span class="pill${sch?.on ? " ok" : ""}">${label.toLowerCase()}: ${sch ? `${esc(sch.words || "")}${sch.on ? "" : ", off"}` : "not scheduled"}</span>`; }).join(" ");
+    const moving = (Array.isArray(a.moves) ? a.moves : []).filter(m => m.from).length;
     const total = (a.data || []).reduce((s, x) => s + (x.size_mb || 0), 0), usedT = (a.data || []).reduce((s, x) => s + (x.used_mb || 0), 0);
     body = `<div class="row stack2"><div class="grow">
         <div class="name">${esc(a.mount || "/mnt/array")} <span class="pill${a.mounted ? " ok" : " bad"}">${a.mounted ? "mounted" : "not mounted"}</span>${a.running ? ` <span class="pill warn">${esc(a.running === "verify" ? "parity check" : a.running)} running${a.progress ? `, ${esc(a.progress)}` : ""}</span>` : ""}</div>
@@ -544,12 +593,12 @@ function storageArray(n){
                     ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
-        ${a.adopted ? `<div class="hint">Taken over from another system: its data disks stay where they were (/mnt/diskN, merged at /mnt/user), new files land on a pool first, and the mover takes ${a.moves || "no"} share${a.moves === 1 ? "" : "s"}' files off the pools onto the data disks${a.last_move ? `, last ${ago(a.last_move)}` : ""}.</div>` : ""}
+        ${a.adopted ? `<div class="hint">Taken over from another system: its data disks stay where they were (/mnt/diskN, merged at /mnt/user). Each share's new files land where its settings say, and the mover takes ${moving === 1 ? "1 share's" : `${moving || "no"} shares'`} files from one place to another${a.last_move ? `, last ${ago(a.last_move)}` : ""}: each share's Edit sets both.</div>` : ""}
         <div class="hint">Parity is periodic: what was written since the last sync is not protected until the next one runs.</div>
       </div>${admin && !why ? `<span class="acts"><button type="button" data-starray="sync" title="bring the parity up to date now">Sync now</button>${actMore([
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
         `<button type="button" data-starray="check" title="SnapRAID's status: what is out of date and what it found">Check</button>`,
-        ...(a.adopted ? [`<button type="button" data-starray="mover" title="each share's files off the pools onto the data disks now">Move now</button>`] : []),
+        ...(a.adopted ? [`<button type="button" data-starray="mover" title="each share's files from one place to another now, as its settings say">Move now</button>`] : []),
         ...("verify" in a ? [`<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`] : []),
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>

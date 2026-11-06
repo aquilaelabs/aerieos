@@ -280,7 +280,9 @@ def render_fstab(p):
         opts = opts.replace(",,", ",")
         lines.append(f"{m['what']} {m['where']} {m['fs']} {opts} 0 0 {MARK}\n")
     for where, branches in (p.get("merged") or {}).items():
-        create = "ff" if where.endswith("/user") else "mfs"
+        # /mnt/user: new files on the first pool, until the array is taken
+        # over and each share lands where its folder is (array.py _landing).
+        create = (p.get("user_create") if p.get("user_create") in ("ff", "epff") else "ff") if where.endswith("/user") else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={b.split('=')[0]}" for b in branches)
         lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,"
                      f"dropcacheonclose=true,category.create={create},moveonenospc=true,minfreespace=10G,fsname=adopted-{os.path.basename(where)},{req} 0 0 {MARK}\n")

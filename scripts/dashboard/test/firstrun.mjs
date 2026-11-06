@@ -633,13 +633,43 @@ await firstRun(false);
                  status: sect?.querySelector('summary')?.textContent.replace(/\s+/g, ' ') || '', back: back?.textContent.replace(/\s+/g, ' ') || '' }; };
       const old = read();
       n.reported.adopted = { ...was, taken: false };
+      // Each share's places, from the old system's settings, set before
+      // the takeover and kept across a redraw (R163).
+      const fbWas = state.firstboot;
+      state.firstboot = { ...fbWas, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *' };
       const offered = read();
+      const msect = () => document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      offered.moves = [...(msect()?.querySelectorAll('[data-admove]') || [])].map(r => `${r.dataset.admove}:${r.querySelector('[data-moveland]').value}:${r.querySelector('[data-movemover]').value}`);
+      const isos = msect()?.querySelector('[data-admove="isos"]');
+      if (isos){ isos.querySelector('[data-movemover]').value = 'array>cache'; isos.dispatchEvent(new Event('change', { bubbles: true })); }
+      read();
+      offered.kept = msect()?.querySelector('[data-admove="isos"] [data-movemover]')?.value || '';
+      offered.sent = JSON.stringify(adoptMovesNow());
+      state.firstboot = fbWas; adoptMoves.clear();
       n.reported.adopted = { ...was, taken: true, writable: true };
       const taken = read();
       n.reported.adopted = was;
       nodesRev++; drawPanes();
       return { old, offered, taken };
     });
+    ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]'
+       && take.offered.kept === 'array>cache' && /"share":"isos","land":"array","from":"array","to":"cache"/.test(take.offered.sent),
+       `before the takeover each share's places start as the old system had them, and a change is kept across a redraw and sent (${JSON.stringify(take.offered)})`);
+    if (process.env.BB_SHOTS){
+      // Each share's places before the takeover, at a desk and on a phone.
+      const vp = page.viewportSize();
+      await page.evaluate(() => { const n = ownMachine(); window.__adWas = [n.reported.adopted, state.firstboot];
+        n.reported.adopted = { ...n.reported.adopted, taken: false };
+        state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
+        nodesRev++; drawPanes(); const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d){ d.open = true; d.scrollIntoView(); } });
+      for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
+        await page.setViewportSize({ width: w, height: 1600 }); await sleep(500);
+        await page.evaluate(() => { const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
+        await page.locator('.machinetab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
+      }
+      await page.setViewportSize(vp);
+      await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; nodesRev++; drawPanes(); });
+    }
     ok(!take.old.take.length && JSON.stringify(take.offered.take) === '["dry","go"]',
        `an agent that has the takeover offers Check the takeover and Take the array over; an older one offers neither (${JSON.stringify([take.old.take, take.offered.take])})`);
     ok(/taken over/.test(take.taken.status) && !take.taken.release && /parity sync that follows rebuilds/.test(take.taken.back)

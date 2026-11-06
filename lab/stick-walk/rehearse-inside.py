@@ -138,6 +138,7 @@ def lay():
     sh(f"head -c 4000000 /dev/urandom > {m}/photos/p1.jpg")
     sh(f"umount {m}; mount /dev/nvme0n1p1 {m}")
     os.makedirs(f"{m}/appdata/whoami")
+    os.makedirs(f"{m}/photos")   # an empty folder the old system left on its cache
     os.makedirs(f"{m}/TV Shows/s2")
     sh(f"head -c 100000 /dev/urandom > {m}/appdata/whoami/db; head -c 2000000 /dev/urandom > '{m}/TV Shows/s2/e2.mkv'; touch -d '2 hours ago' '{m}/TV Shows/s2/e2.mkv'")
     sh(f"umount {m}")
@@ -185,8 +186,20 @@ def main():
     ok(sums("/mnt/user") == before, "the original's disk untouched by the clone")
     (st, _c), text = run(a._apply_storage_array, {"array": "takeover", "dry": True})
     ok(st == "succeeded" and "dry run: nothing changed" in text, "the takeover checked first, changing nothing")
-    (st, _c), text = run(a._apply_storage_array, {"array": "takeover", "moves": [{"share": "TV Shows", "pool": "cache"}]})
+    (st, _c), text = run(a._apply_storage_array, {"array": "takeover", "moves": [
+        {"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "appdata", "land": "cache", "from": "", "to": ""},
+        {"share": "photos", "land": "array", "from": "", "to": ""}]})
     ok(st == "succeeded", "the array taken over, its first sync done" + ("" if st == "succeeded" else f": {text[-400:]}"))
+    # Each share lands where its settings say: a new file through /mnt/user
+    # on the pool for one, on a data disk for the other.
+    ok(not os.path.exists("/mnt/cache/photos"), "a share landing on the array has its empty folder on the cache removed")
+    for f in ("/mnt/user/TV Shows/new.txt", "/mnt/user/photos/new.txt"):
+        with open(f, "w") as fh:
+            fh.write("new")
+    ok(os.path.isfile("/mnt/cache/TV Shows/new.txt") and os.path.isfile("/mnt/disk2/photos/new.txt"),
+       "a new file lands on the cache for TV Shows and on a data disk for photos")
+    for f in ("/mnt/user/TV Shows/new.txt", "/mnt/user/photos/new.txt"):
+        os.unlink(f)
     ok("ro," not in sh("findmnt -no OPTIONS /mnt/disk1").stdout, "the data disks writable where they are")
     new_on = [p for d in ("/mnt/disk1", "/mnt/disk2") for p in os.listdir(d) if p.startswith(".snapraid")]
     ok(sorted(new_on) == [".snapraid.content", ".snapraid.content"], "SnapRAID's content files the only new thing on the data disks")

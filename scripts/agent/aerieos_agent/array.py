@@ -32,16 +32,19 @@ FSTAB = "/etc/fstab"
 MARK = "# builderbot-array"
 MOUNT = "/mnt/array"
 ADOPTED_MOUNT = "/mnt/user"
-# A share and a pool as the mover takes them (the share rule of shares.py).
+# A share as the mover takes it (the share rule of shares.py), and a place
+# its files are: a pool by its name, or the array (the data disks merged,
+# /mnt/user0).
 MOVE_SHARE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
-MOVE_POOL = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+MOVE_PLACE = re.compile(r"array|[a-z][a-z0-9_-]{0,31}")
+MAX_MOVES = 128
 DISKS = "/mnt/disks"
 PARITY = "/mnt/parity"
 CONTENT = "/var/lib/builderbot/snapraid.content"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}
-ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "destroy")
+ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "moves", "destroy")
 MAX_DATA, MAX_PARITY = 24, 2
 NAME_RE = re.compile(r"[a-z][a-z0-9]{0,31}")
 SLOT_RE = re.compile(r"(d|p)([1-9][0-9]?)")
@@ -103,6 +106,49 @@ def merged_of(rec):
     """The merged tree over the data disks: the old system's /mnt/user for
     an array taken over (its pools before its disks), /mnt/array otherwise."""
     return ADOPTED_MOUNT if rec.get("adopted") else MOUNT
+
+
+def moves_of(raw, pools=None):
+    """Each share's places as the record keeps them, from what was asked:
+    [{share, land, from, to}]. land is where its new files go (a pool, or
+    the array); the mover takes its files from one place to another, from
+    and to both set and different, or both empty when it leaves the share
+    be. A pool not in `pools`, where that is given, or an entry in another
+    shape is left out; one entry per share, the last said winning."""
+    def ok(p):
+        return bool(MOVE_PLACE.fullmatch(p)) and (pools is None or p == "array" or p in pools)
+    out = {}
+    for x in raw or []:
+        if not isinstance(x, dict):
+            continue
+        s = str(x.get("share") or "")
+        land, frm, to = (str(x.get(k) or "") for k in ("land", "from", "to"))
+        if not MOVE_SHARE.fullmatch(s) or not ok(land) or bool(frm) != bool(to) or (frm and (not ok(frm) or not ok(to) or frm == to)):
+            continue
+        out[s] = {"share": s, "land": land, "from": frm, "to": to}
+    return list(out.values())[:MAX_MOVES]
+
+
+def moves_said(moves):
+    """Each share's places in a line a person reads."""
+    word = {"array": "the array"}
+    return [f"{m['share']}: new files land on {word.get(m['land'], m['land'])}"
+            + (f"; the mover takes them from {word.get(m['from'], m['from'])} to {word.get(m['to'], m['to'])}" if m["from"] else "; the mover leaves it")
+            for m in moves]
+
+
+def place_of(root, place, share):
+    """A share's folder in a place: on a pool, or across the data disks."""
+    return os.path.join(root, "user0" if place == "array" else place, share)
+
+
+def adopted_pools():
+    """The pools in front of the data disks in the old system's merged
+    tree, by name, in its order."""
+    from . import adopt
+    br = ((adopt.read_record().get("plan") or {}).get("merged") or {}).get(adopt.mnt() + "/user") or []
+    names = [os.path.basename(str(b).split("=", 1)[0]) for b in br]
+    return [n for n in names if not adopt.DATA_RE.fullmatch(n)]
 
 
 def stale_content():
@@ -193,7 +239,7 @@ def array_now():
         return {"slot": int(x["slot"]), "id": str(x.get("id") or "")[:120], "fs": str(x.get("fs") or "")[:8],
                 "size_mb": size, "used_mb": used, "mounted": mounted}
     return {"policy": str(rec.get("policy") or "mfs"), "mount": merged_of(rec), "mounted": os.path.ismount(merged_of(rec)),
-            "adopted": rec.get("adopted") is True, "moves": len(rec.get("moves") or []), "last_move": int(st.get("last_move") or 0),
+            "adopted": rec.get("adopted") is True, "moves": moves_of(rec.get("moves")), "last_move": int(st.get("last_move") or 0),
             "data": [row("d", d) for d in rec.get("data") or []][:MAX_DATA],
             "parity": [row("p", p) for p in rec.get("parity") or []][:MAX_PARITY],
             "last_sync": int(st.get("last_sync") or 0), "last_scrub": int(st.get("last_scrub") or 0),
@@ -287,16 +333,20 @@ class ArrayMixin:
         if rec.get("data") and not rec.get("adopted") and not os.path.ismount(MOUNT) and os.path.isdir(MOUNT):
             subprocess.run(["mount", MOUNT], capture_output=True, timeout=60, check=False)
 
-    def _mover(self, job, moves, root="/mnt", age_s=600):
-        """The old system's mover, for an array taken over: each share's
-        files off a pool onto the data disks (/mnt/user0, the data disks
-        merged), a file written in the last ten minutes left for next time;
-        the folders it empties removed, the share's own kept. 0, or rsync's
-        exit."""
+    def _mover(self, job, moves, root=None, age_s=600):
+        """The mover, for an array taken over: each share's files from the
+        place its entry names to the other (a pool, or the data disks by
+        /mnt/user0), a file written in the last ten minutes left for next
+        time; the folders it empties removed, the share's own kept. 0, or
+        rsync's exit."""
+        from . import adopt
+        root = root or adopt.mnt()
         say, worst = job.say, 0
         now = time.time()
         for mv in moves:
-            src, dst = os.path.join(root, mv["pool"], mv["share"]), os.path.join(root, "user0", mv["share"])
+            if not mv.get("from") or not mv.get("to"):
+                continue
+            src, dst = place_of(root, mv["from"], mv["share"]), place_of(root, mv["to"], mv["share"])
             if not os.path.isdir(src):
                 continue
             files = []
@@ -313,8 +363,9 @@ class ArrayMixin:
                 continue
             with tempfile.NamedTemporaryFile("w", delete=False, suffix=".list") as fl:
                 fl.write("".join(x + "\n" for x in files))
+            said = {"array": "the data disks"}
             try:
-                say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {mv['pool']} to the data disks\n")
+                say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {said.get(mv['from'], mv['from'])} to {said.get(mv['to'], mv['to'])}\n")
                 rc = self._sh(job, ["rsync", "-aHAX", "--remove-source-files", f"--files-from={fl.name}", src + "/", dst + "/"], timeout=86400)
             finally:
                 os.unlink(fl.name)
@@ -324,6 +375,45 @@ class ArrayMixin:
                     with contextlib.suppress(OSError):
                         os.rmdir(here)
         return worst
+
+    def _landing(self, say, moves, pools, root=None):
+        """Where each share's new files land: the merged tree of an array
+        taken over puts a new file on the first pool that holds its folder,
+        and on the data disks where none does (mergerfs's epff). So a share
+        landing on a pool has its folder made there, and one landing on the
+        array has its folder on the data disks; every other pool's folder of
+        it is removed when empty. A folder with anything in it is never
+        touched: new files may land there until the mover empties it, said."""
+        from . import adopt
+        root = root or adopt.mnt()
+        for mv in moves:
+            s, land = mv["share"], mv["land"]
+            here = place_of(root, land, s)
+            if not os.path.isdir(here) and os.path.ismount(os.path.dirname(here)):
+                try:
+                    st = os.stat(os.path.join(root, "user", s))
+                except OSError:
+                    st = None
+                try:
+                    os.mkdir(here, 0o777)
+                    if st:
+                        os.chmod(here, st.st_mode & 0o7777)
+                        os.chown(here, st.st_uid, st.st_gid)
+                except OSError as e:
+                    say(f"{s}: its folder could not be made on {land} ({e.strerror}), so its new files land where its folder already is\n")
+                    continue
+            for p in pools:
+                d = os.path.join(root, p, s)
+                if p == land or not os.path.isdir(d):
+                    continue
+                # A mount or a btrfs subvolume (a device of its own) is left
+                # as it is, even empty.
+                if os.path.ismount(d) or os.stat(d).st_dev != os.stat(os.path.dirname(d)).st_dev:
+                    continue
+                try:
+                    os.rmdir(d)
+                except OSError:
+                    say(f"{s}: files are still on {p}, so its new files may land there until the mover takes them\n")
 
     def _array_takeover(self, job, cfg, rec, disks, snapraid, settle, run_snapraid):
         """Take an adopted array over (R163 step 3): its data disks made
@@ -381,12 +471,22 @@ class ArrayMixin:
             say(f"p{p['slot']}: {p['part']} on {p['dev']} given an xfs filesystem for SnapRAID's parity file; the old system's parity on it is gone, "
                 "so going back to it takes its own parity sync\n")
         say("The first sync builds the parity from nothing: the array is unprotected until it ends, hours for a large one\n")
+        # Each share's places (where its new files land, and the mover's
+        # from and to), held to the pools in front of the data disks.
+        pools = adopted_pools()
+        moves = moves_of(cfg.get("moves"), pools)
+        for line in moves_said(moves):
+            say(line + "\n")
         if dry:
             say("dry run: nothing changed\n")
             return "succeeded", 0
         # The data disks writable, where they are.
         plan_["mounts"] = [{**m, "ro": False} if m in datas else m for m in plan_["mounts"]]
         plan_["merged"] = {w: [b[:-3] + "=RW" if b.endswith("=RO") else b for b in br] for w, br in (plan_.get("merged") or {}).items()}
+        # A new file lands on the first pool holding its share's folder, and
+        # on the data disks where none does: each share's landing is then
+        # where its folder is (_landing), as the old system's was per share.
+        plan_["user_create"] = "epff"
         arec.update(plan=plan_, writable=True)
         adopt.write_record(arec)
         adopt.write_fstab(plan_)
@@ -401,10 +501,7 @@ class ArrayMixin:
                 return "failed", 1
         for w in sorted(plan_.get("merged") or {}):
             self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
-        # The mover's work (which shares come off which pools each night),
-        # each held to a plain name here as it was on the controller.
-        moves = [{"share": str(x.get("share")), "pool": str(x.get("pool"))} for x in cfg.get("moves") or []
-                 if isinstance(x, dict) and MOVE_SHARE.fullmatch(str(x.get("share") or "")) and MOVE_POOL.fullmatch(str(x.get("pool") or ""))][:128]
+        self._landing(say, moves, pools)
         new = {"policy": "adopted", "adopted": True, "data": [], "parity": [], "moves": moves}
         for m in datas:
             new["data"].append({"slot": int(os.path.basename(m["where"])[4:]), "id": m.get("what", ""), "uuid": m["what"].split("=", 1)[-1],
@@ -585,6 +682,25 @@ class ArrayMixin:
             return "failed", 64
         elif action == "takeover":
             return self._array_takeover(job, cfg, rec, disks, snapraid, settle, run_snapraid)
+        elif action == "moves":
+            # A share's places changed (where its new files land, the
+            # mover's from and to), the rest kept.
+            if not rec.get("adopted"):
+                say("refused: a share's places are for an array taken over, whose pools are in front of its data disks\n")
+                return "failed", 66
+            pools = adopted_pools()
+            asked = moves_of(cfg.get("moves"), pools)
+            if not asked or len(asked) != len(cfg.get("moves") or []):
+                say(f"refused: each share's places are a pool in front of the data disks ({', '.join(pools) or 'none'}) or the array, the mover's two different\n")
+                return "failed", 64
+            kept = {m["share"]: m for m in moves_of(rec.get("moves"))}
+            kept.update({m["share"]: m for m in asked})
+            rec["moves"] = list(kept.values())[:MAX_MOVES]
+            write_record(rec)
+            for line in moves_said(asked):
+                say(line + "\n")
+            self._landing(say, asked, pools)
+            rc = 0
         elif action == "mover":
             if not rec.get("adopted"):
                 say("refused: the mover is for an array taken over, whose pools take new files first\n")
@@ -594,7 +710,9 @@ class ArrayMixin:
                 return "failed", 75
             _state_set(running="mover")
             try:
-                rc = self._mover(job, rec.get("moves") or [])
+                moves = moves_of(rec.get("moves"))
+                rc = self._mover(job, moves)
+                self._landing(say, moves, adopted_pools())
             finally:
                 _state_set(running="")
             if rc == 0:

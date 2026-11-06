@@ -323,6 +323,7 @@ function adoptParts(n){
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
+        ${canTake ? adoptMovesField() : ""}
         <div class="actbar">${had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
           : `<button type="button" class="danger" data-adopt="release">Release</button>`}${
           canTake ? `<button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button>` : ""}${
@@ -486,7 +487,27 @@ function adoptFoldersField(n){
     <div class="actbar"><button type="button" data-adoptfolders>Serve the ticked</button></div></div>`;
 }
 
+// Each share's places once the array is taken over (R163): where its new
+// files land and the mover's from and to, started from the old system's
+// own settings and set before the takeover, with when the mover runs. What
+// the person changed is kept across redraws.
+const adoptMoves = new Map();
+function adoptMovesNow(){
+  return (state?.firstboot?.moves || []).map(m => adoptMoves.get(m.share) || m);
+}
+function adoptMovesField(){
+  const list = adoptMovesNow();
+  if (!list.length) return "";
+  const pools = movePools();
+  return `<div class="field">${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}
+    <div class="rows" id="adoptMoves">${list.map((m, i) => `<div class="row stack2 admove" data-admove="${esc(m.share)}"><div class="grow"><div class="name">${esc(m.share)}</div>
+      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div></div>`).join("")}</div></div>`;
+}
+
 function wireAdopt(root){
+  root.querySelectorAll("[data-admove]").forEach(r => r.onchange = () => {
+    adoptMoves.set(r.dataset.admove, moveRead(r.dataset.admove, r.querySelector("[data-moveland]")?.value || "array", r.querySelector("[data-movemover]")?.value || ""));
+  });
   root.querySelectorAll("[data-adopttake]").forEach(b => b.onclick = () => pressing(b, async () => {
     const n = ownMachine(), dry = b.dataset.adopttake === "dry";
     if (!n) return;
@@ -499,7 +520,8 @@ function wireAdopt(root){
       confirm = "parity";
     }
     busy(b, dry ? "Checking" : "Taking over");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm})).json().catch(() => ({error: "no answer"}));
+    const moves = adoptMovesNow();
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})})).json().catch(() => ({error: "no answer"}));
     notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : "taking the array over: the first sync builds the parity, its progress on the Storage page"), !!j.error);
     await loadNodes();
   }));
