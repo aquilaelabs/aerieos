@@ -141,7 +141,12 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
                   text: sect?.textContent.replace(/\s+/g, ' ') || '', btn: !!sect?.querySelector('[data-starray="verify"]'),
                   sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
     const { verify, ...older } = ARR;
-    lay(older); await sectOf();
+    lay(older);
+    // Until the redraw without it: the section is there throughout.
+    for (let i = 0; i < 30 && document.querySelector('.storagetab [data-starray="verify"]'); i++){
+      await new Promise(r => setTimeout(r, 100));
+      if (i === 10) lay(older);
+    }
     out.older = !!document.querySelector('.storagetab details[data-sect="storage:array"]') && !document.querySelector('.storagetab [data-starray="verify"]');
     return out;
   });
