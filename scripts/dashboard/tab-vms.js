@@ -541,7 +541,7 @@ function vmHwFields(host, hw, admin){
       <div class="setrow col ctlrow">${lbl("vmHwMemMax", "Memory ceiling, GB", "it starts with its memory and may balloon up to this; empty for none")}
         <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
     </div>
-    ${vmNetFields(host, hw)}
+    ${vmNetFields(host, hw, !!hw?.mac)}
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
         <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
@@ -571,14 +571,16 @@ function vmNewMac(){
   const b = crypto.getRandomValues(new Uint8Array(3));
   return "52:54:00:" + [...b].map(x => x.toString(16).padStart(2, "0")).join(":");
 }
-function vmNetFields(host, hw){
+function vmNetFields(host, hw, made){
+  // New VM has its own MAC address field above, so the MAC is the Hardware
+  // dialog's alone, for a VM that has one (said once, never twice).
   return `<div class="field"><div class="fgrid">
       <label class="pick"><span class="pickw">Network source</span><select id="vmHwNet">${vmNetOptions(host, hw?.net || "project")}</select></label>
       <label class="pick"><span class="pickw">Network model</span><select id="vmHwModel">${optionList(VM_NET_MODELS, hw?.model || "virtio")}</select></label>
-      <label class="pick"><span class="pickw">Network MAC</span><input id="vmHwMac" spellcheck="false" autocomplete="off" placeholder="made when it is created" value="${esc(hw?.mac || "")}"></label>
+      ${made ? `<label class="pick"><span class="pickw">Network MAC</span><input id="vmHwMac" spellcheck="false" autocomplete="off" value="${esc(hw?.mac || "")}"></label>
+      <div class="fcellbtn"><button type="button" id="vmHwMacNew">Regenerate MAC</button></div>` : ""}
     </div>
-    <div class="actbar"><span class="sp"></span><button type="button" id="vmHwMacNew">Regenerate MAC</button></div>
-    <div class="hint">Its space's network keeps it to its space; the LAN, a bridge or a libvirt network takes it past that, a person's to pick. virtio is fastest; e1000 or rtl8139 for a guest with no virtio driver. The MAC stays unless changed, since a router's reservation knows it.</div></div>`;
+    <div class="hint">Its space's network keeps it to its space; the LAN, a bridge or a libvirt network takes it past that, a person's to pick. virtio is fastest; e1000 or rtl8139 for a guest with no virtio driver.${made ? " The MAC stays unless changed, since a router's reservation knows it." : ""}</div></div>`;
 }
 function vmHwRead(root){
   const cpus = [...root.querySelectorAll("[data-cpus]:checked")].flatMap(c => c.dataset.cpus.split(",").map(Number));

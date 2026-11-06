@@ -4031,6 +4031,9 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 /* Its settings: Apply one cell of the grid, beside the last setting, not a
    row of its own; Reached at's address beside its label. */
 .dmsettings .setfoot{grid-column:auto;justify-content:flex-start;align-self:end}
+/* A field's own button (a VM's Regenerate MAC) as the grid's next cell,
+   level with the field, never a row of its own. */
+.fgrid>.fcellbtn{display:flex;align-items:flex-end;min-width:0}
 .dmsettings .dmboot .ctl{justify-content:space-between;align-items:center}
 @media(max-width:600px){ .dmhead>.actbar.dmacts{flex:1 1 100%;justify-content:flex-start;margin-left:0} }
 .setgrid .dmroute .lbl.dmreach{display:flex;gap:6px;align-items:baseline;min-width:0;white-space:nowrap}
