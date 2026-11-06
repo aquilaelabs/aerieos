@@ -104,6 +104,52 @@ def host_hw(sys_root="/sys"):
             "bridges": bridges(sys_root), "vnets": vnets(), "tpm": tpm_here()}
 
 
+# Devices held for VMs from boot (R163 step 16): each PCI address given to
+# vfio-pci before any driver of the host's can take it, as the machine a VM
+# came from held them, so a card the host would have taken is free when
+# the VM starts. A udev rule by address (driver_override), which a device
+# bound early (in the initramfs) is unbound from at the root's coldplug;
+# kept in /etc, which an AerieOS machine keeps across boots.
+VFIO_RULES = "/etc/udev/rules.d/70-aerieos-vfio.rules"
+
+
+def vfio_rules(addrs):
+    """The rules file's text for these addresses ("" for none)."""
+    if not addrs:
+        return ""
+    lines = ["# Written by AerieOS: these PCI devices are vfio-pci's from boot, for VMs (R163 step 16)."]
+    for a in addrs:
+        lines.append(f'ACTION=="add", SUBSYSTEM=="pci", KERNEL=="{a}", ATTR{{driver_override}}="vfio-pci", '
+                     'RUN+="/bin/sh -c \'/usr/sbin/modprobe -b vfio-pci; [ -e /sys$devpath/driver ] && echo $kernel > /sys$devpath/driver/unbind; '
+                     'echo $kernel > /sys/bus/pci/drivers_probe\'"')
+    return "\n".join(lines) + "\n"
+
+
+def hold_for_vms(addrs, sys_root="/sys", path=None):
+    """Hold these PCI addresses for VMs from the next boot: (held, [why each
+    left out]). One the host needs (its LAN card, a disk it has mounted) or
+    that is not on this machine is left out and said."""
+    path = path or os.environ.get("BB_VFIO_RULES", VFIO_RULES)
+    have = {d["addr"]: d for d in host_hw(sys_root)["pci"]}
+    held, said = [], []
+    for a in sorted({str(x).lower() for x in addrs or []}):
+        if not PCI_RE.fullmatch(a):
+            said.append(f"{a[:20]}: not a PCI address")
+        elif not os.path.isdir(f"{sys_root}/bus/pci/devices/{a}"):
+            said.append(f"{a}: not on this machine")
+        elif (have.get(a) or {}).get("host"):
+            said.append(f"{a}: left to this machine, which needs it ({have[a]['host']})")
+        else:
+            held.append(a)
+    text = vfio_rules(held)
+    if text:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path + ".new", "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(path + ".new", path)
+    return held, said
+
+
 # What a VM's interface can be (R219 step 4, as the old system's form
 # offers): the space's own network, the host's LAN, any bridge on the host
 # by name, or a libvirt network by name; and its model, from QEMU's list.

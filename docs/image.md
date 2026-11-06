@@ -64,6 +64,13 @@ on the stick's data partition, apart from both slots, and an update writes
 the other slot as on a disk. `slot status` says when the root is in memory.
 A machine needs the slot's size in memory beside what it runs (about 2 GB).
 
+A machine's own kernel arguments (the IOMMU, CPUs kept for VMs) are
+`aerie_args` in the same environment, which every boot entry ends with:
+`slot args NAME=VALUE...` sets them, each in place of one of that name,
+`slot args-off NAME...` takes them off, and plain `slot args` prints them;
+each counts from the next boot. The IOMMU switch on This machine's
+Features sets its arguments this way.
+
 **The stick is written rarely.** Flash wears with every write, and many
 small synced writes are what make a stick slow, so on a stick boot it keeps
 the configuration and little else. Its data partition is flushed once a
@@ -206,6 +213,14 @@ first boot applies before anyone signs in. It is a JSON object:
  "people": [{"name": "sam", "role": "user", "smb_nt": "NTHASH"}],
  "shares": [], "pools": [], "array": {}, "apps": []}
 ```
+
+`machine` may also carry `"kernel_args"`, a list of kernel arguments for
+VMs given the machine's own devices and CPUs (`isolcpus`, `nohz_full`,
+`rcu_nocbs`, `intel_iommu`, `amd_iommu`, `iommu`, `pcie_acs_override`,
+`video`, `vfio-pci.ids`, the `kvm` and hugepage options; anything else is
+left out and said), put on every boot entry from the next restart, and
+`"features"`, any of `vmhost` and `iommu`, turned on with the machine's
+own node as the installer's are.
 
 Before the controller starts, the boot sets the hostname and the time zone,
 writes a static address (`"network": "dhcp"` or leaving it out keeps DHCP)

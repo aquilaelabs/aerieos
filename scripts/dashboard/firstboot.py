@@ -15,7 +15,7 @@ hash nor an SMB hash. This machine draws the report (view()).
 
 Format 1:
     {"format": 1, "first_run": "skip" | "ask",
-     "machine": {"hostname", "timezone", "network": {...}},
+     "machine": {"hostname", "timezone", "network": {...}, "kernel_args", "features"},
      "hold_first_start": true | false,
      "owner": {"name", "password_hash"},
      "people": [{"name", "role", "smb_nt"}],
@@ -31,6 +31,7 @@ RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/aerieos-os/firstboot/firstbo
 STATE = None
 # The name a pool may be mounted under (adopt.POOL_RE, nodes._adopt_want).
 POOL_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+PCI_ADDR = re.compile(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]")
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
 WAITS = {"shares": "a share is served from a pool or the array once they are adopted",
@@ -60,7 +61,10 @@ def apply(path=None):
     cfg = handed.get("config") if isinstance(handed, dict) else None
     done, waiting, failed = [], [], []
     for k, v in ((handed or {}).get("machine") or {}).items():
-        (done if v == "applied" else failed).append({"what": k, "said": v})
+        # The boot's arguments and features say what they did in words, a
+        # refusal starting "not set".
+        ok = v == "applied" or (k in ("kernel_args", "features") and isinstance(v, str) and not v.startswith("not set"))
+        (done if ok else failed).append({"what": {"kernel_args": "kernel arguments"}.get(k, k), "said": v})
     if isinstance(cfg, dict):
         owner = cfg.get("owner") or {}
         if owner.get("password_hash"):
@@ -264,5 +268,8 @@ def view(reported=None):
             # Where the old system's containers and VMs are read from, and its
             # networks of fixed addresses (R163 steps 10, 11).
             "apps_from": {"docker": {"image": str(dk.get("image") or ""), "autostart_file": str(dk.get("autostart_file") or "")},
-                          "vms": {"image": str(vm.get("image") or "")}, "networks": nets,
+                          "vms": {"image": str(vm.get("image") or ""),
+                                  # The devices it held for its VMs from boot (R163 step 16).
+                                  "vfio": [str(a) for a in (vm.get("vfio") or [])[:32] if isinstance(a, str) and PCI_ADDR.fullmatch(a)]},
+                          "networks": nets,
                           "containers": len(cfg.get("apps") or [])} if dk or vm or cfg.get("apps") else None}

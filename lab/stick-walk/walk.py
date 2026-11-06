@@ -45,13 +45,15 @@ def prep(img):
         subprocess.run(["cp", "/usr/share/OVMF/OVMF_VARS_4M.fd", vars_], check=True)
 
 def boot():
-    cmd = ["qemu-system-x86_64", "-enable-kvm", "-cpu", "host", "-m", "8192", "-smp", "4", "-machine", "q35",
+    cmd = ["qemu-system-x86_64", "-enable-kvm", "-cpu", "host", "-m", "8192", "-smp", "4", "-machine", os.environ.get("WALK_MACHINE", "q35"),
            "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd",
            "-drive", f"if=pflash,format=raw,file={VM}/vars.fd",
            "-drive", f"file={STICK},format=raw,if=none,id=stick", "-device", "qemu-xhci", "-device", "usb-storage,drive=stick,removable=on,bootindex=0",
            "-netdev", "user,id=n0,hostname=newserver,hostfwd=tcp:127.0.0.1:7690-:7680,hostfwd=tcp:127.0.0.1:1445-:445", "-device", "virtio-net-pci,netdev=n0",
            "-display", "none", "-chardev", f"socket,id=s0,path={SOCK},server=on,wait=off,logfile={VM}/serial.log,logappend=on", "-serial", "chardev:s0", "-chardev", f"socket,id=s1,path={ROOTSOCK},server=on,wait=off,logfile={VM}/root.log", "-serial", "chardev:s1",
            "-daemonize", "-pidfile", f"{VM}/qemu.pid"]
+    # WALK_QEMU_EXTRA: more of QEMU's arguments, one string (an IOMMU, a spare card to hold for a VM).
+    cmd += os.environ.get("WALK_QEMU_EXTRA", "").split()
     for name, serial, _ in DISKS:
         cmd += ["-drive", f"file={VM}/{name}.raw,format=raw,if=none,id={name}", "-device", f"virtio-blk-pci,drive={name},serial={serial}"]
     name, serial, _ = NVME

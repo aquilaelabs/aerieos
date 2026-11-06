@@ -3579,7 +3579,9 @@ def node_storage_adopt(principal, node_id, req):
         af = str(dk.get("autostart_file") or "")
         if af and not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", af):
             return {"error": "the autostart file is a name in Docker's folder"}
-        cfg.update(docker={"image": dk.get("image") or "", "autostart_file": af}, vms={"image": vm.get("image") or ""})
+        vfio = [str(a).lower() for a in (vm.get("vfio") or [])[:32]
+                if isinstance(a, str) and re.fullmatch(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]", a)]
+        cfg.update(docker={"image": dk.get("image") or "", "autostart_file": af}, vms={"image": vm.get("image") or "", "vfio": vfio})
     elif action == "vm":
         name, op = str(req.get("name") or ""), str(req.get("op") or "")
         if op not in ("start", "shutdown", "off", "autostart-on", "autostart-off") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", name):

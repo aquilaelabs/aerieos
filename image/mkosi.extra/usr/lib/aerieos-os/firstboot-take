@@ -133,6 +133,54 @@ def network(net):
 MIRROR = b"BB-MIRROR-1\n"
 
 
+# The kernel arguments a prepared configuration may carry (machine.kernel_args):
+# what VMs given a machine's own devices and CPUs need, as the machine it
+# replaces booted with. Anything else is said and left out.
+KARGS = {"isolcpus", "nohz_full", "rcu_nocbs", "irqaffinity", "intel_iommu", "amd_iommu", "iommu",
+         "pcie_acs_override", "video", "vfio-pci.ids", "vfio_iommu_type1.allow_unsafe_interrupts",
+         "kvm.ignore_msrs", "kvm.report_ignored_msrs", "kvm_intel.nested", "kvm_amd.nested", "kvm_amd.npt",
+         "hugepages", "hugepagesz", "default_hugepagesz", "transparent_hugepage", "pcie_aspm",
+         "initcall_blacklist", "modprobe.blacklist"}
+KARG = re.compile(r"[a-z][a-z0-9_.-]{0,63}(=[A-Za-z0-9_.,:=/@+-]{1,256})?")
+SLOT = os.environ.get("BB_SLOT", "/usr/lib/aerieos-os/slot")
+FEATURES = os.environ.get("BB_OS_FEATURES", "/var/lib/aerieos-os/features")
+
+
+def kernel_args(args):
+    """machine.kernel_args onto every boot entry, from the next boot: what
+    happened, in words."""
+    took, left = [], []
+    for a in args if isinstance(args, list) else []:
+        a = str(a)
+        (took if KARG.fullmatch(a) and a.split("=", 1)[0] in KARGS else left).append(a)
+    said = ""
+    if took:
+        err = run("bash", SLOT, "args", *took)
+        said = f"{' '.join(took)} from the next restart" if not err else f"not set: {err}"
+    if left:
+        said += ("; " if said else "") + f"left out (not an argument this sets): {' '.join(x[:40] for x in left[:8])}"
+    return said
+
+
+def features(want):
+    """machine.features, turned on with the machine's own node as the
+    installer's are: the names added to its list."""
+    names = [f for f in (want if isinstance(want, list) else []) if f in ("vmhost", "iommu")]
+    if not names:
+        return ""
+    try:
+        with open(FEATURES, encoding="utf-8") as f:
+            have = {ln.strip() for ln in f if ln.strip()}
+    except OSError:
+        have = set()
+    new = [f for f in names if f not in have]
+    if new:
+        os.makedirs(os.path.dirname(FEATURES), exist_ok=True)
+        with open(FEATURES, "a", encoding="utf-8") as f:
+            f.write("".join(n + "\n" for n in new))
+    return "turned on with this machine's node: " + ", ".join(names)
+
+
 def mirror(pw):
     """The catalog's mirror a stick maker's --mirror wrote (R169 step 6):
     handed to the controller at every boot while the stick holds one, which
@@ -192,6 +240,10 @@ def main():
     net = network(m.get("network"))
     if net:
         said["network"] = net
+    if m.get("kernel_args"):
+        said["kernel_args"] = kernel_args(m["kernel_args"])
+    if m.get("features"):
+        said["features"] = features(m["features"])
     pw = account()
     os.makedirs(RUN, mode=0o700, exist_ok=True)
     if pw:

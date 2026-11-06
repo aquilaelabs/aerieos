@@ -20,6 +20,8 @@ mergerfs with the read-only disks marked so in the branch list, so a new
 file lands on a pool. Release unmounts all of it and forgets it, every disk
 as it was.
 """
+import contextlib
+import glob
 import json
 import os
 import re
@@ -349,6 +351,8 @@ def adopted_now():
 # neither is ever run.
 APPS = "/var/lib/builderbot/adopted-apps.json"
 NVRAM_KEPT = "/var/lib/builderbot/adopted-nvram"
+TPM_KEPT = "/var/lib/builderbot/adopted-tpm"
+SWTPM_DIR = "/var/lib/libvirt/swtpm"
 NVRAM_DIR = "/var/lib/libvirt/qemu/nvram"
 VM_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}")
 NET_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
@@ -412,20 +416,75 @@ def read_libvirt_root(root):
             continue
         nv = (dom.findtext("os/nvram") or "").strip()
         kept = os.path.join(q, "nvram", os.path.basename(nv)) if nv else ""
+        uuid = (dom.findtext("uuid") or "").strip().lower()
         out.append({"name": name, "xml": xml, "autostart": os.path.exists(os.path.join(q, "autostart", fn)),
-                    "nvram": kept if kept and os.path.isfile(kept) else ""})
+                    "nvram": kept if kept and os.path.isfile(kept) else "",
+                    "tpm": tpm_state(root, uuid) if dom.find("devices/tpm") is not None else ""})
     return out[:64]
 
 
-def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan):
+UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def tpm_state(root, uuid, depth=4):
+    """The folder of a domain's TPM state inside a libvirt configuration
+    directory, wherever the old system kept it: a folder named by the
+    domain's UUID with swtpm's tpm2 state in it (libvirt's own layout is
+    swtpm/UUID/tpm2). "" when there is none."""
+    if not UUID_RE.fullmatch(uuid or ""):
+        return ""
+    base = root.rstrip("/").count("/")
+    for here, dirs, _ in os.walk(root):
+        if here.count("/") - base >= depth:
+            dirs[:] = []
+            continue
+        if os.path.basename(here).lower() == uuid and os.path.isdir(os.path.join(here, "tpm2")):
+            return here
+    return ""
+
+
+def read_libvirt_networks(root):
+    """The libvirt networks a configuration directory defines: [{"name",
+    "bridge", "xml", "autostart"}]. A VM on the old system's NAT network
+    (libvirt's default, on virbr0) names it by its bridge or by its name."""
+    out = []
+    q = os.path.join(root, "qemu", "networks")
+    for fn in sorted(os.listdir(q)) if os.path.isdir(q) else []:
+        if not fn.endswith(".xml"):
+            continue
+        try:
+            with open(os.path.join(q, fn), encoding="utf-8") as f:
+                xml = f.read()
+            net = ET.fromstring(xml)
+        except (OSError, ET.ParseError):
+            continue
+        name = (net.findtext("name") or "").strip()
+        br = net.find("bridge")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", name):
+            continue
+        out.append({"name": name, "bridge": br.get("name", "") if br is not None else "", "xml": xml,
+                    "autostart": os.path.exists(os.path.join(q, "autostart", fn))})
+    return out[:16]
+
+
+def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan, nets=None):
     """A domain another system defined, as this machine runs it: its own
     QEMU, its own UEFI firmware and a variables file of its own, and an
     interface on a bridge put on the LAN through `lan` (macvtap, as this
-    machine's own VMs are). Its disks, passthrough and the rest kept as
-    they were. (xml, [what changed])."""
+    machine's own VMs are). An interface on one of the old system's libvirt
+    networks (`nets`, its bridge name to the network's name: a NAT network
+    such as virbr0) stays on that network, which is defined here too. Its
+    disks, passthrough and the rest kept as they were. (xml, [what changed])."""
     dom = ET.fromstring(xml)
     said = []
     dev = dom.find("devices")
+    for iface in (dev.findall("interface") if dev is not None else []):
+        src = iface.find("source")
+        br = src.get("bridge", "") if src is not None and iface.get("type") == "bridge" else ""
+        if br and br in (nets or {}):
+            iface.set("type", "network")
+            src.attrib.clear()
+            src.set("network", nets[br])
     em = dev.find("emulator") if dev is not None else None
     if em is not None and emulator and (em.text or "").strip() != emulator:
         said.append(f"QEMU is {emulator} here")
@@ -468,6 +527,92 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan):
             src.set("mode", "bridge")
             said.append(f"its network {br or 'bridge'} is the LAN through {lan} (this machine cannot reach it, other machines can)")
     return ET.tostring(dom, encoding="unicode"), said
+
+
+def domain_networks(xml, bybridge, names):
+    """The old system's libvirt networks a domain's interfaces are on."""
+    out = set()
+    for iface in ET.fromstring(xml).findall("devices/interface"):
+        src = iface.find("source")
+        if src is None:
+            continue
+        if iface.get("type") == "bridge" and src.get("bridge") in bybridge:
+            out.add(bybridge[src.get("bridge")])
+        elif iface.get("type") == "network" and src.get("network") in names:
+            out.add(src.get("network"))
+    return out
+
+
+def ensure_network(runner, job, virsh, net):
+    """One of the old system's libvirt networks, here: defined from its XML
+    where this machine has none of that name, started, and started with the
+    machine where it was. What happened, in words."""
+    name = net["name"]
+    if subprocess.run(virsh + ["net-info", name], capture_output=True, timeout=30, check=False).returncode != 0:
+        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
+            f.write(net["xml"])
+        try:
+            rc = runner._sh(job, virsh + ["net-define", f.name], timeout=60)
+        finally:
+            os.unlink(f.name)
+        if rc != 0:
+            return f"the network {name} could not be defined here (above): VMs on it will not start until it is"
+        made = f"the network {name} defined as the old system had it"
+    else:
+        made = f"the network {name} is here already, used as it is"
+    if net.get("autostart"):
+        runner._sh(job, virsh + ["net-autostart", name], timeout=30)
+    active = "yes" in (subprocess.run(virsh + ["net-info", name], capture_output=True, text=True, timeout=30,
+                                       check=False).stdout.split("Active:")[-1].split("\n")[0])
+    if not active and runner._sh(job, virsh + ["net-start", name], timeout=60) != 0:
+        return made + ", and it did not start (above)"
+    return made + ", running"
+
+
+def carry_vars(old, template, out, run=subprocess.run):
+    """A domain's UEFI variables, for this machine's firmware: the old file
+    where it is this firmware's size, else its variables (boot entries, the
+    Secure Boot keys) written into a fresh copy of this firmware's store by
+    virt-fw-vars, else that fresh copy alone. What happened, in words."""
+    if old and os.path.isfile(old) and os.path.getsize(old) == os.path.getsize(template):
+        shutil.copyfile(old, out)
+        return ""
+    shutil.copyfile(template, out)
+    if not old or not os.path.isfile(old):
+        return "its UEFI variables start fresh (the old system kept none)"
+    tool = shutil.which("virt-fw-vars")
+    if tool:
+        with tempfile.TemporaryDirectory() as d:
+            js = os.path.join(d, "vars.json")
+            r = run([tool, "-i", old, "--output-json", js], capture_output=True, text=True, timeout=60, check=False)
+            if r.returncode == 0:
+                r = run([tool, "-i", template, "--set-json", js, "-o", out + ".new"], capture_output=True, text=True,
+                        timeout=60, check=False)
+            if r.returncode == 0 and os.path.isfile(out + ".new"):
+                os.replace(out + ".new", out)
+                return "its UEFI variables (its boot entries) carried into this machine's firmware"
+            with contextlib.suppress(OSError):
+                os.remove(out + ".new")
+    return ("its UEFI variables start fresh (the old ones are another firmware's and could not be carried): "
+            "a guest with no fallback loader stops at the UEFI shell until its boot entry is picked once")
+
+
+def carry_tpm(x, here, swtpm_dir=None):
+    """A domain's TPM, as this machine keeps it: the old state where it was
+    copied out, under libvirt's own path for its UUID. [what was said]."""
+    if "<tpm" not in x["xml"]:
+        return []
+    if not here:
+        return ["it has a TPM, and this machine has no swtpm: it will not start until VM host is turned on again under Features"]
+    uuid = (ET.fromstring(x["xml"]).findtext("uuid") or "").strip().lower()
+    state = x.get("tpm") or ""
+    if state and os.path.isdir(state) and UUID_RE.fullmatch(uuid):
+        dest = os.path.join(swtpm_dir or _env("BB_SWTPM_DIR", SWTPM_DIR), uuid)
+        if not os.path.exists(dest):
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copytree(state, dest, symlinks=True)
+        return ["its TPM's state kept (a Windows guest may still ask for its BitLocker recovery key once, since the firmware is this machine's)"]
+    return ["its TPM starts empty (the old system's state was not found): BitLocker asks for its recovery key once"]
 
 
 def read_apps():
@@ -571,12 +716,25 @@ class AdoptMixin:
                         doms = read_libvirt_root(d)
                         os.makedirs(NVRAM_KEPT, exist_ok=True)
                         for x in doms:
+                            safe = re.sub(r"[^A-Za-z0-9._-]", "_", x["name"])
                             if x["nvram"]:
-                                keep = os.path.join(NVRAM_KEPT, re.sub(r"[^A-Za-z0-9._-]", "_", x["name"]) + ".fd")
+                                keep = os.path.join(NVRAM_KEPT, safe + ".fd")
                                 shutil.copyfile(x["nvram"], keep)
                                 x["nvram"] = keep
+                            # Its TPM's state, copied out before the image
+                            # is closed: a Windows guest's BitLocker is
+                            # sealed to it.
+                            if x.get("tpm"):
+                                keep = os.path.join(TPM_KEPT, safe)
+                                shutil.rmtree(keep, ignore_errors=True)
+                                shutil.copytree(x["tpm"], keep, symlinks=True)
+                                x["tpm"] = keep
                         got["vms"] = doms
-                        said.append(f"VMs: {len(doms)} defined, {sum(1 for x in doms if x['autostart'])} started with the machine")
+                        got["vm_networks"] = read_libvirt_networks(d)
+                        got["vfio"] = sorted({str(a).lower() for a in (spec.get("vfio") or []) if isinstance(a, str)
+                                              and re.fullmatch(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]", a)})[:32]
+                        said.append(f"VMs: {len(doms)} defined, {sum(1 for x in doms if x['autostart'])} started with the machine"
+                                    + (f", {sum(1 for x in doms if x.get('tpm'))} with a TPM's state" if any(x.get("tpm") for x in doms) else ""))
                 finally:
                     self._unmount_image(job, d)
             got["said"] = said
@@ -617,16 +775,28 @@ class AdoptMixin:
                 say(f"the network {name}: {subnet} on {lan}, each container at its own address (this machine cannot reach them there, other machines can)\n")
             return ("succeeded", 0) if rc == 0 else ("failed", rc)
         # define-vms: each named domain of what read-apps kept, as this machine runs it.
+        from . import vmhw
         from .vms import lan_iface, ovmf
-        doms = {x["name"]: x for x in read_apps().get("vms") or []}
+        apps = read_apps()
+        doms = {x["name"]: x for x in apps.get("vms") or []}
         names = [str(n) for n in (cfg.get("names") or []) if isinstance(n, str)][:64]
         if not names or not shutil.which("virsh"):
             say("refused: name the VMs to define, on a machine with libvirt (the VM host feature)\n")
             return "failed", 64
-        have = {n.strip() for n in subprocess.run(["virsh", "-c", "qemu:///system", "list", "--all", "--name"], capture_output=True, text=True,
+        virsh = ["virsh", "-c", "qemu:///system"]
+        have = {n.strip() for n in subprocess.run(virsh + ["list", "--all", "--name"], capture_output=True, text=True,
                                                   timeout=30, check=False).stdout.splitlines() if n.strip()}
         emulator = shutil.which("qemu-system-x86_64") or ""
         pair, lan, bad = ovmf(), lan_iface(), []
+        oldnets = {x["name"]: x for x in apps.get("vm_networks") or []}
+        bybridge = {x["bridge"]: x["name"] for x in oldnets.values() if x.get("bridge")}
+        want_nets, pci_wanted = set(), False
+        for n in names:
+            if n in doms and n not in have:
+                want_nets |= domain_networks(doms[n]["xml"], bybridge, set(oldnets))
+                pci_wanted = pci_wanted or "type='pci'" in doms[n]["xml"].replace('"', "'")
+        for net in sorted(want_nets):
+            say(ensure_network(self, job, virsh, oldnets[net]) + "\n")
         for n in names:
             x = doms.get(n)
             if not x:
@@ -637,31 +807,34 @@ class AdoptMixin:
                 say(f"{n}: defined here already, left as it is\n")
                 continue
             nv = os.path.join(NVRAM_DIR, re.sub(r"[^A-Za-z0-9._-]", "_", n) + "_VARS.fd")
-            xml, said = rewrite_domain(x["xml"], emulator, pair, nv, lan)
+            xml, said = rewrite_domain(x["xml"], emulator, pair, nv, lan, bybridge)
             if pair and "<loader" in x["xml"]:
                 os.makedirs(NVRAM_DIR, exist_ok=True)
-                # The old variables where they fit this firmware (the same
-                # size), else a fresh copy: its boot entries are then made
-                # again from the disk, which a guest's fallback loader does.
-                old = x.get("nvram") or ""
-                if old and os.path.getsize(old) == os.path.getsize(pair[1]):
-                    shutil.copyfile(old, nv)
-                else:
-                    shutil.copyfile(pair[1], nv)
-                    said.append("its UEFI variables start fresh (the old ones are another firmware's size)")
+                said.append(carry_vars(x.get("nvram") or "", pair[1], nv))
+            said += carry_tpm(x, vmhw.tpm_here())
             with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
                 f.write(xml)
             try:
-                rc = self._sh(job, ["virsh", "-c", "qemu:///system", "define", f.name], timeout=60)
+                rc = self._sh(job, virsh + ["define", f.name], timeout=60)
             finally:
                 os.unlink(f.name)
             if rc != 0:
                 bad.append(n)
                 continue
             if x.get("autostart"):
-                self._sh(job, ["virsh", "-c", "qemu:///system", "autostart", n], timeout=30)
+                self._sh(job, virsh + ["autostart", n], timeout=30)
                 said.append("starts with the machine, as it did")
-            say(f"{n}: defined; " + "; ".join(said) + "\n")
+            say(f"{n}: defined; " + "; ".join(w for w in said if w) + "\n")
+        # The devices the old system held for its VMs from boot, held here
+        # the same way: from the next restart.
+        if apps.get("vfio"):
+            held, why = vmhw.hold_for_vms(apps["vfio"])
+            if held:
+                say(f"held for VMs from the next restart, as the old system held them: {', '.join(held)}\n")
+            for w in why:
+                say(w + "\n")
+        if pci_wanted and not glob.glob("/sys/kernel/iommu_groups/*"):
+            say("the IOMMU is off on this machine, so a VM given a PCI device will not start: This machine, Features, IOMMU, then restart\n")
         self.hello_again("VMs were defined")
         return ("succeeded", 0) if not bad else ("failed", 1)
 

@@ -92,5 +92,90 @@ class Rewrite(unittest.TestCase):
         self.assertEqual(len(said), 3)
 
 
+U = "0f3a1b2c-1111-2222-3333-444455556666"
+WIN = (f"<domain type='kvm'><name>Windows 11</name><uuid>{U}</uuid><os><loader>/x/OVMF_CODE.fd</loader></os>"
+       "<devices><interface type='bridge'><mac address='52:54:00:aa:bb:cc'/><source bridge='virbr0'/></interface>"
+       "<tpm model='tpm-tis'><backend type='emulator' version='2.0'/></tpm></devices></domain>")
+
+
+class Settings(unittest.TestCase):
+    """R163 step 16: what an adopted VM keeps that this machine can honor."""
+    def test_its_tpm_state_is_found_wherever_the_old_system_kept_it(self):
+        root = tempfile.mkdtemp()
+        os.makedirs(f"{root}/qemu")
+        os.makedirs(f"{root}/swtpm/{U}/tpm2")
+        open(f"{root}/swtpm/{U}/tpm2/tpm2-00.permall", "wb").write(b"state")
+        open(f"{root}/qemu/Windows 11.xml", "w").write(WIN)
+        got = adopt.read_libvirt_root(root)
+        self.assertEqual(got[0]["tpm"], f"{root}/swtpm/{U}")
+        self.assertEqual(adopt.tpm_state(root, "not-a-uuid"), "")
+
+    def test_a_nat_network_stays_a_network_and_its_mac_is_kept(self):
+        root = tempfile.mkdtemp()
+        os.makedirs(f"{root}/qemu/networks/autostart")
+        open(f"{root}/qemu/networks/default.xml", "w").write(
+            "<network><name>default</name><forward mode='nat'/><bridge name='virbr0'/><ip address='192.168.122.1' netmask='255.255.255.0'/></network>")
+        open(f"{root}/qemu/networks/autostart/default.xml", "w").write("")
+        nets = adopt.read_libvirt_networks(root)
+        self.assertEqual([(n["name"], n["bridge"], n["autostart"]) for n in nets], [("default", "virbr0", True)])
+        self.assertEqual(adopt.domain_networks(WIN, {"virbr0": "default"}, {"default"}), {"default"})
+        out, said = adopt.rewrite_domain(WIN, "", None, "", "enp3s0", {"virbr0": "default"})
+        out = out.replace('"', "'").replace(" />", "/>")
+        self.assertIn("<interface type='network'><mac address='52:54:00:aa:bb:cc'/><source network='default'/>", out)
+        self.assertNotIn("enp3s0", out, "not moved onto the LAN")
+
+    def test_uefi_variables_carried_into_another_firmwares_store(self):
+        d = tempfile.mkdtemp()
+        tmpl, old, out = f"{d}/VARS_4M.fd", f"{d}/old.fd", f"{d}/new.fd"
+        open(tmpl, "wb").write(b"T" * 64)
+        open(old, "wb").write(b"O" * 32)
+        calls = []
+
+        def run(argv, **_k):
+            calls.append(argv)
+            if "-o" in argv:
+                open(argv[argv.index("-o") + 1], "wb").write(b"N" * 64)
+            return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        from unittest import mock
+        with mock.patch.object(adopt.shutil, "which", return_value="/usr/bin/virt-fw-vars"):
+            said = adopt.carry_vars(old, tmpl, out, run=run)
+        self.assertIn("carried", said)
+        self.assertEqual(open(out, "rb").read(), b"N" * 64)
+        self.assertEqual([c[1:3] for c in calls], [["-i", old], ["-i", tmpl]])
+        with mock.patch.object(adopt.shutil, "which", return_value=None):
+            self.assertIn("start fresh", adopt.carry_vars(old, tmpl, out, run=run))
+        self.assertEqual(open(out, "rb").read(), b"T" * 64)
+        open(old, "wb").write(b"O" * 64)
+        self.assertEqual(adopt.carry_vars(old, tmpl, out, run=run), "", "the same size: the file itself")
+        self.assertEqual(open(out, "rb").read(), b"O" * 64)
+
+    def test_its_tpm_state_goes_where_libvirt_looks_for_it(self):
+        d = tempfile.mkdtemp()
+        os.makedirs(f"{d}/kept/tpm2")
+        open(f"{d}/kept/tpm2/tpm2-00.permall", "wb").write(b"state")
+        x = {"xml": WIN, "tpm": f"{d}/kept"}
+        self.assertIn("no swtpm", adopt.carry_tpm(x, False, f"{d}/swtpm")[0])
+        self.assertIn("kept", adopt.carry_tpm(x, True, f"{d}/swtpm")[0])
+        self.assertTrue(os.path.isfile(f"{d}/swtpm/{U}/tpm2/tpm2-00.permall"))
+        self.assertIn("starts empty", adopt.carry_tpm({"xml": WIN, "tpm": ""}, True, f"{d}/swtpm")[0])
+        self.assertEqual(adopt.carry_tpm({"xml": "<domain/>"}, True), [])
+
+    def test_passthrough_held_from_boot_by_address_and_the_hosts_own_left(self):
+        from unittest import mock
+        vmhw = agentpkg.load("aerieos_agent_adopt_apps").module("vmhw")
+        d = tempfile.mkdtemp()
+        for a in ("0000:01:00.0", "0000:01:00.1", "0000:03:00.0"):
+            os.makedirs(f"{d}/sys/bus/pci/devices/{a}")
+        host = {"pci": [{"addr": "0000:03:00.0", "host": "the host's LAN interface"}]}
+        with mock.patch.object(vmhw, "host_hw", return_value=host):
+            held, why = vmhw.hold_for_vms(["0000:01:00.0", "0000:01:00.1", "0000:03:00.0", "0000:09:00.0", "x"],
+                                          sys_root=f"{d}/sys", path=f"{d}/rules")
+        self.assertEqual(held, ["0000:01:00.0", "0000:01:00.1"])
+        self.assertEqual(len(why), 3)
+        rules = open(f"{d}/rules").read()
+        self.assertIn('KERNEL=="0000:01:00.1", ATTR{driver_override}="vfio-pci"', rules)
+        self.assertNotIn("0000:03:00.0", rules)
+
+
 if __name__ == "__main__":
     unittest.main()

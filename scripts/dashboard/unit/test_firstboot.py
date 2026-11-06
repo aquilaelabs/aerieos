@@ -102,6 +102,29 @@ class Take(unittest.TestCase):
             self.assertEqual(os.readlink(etc / "localtime"), str(Path(d, "zoneinfo", "Europe", "Berlin")))
             self.assertEqual((etc / "timezone").read_text(), "Europe/Berlin\n")
 
+    def test_kernel_arguments_and_features_from_the_machine_it_replaces(self):
+        # R163 step 16: CPUs kept for VMs and devices held for them, as the
+        # old machine booted, from the next restart; the IOMMU turned on
+        # with the node. An argument outside the list is said, not set.
+        with tempfile.TemporaryDirectory() as d:
+            esp = Path(d, "esp", "aerieos"); esp.mkdir(parents=True)
+            cfg = {"format": 1, "machine": {"kernel_args": ["isolcpus=2-5", "pcie_acs_override=downstream,multifunction", "init=/bin/sh"],
+                                            "features": ["iommu", "vmhost", "warpdrive"]}}
+            (esp / "firstboot.json").write_bytes(b"AERIE-FIRSTBOOT-1\n" + json.dumps(cfg).encode() + b"\n")
+            slot = Path(d, "slot"); slot.write_text(f"echo \"$@\" >> {d}/slot.said\n")
+            feats = Path(d, "lib", "features")
+            run = Path(d, "run")
+            r = subprocess.run([sys.executable, TAKE], capture_output=True, text=True, check=False,
+                               env=dict(os.environ, BB_ESP=str(Path(d, "esp")), BB_OS_RUN=str(run), BB_CONTROLLER_ENV=str(Path(d, "none")),
+                                        BB_SLOT=str(slot), BB_OS_FEATURES=str(feats)))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(Path(d, "slot.said").read_text(), "args isolcpus=2-5 pcie_acs_override=downstream,multifunction\n")
+            self.assertEqual(feats.read_text(), "iommu\nvmhost\n")
+            handed = json.loads((run / "firstboot" / "firstboot.json").read_text())["machine"]
+            self.assertIn("from the next restart", handed["kernel_args"])
+            self.assertIn("left out", handed["kernel_args"])
+            self.assertIn("iommu, vmhost", handed["features"])
+
     def test_a_static_address_becomes_the_sticks_own_network_settings(self):
         # R161 step 12: the configuration's network written into the stick's
         # aerieos.env in its 4 KiB, for every boot's network step, and into
