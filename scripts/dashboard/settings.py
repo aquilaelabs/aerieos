@@ -77,6 +77,10 @@ KEYS = {
     # panel and the Nodes tab. True by default: a controller that never
     # went through the setup page is one already set up.
     "setup_done": {"default": True, "kind": "bool", "applied": "now"},
+    # The disks and shares under Other disks and shares that the controller's
+    # backup copies also go to, by their ids (the operator, 6 Nov: a copy off
+    # the machine), besides its own pools.
+    "backup_also": {"default": "", "kind": "text", "shape": "line", "applied": "now"},
     # The home tunnel the controller runs itself (R176, tunnel.py): the
     # public hostname a node off the LAN dials, the tunnel's token from
     # Zero Trust, and an API token with which the hostname's record and the

@@ -288,11 +288,22 @@ function backupSection(){
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
   return `<div class="row stack2" data-group="Backup copies"><div class="grow">
       <div class="sub">${b.on ? `Copies go to ${(b.where || []).map(esc).join(", ")}${b.made_at ? `; the last was written ${esc(ago(b.made_at))} (${esc(humanBytes(b.size || 0))})` : "; none written yet"}.` : "No backup password set: nothing is copied until one is, under Backup."}${(b.failed || []).length ? ` <span class="bad">Not written: ${esc(b.failed.join("; "))}.</span>` : ""}</div>
+      ${(b.other || []).length ? `<div class="field">${lbl("", "Also copied to", "a disk or share under Other disks and shares on the Storage page, so a copy is off this machine; one mounted read-only cannot take one")}
+        ${(b.other || []).map(o => `<label class="ndcap"><input type="checkbox" data-backupalso="${esc(o.id)}"${o.on ? " checked" : ""}${o.ro || !owner ? " disabled" : ""}> ${esc(o.name)} <span class="sub">${esc(o.kind === "smb" ? "SMB share" : o.kind === "nfs" ? "NFS export" : "disk")}${o.ro ? ", read-only" : ""}</span></label>`).join("")}
+        <div class="actbar"><span class="sp"></span><button type="button" data-backupalsosave${owner ? "" : " disabled"}>Save</button></div></div>` : ""}
+      <div class="hint">These copies are the controller: its accounts, the spaces' notebooks and settings, its nodes and keys. The files on your pools are not in them; the Storage page's snapshots and Backups keep those.</div>
       ${rows ? `<div class="rows">${rows}</div>` : ""}
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-backupnow${b.on && owner ? "" : " disabled"}>Back up now</button></div>
     </div></div>`;
 }
 function wireBackup(root){
+  root.querySelectorAll("[data-backupalsosave]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const ids = [...root.querySelectorAll("[data-backupalso]:checked")].map(x => x.dataset.backupalso);
+    busy(b, "Saving");
+    const j = await (await postJSON("/api/settings", {set: {backup_also: ids.join(" ")}})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || (ids.length ? `the next copy also goes to ${ids.length} disk${ids.length === 1 ? "" : "s"} or share${ids.length === 1 ? "" : "s"} off this machine` : "copies stay on this machine's pools"), !!j.error);
+    await loadBackup();
+  }));
   root.querySelectorAll("[data-backupnow]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Writing");
     const j = await (await postJSON("/api/backup", {action: "now"})).json().catch(() => ({error: "no answer"}));
@@ -429,7 +440,7 @@ function wireMove(root){
     const j = await (await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
     unbusy(b, "Download a backup");
     if (j.error){ notify(j.error, true); return; }
-    const typed = await askText(`The backup's token, shown once and never kept here:\n\n${j.token}\n\nRecord it: the backup opens only under it, on a new controller's first setup, and whoever holds the file and the token holds this controller's data${on("install_key") ? " and its install key" : ""}. Nothing is armed, so no node hears of it.\n\nType the token's last four characters to download the file.`,
+    const typed = await askText(`The backup's token, shown once and never kept here:\n\n${j.token}\n\nRecord it: the backup opens only under it, on a new controller's first setup, and whoever holds the file and the token holds this controller's data${on("install_key") ? " and its install key" : ""}. Nothing is armed, so no node hears of it. It is the controller and what was ticked, not the files on your pools: the Storage page's snapshots and Backups keep those.\n\nType the token's last four characters to download the file.`,
                                 {title: "Record the backup's token", verb: "Download", label: "The token's last four characters"});
     if (typed === null || typed === undefined){ notify("not downloaded: press Download a backup again for a new one under a new token", true); return; }
     if (String(typed).trim() !== j.token.slice(-4)){ notify("those are not the token's last four characters: press Download a backup again", true); return; }
