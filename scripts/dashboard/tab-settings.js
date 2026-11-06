@@ -391,7 +391,7 @@ function moveLandBox(ld, inWalk = false, heldSaid = false){
       ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
       <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
         <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".bbmove"${ld.held ? " disabled" : ""}></label></div>
+        <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".aeriemove,.bbmove"${ld.held ? " disabled" : ""}></label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>`;
 }
 function wireMove(root){

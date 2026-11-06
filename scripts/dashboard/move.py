@@ -72,6 +72,11 @@ open_with = None
 checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
 
 
+
+# What a bundle is called: .aeriemove, and .bbmove from an install older than the name.
+BUNDLE_SUFFIXES = (".aeriemove", ".bbmove")
+
+
 def _key_beside_state(key, state_dir):
     """A carried install key where an install with no secrets folder keeps
     its own: the server hands this over to installkey.landed (B599)."""
@@ -562,7 +567,9 @@ def prepare(principal, to, repos=False, carry_key=False, stores=None):
     # nodes' knocks from the key kept here, under the state that moved.
     with _lock:
         d = _load()
-        for old in (STATE / "move").glob("*.bbmove"):
+        for old in (STATE / "move").glob("*"):
+            if old.suffix not in BUNDLE_SUFFIXES:
+                continue
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         d.update(made_at=made_at, to=to, bundle="", size=0, used=False, repos=bool(repos), carries_key=bool(carry_key),
@@ -588,7 +595,9 @@ def pack_bundle():
     out_dir.mkdir(parents=True, exist_ok=True)
     # Named to the millisecond: two packs in one second are two bundles.
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
-    name = f"builderbot-move-{stamp}.bbmove"
+    # .aeriemove since the name moved; a .bbmove an older install packed
+    # still lands (only its contents are read), and is cleaned up as one.
+    name = f"aerieos-move-{stamp}.aeriemove"
     tmp = out_dir / (name + ".partial")
 
     def manifest_of(counts):
@@ -605,7 +614,9 @@ def pack_bundle():
     os.replace(tmp, out_dir / name)
     with _lock:
         d = _load()
-        for old in out_dir.glob("*.bbmove"):
+        for old in out_dir.glob("*"):
+            if old.suffix not in BUNDLE_SUFFIXES:
+                continue
             if old.name != name:
                 old.unlink(missing_ok=True)
         d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
@@ -621,7 +632,9 @@ def forget(principal):
             return {"error": "no move is prepared"}
         if d.get("moved_to"):
             return {"error": "this controller has moved; the move is not withdrawn after it landed"}
-        for old in (STATE / "move").glob("*.bbmove"):
+        for old in (STATE / "move").glob("*"):
+            if old.suffix not in BUNDLE_SUFFIXES:
+                continue
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         _save(d)

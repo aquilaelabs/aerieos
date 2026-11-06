@@ -30,7 +30,7 @@ export const steps = {
     await tall('73-walk-land', 2400);
     console.log('land enabled', await page.$eval('[data-moveland]', b => !b.disabled));
     await page.fill('#landTok', readFileSync(new URL('run/move-token.txt', import.meta.url), 'utf8').trim());
-    await page.setInputFiles('#landFile', new URL('run/moved.bbmove', import.meta.url).pathname);
+    await page.setInputFiles('#landFile', new URL('run/moved.aeriemove', import.meta.url).pathname);
     await page.click('[data-moveland]'); await sleep(1200);
     const m = await page.$('.modal:not([hidden])'); if (!m) throw new Error('Land asked nothing');
     console.log((await m.innerText()).replace(/\s+/g, ' ').slice(0, 400));
@@ -76,7 +76,7 @@ export const steps = {
     writeFileSync(new URL('run/move-token.txt', import.meta.url), token || '');
     console.log('token', token ? `${token.length} characters` : 'NOT SHOWN');
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('a[href="/api/move-bundle"]')]);
-    await dl.saveAs(new URL('run/moved.bbmove', import.meta.url).pathname);
+    await dl.saveAs(new URL('run/moved.aeriemove', import.meta.url).pathname);
     console.log('bundle', dl.suggestedFilename());
   },
   async pageshots({ page, BASE }){

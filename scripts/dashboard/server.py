@@ -251,7 +251,7 @@ MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move to
   <input id="t" name="token" type="password" autocomplete="off" required>
   <label for="f">The old controller's address, to pull the bundle from it</label>
   <input id="f" name="from" type="url" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false">
-  <label for="b">...or its bundle, downloaded there (builderbot-move-DATE.bbmove)</label>
+  <label for="b">...or its bundle, downloaded there (aerieos-move-DATE.aeriemove)</label>
   <input id="b" name="bundle" type="file">
   <button type="submit">Move it here</button>
   <p class="note"><a href="/">Not moving one: make the first account instead</a>.</p>"""
