@@ -1595,6 +1595,13 @@ def _census(c):
                                             "disks": [{"id": pw(d.get("id"), 120), "state": pw(d.get("state"), 12)}
                                                       for d in (v.get("disks") or [])[:64] if isinstance(d, dict)]}
                                            for v in (pl.get("vdevs") or [])[:32] if isinstance(v, dict)]})
+    # ...and the pools on its disks another machine made (R163 step 1).
+    if isinstance(c.get("pools_importable"), list):
+        out["pools_importable"] = [{"name": str(x["name"]), "id": str(x.get("id") or "")[:24] if str(x.get("id") or "").isdigit() else "",
+                                    "state": re.sub(r"[^\w -]", "", str(x.get("state") or ""))[:16],
+                                    "said": re.sub(r"[^\w .,:;/()'@+-]", "", str(x.get("said") or ""))[:200]}
+                                   for x in c["pools_importable"][:16]
+                                   if isinstance(x, dict) and re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", str(x.get("name") or ""))]
     # ...and its snapshots per pool (R162 step 5): counts by kind, the newest.
     if isinstance(c.get("snapshots"), dict):
         out["snapshots"] = {}
@@ -3813,7 +3820,7 @@ def smb_shares_for(uid):
     return None
 
 
-POOL_ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy")
+POOL_ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy", "import")
 POOL_LAYOUTS = {"single": 1, "mirror": 2, "raidz1": 3, "raidz2": 4}
 
 
@@ -3847,7 +3854,7 @@ def node_storage_pool(principal, node_id, req):
     # /mnt/NAME is where it mounts: not the array's folders, the other
     # mounts', or what disks adopted from another system are found under.
     held = {m.get("where", "").rsplit("/", 1)[-1] for m in ((rep.get("adopted") or {}).get("mounts") or [])}
-    if action == "create" and (re.fullmatch(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)", name) or name in held):
+    if action in ("create", "import") and (re.fullmatch(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)", name) or name in held):
         return {"error": f"/mnt/{name} means something else on this machine (the array's folders, the other mounts', or adopted disks): pick another name"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
@@ -3885,6 +3892,14 @@ def node_storage_pool(principal, node_id, req):
         if str(req.get("confirm") or "") != name:
             return {"error": "destroying a pool takes its name typed again"}
         cfg["confirm"] = name
+    elif action == "import":
+        # A pool another machine made (R163 step 1), as the census lists it.
+        if "pools_importable" not in rep:
+            return {"error": f"{n['name']}'s agent is from before importing a pool: it updates itself within the hour"}
+        found = next((x for x in rep.get("pools_importable") or [] if x.get("name") == name), None)
+        if not found:
+            return {"error": f"no pool called {name} is waiting to be imported on {n['name']}"}
+        cfg["id"] = found.get("id") or ""
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-pool", "config": cfg, "timeout": 900})
     if r.get("ok"):
         audit(principal, "storage-pool", node_id, {"job": r["job"], **cfg})

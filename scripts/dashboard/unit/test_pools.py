@@ -6,6 +6,7 @@ to their shape and queues the job for the own machine alone. Snapshots
 (step 5): counted by kind for the census, taken with the oldest of the
 kind pruned, rolled back only with the name typed again, and scheduled as
 a system schedule the Storage page lists per pool."""
+import json
 import os
 import sys
 import tempfile
@@ -100,6 +101,34 @@ class TheAgent(unittest.TestCase):
              mock.patch.object(self.pm, "by_id", side_effect=lambda n: f"/dev/disk/by-id/ata-{n}"):
             state, code = self.A()._apply_storage_pool(job, cfg)
         return state, code, job.text()
+
+    def test_a_pool_another_machine_made_is_imported_as_it_is_and_again_after_a_boot(self):
+        # R163 step 1: zpool import's list read; imported with no -f and no
+        # upgrade, its datasets under /mnt, kept out of zpool.cache and
+        # imported again by the minute pass; export forgets it.
+        found = ("   pool: nas\n     id: 1234567890\n  state: ONLINE\n action: The pool can be imported using its name or numeric identifier.\n"
+                 " config:\n\n\tnas  ONLINE\n\n   pool: Bad Name\n     id: 99\n  state: ONLINE\n")
+        with mock.patch.object(self.pm, "_out", return_value=found), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zpool"):
+            got = self.pm.importable_now()
+        self.assertEqual(got, [{"name": "nas", "id": "1234567890", "state": "online", "said": "The pool can be imported using its name or numeric identifier."}])
+        rec = os.path.join(tempfile.mkdtemp(), "imported.json")
+        with mock.patch.dict(os.environ, {"BB_POOLS_IMPORTED": rec}):
+            state, code, text = self.run_job({"pool": "import", "name": "nas", "id": "1234567890"})
+            self.assertEqual(state, "succeeded", text)
+            self.assertEqual(self.ran[-1], ["/usr/sbin/zpool", "import", "-o", "altroot=/mnt", "-o", "cachefile=none", "1234567890", "nas"])
+            self.assertFalse([a for a in self.ran if "-f" in a or "upgrade" in a])
+            self.ran.clear()
+            with mock.patch.object(self.pm, "pools_now", return_value=[]), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zpool"), \
+                 mock.patch.object(self.pm.os, "geteuid", return_value=0), mock.patch.object(self.pm.subprocess, "run") as run:
+                self.A().pools_pass()
+            self.assertEqual(run.call_args[0][0][-2:], ["1234567890", "nas"])
+            state, code, text = self.run_job({"pool": "import", "name": "tank"})
+            self.assertIn("is here already", text)
+            with open(rec, "w") as f:
+                json.dump([{"name": "nas", "id": "1"}, {"name": "tank", "id": "2"}], f)
+            self.run_job({"pool": "export", "name": "tank"})
+            with open(rec) as f:
+                self.assertEqual([x["name"] for x in json.load(f)], ["nas"])
 
     def test_a_mirror_is_made_of_disks_that_hold_nothing_by_their_links(self):
         state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"]})
@@ -218,6 +247,23 @@ class TheController(unittest.TestCase):
         import nodes
         nodes.configure(state=tempfile.mkdtemp())
         self.assertEqual(nodes.node_storage_pool("user:t", "n_none", {"pool": "scrub", "name": "tank"})["error"], "no such node")
+
+    def test_a_pool_to_import_is_one_the_census_lists(self):
+        import nodes
+        got = nodes._census({"pools_importable": [{"name": "nas", "id": "123", "state": "ONLINE", "said": "ok"}, {"name": "Bad"}, {"name": "x", "id": "1;rm"}]})
+        self.assertEqual(got["pools_importable"], [{"name": "nas", "id": "123", "state": "ONLINE", "said": "ok"}, {"name": "x", "id": "", "state": "", "said": ""}])
+        n = {"id": "n1", "name": "box", "kind": "agent", "live": True, "config": {"own": True},
+             "reported": {"administers": True, "features": {"storage": {"zfs": True}}, "pools": [], "disks": [], "pools_importable": [{"name": "nas", "id": "123"}]}}
+        with mock.patch.object(nodes, "node", return_value=n), mock.patch.object(nodes, "own_machine", return_value=True), \
+             mock.patch.object(nodes, "node_locked", return_value=""), mock.patch.object(nodes, "system_job_for", return_value=None), \
+             mock.patch.object(nodes, "audit"), mock.patch.object(nodes, "job_add", side_effect=lambda *a: {"ok": True, "job": "j1", "spec": a[3]}) as add:
+            self.assertIn("waiting to be imported", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "data2"})["error"])
+            self.assertIn("means something else", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "user"})["error"])
+            r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})
+            self.assertTrue(r.get("ok"), r)
+            self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123"})
+            del n["reported"]["pools_importable"]
+            self.assertIn("from before importing", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})["error"])
 
     def test_the_census_keeps_each_pools_snapshots_to_their_shape(self):
         import nodes

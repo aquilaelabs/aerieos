@@ -349,7 +349,15 @@ function storagePools(n){
             helpIcon("Kept here, the disks are unreadable pulled from this machine, but the machine as a whole opens them. Not kept, the pool and its shares wait after every boot until the passphrase is typed here, which also protects against the whole machine taken.")}</div>
         </div></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stpool="create">Make the pool</button></div></div>`;
-  const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${form}`;
+  // Pools another machine made, found on its disks (R163 step 1): each
+  // imported as it is, never upgraded, its datasets under /mnt.
+  const found = n.pools_importable || [];
+  const importRows = found.map(p => `<div class="row stack2 stpoolfound" data-poolfound="${esc(p.name)}"><div class="grow">
+      <div class="name">${esc(p.name)} <span class="pill${p.state === "online" ? "" : " warn"}">${esc(p.state || "unknown")}</span></div>
+      ${p.said ? `<div class="sub dim">${esc(p.said)}</div>` : ""}</div>${admin && !why
+        ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}" title="imported as it is, never upgraded; its datasets under /mnt">Import</button></span>` : ""}</div>`).join("");
+  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks, made by another machine: importing one keeps it as it is (nothing upgraded, so the other machine can take it back), its datasets under /mnt. One the other machine did not export is refused rather than forced.</div><div class="rows">${importRows}</div></div>` : "";
+  const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${importBox}${form}`;
   const sick = pools.filter(p => !["online", ""].includes(p.health)).length;
   return docSection("storage", "pools", "Pools", pools.length ? `${pools.length}${sick ? `, ${sick} not online` : ""}` : "", body, {cls: sick ? "bad" : ""});
 }
@@ -389,16 +397,13 @@ function wireStoragePools(root, n){
       }
       const names = body.disks.map(d => { const x = (n.disks || []).find(y => y.name === d); return x ? `${d} (${x.model || "unnamed"}, ${humanBytes((x.size_mb || 0) * 1048576)}, serial ${x.serial || "none"})` : d; });
       if (!await askYes(`Make the pool ${body.name} as a ${body.layout} of:\n\n${names.join("\n")}\n\nEverything on these disks is gone.${body.encrypt ? `\n\nEncrypted, its key ${body.keep_key ? "kept on this machine" : "asked for after every boot"}; nothing recovers it without the passphrase.` : ""}`, {title: "Make the pool?", verb: "Make it", danger: true})) return;
-    } else if (act === "verify"){
-      const how = await ask({title: "Check the parity?", text: "Every block of every data disk is read back against the parity: hours for a large array, the disks busy throughout. What differs is counted; it is corrected only if you ask for that here, and the count is said before anything is written.",
-                             choices: [{label: "Check", value: "check"}, {label: "Check and correct", value: "correct"}]});
-      if (!how) return;
-      body.correct = how === "correct";
     } else if (act === "destroy"){
       if (!await askYes(`Destroy the pool ${body.name}?\n\nEverything on it is gone; its disks hold nothing after.`, {title: "Destroy the pool?", verb: "Destroy it", danger: true})) return;
       body.confirm = body.name;
     } else if (act === "export"){
       if (!await askYes(`Export the pool ${body.name}? Its datasets are unmounted and the disks let go, to import elsewhere or here again.`, {title: "Export the pool?", verb: "Export"})) return;
+    } else if (act === "import"){
+      if (!await askYes(`Import the pool ${body.name}?\n\nIt is taken as it is, never upgraded, so the machine that made it can take it back; its datasets appear under /mnt, and it comes back after every boot until it is exported.`, {title: "Import the pool?", verb: "Import"})) return;
     }
     busy(b, act === "scrub" ? "Scrubbing" : "Working");
     const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
@@ -609,6 +614,11 @@ function wireStorageArray(root, n){
                                 choices: free.map(d => ({label: say([d.name])[0], value: d.name}))});
       if (!choice) return;
       body.new = choice;
+    } else if (act === "verify"){
+      const how = await ask({title: "Check the parity?", text: "Every block of every data disk is read back against the parity: hours for a large array, the disks busy throughout. What differs is counted; it is corrected only if you ask for that here, and the count is said before anything is written.",
+                             choices: [{label: "Check", value: "check"}, {label: "Check and correct", value: "correct"}]});
+      if (!how) return;
+      body.correct = how === "correct";
     } else if (act === "destroy"){
       const typed = await askText("Destroy the array?\n\nIt is unmounted and forgotten; every data disk keeps its files, readable on any Linux, and the parity disks are left as they are.", {verb: "Destroy", label: "Type array to go on"});
       if (typed === null || typed === undefined) return;

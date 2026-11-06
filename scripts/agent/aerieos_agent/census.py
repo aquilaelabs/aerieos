@@ -48,7 +48,7 @@ from . import vmhw
 from .disks import disks_now
 from .osimage import kept_boot, kept_list, os_release, stick_status
 from .shares import shares_now
-from .pools import pools_now, snapshots_now
+from .pools import importable_now, pools_now, snapshots_now
 from .array import array_now
 from .adopt import adopted_now, apps_now
 from .console import console_now
@@ -413,6 +413,8 @@ def census(state):
         "shares": shares_now(),
         # ...and its ZFS pools (R162 step 1), as zpool says them.
         "pools": pools_now(),
+        # ...and the pools on its disks another machine made, not imported here (R163 step 1).
+        "pools_importable": importable_now(),
         # ...and each pool's snapshots (R162 step 5), counted by kind, the newest named.
         "snapshots": snapshots_now(),
         # ...and its array (R162 step 2): the disks by slot, their room, and

@@ -140,6 +140,19 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     const out = { sects: [...document.querySelectorAll('.storagetab details[data-sect]')].map(x => x.dataset.sect),
                   text: sect?.textContent.replace(/\s+/g, ' ') || '', btn: !!sect?.querySelector('[data-starray="verify"]'),
                   sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
+    // Pressing it asks first: Check, or Check and correct.
+    sect.querySelector('[data-starray="verify"]').click();
+    let dlg = null;
+    for (let i = 0; i < 20 && !dlg; i++){ await new Promise(r => setTimeout(r, 100)); dlg = document.querySelector('.modal.askdlg:not([hidden])'); }
+    out.asks = [...(dlg?.querySelectorAll('button') || [])].map(b => b.textContent.trim());
+    dlg?.querySelector('button:last-child')?.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await new Promise(r => setTimeout(r, 200));
+    // A pool another machine made, found on the disks (R163 step 1).
+    const n = (storageList || []).find(x => x.name === 'diskbox');
+    n.zfs = true; n.pools_importable = [{ name: 'tank', id: '1234', state: 'online', said: 'The pool can be imported using its name or numeric identifier.' }];
+    storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+    out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
     const { verify, ...older } = ARR;
     lay(older);
     // Until the redraw without it: the section is there throughout.
@@ -153,6 +166,8 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(got.btn && /parity check running, 45%, 120 MB\/s/.test(got.text) && /Last parity check.*3 differed, 2 corrected, 1 could not be/.test(got.text) && got.sched.includes('verify'),
      `the array offers Check parity, says its progress and its last result, and schedules it (${got.text.slice(0, 220) || JSON.stringify(got)})`);
   ok(got.older, 'an agent from before Check parity is not offered it');
+  ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
+  ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
 }
 await api('/api/v1/nodes', { action: 'retire', id: minted.id });
 

@@ -316,7 +316,14 @@ scrub, errors), each with Scrub, Export and Destroy (which takes the pool's
 name again); and a form for a new pool: a name, a layout (a mirror, raidz2,
 raidz1 or a single disk) and the disks it takes, each named by model, size
 and serial, those that hold something taken only with wipe ticked, and the
-whole said again before anything is written. Every press is a system job
+whole said again before anything is written. A pool another machine made
+(a TrueNAS box's, or any ZFS pool) whose disks are here is listed under the
+pools as found, with **Import**: it is taken as it is, never forced and
+never upgraded, so the machine that made it can take it back, its datasets
+under `/mnt` (the pool's own mountpoints under that root, as such a NAS
+mounts them), and imported again after every boot until it is exported;
+one the other machine did not export is refused with zpool's reason.
+Every press is a system job
 the machine's root agent runs from its table (`zpool` on the disks'
 `/dev/disk/by-id` links), never the controller's account; the system disk
 is never offered. Nothing here is on another node: pools are the controller's

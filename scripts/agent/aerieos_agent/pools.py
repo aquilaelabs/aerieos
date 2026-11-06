@@ -11,6 +11,7 @@ kind for the census, and the storage-snapshot job: one taken of the pool's
 every dataset (the oldest of its kind pruned past what is kept), a dataset
 rolled back to one, or one destroyed.
 """
+import json
 import os
 import re
 import shutil
@@ -27,7 +28,12 @@ POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}")
 # (adopt.py), whose containers and VMs look for them by those names.
 POOL_RESERVED = re.compile(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)")
 LAYOUTS = {"single": 1, "mirror": 2, "raidz1": 3, "raidz2": 4}
-ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy")
+ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy", "import")
+# Pools another machine made, imported here as they are (R163 step 1): kept
+# under /mnt by their own mountpoints (altroot /mnt, as a NAS that mounts its
+# pools there does), which zpool.cache does not keep, so each is imported
+# again from this record at the agent's minute pass after a reboot.
+IMPORTED = "/etc/builderbot/pools-imported.json"
 MOUNT_ROOT = "/mnt"
 SNAP_KINDS = ("hourly", "daily", "weekly", "manual")
 SNAP_RE = re.compile(r"bb-(hourly|daily|weekly|manual)-(\d{8})-(\d{4})")
@@ -119,6 +125,53 @@ def pools_now():
     return out
 
 
+def importable_now():
+    """[{name, id, state, said}]: the pools zpool import finds on the disks
+    that are not imported here; [] without zpool."""
+    zpool = shutil.which("zpool")
+    if not zpool:
+        return []
+    out, cur = [], None
+    for ln in _out([zpool, "import"], timeout=60).splitlines():
+        m = re.match(r"\s*(pool|id|state|action|status):\s*(.*)$", ln)
+        if not m:
+            continue
+        k, v = m.group(1), m.group(2).strip()
+        if k == "pool":
+            cur = {"name": v[:64], "id": "", "state": "", "said": ""}
+            out.append(cur)
+        elif cur is not None and k == "id" and v.isdigit():
+            cur["id"] = v[:24]
+        elif cur is not None and k == "state":
+            cur["state"] = v.lower()[:16]
+        elif cur is not None and k in ("action", "status") and not cur["said"]:
+            cur["said"] = v[:200]
+    return [x for x in out if POOL_RE.fullmatch(x["name"]) and x["id"]][:16]
+
+
+def _imported():
+    try:
+        with open(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), encoding="utf-8") as f:
+            d = json.load(f)
+        return [x for x in d if isinstance(x, dict) and POOL_RE.fullmatch(str(x.get("name") or ""))] if isinstance(d, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _imported_set(rows):
+    path = os.environ.get("BB_POOLS_IMPORTED", IMPORTED)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".new", "w", encoding="utf-8") as f:
+        json.dump(rows, f)
+    os.replace(path + ".new", path)
+
+
+def import_argv(zpool, name, pid):
+    """A pool imported as it is: no -f, never upgraded, its mountpoints
+    under /mnt, kept out of zpool.cache (the minute pass imports it again)."""
+    return [zpool, "import", "-o", f"altroot={MOUNT_ROOT}", "-o", "cachefile=none", pid or name, name]
+
+
 def _snapshots():
     """[(dataset, name, kind, at, used_bytes)] for every bb- snapshot zfs
     lists, oldest first; [] without zfs."""
@@ -200,6 +253,18 @@ class PoolsMixin:
             subprocess.run([zfs, "mount", "-a"], capture_output=True, timeout=120, check=False)
             log(f"pools: {p['name']} unlocked")
             self.hello_again(f"the pool {p['name']} unlocked")
+
+    def pools_pass(self):
+        """Once a minute: a pool imported from another machine that is not
+        imported now (after a reboot) imported again, as it was."""
+        rows = _imported()
+        zpool = shutil.which("zpool")
+        if not rows or not zpool or os.geteuid() != 0:
+            return
+        have = {p["name"] for p in pools_now()}
+        for x in rows:
+            if x["name"] not in have:
+                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or "")), capture_output=True, timeout=120, check=False)
 
     def _apply_storage_snapshot(self, job, cfg):
         say = job.say
@@ -374,6 +439,20 @@ class PoolsMixin:
                 return "failed", 66
             say(f"pool export {name}: its datasets unmounted, the disks left as they are\n")
             rc = self._sh(job, [zpool, "export", name], timeout=600)
+            if rc == 0 and any(x["name"] == name for x in _imported()):
+                _imported_set([x for x in _imported() if x["name"] != name])
+        elif action == "import":
+            pid = str(cfg.get("id") or "")
+            if name in have or POOL_RESERVED.fullmatch(name) or os.path.ismount(f"{MOUNT_ROOT}/{name}"):
+                say(f"refused: a pool called {name} is here already, or {MOUNT_ROOT}/{name} means something else here\n")
+                return "failed", 66
+            if pid and not re.fullmatch(r"\d{1,24}", pid):
+                say("refused: a pool's id is its number, as zpool import lists it\n")
+                return "failed", 64
+            say(f"pool import {name}: as it is, never upgraded, its datasets under {MOUNT_ROOT}; a pool another machine did not export is refused, not forced\n")
+            rc = self._sh(job, import_argv(zpool, name, pid), timeout=600)
+            if rc == 0:
+                _imported_set([x for x in _imported() if x["name"] != name] + [{"name": name, "id": pid}])
         else:
             if name not in have:
                 say(f"refused: no pool called {name} here\n")
