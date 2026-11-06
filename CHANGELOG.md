@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- A VM can have a TPM 2.0, ticked in New VM or its Hardware dialog, so Windows 11 installs; VM host now installs swtpm for it (431cb49)
+
 ### Fixed
 
 - Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (f492c67)
