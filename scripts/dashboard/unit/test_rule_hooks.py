@@ -180,8 +180,12 @@ class Store(unittest.TestCase):
             g = rules.refusing("alpha", line)
             self.assertEqual(g and g[0]["name"], "notified-not-waited", line)
             self.assertIsNone(rules.refusing("alpha", line, background=True), line)
-        for line in ("grep -n FAIL gate.log", "grep -c passed run.log", "tail -8 /tmp/t/tasks/b1.output"):
+        for line in ("grep -n FAIL gate.log", "grep -c passed run.log", "tail -8 /tmp/t/tasks/b1.output",
+                     # A search for the word is a search (B699).
+                     "grep -n '\\[exited\\]' -r scripts/dashboard/*.js", "grep -n exited scripts/dashboard/rules.py"):
             self.assertIsNone(rules.refusing("alpha", line), line)
+        for line in ("while ! grep -q exited f.output; do sleep 5; done", "for i in 1 2 3; do grep -q exited f && break; sleep 5; done"):
+            self.assertEqual((rules.refusing("alpha", line) or [{}])[0].get("name"), "notified-not-waited", line)
 
     def test_what_claude_is_told_is_context_alone(self):
         rules.add("alpha", "agent-compat", "Add, do not change.", by="you", words="agent")

@@ -250,14 +250,15 @@ ALWAYS = [
     # ...and the wait for one is not a foreground loop either (the operator,
     # 16 Oct: a session went unresponsive while it watched a gate's log).
     # The waiter's own test is the shape read: a grep for "exited", the line
-    # a background run's notification file ends on.
+    # a background run's notification file ends on, as a loop's test or in
+    # its body; a grep for the word on its own is a search, and runs (B699).
     {"name": "notified-not-waited",
      "text": "A run started in the background says when it ends: its notification arrives by"
              " itself. Never wait for it in the foreground with a loop over its log (until grep"
              " ... exited; do sleep): that holds every reply as a foreground run does, so a"
              " message sent meanwhile goes unread until it ends. Go on with other work, or end the"
              " turn, and act on the notification.",
-     "refuse": ["grep *exited*"],
+     "refuse": [f"{loop} grep *exited*" for loop in ("until", "while", "do")],
      "foreground": True},
     # git's network half goes through aerie git (the operator, 27 Oct): the
     # controller holds the credential and the project's git policy and its
