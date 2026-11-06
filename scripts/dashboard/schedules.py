@@ -329,6 +329,13 @@ def save(req, by):
     with _lock:
         d = _load()
         rows = d["schedules"]
+        # One schedule per array verb on a node: a new one for a verb that
+        # has one changes that one (the takeover's mover after an earlier).
+        sysj = req.get("system") if isinstance(req.get("system"), dict) else {}
+        if not sid and sysj.get("apply") == "storage-array":
+            verb = (sysj.get("config") or {}).get("array")
+            sid = next((k for k, r in rows.items() if r.get("node") == req.get("node") and (r.get("system") or {}).get("apply") == "storage-array"
+                        and ((r.get("system") or {}).get("config") or {}).get("array") == verb), "")
         if sid:
             was = rows.get(sid) if sid != SCAN_ID else None
             if not was:

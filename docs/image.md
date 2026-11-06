@@ -292,7 +292,8 @@ its sync, scrub and Check parity. Each share keeps its places as the old
 system had them: where its new files land (a pool, or the array) and what
 the mover does with them, from what to what (a pool to the array, the
 array to a pool, one pool to another, or nothing). They are set before the
-takeover, starting from the old system's own settings, and changed later from each share's Edit on the Storage page. A new
+takeover, starting from the old system's own settings, with when the mover
+runs, and changed later from each share's Edit on the Storage page. A new
 file lands on the first pool that holds its share's folder and on the data
 disks where none does, so the agent keeps each share's folder where it
 lands and removes its empty folders elsewhere; a folder with anything in it

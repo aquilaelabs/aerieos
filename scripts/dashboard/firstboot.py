@@ -246,6 +246,21 @@ def mover_moves(pools, cfg=None):
     return list(out.values())[:128]
 
 
+def _cron_words(cron):
+    """A timetable as a person says it, or "" for none."""
+    if not cron:
+        return ""
+    import schedules
+    return schedules.words(cron)
+
+
+def mover_cron(cfg=None):
+    """When the old system's mover ran, as five cron fields, or ""."""
+    cfg = kept_config() if cfg is None else cfg
+    c = str(((cfg or {}).get("sharing") or {}).get("mover") or "").strip()
+    return c if re.fullmatch(r"[0-9*/,-]+( [0-9*/,-]+){4}", c) else ""
+
+
 def met(waiting, done, reported):
     """The waits the machine has met since the report was written (B634):
     the array once a data disk the plan named is mounted, the pools once
@@ -289,8 +304,10 @@ def view(reported=None):
             for k, v in (dk.get("networks") or {}).items() if isinstance(v, dict) and v.get("subnet")}
     aw = adopt_want(cfg)
     return {**{k: d.get(k) for k in ("at", "done", "waiting", "failed")}, "adopt": aw,
-            # Each share's places for the takeover to start from.
+            # Each share's places for the takeover to start from, and when
+            # the old system's mover ran.
             "moves": mover_moves([p["name"] for p in (aw or {}).get("want", {}).get("pools") or []], cfg) if aw else [],
+            "mover_cron": mover_cron(cfg), "mover_words": _cron_words(mover_cron(cfg)),
             "shares": {"rows": rows, "notes": notes} if rows or notes else None,
             # Where the old system's containers and VMs are read from, and its
             # networks of fixed addresses (R163 steps 10, 11).

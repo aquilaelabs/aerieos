@@ -115,6 +115,8 @@ class Take(unittest.TestCase):
             {"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}, {"share": "backups", "land": "array", "from": "", "to": ""},
             {"share": "appdata", "land": "cache", "from": "", "to": ""}, {"share": "isos", "land": "fast", "from": "array", "to": "fast"},
             {"share": "elsewhere", "land": "array", "from": "", "to": ""}, {"share": "scratch", "land": "fast", "from": "fast", "to": "cache"}])
+        self.assertEqual((firstboot.mover_cron(cfg), firstboot._cron_words("40 3 * * *")), ("40 3 * * *", "daily at 3:40"))
+        self.assertEqual(firstboot.mover_cron({"sharing": {"mover": "40 3 * * *; reboot"}}), "")
 
     def test_kernel_arguments_and_features_from_the_machine_it_replaces(self):
         # R163 step 16: CPUs kept for VMs and devices held for them, as the

@@ -82,6 +82,16 @@ class Store(unittest.TestCase):
         self.assertTrue(schedules.remove(s["id"])["ok"])
 
 
+    def test_an_array_verb_has_one_schedule_on_a_node(self):
+        # A second save of the mover's (the takeover after an earlier one)
+        # changes the one there, never makes two.
+        row = {"name": "Array mover", "node": "n1", "on": True, "system": {"apply": "storage-array", "config": {"array": "mover"}}}
+        a = schedules.save({**row, "cron": "40 3 * * *"}, "u")["schedule"]
+        b = schedules.save({**row, "cron": "0 * * * *"}, "u")["schedule"]
+        c = schedules.save({**row, "cron": "0 * * * *", "node": "n2"}, "u")["schedule"]
+        self.assertEqual((a["id"] == b["id"], b["cron"], c["id"] != a["id"]), (True, "0 * * * *", True))
+
+
 class Timer(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()

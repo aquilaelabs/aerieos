@@ -640,21 +640,22 @@ await firstRun(false);
       const offered = read();
       const msect = () => document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
       offered.moves = [...(msect()?.querySelectorAll('[data-admove]') || [])].map(r => `${r.dataset.admove}:${r.querySelector('[data-moveland]').value}:${r.querySelector('[data-movemover]').value}`);
+      offered.when = [...(msect()?.querySelectorAll('#adoptMoverWhen option') || [])].map(o => o.value);
       const isos = msect()?.querySelector('[data-admove="isos"]');
       if (isos){ isos.querySelector('[data-movemover]').value = 'array>cache'; isos.dispatchEvent(new Event('change', { bubbles: true })); }
       read();
       offered.kept = msect()?.querySelector('[data-admove="isos"] [data-movemover]')?.value || '';
       offered.sent = JSON.stringify(adoptMovesNow());
-      state.firstboot = fbWas; adoptMoves.clear();
+      state.firstboot = fbWas; adoptMoves.clear(); adoptMoverCron = null;
       n.reported.adopted = { ...was, taken: true, writable: true };
       const taken = read();
       n.reported.adopted = was;
       nodesRev++; drawPanes();
       return { old, offered, taken };
     });
-    ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]'
+    ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]' && take.offered.when[0] === '0 4 * * *' && take.offered.when.includes('')
        && take.offered.kept === 'array>cache' && /"share":"isos","land":"array","from":"array","to":"cache"/.test(take.offered.sent),
-       `before the takeover each share's places start as the old system had them, and a change is kept across a redraw and sent (${JSON.stringify(take.offered)})`);
+       `before the takeover each share's places start as the old system had them, with its mover's time first, and a change is kept across a redraw and sent (${JSON.stringify(take.offered)})`);
     if (process.env.BB_SHOTS){
       // Each share's places before the takeover, at a desk and on a phone.
       const vp = page.viewportSize();

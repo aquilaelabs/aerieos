@@ -318,7 +318,7 @@ function adoptParts(n){
     const canTake = "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
-        ? "Taken over: SnapRAID keeps the parity on the old parity disk, the array is on the Storage page, and the mover takes new files off the pools each night. Going back to the old system takes its own parity sync."
+        ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
         : had.writable
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
@@ -492,22 +492,29 @@ function adoptFoldersField(n){
 // own settings and set before the takeover, with when the mover runs. What
 // the person changed is kept across redraws.
 const adoptMoves = new Map();
+let adoptMoverCron = null;
+const MOVER_TIMES = [["40 3 * * *", "Daily, at 3:40"], ["0 * * * *", "Hourly"], ["40 3 * * 0", "Weekly, Sundays at 3:40"], ["", "Not scheduled: Move now on the Storage page runs it"]];
 function adoptMovesNow(){
   return (state?.firstboot?.moves || []).map(m => adoptMoves.get(m.share) || m);
 }
 function adoptMovesField(){
   const list = adoptMovesNow();
   if (!list.length) return "";
-  const pools = movePools();
+  const pools = movePools(), old = state?.firstboot?.mover_cron || "";
+  const times = [...(old ? [[old, `As the old system ran it: ${state?.firstboot?.mover_words || old}`]] : []), ...MOVER_TIMES.filter(t => t[0] !== old)];
+  if (adoptMoverCron === null) adoptMoverCron = old || MOVER_TIMES[0][0];
   return `<div class="field">${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}
     <div class="rows" id="adoptMoves">${list.map((m, i) => `<div class="row stack2 admove" data-admove="${esc(m.share)}"><div class="grow"><div class="name">${esc(m.share)}</div>
-      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div></div>`).join("")}</div></div>`;
+      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div></div>`).join("")}</div>
+    <div class="fgrid"><div class="setrow col ctlrow">${lbl("adoptMoverWhen", "The mover runs")}<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select></div></div></div>`;
 }
 
 function wireAdopt(root){
   root.querySelectorAll("[data-admove]").forEach(r => r.onchange = () => {
     adoptMoves.set(r.dataset.admove, moveRead(r.dataset.admove, r.querySelector("[data-moveland]")?.value || "array", r.querySelector("[data-movemover]")?.value || ""));
   });
+  const when = root.querySelector("#adoptMoverWhen");
+  if (when) when.onchange = () => { adoptMoverCron = when.value; };
   root.querySelectorAll("[data-adopttake]").forEach(b => b.onclick = () => pressing(b, async () => {
     const n = ownMachine(), dry = b.dataset.adopttake === "dry";
     if (!n) return;
@@ -522,7 +529,13 @@ function wireAdopt(root){
     busy(b, dry ? "Checking" : "Taking over");
     const moves = adoptMovesNow();
     const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : "taking the array over: the first sync builds the parity, its progress on the Storage page"), !!j.error);
+    // The mover's schedule, as picked, once the takeover is on its way.
+    let sched = "";
+    if (!j.error && !dry && moves.some(m => m.from) && adoptMoverCron){
+      const k = await (await postJSON("/api/schedules", {action: "save", name: "Array mover", cron: adoptMoverCron, node: n.id, on: true, system: {apply: "storage-array", config: {array: "mover"}}})).json().catch(() => ({error: "no answer"}));
+      sched = k.error ? `; the mover's schedule was not made (${k.error}): make it on the Storage page` : `; the mover runs ${String(k.schedule?.words || "on its schedule").toLowerCase()}`;
+    }
+    notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : `taking the array over: the first sync builds the parity, its progress on the Storage page${sched}`), !!j.error || /not made/.test(sched));
     await loadNodes();
   }));
   root.querySelectorAll("[data-adoptfolders]").forEach(b => b.onclick = () => pressing(b, async () => {
