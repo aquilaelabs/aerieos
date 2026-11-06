@@ -102,15 +102,26 @@ dial says: adding a node is theirs.
 
 A VM made a node is not on its space's network, and its own account is
 `admin`, not `builder`: `builder` is the account its sessions run as, which
-has no sudo, where cloud-init gives the VM's own account sudo. It joins the LAN through
-the host's own interface (macvtap) and takes an address from the LAN's DHCP
-like any other machine, because the controller reaches a node at its address
-(its sessions' terminals, its Docker over SSH), which a space network
-behind the host's NAT does not give it. Its firewall is the one the
-provisioner makes on every node, and the VMs page shows the address its
-agent dials in from. A macvtap guest cannot talk to its own host, so a
-controller that runs on the VM host itself does not reach it: put node VMs on
-another machine than the controller's.
+has no sudo, where cloud-init gives the VM's own account sudo. It joins the LAN
+and takes an address from the LAN's DHCP like any other machine, because the
+controller reaches a node at its address (its sessions' terminals, its Docker
+over SSH), which a space network behind the host's NAT does not give it. Its
+firewall is the one the provisioner makes on every node, and the VMs page
+shows the address its agent dials in from.
+
+How it joins depends on the host. On AerieOS the wired card the machine's
+default route leaves by is a port of a bridge, `br0`, which takes the card's
+own MAC (so the router's reservation for the card still answers) and the
+machine's address; a VM on the LAN is a port on `br0` too, and reaches the
+LAN and its own host alike, so a node VM on the controller's own machine
+dials in to it, and one a move brings back knocks there as any node does.
+The bridge is made once, at a boot, and put back as it was when `br0` has no
+address within a minute; a machine updated to it takes it at the boot after
+its update, and its VMs on macvtap move to `br0` from their next start. The
+Network page's settings for the machine are `br0`'s from then on. Elsewhere a
+VM joins through the card itself (macvtap), which other machines reach but
+its own host does not: there, put node VMs on another machine than the
+controller's.
 
 ## Console and Screen
 

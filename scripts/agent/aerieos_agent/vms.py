@@ -17,7 +17,7 @@ import tempfile
 import urllib.request
 from xml.sax.saxutils import escape, quoteattr  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (escaping for XML this file writes; nothing is parsed)
 
-from . import vmhw
+from . import lanbridge, vmhw
 from .base import _run
 
 VIRSH = ["virsh", "-c", "qemu:///system"]
@@ -428,7 +428,9 @@ def domain_xml(name, project, vcpus, mem_mb, disk, seed, network, boot="bios", f
     (discard); a screen over VNC on the loopback, with `vnc_pw` when given,
     for the dock's Screen; `mac` keeps the address a DHCP reservation knows."""
     mac_el = f"<mac address={quoteattr(mac)}/>" if mac else ""
-    nic = (f"<interface type='direct'>{mac_el}<source dev={quoteattr(lan)} mode='bridge'/><model type='virtio'/></interface>"
+    # On the LAN: a port on the host's bridge where it has one (R219), which
+    # reaches the host too, else macvtap on the card, which does not.
+    nic = (lanbridge.nic_xml(lan, mac_el)
            if lan else f"<interface type='network'>{mac_el}<source network={quoteattr(network)}/><model type='virtio'/></interface>")
     # A serial per disk, the same every boot, so /dev/disk/by-id names it
     # (virtio takes 20 bytes): this VM's and the disk's own.

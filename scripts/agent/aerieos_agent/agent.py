@@ -586,6 +586,17 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         log(f"the controller moved: this node follows it to {self.state['controller']}")
         return True
 
+    def _lan_bridge(self):
+        from . import lanbridge
+        from .osimage import os_release
+        try:
+            done, why = lanbridge.ensure(bool(os_release()))
+        except Exception as e:  # noqa: BLE001 (a bridge that could not be made leaves the card as it was)
+            done, why = False, f"{type(e).__name__}: {e}"
+        self.state["lan_bridge"] = {"bridged": bool(done) or lanbridge.is_bridge(lanbridge.BRIDGE), "why": why[:200]}
+        if done:
+            self.hello_again("the LAN card is in a bridge now")
+
     def hello_again(self, why):
         """Ask the loop for a fresh hello, saying why in the journal: a node
         was saying hello every hundred seconds with nothing in its log to
@@ -689,6 +700,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.keep_sessions_through_restart()
         self.session_try()
         self.sessnet.start()
+        # The LAN card in a bridge on AerieOS, once, at a boot (R219): on a
+        # thread of its own, since it waits up to a minute for the address.
+        threading.Thread(target=self._lan_bridge, name="lanbridge", daemon=True).start()
         self.sesswatch.start()
         self.wssync.start()
         self.claudesync.start()

@@ -151,8 +151,14 @@ def _lan_pci(sys_root="/sys"):
             for line in f.read().splitlines()[1:]:
                 p = line.split()
                 if len(p) > 3 and p[1] == "00000000" and int(p[3], 16) & 2:
-                    dev = f"{sys_root}/class/net/{p[0]}/device"
-                    return os.path.basename(os.path.realpath(dev)) if os.path.islink(dev) else ""
+                    # A bridge (br0, R219) has no device: its port is the card.
+                    ports = sorted(glob.glob(f"{sys_root}/class/net/{p[0]}/brif/*"))
+                    names = [os.path.basename(x) for x in ports] or [p[0]]
+                    for n in names:
+                        dev = f"{sys_root}/class/net/{n}/device"
+                        if os.path.islink(dev):
+                            return os.path.basename(os.path.realpath(dev))
+                    return ""
     except (OSError, ValueError):
         pass
     return ""
@@ -361,10 +367,14 @@ def apply(xml, hw, vcpus, mem_mb, lan="", network="", vbios_dir="", fsd=""):
     if "net" in hw:
         nic = dev.find("interface")
         mac = nic.find("mac") if nic is not None else None
-        new = ET.Element("interface", type="direct" if hw["net"] == "lan" else "network")
+        # On the LAN, a port on the host's bridge where it has one (R219).
+        on_br = hw["net"] == "lan" and os.path.isdir(f"/sys/class/net/{lan}/bridge")
+        new = ET.Element("interface", type=("bridge" if on_br else "direct") if hw["net"] == "lan" else "network")
         if mac is not None:
             new.append(mac)
-        if hw["net"] == "lan":
+        if on_br:
+            ET.SubElement(new, "source", bridge=lan)
+        elif hw["net"] == "lan":
             ET.SubElement(new, "source", dev=lan, mode="bridge")
         else:
             ET.SubElement(new, "source", network=network)
@@ -429,7 +439,7 @@ def read(xml):
         unit = 1024 if (mem.get("unit") or "KiB") in ("KiB", "k") else 1
         out["mem_max_mb"] = int(mem.text) // unit
     nic = root.find("devices/interface")
-    out["net"] = "lan" if nic is not None and nic.get("type") == "direct" else "project"
+    out["net"] = "lan" if nic is not None and nic.get("type") in ("direct", "bridge") else "project"
     fs = root.find("devices/filesystem")
     if fs is not None and fs.find("source") is not None:
         out["share"] = {"path": fs.find("source").get("dir") or "", "tag": (fs.find("target").get("dir") if fs.find("target") is not None else ""),

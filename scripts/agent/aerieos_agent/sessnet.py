@@ -734,6 +734,17 @@ class SessionNet:
         SESSNET_STATUS.update(now_is)
         self.step_ctr(now)
         self.step_vms(now)
+        self.step_bridge(now)
+
+    # -- frames bridged on br0 past Docker's forwarding (R219) -------------------
+    def step_bridge(self, now):
+        if now - getattr(self, "bridge_at", 0) < 60:
+            return
+        self.bridge_at = now
+        from . import lanbridge
+        err = lanbridge.keep_forward()
+        if err:
+            self.say(f"LAN bridge: {err}")
 
     # -- the VMs' own network rules (R91 step 8) -------------------------------
     def step_vms(self, now):

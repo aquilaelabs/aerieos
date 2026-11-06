@@ -442,7 +442,21 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan):
             nv = ET.SubElement(dom.find("os"), "nvram")
         nv.text = nvram_path
         nv.set("template", ovmf_pair[1])
+    on_br = bool(lan) and os.path.isdir(f"/sys/class/net/{lan}/bridge")
     for iface in (dev.findall("interface") if dev is not None else []):
+        # A host with its card in a bridge (R219, AerieOS): the VM's port is
+        # on it, so it reaches this machine as well as the LAN.
+        if on_br and iface.get("type") in ("bridge", "direct"):
+            src = iface.find("source")
+            was = (src.get("bridge") or src.get("dev") or "") if src is not None else ""
+            iface.set("type", "bridge")
+            if src is None:
+                src = ET.SubElement(iface, "source")
+            src.attrib.clear()
+            src.set("bridge", lan)
+            if was != lan:
+                said.append(f"its network {was or 'bridge'} is {lan} here, the LAN and this machine alike")
+            continue
         if iface.get("type") == "bridge" and lan:
             src = iface.find("source")
             br = src.get("bridge", "") if src is not None else ""
