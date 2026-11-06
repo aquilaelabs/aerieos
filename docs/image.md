@@ -271,6 +271,10 @@ how much you can use, how many disks may fail and how it grows, and
 Advanced picks another layout. **Make it** names every disk it erases by
 serial before anything is written. On a stick the first pool made becomes the
 system pool by itself, a fast one where there is one, and a later step says so.
+A pool that holds an earlier AerieOS install's data (its containers, VMs,
+spaces and the accounts' sign-ins) is never taken as the system pool: a
+reinstall starts clean, and that controller is brought over only with a move
+token from it.
 **Shares** is the next step and is optional. A share is a folder on a pool, Media
 and Backups to begin with, and stays on this machine until you export it; then
 other computers open it over the network, signing in with the same name and
