@@ -214,10 +214,8 @@ def _old(project, tag, path):
 
 def answer_of(bug):
     """What the bug's notes say for the changelog, or ""."""
-    m = None
-    for m in ANSWER.finditer(bug.get("notes") or ""):
-        pass
-    return m.group(1).strip() if m else ""
+    said = ANSWER.findall(bug.get("notes") or "")
+    return said[-1].strip() if said else ""
 
 
 def _named(where, shas):

@@ -316,7 +316,9 @@ def _attach(project, repo, token, tag, files, lines):
     body = "\n".join([*kept, *([""] if kept else []), *lines])
     # The release's draft said back with the notes: a draft whose notes were
     # sent alone was published, unread, by the APK's attach (B590).
-    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body, "draft": rel.get("draft") is True})
+    # The tag goes with it: GitHub drops a draft's tag patched without one (B696).
+    forgerelease._req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": body, "draft": rel.get("draft") is True,
+                                                                  "tag_name": tag})
     return rel.get("html_url") or ""
 
 

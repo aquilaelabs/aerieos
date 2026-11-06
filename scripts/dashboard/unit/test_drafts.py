@@ -53,7 +53,8 @@ class Drafts(unittest.TestCase):
                 mock.patch.object(forgerelease, "_req", req):
             r = forgerelease.publish_draft("p", "v1.0.0", notes="read and corrected")
             self.assertTrue(r.get("ok"), r)
-            self.assertEqual(sent[-1], ("PATCH", {"draft": False, "body": "read and corrected"}))
+            # The tag goes with it: GitHub drops a draft's tag patched without one (B696).
+            self.assertEqual(sent[-1], ("PATCH", {"draft": False, "tag_name": "v1.0.0", "body": "read and corrected"}))
             rel["draft"] = False
             self.assertIn("published already", forgerelease.publish_draft("p", "v1.0.0")["error"])
 
@@ -71,6 +72,7 @@ class TheSigningAttach(unittest.TestCase):
             releasesign._attach("p", REPO, "tok", "v1.0.0-dev.3", [], ["signed with the space's key"])
         self.assertEqual(sent[-1][0], "PATCH")
         self.assertIs(sent[-1][1]["draft"], True)
+        self.assertEqual(sent[-1][1]["tag_name"], "v1.0.0-dev.3")
 
 
 class TheCheck(unittest.TestCase):
