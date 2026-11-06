@@ -3139,8 +3139,9 @@ feature_iommu() {
             way="$(sed -n 's/^way=//p' "$marker")"; args="$(sed -n 's/^args=//p' "$marker")"
             say "taking $args off the kernel's command line (by $way)"
             case "$way" in
-                # shellcheck disable=SC2046 # the names, one word each
-                aerieos) bash "$AERIEOS_SLOT" args-off $(printf '%s\n' $args | sed 's/=.*//') || warn "GRUB's environment did not take them off" ;;
+                aerieos)
+                    # shellcheck disable=SC2046,SC2086 # the names, one word each
+                    bash "$AERIEOS_SLOT" args-off $(printf '%s\n' $args | sed 's/=.*//') || warn "GRUB's environment did not take them off" ;;
                 grubby) grubby --update-kernel=ALL --remove-args="$args" || warn "grubby did not take them off" ;;
                 grub) sed -i '/^# builderbot-iommu-begin$/,/^# builderbot-iommu-end$/d' /etc/default/grub; grub_regen || warn "GRUB's configuration did not regenerate" ;;
                 extlinux) sed -i "s/ $args//" /etc/update-extlinux.conf; update-extlinux >/dev/null 2>&1 || warn "update-extlinux did not take it" ;;
