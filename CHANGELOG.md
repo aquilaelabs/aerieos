@@ -176,6 +176,14 @@
 - On a phone the terminal's Keys and Commands buttons were different widths (b4b7e9d)
 - Analysis with no scanner reports showed a red message that stayed over the pages opened after it (788484c)
 - A home made by a BuilderBot image still greeted with BuilderBot at every start (5da10c0)
+- On the first run's disks step a disk's checkbox sat on a line of its own above the disk's name instead of before it (46ee70b)
+- On Windows the USB maker's write could stop at 'access denied' after the stick's partitions were cleared: it now opens and locks the stick again and goes on where it was (401400a)
+- The dashboard could answer an error while a space was being deleted, if a status read was going on at the same moment (6b7a26f)
+- AerieOS printed 'No changes allowed in reconfigure' on the console at every boot (2d67d9e)
+- This machine's Features said Storage and Shares were not installed on an AerieOS machine whose pools and shares worked, and its count said 1 installed above three (0ff1a80, 741c2d7)
+- Home's containers tile said an unknown count as last seen on a fresh machine instead of 0 of 0 (95e19b2)
+- The Containers page on the controller's own machine said to install Docker, which is already there, instead of saying containers do not run there yet and to enroll another machine (8687f19)
+- The console password, the move landing and Storage's new pool, schedule and array forms were laid out unlike every other form, with pulldowns too long to read (ce9bfe3)
 
 ### Security
 
