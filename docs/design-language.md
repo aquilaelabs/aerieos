@@ -406,8 +406,8 @@ Color comes only from the tokens in `:root`: surfaces `--bg` / `--panel` /
 terminal's bottom bar opens: tinted towards the accent, with an accent edge
 and a shadow, so it never reads as part of the bar or the page), edge `--line`, text `--ink`
 and `--dim`, status `--accent` / `--warn` / `--bad` / `--note`, buttons
-`--btn` / `--btn-hi`. Twelve schemes repaint the page by swapping nine of
-them, so a hardcoded hex is a spot the schemes cannot reach.
+`--btn` / `--btn-hi`. Twelve schemes repaint the page by swapping the rest of
+them, so a hardcoded hex is a spot the schemes cannot reach. **Good, warning and error are not a scheme's** (`--pass`, `--warn`, `--bad`; the operator, 7 Nov): one set for every dark scheme and one for every light one, each shade chosen for its half's contrast, so a warning reads the same on any theme; the warning an orange-leaning amber, since a yellow mixed into a dark panel read as olive.
 
 **A filled lit surface is `--accent-deep` (mixed from the second color, `--lit`, since 16 Oct), and what sits on it is `--ink`,
 never `--dim`.** The active tab, a primary button, a button that is on, a

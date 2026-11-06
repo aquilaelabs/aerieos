@@ -96,12 +96,13 @@
    `design` and measured by test/uniform.mjs. */
 :root,.sw[data-theme="default"]{
   --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
-  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#d29922; --bad:#f07178;
+  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#f0a43c; --bad:#f2707a;
   --note:#8cc8ff;
-  /* A check that passed is green in every scheme (the operator, 16 Oct: the
-     doctor read teal on Abyss and orange on Ember, an accent that reads as
-     a warning there), as warn and bad stay yellow and red. Not swapped by
-     a scheme; the light half darkens it for contrast. */
+  /* Good, warning and error are one set in every scheme (the operator, 16
+     Oct and 7 Nov: they mean the same whatever the theme), a shade for the
+     dark half here and one for the light half below, never a scheme's own:
+     green, an orange-leaning amber (a yellow mixed into the panels read as
+     olive), and red. */
   --pass:#3fb950;
   /* Derived, not chosen. Buttons and the active/primary family were hardcoded
      hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
@@ -316,7 +317,7 @@
    invite them apart. */
 html[data-theme="nostromo"],.sw[data-theme="nostromo"]{
   --bg:#0b0f13; --panel:#121920; --line:#33404c; --ink:#d3dbe3;
-  --dim:#8b98a5; --accent:#ffb000; --warn:#e0913a; --bad:#ff5f45; --note:#6fa8dc}
+  --dim:#8b98a5; --accent:#ffb000; --note:#6fa8dc}
 /* Square corners are the dark half's, the hallways (the operator,
    16 Oct); the light half, the white corridors, is rounded like every other
    scheme. */
@@ -324,34 +325,34 @@ html[data-theme="nostromo"]:not([data-mode="light"]),html:not([data-mode="light"
   --r-surface:0; --r-control:0; --r-small:0}
 html[data-theme="slate"],.sw[data-theme="slate"]{
   --bg:#181c23; --panel:#1f242d; --line:#4f5a68; --ink:#dfe5ec;
-  --dim:#9fa6ae; --accent:#6ea8fe; --warn:#d9a441; --bad:#ef6f6c; --note:#a6d96a}
+  --dim:#9fa6ae; --accent:#6ea8fe; --note:#a6d96a}
 html[data-theme="carbon"],.sw[data-theme="carbon"]{
   --bg:#141417; --panel:#1c1c1f; --line:#53535b; --ink:#e8e8ea;
-  --dim:#9d9da4; --accent:#e64e53; --warn:#d9a441; --bad:#ff6b6b; --note:#3cc6b5}
+  --dim:#9d9da4; --accent:#e64e53; --note:#3cc6b5}
 html[data-theme="nocturne"],.sw[data-theme="nocturne"]{
   --bg:#181825; --panel:#202031; --line:#53537b; --ink:#e4e2f5;
-  --dim:#a2a0c1; --accent:#9d7cff; --warn:#e0b24d; --bad:#f2637b; --note:#5fdcb4}
+  --dim:#a2a0c1; --accent:#9d7cff; --note:#5fdcb4}
 html[data-theme="moss"],.sw[data-theme="moss"]{
   --bg:#161f1b; --panel:#1d2920; --line:#48604f; --ink:#dfe9df;
-  --dim:#9daba0; --accent:#63c98a; --warn:#d6ad4e; --bad:#e8695f; --note:#b49cf0}
+  --dim:#9daba0; --accent:#63c98a; --note:#b49cf0}
 html[data-theme="ember"],.sw[data-theme="ember"]{
   --bg:#1f1814; --panel:#271f1a; --line:#67533e; --ink:#f0e4d8;
-  --dim:#af9f90; --accent:#f0873f; --warn:#e8bb50; --bad:#ef5f52; --note:#4cc9d0}
+  --dim:#af9f90; --accent:#f0873f; --note:#4cc9d0}
 html[data-theme="abyss"],.sw[data-theme="abyss"]{
   --bg:#111d20; --panel:#18262a; --line:#3e5e66; --ink:#dcecee;
-  --dim:#93a9ac; --accent:#2fb8c6; --warn:#d7ab4c; --bad:#ef6a63; --note:#e391d9}
+  --dim:#93a9ac; --accent:#2fb8c6; --note:#e391d9}
 html[data-theme="plum"],.sw[data-theme="plum"]{
   --bg:#1e1623; --panel:#261d2d; --line:#654d73; --ink:#eddff2;
-  --dim:#ae9cb7; --accent:#c874d8; --warn:#dfae52; --bad:#ee6183; --note:#7dd8a0}
+  --dim:#ae9cb7; --accent:#c874d8; --note:#7dd8a0}
 html[data-theme="rust"],.sw[data-theme="rust"]{
   --bg:#1e1614; --panel:#261d1a; --line:#6a4e4a; --ink:#ecdedb;
-  --dim:#ae9d99; --accent:#cf6a4c; --warn:#d9a441; --bad:#e8544a; --note:#6cc2a8}
+  --dim:#ae9d99; --accent:#cf6a4c; --note:#6cc2a8}
 html[data-theme="ice"],.sw[data-theme="ice"]{
   --bg:#151c21; --panel:#1c252c; --line:#465b6c; --ink:#e3edf5;
-  --dim:#9aa8ae; --accent:#58c7e8; --warn:#d3ab52; --bad:#ee6a68; --note:#b8a2ff}
+  --dim:#9aa8ae; --accent:#58c7e8; --note:#b8a2ff}
 html[data-theme="sepia"],.sw[data-theme="sepia"]{
   --bg:#1f1b14; --panel:#272219; --line:#63563e; --ink:#ece0cb;
-  --dim:#b0a28c; --accent:#d3a94f; --warn:#e3c069; --bad:#e0705f; --note:#5fbdb0}
+  --dim:#b0a28c; --accent:#d3a94f; --note:#5fbdb0}
 /* ---- the light half (R216) -----------------------------------------------
    Every scheme has a light half: the same hue family token for token, with
    the page near white, the ink dark, and the accent and the marks pulled
@@ -385,7 +386,7 @@ html[data-mode="light"]{
 }
 html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
   --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
-  --dim:#566275; --accent:#0059c7; --warn:#996200; --bad:#c3131b; --note:#0a5fb0}
+  --dim:#566275; --accent:#0059c7; --warn:#9a5b00; --bad:#c62828; --note:#0a5fb0}
 /* The default scheme alone fills what is pressed in its third hue, copper, so
    words and links stay blue and information never reads as a warning. */
 html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
@@ -395,37 +396,37 @@ html[data-mode="light"]:not([data-theme]),html[data-mode="light"] .sw[data-theme
    (the operator, 16 Oct); its graphics are with the dark half's, below. */
 html[data-mode="light"][data-theme="nostromo"],html[data-mode="light"] .sw[data-theme="nostromo"]{
   --bg:#e4e5e2; --panel:#f6f6f3; --line:#bfc1bc; --ink:#232628;
-  --dim:#595d60; --accent:#b23a0a; --warn:#8b6100; --bad:#a8002a; --note:#3d7322}
+  --dim:#595d60; --accent:#b23a0a; --note:#3d7322}
 html[data-mode="light"][data-theme="slate"],html[data-mode="light"] .sw[data-theme="slate"]{
   --bg:#f1f3f7; --panel:#fcfdff; --line:#cbd2da; --ink:#24272a;
-  --dim:#606468; --accent:#2a61b1; --warn:#905e00; --bad:#b2373a; --note:#4e761e}
+  --dim:#606468; --accent:#2a61b1; --note:#4e761e}
 html[data-mode="light"][data-theme="carbon"],html[data-mode="light"] .sw[data-theme="carbon"]{
   --bg:#f3f3f5; --panel:#fdfdfe; --line:#d0d0d5; --ink:#262627;
-  --dim:#636367; --accent:#b6192c; --warn:#905e00; --bad:#bb2933; --note:#22776c}
+  --dim:#636367; --accent:#b6192c; --note:#22776c}
 html[data-mode="light"][data-theme="nocturne"],html[data-mode="light"] .sw[data-theme="nocturne"]{
   --bg:#f2f3f9; --panel:#fdfdff; --line:#cecfe6; --ink:#26252e;
-  --dim:#626173; --accent:#6a44c2; --warn:#916600; --bad:#b72b4c; --note:#1b795b}
+  --dim:#626173; --accent:#6a44c2; --note:#1b795b}
 html[data-mode="light"][data-theme="moss"],html[data-mode="light"] .sw[data-theme="moss"]{
   --bg:#f0f5f3; --panel:#fbfefc; --line:#c8d5cb; --ink:#232823;
-  --dim:#5e6660; --accent:#00783f; --warn:#8e6800; --bad:#b33833; --note:#794ee4}
+  --dim:#5e6660; --accent:#00783f; --note:#794ee4}
 html[data-mode="light"][data-theme="ember"],html[data-mode="light"] .sw[data-theme="ember"]{
   --bg:#f6f3f1; --panel:#fffdfb; --line:#dbcfc3; --ink:#2b2520;
-  --dim:#6a6159; --accent:#a34100; --warn:#8b6100; --bad:#ba2c25; --note:#21787d}
+  --dim:#6a6159; --accent:#a34100; --note:#21787d}
 html[data-mode="light"][data-theme="abyss"],html[data-mode="light"] .sw[data-theme="abyss"]{
   --bg:#eff5f6; --panel:#fbfeff; --line:#c3d5d9; --ink:#212829;
-  --dim:#5a6667; --accent:#007480; --warn:#906700; --bad:#b53433; --note:#bb30aa}
+  --dim:#5a6667; --accent:#007480; --note:#bb30aa}
 html[data-mode="light"][data-theme="plum"],html[data-mode="light"] .sw[data-theme="plum"]{
   --bg:#f6f2f8; --panel:#fffcff; --line:#d9cbe1; --ink:#2a242c;
-  --dim:#695f6e; --accent:#8c3a9b; --warn:#936500; --bad:#b62b55; --note:#247b45}
+  --dim:#695f6e; --accent:#8c3a9b; --note:#247b45}
 html[data-mode="light"][data-theme="rust"],html[data-mode="light"] .sw[data-theme="rust"]{
   --bg:#f7f2f1; --panel:#fffdfc; --line:#ddcdca; --ink:#2b2523;
-  --dim:#6a615f; --accent:#a14123; --warn:#905e00; --bad:#bc2825; --note:#247b60}
+  --dim:#6a615f; --accent:#a14123; --note:#247b60}
 html[data-mode="light"][data-theme="ice"],html[data-mode="light"] .sw[data-theme="ice"]{
   --bg:#f0f4f6; --panel:#fbfeff; --line:#c7d3dd; --ink:#23272b;
-  --dim:#5d6568; --accent:#00708f; --warn:#886200; --bad:#b43439; --note:#7347ff}
+  --dim:#5d6568; --accent:#00708f; --note:#7347ff}
 html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-theme="sepia"]{
   --bg:#f5f3f0; --panel:#fffdfb; --line:#d7d0c3; --ink:#2b261c;
-  --dim:#6a6256; --accent:#835c00; --warn:#8a6900; --bad:#ac4133; --note:#22776b}
+  --dim:#6a6256; --accent:#835c00; --note:#22776b}
 
 /* ---- Nostromo -----------------------------------------------------------
    The one scheme that is more than a recolor: the ship itself, a half for
@@ -2834,7 +2835,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    spilling, with overflow-y set to hidden by hand: one axis on auto turns
    the other from visible to auto, and the strip became a vertical scroller
    too. No scrollbar: under a row of tabs it reads as a divider. */
-.nbtabs{border-bottom:var(--hair) solid var(--line)}
+/* Pinned at the top of what scrolls (the operator, 7 Nov: the view strips
+   scrolled away under the header); a view's own sticky parts sit under it. */
+.nbtabs{border-bottom:var(--hair) solid var(--line);position:sticky;top:0;z-index:6;background:var(--bg)}
 .nbtabs .nbgroups,.nbtabs .nbsub{display:flex;padding:0 calc(8px + var(--doc-in));
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .nbtabs .nbgroups::-webkit-scrollbar,.nbtabs .nbsub::-webkit-scrollbar{display:none}
@@ -3661,6 +3664,18 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.proj .more{position:relative;display:inline-flex}
 .pane .bar.proj .more>button{min-height:32px;min-width:32px;padding:4px 8px}
 .pane .bar.proj .pnote{flex:1 1 100%;font:var(--f-ui)}
+/* On a phone the actions sit on the name's row, at its right, as at a desk
+   (the operator, 7 Nov: three rows of name, sessions and buttons); the facts
+   and the sessions' states go under them, each a line; the name and the
+   repository pulldown give up their width first. */
+@media(max-width:600px){
+  .pane .bar.proj .phead>:is(.pfacts,.pstate,.pstates){order:2}
+  .pane .bar.proj .phead>.pfacts{flex:1 1 100%;max-width:none}
+  .pane .bar.proj .pname{flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .pane .bar.proj .phead select.prepos{flex:0 1 auto;max-width:9rem}
+  .pane .bar.proj .phead>.sp{order:1;flex:1 0 0;min-width:0}
+  .pane .bar.proj .phead>:is(button,.more){order:1;flex:0 0 auto}
+}
 /* The restart note as a band between the header and the view strip (the
    operator, 28 Oct): tinted, its x at the right. */
 .pane .bar.proj .pnote.pband{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r-control);
