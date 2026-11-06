@@ -368,7 +368,7 @@ function moveSection(){
   return `<div class="row stack2" data-group="Move"><div class="grow">
       ${land}
       ${arrived}
-      ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once${
+      ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once; Download a backup packs what is ticked under a token of its own and arms nothing${
         helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
       ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://aerieos.new.example" autocomplete="off" spellcheck="false"></label></div>
