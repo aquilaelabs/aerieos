@@ -427,8 +427,8 @@ aerie tests run [ARGS]  run the space's test command, time it, and record the ru
                    and the fact that nothing after it ran. A crash prints no `FAIL` line and no totals, so a
                    run that only said "failures above" cost four whole runs to read once. ARGS go to the
                    command, so `aerie tests run auth cards` times and records those two files and nothing else
-                   else. On the test node the space's settings name (Test node, beside its
-                   nodes; R151) the suites run there as a job, this tree snapshotted, with as
+                   else. On the test node a repository's settings name (Tests run, under Build and test;
+                   R151) the suites run there as a job, this tree snapshotted, with as
                    many workers as its cores and memory allow, the lines streamed here and the
                    run recorded as a local one; aerie dashboard test and the gate go there too
 

@@ -44,7 +44,7 @@ aerie tests lab                  # the lab suites, against the lab's own stack (
 The browser suite runs the checkout's `server.py` on a spare port with a
 scratch state directory, fake projects and a private tmux server, from a
 copy of the tree, one run at a time. A project whose settings name a
-**Test node** (beside its nodes) runs `aerie tests run`, `aerie dashboard test`
+**test node** (picked in its Build and test section) sends `aerie tests run`, `aerie dashboard test`
 and the gate's suites there as a job, the tree snapshotted and the lines
 streamed back. Its discipline is the house rule
 `tests`. `surface.mjs` holds the page's top-level names; a new one is

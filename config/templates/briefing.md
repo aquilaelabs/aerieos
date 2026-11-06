@@ -140,7 +140,7 @@ Gradle's cache is this space's own (`$GRADLE_USER_HOME`), and it builds on
 the node's own disk with a link at each module's usual place (`app/build`);
 point it at another home and its builds land in the tree again.
 
-A space whose settings name a test node (Test node, beside its nodes) runs
+A repository whose settings name a test node (Tests run, under Build and test) runs
 its suites there: `aerie tests run`, `aerie dashboard test` and the gate send this
 tree as a job's snapshot, pick the workers from that node's cores and
 memory, stream the lines back and record the run as a local one; a run
