@@ -149,10 +149,10 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
 
 <table>
   <tr>
-    <td colspan="2"><img src="docs/screenshots/dashboard.png" alt="Home at a desk: what runs, what needs you, the last jobs and your projects"></td>
+    <td colspan="2"><img src="docs/screenshots/dashboard.png" alt="Home at a desk: what runs, what needs you, the last jobs and your spaces"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/notebook.png" alt="A project's page, on its roadmap"></td>
+    <td width="50%"><img src="docs/screenshots/notebook.png" alt="A space's page, on its roadmap"></td>
     <td width="50%"><img src="docs/screenshots/nodes.png" alt="A node's page under the Machines header: how it is reached, its health and its stores"></td>
   </tr>
   <tr>
@@ -160,8 +160,8 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
     <td width="50%"><img src="docs/screenshots/installed.png" alt="The Installed page: what a node has from the Library, each thing configured where it lives"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/containers.png" alt="The Containers page: each project's containers on a node"></td>
-    <td width="50%"><img src="docs/screenshots/vms.png" alt="The VMs page: a project's virtual machines with their state, address and snapshots"></td>
+    <td width="50%"><img src="docs/screenshots/containers.png" alt="The Containers page: each space's containers on a node"></td>
+    <td width="50%"><img src="docs/screenshots/vms.png" alt="The VMs page: a space's virtual machines with their state, address and snapshots"></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/features.png" alt="A node's Features section: VM host, sessions, the SSH door and the rest, each with how it installs"></td>
