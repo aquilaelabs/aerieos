@@ -9,6 +9,8 @@
 - A VM AerieOS did not make, such as one made in virt-manager, can be cloned into a space from the VMs page: its disks are copied and the original is left as it was (9f002c9)
 - A ZFS pool made on another machine, such as a TrueNAS box, can be imported from the Storage page as it is, and comes back after every restart until it is exported (d9034fa)
 
+- Download a backup under Move this controller keeps a copy of the controller, its spaces and their repositories under a token of its own, without arming a move: record the token, since it is shown once; the file and token never expire, and land on a new controller's first setup the way a move does (73e495f)
+
 ### Changed
 
 - A share's name and its folder may have spaces between words, such as TV Shows (8f2f7d3)
