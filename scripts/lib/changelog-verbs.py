@@ -78,9 +78,9 @@ if "--bug" in argv:
 
 def _bug_of(word):
     import ids
-    n = ids.parse("bugs", word)
+    n, why = ids.parse("bugs", word)
     if n is None:
-        print(f"not a bug's number: {word}", file=sys.stderr)
+        print(why or f"not a bug's number: {word}", file=sys.stderr)
         raise SystemExit(1)
     with bugs._lock:
         b = next((x for x in (bugs.load()["projects"].get(proj) or []) if x.get("id") == n), None)
