@@ -37,9 +37,17 @@ host installs too, with one difference: libvirt's group is root on that
 machine, so the jobs account stays out of it and the VMs there run through
 the node's root agent, each action still one of its table's. Domains the
 machine's libvirt has that AerieOS did not make (made with virt-manager,
-say) are listed on the VMs page for an administrator under **Not
-AerieOS's**, by name, state and size, with nothing to press: the page
-reads them and never changes them.
+say, or another system's VMs taken over with its disks) are listed on the
+VMs page for an administrator under **Not AerieOS's**, by name, state and
+size; the page never changes one. **Clone into a space** on a shut-off one
+makes a copy that is AerieOS's: each of its disk files copied into the
+node's VM folder as qcow2 (the original untouched), its UEFI variables
+copied, and the domain defined again with its own UUID, AerieOS's marker
+and its hardware as it was (vCPUs, memory, firmware, MAC address and
+passthrough; a disk passed through whole is shared, not copied, and said
+so). The copy is then managed on the VMs page like any other, under the
+space or as This machine's own; the original stays defined until it is
+removed, and since the two share a MAC address, one runs at a time.
 
 ## What a VM is made from
 

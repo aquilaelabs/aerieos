@@ -157,11 +157,25 @@ function vmRow(v){
 // page acts on one; libvirt's own tools do, on the machine.
 function vmOthersHtml(rows){
   const size = v => [v.vcpus ? `${v.vcpus} vCPU` : "", v.mem_mb ? (v.mem_mb >= 1024 ? `${+(v.mem_mb / 1024).toFixed(1)} GB` : `${v.mem_mb} MB`) : ""].filter(Boolean).join(" · ");
-  return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not AerieOS's</b><span class="sub"> · on a node's libvirt, made outside AerieOS: read here, never changed from here</span></div>
+  // Clone into a space (R163 step 12): its disks copied, the original left
+  // as it is; offered once it is shut off, its reason on the row otherwise.
+  const off = v => v.state === "shut off" || v.state === "crashed";
+  return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not AerieOS's</b><span class="sub"> · on a node's libvirt, made outside AerieOS: read here; Clone makes a copy one of a space's, the original left as it is</span></div>
     <div class="rows">${rows.map(v => `<div class="row stack2 vmother" data-vmother="${esc(v.node)}/${esc(v.name)}"><div class="grow"><div class="dmhead"><div class="dmid">
       <div class="name">${esc(v.name)}<span class="pill${v.state === "running" ? " ok" : ""}">${esc(v.state || "unknown")}</span></div>
-      <div class="sub dmorigin">${[esc(v.node_name || ""), esc(size(v))].filter(Boolean).join(`<span class="sep"></span>`)}</div>
-    </div></div></div></div>`).join("")}</div></section>`;
+      <div class="sub dmorigin">${[esc(v.node_name || ""), esc(size(v)), off(v) ? "" : "shut it down to clone it"].filter(Boolean).join(`<span class="sep"></span>`)}</div>
+    </div><span class="acts"><button type="button" data-vmclone="${esc(v.node)}" data-vmfrom="${esc(v.name)}"${off(v) ? "" : " disabled"}>Clone into a space…</button></span></div></div></div>`).join("")}</div></section>`;
+}
+// Ask which space and under what name, then queue the clone.
+async function vmCloneAsk(nodeId, from){
+  const spaces = (state?.projects || []).filter(p => !p.locked).map(p => ({label: projLabel(p.name), value: p.name}));
+  const choices = [{label: "This machine's own", value: "machine"}, ...spaces].slice(0, 10);
+  const a = await ask({title: `Clone ${from} into a space?`, text: `Each of its disks is copied into the node's VM folder, the original untouched and still defined, so you can try the copy before removing it. The copy keeps its vCPUs, memory, firmware, MAC address and passthrough: run one of the two at a time.\n\nThe copy's name, then the space it goes to.`,
+                       choices, field: {value: from.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 31) || "vm", label: "Name"}});
+  if (!a) return;
+  const j = await (await postJSON("/api/vms", {action: "clone", project: a.value, node: nodeId, from, name: String(a.text || "").trim()})).json().catch(() => ({error: "no answer"}));
+  notify(j.error || `cloning ${from}: its disks are copied on the node, then it is on the VMs page under ${a.value === "machine" ? "This machine's own" : projLabel(a.value)}`, !!j.error);
+  if (!j.error && typeof loadVms === "function") loadVms();
 }
 
 // A VM whose repository is gone is in no project (the operator, 26 Oct),
@@ -270,6 +284,7 @@ function renderVmsInto(i){
 }
 
 function wireVms(el){
+  el.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const s = el.querySelector("#vmSearch");
   if (s) s.oninput = () => { vmsSearch = s.value; const at = s.selectionStart; drawPanes();
     const n = document.querySelector("#vmSearch"); if (n){ n.focus(); n.setSelectionRange(at, at); } };

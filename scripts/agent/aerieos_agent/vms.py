@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (libvirt's own XML for this node's domains, from virsh)
 from xml.sax.saxutils import escape, quoteattr  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (escaping for XML this file writes; nothing is parsed)
 
 from . import lanbridge, vmhw
@@ -33,7 +34,9 @@ USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 KEY_RE = re.compile(r"(ssh-(ed25519|rsa)|ecdsa-sha2-nistp(256|384|521)) [A-Za-z0-9+/=]{20,800}( [^\n]{0,100})?")
 ACTIONS = ("create", "start", "stop", "restart", "remove", "snapshot", "revert", "snapshot-rm",
            "eject", "disk-grow", "disk-add", "iso-add", "iso-rm", "hardware", "autostart", "vbios",
-           "usb-give", "usb-take")
+           "usb-give", "usb-take", "clone")
+# A domain another system or a person made, as libvirt names it (R163 step 12).
+FOREIGN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}")
 # An installer ISO a person fetched onto this node (R99), by its own name.
 ISO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.iso")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -1126,6 +1129,104 @@ class VmsMixin:
 
     def _vm_restart(self, job, spec, name, who):
         return self._vm_simple(job, name, who, ["reboot", name])
+
+    def _vm_clone(self, job, spec, name, who):
+        """A VM AerieOS did not make, made one of a space's (R163 step 12):
+        each of its disk files copied into this node's VM folder as qcow2
+        (the originals untouched), its UEFI variables copied, and the domain
+        defined again under `name` with AerieOS's marker, its own UUID, and
+        its hardware as it was (vCPUs, memory, firmware, MAC, passthrough).
+        The original stays defined, so the clone is tried before it goes; it
+        is shut off first, so its disks are copied whole."""
+        src = str(spec.get("from") or "")
+        project = str(spec.get("project") or "")
+        if not FOREIGN_RE.fullmatch(src) or DOMAIN_RE.fullmatch(src) or not project:
+            job.say("refused: clone takes a VM AerieOS did not make, by its name, and the space it goes to\n")
+            return "failed", 64
+        if self._vm_exists(name, who):
+            job.say(f"refused: {name} is a VM here already\n")
+            return "failed", 73
+        info = subprocess.run(VIRSH + ["domstate", src], capture_output=True, text=True, check=False, **who)
+        if info.returncode != 0:
+            job.say(f"refused: {src} is not a VM on this node\n")
+            return "failed", 66
+        if info.stdout.strip() not in ("shut off", "crashed"):
+            job.say(f"refused: {src} is {info.stdout.strip()}: shut it down first, so its disks are copied whole\n")
+            return "failed", 75
+        xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive"], capture_output=True, text=True, check=False, **who).stdout
+        try:
+            dom = ET.fromstring(xml)
+        except ET.ParseError:
+            job.say(f"refused: {src}'s definition could not be read\n")
+            return "failed", 65
+        ddir = os.path.join(VM_DIR, "disks")
+        self.own_dir(ddir, who)
+        made, n = [], 0
+        try:
+            for disk in dom.findall("devices/disk"):
+                srcel = disk.find("source")
+                if disk.get("device") == "cdrom":
+                    # An installer's disc stays with the original.
+                    if srcel is not None:
+                        disk.remove(srcel)
+                    continue
+                if disk.get("type") != "file" or srcel is None or not srcel.get("file"):
+                    job.say(f"a {disk.get('type')} disk ({(srcel.get('dev') if srcel is not None else '') or 'unnamed'}) is passed through as it was: "
+                            "the clone and the original share it, so run one at a time\n")
+                    continue
+                old = srcel.get("file")
+                drv = disk.find("driver")
+                fmt = (drv.get("type") if drv is not None else "") or "raw"
+                dst = os.path.join(ddir, name + (".qcow2" if n == 0 else f"-d{n}.qcow2"))
+                n += 1
+                job.say(f"copying {old} into {dst} (the original untouched)\n")
+                if self._vm_run(job, ["qemu-img", "convert", "-p", "-f", fmt, "-O", "qcow2", old, dst], who, timeout=172800) != 0:
+                    raise RuntimeError(f"{old} did not copy (above)")
+                made.append(dst)
+                srcel.attrib.clear()
+                srcel.set("file", dst)
+                if drv is None:
+                    drv = ET.SubElement(disk, "driver", name="qemu")
+                drv.set("type", "qcow2")
+            nv = dom.find("os/nvram")
+            if nv is not None and (nv.text or "").strip() and os.path.isfile(nv.text.strip()):
+                dst = os.path.join(ddir, name + "_VARS.qcow2")
+                fmt = "qcow2" if nv.get("format") == "qcow2" else "raw"
+                if self._vm_run(job, ["qemu-img", "convert", "-f", fmt, "-O", "qcow2", nv.text.strip(), dst], who, say=False) != 0:
+                    raise RuntimeError("its UEFI variables did not copy (above)")
+                made.append(dst)
+                nv.text = dst
+                nv.set("format", "qcow2")
+        except RuntimeError as e:
+            for f in made:
+                with contextlib.suppress(OSError):
+                    os.unlink(f)
+            job.say(f"stopped: {e}; nothing of the clone is left\n")
+            return "failed", 1
+        dom.find("name").text = name
+        for u in dom.findall("uuid"):
+            dom.remove(u)
+        md = dom.find("metadata")
+        if md is None:
+            md = ET.SubElement(dom, "metadata")
+        ET.register_namespace("bb", META_NS)
+        ET.SubElement(md, f"{{{META_NS}}}vm", project=project)
+        tmp = os.path.join(ddir, name + ".clone.xml")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(ET.tostring(dom, encoding="unicode"))
+        try:
+            rc = self._vm_run(job, VIRSH + ["define", tmp], who)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+        if rc != 0:
+            for f in made:
+                with contextlib.suppress(OSError):
+                    os.unlink(f)
+            return "failed", rc
+        job.say(f"{name}: {src} cloned into {project}, {len(made)} file{'' if len(made) == 1 else 's'} copied; "
+                f"{src} stays defined until you remove it, and the two share a MAC address, so run one at a time\n")
+        return "succeeded", 0
 
     def _vm_remove(self, job, spec, name, who):
         if self._vm_exists(name, who):

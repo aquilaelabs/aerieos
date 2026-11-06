@@ -4714,6 +4714,8 @@ def _vm_do(principal, project, req, session):
         return vms.iso(principal, field(req, "action"), req)
     if field(req, "action") == "vbios":
         return vms.vbios(principal, req, bool(req.get("_admin")))
+    if field(req, "action") == "clone":
+        return vms.clone(principal, project, req, admin=bool(req.get("_admin")), session=session)
     if field(req, "action") == "new":
         allowed = devapp.nodes_of(project) or [] if session else [n["id"] for n in vms.hosts()]
         return vms.create(principal, project, req, allowed, session=session, admin=bool(req.get("_admin")))

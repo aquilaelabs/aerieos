@@ -172,6 +172,25 @@ class Controller(unittest.TestCase):
         self.assertEqual(vms.view()[0]["state"], "making")
         self.assertIn("already", self.new()["error"])
 
+    def test_a_vm_aerieos_did_not_make_is_cloned_into_a_space(self):
+        # R163 step 12: an administrator's, from a shut-off VM the node lists
+        # as not AerieOS's; recorded as making, as New VM's is.
+        self.f.nodes["n1"]["reported"]["vms_other"] = [{"name": "Windows 11", "state": "shut off", "vcpus": 4, "mem_mb": 8192},
+                                                       {"name": "Ubuntu", "state": "running", "vcpus": 2, "mem_mb": 2048}]
+        req = {"node": "n1", "from": "Windows 11", "name": "win11"}
+        self.assertIn("administrator", vms.clone("user:t", "web", req)["error"])
+        self.assertIn("shut it down", vms.clone("user:t", "web", dict(req, **{"from": "Ubuntu"}), admin=True)["error"])
+        self.assertIn("not a VM AerieOS did not make", vms.clone("user:t", "web", dict(req, **{"from": "nope"}), admin=True)["error"])
+        r = vms.clone("user:t", "web", req, admin=True)
+        self.assertTrue(r.get("ok"), r)
+        _p, type_, spec, project = self.f.jobs[-1]
+        self.assertEqual((type_, spec["action"], spec["domain"], spec["from"], project), ("vm", "clone", "bbvm-web-win11", "Windows 11", "web"))
+        row = vms.view()[0]
+        self.assertEqual((row["state"], row["vcpus"], row["mem_mb"], row["cloned_from"]), ("making", 4, 8192, "Windows 11"))
+        vms.vm_done({"spec": spec, "node": "n1"}, "succeeded")
+        self.assertEqual(vms._load()["vms"]["web/win11"]["state"], "made")
+        self.assertIn("already", vms.clone("user:t", "web", req, admin=True)["error"])
+
     def test_two_projects_names_that_make_one_machine_name_are_refused_on_one_node(self):
         # web's db-x and web-db's x are both bbvm-web-db-x: the second is
         # refused on that node, and every action names its project.
@@ -426,6 +445,61 @@ class Agent(unittest.TestCase):
         import agentpkg
         self.agent = agentpkg.load("aerieos_agent_vms")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".vms"]
+
+    def test_a_clone_copies_each_disk_and_keeps_the_rest(self):
+        # R163 step 12: each file disk copied as qcow2 (the original
+        # untouched), a cdrom left empty, a passed-through disk kept and
+        # said, the variables copied, a new UUID and AerieOS's marker.
+        from unittest import mock
+        src = ("<domain type='kvm'><name>Windows 11</name><uuid>0f3a1b2c-1111-2222-3333-444455556666</uuid><memory unit='KiB'>8388608</memory>"
+               "<vcpu>4</vcpu><os><loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE_4M.fd</loader>"
+               "<nvram>/var/lib/libvirt/qemu/nvram/w_VARS.fd</nvram></os><devices>"
+               "<disk type='file' device='disk'><driver name='qemu' type='raw'/><source file='/mnt/user/domains/w/vdisk1.img'/><target dev='hdc' bus='sata'/></disk>"
+               "<disk type='file' device='cdrom'><source file='/mnt/user/isos/virtio.iso'/><target dev='hda' bus='sata'/></disk>"
+               "<disk type='block' device='disk'><source dev='/dev/disk/by-id/nvme-X'/><target dev='vdb'/></disk>"
+               "<interface type='bridge'><mac address='52:54:00:aa:bb:cc'/><source bridge='br0'/></interface></devices></domain>")
+        ran, defined = [], []
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "disks"))
+
+        def sub(argv, **kw):
+            if "domstate" in argv:
+                return mock.Mock(returncode=0, stdout="shut off\n")
+            if "dumpxml" in argv:
+                return mock.Mock(returncode=0, stdout=src)
+            return mock.Mock(returncode=1, stdout="", stderr="")
+
+        def vm_run(inner, job, argv, who, timeout=300, say=True):
+            ran.append(argv)
+            if "define" in argv:
+                defined.append(open(argv[-1]).read())
+            return 0
+
+        class Job:
+            def __init__(self):
+                self.t = []
+
+            def say(self, x):
+                self.t.append(x)
+        job = Job()
+        with mock.patch.object(self.av, "VM_DIR", d), mock.patch.object(self.av.subprocess, "run", side_effect=sub), \
+             mock.patch.object(self.av.VmsMixin, "_vm_run", vm_run), mock.patch.object(self.av.VmsMixin, "own_dir", lambda *a: None, create=True), \
+             mock.patch.object(self.av.os.path, "isfile", return_value=True):
+            st = self.av.VmsMixin._vm_clone(self.av.VmsMixin(), job, {"from": "Windows 11", "project": "web"}, "bbvm-web-win11", {})
+        self.assertEqual(st, ("succeeded", 0), "".join(job.t))
+        self.assertEqual([a[:6] for a in ran if a[0] == "qemu-img"],
+                         [["qemu-img", "convert", "-p", "-f", "raw", "-O"], ["qemu-img", "convert", "-f", "raw", "-O", "qcow2"]])
+        out = defined[0].replace('"', "'").replace(" />", "/>")
+        self.assertIn(f"<source file='{d}/disks/bbvm-web-win11.qcow2'/>", out)
+        self.assertIn("<driver name='qemu' type='qcow2'/>", out)
+        self.assertIn("<source dev='/dev/disk/by-id/nvme-X'/>", out, "a passed-through disk kept")
+        self.assertNotIn("virtio.iso", out)
+        self.assertNotIn("<uuid>", out)
+        self.assertIn("<mac address='52:54:00:aa:bb:cc'/>", out)
+        self.assertIn(f"format='qcow2'>{d}/disks/bbvm-web-win11_VARS.qcow2</nvram>", out)
+        self.assertIn(self.av.META_NS, out)
+        self.assertIn("project='web'", out)
+        self.assertIn("run one at a time", "".join(job.t))
 
     def test_the_domains_it_did_not_make_are_listed_and_never_ours(self):
         # R165 step 1: a name without the prefix, or with it and without the

@@ -390,7 +390,9 @@ function adoptAppsSection(n){
   const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
     return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
-      btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}</div>`; }).join("");
+      btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}${
+      // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
+      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${s.state === "shut off" ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
   return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
@@ -410,6 +412,7 @@ async function loadAdoptPlan(){
 }
 
 function wireAdoptApps(root){
+  root.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const n = ownMachine();
   root.querySelectorAll("[data-adpick]").forEach(c => c.onchange = () => {
     if (c.checked) adoptSkip.delete(c.dataset.adpick); else adoptSkip.add(c.dataset.adpick);

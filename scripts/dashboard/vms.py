@@ -539,6 +539,45 @@ def create(principal, project, req, nodes_allowed, session=False, admin=False):
     return {"ok": True, "key": key, "job": r["job"], "node": pick["name"], "domain": dom}
 
 
+def clone(principal, project, req, admin=False, session=False):
+    """A VM AerieOS did not make (another system's, adopted, or one made by
+    hand on the node) cloned into `project` as one of its own (R163 step
+    12): an administrator's, its disks copied on its node by the job, the
+    original left as it is. Recorded as making, as New VM's is."""
+    if session or not admin:
+        return {"error": "cloning a VM AerieOS did not make into a space is an administrator's, on the VMs page"}
+    name = str(req.get("name") or "").strip().lower()
+    if not NAME_RE.fullmatch(name):
+        return {"error": f"a VM's name is letters, digits and dashes, up to 31, starting with a letter or digit: not {name or 'nothing'}"}
+    nid, src = str(req.get("node") or ""), str(req.get("from") or "")
+    other = next((v for v in others() if v["node"] == nid and v["name"] == src), None)
+    if not other:
+        return {"error": f"{src or 'no VM'} is not a VM AerieOS did not make on that node"}
+    if other["state"] not in ("shut off", "crashed"):
+        return {"error": f"{src} is {other['state']}: shut it down first, so its disks are copied whole"}
+    n = node(nid) or {}
+    if not n.get("live"):
+        return {"error": f"{n.get('name') or nid}'s agent is not dialing in"}
+    key = f"{project}/{name}"
+    with _lock:
+        d = _load()
+        if key in d["vms"]:
+            return {"error": f"{project} has a VM called {name} already"}
+        dom = domain(project, name)
+        if dom in _live(n):
+            return {"error": f"{n.get('name')} has a VM named {dom} already"}
+        spec = {"action": "clone", "domain": dom, "project": project, "from": src, "timeout": 172800}
+        r = job_add(principal, {"node": nid}, "vm", spec, project)
+        if r.get("error"):
+            return r
+        d["vms"][key] = {"project": project, "name": name, "node": nid, "domain": dom, "os": "cloned",
+                         "os_name": f"Cloned from {src}", "user": "", "vcpus": other["vcpus"], "mem_mb": other["mem_mb"], "disk_gb": 0,
+                         "by": principal, "at": int(time.time()), "state": "making", "job": r["job"], "error": "", "cloned_from": src}
+        _save(d)
+    audit(principal, "vm-clone", key, {"node": nid, "from": src, "job": r["job"]})
+    return {"ok": True, "key": key, "job": r["job"], "domain": dom}
+
+
 UPLOAD_MAX = 16 * 2**30         # an installer's ISO, uploaded (R99): DVD-sized and then some
 
 
@@ -936,7 +975,7 @@ def vm_done(job, state):
             # Its node goes with it, credential and all (step 14).
             if gone.get("node_id") and node_retire:
                 node_retire(f"vm:{key}", gone["node_id"])
-        elif spec.get("action") == "create":
+        elif spec.get("action") in ("create", "clone"):
             rec["state"] = "made" if ok else "failed"
             rec["made_at"] = int(time.time())
             rec["error"] = "" if ok else _why(job, f"its create job {state}; the job's log says why")[:300]
