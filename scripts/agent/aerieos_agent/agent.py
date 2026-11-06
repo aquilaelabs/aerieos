@@ -833,7 +833,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if st == 200 and r.get("kill_sessions"):
                 # ...or sessions here the operator ended from the Sessions
                 # card: the session account's tmux is only reachable as it.
-                self.kill_sessions([str(x) for x in r["kill_sessions"]])
+                ages = r.get("kill_ages") if isinstance(r.get("kill_ages"), dict) else {}
+                self.kill_sessions([str(x) for x in r["kill_sessions"]], ages=ages)
                 continue
             if st == 200 and r.get("tmux"):
                 # ...or keys for a session here: the phone keyboard's row,

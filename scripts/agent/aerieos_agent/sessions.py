@@ -595,8 +595,20 @@ class SessionsMixin:
             return None
         return rows[:64] if isinstance(rows, list) else None
 
-    def kill_sessions(self, names, why="asked from the dashboard"):
+    def kill_sessions(self, names, why="asked from the dashboard", ages=None):
+        """End each named session. With `ages` (seconds since each was asked,
+        from the controller), a session made after the ask is left alone: an
+        end heard late, after the held poll was down, landed on the session
+        Restart had started under the same name since, and the new terminal
+        ended as it opened."""
+        ages = ages or {}
         for name in names:
+            age = ages.get(name)
+            if isinstance(age, (int, float)) and age >= 0:
+                made = (self._tmux(["display-message", "-p", "-t", "=" + name, "#{session_created}"]) or "").strip()
+                if made.isdigit() and int(made) > time.time() - age + 1:
+                    log(f"sessions: not ending {name}: it started after the end was asked, {age:.0f}s ago")
+                    continue
             log(f"sessions: ending {name} ({why})")
             self._tmux(["kill-session", "-t", "=" + name])
 

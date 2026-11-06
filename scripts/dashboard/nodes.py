@@ -6033,7 +6033,10 @@ def session_kill(node_id, name):
     if not n or n["kind"] != "agent":
         return {"error": "no such node"}
     with _wake:
-        _kills.setdefault(node_id, set()).add(str(name)[:120])
+        # When it was asked, kept with it: an agent that hears late (its held
+        # poll down while the controller restarted) must not end a session
+        # started under the same name since, which is what Restart makes.
+        _kills.setdefault(node_id, {})[str(name)[:120]] = time.time()
         # Off the list from this moment: the heartbeat that stops carrying
         # it is up to a poll away, and a row that stays after ✕ for twenty
         # seconds reads as a button that did nothing.
@@ -6255,7 +6258,12 @@ def job_next(node_id, wait, runner="node", alive=None):
                 # them, and the held poll is how it hears at once.
                 kills = _kills.pop(node_id, None)
                 if kills:
-                    return {"kill_sessions": sorted(kills)}
+                    # The names as every agent reads them, and beside them how
+                    # long ago each was asked, in seconds: an age, not a time,
+                    # so the node's clock need not agree with this one's.
+                    now = time.time()
+                    return {"kill_sessions": sorted(kills),
+                            "kill_ages": {k: round(now - at, 1) for k, at in kills.items()}}
                 ops = _tmux_ops.pop(node_id, None)
                 if ops:
                     return {"tmux": ops}
