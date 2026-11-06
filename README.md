@@ -116,14 +116,17 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   Let's Encrypt where you ask. A public box can take in only 80 and 443,
   and Lock down stops it and revokes it in one press if it is ever taken over.
 - **Virtual machines.** A space's VMs on any node with KVM, made from a
-  cloud image or an installer's ISO (Windows included), each on its own
-  network, with snapshots, more disks when it needs them, USB devices given
-  through, and its screen and console in the dock. Ask a session for "a
+  cloud image or an installer's ISO (Windows included, with a TPM 2.0 for
+  Windows 11), each on its own network, with snapshots, more disks when it
+  needs them, USB devices given through, and its screen and console in the
+  dock. A VM made elsewhere, in virt-manager say, can be cloned into a space. Ask a session for "a
   Debian 12 VM with 4 GB" and it makes one, where the space allows it.
 - **Storage, on the installed editions.** The machine's disks as ZFS pools
-  or an array of mixed disks with parity, SMB and NFS shares, a pool for
-  each purpose, snapshots, backups of the pools and a sealed copy of the
-  controller's own configuration after every change.
+  or an array of mixed disks with parity and a full parity check, SMB and
+  NFS shares, a pool for each purpose, snapshots, backups of the pools, a
+  ZFS pool made on another machine imported as it is, and a sealed copy of
+  the controller's own configuration after every change, on the pools and
+  on a disk or share off the machine.
 - **People and permissions.** Accounts with roles, per-space access, and a
   dial for everything a session may do on its own (file bugs, add rules, run
   its container, sign a release): allowed, asked of a person, or refused.
@@ -135,9 +138,12 @@ VM you can wipe, and expect rough edges ([docs/image.md](docs/image.md)).
   of their own or purge at any time. A session reaches a git host only
   through `aerie git`, which hands over the credential, so the session never
   holds it.
-- **A controller that moves.** Prepare to move arms a move to another home;
-  every node hears where and follows by itself once the new home answers,
-  however long that takes.
+- **A controller that moves, and comes back.** Prepare to move arms a move
+  to another home; every node hears where and follows by itself once the new
+  home answers, however long that takes. A move lands only on a new
+  controller's first setup, never merged into one in use. Download a backup
+  keeps the controller under a token of its own, and a controller restored
+  from a backup takes back every node still there by itself.
 - **A tour of each page** the first time you open it, which you can skip
   once for every page and bring back from About or your Profile. About's
   Credits name the open-source work AerieOS is built on.
