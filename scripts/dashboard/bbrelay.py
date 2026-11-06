@@ -342,7 +342,7 @@ def run(me, req, project):
             return {"held": a["id"], "code": 1, "out": "",
                     "err": f"[builderbot] held: {pushscan.summary(r['held'])}. The flagged lines wait on the bell "
                            f"for {a.get('to') or 'a person'} to approve or deny; waiting up to 15 minutes\n"}, 200
-        return {"code": r["code"], "out": r["out"][-200000:], "err": r["err"][-20000:],
+        return {"code": r["code"], **_cut(r["out"], r["err"]),
                 **({"apply": r["apply"]} if r.get("apply") else {})}, 200
     # A few at a time: every relayed verb is a process of its own here, and
     # six sessions and two people writing at once was 129 of them started
@@ -361,5 +361,20 @@ def run(me, req, project):
         return {"error": str(e), "code": 1, "out": "", "err": ""}, 500
     finally:
         _SLOTS.release()
-    return {"code": r.returncode, "out": r.stdout[-200000:],
-            "err": r.stderr[-20000:]}, 200
+    return {"code": r.returncode, **_cut(r.stdout, r.stderr)}, 200
+
+
+# What a relayed verb prints comes back whole up to this, so a record printed
+# as JSON or YAML (aerie bug all --format json) still parses; past it the
+# start is cut, and said on stderr, since a cut document read as a whole one
+# is worse than a refusal.
+OUT_MAX = 16 * 1024 * 1024
+ERR_MAX = 20000
+
+
+def _cut(out, err):
+    out, err = out or "", err or ""
+    if len(out) > OUT_MAX:
+        err = (f"[builderbot] the output was {len(out)} characters: only the last {OUT_MAX} are here\n" + err)
+        out = out[-OUT_MAX:]
+    return {"out": out, "err": err[-ERR_MAX:]}
