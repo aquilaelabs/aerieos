@@ -7,6 +7,9 @@
 - Each of a space's settings is changed in one place: what every repository shares (people, what sessions reach, toolchains, coding agents, its nodes) on the space's own settings, shown read-only on a repository's with a button to them; a repository may still keep its containers off some of the space's hosting nodes, pick its own test node, and set any Agents may dial apart, and the space's settings name each repository that does (64b2b7d)
 - Fewer controls: where a repository's tests run is one choice under Build and test; the daily snapshot switch is gone (0 days kept takes none); terminal colors are Profile's for every space; Move the version is set on the Permissions view; Its VMs may hold shows only where VMs may be made (64b2b7d)
 
+- On a phone a space's Manage agent, Shell and its menu sit on the name's row, and a notebook's view tabs stay pinned at the top as its page scrolls (da5d620)
+- Good, warning and error colors are the same in every theme, one shade for dark themes and one for light; the warning is a warmer amber (da5d620)
+
 ### Fixed
 
 - A space's session can rebuild a container one of its repositories has on a hosting node the space or the repository uses, however it got there; one made there before the repository joined the space was still refused (8bb4415)
