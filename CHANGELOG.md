@@ -4,20 +4,175 @@
 
 ### Added
 
+- Pre-releases of any name and a changelog that knows what each release carried: aerie version release --pre NAME cuts vX.Y.Z-NAME.N beside --dev, each pre-release takes Unreleased as its own changelog section and its notes, a stable release gathers every pre-release since the last stable into its own section, the fixes to what only they had left out, and a release is refused while a bug the last release carried has no Fixed line (aerie changelog missing, add --bug N, skip N) (3df9934)
+
+### Fixed
+
+- aerie changelog add named the current commit as well on a line that already named its own (0b19d80)
+- A session's aerie output past 200 KB came back with its start cut off and no word of it, so a bug list printed as JSON on a node did not parse (61b68be)
+
+## 0.9.0-dev.4951: 2026-11-06
+
+### Changed
+
+- Projects are called spaces, since a space can hold code or only containers and VMs: every page, dialog and message says space, the Spaces page is at #/spaces, and a link to #/projects still opens it (da5e87e, e6e48f0)
+
+### Fixed
+
+- A dashboard page no longer reloads by itself when the machine's clock is corrected, which took what was being typed or pressed with it (ce458a5)
+- A console password could not be set: the job always failed, so the screen could never be logged in to (39118b2)
+- A machine with no NVIDIA card started with a failed unit at every boot (795590f)
+- The Installed page and the Library offered Remove on the NVIDIA driver and container toolkit the AerieOS image carries, and drew them on a machine with no card (ac2ce10)
+- The first-run page lost what was being typed each time it read the disks again (0b47c38)
+- A move could not land from the first-run walk or Controller settings: the controller's own machine counted as another node, so it never read as fresh (c7feb1d)
+- After a move onto a machine of its own, the spaces that ran on the old controller's machine still pointed at the old machine, which stayed on the Nodes page as one still to come (52c971a)
+- The dock's line jumped back to its start whenever it redrew (1e941bf)
+- On a phone the terminal's Keys and Commands buttons were different widths (b4b7e9d)
+- Analysis with no scanner reports showed a red message that stayed over the pages opened after it (788484c)
+- A home made by a BuilderBot image still greeted with BuilderBot at every start (5da10c0)
+- The move walk's Land card said more than the walk needs, and the space folder's card had two primary buttons (4b6302d)
+- aerie map could answer with a copy of a file left in a folder git ignores, ahead of the file itself (cd35f35)
+- The sessions doc said each session's own network was a switch on a node's page; it is always on, with no switch, and fails closed (fc1e749)
+
+### Upgrading
+
+- Nothing to do for the rename to spaces: aerie's verbs and --project, the API's paths and fields and what an install stores keep their names, and old #/projects links open the new page (da5e87e, e6e48f0)
+
+## 0.9.0-dev.4922: 2026-11-05
+
+### Changed
+
+- A share works as a NAS's does: a folder on a pool, internal until you turn Export on, then Private, Secure or Public, with each person read/write, read-only or no access, and editable after it is made. A share has no password of its own: each person signs in with their name and their sign-in password, or a separate one set on Profile (099ceeb)
+- One rule for fields on every page: a label over its field, fields in a grid with room between them, a long form in groups; and the control fits the answer, so the time zone is a pulldown and a store's path suggests the node's mounts (e96124a)
+- The first run on a machine of its own makes the disks, then gives the projects and containers a place by itself, with Shares as an optional step (d2859ed)
+
+### Fixed
+
+- An AerieOS machine lost its own node at every reboot: the agent and each account's home were kept in memory, and the page waited for ever. They now last, and a machine that lost them takes them back at its next boot (873803c)
+- A first run on blank disks could not make anything: every blank disk read as holding data and Make it stayed dead, a machine with an SSD got half its storage, and the shares could not be made (d2859ed)
+- Nothing could reach a share: Samba was never told of the shares file, a person's name was not mapped to their user, every imported password read as expired, and a file could not be saved over (099ceeb)
+- The console password could never log in, since the image had no login program (873803c)
+- VMs had no host after a reboot: libvirtd failed at every boot after the first (873803c)
+- A new project left a stray folder beside it (78c7d97)
+- This machine's Features said Storage and Shares were not installed on an AerieOS machine whose pools and shares worked, and its count said 1 installed above three (0ff1a80, 741c2d7)
+- Home's containers tile said an unknown count as last seen on a fresh machine instead of 0 of 0 (95e19b2)
+- The Containers page on the controller's own machine said to install Docker, which is already there, instead of saying containers do not run there yet and to enroll another machine (8687f19)
+- The console password, the move landing and Storage's new pool, schedule and array forms were laid out unlike every other form, with pulldowns too long to read (ce9bfe3)
+
+## 0.9.0-dev.4909: 2026-11-04
+
+### Changed
+
+- The first page asks whether you are moving a controller here, and yes opens a walk through it on the next page: what to have with you, the disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page. Every install takes it with the steps it has (b3d345a, ce7cd9e)
+- This machine reads as one page: every section a card, each fact said once, labels lined up and the words cut down. Its sections about the stick are now Pool and projects, First boot and The old system's disks (d83bc4e)
+
+### Fixed
+
+- Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (1e5c2d6, 9cd0b52)
+- Naming a projects folder took it from the system that had it, with no way back: that system could no longer read it. Who had it is now kept in the folder, Let it go gives it back, and root on the other system can run `.aerieos-give-back.sh` there (70ff89e)
+- A pool adopted from another system can be a stick's system pool whatever its filesystem: a btrfs or XFS one was not offered, which left Docker and the VMs waiting (095dce1)
+- The first-run page's links to This machine and the Storage page, and the held band's press, led nowhere while the page stood (b3d345a)
+
+## 0.9.0-dev.4895: 2026-11-04
+
+### Changed
+
+- A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
+
+### Fixed
+
+- A mount's state on the Storage section was cut off at a desk when it carried a fix (a stale handle, a mount that did not come up): the whole reason now sits under the mount's row, and the cell keeps its first words (bdad714)
+- Enrolling a node again had moved its stores back onto the default paths, so the runner lost its JDK, the project's FTP server was not found and every toolchain read as not installed; the script carries the node's store paths and the agent keeps the ones its record has (88a2736)
+
+## 0.9.0-dev.4885: 2026-11-03
+
+### Added
+
 - The doctor warns while /config sits on a FUSE share (a /mnt/user path): the state database there can come back older after a restart, and the line says what to map instead (25b29f0)
-- A project's FTP access can be kept on for an hour, a day or a week, then turns itself off
+
+### Changed
+
+- Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
+
+### Fixed
+
+- An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (615323d)
+- Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (0b67ee1)
+- A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (ef2656d)
+- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (f80e647)
+- Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (46119a7)
+
+## 0.9.0-dev.4875: 2026-11-03
+
+### Changed
+
+- Controller settings' Update checks is the clocks alone: when each check last looked and how often it runs; Check for updates stays on each thing's own page (Containers, nginx, Scanners, the Library) (801c19e)
+- Move this controller reads as facts (new home, armed, nodes heard, last packed, what is in the bundle, the ask) with one line under them, and a dozen dense hints across the pages say their one thing in a line with the rest behind a help mark (1f42d65)
+
+### Fixed
+
+- Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (68851b8, be70d12, 1db8d53)
+- The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (5f020a1, 1db8d53)
+- The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (df0f1c7)
+- AerieOS printed 'No changes allowed in reconfigure' on the console at every boot (2d67d9e)
+
+## 0.9.0-dev.4858: 2026-11-03
+
+### Added
+
+- A project with no repository is a place to run an agent that builds containers and VMs: Start agent on an empty project's card starts a session in a plain folder of the project's own, with no git and no notebook, briefed that its work is containers (aerie container new) and VMs (aerie vm); git, the build, test and notebook verbs are refused there with why, and the card's Settings opens the project's own settings as a dialog, with each repository's git, build, files and snapshots left to its notebook (1619322)
+- A project's Agents may dials are the defaults for every repository in it: a notebook's Permissions view starts each dial on 'as the project' and sets one apart only when picked, so a new repository takes the project's permissions until somebody says otherwise (52d4ee9)
+
+### Fixed
+
+- The dashboard could answer an error while a project was being deleted, if a status read was going on at the same moment (6b7a26f)
+
+## 0.9.0-dev.4852: 2026-11-03
+
+### Added
+
+- A node's Features section marks an NVIDIA card for a VM: from the next boot vfio-pci holds it, one VM takes it under Hardware, and the machine and its containers do without it until it is unmarked (9a90fa8)
+- A container is given the machine's GPU from its settings on the Containers page: an NVIDIA card through the container toolkit, an AMD card or APU through its render devices, for every service of it from the next build (946f98d)
+
+### Fixed
+
+- The first run's Your disks step leaves the disks a stick's plan adopts alone: each is listed as the old system's, with no box, and Make it never sees them; with every disk theirs the step points at This machine's Disks from the stick (565fc4b)
+- AerieOS carries the Realtek and Broadcom network firmware, so a board with one of those chips no longer boots saying its firmware could not be loaded (565fc4b)
+- Install on IOMMU, Storage, Shares or UPS in a node's Features section lands: the agent refused every feature but VM host and the firewall as 'not a feature verb' (9a90fa8)
+- This machine's From the stick section marks the array, the pools and the shares done once they are adopted or served, instead of saying they are waiting for good (f0d0d47)
+- On an AerieOS machine the Nodes page says the machine is its own node and where its page is, instead of 'No node yet' (f0d0d47)
+- A move's landing cut midway (a power loss between its steps) is said on the bell, with where what was there is kept and that landing the same bundle again finishes it (f0d0d47)
+- A landing says when the carried install key could not be taken because the new home's key is set in its environment, and what to set (f0d0d47)
+- A moved controller's band says the way back: its bundle still downloads and lands on a fresh install (f0d0d47)
+- A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
+- Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
+- Forge measure asks the git door whether a project's token may push, so a fine-grained token an organization has not approved no longer reads as able to push until the push itself is refused (b0be3a2)
+- On the first run's disks step a disk's checkbox sat on a line of its own above the disk's name instead of before it (46ee70b)
+- On Windows the USB maker's write could stop at 'access denied' after the stick's partitions were cleared: it now opens and locks the stick again and goes on where it was (401400a)
+
+## 0.9.0-dev.4818: 2026-11-02
+
+### Fixed
+
+- The USB maker and the installer take the newest published build that carries their file, by its exact name: a dev build from before the name carries builderbot-os and builderbot-controller files, and the maker took one, asked for an aerieos-os image that was not there and stopped (84604c8)
+- On Windows the USB maker's first write after the stick's partitions are cleared no longer stops at 'the device is not ready': the write waits for the stick for up to thirty seconds, and a Windows refusal is said in Windows' own words (84604c8)
+- A stick's first boot sets the hostname and the time zone its prepared configuration names; they were left at aerieos and UTC, with both under failed on This machine (84604c8)
+- The Storage page shows a disk as mounted as soon as Disks from the stick has adopted it, instead of 'not mounted' until the hourly walk or Measure now (84604c8)
+- Serve the shares on This machine no longer refuses a share for a person who has not signed in yet: their user is made on the machine when the share names them, and they reach it over SMB once their password is set on Profile (84604c8)
+- A release is no longer refused for 'uncommitted changes' over files git does not track; a changed tracked file still refuses it, named (84604c8)
+- A dev build's files all land on one release: the apps, the controller bundle and the OS image each found the tag's draft among the drafts, where two drafts had been made for one tag (84604c8)
+
+## 0.9.0-dev.4809: 2026-11-02
+
+### Added
+
+- The roadmap's steps move between items without losing anything: aerie roadmap step mv takes a step to another item whole, split makes new items from an item's steps, fold makes an item a step of another, and each step keeps the number it was first given, so aerie roadmap show finds it by that number wherever it is now; on the page a step has Move to, an item Split and Fold into, and in reorder mode a step drags onto another item (3b4d293)
 - AerieOS has a way in at its screen: a console password set on This machine logs in as admin with sudo, and the boot menu's Rescue entry opens a root shell at the screen when nothing else answers (6e8e123)
-- A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
 - An installed AerieOS takes over the disks another NAS made as they are: each data disk found by its serial and mounted with its own filesystem at its old path (read-only by default, writing nothing at all), the parity disk left alone, the pools writable, the merged folders made again, the shares served as they were, and the containers and VMs that ran brought back with the exact images they ran and started with the machine where they were (This machine, Disks from the stick)
 - The image is tagged :dev when a release or dev build is published, so an install can follow the dev channel by its compose file or template (1b8ce1d)
 - aerie version release --withdraw TAG deletes a published release and its tag together, and the tag in the project's copy, so the number can be cut again; it is always the project owner's answer on the bell, and a tag whose release is already gone goes alone (7a8e367)
 - aerie version rehearse runs every build a release's tag runs on the pushed branch, publishing nothing, with a summary of the files the release would carry, so a release is tagged once it is green (7a8e367)
-- A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
 - A release can be signed with an offline release key (tools/release-sign.py): AerieOS's updater, the stick maker and the installer refuse a release the install's own config/release-signers does not verify, so a change to the repository or its CI cannot hand an install an update (7f98d53)
-- On a USB stick, This machine can name a folder already on the machine's disks as the projects folder, so a controller moved there works on its projects where they are, with nothing copied (7c24926)
-- On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
-- A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
-- Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
 - AerieOS keeps the versions an update replaces, the three newest by default: each is on the boot menu under Older versions and on This machine, a visit lasting one boot with the configuration as it was (300599f)
 - On a bare-metal or USB install, plain http://the-machine/ finds the dashboard: a redirect on port 80 until nginx or anything else takes the port (2a102c2)
 - An agent works the project's git host through `aerie forge`: pull requests (list, view, create, comment, review, close, merge), issues, CI runs with their logs, reruns and dispatches, and releases, one set of verbs on GitHub, GitLab, Gitea and Forgejo, each run on the controller with the project's access token, which never reaches a session. The token is measured on the host without changing anything; the project's Permissions view gains On the git host, each ability with what the token allows and an Allow or Deny over it (merging starts at Deny); every session is told at its start what it may do there and what to ask for; and *Which permissions?* beside the token field opens the new git hosts page, the table of what to enable on each host. (3113eeb)
@@ -32,7 +187,6 @@
 - A bare-metal install updates from the page: a newer release is a line on the bell and an Updates section under Controller settings, Update runs the installer through the machine's own node (its root agent, never the controller's account), the release's controller bundle is fetched from the release and checked against its sha256 and its build attestation, and a new release that does not answer is rolled back by itself; each release now publishes builderbot-controller-X.Y.Z.tar.gz with its sha256 and attestation (2df7ee8)
 - Tests run on a node picked for them: a project's settings gain a Test node beside its nodes, and with one named aerie tests run, aerie dashboard test and the gate's suites run there as a job (this tree snapshotted, as a build travels), with as many workers as that node's cores and memory allow, the lines streamed back, the run recorded and a covered run's counters merged here as a local run's are; a run behind another there says how many jobs are ahead (725635f)
 - USB devices to VMs: a VM host's node page gains a USB section listing each device the machine has (name, vendor and product, serial, port, speed, the driver holding it) with what holds it, Give to a VM attaches it live to a running VM and writes it into its definition (a stopped one has it from its next start), Take back detaches it, a device is found again by its serial after a replug or a reboot and by its port when two are alike, a device the host boots from, serves storage on or has in a pool stays the host's with why, the VM's row names what it holds, and aerie vm devices and aerie vm usb let a session list and ask, held for an administrator on the bell; the section's Controllers list each USB controller with what hangs off it and its IOMMU group, given whole through the VM's Hardware dialog unless something the host needs shares the group; the Features section's IOMMU puts intel_iommu=on or amd_iommu=on with iommu=pt on the kernel's command line and asks for a restart (afbb962)
-- The roadmap's steps move between items without losing anything: aerie roadmap step mv takes a step to another item whole, split makes new items from an item's steps, fold makes an item a step of another, and each step keeps the number it was first given, so aerie roadmap show finds it by that number wherever it is now; on the page a step has Move to, an item Split and Fold into, and in reorder mode a step drags onto another item (3b4d293)
 - Every notebook record prints whole as JSON, YAML or Markdown (--format, or --json) on aerie roadmap, bug, rules, wiki, design and map, from one serializer with a format number in each document, and the same formats come back in: aerie roadmap add --from FILE and aerie bug add --from FILE add the records in a file, and aerie roadmap apply FILE writes an edited show back, refused when the list moved since it was printed; the code map reads data files too, so aerie map find DASHBOARD_PORT names every file a setting lands in and aerie map who-calls DASHBOARD_PORT where the code reads it (3b4d293)
 - A model router on a node: a node's page gains a Model router section that deploys LiteLLM there with the provider keys you give it (Anthropic, OpenAI, Google, OpenRouter, xAI, and any OpenAI-compatible endpoint under a name of its own), kept sealed on the controller and never in a session's view, Ollama beside it where you turn it on with its models pulled and removed from the section, and the projects allowed to use it, each handed the router's address and a key of its own at a session's start so its spend is its own; the models the router knows, with their context and price, and each project's spend are read from the section (a82d20e)
 - Any model as a fifth coding agent: OpenCode, pointed at a node's model router rather than signed in to anybody, offered by Start as Any model with the router's models (their context and price where known) and started with a config of its own (the router as its provider, the briefing as its instructions), its guards a plugin of AerieOS's calling the same hooks as the other agents', its conversations exported into the transcripts; the Library installs and updates it as the others; the picker marks the models walked with it and says when one's context cannot hold the briefing, and its tab on the dock says the project's spend through the router and a local model's tokens per second (a196894)
@@ -72,34 +226,23 @@
 - One manifest for everything: every shipped toolchain and every coding agent is a pack in bbtool.json's format under packs/, tagged official and bundled with the release for an install with no network, a toolchain's recipe under shipped and an agent's adapter (how it installs, updates and signs in, how it takes the briefing and AerieOS's guards, where its conversations are) under agent; an agent that cannot take the guards is not listed, and aerie lint holds the packs to the tables they are written from (3aa2613)
 - The vetted catalog's signed index: AerieOS reads the catalog's index.json and index.sig from the address under Controller settings (the public builderbot-catalog by default), checks the signature against the maintainers' public key the install ships before reading an entry, refuses a tampered or re-signed index and keeps the one before, and puts a pack the catalog withdrew on the bell for every install that holds it; each entry pins a pack to an exact commit and its archive's sha256, never latest (c9eebb7)
 - Install from the vetted catalog: the Library lists the index's packs with their tier, each Install opening the Add tool pack dialog on the commit the index pins with the archive's sha256 checked on the way in, Look before Add as always; every pack's row says its tier (vetted, or by URL), and a withdrawn pack is said and not offered (a196894)
-- A node's Features section marks an NVIDIA card for a VM: from the next boot vfio-pci holds it, one VM takes it under Hardware, and the machine and its containers do without it until it is unmarked (9a90fa8)
-- A container is given the machine's GPU from its settings on the Containers page: an NVIDIA card through the container toolkit, an AMD card or APU through its render devices, for every service of it from the next build (946f98d)
-- A project with no repository is a place to run an agent that builds containers and VMs: Start agent on an empty project's card starts a session in a plain folder of the project's own, with no git and no notebook, briefed that its work is containers (aerie container new) and VMs (aerie vm); git, the build, test and notebook verbs are refused there with why, and the card's Settings opens the project's own settings as a dialog, with each repository's git, build, files and snapshots left to its notebook (1619322)
-- A project's Agents may dials are the defaults for every repository in it: a notebook's Permissions view starts each dial on 'as the project' and sets one apart only when picked, so a new repository takes the project's permissions until somebody says otherwise (52d4ee9)
+- A project's FTP access can be kept on for an hour, a day or a week, then turns itself off
+- A controller moved onto a bare-metal machine keeps the node that machine already is and a stick's plan of disks to adopt (a94c440)
+- A project can list the files each release must carry in .release-files; the controller checks every release against it once CI has had three hours, and a release short of a file is a red row on the bell naming the file and why (7a8e367)
+- On a USB stick, This machine can name a folder already on the machine's disks as the projects folder, so a controller moved there works on its projects where they are, with nothing copied (7c24926)
+- On a USB stick the projects are never kept on the stick: until a system pool or a projects folder on the disks is named, no project is made, cloned or moved in (7c24926)
+- A move onto a USB stick lands from Controller settings, Move a controller here, once the disks hold the projects, spooled and unpacked there; a landing without room says so before it takes the bundle (7c24926)
+- Every release starts as a draft: the Artifacts view's Drafts shows its notes to read and correct, and Publish makes it public once its files are all there (c4879b7)
 
 ### Changed
 
-- A share works as a NAS's does: a folder on a pool, internal until you turn Export on, then Private, Secure or Public, with each person read/write, read-only or no access, and editable after it is made. A share has no password of its own: each person signs in with their name and their sign-in password, or a separate one set on Profile (099ceeb)
-- One rule for fields on every page: a label over its field, fields in a grid with room between them, a long form in groups; and the control fits the answer, so the time zone is a pulldown and a store's path suggests the node's mounts (e96124a)
-- The first run on a machine of its own makes the disks, then gives the projects and containers a place by itself, with Shares as an optional step (d2859ed)
-- The first page asks whether you are moving a controller here, and yes opens a walk through it on the next page: what to have with you, the disks, where the projects and containers go, landing the controller, what comes after and the way back, in the order they have to happen and each done on that page. Every install takes it with the steps it has (b3d345a, ce7cd9e)
-- This machine reads as one page: every section a card, each fact said once, labels lined up and the words cut down. Its sections about the stick are now Pool and projects, First boot and The old system's disks (d83bc4e)
-- A store pointed at a folder that already is one is used as it is: AerieOS's marker in it, the node's own toolchain folder inside it, or the folder the page nested for the node before; nothing is nested inside and nothing brought across (c99eafc); the agent asks the same at apply time, so a setting saved before the controller could tell applies without a second save (f386579)
-- Enroll script on an enrolled node's row downloads the script at once, built from what the node was enrolled with (the system it runs included); the Features section's Enroll again is where an answer is changed (3d5f350)
 - Any install picks its update channel under Controller settings, Updates, and a dev build follows the dev builds until another is picked
 - The default theme is blue and copper: navy surfaces, a cerulean accent, blue words and warm copper on what is pressed, and the mark with them; a check that passed stays green
 - BuilderBot is now AerieOS, at aerieos.org, with a new mark: a raptor with its wings swept back, which is also the letter A
 - The command is aerie, in every shell and session
 - The container edition is called Aerie Workshop: it is the AI workshop alone, and the storage comes with AerieOS on a machine of its own
-- A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
-- On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
-- The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)
-- A project's Agents may says what each of its parts is for: Coding agents says Claude always may and an unticked agent does not start there, Start opens and Sessions each carry a line under them, and each agent's guards fold under How each agent is guarded (6ae825f)
 - A session's aerie version release from a branch other than main makes a dev pre-release unless --stable is said, and its first line names the channel the release lands on (7a8e367)
 - aerie sign release waits for its look and says what it found, run by run, or why it found nothing to sign (7a8e367)
-- Pages read alike: sizes say their unit after a space and in TB past a terabyte, a list narrowed two ways shows one All with the second row starting at Any source or Any version, a view's status line is a note unless it says what stops a press, the Wiki view's controls are one row, Commit all and the Design view's new page sit on one line, and where any coding agent is meant the page says agent (56bc704)
-- A project's Permissions, On the git host: Change CI workflow files set to Deny now refuses a session's push that changes a workflow file (a workflow runs with the repository's secrets); Push branches, Read the code and Publish and edit releases have no switch there any more, each showing the setting that governs it (Pushing, or Agents may: Tag and publish a release), since a Deny on them was told to sessions but never enforced (30cba84)
-- The :latest image is now the newest published release, moved when one is published, where it followed every push to main; :main follows main, and :dev and :X.Y move when a release is published (c4879b7)
 - A dev build's release notes list only what changed since the last published release (37e8e97)
 - Every page's top reads in one order: a notice, the page's head, its number tiles, then the search with the page's buttons at its right, the filter chips under it and the small jump chips over the sections they lead to; a notebook view the same, its tiles first. A single action sits in its head's top-right corner or beside the words it belongs with, never on a line of its own, and on a phone the search keeps its buttons on its line while they fit. (61c8237)
 - The Machines, Build and Containers headers keep one node for every one of their pages, and no page names that node again under the header. (61c8237)
@@ -121,69 +264,13 @@
 - A pack's setting may be each person's own: a config field with `"scope": "person"` is set under Yours on the Installed page's row by anyone who works on that node's projects, sealed under their own key and read by their own sessions' verbs (8f2fabf)
 - Configure on the card: a tool pack says in its manifest what it asks for on a node (keys, choices, a list of endpoints, a switch, the projects allowed), a new Installed page under Machines, with the node picked, lists what the Library put there and draws that form on each row, keeps the answers sealed and hands them to that node for the pack's verbs; an agent's sign-in, a toolchain's system packages and Remove live there too, the Library's cards showing the catalog's entry alone; the Model router is installed from the Library and configured on Installed, and its section leaves the node's page (5155820)
 - A person keeps one token for each git host and sign-in: a new one replaces the one before in place, every project using it moves to the new one, and the older tokens an install already kept for the same host are let go at the upgrade (fb7bd4d)
-- Controller settings' Update checks is the clocks alone: when each check last looked and how often it runs; Check for updates stays on each thing's own page (Containers, nginx, Scanners, the Library) (801c19e)
-- Move this controller reads as facts (new home, armed, nodes heard, last packed, what is in the bundle, the ask) with one line under them, and a dozen dense hints across the pages say their one thing in a line with the rest behind a help mark (1f42d65)
-- Projects are called spaces, since a space can hold code or only containers and VMs: every page, dialog and message says space, the Spaces page is at #/spaces, and a link to #/projects still opens it (da5e87e, e6e48f0)
-
-### Fixed
-
-- An AerieOS machine lost its own node at every reboot: the agent and each account's home were kept in memory, and the page waited for ever. They now last, and a machine that lost them takes them back at its next boot (873803c)
-- A first run on blank disks could not make anything: every blank disk read as holding data and Make it stayed dead, a machine with an SSD got half its storage, and the shares could not be made (d2859ed)
-- Nothing could reach a share: Samba was never told of the shares file, a person's name was not mapped to their user, every imported password read as expired, and a file could not be saved over (099ceeb)
-- The console password could never log in, since the image had no login program (873803c)
-- VMs had no host after a reboot: libvirtd failed at every boot after the first (873803c)
-- A new project left a stray folder beside it (78c7d97)
-- Move a controller here was never drawn on Controller settings, on any install, so a move onto a stick had no form to land on; Back up now stayed dead for the owner too, and a kept copy had no Download (1e5c2d6, 9cd0b52)
-- Naming a projects folder took it from the system that had it, with no way back: that system could no longer read it. Who had it is now kept in the folder, Let it go gives it back, and root on the other system can run `.aerieos-give-back.sh` there (70ff89e)
-- A pool adopted from another system can be a stick's system pool whatever its filesystem: a btrfs or XFS one was not offered, which left Docker and the VMs waiting (095dce1)
-- The first-run page's links to This machine and the Storage page, and the held band's press, led nowhere while the page stood (b3d345a)
-- A mount's state on the Storage section was cut off at a desk when it carried a fix (a stale handle, a mount that did not come up): the whole reason now sits under the mount's row, and the cell keeps its first words (bdad714)
-- Enrolling a node again had moved its stores back onto the default paths, so the runner lost its JDK, the project's FTP server was not found and every toolchain read as not installed; the script carries the node's store paths and the agent keeps the ones its record has (88a2736)
-- An enroll script run again on a node with a cloudflared door left the door restarting under the ssh session running it, which ended the session and the script with it; a door up on its token is left running (615323d)
-- Just a token in an enrolled node's Enroll again dialog was refused as a second node with the row's name; it mints on the row (0b67ee1)
-- The USB maker and the installer take the newest published build that carries their file, by its exact name: a dev build from before the name carries builderbot-os and builderbot-controller files, and the maker took one, asked for an aerieos-os image that was not there and stopped (84604c8)
-- On Windows the USB maker's first write after the stick's partitions are cleared no longer stops at 'the device is not ready': the write waits for the stick for up to thirty seconds, and a Windows refusal is said in Windows' own words (84604c8)
-- A stick's first boot sets the hostname and the time zone its prepared configuration names; they were left at aerieos and UTC, with both under failed on This machine (84604c8)
-- The Storage page shows a disk as mounted as soon as Disks from the stick has adopted it, instead of 'not mounted' until the hourly walk or Measure now (84604c8)
-- Serve the shares on This machine no longer refuses a share for a person who has not signed in yet: their user is made on the machine when the share names them, and they reach it over SMB once their password is set on Profile (84604c8)
-- A release is no longer refused for 'uncommitted changes' over files git does not track; a changed tracked file still refuses it, named (84604c8)
-- A dev build's files all land on one release: the apps, the controller bundle and the OS image each found the tag's draft among the drafts, where two drafts had been made for one tag (84604c8)
-- The first run's Your disks step leaves the disks a stick's plan adopts alone: each is listed as the old system's, with no box, and Make it never sees them; with every disk theirs the step points at This machine's Disks from the stick (565fc4b)
-- AerieOS carries the Realtek and Broadcom network firmware, so a board with one of those chips no longer boots saying its firmware could not be loaded (565fc4b)
-- Install on IOMMU, Storage, Shares or UPS in a node's Features section lands: the agent refused every feature but VM host and the firewall as 'not a feature verb' (9a90fa8)
-- This machine's From the stick section marks the array, the pools and the shares done once they are adopted or served, instead of saying they are waiting for good (f0d0d47)
-- On an AerieOS machine the Nodes page says the machine is its own node and where its page is, instead of 'No node yet' (f0d0d47)
-- A move's landing cut midway (a power loss between its steps) is said on the bell, with where what was there is kept and that landing the same bundle again finishes it (f0d0d47)
-- A landing says when the carried install key could not be taken because the new home's key is set in its environment, and what to set (f0d0d47)
-- A moved controller's band says the way back: its bundle still downloads and lands on a fresh install (f0d0d47)
-- A cache disk an old system kept in its array's cache slot is offered for adoption as a pool (f0d0d47)
-- Four refusals on the adoption path say what to do: a disk with no filesystem UUID, a pool's name that cannot be mounted here, a prepared configuration that could not be read, and a stick with no room for a static address (f0d0d47)
-- Forge measure asks the git door whether a project's token may push, so a fine-grained token an organization has not approved no longer reads as able to push until the push itself is refused (b0be3a2)
-- Move this controller on Controller settings fills in after a reload and after Forget it, and keeps itself current while a move is armed (68851b8, be70d12) (1db8d53)
-- The Update window is offered only on an install that updates itself (bare metal and AerieOS), and its boot-menu field only on AerieOS; the container edition's image is pulled by whatever runs it (5f020a1) (1db8d53)
-- The color scheme picker's chosen tile shows its scheme's own colors; the page's pressed-button fill had painted the Default tile copper (df0f1c7) (df0f1c7)
-- A node whose newest token the controller does not know tries the one it was handed before, and takes a fresh one from there: a controller back from a restart with an older record had kept its nodes refused until each was re-enrolled by hand (ef2656d)
-- The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (f80e647)
-- Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (46119a7)
-- A dashboard page no longer reloads by itself when the machine's clock is corrected, which took what was being typed or pressed with it (ce458a5)
-- A console password could not be set: the job always failed, so the screen could never be logged in to (39118b2)
-- A machine with no NVIDIA card started with a failed unit at every boot (795590f)
-- The Installed page and the Library offered Remove on the NVIDIA driver and container toolkit the AerieOS image carries, and drew them on a machine with no card (ac2ce10)
-- The first-run page lost what was being typed each time it read the disks again (0b47c38)
-- A move could not land from the first-run walk or Controller settings: the controller's own machine counted as another node, so it never read as fresh (c7feb1d)
-- After a move onto a machine of its own, the spaces that ran on the old controller's machine still pointed at the old machine, which stayed on the Nodes page as one still to come (52c971a)
-- The dock's line jumped back to its start whenever it redrew (1e941bf)
-- On a phone the terminal's Keys and Commands buttons were different widths (b4b7e9d)
-- Analysis with no scanner reports showed a red message that stayed over the pages opened after it (788484c)
-- A home made by a BuilderBot image still greeted with BuilderBot at every start (5da10c0)
-- On the first run's disks step a disk's checkbox sat on a line of its own above the disk's name instead of before it (46ee70b)
-- On Windows the USB maker's write could stop at 'access denied' after the stick's partitions were cleared: it now opens and locks the stick again and goes on where it was (401400a)
-- The dashboard could answer an error while a space was being deleted, if a status read was going on at the same moment (6b7a26f)
-- AerieOS printed 'No changes allowed in reconfigure' on the console at every boot (2d67d9e)
-- This machine's Features said Storage and Shares were not installed on an AerieOS machine whose pools and shares worked, and its count said 1 installed above three (0ff1a80, 741c2d7)
-- Home's containers tile said an unknown count as last seen on a fresh machine instead of 0 of 0 (95e19b2)
-- The Containers page on the controller's own machine said to install Docker, which is already there, instead of saying containers do not run there yet and to enroll another machine (8687f19)
-- The console password, the move landing and Storage's new pool, schedule and array forms were laid out unlike every other form, with pulldowns too long to read (ce9bfe3)
+- A chip that narrows a list moves it: what stays slides to its new place, what the chip leaves out fades away and what it brings fades in, on the Library's cards and every page with chips (3279319)
+- On the Library the source chips count within the kind picked, so picking Apps says how many apps each source has (4330d70)
+- The NVIDIA driver's card and row say installed and in use where they said running the card, and an installed card or row says so in green (bc71c74)
+- A project's Agents may says what each of its parts is for: Coding agents says Claude always may and an unticked agent does not start there, Start opens and Sessions each carry a line under them, and each agent's guards fold under How each agent is guarded (6ae825f)
+- Pages read alike: sizes say their unit after a space and in TB past a terabyte, a list narrowed two ways shows one All with the second row starting at Any source or Any version, a view's status line is a note unless it says what stops a press, the Wiki view's controls are one row, Commit all and the Design view's new page sit on one line, and where any coding agent is meant the page says agent (56bc704)
+- A project's Permissions, On the git host: Change CI workflow files set to Deny now refuses a session's push that changes a workflow file (a workflow runs with the repository's secrets); Push branches, Read the code and Publish and edit releases have no switch there any more, each showing the setting that governs it (Pushing, or Agents may: Tag and publish a release), since a Deny on them was told to sessions but never enforced (30cba84)
+- The :latest image is now the newest published release, moved when one is published, where it followed every push to main; :main follows main, and :dev and :X.Y move when a release is published (c4879b7)
 
 ### Security
 
@@ -198,4 +285,3 @@
 - The command is aerie, and bb is gone
 - The image is ghcr.io/aquilaelabs/aerieos, the repositories are github.com/aquilaelabs/aerieos and aerieos-catalog, and every download is named aerieos-*
 - The Android app is org.aerieos.app and the VS Code extension aquilaelabs.aerieos: install them new and pair or sign in again
-- Nothing to do for the rename to spaces: aerie's verbs and --project, the API's paths and fields and what an install stores keep their names, and old #/projects links open the new page (da5e87e, e6e48f0)
