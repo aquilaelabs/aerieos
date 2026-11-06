@@ -10057,6 +10057,12 @@ class Handler(BaseHTTPRequestHandler):
             # space's session works on each of its repositories (B709).
             shipped_there = devapp._read_rec(name, devapp.instance_key(name, field(req, "instance") or devapp.MAIN)).get("ship") \
                 and on in ((prefs.get(name).get("hosts") or []) + (prefs.get(sess).get("hosts") or []))
+            # ...and one on a node its repository or its space works on or
+            # hosts containers on (Also works on, set on the space's door),
+            # however it got there: aerie devapp new --node, before the
+            # repository joined this space (the website on draconis, 7 Nov).
+            shipped_there = shipped_there or on in [n for w in (name, sess) for n in
+                                                     (devapp.nodes_of(w) or []) + (prefs.get(w).get("hosts") or [])]
             if on and mine and on != mine and not shipped_there:
                 return self._json({"error": "this dev instance is on another node: it stayed "
                                             "where it was running when this space moved, "
