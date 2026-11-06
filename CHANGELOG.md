@@ -10,6 +10,7 @@
 
 - aerie changelog add named the current commit as well on a line that already named its own (0b19d80)
 - A session's aerie output past 200 KB came back with its start cut off and no word of it, so a bug list printed as JSON on a node did not parse (61b68be)
+- Editing a draft release's notes, or attaching its signed APK, could take its tag off on GitHub, so Publish and the next edit could not find it (028a05c)
 
 ## 0.9.0-dev.4951: 2026-11-06
 
