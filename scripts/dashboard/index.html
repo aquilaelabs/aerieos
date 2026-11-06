@@ -1017,6 +1017,8 @@ html[data-motion="reduce"] .tourring{transition:none}
    a hairline between each, the words left, the download right. */
 .cvlogs{display:flex;flex-direction:column}
 .cvlogs .artrow .first{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A conversation's time is one piece: on a phone its PM never sits alone on a line. */
+.cvlogs .artrow .top b{white-space:nowrap}
 /* A swatch renders in its own scheme: the tokens above are defined for
    .sw[data-theme=...] as well as for the page, so this is the palette itself
    at 1cm rather than a hand-kept copy of it. */
