@@ -7,6 +7,11 @@
 - A controller restored from a backup takes back every node still there by itself, even one whose credential changed since the copy was made; a node that is gone simply never comes back (b9d2886)
 - Backup copies can also go to a disk or share under Other disks and shares, so a copy of the controller is off the machine; the section says plainly that it holds the controller, not the files on your pools (a1c7bad)
 
+### Fixed
+
+- A space's session can rebuild a container that one of the space's repositories sent to a hosting node; it was refused as left behind on another node (54a4726)
+
+
 ## 0.9.0-dev.5030: 2026-11-06
 
 ### Added
