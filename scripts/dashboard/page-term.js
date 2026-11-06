@@ -137,11 +137,11 @@ function termProject(arg){
   return m ? m[1] : "";
 }
 
-// This person's look for this tab: their Profile's, and the colors they
-// gave its project over the Profile's (prefs' term_scheme).
+// This person's look for this tab: their Profile's, for every space alike
+// (R223: a space's own colors went, its card's color telling spaces apart).
 function termLook(t){
-  const look = state?.term_look || {}, row = (state?.projects || []).find(p => p.name === termProject(t.arg));
-  const scheme = row?.yours?.term_scheme || look.scheme || "default";
+  const look = state?.term_look || {};
+  const scheme = look.scheme || "default";
   const theme = termPalette(scheme, (look.colors || {})[scheme]);
   return {fontSize: look.size || 13, cursorStyle: look.cursor || "block", cursorBlink: look.blink !== false, theme};
 }

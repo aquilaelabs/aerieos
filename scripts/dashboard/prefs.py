@@ -165,13 +165,13 @@ GROUP_FIELDS = ("node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", 
 # repository inherits each unless its record names the dial in `overrides`,
 # the notebook's own choice. A gate is named gate.KIND. "inherit" written
 # to one takes the override away.
-OVERRIDABLE = ("devbuild", "makevms", "installpacks", "report", "sign", "keys", "release", "pc", "test_change")
+OVERRIDABLE = ("devbuild", "makevms", "installpacks", "report", "sign", "keys", "release", "pc", "test_change", "test_node")
 INHERIT = "inherit"
 
 
 # What each dial reads as when nothing is set.
 DIAL_DEFAULTS = {"devbuild": "deny", "makevms": "deny", "installpacks": "ask", "report": "auto", "sign": "ask",
-                 "keys": "ask", "release": "ask", "pc": "deny", "test_change": "wait"}
+                 "keys": "ask", "release": "ask", "pc": "deny", "test_change": "wait", "test_node": ""}
 
 
 def _overrides_of(rec):
@@ -251,6 +251,11 @@ def _over(project, rec, raw):
         rec.update({f: g[f] for f in GROUP_FIELDS if not (f in OVERRIDABLE and f in own)})
         rec["gate"] = {k: rec["gate"][k] if f"gate.{k}" in own else g["gate"][k] for k in GATE_KINDS}
         rec["project_dials"] = {f: g[f] for f in OVERRIDABLE} | {"gate": dict(g["gate"])}
+        # The space's hosting nodes, less the ones this repository keeps its
+        # containers off (R223); the space's whole list beside them.
+        off = set(rec.get("hosts_off") or [])
+        rec["space_hosts"] = list(rec.get("hosts") or [])
+        rec["hosts"] = [h for h in rec["space_hosts"] if h not in off]
         rec["repos_of"] = key
     return rec
 
@@ -482,6 +487,10 @@ def _clean(rec):
             # project's sessions make, rebuild and remove containers there
             # under its Run its container dial (the operator, 10 Oct).
             "hosts": _hosts_of(rec),
+            # The space's hosting nodes this repository's containers may not
+            # go to (R223, the operator, 7 Nov): a repository narrows its
+            # space's list, never adds to it.
+            "hosts_off": _hosts_of({"hosts": rec.get("hosts_off")}),
             # The other projects a session here may READ: their trees, bound
             # read-only into the session's view on a node, and their
             # notebooks through the API and the relayed verbs, every write
@@ -999,7 +1008,7 @@ def _no_inherit(kw):
     return out
 
 
-def _set_prefs(project, node=None, nodes=None, build=None, test=None,
+def _set_prefs(project, node=None, nodes=None, hosts_off=None, build=None, test=None,
               outputs=None, gate=None, gitpol=None, forgepol=None,
               devbuild=None, tests_in=None, test_node=None, report=None, color=None, workspace=None, sign=None, keys=None,
               test_change=None, capture_days=None, reads=None, sees=None, gpu=None, dev_keep=None,
@@ -1195,7 +1204,10 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
             # One of the project's own nodes (R151), where its tree is synced
             # and its session may run a job; "" is the session's own node.
             tn = str(test_node or "").strip()[:40]
-            if tn and tn not in _nodes_of(cur) and tn != cur.get("node"):
+            # A repository's are its space's (R223): its own record holds none.
+            sk = _rp()[0](project) if _rp() else ""
+            sp = _clean(d["projects"].get(sk)) if sk and sk != project else {}
+            if tn and tn not in _nodes_of(cur) + _nodes_of(sp) and tn not in (cur.get("node"), sp.get("node")):
                 return {"error": "the test node is one of the space's nodes: add it under Node first"}
             cur["test_node"] = tn
         if test_change is not None:
@@ -1234,6 +1246,8 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
             cur["dev_keep"] = n
         if hosts is not None:
             cur["hosts"] = _hosts_of({"hosts": hosts if isinstance(hosts, list) else str(hosts).split(",")})
+        if hosts_off is not None:
+            cur["hosts_off"] = _hosts_of({"hosts": hosts_off if isinstance(hosts_off, list) else str(hosts_off).split(",")})
         if log_from is not None:
             cur["log_from"] = _log_from({"log_from": log_from})
         if diag is not None:
@@ -1243,7 +1257,7 @@ def _set_prefs(project, node=None, nodes=None, build=None, test=None,
         # An empty pair is removed rather than stored: the file then says only
         # what somebody chose, and a project left alone leaves no trace to read
         # past when its directory is renamed or deleted.
-        if (cur["node"] or cur["hosts"] or cur["color"] or cur["reads"] or cur["sees"] or cur["reaches"]
+        if (cur["node"] or cur["hosts"] or cur["hosts_off"] or cur["color"] or cur["reads"] or cur["sees"] or cur["reaches"]
                 or cur["tc_off"] or cur["packs_on"] or cur["agents_off"] or cur["agent_default"] != "claude"
                 or cur["agent_slots"] != AGENT_SLOTS
                 or cur["log_from"] or cur["diag"]
@@ -1464,7 +1478,7 @@ def dialog_save(name, req, uid):
                   dev_keep=req.get("dev_keep"), sign=req.get("sign"), keys=req.get("keys"),
                   release=req.get("release"), pc=req.get("pc"),
                   color=req.get("color"), reads=req.get("reads"), sees=req.get("sees"),
-                  reaches=req.get("reaches"), hosts=req.get("hosts"),
+                  reaches=req.get("reaches"), hosts=req.get("hosts"), hosts_off=req.get("hosts_off"),
                   tc_off=req.get("tc_off"), packs_on=req.get("packs_on"),
                   agents_off=req.get("agents_off"), agent_default=req.get("agent_default"),
                   agent_slots=req.get("agent_slots"),

@@ -29,7 +29,7 @@ await ready(page);
 // The Debug grants are drawn only with debug mode on, which is the
 // controller started with DEBUG_MODE=1 (run.sh does).
 await refreshUntil(page, () => !!state?.settings?.settings?.debug_mode?.value, { timeout: 20000 });
-await page.evaluate(() => renameProject('alpha', 'all'));
+await page.evaluate(() => renameProject('alpha', 'project'));
 await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
 await page.waitForSelector('#rnReadsField:not([hidden])', { timeout: 10000 });
 const rows = await page.$$eval('#rnReads label.lrow', ls => ls.map(l => [l.querySelector('input').value, l.querySelector('input').checked]));
@@ -51,7 +51,7 @@ await page.evaluate(k => { window.__betaKey = k; }, betaKey);
 await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reads?.join() === window.__betaKey, { timeout: 20000 });
 ok((prefsOf('alpha').reads || []).join() === projectKey('beta'),
    'Save keeps the ticked spaces as the reads, in the settings store');
-await page.evaluate(() => renameProject('alpha', 'all'));
+await page.evaluate(() => renameProject('alpha', 'project'));
 await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
 ok(await page.$eval(`#rnReads input[value="${betaKey}"]`, i => i.checked), '...and the dialog opens with it ticked');
 await page.keyboard.press('Escape');
@@ -199,7 +199,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   // from a moment ago still carried the off this file had just set.
   await refreshUntil(page, () => { const p = (state?.projects || []).find(p => p.name === 'alpha')?.prefs;
     return p?.sees?.join() === '/mnt/media,/srv/samples' && (p.gpu || 'on') === 'on'; }, { timeout: 20000 });
-  await page.evaluate(() => { nodesList = [{ id: 'n_0000test', name: 'box', kind: 'agent', state: 'ready', reported: {} }]; renameProject('alpha', 'all'); });
+  await page.evaluate(() => { nodesList = [{ id: 'n_0000test', name: 'box', kind: 'agent', state: 'ready', reported: {} }]; renameProject('alpha', 'project'); });
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   await page.waitForSelector('#rnSeesField:not([hidden])', { timeout: 10000 });
   const field = await page.$eval('#rnSees', e => ({ value: e.value, label: document.querySelector('label[for=rnSees]').firstChild.textContent,
@@ -222,7 +222,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.sees?.join() === '/mnt/media', { timeout: 20000 });
   ok((prefsOf('alpha').sees || []).join() === '/mnt/media',
      '...and Save keeps what the field says');
-  await page.evaluate(() => renameProject('alpha', 'all'));
+  await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   await page.fill('#rnSees', '/etc/ssh');
   // The section's own Save (Save, keep it running where a session of this
@@ -308,5 +308,49 @@ await api('/api/prefs', { project: 'alpha', reads: [] });
 ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
    '...and says nothing about reads when there are none');
 
+// What every repository of a space shares is the space's (R223): on a
+// repository's settings it is drawn as the space's, its controls dead, with
+// a press to the space's own dialog; there it is live.
+{
+  const got = await page.evaluate(async () => {
+    const key = reposOf('alpha');
+    renameProject('alpha');
+    await new Promise(r => setTimeout(r, 600));
+    const lockedIn = sect => { const b = document.querySelector(`#rnmodal details[data-sect="${sect}"] > .body`);
+      return { band: !!b?.querySelector('.rnspaceband [data-rnspacego]'),
+               live: [...(b?.querySelectorAll('input, select') || [])].filter(x => !x.disabled && !x.closest('.rnspaceband')).length }; };
+    const repo = { sees: lockedIn('rn:sees'), node: !!document.querySelector('#rnNodeSpace .rnspaceband'), nodeLive: !$('rnNode').dataset.spacelock,
+                   build: [...document.querySelectorAll('#rnmodal details[data-sect="rn:build"] input')].some(x => !x.disabled) };
+    document.querySelector('#rnmodal details[data-sect="rn:sees"] [data-rnspacego]')?.click();
+    await new Promise(r => setTimeout(r, 600));
+    const space = { title: $('rnTitle').textContent, bands: document.querySelectorAll('.rnspaceband').length, nodeLocked: !!$('rnNode').dataset.spacelock, key };
+    $('rnmodal').hidden = true;
+    return { repo, space };
+  });
+  ok(got.repo.sees.band && got.repo.sees.live === 0 && got.repo.node && !got.repo.nodeLive && got.repo.build,
+     `a repository's settings draw the space's as the space's, dead, with a press to its dialog, and its own live (${JSON.stringify(got.repo)})`);
+  ok(got.space.bands === 0 && !got.space.nodeLocked && / settings$/.test(got.space.title),
+     `...and the press opens the space's own dialog, where they are live (${JSON.stringify(got.space)})`);
+}
+// ...and the space's dialog says under a dial which repository sets it
+// apart (R223), and nothing where none does.
+{
+  const apart = await page.evaluate(async () => {
+    const H = { 'Content-Type': 'application/json' };
+    await fetch('/api/prefs', { method: 'POST', headers: H, body: JSON.stringify({ project: 'alpha', scope: 'repository', report: 'deny' }) });
+    for (let i = 0; i < 30 && !((state?.projects || []).find(p => p.name === 'alpha')?.prefs?.overrides || []).includes('report'); i++){
+      await refresh(); await new Promise(r => setTimeout(r, 300)); }
+    renameProject('alpha', 'project');
+    await new Promise(r => setTimeout(r, 500));
+    const said = $('rnGateReport').closest('label')?.nextElementSibling?.classList.contains('rnapart')
+      ? $('rnGateReport').closest('label').nextElementSibling.textContent : '';
+    const others = document.querySelectorAll('#rnmodal .rnapart').length;
+    await fetch('/api/prefs', { method: 'POST', headers: H, body: JSON.stringify({ project: 'alpha', scope: 'repository', report: 'inherit' }) });
+    $('rnmodal').hidden = true;
+    return { said, others };
+  });
+  ok(/^Set apart: alpha: /.test(apart.said) && apart.others === 1,
+     `the space's dialog names, under a dial, the repository that sets it apart (${JSON.stringify(apart)})`);
+}
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 await done(browser);

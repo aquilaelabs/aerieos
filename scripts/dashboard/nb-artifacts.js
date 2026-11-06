@@ -846,11 +846,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     });
     // Staged like a bump, written by the foot's Save (docs/design-language.md,
     // Settings): picking the saved value back clears the stage.
-    const pol = $("verPolicy");
-    if (pol) pol.onchange = () => {
-      verPolicyPending = pol.value === pol.dataset.was ? null : pol.value;
-      drawVersion(); nb.syncSave();
-    };
+    root.querySelectorAll("[data-verpolgo]").forEach(b => { b.onclick = () => openNotebook(project, "permissions"); });
   }
 
   // "Ships something else from here?": the door to a component's own
@@ -1038,14 +1034,12 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
   // way to say who may give it one, which is the setting that matters most
   // at exactly that moment.
   function verPolicyPicker(v){
-    return `<label class="verpol">
-      <span>Agent access</span>
-      <select id="verPolicy" data-was="${esc(v.policy)}"
-        aria-label="what a session may do with this space's version">
-        ${optionList((v.policies || []).map(o => [o, POLICY_LABEL[o] || o]), verPolicyPending ?? v.policy)}
-      </select>${verPolicyPending != null
-        ? `<span class="vermark">staged: on Save</span>` : ""}
-    </label>`;
+    // Said here, set on the Permissions view beside every other dial (R223,
+    // the operator, 7 Nov: one place for what an agent may do).
+    return `<span class="verpol">
+      <span>Agent access</span> <b>${esc(POLICY_LABEL[v.policy] || v.policy || "")}</b>
+      <button type="button" data-verpolgo>Change on Permissions</button>
+    </span>`;
   }
 
   // Drafts (the operator, 1 Nov): every release CI makes waits as a draft,

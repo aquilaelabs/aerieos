@@ -6592,7 +6592,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <!-- Your terminals' colors here, over your Profile's (R133 step 10):
              a project told apart at a glance, a production one red. Drawn
              while AerieOS's own terminal is on. -->
-        <label class="pick" id="rnTermSchemeRow">Terminal colors <select id="rnTermScheme"
+        <label class="pick" id="rnTermSchemeRow" hidden>Terminal colors <select id="rnTermScheme"
           aria-label="the colors of your terminals in this space">
           <option value="">your Profile's</option>
           <option value="amber">amber</option>
@@ -6606,7 +6606,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       </div>
       <!-- ...and how it looks, before a terminal opens (the operator, 25 Oct):
            a line of its own under the row. -->
-      <div class="field" id="rnTermPreviewField"><label class="lbl" for="rnTermPreview">How your terminals here look</label>
+      <div class="field" id="rnTermPreviewField" hidden><label class="lbl" for="rnTermPreview">How your terminals here look</label>
         <div id="rnTermPreview" aria-live="polite"></div></div>
       <div class="hint" id="rnPrefHint"></div>
       <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnMineLabel">
@@ -6706,6 +6706,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
          wanted. Send-to-Docker preselects it, and an instance still remembers
          the node it was actually created on. -->
     <div class="field" id="rnNodeField" hidden>
+      <div id="rnNodeSpace">
       <label for="rnNode">Node<span class="help" data-help="where this space's work runs: builds, tests, CI, the emulator" tabindex="0">?</span></label>
       <select id="rnNode"></select>
       <div class="hint" id="rnNodeHint">Builds, tests, CI, containers and the emulator run here.</div>
@@ -6725,11 +6726,18 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
           <option value="off">is not for this space: it runs as if the machine had none</option>
         </select></label>
       </div>
+      </div>
+      <!-- A repository's narrowing of its space's hosting nodes (R223). -->
+      <div id="rnHostsOwn" hidden>
+        <label id="rnHostsOwnLabel">Its containers may go to</label>
+        <div class="lbox" id="rnHostsOwnBox" role="group" aria-labelledby="rnHostsOwnLabel"></div>
+        <div class="hint">The space's hosting nodes: untick one to keep this repository's containers off it.</div>
+      </div>
       <!-- Where the tests run, which is this project's business and used to
            be set on the Docker tab, a machine surface it has no other reason
            to visit (R68 step 6). Only for a project that HAS a container to
            run in: rnFill hides it otherwise. -->
-      <div id="rnTestWhere" hidden>
+      <div id="rnTestWhere" hidden data-holder="1">
         <label for="rnDevTest">Tests run<span class="help" data-help="inside the dev instance only when its image carries the tests" tabindex="0">?</span></label>
         <select id="rnDevTest">
           <option value="node">on the node, never in its dev instance</option>
@@ -6739,7 +6747,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       </div>
       <!-- The node its suites run on (R151): one of the project's, or the
            session's own, which is the default and was the only way. -->
-      <div id="rnTestNodeF">
+      <div id="rnTestNodeF" data-holder="1">
         <label for="rnTestNode">Test node<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run the suites: this session's own node unless one of the space's is picked here; the tree goes there as a job's snapshot and the lines stream back; it needs the playwright toolchain" tabindex="0">?</span></label>
         <select id="rnTestNode"><option value="">the session's own node</option></select>
       </div>
@@ -6755,6 +6763,10 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <input id="rnOutputs" autocomplete="off" spellcheck="false"
              placeholder="outputs, globs from the tree root: app/build/outputs/apk/**/*.apk">
       <div class="hint">Run from the tree's root on the node; files matching the outputs land in dist/.</div>
+      <!-- Where its tests run, one choice (R223, the operator, 7 Nov): the
+           node and the dev instance were two pickers in another section. -->
+      <div class="setrow col ctlrow" id="rnTestsF"><label for="rnTests">Tests run<span class="help" data-help="where aerie tests run, aerie dashboard test and the gate run its suites: a node of the space's, or its dev instance where its image carries the tests" tabindex="0">?</span></label>
+        <select id="rnTests"></select></div>
       <!-- What a session looks with lands in dist/ too (a reel's sheet, an
            emulator shot), under the Artifacts tab's Captures fold, and goes
            by age rather than by need: nothing can tell whether another
@@ -6763,11 +6775,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric" aria-label="days a capture is kept"> <span class="dim">days</span></div>
       <!-- The project's daily snapshots (R165): what a node gone wrong, or
            compromised, through its synced copy is undone from. -->
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none. Restored from Snapshots below" tabindex="0">?</span></label>
+      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none and keeps none. Restored from Snapshots below" tabindex="0">?</span></label>
         <input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric" aria-label="days a snapshot is kept"> <span class="dim">days</span></div>
       <!-- ...and whether one is taken each day (R105): on unless switched
            off; off takes none, and what is kept ages out by the days. -->
-      <div class="logdays setrow ctlrow"><label class="ndcap"><input type="checkbox" id="rnSnapOn"> Take a snapshot every day<span class="help" data-help="off, no new snapshot is taken; those kept still go once older than the days kept. A pinned day always stays" tabindex="0">?</span></label></div>
+      <div class="logdays setrow ctlrow" hidden><label class="ndcap"><input type="checkbox" id="rnSnapOn"> Take a snapshot every day<span class="help" data-help="off, no new snapshot is taken; those kept still go once older than the days kept. A pinned day always stays" tabindex="0">?</span></label></div>
       <div class="logdays setrow ctlrow"><label class="ndcap" for="rnDevKeep">Dev builds kept<span class="help" data-help="of each product in dist/, every file of its newest this many builds stays and older builds are removed, a signed build keeping its signed copy alone; a release and anything pinned always stay; 0 keeps everything" tabindex="0">?</span></label>
         <input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric" aria-label="dev builds kept of each product"> <span class="dim">builds</span></div>
     </div>

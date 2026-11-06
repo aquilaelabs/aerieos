@@ -36,7 +36,7 @@ const EFFORTS = [["", "Claude's default"], ["low", "low"], ["medium", "medium"],
 // session is restarted, which is not something to do because somebody opened
 // a menu.
 let rnPrefWas = {git_name: "", git_email: "",
-                 node: "", nodes: "", hosts: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
+                 node: "", nodes: "", hosts: "", hosts_off: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
                  capture_days: "7", snapshot_days: "14", snapshots_on: "1", dev_keep: "3", gate: ""};
 // The colors a project can be, by the names prefs.py stores (COLORS there)
 // and the tone each is drawn in. Named at the store and mapped here so the
@@ -126,6 +126,7 @@ function rnPrefsOf(p){
                node: p?.prefs?.node || "",
                nodes: (p?.prefs?.nodes || []).join(","),
                hosts: (p?.prefs?.hosts || []).join(","),
+               hosts_off: (p?.prefs?.hosts_off || []).join(","),
                reads: (p?.prefs?.reads || []).join(","),
                tc_off: (p?.prefs?.tc_off || []).join(","), packs_on: (p?.prefs?.packs_on || []).join(","),
                agents_off: (p?.prefs?.agents_off || []).join(","),
@@ -140,7 +141,7 @@ function rnPrefsOf(p){
                snapshots_on: p?.prefs?.snapshots_on === false ? "0" : "1",
                dev_keep: String(p?.prefs?.dev_keep ?? 3),
                gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
-               tests_in: p?.prefs?.tests_in || "node", test_node: p?.prefs?.test_node || "",
+               tests_in: p?.prefs?.tests_in || "node", test_node: rnDialVal(p, "test_node", ""),
                test_change: rnDialVal(p, "test_change", "wait"),
                gpu: p?.prefs?.gpu || "on",
                reply: p?.yours?.reply || "", asks: p?.yours?.asks || "", term_scheme: p?.yours?.term_scheme || "",
@@ -414,6 +415,7 @@ function rnFillTools(){
       `tool pack, added by ${i.pack.by || "an administrator"}${i.installed ? "" : "; not installed on its node yet"}`))).join("")
     || `<div class="hint">nothing is installed on its node yet</div>`;
   box.querySelectorAll("input").forEach(i => i.onchange = () => rnBars());
+  rnSpaceRelock();
 }
 
 // A list setting read off the Toolchains rows, in its saved order. A saved
@@ -482,6 +484,24 @@ function rnTermPreview(){
   box.innerHTML = termPreview(termPalette(scheme, (look.colors || {})[scheme]), look);
 }
 
+// On the space's own door, under a dial, each repository that sets it apart
+// and what it holds (R223, the operator, 7 Nov: the space's settings are the
+// whole picture); nothing elsewhere.
+function rnDialApart(el, p, f, modes){
+  const at = el?.closest("label") || el;
+  if (!at) return;
+  let line = at.nextElementSibling?.classList.contains("rnapart") ? at.nextElementSibling : null;
+  const gate = f.startsWith("gate.") ? f.slice(5) : "";
+  const members = rnMode === "project" ? (state?.repos?.[reposOf(p?.name)]?.members || []) : [];
+  const apart = members.map(m => (state?.projects || []).find(x => x.name === m)).filter(Boolean)
+    .filter(mp => (mp.prefs?.overrides || []).includes(f))
+    .map(mp => { const v = gate ? mp.prefs?.gate?.[gate] : mp.prefs?.[f];
+      return `${projLabel(mp.name)}: ${(modes.find(([m]) => m === v) || [v, v || "its own"])[1]}`; });
+  if (!apart.length){ line?.remove(); return; }
+  if (!line){ line = document.createElement("div"); line.className = "hint rnapart"; at.after(line); }
+  line.textContent = `Set apart: ${apart.join("; ")}`;
+}
+
 // The test node picker (R151): the session's own node, then each of the
 // project's nodes by name as the Node picker names them; the field is
 // drawn only when the project has a node to pick.
@@ -497,11 +517,36 @@ function rnFillTestNode(p){
   // Named off the Node picker's options, else off the nodes list, else by
   // id (B418: a dialog opened before the picker was drawn listed ids).
   const named = id => names.get(id) || (nodesList || []).find(n => n.id === id)?.name || id;
-  sel.innerHTML = `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join("");
+  // A repository may set its own apart from its space's, as a dial (R223).
+  const inh = rnDialMode(p) === "inherit", sv = p?.prefs?.project_dials?.test_node || "";
+  sel.innerHTML = (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
+    + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join("");
   sel.dataset.proj = p?.name || "";
-  sel.value = picked !== null && (picked === "" || ids.includes(picked)) && picked !== (p?.prefs?.test_node || "") ? picked
-    : ids.includes(p?.prefs?.test_node) ? p.prefs.test_node : "";
-  f.hidden = ids.length === 0;
+  const saved = inh ? rnDialVal(p, "test_node", "") : (p?.prefs?.test_node || "");
+  sel.value = picked !== null && (picked === "" || picked === "inherit" || ids.includes(picked)) && picked !== saved ? picked
+    : saved === "inherit" || ids.includes(saved) ? saved : "";
+  f.hidden = true;
+}
+// Tests run, one choice (R223): the test node (the space's, as the space,
+// or the session's own) and, where the repository has a dev instance whose
+// image may carry the tests, whether they run in it first or only there.
+// The two pickers it sets stay the values' holders.
+function rnFillTests(canDev){
+  const sel = $("rnTests"), node = $("rnTestNode"), dev = $("rnDevTest");
+  if (!sel || !node || !dev) return;
+  const nodes = [...node.options].map(o => [o.value, o.textContent]);
+  const on = t => /^as the space/.test(t) ? `on the space's test node (${t.replace(/^as the space \(|\)$/g, "")})` : `on ${t}`;
+  const opts = [...nodes.map(([v, t]) => [`node|${v}`, on(t)]),
+                ...(canDev ? [...nodes.map(([v, t]) => [`up|${v}`, `in its dev instance when it is up, else ${on(t)}`]),
+                              ["only|", "only in its dev instance"]] : [])];
+  sel.innerHTML = optionList(opts);
+  const want = `${dev.value || "node"}|${dev.value === "only" ? "" : node.value}`;
+  sel.value = opts.some(([v]) => v === want) ? want : opts[0]?.[0] || "";
+  sel.onchange = () => {
+    const [t, n] = sel.value.split("|");
+    dev.value = t; if (t !== "only") node.value = n;
+    dev.dispatchEvent(new Event("change", {bubbles: true}));
+  };
 }
 function rnFillPrefsRest(p){
   $("rnBuildCmd").value = p?.prefs?.build || "";
@@ -510,9 +555,10 @@ function rnFillPrefsRest(p){
   // which projects have one, and `has_compose` on the project row is the
   // same answer without asking it.
   const canDevTest = !!(p?.has_compose || (p?.prefs?.tests_in || "node") !== "node");
-  $("rnTestWhere").hidden = !canDevTest;
+  $("rnTestWhere").hidden = true;
   $("rnDevTest").value = p?.prefs?.tests_in || "node";
   rnFillTestNode(p);
+  rnFillTests(canDevTest);
   // The test-run pick inherits too (R208 step 6): its "as the project"
   // option is drawn here, the two words being the markup's own.
   {
@@ -553,7 +599,11 @@ function rnFillPrefsRest(p){
   };
   // Each dial (R208 step 6): the project's default on its own door, this
   // repository's override or "as the project" in its notebook.
-  const dial = (id, f, modes, dflt) => pick(id, rnDialChoices(p, f, modes, dflt), rnDialVal(p, f, dflt));
+  const dial = (id, f, modes, dflt) => {
+    const el = pick(id, rnDialChoices(p, f, modes, dflt), rnDialVal(p, f, dflt));
+    rnDialApart(el, p, f, modes);
+    return el;
+  };
   for (const [k, id] of Object.entries(GATE_IDS)) dial(id, "gate." + k, gateChoices(k), "auto");
   // Auto and deny only: a report has nothing to hold for approval.
   dial("rnGateReport", "report", GATE_MODES.filter(([v]) => v !== "ask"), "auto");
@@ -569,7 +619,14 @@ function rnFillPrefsRest(p){
   dial("rnGateVms", "makevms", GATE_MODES, "deny").closest("label").hidden = state?.can?.["vms-write"] === false;
   dial("rnGatePacks", "installpacks", GATE_MODES, "ask").closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
-  $("rnVmCapsRow").hidden = state?.can?.["vms-write"] === false;
+  // What its VMs may hold, only where it may make VMs at all (R223).
+  const vmsCaps = () => {
+    const g = $("rnGateVms"), v = g.value === "inherit" ? g.dataset.inherit : g.value;
+    $("rnVmCapsRow").hidden = state?.can?.["vms-write"] === false || v === "deny";
+  };
+  if (!$("rnGateVms").dataset.capsWired){ $("rnGateVms").dataset.capsWired = "1"; $("rnGateVms").addEventListener("change", () => rnVmCapsShown()); }
+  rnVmCapsShown = vmsCaps;
+  vmsCaps();
   rnDrawPrefs();
 }
 
@@ -840,6 +897,8 @@ function renameProject(name, mode = "all"){
   rnLoadPeople(name);
   if (!p?.work) rnLoadFtp(name);
   rnFillPrefs(p);
+  rnSpaceMarks(name, proj || git);
+  rnFillHostsOwn(p);
   // The sessions at the foot: the gear's door, and an administrator's.
   $("rnSessField").hidden = true;
   // Asked of the server, which answers by the account's areas on this
@@ -850,6 +909,66 @@ function renameProject(name, mode = "all"){
   // Each section's Save and Revert, drawn dead until something changes.
   document.querySelectorAll(".rnbar .state.bad").forEach(x => { x.classList.remove("bad"); x.textContent = ""; });
   rnBars();
+}
+
+// What every repository of a space shares, on one repository's view (R223,
+// the operator, 7 Nov): one value, the space's (prefs.GROUP_FIELDS), which
+// the repository's view used to edit as its own. Drawn as the space's, its
+// controls dead, with one press to the space's own dialog; the repository's
+// own settings beside them stay live. A section wholly the space's, and the
+// parts of a section that are.
+const RN_SPACE_SECTS = ["rn:people", "rn:sees", "rn:tools"];
+const RN_SPACE_PARTS = ["rnNodeSpace", "rnAgentsField"];
+let rnSpaceOn = false;
+let rnVmCapsShown = () => {};
+// The space's fields (prefs.GROUP_FIELDS less the overridable dials), which a
+// repository's view never sends.
+const RN_GROUP = new Set(["node", "nodes", "hosts", "reads", "sees", "reaches", "tc_off", "packs_on", "agents_off", "agent_default",
+                          "agent_slots", "gpu", "vm_caps", "color"]);
+// The space's hosting nodes, each a tick: unticked keeps this repository's
+// containers off it (R223). Drawn on a repository's view alone.
+function rnFillHostsOwn(p){
+  const f = $("rnHostsOwn"), box = $("rnHostsOwnBox");
+  if (!f || !box) return;
+  const all = p?.prefs?.space_hosts || [];
+  f.hidden = !rnSpaceOn || !all.length;
+  if (f.hidden) return;
+  const off = new Set(String(rnPrefWas.hosts_off || "").split(",").filter(Boolean));
+  const named = id => (nodesList || []).find(n => n.id === id)?.name || id;
+  box.innerHTML = all.map(id => lrow(id, named(id), "hosting only", !off.has(id))).join("");
+}
+// The space's parts locked again: People and Toolchains draw themselves once
+// their lists arrive, after the dialog has opened.
+function rnSpaceRelock(){
+  if (!rnSpaceOn) return;
+  const els = [...RN_SPACE_SECTS.flatMap(sect => [...document.querySelectorAll(`details[data-sect="${sect}"] > .body`)]),
+               ...RN_SPACE_PARTS.map(id => $(id)).filter(Boolean)];
+  for (const el of els) el.querySelectorAll("input, select, textarea, button").forEach(x => {
+    if (x.disabled || x.closest(".rnspaceband, .rnbar")) return;
+    x.disabled = true; x.dataset.spacelock = "1";
+  });
+}
+function rnSpaceMarks(name, door){
+  const key = reposOf(name);
+  const on = !door && !!key && key !== name;
+  rnSpaceOn = on;
+  document.querySelectorAll("[data-spacelock]").forEach(x => { x.disabled = false; delete x.dataset.spacelock; });
+  document.querySelectorAll(".rnspaceband").forEach(x => x.remove());
+  if (!on) return;
+  const band = () => {
+    const d = document.createElement("div");
+    d.className = "field rnspaceband";
+    d.innerHTML = `<div class="hint">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</div>
+      <div class="actbar"><span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`;
+    d.querySelector("[data-rnspacego]").onclick = () => renameProject(name, "project");
+    return d;
+  };
+  for (const sect of RN_SPACE_SECTS){
+    const body = document.querySelector(`details[data-sect="${sect}"] > .body`);
+    if (body) body.prepend(band());
+  }
+  for (const id of RN_SPACE_PARTS) $(id)?.prepend(band());
+  rnSpaceRelock();
 }
 
 // Sections, every one open unless this person shut it here (the operator,
@@ -946,6 +1065,7 @@ function rnDrawPeople(){
     .then(() => notify(`invited to ${projLabel(rnFor)}: they say yes or no from their bell`));
   $("rnPeople").querySelectorAll("[data-withdraw]").forEach(b =>
     b.onclick = () => act({action: "withdraw", id: Number(b.dataset.withdraw)}));
+  rnSpaceRelock();
 }
 
 // The staged owner and restriction, sent by Save; "" when they landed.
@@ -1447,7 +1567,7 @@ function closeRename(){
 const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "claude", "yours"];
 // Which section each of rnPrefWas's fields is in, and what it is called.
 const RN_WAS = {
-  node: ["runs", "Node"], nodes: ["runs", "Node"], hosts: ["runs", "Hosts its containers on"], gpu: ["runs", "The node's GPU"], tests_in: ["runs", "Where tests run"], test_node: ["runs", "Test node"],
+  node: ["runs", "Node"], nodes: ["runs", "Node"], hosts: ["runs", "Hosts its containers on"], hosts_off: ["runs", "Its containers may go to"], gpu: ["runs", "The node's GPU"], tests_in: ["build", "Tests run"], test_node: ["build", "Tests run"],
   reads: ["sees", "Reads"], sees: ["sees", "Also sees"], reaches: ["sees", "Also reaches"],
   tc_off: ["tools", "Toolchains"], packs_on: ["tools", "Tool packs"],
   build: ["build", "Build"], test: ["build", "Test"], outputs: ["build", "Outputs"],
@@ -1478,6 +1598,10 @@ function rnEnc(){
           // The ticked rows marked Hosting only are prefs.hosts, the rest
           // prefs.nodes: one list on screen, two settings underneath.
           hosts: !drawn ? rnPrefWas.hosts : [...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => rnHostIds().has(id)).join(","),
+          // The space's hosting nodes this repository keeps its containers
+          // off (R223): the rows unticked.
+          hosts_off: $("rnHostsOwn")?.hidden !== false ? rnPrefWas.hosts_off
+            : [...$("rnHostsOwnBox").querySelectorAll("input:not(:checked)")].map(i => i.value).join(","),
           reads: [...$("rnReads").querySelectorAll("input:checked")].map(i => i.value).join(","),
           // The rows are drawn once the node's toolchains have arrived;
           // until then the saved values stand, so an open is no change.
@@ -1596,6 +1720,7 @@ function rnRevertSect(sect){
     delete $("rnNodesMore").dataset.drawn;
     rnFillNode();
     $("rnGpu").value = w.gpu; $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
+  if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
   } else if (sect === "files"){
     rnFtpDraft = {}; rnDrawFtp();
   } else if (sect === "tools"){
@@ -1644,6 +1769,7 @@ function rnDec(w){
   return {...w,
     nodes: String(w.nodes || "").split(",").filter(Boolean),
     hosts: String(w.hosts || "").split(",").filter(Boolean),
+    hosts_off: String(w.hosts_off || "").split(",").filter(Boolean),
     reads: String(w.reads || "").split(",").filter(Boolean),
     sees: String(w.sees || "").split(",").map(x => x.trim()).filter(Boolean),
     reaches: JSON.parse(w.reaches || "[]"),
@@ -1714,7 +1840,10 @@ async function rnSubmit(sect, end = false){
       // This section's own fields alone (the operator, 17 Oct): every field
       // went with every save, the others as this window last read them, so a
       // save here put back what somebody had changed in another section.
-      const only = new Set(mine);
+      // ...and from a repository's view never the space's: they are drawn
+      // there dead, and the repository's narrowed hosting list sent as the
+      // space's would have cut the space's own (R223).
+      const only = new Set(mine.filter(k => !(rnSpaceOn && RN_GROUP.has(k))));
       const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => only.has(k)));
       const r = await fetch("/api/prefs", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({project: name, restart: restartNow,
@@ -1722,7 +1851,7 @@ async function rnSubmit(sect, end = false){
                               // a notebook writes this repository's overrides.
                               scope: rnMode === "project" ? "project" : "repository",
                               ...pick({git_name: v.git_name, git_email: v.git_email,
-                              node: v.node, nodes: v.nodes, hosts: v.hosts, reads: v.reads, sees: v.sees, reaches: v.reaches,
+                              node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
                               tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default, agent_slots: v.agent_slots,
                               build: v.build, test: v.test, gate: v.gate,
                               tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks, term_scheme: v.term_scheme,

@@ -100,5 +100,24 @@ class Overrides(unittest.TestCase):
         self.assertEqual(prefs.get(key)["makevms"], "deny")
 
 
+
+    def test_a_repository_narrows_its_spaces_hosting_nodes_and_sets_its_test_node_apart(self):
+        # R223: the space's hosting nodes are its own list; a repository keeps
+        # its containers off some of them, never adding one; Test node is a
+        # dial a repository may set apart.
+        r = prefs.set_prefs("app", scope="project", node="n_cccccccc", hosts=["n_aaaaaaaa", "n_bbbbbbbb"], test_node="")
+        self.assertTrue(r.get("ok"), r)
+        r = prefs.set_prefs("server", hosts_off=["n_aaaaaaaa"], test_node="n_cccccccc")
+        self.assertTrue(r.get("ok"), r)
+        srv, app = prefs.get("server"), prefs.get("app")
+        self.assertEqual((srv["hosts"], srv["space_hosts"]), (["n_bbbbbbbb"], ["n_aaaaaaaa", "n_bbbbbbbb"]))
+        self.assertEqual(app["hosts"], ["n_aaaaaaaa", "n_bbbbbbbb"], "the other repository keeps the space's whole list")
+        self.assertEqual(prefs.get(self.key)["hosts"], ["n_aaaaaaaa", "n_bbbbbbbb"], "...and the space's own is untouched")
+        self.assertEqual((srv["test_node"], app["test_node"]), ("n_cccccccc", ""))
+        self.assertIn("test_node", srv["overrides"])
+        prefs.set_prefs("server", test_node="inherit", hosts_off=[])
+        srv = prefs.get("server")
+        self.assertEqual((srv["test_node"], srv["hosts"]), ("", ["n_aaaaaaaa", "n_bbbbbbbb"]))
+
 if __name__ == "__main__":
     unittest.main()

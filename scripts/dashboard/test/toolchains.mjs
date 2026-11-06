@@ -698,7 +698,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   // A project's Toolchains group (R77 step 5): the pack is offered switched
   // off, since adding a pack hands it to no project, and switched on and
   // saved it is among the packs the project's sessions use.
-  await page.evaluate(() => renameProject('alpha', 'all'));
+  // The space's toolchains are set on its own dialog (R223).
+  await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnTools input[data-pack][value="hexkit"]', { timeout: 20000 });
   ok(!await page.$eval('#rnTools input[data-pack][value="hexkit"]', i => i.checked),
      'a space\'s Toolchains group offers the new pack switched off');
@@ -835,7 +836,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   // B85: a project that had switched it on opens its Toolchains group
   // unchanged: the saved list still names the pack, which the form cannot
   // draw.
-  await page.evaluate(() => renameProject('alpha', 'all'));
+  // The space's toolchains are set on its own dialog (R223).
+  await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForFunction(() => rnToolsList !== null, null, { timeout: 20000 });
   const group = await page.evaluate(() => ({ dirty: !document.querySelector('.rnbar[data-rnbar="tools"] [data-rnsave]')?.disabled,
     said: document.querySelector('.rnbar[data-rnbar="tools"]')?.textContent.replace(/\s+/g, ' ').trim() || '' }));
