@@ -79,6 +79,13 @@ def follow(state, url="", expect=""):
     return True, ""
 
 
+
+# A node's past tokens kept for a restored controller (the operator, 6 Nov):
+# a month of them, at most PAST_MOST, offered RECOVER_CHUNK a call.
+PAST_KEEP_S = 30 * 86400
+PAST_MOST = 9000
+RECOVER_CHUNK = 200
+
 class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, ConsoleMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
             TokensMixin, ScanMixin):
     def __init__(self, state):
@@ -183,14 +190,42 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # Written first and used only once it is: a node.json that kept the
         # old token past a restart would present a retired one, which reads
         # as a stolen copy and revokes this node.
+        # The tokens of the last month kept, newest first: a controller
+        # restored from a backup knows one of them (the operator, 6 Nov).
+        now = int(time.time())
+        old = self.state.get("token") or ""
+        past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
+                and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
+        past = ([[old, now]] if old else []) + past
         try:
-            save_state(dict(self.state, token=new))
+            save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
         except OSError as e:
             log(f"the controller's next token was not kept, so the current one stays: {e}")
             return
-        self.prev_token = (self.state.get("token") or "", time.monotonic())
+        self.prev_token = (old, time.monotonic())
         self.state["token"] = new
+        self.state["past_tokens"] = past[:PAST_MOST]
         self.ctl.token = new
+
+    def recover_token(self):
+        """This node taken back by a controller that does not know its
+        newest token: a controller restored from a backup or a copy of its
+        settings older than this node's last hello holds one of the tokens
+        this node was handed before. The month's tokens offered newest first,
+        a few hundred a call; the fresh token the controller answers taken as
+        a rotation's is. True when it was."""
+        past = [p[0] for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and p and isinstance(p[0], str)]
+        if not past or not self.state.get("node_id"):
+            return False
+        for i in range(0, len(past), RECOVER_CHUNK):
+            st, r = self.ctl.call("recover", {"node": self.state["node_id"], "tokens": past[i:i + RECOVER_CHUNK]}, timeout=30)
+            if st == 200 and isinstance(r.get("token"), str):
+                log("the controller knew this node by a token from before its newest (a restored record): taken back")
+                self.take_token(r["token"])
+                return True
+            if st != 401:
+                return False
+        return False
 
     def token_back(self):
         """The token before the last rotation tried again when the
@@ -757,6 +792,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     if self.token_back():
                         self.hello_again("the token before is tried")
                         continue
+                    if r.get("error") == "unknown token" and self.recover_token():
+                        self.hello_again("taken back by a restored controller")
+                        continue
                     log(f"refused: {r.get('error')}; this node's credential "
                         "is no longer good. Re-enroll with a new token.")
                     time.sleep(300)
@@ -882,6 +920,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if st == 401:
                 if self.token_back():
                     self.hello_again("the token before is tried")
+                    continue
+                if r.get("error") == "unknown token" and self.recover_token():
+                    self.hello_again("taken back by a restored controller")
                     continue
                 log(f"refused: {r.get('error')}; re-enroll with a new token")
                 self.hello_again("the work poll was refused")

@@ -87,5 +87,48 @@ class Rotation(unittest.TestCase):
         self.assertIn("node", nodes.authenticate(self.first))
 
 
+
+
+class Restored(unittest.TestCase):
+    """A controller restored from a backup older than a node's last hellos
+    (the operator, 6 Nov): the node offers its month of tokens newest first,
+    and the one the restored record holds takes it back with a fresh token;
+    nothing about it reads as a stolen copy."""
+    def setUp(self):
+        import shutil
+        self.d = tempfile.mkdtemp()
+        nodes.configure(state=self.d)
+        mint = nodes.enroll_mint("user:test", "box")
+        got = nodes.enroll(nodes.authenticate(mint["token"]), CENSUS, "10.0.0.5", user="bb")
+        self.nid, self.first = mint["id"], got["token"]
+        self.kept = tempfile.mkdtemp()
+        shutil.copytree(self.d, self.kept, dirs_exist_ok=True)
+        self.past = [self.first]
+        for _ in range(3):
+            new = nodes.hello(self.nid, CENSUS, "10.0.0.5", rotates=True)["token"]
+            self.assertIn("node", nodes.authenticate(new))
+            self.past.insert(0, new)
+        nodes._recover_at.clear()
+
+    def restore(self):
+        nodes.configure(state=self.kept)
+
+    def test_the_restored_record_takes_the_node_back_by_an_older_token(self):
+        self.restore()
+        self.assertEqual(nodes.authenticate(self.past[0]).get("error"), "unknown token")
+        fresh = nodes.recover_token(self.nid, self.past)
+        self.assertTrue(fresh and fresh.startswith("bbn_"))
+        self.assertIn("node", nodes.authenticate(fresh), "the fresh token is the node's")
+        self.assertIsNone(nodes.recover_token(self.nid, self.past), "once in twenty seconds a node")
+
+    def test_a_retired_token_ends_the_search_and_raises_no_alarm(self):
+        # Without the restore the record knows the newest: offering only the
+        # older ones meets a retired one first, and the node keeps its tokens.
+        self.assertIsNone(nodes.recover_token(self.nid, self.past[1:]))
+        self.assertIn("node", nodes.authenticate(self.past[0]), "nothing of the node revoked")
+        nodes._recover_at.clear()
+        self.assertIsNone(nodes.recover_token("n_ffffffff", self.past), "another node's past is not this one's")
+        self.assertIsNone(nodes.recover_token(self.nid, "not a list"))
+
 if __name__ == "__main__":
     unittest.main()

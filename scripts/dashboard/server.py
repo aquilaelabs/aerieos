@@ -5447,10 +5447,21 @@ def _own_pool_mounts():
     return [p.get("mount") for p in ((n or {}).get("reported") or {}).get("pools") or [] if isinstance(p, dict) and p.get("mount")]
 
 
+def _backup_dirs():
+    """Where the controller's backup copies go: its own pools, and the disks
+    and shares under Other disks and shares that Backup copies names (the
+    operator, 6 Nov: a copy off the machine), each one that is on and
+    writable, at its folder under /mnt/other."""
+    ids = set(str(settings.get("backup_also") or "").split())
+    other = [f"/mnt/other/{r['name']}" for r in extmounts.rows()
+             if r.get("id") in ids and r.get("on") is not False and not r.get("ro") and r.get("name")]
+    return _own_pool_mounts() + other
+
+
 # The configuration backed up onto the machine's pools and found again at a
 # first run (R161 step 4, backup.py): the move's bundle under a password's key.
 backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.restore, manifest_fn=move.read_manifest,
-                 password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_own_pool_mounts,
+                 password_fn=lambda: settings.secret("backup_password") or "", dirs_fn=_backup_dirs,
                  version_fn=lambda: image_stamp().get("version") or "", state_version_fn=stateversion.current, write_json_fn=write_json,
                  host_fn=lambda: socket.gethostname())
 nodes.move_for_node = move.for_node
@@ -9520,6 +9531,13 @@ class Handler(BaseHTTPRequestHandler):
             # row says it is turned away (B652), when it is quiet anyway.
             if verb == "hello" and auth["error"] == "unknown token":
                 nodes.refused_unknown(req.get("node"))
+            # ...and a node taken back by a token from before its newest,
+            # as a restored record holds (the operator, 6 Nov).
+            if verb == "recover" and auth["error"] == "unknown token":
+                got = nodes.recover_token(req.get("node"), req.get("tokens"))
+                if got:
+                    db.audit(f"node:{req.get('node')}", "node-recovered", "", {})
+                    return self._json({"ok": True, "token": got})
             return self._json({"error": auth["error"]}, 401)
         # Where the node is, as seen from here: informational on the row,
         # and the address docker-over-ssh goes to for an agent node (see
@@ -12964,7 +12982,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "the backup is an administrator's"}, 403)
         # ...with whether this account is the owner, whose Back up now and
         # Download are (_backup's own test): the poll carries the name alone.
-        return self._json(backup.status() | {"owner": (users.account_of(me) or {}).get("role") == "owner"})
+        # ...and the disks and shares a copy may also go to, off the machine.
+        also = set(str(settings.get("backup_also") or "").split())
+        other = [{"id": r.get("id"), "name": r.get("name"), "kind": r.get("kind"), "ro": bool(r.get("ro")), "on": r.get("id") in also}
+                 for r in extmounts.rows() if r.get("id") and r.get("name")]
+        return self._json(backup.status() | {"owner": (users.account_of(me) or {}).get("role") == "owner", "other": other})
 
     def _backup(self, req):
         """POST /api/backup {action: now}: a copy written now, the owner's."""

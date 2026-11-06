@@ -941,6 +941,49 @@ def _refused(node_id, why):
     _bump()
 
 
+# A node offers at most this many of its old tokens in one recovery call.
+RECOVER_MOST = 200
+_recover_at = {}
+
+
+def recover_token(node_id, bearers):
+    """A node this controller no longer knows by its newest token, taken
+    back by an older one it still holds (the operator, 6 Nov: a controller
+    restored from a backup re-adopts every node still there): the node's
+    tokens of the last month offered newest first, the first this record
+    knows decides. One it holds live or pending is the node's own: a fresh
+    token answers, minted as a hello's rotation is. One it holds retired or
+    revoked ends the search with nothing, never the alarm a stolen copy
+    raises, since a node offering its own past is not a copy. The tokens
+    themselves are offered, never their hashes, which the record keeps and a
+    backup's reader would hold. Once in twenty seconds a node. The bearer,
+    or None."""
+    if not (isinstance(node_id, str) and re.fullmatch(r"n_[0-9a-f]{8,32}", node_id)) or not isinstance(bearers, list):
+        return None
+    now = time.monotonic()
+    if now - _recover_at.get(node_id, -60.0) < 20:
+        return None
+    _recover_at[node_id] = now
+    n = node(node_id)
+    if not n or n.get("kind") != "agent" or n.get("state") == "retired":
+        return None
+    pre = TOKEN_PREFIX["node"]
+    for b in bearers[:RECOVER_MOST]:
+        if not isinstance(b, str) or not b.startswith(pre):
+            continue
+        rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = 'node'", (_hash(b[len(pre):]),))
+        if not rows:
+            continue
+        t = rows[0]
+        if t["node_id"] != node_id or t["revoked"] not in (0, TOKEN_PENDING):
+            return None
+        if authenticate(b).get("error"):
+            return None
+        print(f"dashboard: node {node_id} came back by a token from before its newest (a restored record); a fresh one handed over", flush=True)
+        return rotate_token(node_id)
+    return None
+
+
 def refused_unknown(node_id):
     """A hello whose token this controller has no record of, from an agent
     that says which node it is (B652): its credential went with a /config
