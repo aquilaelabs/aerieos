@@ -326,6 +326,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if ts:
                 c["tokseal"] = ts
         st, r = self.ctl.call("hello", {"census": c,
+                                        # Which node this is, for a controller that no
+                                        # longer knows the token (B652).
+                                        "node": self.state.get("node_id", ""),
                                         "version": AGENT_VERSION,
                                         "digest": own_digest(),
                                         "running": self.running_ids(),

@@ -941,6 +941,21 @@ def _refused(node_id, why):
     _bump()
 
 
+def refused_unknown(node_id):
+    """A hello whose token this controller has no record of, from an agent
+    that says which node it is (B652): its credential went with a /config
+    restored from before its last hellos, and it is turned away every five
+    minutes with nothing on its row to say so. Kept on the row only when the
+    node is quiet anyway (no good hello in ten minutes), so a stranger
+    naming a live node cannot paint it refused."""
+    n = node(node_id) if isinstance(node_id, str) and re.fullmatch(r"n_[0-9a-f]{8,32}", node_id) else None
+    if not n or n.get("kind") != "agent" or n.get("state") == "retired":
+        return
+    if time.time() - int((n.get("agent") or {}).get("last_seen") or 0) < 600:
+        return
+    _refused(node_id, "this controller has no record of its credential (its state went back to before the agent's last hellos)")
+
+
 def _token_reused(t):
     """A retired token presented after its grace: every token of the node
     revoked, and the bell told, with when and from where."""

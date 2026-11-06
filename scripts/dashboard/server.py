@@ -9515,6 +9515,10 @@ class Handler(BaseHTTPRequestHandler):
         if req is None:
             return None
         if auth.get("error"):
+            # A hello naming its node, with a token nobody here issued: the
+            # row says it is turned away (B652), when it is quiet anyway.
+            if verb == "hello" and auth["error"] == "unknown token":
+                nodes.refused_unknown(req.get("node"))
             return self._json({"error": auth["error"]}, 401)
         # Where the node is, as seen from here: informational on the row,
         # and the address docker-over-ssh goes to for an agent node (see
