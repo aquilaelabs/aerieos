@@ -138,6 +138,24 @@ class PreRelease(unittest.TestCase):
         bugs.set_status("app", m, "fixed", "fixed")
         self.assertEqual(releasegaps.gaps("app")["owed"], [])
 
+    def test_a_stamp_on_no_branch_reads_by_its_date(self):
+        # B700: a commit a history rewrite left on no branch resolves and is
+        # in no tag's history; the bug closed weeks before is not owed.
+        self.git("checkout", "-q", "-b", "gone")
+        (self.app / "x.py").write_text("x = 1\n")
+        lost = self.commit("on a branch that goes")
+        self.git("checkout", "-q", "main")
+        self.git("branch", "-q", "-D", "gone")
+        n = bugs.add("app", "An old one", by="you", severity="low", seen_in=f"1.0.0-dev.1+{lost}")["bug"]["id"]
+        bugs.set_status("app", n, "fixed", "fixed")
+        with bugs._lock:
+            d = bugs.load()
+            b = next(x for x in d["projects"]["app"] if x["id"] == n)
+            b["fixed_in"], b["closed_at"] = f"1.0.0-dev.1+{lost}", 1000
+            bugs.save(d)
+        self.release(pre="rc")
+        self.assertEqual(releasegaps.gaps("app")["owed"], [])
+
     def test_a_bug_born_after_the_release_owes_nothing(self):
         self.release(pre="rc")
         (self.app / "new.py").write_text("x = 1\n")

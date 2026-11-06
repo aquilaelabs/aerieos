@@ -115,9 +115,16 @@ def _at_or_before(project, sha, tag):
     return _yes(project, "merge-base", "--is-ancestor", sha, tag)
 
 
+def _ours(project, sha):
+    """A stamp's commit that this branch's history holds: one a rewrite left
+    on no branch still resolves, and is in no tag's history either, which read
+    as after every release (B700)."""
+    return bool(sha) and _resolves(project, sha) and _at_or_before(project, sha, "HEAD")
+
+
 def _closed_after(project, bug, tag, tag_time):
     sha, dirty = _stamp_sha(bug.get("fixed_in"))
-    if sha and _resolves(project, sha):
+    if _ours(project, sha):
         if not _at_or_before(project, sha, tag):
             return True
         # Closed with the fix not yet committed, on the release's own commit:
@@ -134,7 +141,7 @@ def fix_commits(project, bug, tag):
     out = _git(project, "log", "--format=%h", "-E", f"--grep={re.escape(word)}([^0-9]|$)", f"{tag}..HEAD") or ""
     shas = [s for s in out.split() if s]
     sha, dirty = _stamp_sha(bug.get("fixed_in"))
-    if sha and not dirty and _resolves(project, sha) and not _at_or_before(project, sha, tag):
+    if not dirty and _ours(project, sha) and not _at_or_before(project, sha, tag):
         short = _git(project, "rev-parse", "--short=7", sha) or sha[:7]
         if not any(s.startswith(short) or short.startswith(s) for s in shas):
             shas.append(short)
@@ -155,7 +162,7 @@ def carried(project, bug, tag, shas=None):
     if shas and all(_DEV_ONLY.search(p) for p in _files(project, shas)):
         return "no", "its fix touched only tests and CI"
     seen, _ = _stamp_sha(bug.get("seen_in"))
-    if seen and _resolves(project, seen) and _at_or_before(project, seen, tag):
+    if _ours(project, seen) and _at_or_before(project, seen, tag):
         return "yes", f"seen in {bug.get('seen_in')}, a build {tag} carries"
     if not shas:
         return "unsure", "no commit since the release names it"
