@@ -149,10 +149,14 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await new Promise(r => setTimeout(r, 200));
     // A pool another machine made, found on the disks (R163 step 1).
-    const n = (storageList || []).find(x => x.name === 'diskbox');
-    n.zfs = true; n.pools_importable = [{ name: 'tank', id: '1234', state: 'online', said: 'The pool can be imported using its name or numeric identifier.' }];
-    storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
-    out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
+    // Laid over again until it draws: the page's poll reads the list again.
+    for (let i = 0; i < 20 && !(out.found || []).length; i++){
+      const m = (storageList || []).find(x => x.name === 'diskbox');
+      Object.assign(m, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: ARR, zfs: true });
+      m.pools_importable = [{ name: 'tank', id: '1234', state: 'online', said: 'The pool can be imported using its name or numeric identifier.' }];
+      storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 150));
+      out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
+    }
     const { verify, ...older } = ARR;
     lay(older);
     // Until the redraw without it: the section is there throughout.
@@ -176,7 +180,8 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   const got = await page.evaluate(async () => {
     const keepOwn = ownMachine, keepPost = postJSON, posted = [];
     ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
-    postJSON = async (url, body) => { posted.push(body); return { json: async () => ({ ok: true }) }; };
+    // Only the presses under test: the page posts its own things too (its layout).
+    postJSON = async (url, body) => { if (/^storage-/.test(body?.action || "")) posted.push(body); else return keepPost(url, body); return { json: async () => ({ ok: true }) }; };
     const n = (storageList || []).find(x => x.name === 'diskbox');
     const lay = () => { Object.assign(n, { own: true, smb: true, nfs: false, live: true, may_measure: true, mergerfs: true, snapraid: true,
       array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
