@@ -4,9 +4,10 @@ A VM on macvtap cannot talk to its own host, so a VM made a node on the
 controller's own machine never reached its controller, and one a move
 brought back could not knock. AerieOS puts the interface its default route
 leaves by in a Linux bridge, br0, as the system it replaces did: the bridge
-takes the interface's own MAC (MACAddress=none: the kernel gives a bridge its
-first port's), so the router's reservation for that card still answers, and
-the host's address moves to br0. A VM's port on br0 reaches the LAN and the
+is given the interface's own MAC, written into its .netdev (left to itself,
+udev gives a new bridge a MAC of its own, and the router a new lease: walked
+on the 4951 stick, 10.0.2.16 where the card had .15), so the router's
+reservation for that card still answers, and the host's address moves to br0. A VM's port on br0 reaches the LAN and the
 host alike.
 
 Applied once, at a boot, by the own node's root agent: an update reboots
@@ -74,13 +75,22 @@ def wired(iface, sys_net=None):
             and not os.path.isdir(os.path.join(base, "wireless")) and not os.path.isdir(os.path.join(base, "bridge")))
 
 
-def plan(iface, page_text=None):
+def mac_of(iface, sys_net=None):
+    try:
+        with open(os.path.join(sys_net or SYS_NET, iface, "address"), encoding="utf-8") as f:
+            mac = f.read().strip().lower()
+    except OSError:
+        return ""
+    return mac if re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac) and mac != "00:00:00:00:00:00" else ""
+
+
+def plan(iface, page_text=None, mac=""):
     """{path: text or None} that puts `iface` in br0: the bridge, the card as
     its port, br0 on DHCP, and a Network page file for the card moved to br0
     (None removes a path). Pure, for the tests."""
     out: dict = {
-        netdev_path(): "[NetDev]\nName=br0\nKind=bridge\n# The card's own MAC, so its DHCP reservation answers.\nMACAddress=none\n\n"
-                       "[Bridge]\nSTP=no\n",
+        netdev_path(): "[NetDev]\nName=br0\nKind=bridge\n# The card's own MAC, so its DHCP reservation answers.\n"
+                       f"MACAddress={mac or 'none'}\n\n[Bridge]\nSTP=no\n",
         port_path(iface): f"[Match]\nName={iface}\n\n[Network]\nBridge={BRIDGE}\n",
         bridge_path(): "[Match]\nName=br0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\n# By the MAC, as a router's reservation is.\nClientIdentifier=mac\n",
     }
@@ -163,7 +173,7 @@ def ensure(os_image, confirm_s=CONFIRM_S):
     if why:
         return False, why
     pg = _snapshot([page_path(iface)])[page_path(iface)]
-    files = plan(iface, pg)
+    files = plan(iface, pg, mac_of(iface))
     before = _snapshot(list(files))
     _write(files)
     log(f"LAN bridge: {iface} goes into {BRIDGE}, which takes its MAC and its address")

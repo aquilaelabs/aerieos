@@ -702,7 +702,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.sessnet.start()
         # The LAN card in a bridge on AerieOS, once, at a boot (R219): on a
         # thread of its own, since it waits up to a minute for the address.
-        threading.Thread(target=self._lan_bridge, name="lanbridge", daemon=True).start()
+        self.bridging = threading.Thread(target=self._lan_bridge, name="lanbridge", daemon=True)
+        self.bridging.start()
         self.sesswatch.start()
         self.wssync.start()
         self.claudesync.start()
@@ -929,6 +930,13 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             job.why = f"busy with {', '.join(what(i) for i in others)}: not retried; press Update agent again when they finish"
             job.say(job.why + "\n")
             return "failed", 75
+        # Not while the LAN card is being put in a bridge (R219): a re-exec
+        # mid-way left the files written and neither confirmed nor put back
+        # (walked on the 4951 stick: the controller's update came a second in).
+        br = getattr(self, "bridging", None)
+        if br is not None and br.is_alive():
+            job.say("waiting for the LAN bridge to be confirmed or put back first\n")
+            br.join(timeout=150)
         st, body = self.ctl.call("download", None, timeout=60, method="GET", raw=True)
         if st != 200:
             job.say(f"download failed: {st}\n")

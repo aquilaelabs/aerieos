@@ -29,10 +29,12 @@ class Bridge(unittest.TestCase):
         os.makedirs(f"{self.net}/br0/bridge")
 
     def test_the_plan(self):
-        files = self.lb.plan("enp3s0")
+        files = self.lb.plan("enp3s0", mac="52:54:00:12:34:56")
         netdev = files[self.lb.netdev_path()]
         self.assertIn("Kind=bridge", netdev)
-        self.assertIn("MACAddress=none", netdev)
+        # The card's own MAC, written: left to itself the bridge took one of
+        # its own and a new lease (the 4951 stick, .16 for the card's .15).
+        self.assertIn("MACAddress=52:54:00:12:34:56", netdev)
         self.assertIn("Bridge=br0", files[self.lb.port_path("enp3s0")])
         self.assertIn("ClientIdentifier=mac", files[self.lb.bridge_path()])
         # The port's file sorts ahead of the image's DHCP and the page's own.
@@ -41,6 +43,12 @@ class Bridge(unittest.TestCase):
         self.assertEqual(names[0], "00-aerieos-port-enp3s0.network")
         # ...and the page's file for br0 sorts ahead of the bridge's own.
         self.assertLess("00-builderbot-br0.network", os.path.basename(self.lb.bridge_path()))
+
+    def test_the_cards_mac_is_read(self):
+        with open(f"{self.net}/enp3s0/address", "w") as f:
+            f.write("52:54:00:AA:bb:cc\n")
+        self.assertEqual(self.lb.mac_of("enp3s0", self.net), "52:54:00:aa:bb:cc")
+        self.assertEqual(self.lb.mac_of("eno9", self.net), "")
 
     def test_a_static_address_moves_to_the_bridge(self):
         page = "[Match]\nName=enp3s0\n\n[Network]\nAddress=192.168.1.15/24\nGateway=192.168.1.1\n"
@@ -74,6 +82,45 @@ class Bridge(unittest.TestCase):
             self.assertIn("<interface type='bridge'>", self.lb.nic_xml("br0"))
             self.assertIn('<source bridge="br0"/>', self.lb.nic_xml("br0"))
             self.assertIn("<interface type='direct'>", self.lb.nic_xml("enp3s0"))
+
+
+class Ensure(unittest.TestCase):
+    """Committed and confirmed: the bridge stays when br0 holds the address and
+    the default route in time, and the files go back when it does not."""
+    def setUp(self):
+        self.lb = _mod("lanbridge")
+        self.d = tempfile.mkdtemp()
+        self.net = tempfile.mkdtemp()
+        os.makedirs(f"{self.net}/enp3s0/device")
+        with open(f"{self.net}/enp3s0/address", "w") as f:
+            f.write("52:54:00:12:34:56\n")
+        with open(f"{self.d}/80-dhcp.network", "w") as f:
+            f.write("[Match]\nName=en*\n\n[Network]\nDHCP=yes\n")
+        self.route = ["enp3s0"]
+        self.v4 = False
+        for k, v in (("NETWORKD_DIR", self.d), ("SYS_NET", self.net), ("_reload", lambda i: None),
+                     ("_route_iface", lambda: self.route[0]), ("_has_v4", lambda i: self.v4),
+                     ("_booted_recently", lambda: True), ("move_domains", lambda i: []),
+                     ("log", lambda m: None)):
+            p = mock.patch.object(self.lb, k, v)
+            p.start()
+            self.addCleanup(p.stop)
+        p = mock.patch.object(self.lb.time, "sleep", lambda s: None)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_confirmed(self):
+        def reload(_i):
+            self.route[0], self.v4 = "br0", True
+        with mock.patch.object(self.lb, "_reload", reload):
+            self.assertEqual(self.lb.ensure(True, confirm_s=5), (True, ""))
+        self.assertIn("MACAddress=52:54:00:12:34:56", open(f"{self.d}/00-aerieos-br0.netdev").read())
+
+    def test_put_back_without_an_address(self):
+        done, why = self.lb.ensure(True, confirm_s=0.01)
+        self.assertFalse(done)
+        self.assertIn("put back", why)
+        self.assertEqual(sorted(os.listdir(self.d)), ["80-dhcp.network"])
 
 
 class Adopted(unittest.TestCase):
