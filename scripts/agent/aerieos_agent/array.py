@@ -729,6 +729,14 @@ class ArrayMixin:
             if str(cfg.get("confirm") or "") != "array":
                 say("refused: destroying the array takes the word array again as the confirmation\n")
                 return "failed", 64
+            # SnapRAID's content files go with it, on the system and on each
+            # data disk, or the next array's first sync reads them as this
+            # one's and refuses its disks as changed (B704); on a disk taken
+            # over from another system they are what this machine added.
+            for path in [_env("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
+                for p_ in (path, path + ".tmp", path + ".lock"):
+                    with contextlib.suppress(OSError):
+                        os.unlink(p_)
             if rec.get("adopted"):
                 # Its data disks and /mnt/user stay the adoption's, writable;
                 # the parity disk is unmounted and its SnapRAID parity forgotten.

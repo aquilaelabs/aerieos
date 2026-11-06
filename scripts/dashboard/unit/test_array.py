@@ -163,8 +163,12 @@ class TheAgent(unittest.TestCase):
         self.assertIn("one at a time", text)
         with mock.patch.dict(os.environ, self.env):
             self.am._state_set(running="")
-        state, code, text, _ = self.run_job({"array": "destroy", "confirm": "array"}, REC)
+        content = os.path.join(self.d, "snapraid.content")
+        open(content, "w").close()
+        with mock.patch.dict(os.environ, {"BB_SNAPRAID_CONTENT": content}):
+            state, code, text, _ = self.run_job({"array": "destroy", "confirm": "array"}, REC)
         self.assertEqual(state, "succeeded", text)
+        self.assertFalse(os.path.exists(content), "B704: the next array's sync would read it as this one's")
         self.assertFalse(os.path.exists(self.env["BB_ARRAY_RECORD"]))
         self.assertNotIn("builderbot-array", open(self.env["BB_ARRAY_FSTAB"]).read())
 
