@@ -74,11 +74,11 @@ class Tidy(unittest.TestCase):
         proc(r, 71, "bash", "bash /opt/aerieos/scripts/aerie run -- python3 server.py", ppid=70)
         proc(r, 72, "python3", "python3 scripts/dashboard/server.py", ppid=71, fds=["socket:[5003]"])
         got = sorted(tidy.processes(root=r, uid=UID, spare=set()))
-        self.assertEqual(got, [(10, "node", "server"), (11, "python3", "server"), (60, "node", "server"),
+        self.assertEqual(got, [(10, "node", "server"), (11, "python3", "server"), (50, "python3", "test server"), (60, "node", "server"),
                                (72, "python3", "server")],
                          "an orphan listening goes, adopted by pid 1 or by Claude Code, and so does a background "
-                         "tool call's own server; a running suite's server, the harness's own, a connection and "
-                         "an idle node stay")
+                         "tool call's own server and a harness server no run holds the lock for (B650); a running "
+                         "suite's server, a connection and an idle node stay")
 
     def test_no_server_is_ended_while_a_test_run_holds_its_lock(self):
         r, t = self.root, Path(self.root, "tmp", "dashboard-test.d")
@@ -90,6 +90,7 @@ class Tidy(unittest.TestCase):
         Path(r, "net").mkdir()
         Path(r, "net", "tcp").write_text("hdr\n   0: 0100007F:10E1 00000000:0000 0A 0 0 0 1000 0 7001\n")
         proc(r, 10, "node", "node astro.mjs preview", ppid=1, fds=["socket:[7001]"])
+        proc(r, 20, "python3", "python3 /tmp/bb-suite.x1/scripts/dashboard/server.py", ppid=1)
         self.assertTrue(tidy.suite_running(tidy.TMP))
         self.assertEqual(tidy.processes(root=r, uid=UID, spare=set()), [])
 

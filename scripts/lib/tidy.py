@@ -197,7 +197,8 @@ def processes(root=PROC, uid=None, spare=None):
     """[(pid, comm, kind)] of this account's processes a tidy would end."""
     uid = os.getuid() if uid is None else uid
     spare = ancestors(root=root) if spare is None else spare
-    socks = set() if suite_running() else listening(root)
+    running = suite_running()
+    socks = set() if running else listening(root)
     out = []
     for pid in os.listdir(root):
         if not pid.isdigit() or int(pid) in spare:
@@ -213,6 +214,11 @@ def processes(root=PROC, uid=None, spare=None):
         # holding a port is a dev server somebody forgot.
         serving = bool(socks) and not any(h in info[1] for h in HARNESS) and orphaned(pid, root) \
             and any(f.startswith("socket:[") and f[8:-1] in socks for f in fds)
+        # A harness's server with no run holding the lock (a kept fixture
+        # holds it too): what a run cut by its process group left (B650).
+        if not running and any(h in info[1] for h in HARNESS) and orphaned(pid, root):
+            out.append((int(pid), info[0], "test server"))
+            continue
         if info[0] in SPARE:
             if info[0] == "node" and serving:
                 out.append((int(pid), info[0], "server"))
