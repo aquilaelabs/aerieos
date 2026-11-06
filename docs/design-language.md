@@ -1,6 +1,6 @@
 # The design language
 
-What this project looks like, in one place. Written by AerieOS's Design view from the notebook, so edit it there, or edit here and say so in the notebook. Every surface follows it; a change to the look is a change to this file first.
+What this space looks like, in one place. Written by AerieOS's Design view from the notebook, so edit it there, or edit here and say so in the notebook. Every surface follows it; a change to the look is a change to this file first.
 
 It governs the dashboard (scripts/dashboard: index.html and the scripts beside it), which the companion app mirrors.
 
@@ -645,7 +645,7 @@ One way to lay out fields, on every page, measured by uniform.mjs's forms check 
 
 **Fields go in `.fgrid`**: two equal columns at a desk, one on a phone, 14px down and 20px across, each filling its cell. `.fwide` spans both, for a path or an address. `.fshort` is a number's width. Fields never touch, and a form never sizes one field by hand.
 
-**A long form is `.fgroup`s**, one concern each: a head in the UI voice with a line of dim words under it (`.fgrouphead`), a hairline and 16px between groups. A tick is a line of its own. A hint goes under what it explains. Save is at the foot on the right, as everywhere.
+**A long form is `.fgroup`s**, one concern each: a head in the UI voice with a line of dim words under it (`.fgrouphead`), a hairline and 16px between groups, and the same 16px under the last hairline before the action bar. A tick is a line of its own. A hint goes under what it explains. Save is at the foot on the right, as everywhere.
 
 **The control fits the answer.** A known set of answers is a pulldown, never typed: a time zone, a pool, a security level, a person's access. A choice of two to four short answers that should all stay in view is the segmented control (`.pseg`). Yes or no is a tick. An answer with likely values that may be something else is a field with suggestions (a `datalist`): a path, a store. Only what nobody can list is a plain text field: a name, an address, a token. What depends on another answer stays hidden until that answer asks for it.
 

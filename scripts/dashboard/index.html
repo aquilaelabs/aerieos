@@ -4708,6 +4708,9 @@ button.eye.bare{background:none;border:0;padding:5px 4px;min-width:auto}
 .stnewpool>.field,.stnewpool>.fgrid,.stnewarray>.field,.stnewarray>.fgrid,.stsnapform>.fgrid{margin-top:14px}
 .fgroup{padding:16px 0;border-bottom:var(--hair) solid var(--line)}
 .fgroup:last-of-type{border-bottom:0}
+/* The bar after the last group has the same room under the hairline as a
+   group does, never its buttons flush against it. */
+.fgroup + .actbar{margin-top:16px}
 .ndstores{margin-top:8px}
 .fgrouphead{font:var(--f-ui);font-weight:600;color:var(--ink);margin-bottom:12px}
 .fgrouphead .sub{display:block;font:var(--f-note);font-weight:400;color:var(--dim);margin-top:2px}

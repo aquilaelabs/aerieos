@@ -323,11 +323,11 @@ function adoptParts(n){
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
-        ${canTake ? adoptMovesField() : ""}
-        <div class="actbar">${had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
-          : `<button type="button" class="danger" data-adopt="release">Release</button>`}${
-          canTake ? `<button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button>` : ""}${
-          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>
+        <div class="actbar">${
+          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}${
+          had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
+          : `<button type="button" class="danger" data-adopt="release">Release</button>`}</div></div>
+        ${canTake ? adoptTakeField() : ""}
         ${adoptFoldersField(n)}`};
   }
   const a = state?.firstboot?.adopt;
@@ -497,16 +497,19 @@ const MOVER_TIMES = [["40 3 * * *", "Daily, at 3:40"], ["0 * * * *", "Hourly"], 
 function adoptMovesNow(){
   return (state?.firstboot?.moves || []).map(m => adoptMoves.get(m.share) || m);
 }
-function adoptMovesField(){
+function adoptTakeField(){
   const list = adoptMovesNow();
-  if (!list.length) return "";
   const pools = movePools(), old = state?.firstboot?.mover_cron || "";
   const times = [...(old ? [[old, `As the old system ran it: ${state?.firstboot?.mover_words || old}`]] : []), ...MOVER_TIMES.filter(t => t[0] !== old)];
   if (adoptMoverCron === null) adoptMoverCron = old || MOVER_TIMES[0][0];
-  return `<div class="field">${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}
-    <div class="rows" id="adoptMoves">${list.map((m, i) => `<div class="row stack2 admove" data-admove="${esc(m.share)}"><div class="grow"><div class="name">${esc(m.share)}</div>
-      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div></div>`).join("")}</div>
-    <div class="fgrid"><div class="setrow col ctlrow">${lbl("adoptMoverWhen", "The mover runs")}<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select></div></div></div>`;
+  // Each share a group at the field's margin, then when the mover runs,
+  // then the takeover's own two presses under what they act on.
+  const moves = list.length ? `${lbl("adoptMoves", "Where each share's files go", "set as the old system had them: where new files land, and what the mover does with them, from what to what. Each share's Edit on the Storage page changes it later")}
+    ${list.map((m, i) => `<div class="fgroup admove" data-admove="${esc(m.share)}"><div class="fgrouphead">${esc(m.share)}</div>
+      <div class="fgrid">${moveFields(`adMove${i}`, pools, m)}</div></div>`).join("")}
+    <div class="fgroup"><div class="fgrid"><div class="setrow col ctlrow">${lbl("adoptMoverWhen", "The mover runs")}<select id="adoptMoverWhen">${optionList(times, adoptMoverCron)}</select></div></div></div>` : "";
+  return `<div class="field" id="adoptTake">${moves}
+    <div class="actbar"><button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button></div></div>`;
 }
 
 function wireAdopt(root){

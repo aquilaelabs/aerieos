@@ -656,16 +656,40 @@ await firstRun(false);
     ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]' && take.offered.when[0] === '0 4 * * *' && take.offered.when.includes('')
        && take.offered.kept === 'array>cache' && /"share":"isos","land":"array","from":"array","to":"cache"/.test(take.offered.sent),
        `before the takeover each share's places start as the old system had them, with its mover's time first, and a change is kept across a redraw and sent (${JSON.stringify(take.offered)})`);
+    // At a phone's width each share's group sits at the field's margin, as
+    // its label does, and each bar keeps its buttons on one line apart.
+    {
+      const vp = page.viewportSize();
+      await page.setViewportSize({ width: 393, height: 1600 }); await sleep(400);
+      const lay = await page.evaluate(() => {
+        const n = ownMachine(), was = [n.reported.adopted, state.firstboot];
+        n.reported.adopted = { ...n.reported.adopted, taken: false };
+        state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] };
+        nodesRev++; drawPanes();
+        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); sect.open = true;
+        const take = sect.querySelector('#adoptTake'), lbl = take.querySelector('label, .lblrow, .ctllbl') || take.firstElementChild;
+        const left = el => Math.round(el.getBoundingClientRect().left);
+        const bars = [...sect.querySelectorAll('.actbar')].map(b => { const bs = [...b.querySelectorAll(':scope > button')].map(x => x.getBoundingClientRect());
+          return { n: bs.length, tops: new Set(bs.map(r => Math.round(r.top))).size, gaps: bs.slice(1).map((r, i) => Math.round(r.left - bs[i].right)) }; });
+        const out = { label: left(lbl), groups: [...take.querySelectorAll('[data-admove]')].map(left), bars };
+        [n.reported.adopted, state.firstboot] = was; nodesRev++; drawPanes();
+        return out;
+      });
+      await page.setViewportSize(vp);
+      ok(lay.groups.length === 2 && lay.groups.every(x => x === lay.label) && lay.bars.every(b => b.tops === 1 && b.gaps.every(g => g >= 8)) && lay.bars.some(b => b.n === 2),
+         `on a phone each share's group sits at the field's margin, and each bar keeps its buttons on one line, apart (${JSON.stringify(lay)})`);
+    }
     if (process.env.BB_SHOTS){
       // Each share's places before the takeover, at a desk and on a phone.
       const vp = page.viewportSize();
-      await page.evaluate(() => { const n = ownMachine(); window.__adWas = [n.reported.adopted, state.firstboot];
-        n.reported.adopted = { ...n.reported.adopted, taken: false };
-        state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
-        nodesRev++; drawPanes(); const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d){ d.open = true; d.scrollIntoView(); } });
+      await page.evaluate(() => { const n = ownMachine(); window.__adWas = [n.reported.adopted, state.firstboot]; });
       for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
         await page.setViewportSize({ width: w, height: 1600 }); await sleep(500);
-        await page.evaluate(() => { const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
+        // Laid over again for each width: the page's poll puts the server's own back.
+        await page.evaluate(() => { const n = ownMachine();
+          n.reported.adopted = { ...window.__adWas[0], taken: false };
+          state.firstboot = { ...window.__adWas[1], moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
+          nodesRev++; drawPanes(); const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
         await page.locator('.machinetab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
       }
       await page.setViewportSize(vp);
