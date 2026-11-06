@@ -154,7 +154,8 @@ class Settings(unittest.TestCase):
         os.makedirs(f"{d}/kept/tpm2")
         open(f"{d}/kept/tpm2/tpm2-00.permall", "wb").write(b"state")
         x = {"xml": WIN, "tpm": f"{d}/kept"}
-        self.assertIn("no swtpm", adopt.carry_tpm(x, False, f"{d}/swtpm")[0])
+        self.assertIn("without its TPM", adopt.carry_tpm(x, False, f"{d}/swtpm")[0])
+        self.assertNotIn("<tpm", adopt.drop_tpm(WIN))
         self.assertIn("kept", adopt.carry_tpm(x, True, f"{d}/swtpm")[0])
         self.assertTrue(os.path.isfile(f"{d}/swtpm/{U}/tpm2/tpm2-00.permall"))
         self.assertIn("starts empty", adopt.carry_tpm({"xml": WIN, "tpm": ""}, True, f"{d}/swtpm")[0])

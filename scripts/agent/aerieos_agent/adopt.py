@@ -582,6 +582,15 @@ def ensure_network(runner, job, virsh, net):
     return made + ", running"
 
 
+def drop_tpm(xml):
+    """The domain without its TPM device."""
+    dom = ET.fromstring(xml)
+    dev = dom.find("devices")
+    for t in dev.findall("tpm") if dev is not None else []:
+        dev.remove(t)
+    return ET.tostring(dom, encoding="unicode")
+
+
 def carry_vars(old, template, out, run=subprocess.run):
     """A domain's UEFI variables, for this machine's firmware: the old file
     where it is this firmware's size, else its variables (boot entries, the
@@ -616,7 +625,8 @@ def carry_tpm(x, here, swtpm_dir=None):
     if "<tpm" not in x["xml"]:
         return []
     if not here:
-        return ["it has a TPM, and this machine has no swtpm: it will not start until VM host is turned on again under Features"]
+        return ["defined without its TPM, since this machine has no swtpm: VM host, turned on again under Features, installs it, and the "
+                "VM's Hardware dialog then gives it one (a fresh one: BitLocker asks for its recovery key once)"]
     uuid = (ET.fromstring(x["xml"]).findtext("uuid") or "").strip().lower()
     state = x.get("tpm") or ""
     if state and os.path.isdir(state) and UUID_RE.fullmatch(uuid):
@@ -821,6 +831,10 @@ class AdoptMixin:
                 continue
             nv = os.path.join(NVRAM_DIR, re.sub(r"[^A-Za-z0-9._-]", "_", n) + "_VARS.fd")
             xml, said = rewrite_domain(x["xml"], emulator, pair, nv, lan, bybridge)
+            if "<tpm" in xml and not vmhw.tpm_here():
+                # libvirt refuses a TPM it cannot emulate at define: the VM
+                # is defined without it rather than not at all.
+                xml = drop_tpm(xml)
             if pair and "<loader" in x["xml"]:
                 os.makedirs(NVRAM_DIR, exist_ok=True)
                 said.append(carry_vars(x.get("nvram") or "", pair[1], nv))

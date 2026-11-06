@@ -320,7 +320,7 @@ function adoptParts(n){
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, the array is on the Storage page, and the mover takes new files off the pools each night. Going back to the old system takes its own parity sync."
         : had.writable
-        ? "Writable: going back to the old system takes a parity sync, which leaves its array unprotected until it ends."
+        ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
         <div class="actbar">${had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`

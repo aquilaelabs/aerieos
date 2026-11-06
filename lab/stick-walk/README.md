@@ -7,6 +7,7 @@ Needs `/dev/kvm`, OVMF, `xz` and Playwright. Port 7690 is the VM's dashboard and
 - `walk.py`: lay out the stick and disks, boot, stop, and `sh CMD` for root on the VM through its second serial port.
 - `rescue.py`: pick the boot menu's Rescue over serial and run commands there.
 - `person.mjs` and `steps.mjs`: one browser step per run, its sign-in kept: `node person.mjs jobs`, `node person.mjs look HASH NAME`.
+- `rehearse.py`: the move off another NAS rehearsed on the booted stick with this branch's agent, as root: the three blank disks and the NVMe laid out as the old system left them (data disks with files, a parity disk, a cache pool, its Docker and libvirt image files), then adopted, its VM defined and cloned into a space, the array taken over, its parity checked, the mover run, destroyed and released, every file's checksum compared at each stage. It prints a PASS or FAIL line per check. The disks are laid out afresh each run; the stick's libvirt is started for it with its state in memory.
 
 An image from a release carries that release's code. To walk a branch, copy its dashboard over the VM's after first boot, as root.
 

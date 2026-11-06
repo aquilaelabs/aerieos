@@ -105,6 +105,16 @@ def merged_of(rec):
     return ADOPTED_MOUNT if rec.get("adopted") else MOUNT
 
 
+def stale_content():
+    """With no array recorded, any content file on the system is an earlier
+    one's (B704): taken away before a new array's first sync, which would
+    otherwise read it and refuse its disks as changed."""
+    p = _env("BB_SNAPRAID_CONTENT", CONTENT)
+    for x in (p, p + ".tmp", p + ".lock"):
+        with contextlib.suppress(OSError):
+            os.unlink(x)
+
+
 def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
     a content file on the system and on every data disk, each data disk by
@@ -407,6 +417,7 @@ class ArrayMixin:
             new["parity"].append({"slot": p["slot"], "id": by_id(p["dev"]), "uuid": uuid, "fs": "xfs"})
         rec.clear()
         rec.update(new)
+        stale_content()
         settle()
         for p in new["parity"]:
             m = slot_mount("p", p)
@@ -537,6 +548,7 @@ class ArrayMixin:
             if not shutil.which("mkfs.xfs" if fs == "xfs" else "mkfs.btrfs"):
                 say(f"refused: no mkfs for {fs} on this machine; install Storage on its Features section first\n")
                 return "failed", 65
+            stale_content()
             rec = {"policy": policy, "data": [], "parity": [], "made": int(time.time())}
             say(f"array create: {len(data)} data disk(s) as {fs}, {len(parity)} parity, {POLICIES[policy]}\n")
             done = []
