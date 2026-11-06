@@ -436,8 +436,8 @@ jobs:
           # them rather than edited after. Otherwise they are the changelog's
           # own: the version's section for a release, and for a dev build only
           # what Unreleased gained since the tag before (tools/release-notes.py).
-          ver="${TAG#v}"; base="${ver%%-dev.*}"
-          notes="docs/release-notes/$base.md"; case "$TAG" in *-dev.*) notes="docs/release-notes/$base-dev.md";; esac
+          ver="${TAG#v}"; base="${ver%%-*}"
+          notes="docs/release-notes/$base.md"; case "$TAG" in v*-*) notes="docs/release-notes/$base-dev.md";; esac
           head="## $base:"
           if [ -f "$notes" ]; then
             sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" "$notes" > notes.md

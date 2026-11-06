@@ -77,11 +77,12 @@ class PreRelease(unittest.TestCase):
         self.assertNotIn("## Unreleased", text)
         self.assertEqual(self.git("rev-list", "-n", "1", "--abbrev-commit", "--abbrev=7", r["tag"]), r["sha"])
 
-    def test_any_name_counts_up(self):
+    def test_any_name_numbered_by_the_commit(self):
         self.log("First", "Added")
-        self.assertEqual(self.release(pre="rc").get("tag"), "v1.1.0-rc.1")
+        n = int(self.git("rev-list", "--count", "HEAD"))
+        self.assertEqual(self.release(pre="rc").get("tag"), f"v1.1.0-rc.{n + 1}")
         self.log("Second", "Added")
-        self.assertEqual(self.release(pre="rc").get("tag"), "v1.1.0-rc.2")
+        self.assertEqual(self.release(pre="beta").get("tag"), f"v1.1.0-beta.{n + 3}")
         self.assertIn("error", self.release(pre="Not ok"))
 
     def test_no_lines_no_section_commit(self):
@@ -114,7 +115,7 @@ class PreRelease(unittest.TestCase):
         sha = self.commit(f"The total is right (B{n})")
         bugs.set_status("app", n, "fixed", "fixed")
         g = releasegaps.gaps("app")
-        self.assertEqual(g["since"], "v1.1.0-rc.1")
+        self.assertTrue(g["since"].startswith("v1.1.0-rc."), g)
         self.assertEqual([r["id"] for r in g["owed"]], [n])
         self.assertIn("error", version.release_plan("app", pre="rc"))
         changelog.add(self.app, "The total was off by one", sha=sha, cat="Fixed")

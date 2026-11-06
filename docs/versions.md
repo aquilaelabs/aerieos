@@ -33,7 +33,8 @@ own lint refuses a new state migration on a patch line.
 A controller installed bare metal (or the OS) updates from GitHub's
 releases: the *normal* channel, which is every published release (`vX.Y.Z`)
 and never a pre-release. A *dev* channel takes the pre-releases CI
-publishes from a dev build: a tag `vX.Y.Z-dev.N` built by the same workflow
+publishes: a tag `vX.Y.Z-dev.N`, or a pre-release of another name
+(`vX.Y.Z-rc.N`), built by the same workflow
 as a release, marked a pre-release and never the latest, with the same
 files (the controller bundle, the OS image, the stick disk, the APK). The
 channel is picked under Controller settings, Updates, on any install, and a
@@ -50,8 +51,11 @@ build is not a release: it may not come up, and the OS image's slot
 fallback is what brings the machine back. `aerie version release --dev` cuts
 such a tag (no bump) and pushes it, which is what a session's release from a
 branch other than main is unless `--stable` says otherwise; `--pre NAME`
-cuts a pre-release of any other name, `vX.Y.Z-rc.1`, `-beta.2`, counting up
-per version;
+cuts a pre-release of any other name, `vX.Y.Z-rc.N` or `-beta.N`, numbered by
+the commit as a dev build is, so one number orders every pre-release whatever
+it is called. The dev channel takes a pre-release of any name, Check now and
+the stick maker's `--channel dev` alike, and Release makes its page on the
+forge marked a pre-release, where the space's CI does not make it;
 the stick maker's `--latest` takes the normal channel unless `--channel dev`
 says otherwise, and `--release` names any tag.
 

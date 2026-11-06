@@ -895,8 +895,10 @@ def channel_of(project, dev=False, stable=False):
 
 
 # A pre-release's name (R217): dev, rc, beta, nightly, anything a tag can
-# carry after the version. dev keeps its number from the commit's ordinal, as
-# every dev build is stamped; any other name counts up from 1 per version.
+# carry after the version. Every name is numbered by the commit's ordinal, as
+# every dev build is stamped (R218): one clock for every name, so an install
+# on the dev channel tells which pre-release is newer whatever each is called,
+# and a build of the tag reports the number the tag says.
 _LABEL = re.compile(r"^[a-z][a-z0-9]{0,15}$")
 
 
@@ -916,18 +918,12 @@ def _owes_section(project, comp=""):
 
 
 def _pre_tgt(project, comp, tgt, label, ahead=0):
-    """`tgt` with its pre-release part: X.Y.Z-dev.N (N the ordinal of the
-    commit the tag will be on, `ahead` commits from HEAD), or X.Y.Z-LABEL.N
-    counting up from the newest such tag. (tgt, error)."""
-    if label == "dev":
-        pp = parts(project, comp) or {}
-        if not pp.get("ordinal"):
-            return None, "a dev release needs the commit's ordinal, which this tree has no history for"
-        return f"{pp.get('target') or tgt}-dev.{pp['ordinal'] + ahead}", ""
-    pre = f"{comp}-v" if comp else "v"
-    have = (_git(project, "tag", "--list", f"{pre}{tgt}-{label}.*") or "").split()
-    nums = [int(m.group(1)) for t in have if (m := re.fullmatch(rf"{re.escape(pre + tgt)}-{label}\.(\d+)", t))]
-    return f"{tgt}-{label}.{max(nums, default=0) + 1}", ""
+    """`tgt` with its pre-release part: X.Y.Z-LABEL.N, N the ordinal of the
+    commit the tag will be on (`ahead` commits from HEAD). (tgt, error)."""
+    pp = parts(project, comp) or {}
+    if not pp.get("ordinal"):
+        return None, "a pre-release needs the commit's ordinal, which this tree has no history for"
+    return f"{pp.get('target') or tgt}-{label}.{pp['ordinal'] + ahead}", ""
 
 
 def _owes_stable_section(project, comp, tgt):
@@ -2036,10 +2032,12 @@ def verb(name, act, req, who, principal):
         # A tag on GitHub gets GitHub's release beside it (R123): titled with
         # the version, the changelog's section as its notes, the builds of
         # that commit attached. Only once the tag is there, and a forge that
-        # says no leaves the tag as the release, with its reason. A dev tag's
-        # page is CI's (R179): made a pre-release by the image workflow.
-        if r.get("pushed") and FORGE and not dev:
-            r["forge"] = FORGE(name, r["tag"], r["target"], r["sha"], comp)
+        # says no leaves the tag as the release, with its reason. A
+        # pre-release's page is made too, marked one (R218); where the
+        # space's CI makes its releases (.release-files) the page is CI's,
+        # as publish says.
+        if r.get("pushed") and FORGE:
+            r["forge"] = FORGE(name, r["tag"], r["target"], r["sha"], comp, **({"pre": True} if dev else {}))
         # What CI builds for it is looked for whichever channel it is on: a
         # dev release's APK was left to the hourly look (B469).
         if r.get("pushed") and MADE:

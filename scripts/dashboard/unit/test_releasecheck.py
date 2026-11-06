@@ -84,6 +84,12 @@ class ReleaseCheck(unittest.TestCase):
         self.assertEqual(tags, sorted(tags, key=lambda t: releasecheck.rank(t.lstrip("v")), reverse=True), "newest first")
         self.assertEqual(releasecheck.rank("0.9.0"), (0, 9, 0, 10 ** 9))
         self.assertEqual(releasecheck.rank("v0.9.0-dev.12+abcdef0"), (0, 9, 0, 12))
+        # Any name is a pre-release on the dev channel, ordered by the
+        # commit's ordinal it carries, whatever it is called (R218).
+        self.assertEqual(releasecheck.rank("v0.9.0-rc.14"), (0, 9, 0, 14))
+        self.assertGreater(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0-dev.13"))
+        self.assertLess(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0"))
+        self.assertIsNone(releasecheck.rank("0.9.0-RC 1"))
 
 
 if __name__ == "__main__":

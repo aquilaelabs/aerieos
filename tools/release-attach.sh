@@ -57,7 +57,8 @@ id="$(find_release || true)"
 [ -n "$id" ] || id="$(mend_untagged || true)"
 if [ -z "$id" ]; then
     pre=(--draft)
-    case "$tag" in *-dev.*) pre+=(--prerelease --latest=false) ;; esac
+    # Any name after the version is a pre-release: -dev.N, -rc.N (R218).
+    case "$tag" in v*-*) pre+=(--prerelease --latest=false) ;; esac
     if [ -n "$notes" ]; then
         gh release create "$tag" --repo "$repo" --verify-tag "${pre[@]}" --title "$title" --notes-file "$notes" >/dev/null
     else

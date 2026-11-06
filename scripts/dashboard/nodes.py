@@ -4094,7 +4094,7 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
     src = str(from_dir or "").strip()
-    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-dev\.\d+)?", tag):
+    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
         return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
     if src and (not src.startswith("/") or ".." in src.split("/") or len(src) > 300):
         return {"error": "the folder is a path on the machine, from /"}
@@ -4268,7 +4268,7 @@ def node_controller_update(principal, node_id, release=""):
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
-    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-dev\.\d+)?", tag):
+    if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
         return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
     if tag:
         d = draft_update(principal, node_id, tag, False)

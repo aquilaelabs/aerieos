@@ -237,16 +237,18 @@ def _req(method, url, token, body=None, data=None, ctype="application/json"):
         raise Refused(f"could not reach GitHub: {e}") from e
 
 
-def publish(project, tag, version, sha, comp=""):
+def publish(project, tag, version, sha, comp="", pre=False):
     """The forge's release for `tag`, made if it is not there:
     {url, made, assets, skipped, forge} or {error, forge}. A project whose CI
     makes its releases says so with .release-files: its release is CI's draft,
-    which a person publishes, so nothing is published here ahead of it."""
+    which a person publishes, so nothing is published here ahead of it.
+    `pre` marks it a pre-release (R218), never the latest: its notes are its
+    own changelog section, which notes() finds by its version."""
     if not comp and (WORKSPACE / project / ".release-files").is_file():
         return {"url": "", "made": False, "assets": [], "skipped": [], "forge": "CI",
                 "note": "CI makes this release as a draft: read it and publish it from the Artifacts view's Drafts"}
     if cilogs.repo_of(project):
-        return _github(project, tag, version, sha, comp)
+        return _github(project, tag, version, sha, comp, pre)
     at = _remote(project)
     entry = forges.forge_of(at["host"]) if at else None
     if not at or not entry or entry["kind"] not in ("gitea", "gitlab"):
@@ -265,8 +267,9 @@ def publish(project, tag, version, sha, comp=""):
     title = f"{comp + ' ' if comp else ''}{version}"
     body = notes(where, version, tag, at["path"]) or f"{_shown(project)} {version}"
     try:
-        made = (_gitlab if entry["kind"] == "gitlab" else _gitea)(
-            _Forge(base, entry, token), at, project, tag, version, sha, title, body)
+        made = _gitlab(_Forge(base, entry, token), at, project, tag, version, sha, title, body) \
+            if entry["kind"] == "gitlab" else \
+            _gitea(_Forge(base, entry, token), at, project, tag, version, sha, title, body, pre)
     except Refused as e:
         _keep(project, tag, "", str(e), name)
         return {"error": str(e), "forge": name}
@@ -274,7 +277,7 @@ def publish(project, tag, version, sha, comp=""):
     return made | {"forge": name}
 
 
-def _github(project, tag, version, sha, comp=""):
+def _github(project, tag, version, sha, comp="", pre=False):
     repo = cilogs.repo_of(project)
     token = cilogs._token(project)
     if not token:
@@ -291,7 +294,8 @@ def _github(project, tag, version, sha, comp=""):
         where = WORKSPACE / project / comp if comp else WORKSPACE / project
         body = notes(where, version, tag, repo) or f"{_shown(project)} {version}"
         rel = _req("POST", base, token, {"tag_name": tag, "name": f"{comp + ' ' if comp else ''}{version}",
-                                         "body": body, "draft": False, "prerelease": False})
+                                         "body": body, "draft": False, "prerelease": bool(pre),
+                                         **({"make_latest": "false"} if pre else {})})
         up, skipped = [], []
         for f in assets(project, sha):
             size = f.stat().st_size
@@ -386,7 +390,7 @@ class _Forge:
             raise Refused(f"could not reach {name}: {e}") from e
 
 
-def _gitea(f, at, project, tag, version, sha, title, body):
+def _gitea(f, at, project, tag, version, sha, title, body, pre=False):
     """Gitea's API is GitHub's shape: the release by its tag, made if it is
     not there, and each build attached to it as a multipart upload."""
     owner, _, repo = at["path"].partition("/")
@@ -401,7 +405,7 @@ def _gitea(f, at, project, tag, version, sha, title, body):
     for wait in (1, 2, 3, 4, 0):
         try:
             rel = f.ask("POST", base, {"tag_name": tag, "name": title, "body": body,
-                                       "draft": False, "prerelease": False})
+                                       "draft": False, "prerelease": bool(pre)})
             break
         except Refused as e:
             if not wait or not re.search(r"answered (409|422|404)", str(e)):

@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "the published release's tag, vX.Y.Z or vX.Y.Z-dev.N"
+        description: "the published release's tag, vX.Y.Z or a pre-release's, vX.Y.Z-dev.N or -rc.N"
         required: true
 
 permissions:

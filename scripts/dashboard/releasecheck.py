@@ -25,7 +25,9 @@ EVERY = 24 * 3600
 TIMEOUT = 30
 VER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 # A dev build's tag (R179): the release it heads for and its ordinal.
-DEV = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)-dev\.(\d+)(?:\+[0-9a-f]+)?$")
+# A pre-release of any name (R218): vX.Y.Z-dev.N, -rc.N, -beta.N, N the
+# commit's ordinal whatever the name, so one number orders them all.
+DEV = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)-[a-z][a-z0-9]*\.(\d+)(?:\+[0-9a-f]+)?$")
 
 _lock = threading.Lock()
 _latest = {"version": "", "tag": "", "at": 0, "error": "", "checking": False, "url": "", "dev": {"version": "", "tag": "", "url": ""}}
@@ -107,7 +109,7 @@ def parse(v):
 
 
 def parse_dev(v):
-    """(major, minor, patch, ordinal) of a dev build or its tag, or None."""
+    """(major, minor, patch, ordinal) of a dev build or any pre-release, or its tag, or None."""
     m = DEV.match(str(v or "").strip())
     return tuple(int(x) for x in m.groups()) if m else None
 

@@ -85,7 +85,7 @@ aerie version release --why "..." [--without-apk] [--dev|--stable]
                    signs it once that is put right. --dev tags the dev
                    build instead (vX.Y.Z-dev.N, no bump), which CI publishes as
                    a pre-release on the dev channel; --pre NAME a pre-release of
-                   any other name (vX.Y.Z-rc.1, counting up). A pre-release
+                   any other name (vX.Y.Z-rc.N, N the commit's as for dev). A pre-release
                    first moves Unreleased into its own changelog section,
                    committed and pushed, and is tagged on that commit; a stable
                    one gathers every pre-release section since the last stable

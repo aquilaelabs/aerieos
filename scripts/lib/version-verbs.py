@@ -158,7 +158,7 @@ if argv and argv[0] == "release":
               "    space's owner, deny refuses. A release whose Android APK could not be signed (bb\n"
               "    sign status) is refused before the tag; --without-apk releases it anyway, to be\n"
               "    signed after with aerie sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N),\n"
-              "    --pre NAME a pre-release of any other name (vX.Y.Z-rc.1, -beta.2, counting up): no bump;\n"
+              "    --pre NAME a pre-release of any other name (vX.Y.Z-rc.N, -beta.N, N the commit's ordinal as a dev build's is): no bump;\n"
               "    the changelog's Unreleased becomes the pre-release's own section, committed and pushed\n"
               "    before the tag. A stable release gathers every pre-release section since the last stable\n"
               "    one into its own, leaving out fixes to what only they had. Either is refused while a bug\n"

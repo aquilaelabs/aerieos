@@ -181,7 +181,7 @@ def fetch(url, dest, say_progress=True):
                 say(f"  {os.path.basename(dest)}: {said * 5}%")
 
 
-TAG = r"v\d+\.\d+\.\d+(?:-dev\.\d+)?"
+TAG = r"v\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?"
 
 
 def release_image(tag, channel="normal"):
@@ -298,7 +298,7 @@ def signers():
 
 def tag_of(path):
     """The release an image file names (aerieos-os-0.9.0-dev.4724.stick.raw.xz), or ""."""
-    m = re.match(r"aerieos-os-(\d+\.\d+\.\d+(?:-dev\.\d+)?)\.", os.path.basename(path))
+    m = re.match(r"aerieos-os-(\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?)\.", os.path.basename(path))
     return f"v{m.group(1)}" if m else ""
 
 

@@ -114,6 +114,19 @@ class Release(unittest.TestCase):
         self.assertEqual(r["assets"], ["app-0.5.0-dev.12-65298e0-release-signed.apk"])
         self.assertEqual(fr.kept("app")["v0.5.0"]["url"], "https://github.com/o/app/releases/tag/v0.5.0")
 
+    def test_a_pre_release_is_marked_one_with_its_own_section(self):
+        # Any name (R218): the page is made, marked a pre-release and never
+        # the latest, its notes the section its cut wrote.
+        app = self.tmp / "ws" / "app" / "CHANGELOG.md"
+        app.write_text(app.read_text().replace("## Unreleased\n\n- not yet\n\n",
+                                                "## 0.6.0-rc.20: 2026-11-06\n\n### Fixed\n\n- The rc's fix (def5678)\n\n"))
+        r = fr.publish("app", "v0.6.0-rc.20", "0.6.0-rc.20", "65298e0", pre=True)
+        self.assertTrue(r.get("made"), r)
+        made = [b for m, p, b in SEEN if m == "POST"][0]
+        self.assertTrue(made["prerelease"])
+        self.assertEqual(made["make_latest"], "false")
+        self.assertEqual(made["body"], "### Fixed\n\n- The rc's fix")
+
     def test_a_version_cut_without_a_bump_releases_what_is_under_unreleased(self):
         # v0.5.0 went out reading "builderbot-2 0.5.0" (B116): its changes
         # were still under Unreleased, never dated by a bump.
