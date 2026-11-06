@@ -15,6 +15,7 @@
 ### Fixed
 
 - Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (f492c67)
+- An array made after another was destroyed syncs; its first sync stopped saying too many disks had changed (0574ab1)
 
 ## 0.9.0-dev.4980: 2026-11-06
 
