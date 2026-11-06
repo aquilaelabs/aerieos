@@ -20,6 +20,10 @@
 - Editing a draft release's notes, or attaching its signed APK, could take its tag off on GitHub, so Publish and the next edit could not find it (028a05c)
 - Restarting a session right after the controller was updated could end the new session as its terminal opened (2a4fc8e)
 
+### Upgrading
+
+- On AerieOS, the first boot after this update puts the wired network card in a bridge, br0, with the card's MAC: an address the router reserves for that card stays the machine's. Where the machine's address is set on the Network page, it moves to br0 by itself (238dbfd)
+
 ## 0.9.0-dev.4951: 2026-11-06
 
 ### Changed
