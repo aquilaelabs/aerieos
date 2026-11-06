@@ -10053,8 +10053,10 @@ class Handler(BaseHTTPRequestHandler):
             # A shipped one is the session's while its node is still under the
             # project's Hosts its containers on; taken off, the container stays
             # the project's and the session loses it like any other left behind.
+            # The repository's own setting, the one the instance belongs to: a
+            # space's session works on each of its repositories (B709).
             shipped_there = devapp._read_rec(name, devapp.instance_key(name, field(req, "instance") or devapp.MAIN)).get("ship") \
-                and on in (prefs.get(sess).get("hosts") or [])
+                and on in ((prefs.get(name).get("hosts") or []) + (prefs.get(sess).get("hosts") or []))
             if on and mine and on != mine and not shipped_there:
                 return self._json({"error": "this dev instance is on another node: it stayed "
                                             "where it was running when this space moved, "
