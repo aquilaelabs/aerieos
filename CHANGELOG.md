@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Each of a space's settings is changed in one place: what every repository shares (people, what sessions reach, toolchains, coding agents, its nodes) on the space's own settings, shown read-only on a repository's with a button to them; a repository may still keep its containers off some of the space's hosting nodes, pick its own test node, and set any Agents may dial apart, and the space's settings name each repository that does (64b2b7d)
+- Fewer controls: where a repository's tests run is one choice under Build and test; the daily snapshot switch is gone (0 days kept takes none); terminal colors are Profile's for every space; Move the version is set on the Permissions view; Its VMs may hold shows only where VMs may be made (64b2b7d)
+
+### Fixed
+
+- A space's session can rebuild a container one of its repositories has on a hosting node the space or the repository uses, however it got there; one made there before the repository joined the space was still refused (8bb4415)
+
+### Upgrading
+
+- Terminal colors set for one space are dropped: set them on Profile, under Your terminal, for every space. A repository whose daily snapshots were switched off keeps 0 days of them.
+
 ## 0.9.0-dev.5037: 2026-11-06
 
 ### Added
