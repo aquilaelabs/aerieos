@@ -38,6 +38,27 @@ ENVF="${BB_CONTROLLER_ENV:-/etc/aerieos-controller/controller.env}"
 SUB="aerieos-system"
 SERVICES=(containerd docker libvirtd)
 PFILE="$WORK/projects-folder"
+# Which install a pool's folder is (the operator, 6 Nov): another install's
+# data (its containers, VMs, toolchains, spaces and the session accounts'
+# homes with their sign-ins) is never taken by a new one; that comes over only
+# through a move token from the controller it was.
+IDFILE="$WORK/install-id"
+OWNER_MARK=".aerieos-install"
+install_id() {
+    if [ ! -s "$IDFILE" ]; then
+        mkdir -p "$WORK"
+        tr -d '-' < /proc/sys/kernel/random/uuid > "$IDFILE.new" && mv -f "$IDFILE.new" "$IDFILE"
+    fi
+    head -c 64 "$IDFILE"
+}
+# Whose a pool's folder is: "" when it holds nothing, "mine", or "other".
+pool_owner() {
+    local d="$1/$SUB" mark
+    [ -n "$(ls -A "$d" 2>/dev/null | grep -vx "$OWNER_MARK")" ] || { echo ""; return 0; }
+    mark="$(head -c 64 "$d/$OWNER_MARK" 2>/dev/null || true)"
+    if [ -n "$mark" ] && [ "$mark" = "$(install_id)" ]; then echo mine; else echo other; fi
+}
+mark_pool() { mkdir -p "$1/$SUB" && install_id > "$1/$SUB/$OWNER_MARK"; }
 CONTROLLER="aerieos-controller"
 
 envget() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null | tr -d '"' | tail -1; }
@@ -129,6 +150,8 @@ apply() {
         echo "system-pool: $p is not mounted yet: tried again in half a minute" >&2
         return 1
     fi
+    # This install named the pool: one named before the mark is marked now.
+    [ -s "$p/$SUB/$OWNER_MARK" ] || mark_pool "$p" || true
     local line name place src
     while IFS= read -r line; do
         name="${line%%=*}"; place="${line#*=}"; src="$p/$SUB/$name"
@@ -280,7 +303,12 @@ set_pool() {
     if [ -n "$var_src" ] && [ "$var_src" = "$p_src" ]; then
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
+    if [ "$(pool_owner "$p")" = other ]; then
+        echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, or pick a pool without it; nothing on $p was touched" >&2
+        return 3
+    fi
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "${SERVICES[@]/%/.service}" 2>/dev/null || true
+    mark_pool "$p"
     local line name place src old_pool
     old_pool="$(pool || true)"
     while IFS= read -r line; do

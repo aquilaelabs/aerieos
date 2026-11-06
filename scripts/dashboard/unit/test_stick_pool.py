@@ -117,6 +117,41 @@ class TheImage(unittest.TestCase):
                 self.assertTrue(os.path.isfile(f"{d}/pool/aerieos-system/docker/x"))
                 self.assertFalse(os.path.exists(f"{d}/docker/x"))
 
+    def test_another_installs_data_on_a_pool_is_never_taken(self):
+        # The operator, 6 Nov: a reinstall over an old system never takes its
+        # data (containers, VMs, spaces, the accounts' homes with their
+        # sign-ins); that comes over only through a move token.
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(f"{d}/docker")
+            os.makedirs(f"{d}/pool/aerieos-system/home/bb/.claude")
+            with open(f"{d}/pool/aerieos-system/home/bb/.claude/.credentials.json", "w") as f:
+                f.write("theirs")
+            fakes = f"{d}/bin"
+            os.makedirs(fakes)
+            for p, body in (("findmnt", "#!/bin/sh\nexit 0\n"), ("umount", "#!/bin/sh\nexit 0\n"), ("mount", "#!/bin/sh\nexit 0\n")):
+                with open(f"{fakes}/{p}", "w") as f:
+                    f.write(body)
+                os.chmod(f"{fakes}/{p}", 0o755)
+            env = {"PATH": fakes + ":" + os.environ["PATH"], "BB_SP_MOUNTED": "1", "BB_SP_NO_MOUNT": "1"}
+            with mock.patch.dict(os.environ, env):
+                for mark in (None, "someone-else"):
+                    if mark:
+                        with open(f"{d}/pool/aerieos-system/.aerieos-install", "w") as f:
+                            f.write(mark)
+                    r = self.tool(d, "set", f"{d}/pool")
+                    self.assertEqual(r.returncode, 3, r.stderr)
+                    self.assertIn("another AerieOS install's data", r.stderr)
+                    self.assertIn("move token", r.stderr)
+                    self.assertEqual(json.loads(self.tool(d, "status").stdout)["pool"], "", "the pool is not named")
+                self.assertEqual(read(d, "pool", "aerieos-system", ".aerieos-install"), "someone-else", "nothing on it touched")
+                # A pool with nothing of another's is taken, and marked as this install's.
+                os.makedirs(f"{d}/pool2")
+                r = self.tool(d, "set", f"{d}/pool2")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(read(d, "pool2", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
+                # ...and set again by the same install, holding its own data now.
+                self.assertEqual(self.tool(d, "set", f"{d}/pool2").returncode, 0)
+
     def test_the_projects_are_held_until_they_have_a_place_on_the_disks(self):
         # The operator, 1 Nov: never on the stick, on any stick.
         with tempfile.TemporaryDirectory() as d:
