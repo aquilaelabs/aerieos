@@ -24,7 +24,7 @@ const until = async (fn, ms = 20000, step = 200) => {
 const read = p => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
 const write = (p, t) => { mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true }); writeFileSync(p, t); };
 const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); '
-  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', `${REPO}/scripts/agent`]);
+  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', `${REPO}/scripts/agent`], { maxBuffer: 64 << 20 });
 
 // The project on the controller's share, made the way New project makes
 // one, so the account has it on its list.

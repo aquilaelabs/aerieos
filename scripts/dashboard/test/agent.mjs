@@ -22,7 +22,7 @@ const SHIPPED = `${DIR}/agentsrc`;
 const LOAD_AGENT = `import sys; sys.path.insert(0, ${JSON.stringify(`${REPO}/scripts/dashboard/unit`)}); import agentpkg`;
 // What a node runs: the zip the controller ships (aerieos_agent/bundle.py).
 const agentZip = () => execFileSync('python3', ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); '
-  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED]);
+  + 'from aerieos_agent import bundle; sys.stdout.buffer.write(bundle.build(sys.argv[1]))', SHIPPED], { maxBuffer: 64 << 20 });
 // Under aerie tests coverage (R76) every python this file starts, the agent it
 // runs and the module it drives in-process alike, counts the agent's
 // functions into its own file: PID is each process's own, so a self-update's
