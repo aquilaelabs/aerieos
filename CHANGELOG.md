@@ -6,6 +6,10 @@
 
 - A VM can have a TPM 2.0, ticked in New VM or its Hardware dialog, so Windows 11 installs; VM host now installs swtpm for it (431cb49)
 
+### Changed
+
+- A share's name and its folder may have spaces between words, such as TV Shows (8f2f7d3)
+
 ### Fixed
 
 - Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (f492c67)
