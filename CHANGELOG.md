@@ -1,29 +1,29 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5030: 2026-11-06
 
 ### Added
 
-- A VM can have a TPM 2.0, ticked in New VM or its Hardware dialog, so Windows 11 installs; VM host now installs swtpm for it (431cb49)
-- Check parity on the Storage page's array reads every block back against the parity, says how far it has got, and corrects what differs only when you ask; its result lands on the bell, and it can run monthly (20b1080)
-- A VM AerieOS did not make, such as one made in virt-manager, can be cloned into a space from the VMs page: its disks are copied and the original is left as it was (9f002c9)
-- A ZFS pool made on another machine, such as a TrueNAS box, can be imported from the Storage page as it is, and comes back after every restart until it is exported (d9034fa)
-- Download a backup under Move this controller keeps a copy of the controller, its spaces and their repositories under a token of its own, without arming a move: record the token, since it is shown once; the file and token never expire, and land on a new controller's first setup the way a move does (73e495f)
+- A VM can have a TPM 2.0, ticked in New VM or its Hardware dialog, so Windows 11 installs; VM host now installs swtpm for it (fb8b5c7)
+- Check parity on the Storage page's array reads every block back against the parity, says how far it has got, and corrects what differs only when you ask; its result lands on the bell, and it can run monthly (b4a2f62)
+- A VM AerieOS did not make, such as one made in virt-manager, can be cloned into a space from the VMs page: its disks are copied and the original is left as it was (b88ad6f)
+- A ZFS pool made on another machine, such as a TrueNAS box, can be imported from the Storage page as it is, and comes back after every restart until it is exported (d9db7ae)
+- Download a backup under Move this controller keeps a copy of the controller, its spaces and their repositories under a token of its own, without arming a move: record the token, since it is shown once; the file and token never expire, and land on a new controller's first setup the way a move does (0ab205e)
 
 ### Changed
 
-- A share's name and its folder may have spaces between words, such as TV Shows (8f2f7d3)
-- Moving a controller in is part of a new controller's first setup only: once its setup is finished, Move a controller here is gone from Controller settings and a landing is refused, so a controller in use is never replaced or merged into (3be3972)
-- A reinstall never takes the data an earlier AerieOS left on a pool (its containers, VMs, spaces and the accounts' sign-ins): naming that pool as the system pool is refused, and a move token from the old controller is the way to bring it over (8680292)
+- A share's name and its folder may have spaces between words, such as TV Shows (8f2aa14)
+- Moving a controller in is part of a new controller's first setup only: once its setup is finished, Move a controller here is gone from Controller settings and a landing is refused, so a controller in use is never replaced or merged into (0b40d0d)
+- A reinstall never takes the data an earlier AerieOS left on a pool (its containers, VMs, spaces and the accounts' sign-ins): naming that pool as the system pool is refused, and a move token from the old controller is the way to bring it over (424c90f)
 
 ### Fixed
 
-- Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (f492c67)
-- An array made after another was destroyed syncs; its first sync stopped saying too many disks had changed (0574ab1)
-- A node whose agent is turned away because the controller has no record of its credential, as after restoring the controller's settings from a backup older than the node's last check-in, says so on the Nodes page with Enroll again as the way back, where it said only that the agent had not dialed in lately (01dbaa5)
-- aerie tidy ends the test servers a test run left behind when it was stopped early; it said nothing was running and left them for hours (bf7c9dc)
-- A session can search for the word exited in its files again; only waiting on a background run's log in a loop is refused (cae8b1b)
-- Landing a move on a controller that already has a space of the same name keeps that space's folder whole in the workspace's trash and says so; the two repositories' files were mixed in one folder (3528b54)
+- Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (b656a35)
+- An array made after another was destroyed syncs; its first sync stopped saying too many disks had changed (e5deabf)
+- A node whose agent is turned away because the controller has no record of its credential, as after restoring the controller's settings from a backup older than the node's last check-in, says so on the Nodes page with Enroll again as the way back, where it said only that the agent had not dialed in lately (837ac48)
+- aerie tidy ends the test servers a test run left behind when it was stopped early; it said nothing was running and left them for hours (2335ff2)
+- A session can search for the word exited in its files again; only waiting on a background run's log in a loop is refused (3a6e6e2)
+- Landing a move on a controller that already has a space of the same name keeps that space's folder whole in the workspace's trash and says so; the two repositories' files were mixed in one folder (a3a2949)
 
 ## 0.9.0-dev.4980: 2026-11-06
 
