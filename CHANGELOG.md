@@ -166,6 +166,16 @@
 - The controller folds its write-ahead log into the database every minute and on a clean stop, so a restart has nothing to recover: with /config on a FUSE share (a /mnt/user path) a container re-created had come back with the state of the last fold, 25 minutes before, and turned every node away as unknown until re-enrolled (f80e647)
 - Home's Getting started card stays put away once a node has dialed in: a node whose agent is quiet is still the first node, and Claude Code on it still installed; the card had come back at 2 of 4 whenever the nodes went quiet (46119a7)
 - A dashboard page no longer reloads by itself when the machine's clock is corrected, which took what was being typed or pressed with it (ce458a5)
+- A console password could not be set: the job always failed, so the screen could never be logged in to (39118b2)
+- A machine with no NVIDIA card started with a failed unit at every boot (795590f)
+- The Installed page and the Library offered Remove on the NVIDIA driver and container toolkit the AerieOS image carries, and drew them on a machine with no card (ac2ce10)
+- The first-run page lost what was being typed each time it read the disks again (0b47c38)
+- A move could not land from the first-run walk or Controller settings: the controller's own machine counted as another node, so it never read as fresh (c7feb1d)
+- After a move onto a machine of its own, the spaces that ran on the old controller's machine still pointed at the old machine, which stayed on the Nodes page as one still to come (52c971a)
+- The dock's line jumped back to its start whenever it redrew (1e941bf)
+- On a phone the terminal's Keys and Commands buttons were different widths (b4b7e9d)
+- Analysis with no scanner reports showed a red message that stayed over the pages opened after it (788484c)
+- A home made by a BuilderBot image still greeted with BuilderBot at every start (5da10c0)
 
 ### Security
 
