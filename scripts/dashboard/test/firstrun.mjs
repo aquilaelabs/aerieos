@@ -611,6 +611,30 @@ await firstRun(false);
        `serving the shares where no Samba is installed says so for each, with no job (${many.error})`);
     ok(done.there && done.gone && /\/mnt\/disk1xfs, read-only/.test(done.text) && /not mounted yet/.test(done.text) && /sdc, left alone/.test(done.text) && done.release,
        `once adopted, Adopted disks says each mount and Release takes the plan's place (${done.text.slice(0, 200)})`);
+    // The folders at /mnt/user's top with no share settings, offered to
+    // tick (R163 step 13), and the same section on the Storage page (step 9).
+    const folders = await page.evaluate(() => {
+      const n = ownMachine();
+      n.reported = { ...n.reported, adopted: { ...n.reported.adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
+      nodesRev++; drawPanes();
+      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      return { offered: [...(sect?.querySelectorAll('[data-adoptfolder]') || [])].map(x => x.dataset.adoptfolder),
+               ticked: [...(sect?.querySelectorAll('[data-adoptfolder]:checked') || [])].length, btn: !!sect?.querySelector('[data-adoptfolders]') };
+    });
+    ok(JSON.stringify(folders.offered) === '["TV Shows"]' && folders.ticked === 0 && folders.btn,
+       `a folder with no share settings is offered unticked, and the plan's and the served ones are not (${JSON.stringify(folders)})`);
+    const onStorage = await page.evaluate(async () => {
+      window.__fbKeep = state.firstboot;
+      openStorageTab(); await new Promise(r => setTimeout(r, 400));
+      const own = ownMachine();
+      storageList = [{ node: own.id, name: own.name, measured: true, age_s: 60, fs: [], disks: [], projects: [] }];
+      storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+      const sect = document.querySelector('.storagetab details[data-sect="storage:adopted"]');
+      return { there: !!sect, release: !!sect?.querySelector('[data-adopt="release"]'), folder: !!sect?.querySelector('[data-adoptfolder="TV Shows"]') };
+    });
+    ok(onStorage.there && onStorage.release && onStorage.folder,
+       `the Storage page of the machine draws the same Adopted disks, Release and the folders to serve (${JSON.stringify(onStorage)})`);
+    await page.evaluate(() => { openMachineTab(); state.firstboot = state.firstboot || window.__fbKeep; nodesRev++; drawPanes(); });
     // ...and what the old system ran (R163 steps 10, 11): read first, then
     // its containers to make and start and its VMs to define and run.
     const apps = await page.evaluate(async () => {

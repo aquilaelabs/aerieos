@@ -845,6 +845,7 @@ function storageBody(n, where){
     ${storageMachineDisks(n)}
     ${storagePools(n)}
     ${storageArray(n)}
+    ${storageAdopt(n)}
     ${storageSnapshots(n)}
     ${storageShares(n)}
     ${storageOther(n)}
@@ -854,6 +855,16 @@ function storageBody(n, where){
     ${(n.phones || []).length ? docSection("storage", "phones", "Phones", `${n.phones.length}, ${sgb(n.phones.reduce((a, p) => a + (p.mb || 0), 0))}`, storagePhones(n)) : ""}
     ${n.slow?.length ? `<div class="field"><div class="hint warn">Not measured in time: ${esc(n.slow.join(", "))}. A slow share; the next walk tries again.</div></div>` : ""}
   </div>`;
+}
+
+// The old system's disks (R163 step 9): the section This machine draws,
+// on the Storage page of the machine they are in (the controller's own),
+// with the same Check, Adopt, Release and shares, folded as Storage's are.
+function storageAdopt(n){
+  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  if (!own || own.id !== n.node) return "";
+  const p = adoptParts(own);
+  return p ? docSection("storage", p.id, p.title, p.status, p.body, p.opts) : "";
 }
 
 function renderStorageInto(i){
@@ -887,6 +898,7 @@ function renderStorageInto(i){
   if (n) wireStoragePools(d.el, n);
   if (n) wireStorageSnapshots(d.el, n);
   if (n) wireStorageArray(d.el, n);
+  if (n && storageAdopt(n)) wireAdopt(d.el);
   if (n) wireStorageOther(d.el, n);
   if (n) wireStorageBackups(d.el, n);
 }
