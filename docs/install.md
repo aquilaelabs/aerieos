@@ -384,7 +384,9 @@ container to a machine of its own, and back.
    move never lands on a build older than the state it carries: update the
    new home first), its state put in place of the fresh one (which is moved
    aside, not deleted), and the dashboard restarts on it. Sign in with an
-   account it had.
+   account it had. A move lands only while the new home is first being set
+   up, before its Finish: it replaces what is there, and is never merged into
+   a controller already in use.
 3. The landing is told both ways, each under the move key and never the
    token: the new controller tells the old one, and the old one asks the
    new address while it waits, so whichever is up learns it. The old

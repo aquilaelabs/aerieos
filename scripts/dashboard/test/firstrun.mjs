@@ -190,7 +190,7 @@ await firstRun(false);
         { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }) };
     };
     const finish = () => post('/api/settings', { set: { setup_done: true } });
-    return { base, proc, enroll, finish, stop: () => proc.kill('SIGTERM') };
+    return { base, proc, enroll, finish, land: () => post('/api/move-land', {}), stop: () => proc.kill('SIGTERM') };
   };
 
   // The own machine's disks (R161 step 3): the stick it runs from, three
@@ -211,6 +211,10 @@ await firstRun(false);
   await (await ctr.enroll('box1', false)).go();
   const fin = await ctr.finish();
   ok(!fin.error, `...and finishes once one answers (${fin.error || 'ok'})`);
+  // Moving a controller in is the first setup's alone (the operator, 6 Nov):
+  // once finished, a landing is refused, never merged.
+  const late = await ctr.land();
+  ok(/only while a controller is first being set up/.test(late.error || ''), `a move is refused once the setup is finished (${late.error || 'landed'})`);
   ctr.stop();
 
   const bm = await controller('bare');

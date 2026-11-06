@@ -12834,7 +12834,9 @@ class Handler(BaseHTTPRequestHandler):
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
         # Whether a move may land here (_move_land): a fresh controller's,
         # and on a stick only once the projects have a place on the disks.
-        fresh = len(users.all_users()) <= 1 and nodes.only_this_machine()
+        # A move lands only while this controller is first set up (the
+        # operator, 6 Nov: never a merge into one in use).
+        fresh = len(users.all_users()) <= 1 and nodes.only_this_machine() and (not settings.get("setup_done") or bool(move.cut_landing()))
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
         owner = (users.account_of(me) or {}).get("role") == "owner"
@@ -13111,8 +13113,8 @@ class Handler(BaseHTTPRequestHandler):
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
 
     def _move_land(self):
-        """POST /api/move-land: a move landed from Controller settings by the
-        owner of a fresh controller, the form as the first run's (the token
+        """POST /api/move-land: a move landed while the controller is first
+        set up (before Finish), by the owner of a fresh controller, the form as the first run's (the token
         with the bundle file or the old controller's address). Its state
         replaces this one's, the setup account's with it, which is set aside
         as a reset's is. On a stick (the operator, 1 Nov) only once the
@@ -13121,6 +13123,8 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
+        if settings.get("setup_done") and not move.cut_landing():
+            return self._json({"error": "a move lands only while a controller is first being set up: this one has finished its setup, and a move is never merged into a controller in use"}, 409)
         if len(users.all_users()) > 1 or not nodes.only_this_machine():
             return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
         where = Path(STATE)
