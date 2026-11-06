@@ -3090,6 +3090,7 @@ UNIT
 # extlinux or systemd-boot the machine boots by, and taken out the same way;
 # the marker names the way so a remove undoes exactly that. The kernel
 # reads it at the next boot, which is the person's to ask for.
+AERIEOS_SLOT="${BB_AERIEOS_SLOT:-/usr/lib/aerieos-os/slot}"
 feature_iommu() {
     local vendor args marker="$FEATURES_DIR/iommu" way="" f
     case "$1" in
@@ -3103,7 +3104,13 @@ feature_iommu() {
             esac
             say "IOMMU: $args on the kernel's command line"
             install -d -m 0755 "$FEATURES_DIR"
-            if have grubby; then
+            # AerieOS's GRUB ends every entry with aerie_args from its
+            # environment block, which its slot tool sets (B703).
+            if [ -x "$AERIEOS_SLOT" ] && bash "$AERIEOS_SLOT" current >/dev/null 2>&1; then
+                # shellcheck disable=SC2086 # the arguments, one word each
+                bash "$AERIEOS_SLOT" args $args || die "the boot's arguments could not be written to GRUB's environment"
+                way=aerieos
+            elif have grubby; then
                 grubby --update-kernel=ALL --args="$args" || die "grubby did not take the arguments"
                 way=grubby
             elif [ -f /etc/default/grub ]; then
@@ -3130,6 +3137,8 @@ feature_iommu() {
             way="$(sed -n 's/^way=//p' "$marker")"; args="$(sed -n 's/^args=//p' "$marker")"
             say "taking $args off the kernel's command line (by $way)"
             case "$way" in
+                # shellcheck disable=SC2046 # the names, one word each
+                aerieos) bash "$AERIEOS_SLOT" args-off $(printf '%s\n' $args | sed 's/=.*//') || warn "GRUB's environment did not take them off" ;;
                 grubby) grubby --update-kernel=ALL --remove-args="$args" || warn "grubby did not take them off" ;;
                 grub) sed -i '/^# builderbot-iommu-begin$/,/^# builderbot-iommu-end$/d' /etc/default/grub; grub_regen || warn "GRUB's configuration did not regenerate" ;;
                 extlinux) sed -i "s/ $args//" /etc/update-extlinux.conf; update-extlinux >/dev/null 2>&1 || warn "update-extlinux did not take it" ;;

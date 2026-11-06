@@ -13,6 +13,9 @@
 #   slot good            this boot's slot is healthy: the trial ends, and it stays
 #   slot fell-back [keep]   whether the last boot fell back to the slot before (and clears the mark, unless keep)
 #   slot kept-next [VER]    one boot of the kept older version VER next (R201), or none named: no such boot
+#   slot args [ARG...]   the kernel arguments every boot entry ends with, printed, or each ARG (NAME or
+#                        NAME=VALUE) put there in place of one of that name: from the next boot
+#   slot args-off NAME...   those arguments taken off, from the next boot
 #
 # GRUB keeps the choice in its environment block on the ESP (aerie_slot), the one
 # place this tool writes. Counting a new slot's tries and marking it good is
@@ -120,6 +123,42 @@ keptnext() {
         *) grub-editenv "$ENVF" set "aerie_kept_next=$1" ;;
     esac
 }
+# A machine's own kernel arguments (aerie_args, which every entry of
+# grub.cfg ends with): the IOMMU, a device held for VMs, CPUs kept for them.
+# What the image's own entries say (its root, its slot, its overlay) is not
+# an argument a person sets here.
+argname() { printf '%s\n' "${1%%=*}"; }
+argsok() {
+    case "$(argname "$1")" in
+        root|rootfstype|overlayroot|init|aerie*|systemd.unit|rd.*) echo "slot: $1 is the image's own argument, not one to set" >&2; return 1 ;;
+    esac
+    printf '%s\n' "$1" | grep -Eq '^[a-z][a-z0-9_.-]{0,63}(=[A-Za-z0-9_.,:=/@+-]{1,256})?$' || { echo "slot: $1 is not a kernel argument this sets" >&2; return 1; }
+}
+args() {
+    local a w keep out
+    if [ "$#" -eq 0 ]; then envget aerie_args; return 0; fi
+    for a in "$@"; do argsok "$a" || return 2; done
+    needenv || return 1
+    out=""
+    for w in $(envget aerie_args); do
+        keep=1
+        for a in "$@"; do [ "$(argname "$w")" = "$(argname "$a")" ] && keep=0; done
+        [ "$keep" = 1 ] && out="${out:+$out }$w"
+    done
+    for a in "$@"; do out="${out:+$out }$a"; done
+    grub-editenv "$ENVF" set "aerie_args=$out"
+}
+argsoff() {
+    local a w keep out=""
+    [ "$#" -gt 0 ] || { echo "slot args-off takes the names to take off" >&2; return 2; }
+    needenv || return 1
+    for w in $(envget aerie_args); do
+        keep=1
+        for a in "$@"; do [ "$(argname "$w")" = "$(argname "$a")" ] && keep=0; done
+        [ "$keep" = 1 ] && out="${out:+$out }$w"
+    done
+    if [ -n "$out" ]; then grub-editenv "$ENVF" set "aerie_args=$out"; else grub-editenv "$ENVF" unset aerie_args; fi
+}
 fellback() {
     if [ "$(envget aerie_fell_back)" = 1 ]; then
         echo yes
@@ -152,5 +191,7 @@ case "${1:-}" in
     fell-back) fellback "${2:-}" ;;
     kept-next) keptnext "${2:-}" ;;
     status) status ;;
-    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    args) shift; args "$@" ;;
+    args-off) shift; argsoff "$@" ;;
+    *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

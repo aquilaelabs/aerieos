@@ -9,6 +9,7 @@ where they are laid out; the Debian family treats the image's packages as
 fixed; the workflow pins the mkosi build.sh pins."""
 import json
 import os
+import shlex
 import re
 import shutil
 import subprocess
@@ -149,6 +150,26 @@ class SlotTool(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("is the ESP mounted", r.stderr)
         self.assertEqual(self.run_tool("next", "c").returncode, 2)
+
+
+    def test_a_machines_own_kernel_arguments_are_set_by_name_and_the_images_refused(self):
+        # R163 step 16: what passthrough and CPU isolation need on the
+        # kernel's line, kept in aerie_args, which every entry ends with.
+        with tempfile.TemporaryDirectory() as d:
+            esp = os.path.join(d, "esp")
+            os.makedirs(os.path.join(esp, "grub"))
+            ok = lambda *a: self.run_tool(*a, esp=esp)
+            self.assertEqual(ok("args", "console=ttyS0,115200").returncode, 0)
+            self.assertEqual(ok("args", "intel_iommu=on", "iommu=pt", "isolcpus=2-5").returncode, 0)
+            self.assertEqual(ok("args").stdout.strip(), "console=ttyS0,115200 intel_iommu=on iommu=pt isolcpus=2-5")
+            self.assertEqual(ok("args", "isolcpus=4-7").returncode, 0)
+            self.assertEqual(ok("args").stdout.strip(), "console=ttyS0,115200 intel_iommu=on iommu=pt isolcpus=4-7")
+            for bad in ("root=/dev/sda1", "aerieslot=a", "overlayroot=tmpfs", "a;true", "Init=x"):
+                r = ok("args", shlex.quote(bad))
+                self.assertEqual(r.returncode, 2, bad)
+            self.assertEqual(ok("args-off", "intel_iommu", "iommu").returncode, 0)
+            self.assertEqual(ok("args").stdout.strip(), "console=ttyS0,115200 isolcpus=4-7")
+            self.assertIn("aerie_args", read(IMG, "grub.cfg"))
 
 
 class Installer(unittest.TestCase):

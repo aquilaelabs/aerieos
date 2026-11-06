@@ -177,6 +177,35 @@ class HelperFresh(unittest.TestCase):
         self.assertEqual(fetched, [{"user": "bb"}])
 
 
+class IommuOnAerieOS(unittest.TestCase):
+    """B703: the IOMMU feature on an AerieOS machine writes its arguments
+    with the slot tool (GRUB's aerie_args), where it found no bootloader it
+    knew and died."""
+    def test_on_and_off_through_the_slot_tool(self):
+        with open("/proc/cpuinfo", encoding="utf-8") as f:
+            vendor = "intel" if "GenuineIntel" in f.read() else "amd"
+        with open(PROVISIONER, encoding="utf-8") as f:
+            src = f.read()
+        fn = re.search(r"^AERIEOS_SLOT=.*?^}\n", src, re.S | re.M).group(0)
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        slot = os.path.join(d, "slot")
+        with open(slot, "w") as f:
+            f.write(f'#!/bin/bash\n[ "$1" = current ] && {{ echo a; exit 0; }}\necho "$@" >> {d}/said\n')
+        os.chmod(slot, 0o755)
+        script = ("say(){ echo \"$*\"; }; warn(){ echo \"$*\" >&2; }; die(){ echo \"$*\" >&2; exit 1; }; have(){ command -v \"$1\" >/dev/null; }\n"
+                  f"FEATURES_DIR={d}/features\n{fn}\nfeature_iommu \"$1\"\n")
+        env = os.environ | {"BB_AERIEOS_SLOT": slot}
+        r = subprocess.run(["bash", "-c", script, "x", "install"], capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("by aerieos", r.stdout)
+        r = subprocess.run(["bash", "-c", script, "x", "remove"], capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(d, "said")) as f:
+            said = f.read().splitlines()
+        self.assertEqual(said, [f"args {vendor}_iommu=on iommu=pt", f"args-off {vendor}_iommu iommu"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
