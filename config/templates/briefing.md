@@ -400,9 +400,10 @@ version in one step where that allows the part it changes. `aerie changelog add
 "..." --cat NAME` records what a change means for the person using the
 product, under Added, Changed, Deprecated, Removed, Fixed or Security; with
 no category it says when each applies. Fixed is for a bug a released
-version had: a fix to something no release has carried yet gets no line
-(the bug is still filed and closed), since the changelog is read by
-somebody upgrading from a release. Tagging and publishing the release is
+version had, and a published dev pre-release is a released version: a fix
+to something no release has carried yet gets no line (the bug is still
+filed and closed), since the changelog is read by somebody upgrading from a
+release. Tagging and publishing the release is
 `aerie version release --why "..."` under Agents may: Tag and publish a
 release, which asks the space's owner by default and runs on the
 controller with the space's own credentials, never yours. A published

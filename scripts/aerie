@@ -133,8 +133,10 @@ aerie changelog add "..." --cat NAME   log what a change means for the person us
                    exposed). When two fit, the one a reader would look under;
                    something nobody using the product would notice gets no
                    entry, and neither does a fix to something no release has
-                   carried yet: the changelog is read by somebody upgrading
-                   from a release, who never met that bug. Run without a category
+                   carried yet (a published dev pre-release is a release:
+                   a bug it carried gets a Fixed line): the changelog is
+                   read by somebody upgrading from a release, who never met
+                   that bug. Run without a category
                    and it prints this. A name that means one of the six is
                    spelled the one way (`fix` files under Fixed), the six keep
                    their usual order among themselves, and a space that
