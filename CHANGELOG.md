@@ -12,6 +12,7 @@
 ### Changed
 
 - A share's name and its folder may have spaces between words, such as TV Shows (8f2f7d3)
+- Moving a controller in is part of a new controller's first setup only: once its setup is finished, Move a controller here is gone from Controller settings and a landing is refused, so a controller in use is never replaced or merged into (3be3972)
 
 ### Fixed
 
