@@ -753,7 +753,10 @@ def roll(d, version, date, resolve=None, keep=None):
         gs, moved = groups(d), False
         for g in gs:
             for e in g["entries"]:
-                got = resolve(e["text"]) or []
+                try:
+                    got = resolve(e["text"], list(e["shas"])) or []
+                except TypeError:            # a resolver of the text alone
+                    got = resolve(e["text"]) or []
                 if got and got != e["shas"]:
                     e["shas"], moved = got, True
         if moved:

@@ -77,6 +77,24 @@ class PreRelease(unittest.TestCase):
         self.assertNotIn("## Unreleased", text)
         self.assertEqual(self.git("rev-list", "-n", "1", "--abbrev-commit", "--abbrev=7", r["tag"]), r["sha"])
 
+    def test_a_lines_own_stamp_is_kept_and_heads_is_resolved(self):
+        # B702: the cut cited the commit that introduced every line, over
+        # the change a line named by hand; HEAD's stamp is still resolved.
+        change = self.commit_file("a.py", "a = 1\n", "the change")
+        self.git("commit", "-q", "--allow-empty", "-m", "between")
+        changelog.add(self.app, f"Named by hand ({change})", cat="Fixed")
+        self.commit("changelog by hand")
+        self.log("Stamped with HEAD", "Added")
+        intro = self.git("rev-parse", "--short=7", "HEAD")
+        r = self.release(dev=True)
+        text = (self.app / "CHANGELOG.md").read_text()
+        self.assertIn(f"- Named by hand ({change})", text, r)
+        self.assertIn(f"- Stamped with HEAD ({intro})", text)
+
+    def commit_file(self, name, body, msg):
+        (self.app / name).write_text(body)
+        return self.commit(msg)
+
     def test_any_name_numbered_by_the_commit(self):
         self.log("First", "Added")
         n = int(self.git("rev-list", "--count", "HEAD"))

@@ -966,11 +966,8 @@ def _section_commit(project, comp, title, env=None, keep=None):
     if staged:
         return (f"{', '.join(staged[:4])} {'is' if len(staged) == 1 else 'are'} staged for another commit, and the "
                 f"changelog's commit for {title} would carry {'it' if len(staged) == 1 else 'them'}: commit or unstage first")
-    def cite(text):
-        # The commit that introduced the entry's line, as a bump cites it (B284).
-        out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
-        shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-        return shas[-1:] if shas else []
+    def cite(text, have=()):
+        return _cite(project, rel, text, have)
 
     if not changelog.roll(where, title, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
         return ""
@@ -1391,6 +1388,24 @@ def _stamp(project, value, part, env=None):
     return sorted(touched() - before), ""
 
 
+def _cite(project, rel, text, have=()):
+    """The commits an entry names once it is dated (B284): the commit that
+    introduced its line where its stamp is the one aerie changelog add put on
+    it, HEAD of the moment, the commit before; a stamp the line was given by
+    hand, naming the change it is about, is kept (B702: a cut named the
+    changelog's commits in place of the changes)."""
+    out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
+    shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+    if not shas:
+        return list(have)
+    intro = shas[-1]
+    before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
+    have = [h for h in have if h]
+    if not have or (before and all(before.startswith(h) or h.startswith(before) for h in have)):
+        return [intro]
+    return have
+
+
 def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
     """Roll the changelog, stage, and commit: the tail init and bump share.
 
@@ -1404,13 +1419,9 @@ def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
     cl_rel = None
     note = ""
 
-    def cite(text):
-        # The commit that introduced the entry's own line (B284): oldest of
-        # the ones that touched it, since a reword comes later.
+    def cite(text, have=()):
         rel = str((where / changelog.FILE).relative_to(root(project).resolve()))
-        out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
-        shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-        return shas[-1:] if shas else []
+        return _cite(project, rel, text, have)
 
     # A stable version gathers the pre-releases since the last stable one,
     # leaving out the fixes to what only they had (R217).
