@@ -187,14 +187,18 @@ BUILTIN = [
                 "!apt install* --simulate*", "!dnf install* --assumeno*"]},
     {"name": "file-what-you-find",
      "text": "What you notice goes on the record as you meet it, not only in a"
-             " reply: a bug with `aerie bug add`, work worth doing with `aerie roadmap"
-             " add`. Close what you finish as it lands: `aerie bug fix`, `aerie roadmap"
-             " step done`, `aerie roadmap done`."},
+             " reply: a bug that was there before your task with `aerie bug add`,"
+             " work worth doing with `aerie roadmap add`. A bug your own task"
+             " caused is not filed: it is fixed as part of the work. Close what you"
+             " finish as it lands: `aerie bug fix`, `aerie roadmap step done`,"
+             " `aerie roadmap done`."},
     {"name": "side-quests",
-     "text": "A bug met mid-task is fixed only when your own change caused it"
-             " or it blocks the work: the smallest fix, in its own commit, said"
-             " in the reply. Anything else is filed and left. One level deep:"
-             " a bug found while fixing one of those is filed, not chased."},
+     "text": "A bug your own task caused is fixed as part of the work and never"
+             " filed. One that was there before your task is filed with `aerie bug"
+             " add`, and fixed only when it blocks the work: the smallest fix, in its"
+             " own commit, said in the reply, the bug closed with `aerie bug fix`."
+             " Anything else is filed and left. One level deep: a bug found while"
+             " fixing one of those is filed, not chased."},
     {"name": "prove-in-the-app",
      "text": "Tests passing is not done: where the space has a dev instance"
              " (`aerie devapp`) or an app on the emulator, use the change there the way"

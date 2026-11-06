@@ -372,7 +372,8 @@ about, each finding a step.
 
 The record's verbs, as you meet things: `aerie bug add "..." --sev medium
 --area "..." --repro "..." --reproduces always|sometimes|once|untried` for a
-bug (how often those steps showed it), `aerie roadmap add "..."` for work worth
+bug that was there before your task (how often those steps showed it; one your
+own task caused is fixed as part of it, never filed), `aerie roadmap add "..."` for work worth
 doing, `aerie bug note B7 "..."` for what you learn about an open one, and `aerie
 bug fix B7 "what fixed it"` or `aerie roadmap step done R4 2` as you finish. A
 roadmap item the operator has shelved is parked: `aerie roadmap unshelve N WHY`
@@ -401,9 +402,8 @@ version in one step where that allows the part it changes. `aerie changelog add
 product, under Added, Changed, Deprecated, Removed, Fixed or Security; with
 no category it says when each applies. Fixed is for a bug a released
 version had, and a published pre-release of any name is a released
-version: a fix to something no release has carried yet gets no line (the bug
-is still filed and closed), since the changelog is read by somebody
-upgrading from a release. `--bug N` ties a Fixed line to its bug, `aerie
+version: a fix to something no release has carried yet gets no line, since
+the changelog is read by somebody upgrading from a release. `--bug N` ties a Fixed line to its bug, `aerie
 changelog skip N "why"` answers for one that needs none, and `aerie
 changelog missing` lists what the next release owes; a release is refused
 until it owes nothing. Unreleased is what no published build has carried:
