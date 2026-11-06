@@ -1,5 +1,6 @@
-docs/api.md: 178 routes
-ritten from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.
+# The dashboard's API
+
+Written from `scripts/dashboard/server.py` by `tools/api-doc.py`; `aerie lint` holds this page equal to it.
 Every request carries the account's credential (a session's token, or the person's cookie or
 basic auth); who may call what is decided in the handler, and the last column names the
 permission a handler refuses on (`refused: NAME`), or that it refuses a locked project
