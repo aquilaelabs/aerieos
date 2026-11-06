@@ -99,7 +99,8 @@ ok(/running/.test(row.text) && /ok/.test(row.pill) && /ssh builder@10\.232\.0\.1
    `once made it runs: its pill, how to reach it, its OS and node, Stop, Console and its snapshot with Revert (${row.text.slice(0, 120)})`);
 // Domains the node's libvirt has that AerieOS did not make (R165 step
 // 1): an administrator reads them under Not AerieOS's, by name, state
-// and size, with nothing to press, and the tiles count AerieOS's own.
+// and size, with Clone into a space alone to press, and the tiles count
+// AerieOS's own.
 await agent('hello', { census: { ...CENSUS, vms: [{ name: 'bbvm-alpha-db', state: 'running', ip: '10.232.0.12', vcpus: 2, mem_mb: 2048, snapshots: ['clean'] }],
                                  vms_other: [{ name: 'win11', state: 'running', vcpus: 4, mem_mb: 8192 }, { name: 'old-box', state: 'stopped', vcpus: 1, mem_mb: 512 }] },
                        version: shipped.version, digest: shipped.digest });
@@ -108,10 +109,14 @@ await page.waitForSelector('.vmtab .vmothers', { timeout: 15000 });
 const foreign = await page.evaluate(() => ({
   rows: [...document.querySelectorAll('.vmtab .vmother')].map(r => r.textContent.replace(/\s+/g, ' ').trim()),
   buttons: document.querySelectorAll('.vmtab .vmothers button').length,
+  // Clone into a space (R163 step 12): live on the stopped one, dead with
+  // why on the running one, and nothing else to press.
+  clone: [...document.querySelectorAll('.vmtab .vmothers [data-vmclone]')].map(b => `${b.dataset.vmfrom}:${b.disabled ? 'dead' : 'live'}`),
   running: document.querySelector('.vmtab .tiles')?.textContent.replace(/\s+/g, ' ') || '',
 }));
-ok(foreign.rows.length === 2 && /win11 ?running/.test(foreign.rows[0]) && /4 vCPU · 8 GB/.test(foreign.rows[0]) && foreign.buttons === 0 && /1 running/.test(foreign.running),
-   `the domains AerieOS did not make are listed read-only under Not AerieOS's, and not counted (${JSON.stringify(foreign).slice(0, 200)})`);
+ok(foreign.rows.length === 2 && /win11 ?running/.test(foreign.rows[0]) && /4 vCPU · 8 GB/.test(foreign.rows[0]) && foreign.buttons === 2
+   && JSON.stringify(foreign.clone) === '["win11:dead","old-box:live"]' && /shut it down to clone it/.test(foreign.rows[0]) && /1 running/.test(foreign.running),
+   `the domains AerieOS did not make are listed under Not AerieOS's with Clone alone, live once stopped, and not counted (${JSON.stringify(foreign).slice(0, 200)})`);
 await hello([{ name: 'bbvm-alpha-db', state: 'running', ip: '10.232.0.12', vcpus: 2, mem_mb: 2048, snapshots: ['clean'] }]);
 await page.evaluate(async () => { await loadVms(); });
 await page.waitForFunction(() => !document.querySelector('.vmtab .vmothers'), null, { timeout: 15000 });

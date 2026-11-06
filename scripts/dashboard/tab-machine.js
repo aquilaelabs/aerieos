@@ -392,7 +392,7 @@ function adoptAppsSection(n){
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
       btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}${
       // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
-      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${s.state === "shut off" ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
+      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${["stopped", "shut off", "crashed"].includes(s.state) ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
   return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}

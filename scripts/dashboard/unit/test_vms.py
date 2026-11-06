@@ -175,7 +175,7 @@ class Controller(unittest.TestCase):
     def test_a_vm_aerieos_did_not_make_is_cloned_into_a_space(self):
         # R163 step 12: an administrator's, from a shut-off VM the node lists
         # as not AerieOS's; recorded as making, as New VM's is.
-        self.f.nodes["n1"]["reported"]["vms_other"] = [{"name": "Windows 11", "state": "shut off", "vcpus": 4, "mem_mb": 8192},
+        self.f.nodes["n1"]["reported"]["vms_other"] = [{"name": "Windows 11", "state": "stopped", "vcpus": 4, "mem_mb": 8192},
                                                        {"name": "Ubuntu", "state": "running", "vcpus": 2, "mem_mb": 2048}]
         req = {"node": "n1", "from": "Windows 11", "name": "win11"}
         self.assertIn("administrator", vms.clone("user:t", "web", req)["error"])

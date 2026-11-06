@@ -553,7 +553,8 @@ def clone(principal, project, req, admin=False, session=False):
     other = next((v for v in others() if v["node"] == nid and v["name"] == src), None)
     if not other:
         return {"error": f"{src or 'no VM'} is not a VM AerieOS did not make on that node"}
-    if other["state"] not in ("shut off", "crashed"):
+    # The census's word for it is stopped (the agent's _state_word).
+    if other["state"] not in ("stopped", "shut off", "crashed"):
         return {"error": f"{src} is {other['state']}: shut it down first, so its disks are copied whole"}
     n = node(nid) or {}
     if not n.get("live"):

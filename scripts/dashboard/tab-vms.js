@@ -159,7 +159,7 @@ function vmOthersHtml(rows){
   const size = v => [v.vcpus ? `${v.vcpus} vCPU` : "", v.mem_mb ? (v.mem_mb >= 1024 ? `${+(v.mem_mb / 1024).toFixed(1)} GB` : `${v.mem_mb} MB`) : ""].filter(Boolean).join(" · ");
   // Clone into a space (R163 step 12): its disks copied, the original left
   // as it is; offered once it is shut off, its reason on the row otherwise.
-  const off = v => v.state === "shut off" || v.state === "crashed";
+  const off = v => ["stopped", "shut off", "crashed"].includes(v.state);
   return `<section class="dmcard vmothers"><div class="field dmgroup"><b>Not AerieOS's</b><span class="sub"> · on a node's libvirt, made outside AerieOS: read here; Clone makes a copy one of a space's, the original left as it is</span></div>
     <div class="rows">${rows.map(v => `<div class="row stack2 vmother" data-vmother="${esc(v.node)}/${esc(v.name)}"><div class="grow"><div class="dmhead"><div class="dmid">
       <div class="name">${esc(v.name)}<span class="pill${v.state === "running" ? " ok" : ""}">${esc(v.state || "unknown")}</span></div>
