@@ -7,6 +7,10 @@
 - Pre-releases of any name and a changelog that knows what each release carried: aerie version release --pre NAME cuts vX.Y.Z-NAME.N beside --dev, each pre-release takes Unreleased as its own changelog section and its notes, a stable release gathers every pre-release since the last stable into its own section, the fixes to what only they had left out, and a release is refused while a bug the last release carried has no Fixed line (aerie changelog missing, add --bug N, skip N) (3df9934)
 - A pre-release of any name gets its page on the forge, marked a pre-release, where the space's CI does not make one, and AerieOS's dev channel and the stick maker take an rc or beta as they take a dev build; every pre-release is numbered by its commit, as a dev build is (c01abbf)
 
+### Changed
+
+- A move's bundle downloads as aerieos-move-DATE.aeriemove; a .bbmove from an older install still lands (ccf6e14)
+
 ### Fixed
 
 - aerie changelog add named the current commit as well on a line that already named its own (0b19d80)
