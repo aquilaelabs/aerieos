@@ -1364,8 +1364,18 @@ def _vm_usb(rows):
 def _vm_hw(hw):
     """A VM's hardware as its node reported it (R100), kept to its shapes."""
     hw = hw if isinstance(hw, dict) else {}
+    net = str(hw.get("net") or "")
+    kind, _, name = net.partition(":")
+    # The network as the node read it (R219 step 4): its space's, the LAN, a
+    # bridge or a libvirt network by name; anything else its space's.
+    ok = net == "lan" or (kind in ("br", "net") and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", name)
+                          and not name.startswith("bbvm-"))
     out = {"cpuset": [int(c) for c in (hw.get("cpuset") or [])[:512] if isinstance(c, int)],
-           "net": "lan" if hw.get("net") == "lan" else "project"}
+           "net": net if ok else "project"}
+    if hw.get("model") in ("virtio", "e1000e", "e1000", "rtl8139", "vmxnet3"):
+        out["model"] = hw["model"]
+    if re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", str(hw.get("mac") or "").lower()):
+        out["mac"] = str(hw["mac"]).lower()
     if isinstance(hw.get("mem_max_mb"), int):
         out["mem_max_mb"] = hw["mem_max_mb"]
     sh = hw.get("share") if isinstance(hw.get("share"), dict) else None
@@ -1766,7 +1776,12 @@ def _census(c):
                      "host": re.sub(r"[^\w .,:()+/-]", "", str(d.get("host") or ""))[:120]}
                     for d in (vh.get("pci") or [])[:64]
                     if isinstance(d, dict) and PCI_ADDR_RE.fullmatch(str(d.get("addr")))],
-            "iommu": vh.get("iommu") is True}
+            "iommu": vh.get("iommu") is True,
+            # The host's bridges and libvirt networks a VM can be put on (R219 step 4).
+            "bridges": [str(x) for x in (vh.get("bridges") or [])[:32]
+                        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))],
+            "vnets": [str(x) for x in (vh.get("vnets") or [])[:32]
+                      if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))]}
     # ...and the installer ISOs fetched onto it (R99).
     if isinstance(c.get("vm_isos"), list):
         out["vm_isos"] = [{"name": str(i["name"]), "mb": int(i.get("mb") or 0) if isinstance(i.get("mb"), int) else 0}
