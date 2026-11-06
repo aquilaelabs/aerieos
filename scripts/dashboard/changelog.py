@@ -334,14 +334,15 @@ def add(d, text, sha="", cat=""):
     except _Refused as e:
         return {"error": str(e)}
     # A stamp typed on the end of the text is read as the entry's own, the
-    # way the file is read back, and the sha passed in joins it only when it
-    # is not already there: aerie changelog add passes HEAD, and an entry that
-    # named HEAD itself was written with the hash twice (B336).
+    # way the file is read back, and names the commits the line is about:
+    # the sha passed in (aerie changelog add passes HEAD) is used only when
+    # the text names none, since a line written for an earlier commit is not
+    # about whatever HEAD is when it is written.
     m = _STAMP.search(text)
     shas = m.group(1).split(", ") if m and text[:m.start()].strip() else []
     if shas:
         text = text[:m.start()].rstrip()
-    if sha and not any(s.startswith(sha) or sha.startswith(s) for s in shas):
+    elif sha:
         shas.append(sha)
     if read(d) is None:
         entry = f"- {text}" + (f" ({', '.join(shas)})" if shas else "")
