@@ -4290,11 +4290,13 @@ ok(await page.$('#devSend'),
   await page.evaluate(() => { openProjectsTab(); });
   await page.evaluate(n => renameProject(n), 'ep.silon');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
-  ok(await page.$eval('#rnTestWhere', e => !e.hidden)
-     && await page.$eval('#rnDevTest', e => [...e.options].map(o => o.value).join() === 'node,up,only'
-                                          && e.value === 'node'),
-     'the space settings dialog carries where its tests run, beside its node and command');
-  await page.selectOption('#rnDevTest', 'only');
+  // One choice under Build and test (R223): the space's nodes, its dev
+  // instance first or only.
+  ok(await page.$eval('#rnTestsF', e => !e.hidden)
+     && await page.$eval('#rnTests', e => [...e.options].some(o => o.value.startsWith('up|')) && [...e.options].some(o => o.value === 'only|')
+                                          && e.value.startsWith('node|')),
+     'the space settings dialog carries where its tests run, under Build and test with its commands');
+  await page.selectOption('#rnTests', 'only|');
   await saveDialog(page);
   await refreshUntil(page, () => ((state.projects || [])
     .find(p => p.name === 'ep.silon') || {}).prefs?.tests_in === 'only', { timeout: 20000 });
@@ -4302,8 +4304,8 @@ ok(await page.$('#devSend'),
      '...and saving it there is what writes the setting');
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
-  ok(await page.$eval('#rnTestWhere', e => e.hidden),
-     '...while a space with no compose file is not asked the question at all');
+  ok(await page.$eval('#rnTests', e => ![...e.options].some(o => /^(up|only)\|/.test(o.value))),
+     '...while a space with no compose file is not offered its dev instance at all');
   await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); openDocker(); });
   await page.waitForSelector('.dmtab', { timeout: 15000 });
 

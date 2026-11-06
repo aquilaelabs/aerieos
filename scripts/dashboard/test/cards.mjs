@@ -1744,7 +1744,9 @@ ok(await page.$eval('#rnTokenField', el => el.hidden)
    && await page.$eval('#rnAuthField', el => el.hidden),
    '...and holds no credential: the gear is the project, the chain is its remote');
 // Its people (membership.py): the owner, who may hand it on and make it
-// invite only, staged until Save, and an Invite that acts on the press.
+// invite only, staged until Save, and an Invite that acts on the press;
+// the space's, so on its own dialog (R223).
+await page.evaluate(() => renameProject('alpha', 'project'));
 await page.waitForSelector('#rnPeopleField:not([hidden]) #rnOwner', { timeout: 10000 });
 // What Invite only allows is the ? help on People now (R244), not prose
 // drawn on every visit; the section itself is the two settings and a facts

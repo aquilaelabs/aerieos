@@ -164,11 +164,13 @@ await call('/api/prefs', { project: 'alpha', makevms: 'deny' });
 // project's nodes beside the session's own, and saving one writes it.
 await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); openProjectsTab(); });
 await page.evaluate(n => renameProject(n), 'alpha');
-await page.waitForSelector('#rnmodal:not([hidden]) #rnTestNode', { timeout: 10000 });
-const tn = await page.$eval('#rnTestNode', e => ({ hidden: e.closest('#rnTestNodeF').hidden, opts: [...e.options].map(o => o.value), words: [...e.options].map(o => o.textContent) }));
-ok(!tn.hidden && tn.opts.includes(minted.id) && tn.words.some(w => /usbbox/.test(w)) && tn.opts[0] === '',
-   `the settings dialog offers the space's nodes as its test node, the session's own first (${tn.words.join(' | ')})`);
-await page.selectOption('#rnTestNode', minted.id);
+await page.waitForSelector('#rnmodal:not([hidden]) #rnTests', { timeout: 10000 });
+// One choice under Build and test (R223): as the space first, then the
+// session's own node, then the space's nodes.
+const tn = await page.$eval('#rnTests', e => ({ hidden: e.closest('#rnTestsF').hidden, opts: [...e.options].map(o => o.value), words: [...e.options].map(o => o.textContent) }));
+ok(!tn.hidden && tn.opts.includes(`node|${minted.id}`) && tn.words.some(w => /usbbox/.test(w)) && tn.opts[0] === 'node|inherit' && tn.opts[1] === 'node|',
+   `the settings dialog offers the space's nodes as where its tests run, as the space and the session's own first (${tn.words.join(' | ')})`);
+await page.selectOption('#rnTests', `node|${minted.id}`);
 await saveDialog(page);
 await refreshUntil(page, new Function(`return ((state.projects || []).find(p => p.name === 'alpha') || {}).prefs?.test_node === ${JSON.stringify(minted.id)}`), { timeout: 20000 }).catch(() => {});
 const kept = await page.evaluate(() => ((state.projects || []).find(p => p.name === 'alpha') || {}).prefs?.test_node || '');

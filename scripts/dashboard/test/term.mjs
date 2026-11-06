@@ -98,13 +98,14 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   const said = await page.evaluate(async () => (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: 'red' }) })).status);
   await page.evaluate(() => refresh());
-  await page.waitForFunction(() => [...TERMS.values()].some(r => r.t.arg === 'sh:7:alpha' && r.term?.options.theme.background === '#2c1416'), null, { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   const there = await opts();
   const padThere = await page.evaluate(() => getComputedStyle(document.querySelector('#pane1 .slot.on.ownterm')).backgroundColor);
-  ok(pad === 'rgb(250, 250, 250)' && padThere === 'rgb(44, 20, 22)',
-     `the room around the text changes color with the terminal (${pad} then ${padThere})`);
-  ok(mine.size === 16 && mine.cursor === 'bar' && mine.bg === '#fafafa' && said === 200 && there.bg === '#2c1416' && there.size === 16,
-     `a terminal takes its person's look, and their colors for its space over it (${JSON.stringify(mine)} then ${JSON.stringify(there)})`);
+  // A space has no colors of its own now (R223): Profile's are every space's.
+  ok(pad === 'rgb(250, 250, 250)' && padThere === pad,
+     `the room around the text wears the terminal's color, Profile's in every space (${pad} then ${padThere})`);
+  ok(mine.size === 16 && mine.cursor === 'bar' && mine.bg === '#fafafa' && there.bg === '#fafafa' && there.size === 16,
+     `a terminal takes its person's look from Profile, whatever a space once said (${JSON.stringify(mine)} then ${JSON.stringify(there)}; ${said})`);
   await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: '' }) }));
 }

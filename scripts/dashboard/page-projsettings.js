@@ -513,7 +513,7 @@ function rnFillTestNode(p){
   // Filled again while the dialog is open (the nodes landing, a poll): a
   // pick made since stays, as long as it is this project's and still offered;
   // the saved value otherwise.
-  const picked = sel.dataset.proj === (p?.name || "") && sel.options.length ? sel.value : null;
+  const picked = sel.dataset.proj === `${rnMode}:${p?.name || ""}` && sel.options.length ? sel.value : null;
   // Named off the Node picker's options, else off the nodes list, else by
   // id (B418: a dialog opened before the picker was drawn listed ids).
   const named = id => names.get(id) || (nodesList || []).find(n => n.id === id)?.name || id;
@@ -521,7 +521,7 @@ function rnFillTestNode(p){
   const inh = rnDialMode(p) === "inherit", sv = p?.prefs?.project_dials?.test_node || "";
   sel.innerHTML = (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
     + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join("");
-  sel.dataset.proj = p?.name || "";
+  sel.dataset.proj = `${rnMode}:${p?.name || ""}`;
   const saved = inh ? rnDialVal(p, "test_node", "") : (p?.prefs?.test_node || "");
   sel.value = picked !== null && (picked === "" || picked === "inherit" || ids.includes(picked)) && picked !== saved ? picked
     : saved === "inherit" || ids.includes(saved) ? saved : "";
