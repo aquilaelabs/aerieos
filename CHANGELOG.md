@@ -18,6 +18,7 @@
 - Turning the IOMMU on under This machine's Features, or in the installer, works on an AerieOS machine; it stopped saying no bootloader was found (f492c67)
 - An array made after another was destroyed syncs; its first sync stopped saying too many disks had changed (0574ab1)
 - A node whose agent is turned away because the controller has no record of its credential, as after restoring the controller's settings from a backup older than the node's last check-in, says so on the Nodes page with Enroll again as the way back, where it said only that the agent had not dialed in lately (01dbaa5)
+- aerie tidy ends the test servers a test run left behind when it was stopped early; it said nothing was running and left them for hours (bf7c9dc)
 
 ## 0.9.0-dev.4980: 2026-11-06
 
