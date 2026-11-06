@@ -53,8 +53,13 @@ install_id() {
 }
 # Whose a pool's folder is: "" when it holds nothing, "mine", or "other".
 pool_owner() {
-    local d="$1/$SUB" mark
-    [ -n "$(ls -A "$d" 2>/dev/null | grep -vx "$OWNER_MARK")" ] || { echo ""; return 0; }
+    local d="$1/$SUB" mark f held=""
+    for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do
+        [ -e "$f" ] || [ -L "$f" ] || continue
+        [ "${f##*/}" = "$OWNER_MARK" ] && continue
+        held=1; break
+    done
+    [ -n "$held" ] || { echo ""; return 0; }
     mark="$(head -c 64 "$d/$OWNER_MARK" 2>/dev/null || true)"
     if [ -n "$mark" ] && [ "$mark" = "$(install_id)" ]; then echo mine; else echo other; fi
 }
