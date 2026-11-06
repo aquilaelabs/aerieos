@@ -7,6 +7,7 @@
 - A VM can have a TPM 2.0, ticked in New VM or its Hardware dialog, so Windows 11 installs; VM host now installs swtpm for it (431cb49)
 - Check parity on the Storage page's array reads every block back against the parity, says how far it has got, and corrects what differs only when you ask; its result lands on the bell, and it can run monthly (20b1080)
 - A VM AerieOS did not make, such as one made in virt-manager, can be cloned into a space from the VMs page: its disks are copied and the original is left as it was (9f002c9)
+- A ZFS pool made on another machine, such as a TrueNAS box, can be imported from the Storage page as it is, and comes back after every restart until it is exported (d9034fa)
 
 ### Changed
 
