@@ -289,7 +289,8 @@ function adoptParts(n){
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
         <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button>${
-          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>`};
+          (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>
+        ${adoptFoldersField(n)}`};
   }
   const a = state?.firstboot?.adopt;
   if (!a) return null;
@@ -429,7 +430,34 @@ function adoptSharesLine(){
     (s.notes || []).map(x => ` ${esc(x.name)}: ${esc(x.said)}.`).join("")}</div>`;
 }
 
+// The folders at the top of /mnt/user the plan has no share settings for
+// (R163 step 13): made on a disk directly, so the old system served them
+// with its defaults (exported, public). Each is offered to tick, unticked.
+function adoptFolders(n){
+  const had = n?.reported?.adopted || {}, plan = new Set((state?.firstboot?.shares?.rows || []).map(r => r.name));
+  const served = new Set((n?.reported?.shares || []).flatMap(s => [s.name, s.path]));
+  return (had.folders || []).filter(f => !plan.has(f) && !served.has(f) && !served.has(`/mnt/user/${f}`));
+}
+function adoptFoldersField(n){
+  const fs = adoptFolders(n);
+  if (!fs.length) return "";
+  return `<div class="field">${lbl("adoptFolders", "Folders with no share settings", "made on a disk directly, so the old system served each with its defaults: on SMB, everybody as a guest. Tick the ones to serve that way")}
+    <div id="adoptFolders">${fs.map(f => `<label class="ndcap"><input type="checkbox" data-adoptfolder="${esc(f)}"> ${esc(f)}</label>`).join("")}</div>
+    <div class="actbar"><button type="button" data-adoptfolders>Serve the ticked</button></div></div>`;
+}
+
 function wireAdopt(root){
+  root.querySelectorAll("[data-adoptfolders]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const n = ownMachine(), names = [...root.querySelectorAll("[data-adoptfolder]:checked")].map(c => c.dataset.adoptfolder);
+    if (!n) return;
+    if (!names.length) { notify("tick the folders to serve first", true); return; }
+    const rows = names.map(name => ({name, path: `/mnt/user/${name}`,
+      smb: {on: true, guest: true, ro: false, tm: false, users: [], readers: []}, nfs: {on: false, ro: false, clients: []}}));
+    busy(b, "Serving");
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || `serving ${rows.length - (j.skipped || []).length} folder${rows.length === 1 ? "" : "s"}${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
+    await loadNodes();
+  }));
   root.querySelectorAll("[data-adoptshares]").forEach(b => b.onclick = () => pressing(b, async () => {
     const n = ownMachine(), rows = state?.firstboot?.shares?.rows || [];
     if (!n || !rows.length) return;

@@ -109,6 +109,38 @@ class TheAgent(unittest.TestCase):
         self.assertNotIn("[media]", open(self.smb).read())
         self.assertNotIn("/mnt/tank/media", open(self.nfs).read())
 
+    def test_a_share_with_a_space_in_its_name_is_served_and_read_back(self):
+        # R163 step 13: another NAS names one TV Shows; a doubled space, a
+        # quote or a newline is still refused.
+        state, code, text = self.run_job({"share": "set", "name": "TV Shows", "path": "/mnt/tank/TV Shows",
+                                          "smb": {"on": True, "guest": True, "ro": False, "users": []},
+                                          "nfs": {"on": True, "ro": False, "clients": ["*"]}},
+                                         folders=("/mnt/tank/media", "/mnt/tank/docs", "/mnt/tank/TV Shows"))
+        self.assertEqual((state, code), ("succeeded", 0), text)
+        self.assertIn("[TV Shows]\n    path = /mnt/tank/TV Shows\n", open(self.smb).read())
+        self.assertIn('"/mnt/tank/TV Shows" *(rw,', open(self.nfs).read())
+        with mock.patch.dict(os.environ, self.env):
+            got = {x["name"]: x for x in self.sm.shares_now()}
+        self.assertEqual((got["TV Shows"]["path"], got["TV Shows"]["nfs"]["on"]), ("/mnt/tank/TV Shows", True))
+        for name, path in (("TV  Shows", "/mnt/tank/TV Shows"), ("TV Shows ", "/mnt/tank/TV Shows"),
+                           ("TV", "/mnt/tank/TV\nShows"), ("TV", '/mnt/tank/TV"x')):
+            state, _c, text = self.run_job({"share": "set", "name": name, "path": path, "smb": {"on": True, "guest": True}},
+                                           folders=())
+            self.assertEqual(state, "failed", (name, path, text))
+        import nodes
+        self.assertIsNotNone(nodes._share_cfg({"smb": True}, {"share": "set", "name": "TV Shows", "path": "/mnt/user/TV Shows",
+                                                              "smb": {"on": True, "guest": True}})[0])
+        self.assertIsNone(nodes._share_cfg({"smb": True}, {"share": "set", "name": "TV  Shows", "path": "/mnt/user/x"})[0])
+
+    def test_the_merged_trees_top_folders_are_listed(self):
+        adopt = agentpkg.load("aerieos_agent_shares_folders").module("adopt")
+        d = tempfile.mkdtemp()
+        for n in ("TV Shows", "appdata", ".Recycle.Bin", "bad\nname"):
+            os.makedirs(os.path.join(d, n))
+        open(os.path.join(d, "file.txt"), "w").close()
+        self.assertEqual(adopt.top_folders(d), ["TV Shows", "appdata"])
+        self.assertEqual(adopt.top_folders(os.path.join(d, "none")), [])
+
     def test_a_time_machine_target_is_said_to_the_finder_and_read_back(self):
         smb, _nfs = self.sm.render([{"name": "tm", "path": "/mnt/tank/tm", "smb": {"on": True, "guest": False, "ro": False, "tm": True, "users": ["bbu-0a1b2c3d"]},
                                      "nfs": {"on": False, "ro": False, "clients": []}}])
@@ -277,7 +309,7 @@ class TheController(unittest.TestCase):
     def test_the_census_keeps_each_share_to_its_shape(self):
         import nodes
         got = nodes._census({"shares": [{"name": "media", "path": "/mnt/tank/media<b>", "smb": {"on": True, "guest": "yes", "ro": False, "users": ["ada", 7]},
-                                         "nfs": {"on": True, "ro": True, "clients": ["192.168.1.0/24"]}}, {"name": "bad name"}]})
+                                         "nfs": {"on": True, "ro": True, "clients": ["192.168.1.0/24"]}}, {"name": "bad  name"}]})
         self.assertEqual(got["shares"], [{"name": "media", "path": "/mnt/tank/mediab", "smb": {"on": True, "guest": False, "ro": False, "tm": False, "users": ["ada"], "readers": []},
                                           "nfs": {"on": True, "ro": True, "clients": ["192.168.1.0/24"]}}])
 

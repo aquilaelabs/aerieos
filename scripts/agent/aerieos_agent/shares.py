@@ -32,7 +32,11 @@ NFS_FILE = "/etc/exports.d/builderbot.exports"
 # The accounts' SMB passwords as handed over, written for pdbedit to import
 # (smbpasswd's line format) and removed once read.
 SMB_USERS_FILE = "/run/builderbot/smbusers"
-NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}")
+# A share's name and its folder's path may hold single spaces between words
+# (TV Shows, as another NAS names one), never a leading, trailing or doubled
+# one, nor a character Samba's or NFS's file would read as its own.
+NAME_RE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
+PATH_RE = re.compile(r"(?:/[A-Za-z0-9._+@-]+(?: [A-Za-z0-9._+@-]+)*)+/?")
 USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 CLIENT_RE = re.compile(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}")
 ROOTS = ("/mnt/", "/srv/")
@@ -83,9 +87,12 @@ def shares_now():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        m = re.match(r"^# share: (\S+)", line)
-        parts = line.split()
-        path = parts[0]
+        if line.startswith('"'):
+            path, _, rest = line[1:].partition('"')
+            parts = [path, *rest.split()]
+        else:
+            parts = line.split()
+            path = parts[0]
         clients = []
         ro = False
         for c in parts[1:]:
@@ -225,7 +232,8 @@ def render(shares):
                        + ("    fruit:time machine = yes\n" if s["smb"].get("tm") else "") + "\n")
         if s["nfs"]["on"]:
             opts = "ro" if s["nfs"]["ro"] else "rw"
-            nfs.append(f"{s['path']} " + " ".join(f"{c}({opts},sync,no_subtree_check,root_squash)" for c in s["nfs"]["clients"]) + "\n")
+            # A path with a space is quoted, as exportfs reads one.
+            nfs.append((f'"{s["path"]}" ' if " " in s["path"] else f"{s['path']} ") + " ".join(f"{c}({opts},sync,no_subtree_check,root_squash)" for c in s["nfs"]["clients"]) + "\n")
     return "".join(smb), "".join(nfs)
 
 
@@ -363,8 +371,8 @@ class SharesMixin:
                 say(f"refused: {path or 'no path'} is not a folder under /mnt or /srv\n")
                 return "failed", 65
             if not os.path.isdir(path):
-                if not re.fullmatch(r"/[A-Za-z0-9._/+@-]+", path):
-                    say(f"refused: {path} has characters a share's path may not have (spaces and the like): name its folder plainly\n")
+                if not PATH_RE.fullmatch(path):
+                    say(f"refused: {path} has characters a share's path may not have (quotes, a doubled space and the like): name its folder plainly\n")
                     return "failed", 65
                 why = _make_folder(path)
                 if why:
@@ -376,9 +384,9 @@ class SharesMixin:
             # a share's user made wrote options of its own (a world export
             # keeping root), and a link exported wherever it pointed.
             real = os.path.realpath(path)
-            if not (real.startswith(ROOTS) and re.fullmatch(r"/[A-Za-z0-9._/+@-]+", real)):
+            if not (real.startswith(ROOTS) and PATH_RE.fullmatch(real)):
                 say(f"refused: {path} is a link out of /mnt or /srv, or has characters a share's path may not have "
-                    "(spaces and the like): name its folder plainly\n")
+                    "(quotes, a doubled space and the like): name its folder plainly\n")
                 return "failed", 65
             path = real
             users = [str(u) for u in (smb.get("users") or []) if isinstance(u, str)]

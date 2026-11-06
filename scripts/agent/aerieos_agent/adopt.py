@@ -337,9 +337,22 @@ def adopted_now():
             for m in p.get("mounts") or []]
     rows += [{"where": z["where"], "fs": "zfs", "ro": bool(z.get("readonly")), "mounted": os.path.ismount(z["where"])}
              for z in p.get("zfs") or []]
+    merged = {w: os.path.ismount(w) for w in (p.get("merged") or {})}
     return {"from": str(rec.get("from") or "adopted")[:16], "writable": rec.get("writable") is True, "at": int(rec.get("at") or 0),
-            "mounts": rows[:64], "merged": {w: os.path.ismount(w) for w in (p.get("merged") or {})},
-            "parity": [str(x.get("dev") or "") for x in p.get("parity") or []][:2]}
+            "mounts": rows[:64], "merged": merged,
+            "parity": [str(x.get("dev") or "") for x in p.get("parity") or []][:2],
+            "folders": top_folders(next((w for w, up in merged.items() if up and w.rstrip("/").endswith("/user")), ""))}
+
+
+def top_folders(root):
+    """The folders at the top of the merged tree (R163 step 13): each one
+    the old system shared or a folder made on a disk directly, which the
+    page offers as a share where the plan has no settings for it."""
+    try:
+        names = sorted(e.name for e in os.scandir(root) if e.is_dir(follow_symlinks=False) and not e.name.startswith("."))
+    except OSError:
+        return []
+    return [n for n in names if re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", n)][:128]
 
 
 # ---- the containers and VMs another system ran (R163 steps 10 and 11) ----

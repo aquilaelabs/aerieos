@@ -1567,7 +1567,7 @@ def _census(c):
         sw = lambda v, n: re.sub(r"[^\w .,:/()*@+-]", "", str(v or ""))[:n]  # noqa: E731
         out["shares"] = []
         for sh in c["shares"][:64]:
-            if not isinstance(sh, dict) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", str(sh.get("name") or "")):
+            if not isinstance(sh, dict) or not re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", str(sh.get("name") or "")):
                 continue
             smb = sh.get("smb") if isinstance(sh.get("smb"), dict) else {}
             nfs = sh.get("nfs") if isinstance(sh.get("nfs"), dict) else {}
@@ -1637,7 +1637,10 @@ def _census(c):
             "mounts": [{"where": aw(m.get("where"), 120), "fs": aw(m.get("fs"), 8), "ro": m.get("ro") is True, "mounted": m.get("mounted") is True}
                        for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
             "merged": {aw(k, 120): v is True for k, v in list((ad.get("merged") or {}).items())[:4]} if isinstance(ad.get("merged"), dict) else {},
-            "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]]}
+            "parity": [aw(x, 32) for x in (ad.get("parity") or [])[:2]],
+            # The folders at the top of its merged tree (R163 step 13).
+            "folders": [str(x) for x in (ad.get("folders") or [])[:128]
+                        if isinstance(x, str) and re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", x)]}
         # ...and what its Docker and libvirt said ran (R163 steps 10, 11).
         ap = ad.get("apps") if isinstance(ad.get("apps"), dict) else {}
         if ap:
@@ -3707,8 +3710,8 @@ def _share_cfg(sh, req):
     name = str(req.get("name") or "").strip()
     if action not in ("set", "remove"):
         return None, "a share action is set or remove"
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", name):
-        return None, "a share's name is letters, digits, dots, hyphens and underscores, 63 at most"
+    if not re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*", name):
+        return None, "a share's name is letters, digits, dots, hyphens and underscores, words parted by one space, 63 at most"
     cfg = {"share": action, "name": name}
     if action == "set":
         path = str(req.get("path") or "").strip()
