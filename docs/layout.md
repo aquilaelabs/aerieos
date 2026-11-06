@@ -431,6 +431,7 @@ pyrightconfig.json               how pyright (the pyright-lsp plugin, or the CLI
 tools/version-stamp              this repo's own stamp hook: a bump moves the compatibility
                                  window in the agent and the template with it, or refuses
 docs/README.md                   the index of these docs, linked from the README
+docs/release-notes/downloads.md  which download is for what, put at the top of every release's notes by the image workflow
 docs/reference.md                the configuration reference, every aerie command (its aerie block written by tools/bb-ref.sh) and signing Android releases
 docs/unraid.md                   step-by-step Unraid walkthrough
 docs/image.md                    AerieOS, the appliance image: what it is, the disk and its slots, what persists, how it boots, how it is built

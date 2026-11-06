@@ -447,6 +447,12 @@ jobs:
             awk -v h="$head" 'index($0, h) == 1 {on = 1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
             grep -q '[^[:space:]]' notes.md || echo "AerieOS $ver: see CHANGELOG.md." > notes.md
           fi
+          # Which download is for what, at the top of every release (the
+          # operator, 6 Nov: the files alone did not say).
+          if [ -f docs/release-notes/downloads.md ]; then
+            { sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" docs/release-notes/downloads.md; cat notes.md; } > notes.all
+            mv notes.all notes.md
+          fi
           # One release per tag, found among the drafts and made once
           # (tools/release-attach.sh): v0.9.0-dev.4797 got two drafts when the
           # OS job could not see this job's.
