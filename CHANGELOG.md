@@ -20,6 +20,7 @@
 - A node whose agent is turned away because the controller has no record of its credential, as after restoring the controller's settings from a backup older than the node's last check-in, says so on the Nodes page with Enroll again as the way back, where it said only that the agent had not dialed in lately (01dbaa5)
 - aerie tidy ends the test servers a test run left behind when it was stopped early; it said nothing was running and left them for hours (bf7c9dc)
 - A session can search for the word exited in its files again; only waiting on a background run's log in a loop is refused (cae8b1b)
+- Landing a move on a controller that already has a space of the same name keeps that space's folder whole in the workspace's trash and says so; the two repositories' files were mixed in one folder (3528b54)
 
 ## 0.9.0-dev.4980: 2026-11-06
 
