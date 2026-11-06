@@ -110,6 +110,7 @@ def host_hw(sys_root="/sys"):
 NET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
 MODELS = ("virtio", "e1000e", "e1000", "rtl8139", "vmxnet3")
 MAC_RE = re.compile(r"([0-9a-f]{2}:){5}[0-9a-f]{2}")
+DOCKER_BR = re.compile(r"docker\d+|br-[0-9a-f]{12}")
 
 
 def bridges(sys_root="/sys"):
@@ -118,7 +119,9 @@ def bridges(sys_root="/sys"):
     out = []
     for d in sorted(glob.glob(f"{sys_root}/class/net/*/bridge")):
         n = os.path.basename(os.path.dirname(d))
-        if NET_NAME.fullmatch(n) and not n.startswith("bbvm-"):
+        # Docker's own (docker0, br-<id>) are its containers' networks, not a
+        # place for a VM: left out as the spaces' own are.
+        if NET_NAME.fullmatch(n) and not n.startswith("bbvm-") and not DOCKER_BR.fullmatch(n):
             out.append(n)
     return out[:32]
 

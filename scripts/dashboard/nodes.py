@@ -1779,7 +1779,8 @@ def _census(c):
             "iommu": vh.get("iommu") is True,
             # The host's bridges and libvirt networks a VM can be put on (R219 step 4).
             "bridges": [str(x) for x in (vh.get("bridges") or [])[:32]
-                        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))],
+                        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))
+                        and not re.fullmatch(r"docker\d+|br-[0-9a-f]{12}|bbvm-.*", str(x))],
             "vnets": [str(x) for x in (vh.get("vnets") or [])[:32]
                       if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))]}
     # ...and the installer ISOs fetched onto it (R99).

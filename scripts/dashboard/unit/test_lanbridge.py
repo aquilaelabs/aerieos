@@ -148,6 +148,12 @@ class Picked(unittest.TestCase):
     def test_the_space_network_reads_as_its_own(self):
         self.assertEqual(self.hw.read(self.XML)["net"], "project")
 
+    def test_dockers_bridges_are_not_offered(self):
+        net = tempfile.mkdtemp()
+        for n in ("br0", "virbr0", "docker0", "br-08a7d334e448", "bbvm-n1"):
+            os.makedirs(f"{net}/class/net/{n}/bridge")
+        self.assertEqual(self.hw.bridges(net), ["br0", "virbr0"])
+
     def test_the_names_are_checked(self):
         for good in ("project", "lan", "br:br1", "net:default"):
             self.assertTrue(self.hw.net_ok(good), good)
