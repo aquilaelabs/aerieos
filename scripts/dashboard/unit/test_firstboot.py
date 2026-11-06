@@ -102,6 +102,17 @@ class Take(unittest.TestCase):
             self.assertEqual(os.readlink(etc / "localtime"), str(Path(d, "zoneinfo", "Europe", "Berlin")))
             self.assertEqual((etc / "timezone").read_text(), "Europe/Berlin\n")
 
+    def test_the_mover_moves_what_the_old_system_kept_on_its_data_disks(self):
+        # R163 step 3: new files land on a pool first, so a share kept on the
+        # data disks comes off every pool, one cached comes off its own, and
+        # one kept on a pool stays.
+        import firstboot
+        cfg = {"shares": [{"name": "TV Shows", "cache": "yes", "pool": "cache"}, {"name": "backups", "cache": "no"},
+                          {"name": "appdata", "cache": "only", "pool": "cache"}, {"name": "isos", "cache": "prefer", "pool": "fast"},
+                          {"name": "elsewhere", "cache": "yes", "pool": "gone"}]}
+        self.assertEqual(firstboot.mover_moves(["cache", "fast"], cfg),
+                         [{"share": "TV Shows", "pool": "cache"}, {"share": "backups", "pool": "cache"}, {"share": "backups", "pool": "fast"}])
+
     def test_kernel_arguments_and_features_from_the_machine_it_replaces(self):
         # R163 step 16: CPUs kept for VMs and devices held for them, as the
         # old machine booted, from the next restart; the IOMMU turned on

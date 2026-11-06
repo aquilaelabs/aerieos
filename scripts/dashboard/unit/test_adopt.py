@@ -133,6 +133,19 @@ class HardRules(unittest.TestCase):
             self.assertNotIn(word, body, f"{word} has no place in adopt.py")
         self.assertFalse(re.search(r'\["zpool", "import"[^\]]*"-f"', body))
 
+    def test_the_way_back_stays_open(self):
+        # R163 step 5: no btrfs feature the old kernel may not read, no ZFS
+        # upgrade, in the adoption or the takeover; the takeover formats the
+        # parity partition alone (test_array.Takeover holds that by running it).
+        here = os.path.dirname(adopt.__file__)
+        for name in ("adopt.py", "array.py"):
+            with open(os.path.join(here, name)) as f:
+                code = "\n".join(ln for ln in f.read().splitlines() if not ln.lstrip().startswith("#"))
+            # What the docstrings say they never use is not code.
+            code = re.sub(r'"""(?:.|\n)*?"""', "", code)
+            for word in ("btrfstune", '"balance"', '"convert"', "zpool upgrade", '"upgrade"', '"-O"', "zfs set feature"):
+                self.assertNotIn(word, code, f"{word} has no place in {name}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -623,6 +623,28 @@ await firstRun(false);
     });
     ok(JSON.stringify(folders.offered) === '["TV Shows"]' && folders.ticked === 0 && folders.btn,
        `a folder with no share settings is offered unticked, and the plan's and the served ones are not (${JSON.stringify(folders)})`);
+    // Taking the array over (R163 step 3) and the way back (step 5).
+    const take = await page.evaluate(() => {
+      const n = ownMachine(), was = n.reported.adopted;
+      const read = () => { nodesRev++; drawPanes();
+        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+        const back = document.querySelector('.machinetab details[data-sect="nodes:adoptback"]');
+        return { take: [...(sect?.querySelectorAll('[data-adopttake]') || [])].map(x => x.dataset.adopttake), release: !!sect?.querySelector('[data-adopt="release"]'),
+                 status: sect?.querySelector('summary')?.textContent.replace(/\s+/g, ' ') || '', back: back?.textContent.replace(/\s+/g, ' ') || '' }; };
+      const old = read();
+      n.reported.adopted = { ...was, taken: false };
+      const offered = read();
+      n.reported.adopted = { ...was, taken: true, writable: true };
+      const taken = read();
+      n.reported.adopted = was;
+      nodesRev++; drawPanes();
+      return { old, offered, taken };
+    });
+    ok(!take.old.take.length && JSON.stringify(take.offered.take) === '["dry","go"]',
+       `an agent that has the takeover offers Check the takeover and Take the array over; an older one offers neither (${JSON.stringify([take.old.take, take.offered.take])})`);
+    ok(/taken over/.test(take.taken.status) && !take.taken.release && /parity sync that follows rebuilds/.test(take.taken.back)
+       && /nothing on its data disks was written here/.test(take.old.back) && /never written/.test(take.old.back),
+       `once taken over Release waits, and Going back says a parity sync there; read-only, it says nothing was written (${take.taken.back.slice(0, 160)})`);
     const onStorage = await page.evaluate(async () => {
       window.__fbKeep = state.firstboot;
       openStorageTab(); await new Promise(r => setTimeout(r, 400));

@@ -162,7 +162,8 @@ def system_words(sysj):
     if sysj.get("apply") == "storage-array":
         return {"sync": "a SnapRAID sync of the array: the parity brought up to date", "scrub": "a SnapRAID scrub of the array: a part of it read back and checked",
                 "check": "a SnapRAID status of the array",
-                "verify": "a parity check of the array: every block read back against the parity, nothing corrected"}.get(cfg.get("array", ""), f"the array's {cfg.get('array', '')}")
+                "verify": "a parity check of the array: every block read back against the parity, nothing corrected",
+                "mover": "the mover: each share's files off the pools onto the array's data disks"}.get(cfg.get("array", ""), f"the array's {cfg.get('array', '')}")
     return str(sysj.get("apply") or "")
 
 
@@ -312,8 +313,8 @@ def _clean(req, was):
             for k, kind in shape.items():
                 if not isinstance(cfg.get(k), kind) or isinstance(cfg.get(k), bool):
                     return None, f"the {sysj['apply']} job's {k} is missing or not a {kind.__name__}"
-            if sysj["apply"] == "storage-array" and cfg.get("array") not in ("sync", "scrub", "check", "verify"):
-                return None, "the array's schedule runs sync, scrub, check or a parity check (verify)"
+            if sysj["apply"] == "storage-array" and cfg.get("array") not in ("sync", "scrub", "check", "verify", "mover"):
+                return None, "the array's schedule runs sync, scrub, check, a parity check (verify) or the mover"
             s["system"] = {"apply": sysj["apply"], "config": {k: cfg[k] for k in shape}}
             s["script"] = ""
             s["as"] = "root"

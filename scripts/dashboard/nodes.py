@@ -1622,7 +1622,8 @@ def _census(c):
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
             "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16),
-            "progress": aw(ar.get("progress"), 40)}
+            "progress": aw(ar.get("progress"), 40), "adopted": ar.get("adopted") is True,
+            "moves": mb(ar.get("moves")), "last_move": mb(ar.get("last_move"))}
         # The last full parity check (R163 step 15), kept only from an agent that has it.
         if out["array"] and isinstance(ar.get("verify"), dict):
             v = ar["verify"]
@@ -1639,6 +1640,8 @@ def _census(c):
         aw = lambda v, n: re.sub(r"[^\w .,:;/()'@%+-]", "", str(v or ""))[:n]  # noqa: E731
         out["adopted"] = {
             "from": aw(ad.get("from"), 16), "writable": ad.get("writable") is True,
+            # Whether its array is taken over (R163 step 3); its presence says the agent has the verb.
+            **({"taken": ad.get("taken") is True} if "taken" in ad else {}),
             "at": ad["at"] if isinstance(ad.get("at"), int) and not isinstance(ad.get("at"), bool) else 0,
             "mounts": [{"where": aw(m.get("where"), 120), "fs": aw(m.get("fs"), 8), "ro": m.get("ro") is True, "mounted": m.get("mounted") is True}
                        for m in (ad.get("mounts") or [])[:64] if isinstance(m, dict)],
@@ -3385,7 +3388,7 @@ def node_storage_snapshot(principal, node_id, req):
     return r
 
 
-ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "destroy")
+ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "destroy")
 ARRAY_POLICIES = ("mfs", "lfs", "epmfs", "ff")
 ARRAY_LONG = 86400
 
@@ -3472,8 +3475,31 @@ def node_storage_array(principal, node_id, req):
         if str(req.get("confirm") or "") != "array":
             return {"error": "destroying the array takes the word array typed again"}
         cfg["confirm"] = "array"
+    elif action == "takeover":
+        # An adopted array taken over as SnapRAID's (R163 step 3): what was
+        # adopted, its parity disk on the machine; a dry run first.
+        ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+        if have.get("data"):
+            return {"error": "an array is on the machine already"}
+        if not (ad.get("mounts") or []):
+            return {"error": "nothing is adopted on the machine: adopt the old system's disks first"}
+        if ad.get("taken"):
+            return {"error": "the adopted array is taken over already"}
+        if "taken" not in ad:
+            return {"error": f"{n['name']}'s agent is from before the takeover: it updates itself within the hour"}
+        cfg["dry"] = req.get("dry") is True
+        if not cfg["dry"] and str(req.get("confirm") or "") != "parity":
+            return {"error": "taking the array over overwrites the old parity: it takes the word parity typed"}
+        # The mover's work, from the stick's plan: which shares come off
+        # which pools onto the data disks each night.
+        import firstboot
+        pools = [m["where"].rsplit("/", 1)[-1] for m in ad.get("mounts") or [] if not re.fullmatch(r"/mnt/disk\d+", m.get("where") or "")]
+        cfg["moves"] = firstboot.mover_moves(pools)
     elif not have.get("data"):
         return {"error": "no array on the machine yet"}
+    elif action == "mover":
+        if not have.get("adopted"):
+            return {"error": "the mover is for an array taken over from another system"}
     elif action == "verify":
         # Check parity (R163 step 15): an agent that has it says its last
         # one in the census, even as none yet.

@@ -216,13 +216,137 @@ class TheAgent(unittest.TestCase):
         self.assertNotIn("ETA", "".join(said))
 
 
+class Takeover(unittest.TestCase):
+    """R163 steps 3 and 5: an adopted array taken over as SnapRAID's. The
+    data disks are made writable where they are and never formatted; the
+    old parity disk's first partition is the one thing given a filesystem;
+    SnapRAID's content files are the only new thing on a data disk; Release
+    waits until the array is destroyed."""
+    def setUp(self):
+        self.agent = agentpkg.load("aerieos_agent_takeover")
+        self.am = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".array"]
+        self.ad = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".adopt"]
+        self.d = tempfile.mkdtemp()
+        self.env = {"BB_ARRAY_RECORD": os.path.join(self.d, "array.json"), "BB_ARRAY_STATE": os.path.join(self.d, "state.json"),
+                    "BB_ARRAY_FSTAB": os.path.join(self.d, "fstab"), "BB_SNAPRAID_CONF": os.path.join(self.d, "snapraid.conf"),
+                    "BB_ADOPT_RECORD": os.path.join(self.d, "adopted.json"), "BB_ADOPT_FSTAB": os.path.join(self.d, "fstab")}
+        with open(self.env["BB_ARRAY_FSTAB"], "w") as f:
+            f.write("UUID=root / ext4 defaults 0 1\n")
+        self.plan = {"mounts": [{"what": "UUID=aaaa", "where": "/mnt/disk1", "fs": "xfs", "ro": True, "dev": "sdb1"},
+                                {"what": "UUID=bbbb", "where": "/mnt/disk2", "fs": "btrfs", "ro": True, "dev": "sdc1"},
+                                {"what": "UUID=cccc", "where": "/mnt/cache", "fs": "btrfs", "ro": False, "dev": "nvme0n1p1"}],
+                     "zfs": [], "parity": [{"slot": "parity", "dev": "sdd"}],
+                     "merged": {"/mnt/user": ["/mnt/cache=RW", "/mnt/disk1=RO", "/mnt/disk2=RO"], "/mnt/user0": ["/mnt/disk1=RO", "/mnt/disk2=RO"]}}
+        self.disks = [{"name": "sdb", "size_mb": 4000000, "parts": [{"name": "sdb1", "holds": "xfs at /mnt/disk1"}], "mounted": True},
+                      {"name": "sdc", "size_mb": 4000000, "parts": [{"name": "sdc1", "holds": "btrfs at /mnt/disk2"}], "mounted": True},
+                      {"name": "sdd", "size_mb": 8000000, "parts": [{"name": "sdd1", "holds": "nothing"}]},
+                      {"name": "nvme0n1", "size_mb": 1000000, "system": True, "parts": [{"name": "nvme0n1p2", "holds": "squashfs at /"}]}]
+        ran = self.ran = []
+
+        class A(self.am.ArrayMixin, self.ad.AdoptMixin):
+            def _sh(inner, job, argv, timeout=0, **kw):
+                ran.append(argv)
+                return 0
+
+            def hello_again(self, why):
+                self.said = why
+        self.A = A
+
+    def adopt(self, **kw):
+        with mock.patch.dict(os.environ, self.env):
+            self.ad.write_record({"plan": self.plan, "writable": False, **kw})
+
+    def take(self, cfg):
+        job = Job()
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(self.am, "disks_now", return_value=self.disks), \
+             mock.patch.object(self.am.shutil, "which", side_effect=lambda t: f"/usr/bin/{t}"), mock.patch.object(self.am.os, "geteuid", return_value=0), \
+             mock.patch.object(self.am, "_df", return_value=(3815447, 10)), mock.patch.object(self.am, "_out", return_value="pppp\n"), \
+             mock.patch.object(self.am.os.path, "ismount", return_value=False), mock.patch.object(self.am.os, "makedirs"):
+            state, code = self.A()._apply_storage_array(job, cfg)
+            return state, code, job.text(), self.am.read_record(), self.ad.read_record()
+
+    def test_a_dry_run_says_it_all_and_changes_nothing(self):
+        self.adopt()
+        state, code, text, rec, arec = self.take({"array": "takeover", "dry": True})
+        self.assertEqual(state, "succeeded", text)
+        self.assertEqual(self.ran, [])
+        self.assertIn("sdd1 on sdd given an xfs filesystem for SnapRAID's parity file", text)
+        self.assertIn("unprotected until it ends", text)
+        self.assertEqual((rec, arec.get("writable")), ({}, False))
+
+    def test_only_the_parity_partition_is_formatted_and_the_data_disks_stay_where_they_are(self):
+        self.adopt()
+        state, code, text, rec, arec = self.take({"array": "takeover", "moves": [{"share": "TV Shows", "pool": "cache"}, {"share": "x;y", "pool": "cache"}]})
+        self.assertEqual(state, "succeeded", text)
+        made = [a for a in self.ran if a[0].startswith(("mkfs", "wipefs", "sgdisk", "parted", "fdisk", "sfdisk"))]
+        self.assertEqual(made, [["mkfs.xfs", "-L", "aerie-p1", "/dev/sdd1"]], "the parity partition alone, never a data disk, never a partition table")
+        self.assertIn(["mount", "-T", self.env["BB_ADOPT_FSTAB"], "/mnt/disk1"], self.ran)
+        self.assertEqual(self.ran[-1], ["/usr/bin/snapraid", "sync"])
+        self.assertTrue(rec["adopted"])
+        self.assertEqual([(d["slot"], d["where"]) for d in rec["data"]], [(1, "/mnt/disk1"), (2, "/mnt/disk2")])
+        self.assertEqual(rec["moves"], [{"share": "TV Shows", "pool": "cache"}])
+        self.assertTrue(arec["taken"] and arec["writable"])
+        self.assertFalse([m for m in arec["plan"]["mounts"] if m["ro"]])
+        self.assertEqual(arec["plan"]["merged"]["/mnt/user"], ["/mnt/cache=RW", "/mnt/disk1=RW", "/mnt/disk2=RW"])
+        conf = self.am.render_snapraid(rec)
+        on_data = [ln for ln in conf.splitlines() if "/mnt/disk" in ln and not ln.startswith("data ")]
+        self.assertEqual(on_data, ["content /mnt/disk1/.snapraid.content", "content /mnt/disk2/.snapraid.content"],
+                         "SnapRAID's content files are the only new thing on a data disk")
+        self.assertIn("parity /mnt/parity/p1/snapraid.parity", conf)
+        lines = [ln for ln in self.am.render_fstab(rec).splitlines()]
+        self.assertEqual(len(lines), 1, "the data disks and /mnt/user stay the adoption's lines")
+        self.assertIn("/mnt/parity/p1 xfs", lines[0])
+        with mock.patch.dict(os.environ, self.env):
+            self.assertEqual(self.am.array_now()["mount"], "/mnt/user")
+        # Release waits; add and replace are refused.
+        job = Job()
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(self.ad.shutil, "which", return_value="/usr/bin/x"), \
+             mock.patch.object(self.ad.os, "geteuid", return_value=0):
+            st, _c = self.A()._apply_storage_adopt(job, {"adopt": "release"})
+        self.assertEqual(st, "failed")
+        self.assertIn("destroy the array", job.text())
+        st, _c, text, _r, _a = self.take({"array": "replace", "which": "d1", "new": "sdd"})
+        self.assertIn("not done on it yet", text)
+
+    def test_a_parity_disk_with_no_partition_or_holding_a_filesystem_is_refused(self):
+        self.adopt()
+        self.disks[2]["parts"] = []
+        state, code, text, rec, _a = self.take({"array": "takeover"})
+        self.assertIn("never rewritten", text)
+        self.disks[2]["parts"] = [{"name": "sdd1", "holds": "ext4, not mounted"}]
+        state, code, text, rec, _a = self.take({"array": "takeover"})
+        self.assertIn("holds ext4", text)
+        self.assertEqual((rec, [a for a in self.ran if a[0].startswith("mkfs")]), ({}, []))
+
+    def test_the_mover_takes_old_files_off_the_pool_and_leaves_new_ones(self):
+        root = tempfile.mkdtemp()
+        src = os.path.join(root, "cache", "TV Shows", "s1")
+        os.makedirs(src)
+        old, new = os.path.join(src, "e1.mkv"), os.path.join(src, "e2.mkv")
+        for f in (old, new):
+            open(f, "w").close()
+        os.utime(old, (1000, 1000))
+        seen = []
+
+        class M(self.am.ArrayMixin):
+            def _sh(inner, job, argv, timeout=0, **kw):
+                lst = next(a for a in argv if a.startswith("--files-from="))[13:]
+                seen.append((argv[:3], open(lst).read(), argv[-2:]))
+                return 0
+        job = Job()
+        rc = M()._mover(job, [{"share": "TV Shows", "pool": "cache"}, {"share": "none", "pool": "cache"}], root=root)
+        self.assertEqual(rc, 0)
+        self.assertEqual(seen, [(["rsync", "-aHAX", "--remove-source-files"], "s1/e1.mkv\n",
+                                 [os.path.join(root, "cache", "TV Shows") + "/", os.path.join(root, "user0", "TV Shows") + "/"])])
+
+
 class TheController(unittest.TestCase):
     def test_the_census_keeps_the_array_to_its_shape(self):
         import nodes
         got = nodes._census({"array": {"policy": "mfs<b>", "mount": "/mnt/array", "mounted": True, "last_sync": "x", "last_scrub": 5, "status": "ok", "running": "",
                                        "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}, {"slot": 0}, "junk"],
                                        "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": "yes"}]}})
-        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "", "progress": "",
+        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "", "progress": "", "adopted": False, "moves": 0, "last_move": 0,
                                         "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}],
                                         "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": False}]})
         self.assertEqual(nodes._census({"array": {"data": []}})["array"], {})

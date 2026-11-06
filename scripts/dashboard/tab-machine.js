@@ -75,6 +75,7 @@ function renderMachineInto(i){
     + machineConsoleSection(n)
     + firstbootSection()
     + adoptSection(n)
+    + adoptBackSection(n)
     + adoptAppsSection(n));
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
@@ -282,6 +283,27 @@ function adoptSection(n){
   const p = adoptParts(n);
   return p ? docSection("nodes", p.id, p.title, p.status, p.body, p.opts) : "";
 }
+// The way back to the old system (R163 step 5), for the state the disks
+// are in: read-only, nothing to do; written to, its parity checked or
+// rebuilt there; taken over, its parity rebuilt there. What is never done
+// here, which keeps that way open, is said once.
+function adoptBackSection(n){
+  const had = n.reported?.adopted;
+  if (!had || !(had.mounts || []).length) return "";
+  const steps = had.taken ? [
+      "Shut this machine down and boot the old system's own stick.",
+      "On the old system, make a new configuration that keeps every disk in the slot it had, with the parity not trusted: its parity disk holds this machine's parity now.",
+      "Start its array: the parity sync that follows rebuilds the parity from the data disks, and the array is unprotected until it ends.",
+      "The data disks mount as they were. The .snapraid.content file at the top of each is this machine's, and may be deleted."]
+    : had.writable ? [
+      "Shut this machine down and boot the old system's own stick.",
+      "Start its array and run its parity check with corrections on: what was written here is what its parity did not see, and the array is not fully protected until the check ends."]
+    : ["Shut this machine down and boot the old system's own stick: nothing on its data disks was written here, so its array starts as it was, its parity good."];
+  return docSection("nodes", "adoptback", "Going back to the old system", had.taken ? "a parity sync there" : had.writable ? "a parity check there" : "nothing to do",
+    `<div class="field"><ol class="setsteps">${steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+      <div class="hint">Nothing here repartitions or reformats a data disk, upgrades a ZFS pool or turns on a btrfs feature the old system cannot read, and its stick is never written, so this way stays open.</div></div>`);
+}
+
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
 function adoptParts(n){
@@ -290,12 +312,20 @@ function adoptParts(n){
     const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
       ...Object.entries(had.merged || {}).map(([w, up]) => [w, up ? "merged" : "merged, not mounted yet", {cls: up ? "" : "warn"}]),
       ...(had.parity || []).map(p => ["parity", `${p}, left alone`])];
-    return {id: "adopted", title: "Adopted disks", status: had.writable ? "writable" : "read-only",
-      body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.writable
+    // Taking the array over (R163 step 3): SnapRAID's parity on the old
+    // parity disk, the data disks writable where they are; offered by an
+    // agent that has it, where the old parity disk is here.
+    const canTake = "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
+    return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
+      body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
+        ? "Taken over: SnapRAID keeps the parity on the old parity disk, the array is on the Storage page, and the mover takes new files off the pools each night. Going back to the old system takes its own parity sync."
+        : had.writable
         ? "Writable: going back to the old system takes a parity sync, which leaves its array unprotected until it ends."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
         ${adoptSharesLine()}
-        <div class="actbar"><button type="button" class="danger" data-adopt="release">Release</button>${
+        <div class="actbar">${had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
+          : `<button type="button" class="danger" data-adopt="release">Release</button>`}${
+          canTake ? `<button type="button" data-adopttake="dry">Check the takeover</button><button type="button" class="danger" data-adopttake="go">Take the array over</button>` : ""}${
           (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}</div></div>
         ${adoptFoldersField(n)}`};
   }
@@ -454,6 +484,22 @@ function adoptFoldersField(n){
 }
 
 function wireAdopt(root){
+  root.querySelectorAll("[data-adopttake]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const n = ownMachine(), dry = b.dataset.adopttake === "dry";
+    if (!n) return;
+    let confirm = "";
+    if (!dry){
+      const typed = await askText("Take the array over?\n\nThe data disks become writable where they are, nothing on them formatted. The old parity disk's partition is given a filesystem for SnapRAID's parity, so the old system's parity is gone: going back to it takes its own parity sync. The first sync builds the new parity from nothing, and the array is unprotected until it ends, hours for a large one.",
+                                  {verb: "Take it over", label: "Type parity to go on"});
+      if (typed === null || typed === undefined) return;
+      if (String(typed).trim() !== "parity"){ notify("the word typed is not parity; nothing taken over", true); return; }
+      confirm = "parity";
+    }
+    busy(b, dry ? "Checking" : "Taking over");
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : "taking the array over: the first sync builds the parity, its progress on the Storage page"), !!j.error);
+    await loadNodes();
+  }));
   root.querySelectorAll("[data-adoptfolders]").forEach(b => b.onclick = () => pressing(b, async () => {
     const n = ownMachine(), names = [...root.querySelectorAll("[data-adoptfolder]:checked")].map(c => c.dataset.adoptfolder);
     if (!n) return;

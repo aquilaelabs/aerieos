@@ -222,6 +222,26 @@ def kept_config():
     return d.get("config") if isinstance(d.get("config"), dict) else {}
 
 
+def mover_moves(pools, cfg=None):
+    """What the mover takes off the pools for an array taken over (R163
+    step 3): [{"share", "pool"}]. New files land on a pool first (the merged
+    tree's create policy), so a share the old system kept on its data disks
+    (its cache no) is moved off every pool, and one that wrote to a cache
+    and moved later (its cache yes) off its own; a share kept on a pool
+    (only, prefer) stays."""
+    cfg = kept_config() if cfg is None else cfg
+    out = []
+    for s in (cfg or {}).get("shares") or []:
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        c = str(s.get("cache") or "no")
+        if c == "yes" and s.get("pool") in pools:
+            out.append({"share": str(s["name"]), "pool": str(s["pool"])})
+        elif c == "no":
+            out += [{"share": str(s["name"]), "pool": p} for p in pools]
+    return out[:128]
+
+
 def met(waiting, done, reported):
     """The waits the machine has met since the report was written (B634):
     the array once a data disk the plan named is mounted, the pools once

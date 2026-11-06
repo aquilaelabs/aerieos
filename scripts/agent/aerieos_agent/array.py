@@ -13,6 +13,7 @@ unless the job says to wipe it, and nothing is ever made on the system
 disk; destroying the array unmounts it and forgets it, every data disk's
 files left as they are, readable on any Linux.
 """
+import contextlib
 import json
 import os
 import re
@@ -30,13 +31,17 @@ SNAPRAID_CONF = "/etc/snapraid.conf"
 FSTAB = "/etc/fstab"
 MARK = "# builderbot-array"
 MOUNT = "/mnt/array"
+ADOPTED_MOUNT = "/mnt/user"
+# A share and a pool as the mover takes them (the share rule of shares.py).
+MOVE_SHARE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
+MOVE_POOL = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 DISKS = "/mnt/disks"
 PARITY = "/mnt/parity"
 CONTENT = "/var/lib/builderbot/snapraid.content"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}
-ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "destroy")
+ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "destroy")
 MAX_DATA, MAX_PARITY = 24, 2
 NAME_RE = re.compile(r"[a-z][a-z0-9]{0,31}")
 SLOT_RE = re.compile(r"(d|p)([1-9][0-9]?)")
@@ -88,6 +93,18 @@ def mount_of(kind, slot):
     return f"{DISKS}/d{slot}" if kind == "d" else f"{PARITY}/p{slot}"
 
 
+def slot_mount(kind, x):
+    """Where a slot's disk is: its own path for a disk another system's
+    array had (R163 step 3: /mnt/diskN, kept), the array's otherwise."""
+    return str(x.get("where") or "") or mount_of(kind, int(x["slot"]))
+
+
+def merged_of(rec):
+    """The merged tree over the data disks: the old system's /mnt/user for
+    an array taken over (its pools before its disks), /mnt/array otherwise."""
+    return ADOPTED_MOUNT if rec.get("adopted") else MOUNT
+
+
 def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
     a content file on the system and on every data disk, each data disk by
@@ -95,12 +112,12 @@ def render_snapraid(rec):
     out = ["# Written by AerieOS (the Storage page): the array's SnapRAID layout. Do not edit; the page writes it whole.\n"]
     for p in rec.get("parity") or []:
         n = int(p["slot"])
-        out.append(f"{'' if n == 1 else f'{n}-'}parity {mount_of('p', n)}/snapraid.{'' if n == 1 else f'{n}-'}parity\n")
+        out.append(f"{'' if n == 1 else f'{n}-'}parity {slot_mount('p', p)}/snapraid.{'' if n == 1 else f'{n}-'}parity\n")
     out.append(f"content {CONTENT}\n")
     for d in rec.get("data") or []:
-        out.append(f"content {mount_of('d', int(d['slot']))}/.snapraid.content\n")
+        out.append(f"content {slot_mount('d', d)}/.snapraid.content\n")
     for d in rec.get("data") or []:
-        out.append(f"data d{int(d['slot'])} {mount_of('d', int(d['slot']))}/\n")
+        out.append(f"data d{int(d['slot'])} {slot_mount('d', d)}/\n")
     out.append("exclude *.unrecoverable\nexclude /lost+found/\nexclude .snapraid.content\nexclude /.Trash*/\nexclude .DS_Store\n"
                "blocksize 256\nhashsize 16\nautosave 500\n")
     return "".join(out)
@@ -112,11 +129,13 @@ def render_fstab(rec):
     over the data disks, with the record's create policy and 20 GB kept
     free on each before the next is picked."""
     lines = []
-    for d in rec.get("data") or []:
+    # An array taken over keeps its data disks and its merged tree on the
+    # adoption's own lines (adopt.render_fstab): only its parity is ours.
+    for d in [] if rec.get("adopted") else rec.get("data") or []:
         lines.append(f"UUID={d['uuid']} {mount_of('d', int(d['slot']))} {d.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
     for p in rec.get("parity") or []:
-        lines.append(f"UUID={p['uuid']} {mount_of('p', int(p['slot']))} {p.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
-    if rec.get("data"):
+        lines.append(f"UUID={p['uuid']} {slot_mount('p', p)} {p.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
+    if rec.get("data") and not rec.get("adopted"):
         policy = rec.get("policy") if rec.get("policy") in POLICIES else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={mount_of('d', int(d['slot']))}" for d in rec["data"])
         lines.append(f"{DISKS}/d* {MOUNT} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,dropcacheonclose=true,"
@@ -158,12 +177,13 @@ def array_now():
     st = _state()
 
     def row(kind, x):
-        m = mount_of(kind, int(x["slot"]))
+        m = slot_mount(kind, x)
         mounted = os.path.ismount(m)
         size, used = _df(m) if mounted else (0, 0)
         return {"slot": int(x["slot"]), "id": str(x.get("id") or "")[:120], "fs": str(x.get("fs") or "")[:8],
                 "size_mb": size, "used_mb": used, "mounted": mounted}
-    return {"policy": str(rec.get("policy") or "mfs"), "mount": MOUNT, "mounted": os.path.ismount(MOUNT),
+    return {"policy": str(rec.get("policy") or "mfs"), "mount": merged_of(rec), "mounted": os.path.ismount(merged_of(rec)),
+            "adopted": rec.get("adopted") is True, "moves": len(rec.get("moves") or []), "last_move": int(st.get("last_move") or 0),
             "data": [row("d", d) for d in rec.get("data") or []][:MAX_DATA],
             "parity": [row("p", p) for p in rec.get("parity") or []][:MAX_PARITY],
             "last_sync": int(st.get("last_sync") or 0), "last_scrub": int(st.get("last_scrub") or 0),
@@ -247,13 +267,159 @@ class ArrayMixin:
         rec = read_record()
         if not rec or os.geteuid() != 0:
             return
-        for kind, key in (("d", "data"), ("p", "parity")):
+        # An array taken over: the adoption's pass mounts its data disks
+        # and its merged tree; only the parity is this one's.
+        for kind, key in (("p", "parity"),) if rec.get("adopted") else (("d", "data"), ("p", "parity")):
             for x in rec.get(key) or []:
-                m = mount_of(kind, int(x["slot"]))
+                m = slot_mount(kind, x)
                 if not os.path.ismount(m) and os.path.isdir(m):
                     subprocess.run(["mount", m], capture_output=True, timeout=60, check=False)
-        if rec.get("data") and not os.path.ismount(MOUNT) and os.path.isdir(MOUNT):
+        if rec.get("data") and not rec.get("adopted") and not os.path.ismount(MOUNT) and os.path.isdir(MOUNT):
             subprocess.run(["mount", MOUNT], capture_output=True, timeout=60, check=False)
+
+    def _mover(self, job, moves, root="/mnt", age_s=600):
+        """The old system's mover, for an array taken over: each share's
+        files off a pool onto the data disks (/mnt/user0, the data disks
+        merged), a file written in the last ten minutes left for next time;
+        the folders it empties removed, the share's own kept. 0, or rsync's
+        exit."""
+        say, worst = job.say, 0
+        now = time.time()
+        for mv in moves:
+            src, dst = os.path.join(root, mv["pool"], mv["share"]), os.path.join(root, "user0", mv["share"])
+            if not os.path.isdir(src):
+                continue
+            files = []
+            for here, _dirs, names in os.walk(src):
+                for nm in names:
+                    f = os.path.join(here, nm)
+                    try:
+                        st = os.lstat(f)
+                    except OSError:
+                        continue
+                    if now - st.st_mtime >= age_s:
+                        files.append(os.path.relpath(f, src))
+            if not files:
+                continue
+            with tempfile.NamedTemporaryFile("w", delete=False, suffix=".list") as fl:
+                fl.write("".join(x + "\n" for x in files))
+            try:
+                say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {mv['pool']} to the data disks\n")
+                rc = self._sh(job, ["rsync", "-aHAX", "--remove-source-files", f"--files-from={fl.name}", src + "/", dst + "/"], timeout=86400)
+            finally:
+                os.unlink(fl.name)
+            worst = worst or rc
+            for here, _dirs, _names in sorted(os.walk(src), key=lambda w: -w[0].count("/")):
+                if here != src:
+                    with contextlib.suppress(OSError):
+                        os.rmdir(here)
+        return worst
+
+    def _array_takeover(self, job, cfg, rec, disks, snapraid, settle, run_snapraid):
+        """Take an adopted array over (R163 step 3): its data disks made
+        writable where they are (/mnt/diskN, never formatted or
+        repartitioned), SnapRAID's parity on its old parity disk's first
+        partition, given a filesystem (its partition table never rewritten),
+        and the first sync, which builds the parity from nothing. SnapRAID's
+        content files are the only new thing on a data disk. `dry` says it
+        all and changes nothing. (state, code)."""
+        from . import adopt
+        from .pools import by_id
+        say, dry = job.say, cfg.get("dry") is True
+        arec = adopt.read_record()
+        plan_ = arec.get("plan") or {}
+        if rec:
+            say("refused: an array is here already\n")
+            return "failed", 66
+        if not plan_.get("mounts"):
+            say("refused: nothing is adopted here: the old system's disks are adopted first\n")
+            return "failed", 66
+        datas = [m for m in plan_["mounts"] if adopt.DATA_RE.fullmatch(os.path.basename(m["where"]))]
+        if plan_.get("zfs") and any(adopt.DATA_RE.fullmatch(str(z.get("slot") or "")) for z in plan_["zfs"]):
+            say("refused: a ZFS data disk is not taken into SnapRAID here yet\n")
+            return "failed", 64
+        if not datas:
+            say("refused: no adopted data disk to take over\n")
+            return "failed", 66
+        pars = [x for x in plan_.get("parity") or [] if x.get("dev") in disks][:MAX_PARITY]
+        if not pars:
+            say("refused: the old system's parity disk is not on this machine: SnapRAID's parity needs a disk of its own\n")
+            return "failed", 66
+        biggest = max(_df(m["where"])[0] for m in datas)
+        parity, slot = [], 0
+        for x in pars:
+            d = disks[x["dev"]]
+            slot += 1
+            parts = d.get("parts") or []
+            if d.get("system") or d.get("mounted"):
+                say(f"refused: {d['name']}, the old parity disk, is {'the system disk' if d.get('system') else 'mounted'}\n")
+                return "failed", 65
+            if not parts:
+                say(f"refused: {d['name']}, the old parity disk, has no partition, and its partition table is never rewritten here\n")
+                return "failed", 65
+            part = parts[0]["name"]
+            held = parts[0].get("holds") or ""
+            if held not in ("nothing", ""):
+                say(f"refused: {part}, the old parity disk's partition, holds {held}: only a partition holding no filesystem is given one\n")
+                return "failed", 65
+            if d.get("size_mb", 0) < biggest:
+                say(f"refused: {d['name']} is smaller than the largest data disk, so it cannot hold SnapRAID's parity\n")
+                return "failed", 64
+            parity.append({"slot": slot, "dev": d["name"], "part": part})
+        say("Taking the array over, as SnapRAID's: " + "; ".join(f"{os.path.basename(m['where'])} at {m['where']}, made writable where it is" for m in datas) + "\n")
+        for p in parity:
+            say(f"p{p['slot']}: {p['part']} on {p['dev']} given an xfs filesystem for SnapRAID's parity file; the old system's parity on it is gone, "
+                "so going back to it takes its own parity sync\n")
+        say("The first sync builds the parity from nothing: the array is unprotected until it ends, hours for a large one\n")
+        if dry:
+            say("dry run: nothing changed\n")
+            return "succeeded", 0
+        # The data disks writable, where they are.
+        plan_["mounts"] = [{**m, "ro": False} if m in datas else m for m in plan_["mounts"]]
+        plan_["merged"] = {w: [b[:-3] + "=RW" if b.endswith("=RO") else b for b in br] for w, br in (plan_.get("merged") or {}).items()}
+        arec.update(plan=plan_, writable=True)
+        adopt.write_record(arec)
+        adopt.write_fstab(plan_)
+        for w in sorted(plan_.get("merged") or {}, reverse=True):
+            if os.path.ismount(w):
+                self._sh(job, ["umount", "-l", w], timeout=60)
+        for m in datas:
+            if os.path.ismount(m["where"]):
+                self._sh(job, ["umount", m["where"]], timeout=120)
+            if self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
+                say(f"{m['where']} did not mount writable (above): stopped before the parity was touched\n")
+                return "failed", 1
+        for w in sorted(plan_.get("merged") or {}):
+            self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+        # The mover's work (which shares come off which pools each night),
+        # each held to a plain name here as it was on the controller.
+        moves = [{"share": str(x.get("share")), "pool": str(x.get("pool"))} for x in cfg.get("moves") or []
+                 if isinstance(x, dict) and MOVE_SHARE.fullmatch(str(x.get("share") or "")) and MOVE_POOL.fullmatch(str(x.get("pool") or ""))][:128]
+        new = {"policy": "adopted", "adopted": True, "data": [], "parity": [], "moves": moves}
+        for m in datas:
+            new["data"].append({"slot": int(os.path.basename(m["where"])[4:]), "id": m.get("what", ""), "uuid": m["what"].split("=", 1)[-1],
+                                "fs": m["fs"], "where": m["where"]})
+        for p in parity:
+            if self._sh(job, ["mkfs.xfs", "-L", f"aerie-p{p['slot']}", f"/dev/{p['part']}"], timeout=600) != 0:
+                say(f"{p['part']} did not take xfs (above): the data disks are writable, and no parity is kept yet\n")
+                return "failed", 1
+            uuid = _out(["blkid", "-s", "UUID", "-o", "value", f"/dev/{p['part']}"]).strip()
+            new["parity"].append({"slot": p["slot"], "id": by_id(p["dev"]), "uuid": uuid, "fs": "xfs"})
+        rec.clear()
+        rec.update(new)
+        settle()
+        for p in new["parity"]:
+            m = slot_mount("p", p)
+            os.makedirs(m, exist_ok=True)
+            if not os.path.ismount(m) and self._sh(job, ["mount", m], timeout=60) != 0:
+                say(f"{m} did not mount (above): run Sync now once it does\n")
+                return "failed", 1
+        arec["taken"] = True
+        adopt.write_record(arec)
+        say("building the parity: the array is unprotected until this ends\n")
+        rc = run_snapraid("sync", key="last_sync")
+        self.hello_again("the array was taken over")
+        return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def _apply_storage_array(self, job, cfg):
         say = job.say
@@ -402,6 +568,27 @@ class ArrayMixin:
             if not mount_all():
                 return "failed", 1
             rc = run_snapraid("sync", key="last_sync", timeout=3600)
+        elif action in ("add", "replace") and rec.get("adopted"):
+            say("refused: an array taken over keeps its disks as the old system laid them out; adding or replacing a disk is not done on it yet\n")
+            return "failed", 64
+        elif action == "takeover":
+            return self._array_takeover(job, cfg, rec, disks, snapraid, settle, run_snapraid)
+        elif action == "mover":
+            if not rec.get("adopted"):
+                say("refused: the mover is for an array taken over, whose pools take new files first\n")
+                return "failed", 66
+            if _state().get("running"):
+                say(f"refused: a {_state()['running']} is running on the array already; one at a time\n")
+                return "failed", 75
+            _state_set(running="mover")
+            try:
+                rc = self._mover(job, rec.get("moves") or [])
+            finally:
+                _state_set(running="")
+            if rc == 0:
+                _state_set(last_move=int(time.time()))
+            self.hello_again("the mover ran")
+            return ("succeeded", 0) if rc == 0 else ("failed", rc)
         elif action == "add":
             n = str(cfg.get("disk") or "")
             if not rec:
@@ -542,14 +729,25 @@ class ArrayMixin:
             if str(cfg.get("confirm") or "") != "array":
                 say("refused: destroying the array takes the word array again as the confirmation\n")
                 return "failed", 64
-            say("array destroy: unmounted and forgotten; every data disk keeps its files, readable on any Linux\n")
-            if os.path.ismount(MOUNT):
-                self._sh(job, ["umount", "-l", MOUNT], timeout=60)
-            for kind, key in (("d", "data"), ("p", "parity")):
+            if rec.get("adopted"):
+                # Its data disks and /mnt/user stay the adoption's, writable;
+                # the parity disk is unmounted and its SnapRAID parity forgotten.
+                say("array destroy: SnapRAID's parity forgotten and its disk unmounted; the data disks stay where they are, as adopted\n")
+            else:
+                say("array destroy: unmounted and forgotten; every data disk keeps its files, readable on any Linux\n")
+                if os.path.ismount(MOUNT):
+                    self._sh(job, ["umount", "-l", MOUNT], timeout=60)
+            for kind, key in (("p", "parity"),) if rec.get("adopted") else (("d", "data"), ("p", "parity")):
                 for x in rec.get(key) or []:
-                    m = mount_of(kind, int(x["slot"]))
+                    m = slot_mount(kind, x)
                     if os.path.ismount(m):
                         self._sh(job, ["umount", "-l", m], timeout=60)
+            if rec.get("adopted"):
+                from . import adopt
+                arec = adopt.read_record()
+                if arec:
+                    arec.pop("taken", None)
+                    adopt.write_record(arec)
             rec = {}
             write_fstab(rec)
             for path in (_env("BB_ARRAY_RECORD", RECORD), _env("BB_SNAPRAID_CONF", SNAPRAID_CONF), _env("BB_ARRAY_STATE", STATE)):

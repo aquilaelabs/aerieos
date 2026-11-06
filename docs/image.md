@@ -280,6 +280,23 @@ names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
 they are in the first-run page's walk, and later on This machine under The old system's disks.
 
+Once they are adopted, This machine and the Storage page show them under
+**Adopted disks**, with the folders at the top of `/mnt/user` that had no
+share settings offered to serve as the old system did. **Take the array
+over** (after **Check the takeover**, which says every step and changes
+nothing) makes the data disks writable where they are, never formatting
+one, gives the old parity disk's first partition a filesystem for
+SnapRAID's parity, and builds the parity with a first sync, the array
+unprotected until it ends. The array then appears on the Storage page with
+its sync, scrub and Check parity, and a mover that takes each share's new
+files off the pools onto the data disks nightly, as the old system's did.
+**Going back to the old system** on This machine says the way back for the
+state the disks are in: nothing to do while they are read-only, a parity
+check there once they were written to, and a new configuration with its
+parity rebuilt once the array was taken over. Nothing here repartitions or
+reformats a data disk, upgrades a ZFS pool or turns on a btrfs feature, and
+the old system's stick is never written.
+
 ## At the console
 
 A machine running AerieOS welcomes whoever is at its screen with

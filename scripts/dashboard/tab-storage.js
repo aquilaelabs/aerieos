@@ -498,7 +498,7 @@ function wireStorageSnapshots(root, n){
 const ARRAY_POLICIES = [["mfs", "most free space: the emptiest disk"], ["epmfs", "existing path first: a folder's files stay together"],
                         ["lfs", "fill up: one disk fills before the next is used"], ["ff", "the first disk with room"]];
 const ARRAY_KINDS = [["sync", "Sync", "0 4 * * *", "Daily, at 4:00"], ["scrub", "Scrub", "0 5 * * 0", "Weekly, Sundays at 5:00"],
-                     ["verify", "Parity check", "0 3 1 * *", "Monthly, the 1st at 3:00"]];
+                     ["verify", "Parity check", "0 3 1 * *", "Monthly, the 1st at 3:00"], ["mover", "Mover", "40 3 * * *", "Daily, at 3:40"]];
 // The last full parity check (R163 step 15), in words.
 function arrayVerifyWord(v){
   if (!v?.at) return "never";
@@ -521,12 +521,15 @@ function storageArray(n){
     return `<div class="row stslot${x.mounted ? "" : " bad"}" data-slot="${kind}${x.slot}"><div class="grow">
       <div class="name">${kind}${x.slot} <span class="pill">${kind === "d" ? "data" : "parity"}</span>${x.mounted ? "" : ` <span class="pill bad">not mounted</span>`} <code>${esc(x.id.replace(/^\/dev\/disk\/by-id\//, ""))}</code></div>
       ${x.mounted ? `<div class="ndmeters">${meter("used", pct, `${sgb(x.used_mb)} / ${sgb(x.size_mb)}`, `${sgb((x.size_mb || 0) - (x.used_mb || 0))} free`)}</div>` : ""}
-      </div>${admin && !why && free.length ? `<span class="acts">${actMore([`<button type="button" data-starray="replace" data-which="${kind}${x.slot}" title="a new disk takes this slot; ${kind === "d" ? "its files are rebuilt from parity" : "parity is rebuilt on it"}">Replace</button>`], true)}</span>` : ""}</div>`;
+      </div>${admin && !why && free.length && !a.adopted ? `<span class="acts">${actMore([`<button type="button" data-starray="replace" data-which="${kind}${x.slot}" title="a new disk takes this slot; ${kind === "d" ? "its files are rebuilt from parity" : "parity is rebuilt on it"}">Replace</button>`], true)}</span>` : ""}</div>`;
   };
   const pick = (id, held) => `<div class="field"><div class="lbox" id="${id}">${[...free, ...(held ? used : [])].map(d => `<label class="ndcap"><input type="checkbox" data-${id}="${esc(d.name)}"${used.includes(d) ? ' data-held="1"' : ""}> ${diskLine(d)}${used.includes(d) ? ` <span class="pill warn">holds ${esc((d.parts || []).find(p => p.holds && p.holds !== "nothing")?.holds || d.holds)}</span>` : ""}</label>`).join("") || `<div class="empty">No disk free for it.</div>`}</div></div>`;
   let body;
   if (has){
-    const kinds = ARRAY_KINDS.map(([k, label]) => { const sch = scheds.find(x => x.array === k); return `<span class="pill${sch?.on ? " ok" : ""}">${label.toLowerCase()}: ${sch ? `${esc(sch.words || "")}${sch.on ? "" : ", off"}` : "not scheduled"}</span>`; }).join(" ");
+    // An array taken over (R163 step 3) has the mover beside its schedules;
+    // another array has no pool in front of it to move from.
+    const kindsHere = ARRAY_KINDS.filter(k => k[0] !== "mover" || a.adopted);
+    const kinds = kindsHere.map(([k, label]) => { const sch = scheds.find(x => x.array === k); return `<span class="pill${sch?.on ? " ok" : ""}">${label.toLowerCase()}: ${sch ? `${esc(sch.words || "")}${sch.on ? "" : ", off"}` : "not scheduled"}</span>`; }).join(" ");
     const total = (a.data || []).reduce((s, x) => s + (x.size_mb || 0), 0), usedT = (a.data || []).reduce((s, x) => s + (x.used_mb || 0), 0);
     body = `<div class="row stack2"><div class="grow">
         <div class="name">${esc(a.mount || "/mnt/array")} <span class="pill${a.mounted ? " ok" : " bad"}">${a.mounted ? "mounted" : "not mounted"}</span>${a.running ? ` <span class="pill warn">${esc(a.running === "verify" ? "parity check" : a.running)} running${a.progress ? `, ${esc(a.progress)}` : ""}</span>` : ""}</div>
@@ -536,20 +539,22 @@ function storageArray(n){
                     ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
+        ${a.adopted ? `<div class="hint">Taken over from another system: its data disks stay where they were (/mnt/diskN, merged at /mnt/user), new files land on a pool first, and the mover takes ${a.moves || "no"} share${a.moves === 1 ? "" : "s"}' files off the pools onto the data disks${a.last_move ? `, last ${ago(a.last_move)}` : ""}.</div>` : ""}
         <div class="hint">Parity is periodic: what was written since the last sync is not protected until the next one runs.</div>
       </div>${admin && !why ? `<span class="acts"><button type="button" data-starray="sync" title="bring the parity up to date now">Sync now</button>${actMore([
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
         `<button type="button" data-starray="check" title="SnapRAID's status: what is out of date and what it found">Check</button>`,
+        ...(a.adopted ? [`<button type="button" data-starray="mover" title="each share's files off the pools onto the data disks now">Move now</button>`] : []),
         ...("verify" in a ? [`<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`] : []),
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>
-      ${admin && !why ? `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>
+      ${admin && !why ? `${a.adopted ? "" : `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>
         ${pick("stArrayAdd", true)}
         <div class="field"><label class="ndcap"><input type="checkbox" id="stArrayWipe2"> wipe disks that hold something (what is on them is gone)</label></div>
-        <div class="actbar"><span class="sp"></span><button type="button" data-starray="add">Add the disk</button></div></div>
+        <div class="actbar"><span class="sp"></span><button type="button" data-starray="add">Add the disk</button></div></div>`}
       <div class="field"><div class="hint">A schedule: the parity synced daily and a scrub weekly is the usual pair.</div>
         <div class="prefrow ctlrow">
-          <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Run</span><select id="stArraySched">${optionList(ARRAY_KINDS.map(([k, label, , said]) => [k, `${label}, ${said.toLowerCase()}`]), "sync")}</select></label></div>
+          <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Run</span><select id="stArraySched">${optionList(kindsHere.map(([k, label, , said]) => [k, `${label}, ${said.toLowerCase()}`]), "sync")}</select></label></div>
         </div>
         <div class="actbar"><span class="sp"></span>${scheds.length ? actMore(scheds.map(x => `<button type="button" class="danger" data-stsnapsched="${esc(x.id)}">Remove the ${esc(x.array)} schedule</button>`), true) : ""}<button type="button" class="primary" data-starray="schedule">Save the schedule</button></div></div>` : ""}`;
   } else {
@@ -610,7 +615,7 @@ function wireStorageArray(root, n){
       if (String(typed).trim() !== "array"){ notify("the word typed is not array; nothing destroyed", true); return; }
       body.confirm = "array";
     }
-    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking"}[act] || "Working");
+    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving"}[act] || "Working");
     const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
     notify(j.error || `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, !!j.error);
     await refresh();

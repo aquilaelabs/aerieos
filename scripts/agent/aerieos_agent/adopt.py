@@ -338,7 +338,7 @@ def adopted_now():
     rows += [{"where": z["where"], "fs": "zfs", "ro": bool(z.get("readonly")), "mounted": os.path.ismount(z["where"])}
              for z in p.get("zfs") or []]
     merged = {w: os.path.ismount(w) for w in (p.get("merged") or {})}
-    return {"from": str(rec.get("from") or "adopted")[:16], "writable": rec.get("writable") is True, "at": int(rec.get("at") or 0),
+    return {"from": str(rec.get("from") or "adopted")[:16], "writable": rec.get("writable") is True, "taken": rec.get("taken") is True, "at": int(rec.get("at") or 0),
             "mounts": rows[:64], "merged": merged,
             "parity": [str(x.get("dev") or "") for x in p.get("parity") or []][:2],
             "folders": top_folders(next((w for w, up in merged.items() if up and w.rstrip("/").endswith("/user")), ""))}
@@ -868,6 +868,9 @@ class AdoptMixin:
             if not p:
                 say("nothing is adopted here\n")
                 return "succeeded", 0
+            if rec.get("taken"):
+                say("refused: the array is taken over, its parity SnapRAID's over these disks: destroy the array on the Storage page first\n")
+                return "failed", 64
             for where in p.get("merged") or {}:
                 if os.path.ismount(where):
                     self._sh(job, ["umount", where], timeout=60)
