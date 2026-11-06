@@ -66,6 +66,11 @@ _rev = [0]
 _seen = {"nodes": None, "sig": 0}
 
 
+
+# A VM's network by name and its model (R219 step 4), as the agent's vmhw has them.
+_NET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
+NET_MODELS = ("virtio", "e1000e", "e1000", "rtl8139", "vmxnet3")
+
 def configure(*, state, write_json, node, node_list, job_add, audit, prefs_get, nodes_rev=lambda: 0,
               enroll_script=None, node_retire=None, node_mark=None, node_discard=None, job_tail=None,
               job_get=None):
@@ -654,12 +659,26 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
             return None, f"the memory ceiling ({mx} MB) is under what it starts with ({mem_mb} MB)"
         out["mem_max_mb"] = mx
     if hw.get("net") is not None:
-        if hw["net"] not in ("project", "lan"):
-            return None, "a VM's network is its space's or the LAN"
-        if hw["net"] == "lan" and not person:
-            return None, ("putting a VM on the LAN is a person's: it takes it past the firewall that keeps a space's "
-                          "VMs off the LAN; its Hardware dialog on the VMs page does it")
-        out["net"] = hw["net"]
+        net = str(hw["net"])
+        kind, _, name = net.partition(":")
+        if net not in ("project", "lan") and not (kind in ("br", "net") and _NET_NAME.fullmatch(name)
+                                                  and not name.startswith("bbvm-")):
+            return None, "a VM's network is its space's, the LAN, a bridge on the host or a libvirt network, by name"
+        # Anything but its space's own network takes the VM past the firewall
+        # that keeps a space's VMs to themselves (R219 step 4): a person's.
+        if net != "project" and not person:
+            return None, ("putting a VM on the LAN, a host bridge or another network is a person's: it takes it past "
+                          "the firewall that keeps a space's VMs to themselves; its Hardware dialog on the VMs page does it")
+        out["net"] = net
+    if hw.get("model") not in (None, ""):
+        if hw["model"] not in NET_MODELS:
+            return None, f"a network model is one of {', '.join(NET_MODELS)}"
+        out["model"] = hw["model"]
+    if hw.get("mac") not in (None, ""):
+        mac = str(hw["mac"]).strip().lower()
+        if not re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac) or int(mac[:2], 16) & 1:
+            return None, "a MAC is six pairs of hex digits, and not a multicast one"
+        out["mac"] = mac
     if hw.get("share") is not None:
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
         if sh:

@@ -82,6 +82,16 @@ itself but for the DHCP and DNS libvirt serves; the controller's address and
 port it reaches. Its space's sessions reach it, by ssh and anything else,
 through the sessions' own table; no other space's session does.
 
+The Hardware dialog picks a VM's network as a machine's VM settings do:
+**Network source** is its space's network, the LAN (on AerieOS a port on
+`br0`, below), any other bridge on the host by name, or a libvirt network
+by name, grouped as Bridges and libvirt networks; **Network model** is
+virtio, e1000e, e1000, rtl8139 or vmxnet3, for a guest with no virtio
+driver; **Network MAC** keeps the address a router's reservation knows,
+and Regenerate makes a new one. Anything but its space's network takes the
+VM past the table above, so a session cannot pick it: a person does, in
+the dialog.
+
 ## Snapshots
 
 A VM's state saved under a name and gone back to, as in VMware: libvirt's

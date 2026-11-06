@@ -540,9 +540,8 @@ function vmHwFields(host, hw, admin){
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmHwMemMax", "Memory ceiling, GB", "it starts with its memory and may balloon up to this; empty for none")}
         <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
-      <div class="setrow col ctlrow">${lbl("vmHwNet", "Network", "its space's own network, or your LAN as a machine of its own")}
-        <select id="vmHwNet">${optionList([["project", "Its space's network"], ["lan", "The LAN"]], hw?.net || "project")}</select></div>
     </div>
+    ${vmNetFields(host, hw)}
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
         <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
@@ -550,6 +549,36 @@ function vmHwFields(host, hw, admin){
     </div>
     ${admin ? `<div class="field">${lbl("vmHwDevs", "Devices passed through", "the host's own, given to this VM alone while it runs; a PCI device needs the IOMMU on")}
       <div id="vmHwDevs">${devs.join("") || `<span class="sub">none on this node</span>`}${host?.hw?.iommu ? "" : `<div class="sub warn">The IOMMU is off on this node, so no PCI device can be passed through.</div>`}</div></div>` : ""}`;
+}
+// ---- a VM's network: source, model, MAC (R219 step 4) ----
+// The source is its space's own network, the LAN (the host's br0 on AerieOS,
+// the card itself elsewhere), any other bridge on the host, or a libvirt
+// network, grouped as the old system's form groups them; the model is
+// QEMU's; the MAC is kept unless changed, and Regenerate makes a new one.
+const VM_NET_MODELS = [["virtio", "virtio"], ["e1000e", "e1000e"], ["e1000", "e1000"], ["rtl8139", "rtl8139"], ["vmxnet3", "vmxnet3"]];
+function vmNetOptions(host, cur){
+  const opt = (v, l) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(l)}</option>`;
+  const brs = (host?.hw?.bridges || []).filter(b => b !== "br0");
+  const nets = host?.hw?.vnets || [];
+  // One the VM has that the host no longer lists stays offered, as it is.
+  const extraBr = cur?.startsWith("br:") && !brs.includes(cur.slice(3)) ? [cur.slice(3)] : [];
+  const extraNet = cur?.startsWith("net:") && !nets.includes(cur.slice(4)) ? [cur.slice(4)] : [];
+  return opt("project", "Its space's network") + opt("lan", "The LAN")
+    + (brs.length + extraBr.length ? `<optgroup label="Bridges">${[...brs, ...extraBr].map(b => opt(`br:${b}`, b)).join("")}</optgroup>` : "")
+    + (nets.length + extraNet.length ? `<optgroup label="libvirt networks">${[...nets, ...extraNet].map(n => opt(`net:${n}`, n)).join("")}</optgroup>` : "");
+}
+function vmNewMac(){
+  const b = crypto.getRandomValues(new Uint8Array(3));
+  return "52:54:00:" + [...b].map(x => x.toString(16).padStart(2, "0")).join(":");
+}
+function vmNetFields(host, hw){
+  return `<div class="field"><div class="fgrid">
+      <label class="pick"><span class="pickw">Network source</span><select id="vmHwNet">${vmNetOptions(host, hw?.net || "project")}</select></label>
+      <label class="pick"><span class="pickw">Network model</span><select id="vmHwModel">${optionList(VM_NET_MODELS, hw?.model || "virtio")}</select></label>
+      <label class="pick"><span class="pickw">Network MAC</span><input id="vmHwMac" spellcheck="false" autocomplete="off" placeholder="made when it is created" value="${esc(hw?.mac || "")}"></label>
+    </div>
+    <div class="actbar"><span class="sp"></span><button type="button" id="vmHwMacNew">Regenerate MAC</button></div>
+    <div class="hint">Its space's network keeps it to its space; the LAN, a bridge or a libvirt network takes it past that, a person's to pick. virtio is fastest; e1000 or rtl8139 for a guest with no virtio driver. The MAC stays unless changed, since a router's reservation knows it.</div></div>`;
 }
 function vmHwRead(root){
   const cpus = [...root.querySelectorAll("[data-cpus]:checked")].flatMap(c => c.dataset.cpus.split(",").map(Number));
@@ -559,10 +588,14 @@ function vmHwRead(root){
     .concat([...root.querySelectorAll("[data-pci]:checked")].map(c => ({type: "pci", addr: c.dataset.pci})));
   return {cpuset: cpus, share_cpus: !!root.querySelector("#vmHwShareCpus")?.checked, mem_max_mb: Math.round(mx * 1024),
           net: root.querySelector("#vmHwNet")?.value || "project",
+          model: root.querySelector("#vmHwModel")?.value || "",
+          mac: root.querySelector("#vmHwMac")?.value.trim() || "",
           share: share ? {path: share === "." ? "" : share, ro: !!root.querySelector("#vmHwShareRo")?.checked} : {},
           ...(root.querySelector("#vmHwDevs") ? {devices} : {})};
 }
 function vmHwWire(root, nodeId, project){
+  const mb = root.querySelector("#vmHwMacNew");
+  if (mb) mb.onclick = e => { e.preventDefault(); root.querySelector("#vmHwMac").value = vmNewMac(); };
   root.querySelectorAll("[data-vbios]").forEach(b => b.onclick = e => { e.preventDefault(); pressing(b, async () => {
     busy(b, "Asking");
     const j = await (await postJSON("/api/vms", {action: "vbios", project, node: nodeId, addr: b.dataset.vbios})).json();

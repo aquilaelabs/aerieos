@@ -123,6 +123,38 @@ class Ensure(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.d)), ["80-dhcp.network"])
 
 
+class Picked(unittest.TestCase):
+    """A VM's network source, model and MAC as the old system's form picks
+    them (R219 step 4): written into the domain and read back."""
+    XML = ("<domain><name>v</name><memory unit='KiB'>1048576</memory><currentMemory unit='KiB'>1048576</currentMemory>"
+           "<vcpu>1</vcpu><devices><interface type='network'><mac address='52:54:00:01:02:03'/>"
+           "<source network='bbvm-n1'/><model type='virtio'/></interface></devices></domain>")
+
+    def setUp(self):
+        self.hw = _mod("vmhw")
+
+    def put(self, **hw):
+        return self.hw.apply(self.XML, hw, 1, 1024, lan="br0", network="bbvm-n1")
+
+    def test_a_bridge_by_name(self):
+        x = self.put(net="br:virbr0", model="e1000")
+        r = self.hw.read(x)
+        self.assertEqual((r["net"], r["model"], r["mac"]), ("br:virbr0", "e1000", "52:54:00:01:02:03"))
+
+    def test_a_libvirt_network_and_a_new_mac(self):
+        r = self.hw.read(self.put(net="net:default", mac="52:54:00:aa:bb:cc"))
+        self.assertEqual((r["net"], r["mac"], r["model"]), ("net:default", "52:54:00:aa:bb:cc", "virtio"))
+
+    def test_the_space_network_reads_as_its_own(self):
+        self.assertEqual(self.hw.read(self.XML)["net"], "project")
+
+    def test_the_names_are_checked(self):
+        for good in ("project", "lan", "br:br1", "net:default"):
+            self.assertTrue(self.hw.net_ok(good), good)
+        for bad in ("br:", "net:bbvm-n2", "br:a b", "host", "net:../x"):
+            self.assertFalse(self.hw.net_ok(bad), bad)
+
+
 class Adopted(unittest.TestCase):
     def test_an_adopted_vm_on_the_old_br0_is_a_port_on_this_one(self):
         adopt = _mod("adopt")

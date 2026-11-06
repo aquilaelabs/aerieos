@@ -100,7 +100,47 @@ def host_hw(sys_root="/sys"):
         pci.append({"addr": addr, "class": cls[:8], "vendor": _read(f"{d}/vendor"), "device": _read(f"{d}/device"),
                     "group": os.path.basename(os.readlink(link)) if os.path.islink(link) else "",
                     "driver": os.path.basename(os.readlink(drv)) if os.path.islink(drv) else "", "host": host})
-    return {"cpus": pairs[:256], "usb": usb[:64], "pci": pci[:64], "iommu": bool(groups)}
+    return {"cpus": pairs[:256], "usb": usb[:64], "pci": pci[:64], "iommu": bool(groups),
+            "bridges": bridges(sys_root), "vnets": vnets()}
+
+
+# What a VM's interface can be (R219 step 4, as the old system's form
+# offers): the space's own network, the host's LAN, any bridge on the host
+# by name, or a libvirt network by name; and its model, from QEMU's list.
+NET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
+MODELS = ("virtio", "e1000e", "e1000", "rtl8139", "vmxnet3")
+MAC_RE = re.compile(r"([0-9a-f]{2}:){5}[0-9a-f]{2}")
+
+
+def bridges(sys_root="/sys"):
+    """The host's bridges by name, its VMs' own networks' (bbvm-, virbr's
+    libvirt makes for a network) left out: those are offered as networks."""
+    out = []
+    for d in sorted(glob.glob(f"{sys_root}/class/net/*/bridge")):
+        n = os.path.basename(os.path.dirname(d))
+        if NET_NAME.fullmatch(n) and not n.startswith("bbvm-"):
+            out.append(n)
+    return out[:32]
+
+
+def vnets():
+    """libvirt's networks by name, the spaces' own (bbvm-) left out."""
+    if not shutil.which("virsh"):
+        return []
+    try:
+        r = subprocess.run(["virsh", "-c", "qemu:///system", "net-list", "--all", "--name"], capture_output=True,
+                           text=True, timeout=10, check=False, start_new_session=True)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [n for n in r.stdout.split() if NET_NAME.fullmatch(n) and not n.startswith("bbvm-")][:32]
+
+
+def net_ok(net):
+    """Whether `net` names a network a VM can be given."""
+    if net in ("project", "lan"):
+        return True
+    kind, _, name = str(net or "").partition(":")
+    return kind in ("br", "net") and bool(NET_NAME.fullmatch(name)) and not name.startswith("bbvm-")
 
 
 def _mounts():
@@ -263,9 +303,18 @@ def clean(hw, vcpus, mem_mb, project=""):
             return None, f"the memory ceiling ({mx} MB) is under what it starts with ({mem_mb} MB)"
         out["mem_max_mb"] = mx
     if hw.get("net") is not None:
-        if hw["net"] not in ("project", "lan"):
-            return None, "a VM's network is its space's or the LAN"
+        if not net_ok(hw["net"]):
+            return None, "a VM's network is its space's, the LAN, a bridge on the host or a libvirt network, by name"
         out["net"] = hw["net"]
+    if hw.get("model") not in (None, ""):
+        if hw["model"] not in MODELS:
+            return None, f"a network model is one of {', '.join(MODELS)}"
+        out["model"] = hw["model"]
+    if hw.get("mac") not in (None, ""):
+        mac = str(hw["mac"]).strip().lower()
+        if not MAC_RE.fullmatch(mac) or int(mac[:2], 16) & 1:
+            return None, "a MAC is six pairs of hex digits, and not a multicast one"
+        out["mac"] = mac
     if hw.get("share") is not None:
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
         if sh:
@@ -367,18 +416,33 @@ def apply(xml, hw, vcpus, mem_mb, lan="", network="", vbios_dir="", fsd=""):
     if "net" in hw:
         nic = dev.find("interface")
         mac = nic.find("mac") if nic is not None else None
-        # On the LAN, a port on the host's bridge where it has one (R219).
-        on_br = hw["net"] == "lan" and os.path.isdir(f"/sys/class/net/{lan}/bridge")
-        new = ET.Element("interface", type=("bridge" if on_br else "direct") if hw["net"] == "lan" else "network")
-        if mac is not None:
+        # On the LAN, a port on the host's bridge where it has one (R219);
+        # a bridge or a libvirt network by name, as picked (step 4).
+        net = hw["net"]
+        kind, _, name = net.partition(":")
+        on_br = net == "lan" and os.path.isdir(f"/sys/class/net/{lan}/bridge")
+        if kind == "br":
+            new = ET.Element("interface", type="bridge")
+        elif kind == "net":
+            new = ET.Element("interface", type="network")
+        else:
+            new = ET.Element("interface", type=("bridge" if on_br else "direct") if net == "lan" else "network")
+        if hw.get("mac"):
+            ET.SubElement(new, "mac", address=hw["mac"])
+        elif mac is not None:
             new.append(mac)
-        if on_br:
+        if kind == "br":
+            ET.SubElement(new, "source", bridge=name)
+        elif kind == "net":
+            ET.SubElement(new, "source", network=name)
+        elif on_br:
             ET.SubElement(new, "source", bridge=lan)
-        elif hw["net"] == "lan":
+        elif net == "lan":
             ET.SubElement(new, "source", dev=lan, mode="bridge")
         else:
             ET.SubElement(new, "source", network=network)
-        ET.SubElement(new, "model", type="virtio")
+        was = nic.find("model") if nic is not None else None
+        ET.SubElement(new, "model", type=hw.get("model") or (was.get("type") if was is not None else "") or "virtio")
         if nic is not None:
             dev.insert(list(dev).index(nic), new)
             dev.remove(nic)
@@ -424,6 +488,11 @@ def apply(xml, hw, vcpus, mem_mb, lan="", network="", vbios_dir="", fsd=""):
     return ET.tostring(root, encoding="unicode")
 
 
+def lanbridge_name():
+    from .lanbridge import BRIDGE
+    return BRIDGE
+
+
 def read(xml):
     """What a domain's XML says of its hardware, for the census and the
     Hardware dialog's starting values."""
@@ -439,7 +508,20 @@ def read(xml):
         unit = 1024 if (mem.get("unit") or "KiB") in ("KiB", "k") else 1
         out["mem_max_mb"] = int(mem.text) // unit
     nic = root.find("devices/interface")
-    out["net"] = "lan" if nic is not None and nic.get("type") in ("direct", "bridge") else "project"
+    src = nic.find("source") if nic is not None else None
+    kind = nic.get("type") if nic is not None else ""
+    br = src.get("bridge", "") if src is not None else ""
+    vn = src.get("network", "") if src is not None else ""
+    # The LAN is the card's macvtap or the host's own bridge (br0, R219);
+    # another bridge or a libvirt network is named, a space's is "project".
+    out["net"] = ("lan" if kind == "direct" or (kind == "bridge" and br == lanbridge_name())
+                  else f"br:{br}" if kind == "bridge" and br
+                  else f"net:{vn}" if kind == "network" and vn and not vn.startswith("bbvm-")
+                  else "project")
+    m = nic.find("model") if nic is not None else None
+    out["model"] = (m.get("type") if m is not None else "") or "virtio"
+    mc = nic.find("mac") if nic is not None else None
+    out["mac"] = (mc.get("address") if mc is not None else "") or ""
     fs = root.find("devices/filesystem")
     if fs is not None and fs.find("source") is not None:
         out["share"] = {"path": fs.find("source").get("dir") or "", "tag": (fs.find("target").get("dir") if fs.find("target") is not None else ""),

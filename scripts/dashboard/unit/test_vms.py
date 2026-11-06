@@ -83,6 +83,14 @@ class Controller(unittest.TestCase):
         # project's firewall.
         self.assertIn("a person's", vms.hardware({"hw": {"net": "lan"}}, "web", "n1", False, 2048, person=False)[1])
         self.assertEqual(vms.hardware({"hw": {"net": "project"}}, "web", "n1", False, 2048, person=False)[0], {"net": "project"})
+        # A bridge or a libvirt network by name is a person's too, and the
+        # model and MAC are checked (R219 step 4).
+        self.assertIn("a person's", vms.hardware({"hw": {"net": "br:virbr0"}}, "web", "n1", False, 2048, person=False)[1])
+        got = vms.hardware({"hw": {"net": "net:default", "model": "e1000", "mac": "52:54:00:AA:bb:cc"}}, "web", "n1", False, 2048)[0]
+        self.assertEqual(got, {"net": "net:default", "model": "e1000", "mac": "52:54:00:aa:bb:cc"})
+        self.assertIn("bridge on the host", vms.hardware({"hw": {"net": "net:bbvm-other"}}, "web", "n1", False, 2048)[1])
+        self.assertIn("model", vms.hardware({"hw": {"model": "ne2000"}}, "web", "n1", False, 2048)[1])
+        self.assertIn("multicast", vms.hardware({"hw": {"mac": "01:00:5e:00:00:01"}}, "web", "n1", False, 2048)[1])
         r = self.new(hw={"cpuset": [0, 1], "net": "lan"}, autostart=True)
         self.assertTrue(r.get("ok"), r)
         spec = self.f.jobs[-1][2]
