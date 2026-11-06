@@ -217,6 +217,32 @@ class Move(unittest.TestCase):
         self.assertTrue(link.is_symlink() and os.readlink(link) == "README.md", "a link inside comes back a link")
         self.assertFalse(os.path.lexists(self.tmp / "new-ws" / "alpha" / "outside"), "one leading out is not restored")
 
+    def test_a_space_folder_already_here_is_set_aside_never_merged(self):
+        # B707: the new controller's own alpha and the moved alpha's files
+        # were mixed in one folder.
+        (self.ws / "alpha" / "README.md").write_text("moved\n")
+        (self.ws / ".trash" / "old").mkdir(parents=True)
+        (self.ws / ".trash" / "old" / "f").write_text("gone\n")
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        (new_ws / "alpha").mkdir(parents=True)
+        (new_ws / "alpha" / "mine.txt").write_text("here first\n")
+        (new_ws / "empty").mkdir()
+        (new_ws / ".trash" / "old").mkdir(parents=True)
+        self.configure(new_state, bare=True)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((new_ws / "alpha" / "README.md").read_text(), "moved\n")
+        self.assertFalse((new_ws / "alpha" / "mine.txt").exists(), "never merged with what was here")
+        kept = [p for p in (new_ws / ".trash").iterdir() if p.name.startswith("alpha-before-move-")]
+        self.assertEqual(len(kept), 1)
+        self.assertEqual((kept[0] / "mine.txt").read_text(), "here first\n", "what was here, whole in the trash")
+        self.assertTrue([p for p in (new_ws / ".trash").iterdir() if p.name.startswith("old-before-move-")], "a deleted one of the same name too")
+        said = " ".join(str(x) for x in (got.get("said") or []))
+        self.assertIn("alpha: this controller had a space folder of that name", said)
+
     def test_a_restore_that_fails_puts_the_state_back(self):
         # B557: a failure after the swap left the new state half restored
         # and the old one aside, unsaid.

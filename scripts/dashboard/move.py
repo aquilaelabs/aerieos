@@ -961,6 +961,42 @@ def read_manifest(path):
         return None, f"could not read the bundle: {e}"
 
 
+def _set_aside_clashes(carried, workspace_dir, stamp, state_dir):
+    """A space folder this controller has, of the same name as one the
+    bundle carries (or a deleted one in its trash), moved into the trash
+    under a name of its own before the copy, never merged with the bundle's
+    (B707): two repositories' files mixed in one folder, and this one's
+    space gone from the records the landing replaces. A landing cut midway
+    and landed again (B622) finishes its own copy. What was set aside, said."""
+    if cut_landing(state_dir):
+        return []
+    bin_ = workspace_dir / ".trash"
+    said = []
+
+    def aside(here, name):
+        bin_.mkdir(exist_ok=True)
+        dest, n = bin_ / f"{name}-before-move-{stamp}", 1
+        while dest.exists():
+            n += 1
+            dest = bin_ / f"{name}-before-move-{stamp}-{n}"
+        here.rename(dest)
+        return dest.name
+
+    for top in sorted(carried.iterdir()):
+        here = workspace_dir / top.name
+        if top.name == ".trash" and top.is_dir() and bin_.is_dir():
+            for t in sorted(top.iterdir()):
+                if (bin_ / t.name).exists():
+                    said.append(f"{t.name}: a deleted space of that name was in this controller's trash; it is there now as {aside(bin_ / t.name, t.name)}")
+            continue
+        if top.name.startswith(".") or not (here.exists() or here.is_symlink()):
+            continue
+        if here.is_dir() and not here.is_symlink() and not any(here.iterdir()):
+            continue
+        said.append(f"{top.name}: this controller had a space folder of that name; it is in the workspace's trash as {aside(here, top.name)}, and the moved one in its place")
+    return said
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1040,6 +1076,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         # not said where.
         if (work / "workspace").is_dir():
             workspace_dir.mkdir(parents=True, exist_ok=True)
+            said += _set_aside_clashes(work / "workspace", workspace_dir, stamp, state_dir)
             shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
         if (work / "secrets").is_dir() and secrets_dir:
             secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
