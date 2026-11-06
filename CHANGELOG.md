@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A controller restored from a backup takes back every node still there by itself, even one whose credential changed since the copy was made; a node that is gone simply never comes back (b9d2886)
+- Backup copies can also go to a disk or share under Other disks and shares, so a copy of the controller is off the machine; the section says plainly that it holds the controller, not the files on your pools (a1c7bad)
+
 ## 0.9.0-dev.5030: 2026-11-06
 
 ### Added
