@@ -753,7 +753,7 @@ const RN_LIST = {
   project: "the name it is shown under", people: "owner, who is on it, invitations",
   claude: "what its sessions do on their own, ask about, or may not",
   yours: "your replies, questions and commit name here",
-  repo: "how it pushes and pulls", runs: "where it builds, tests and runs",
+  repo: "how it pushes and pulls", runs: "the space's nodes, and where its containers go",
   build: "commands, outputs, and what is kept", sees: "other spaces, shares, addresses",
   tools: "the toolchains and tool packs its sessions use",
   files: "its files over FTP and in an editor", snapshots: "the days kept, and putting one back",
