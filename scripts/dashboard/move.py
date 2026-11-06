@@ -39,6 +39,7 @@ import hmac
 import io
 import json
 import os
+import re
 import secrets
 import shutil
 import ssl
@@ -624,6 +625,55 @@ def pack_bundle():
     return {"ok": True, "bundle": name, "size": d["size"], "counts": counts}
 
 
+# A backup of the controller under a token of its own (the operator, 6 Nov):
+# kept here under a name never packed, the newest alone.
+BACKUP_DIR = ".move-backup"
+BACKUP_NAME = re.compile(r"aerieos-backup-[0-9-]+\.aeriemove")
+
+
+def backup_bundle(principal, repos=False, carry_key=False, stores=None):
+    """A copy of the controller to keep (the operator, 6 Nov): the state,
+    the stores ticked, the spaces' repositories and the install key when
+    ticked, packed as a move's bundle under a new token returned once and
+    never kept, landed later on a controller being set up as a move is. No
+    move is armed and no node told; landed, it never tells this controller,
+    and nodes still there follow by the line the new Nodes page gives.
+    {ok, token, bundle, size, counts} or {error}."""
+    if _load().get("moved_to"):
+        return {"error": "this controller has moved already; nothing more leaves here"}
+    token = new_token()
+    key = key_of(token)
+    out_dir = STATE / BACKUP_DIR
+    out_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
+    name = f"aerieos-backup-{stamp}.aeriemove"
+    tmp = out_dir / (name + ".partial")
+    now = int(time.time())
+
+    def manifest_of(counts):
+        return {"kind": "token-backup", "version": build_version(), "state_version": int(state_version() or 0), "made_at": now,
+                "packed_at": now, "from": page_url(), "to": "", "repos": bool(repos),
+                "carries_key": bool(carry_key and counts.get("install_key")), "nodes": list(node_ids()),
+                "bare_metal": bool(bare_metal()), "counts": counts, "token_hash": token_hash(token), "by": str(principal)[:80]}
+    try:
+        manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(repos), carry_key=bool(carry_key),
+                                        stores=set(stores) if stores is not None else None)
+    except OSError as e:
+        tmp.unlink(missing_ok=True)
+        return {"error": f"the backup could not be written: {e.strerror or e}"}
+    os.replace(tmp, out_dir / name)
+    for old in out_dir.glob("*"):
+        if old.name != name:
+            old.unlink(missing_ok=True)
+    return {"ok": True, "token": token, "bundle": name, "size": (out_dir / name).stat().st_size, "counts": counts}
+
+
+def backup_path(name):
+    """The backup's file by its name, or None."""
+    p = STATE / BACKUP_DIR / str(name or "")
+    return p if BACKUP_NAME.fullmatch(str(name or "")) and p.is_file() else None
+
+
 def forget(principal):
     """The armed move withdrawn: the bundle gone, the nodes told nothing more."""
     with _lock:
@@ -1143,12 +1193,17 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 rec = json.load(f)
         except (OSError, ValueError):
             rec = {}
-        rec.update(restored_at=int(time.time()), used=True, came_from=m.get("from", "") if m.get("kind") != "backup" else "",
+        backup = m.get("kind") in ("backup", "token-backup")
+        rec.update(restored_at=int(time.time()), used=True, came_from=m.get("from", "") if not backup else "",
                    source_bare_metal=bool(m.get("bare_metal")),
                    here_bare_metal=bool(here_bare_metal if here_bare_metal is not None else bare_metal()),
                    nodes=list(m.get("nodes") or []))
-        if m.get("kind") == "backup":
+        if backup:
             rec["came_from_backup"] = True
+        # A backup under a token (no move armed where it came from): its key
+        # is the one nodes still there follow by, with the Nodes page's line.
+        if m.get("kind") == "token-backup":
+            rec.update(key_b64=base64.b64encode(key).decode(), token_hash=m.get("token_hash", ""), made_at=int(m.get("made_at") or 0))
         rec["said"] = list(said)
         with contextlib.suppress(OSError):
             marker.unlink()

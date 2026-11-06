@@ -243,6 +243,31 @@ class Move(unittest.TestCase):
         said = " ".join(str(x) for x in (got.get("said") or []))
         self.assertIn("alpha: this controller had a space folder of that name", said)
 
+    def test_a_backup_arms_nothing_and_lands_under_its_own_token(self):
+        # The operator, 6 Nov: a copy of the controller to keep, under a token
+        # the person records, no move armed and no node told; landed, it
+        # never tells the controller it came from, and nodes still there
+        # follow by its key.
+        (self.ws / "alpha" / "README.md").write_text("kept\n")
+        r = move.backup_bundle("user:ann", repos=True, carry_key=False)
+        self.assertTrue(r.get("ok"), r)
+        self.assertFalse(move._load().get("made_at"), "no move armed")
+        self.assertEqual(move.for_node("n_02529b69"), {}, "no node told")
+        p = move.backup_path(r["bundle"])
+        self.assertTrue(p and p.is_file())
+        self.assertIsNone(move.backup_path("../users.json"))
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        self.configure(new_state, bare=True)
+        self.assertIn("token", move.restore(str(p), "wrong-token", state_dir=new_state, workspace_dir=new_ws,
+                                            secrets_dir=self.tmp / "new-secrets").get("error", ""))
+        got = move.restore(str(p), r["token"], state_dir=new_state, workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((new_ws / "alpha" / "README.md").read_text(), "kept\n")
+        rec = json.loads((new_state / "move.json").read_text())
+        self.assertEqual((rec.get("came_from"), rec.get("came_from_backup")), ("", True), "the controller it came from is never told")
+        self.assertTrue(rec.get("key_b64") and rec.get("token_hash") == move.token_hash(r["token"]), "nodes still there follow by its key")
+
     def test_a_restore_that_fails_puts_the_state_back(self):
         # B557: a failure after the swap left the new state half restored
         # and the old one aside, unsaid.

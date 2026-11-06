@@ -386,7 +386,13 @@ container to a machine of its own, and back.
    aside, not deleted), and the dashboard restarts on it. Sign in with an
    account it had. A move lands only while the new home is first being set
    up, before its Finish: it replaces what is there, and is never merged into
-   a controller already in use.
+   a controller already in use. **Download a backup**, beside Prepare to
+   move, packs the same bundle under a token of its own without arming a
+   move: no node hears of it and the controller it came from is never told
+   when it lands. Neither the token nor the file expires, and the token is
+   shown once, so record it; whoever holds both holds the controller's data.
+   It lands the way a move does, on a new controller's first setup, and the
+   nodes still there follow by the line its Nodes page gives each.
 3. The landing is told both ways, each under the move key and never the
    token: the new controller tells the old one, and the old one asks the
    new address while it waits, so whichever is up learns it. The old

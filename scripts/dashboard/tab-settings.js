@@ -375,7 +375,7 @@ function moveSection(){
       ${pieces}`}
       <div class="actbar"><span class="sp"></span>
         ${m.prepared ? `<a class="btn" href="/api/move-bundle" download>Download the bundle</a>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button>`
-                     : `<button type="button" class="primary" data-moveprep>Prepare to move</button>`}</div>
+                     : `<button type="button" data-movebackup title="a copy of what is ticked, under a token of its own; no move is armed and no node told">Download a backup</button><button type="button" class="primary" data-moveprep>Prepare to move</button>`}</div>
     </div></div>`;
 }
 // The form that lands a move here: Controller settings' on a fresh controller,
@@ -419,6 +419,24 @@ function wireMove(root){
     if (j.error){ notify(j.error, true); unbusy(b, "Prepare to move"); return; }
     moveToken = j.token;
     await loadMove();
+  }));
+  // A backup of the controller to keep (the operator, 6 Nov): what is ticked,
+  // under a token of its own that the person records, no move armed.
+  root.querySelectorAll("[data-movebackup]").forEach(b => b.onclick = () => pressing(b, async () => {
+    const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
+    const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
+    busy(b, "Packing");
+    const j = await (await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
+    unbusy(b, "Download a backup");
+    if (j.error){ notify(j.error, true); return; }
+    const typed = await askText(`The backup's token, shown once and never kept here:\n\n${j.token}\n\nRecord it: the backup opens only under it, on a new controller's first setup, and whoever holds the file and the token holds this controller's data${on("install_key") ? " and its install key" : ""}. Nothing is armed, so no node hears of it.\n\nType the token's last four characters to download the file.`,
+                                {title: "Record the backup's token", verb: "Download", label: "The token's last four characters"});
+    if (typed === null || typed === undefined){ notify("not downloaded: press Download a backup again for a new one under a new token", true); return; }
+    if (String(typed).trim() !== j.token.slice(-4)){ notify("those are not the token's last four characters: press Download a backup again", true); return; }
+    const a = document.createElement("a");
+    a.href = `/api/move-backup?name=${encodeURIComponent(j.bundle)}`; a.download = j.bundle;
+    document.body.appendChild(a); a.click(); a.remove();
+    notify(`downloading ${j.bundle} (${moveSize(j.size || 0)}); keep it with its token`);
   }));
   root.querySelectorAll("[data-moveforget]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Forget this move?\n\nThe key is gone from here, so no node will follow a controller restored from its bundle, and the nodes hear of it no more. A bundle already downloaded still opens under its token, as a backup does.", {title: "Forget the move?", verb: "Forget it", danger: true})) return;

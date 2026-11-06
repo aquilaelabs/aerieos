@@ -842,6 +842,14 @@ await firstRun(false);
     const pieces = (await sApi('/api/move?pieces=1')).pieces || [];
     ok(pieces.some(p => p.key === 'state' && p.fixed && p.size > 0) && pieces.some(p => p.key === 'repos' && !p.on) && pieces.some(p => p.key === 'install_key'),
        `what a bundle may carry is listed with sizes, the state fixed and the repositories off (${pieces.map(p => p.key).join(',')})`);
+    // A backup to keep (the operator, 6 Nov): its own token, nothing armed.
+    const bkp = await sApi('/api/move', { action: 'backup', repos: false, stores: [] });
+    const bst = await sApi('/api/move');
+    const bfile = await fetch(`${src.base}/api/move-backup?name=${encodeURIComponent(bkp.bundle || '')}`, { headers: sH });
+    const blen = (await bfile.arrayBuffer()).byteLength;
+    const nofile = await fetch(`${src.base}/api/move-backup?name=..%2Fusers.json`, { headers: sH });
+    ok(bkp.ok && bkp.token && /^aerieos-backup-/.test(bkp.bundle || '') && !bst.prepared && bfile.ok && blen === bkp.size && nofile.status === 404,
+       `Download a backup packs one under a token of its own, arms no move, and its file downloads by its name alone (${JSON.stringify({ err: bkp.error, prepared: bst.prepared, status: bfile.status, blen, size: bkp.size, other: nofile.status })})`);
     const prep = await sApi('/api/move', { action: 'prepare', to: dst.base, repos: false, stores: [] });
     ok(prep.ok && prep.token && prep.bundle && prep.counts?.state >= 2, `Prepare to move arms the move, packs a bundle and shows a token once (${prep.error || prep.bundle})`);
     const st0 = await sApi('/api/move');

@@ -5958,6 +5958,7 @@ GET_ROUTES = (
     ("exact", "/api/reset", "_get_reset"),
     ("exact", "/api/move", "_get_move"),
     ("exact", "/api/move-bundle", "_get_move_bundle"),
+    ("exact", "/api/move-backup", "_get_move_backup"),
     ("exact", "/api/backup", "_get_backup"),
     ("exact", "/api/backup-file", "_get_backup_file"),
     ("prefix", "/api/findings", "_get_findings"),
@@ -12862,6 +12863,15 @@ class Handler(BaseHTTPRequestHandler):
             if r.get("ok"):
                 db.audit(self._principal(), "move-prepare", "", {"to": r.get("to", ""), "repos": req.get("repos") is True})
             return self._json(r, 400 if r.get("error") else 200)
+        if act == "backup":
+            # A copy to keep under a token of its own, no move armed (the
+            # operator, 6 Nov); the token is answered once, as a move's is.
+            stores = req.get("stores")
+            r = move.backup_bundle(self._principal(), repos=req.get("repos") is True, carry_key=req.get("carry_key") is True,
+                                   stores=[str(k) for k in stores if isinstance(k, str)] if isinstance(stores, list) else None)
+            if r.get("ok"):
+                db.audit(self._principal(), "move-backup", "", {"repos": req.get("repos") is True, "size": r.get("size", 0)})
+            return self._json(r, 400 if r.get("error") else 200)
         if act == "forget":
             r = move.forget(self._principal())
             if r.get("ok"):
@@ -12874,7 +12884,7 @@ class Handler(BaseHTTPRequestHandler):
         if act == "ask":
             learned = move.ask_new(force=True)
             return self._json({"ok": True, "moved": learned, **move.status()})
-        return self._json({"error": "action is prepare, forget, moved or ask"}, 400)
+        return self._json({"error": "action is prepare, backup, forget, moved or ask"}, 400)
 
     def _move_peer(self):
         """/api/v1/move/* (R175): what the two controllers say to each
@@ -12920,6 +12930,24 @@ class Handler(BaseHTTPRequestHandler):
         p = move.bundle_path()
         if not p:
             return self._json({"error": "no move is prepared"}, 404)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", f'attachment; filename="{p.name}"')
+        self.send_header("Content-Length", str(p.stat().st_size))
+        self.end_headers()
+        with open(p, "rb") as f:
+            shutil.copyfileobj(f, self.wfile)
+
+    def _get_move_backup(self):
+        """GET /api/move-backup?name=: the controller's backup packed under a
+        token of its own, as a download; the owner's."""
+        me = self._who() or {}
+        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+            return self._json({"error": "the controller's backup is its owner's"}, 403)
+        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        p = move.backup_path(q.get("name", [""])[0])
+        if not p:
+            return self._json({"error": "no such backup here: make one with Download a backup"}, 404)
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Disposition", f'attachment; filename="{p.name}"')
