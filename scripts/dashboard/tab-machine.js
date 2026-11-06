@@ -29,7 +29,14 @@ function machineHead(n){
   // A held start (R56 step 9): Start lifts it. Holding the next one is the
   // checkbox beside Reboot and Shut down (R161 step 11).
   const h = state?.held || {};
-  const actions = h.held ? `<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
+  // Beside it, Check parity once the array is up (R163 step 15): the
+  // check runs after the start, never holding it; an old system's array
+  // adopted as it is waits until it is taken over, its parity not ours.
+  const ar = r.array || {}, oldParity = (state?.firstboot?.adopt?.want?.parity || []).length;
+  const verify = !h.held ? "" : (ar.data || []).length && "verify" in ar
+    ? `<label class="ndcap"><input type="checkbox" id="heldVerify"> Check parity once the array is up</label>`
+    : oldParity ? `<label class="ndcap"><input type="checkbox" disabled> Check parity <span class="sub dim">waits until the array is taken over: its parity is the old system's until then</span></label>` : "";
+  const actions = h.held ? `${verify}<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
   return pageHead({title: n.name, pills: `<span class="tag ndown">this machine</span> ${nodeStatePill(n)}${h.held ? ` <span class="pill bad">held</span>` : ""}`, actions, facts: [
     ["System", [r.os, r.hostname && r.hostname !== n.name ? r.hostname : ""].filter(Boolean).join(" · ")],
     ["Release", `${img.version || "unstamped"}${img.rev ? ` (${img.rev.slice(0, 7)})` : ""}`],
@@ -485,8 +492,14 @@ function wireAdopt(root){
 function wireHeld(root){
   root.querySelectorAll("[data-heldstart]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Starting");
+    const check = !!root.querySelector("#heldVerify")?.checked;
     const j = await (await postJSON("/api/v1/nodes", {action: "start-held"})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "started: sessions run again", !!j.error);
+    let v = null;
+    if (!j.error && check){
+      const n = ownMachine();
+      v = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n?.id, array: "verify", correct: false})).json().catch(() => ({error: "no answer"}));
+    }
+    notify(j.error || `started: sessions run again${v ? v.error ? `; the parity check did not start: ${v.error}` : "; the parity check runs now, its result on the bell" : ""}`, !!(j.error || v?.error));
     await refresh();
   }));
   wireHoldNext(root);

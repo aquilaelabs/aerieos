@@ -122,6 +122,33 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   const refused = await api('/api/emulator', { action: 'phone-remove', node: minted.id, project: 'alpha', uid: '', name: 'builderbot-35' });
   ok(/running/.test(refused.error || ''), `a running phone is refused by the server too (${refused.error})`);
 }
+// The array's parity check (R163 step 15): offered where the machine's
+// agent has it, its progress on the running pill, its result a fact.
+{
+  const got = await page.evaluate(async () => {
+    // Laid over the record each time: the page's poll reads the list again.
+    const ARR = { mount: '/mnt/array', mounted: true, policy: 'mfs', data: [{ slot: 1, id: 'ata-A', mounted: true, size_mb: 10, used_mb: 1 }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
+                  running: 'verify', progress: '45%, 120 MB/s', verify: { at: Math.floor(Date.now() / 1000) - 3600, ok: true, found: 3, fixed: 2, unfixed: 1, corrected: true } };
+    const lay = arr => { const n = (storageList || []).find(x => x.name === 'diskbox');
+      Object.assign(n, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: arr }); storageRev++; drawPanes(); };
+    const sectOf = async () => { for (let i = 0; i < 20; i++){ await new Promise(r => setTimeout(r, 100));
+      const x = document.querySelector('.storagetab details[data-sect="storage:array"]'); if (x) return x; } return null; };
+    openStorageTab();
+    lay(ARR);
+    let sect = await sectOf();
+    if (!sect){ lay(ARR); sect = await sectOf(); }
+    const out = { sects: [...document.querySelectorAll('.storagetab details[data-sect]')].map(x => x.dataset.sect),
+                  text: sect?.textContent.replace(/\s+/g, ' ') || '', btn: !!sect?.querySelector('[data-starray="verify"]'),
+                  sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
+    const { verify, ...older } = ARR;
+    lay(older); await sectOf();
+    out.older = !!document.querySelector('.storagetab details[data-sect="storage:array"]') && !document.querySelector('.storagetab [data-starray="verify"]');
+    return out;
+  });
+  ok(got.btn && /parity check running, 45%, 120 MB\/s/.test(got.text) && /Last parity check.*3 differed, 2 corrected, 1 could not be/.test(got.text) && got.sched.includes('verify'),
+     `the array offers Check parity, says its progress and its last result, and schedules it (${got.text.slice(0, 220) || JSON.stringify(got)})`);
+  ok(got.older, 'an agent from before Check parity is not offered it');
+}
 await api('/api/v1/nodes', { action: 'retire', id: minted.id });
 
 await done(browser);

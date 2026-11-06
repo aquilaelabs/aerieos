@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 
 from .disks import disks_now, moved
@@ -35,7 +36,7 @@ CONTENT = "/var/lib/builderbot/snapraid.content"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}
-ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "destroy")
+ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "destroy")
 MAX_DATA, MAX_PARITY = 24, 2
 NAME_RE = re.compile(r"[a-z][a-z0-9]{0,31}")
 SLOT_RE = re.compile(r"(d|p)([1-9][0-9]?)")
@@ -167,7 +168,74 @@ def array_now():
             "parity": [row("p", p) for p in rec.get("parity") or []][:MAX_PARITY],
             "last_sync": int(st.get("last_sync") or 0), "last_scrub": int(st.get("last_scrub") or 0),
             "last_check": int(st.get("last_check") or 0), "status": str(st.get("status") or "")[:400],
-            "running": str(st.get("running") or "")[:16]}
+            "running": str(st.get("running") or "")[:16], "progress": str(st.get("progress") or "")[:40],
+            # The last full parity check (R163 step 15); its key's presence
+            # says this agent has the verb.
+            "verify": st.get("verify") if isinstance(st.get("verify"), dict) else {}}
+
+
+PROGRESS_RE = re.compile(r"(\d{1,3})%,\s*(\d+) MB(?:,\s*(\d+) MB/s)?")
+COUNT_RE = re.compile(r"(\d+) (file|io|data|recovered|unrecoverable) errors?")
+
+
+def counts(text):
+    """SnapRAID's closing counts: {"file", "io", "data", "recovered",
+    "unrecoverable"} errors, the last of each it said."""
+    out = {}
+    for n, kind in COUNT_RE.findall(text or ""):
+        out[kind] = int(n)
+    return out
+
+
+def scrub_log(path):
+    """SnapRAID's log of a run (-l): ({"file", "io", "data", "recovered",
+    "unrecoverable"} from its summary, [each file it named with an error,
+    relative to its disk])."""
+    counts_, files = {}, []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = re.match(r"summary:error_(file|io|data|recovered|unrecoverable):(\d+)", line)
+                if m:
+                    counts_[m.group(1)] = int(m.group(2))
+                m = re.match(r"error:\d+:[^:]+:(.+?): \w+ error", line)
+                if m and m.group(1) not in files:
+                    files.append(m.group(1))
+    except OSError:
+        pass
+    return counts_, files[:1000]
+
+
+def run_watched(argv, say, progress, timeout=172800):
+    """A SnapRAID run whose lines go to the job and whose progress line
+    ("45%, 1234 MB, 120 MB/s ...", redrawn with a carriage return) is handed
+    to `progress` as it moves: (exit code, all it said)."""
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    said, buf, end = [], b"", time.time() + timeout
+    while True:
+        chunk = proc.stdout.read1(4096) if hasattr(proc.stdout, "read1") else proc.stdout.read(4096)
+        if not chunk:
+            break
+        buf += chunk
+        while True:
+            cut = min([i for i in (buf.find(b"\n"), buf.find(b"\r")) if i >= 0], default=-1)
+            if cut < 0:
+                break
+            line, buf = buf[:cut].decode("utf-8", "replace"), buf[cut + 1:]
+            m = PROGRESS_RE.search(line)
+            if m:
+                progress(int(m.group(1)), int(m.group(3) or 0))
+            elif line.strip():
+                said.append(line)
+                say(line + "\n")
+        if time.time() > end:
+            proc.kill()
+            say("stopped: it ran past its time\n")
+            break
+    if buf.strip():
+        said.append(buf.decode("utf-8", "replace"))
+        say(said[-1] + "\n")
+    return proc.wait(), "\n".join(said)
 
 
 class ArrayMixin:
@@ -400,6 +468,59 @@ class ArrayMixin:
             else:
                 say(f"rebuilding parity on p{slot}: the array is unprotected until this ends\n")
                 rc = run_snapraid("sync", "-F", key="last_sync")
+        elif action == "verify":
+            # Check parity (R163 step 15): every block of every data disk
+            # read back against the parity, not the scrub's sampled part;
+            # what differs is corrected only when asked, its count said first.
+            if not rec:
+                say("refused: no array here yet\n")
+                return "failed", 66
+            if _state().get("running"):
+                say(f"refused: a {_state()['running']} is running on the array already; one at a time\n")
+                return "failed", 75
+            _state_set(running="verify", progress="")
+            last = [0.0]
+
+            def progressed(pct, rate):
+                if time.time() - last[0] >= 10 or pct >= 100:
+                    last[0] = time.time()
+                    _state_set(progress=f"{pct}%" + (f", {rate} MB/s" if rate else ""))
+            try:
+                say("reading every block of every data disk back against the parity: hours for a large array\n")
+                with tempfile.TemporaryDirectory() as td:
+                    log1 = os.path.join(td, "scrub.log")
+                    rc, _text = run_watched([snapraid, "scrub", "-p", "full", "-l", log1], say, progressed)
+                    c, files = scrub_log(log1)
+                    found = c.get("data", 0) + c.get("io", 0) + c.get("file", 0)
+                    fixed = unfixed = 0
+                    if found and cfg.get("correct") is True:
+                        say(f"{found} block{'' if found == 1 else 's'} differ from the parity: correcting them\n")
+                        _state_set(running="fix", progress="")
+                        # SnapRAID marks a block whose parity was wrong for
+                        # -e; a file whose own hash failed it names in its
+                        # log, and is fixed by name.
+                        runs = [[snapraid, "-e", "fix"]]
+                        plain = [f for f in files if not re.search(r"[*?\[\]\\]", f)]
+                        if files and len(plain) == len(files) and len(files) <= 200:
+                            runs.append([snapraid, "fix", *[x for f in files for x in ("-f", "/" + f)]])
+                        elif files:
+                            runs.append([snapraid, "fix"])
+                        for k, argv in enumerate(runs):
+                            logk = os.path.join(td, f"fix{k}.log")
+                            run_watched([*argv[:1], "-l", logk, *argv[1:]], say, progressed)
+                            ck, _f = scrub_log(logk)
+                            fixed += ck.get("recovered", 0)
+                            unfixed += ck.get("unrecoverable", 0)
+                        unfixed = max(unfixed, found - fixed) if not fixed and not unfixed else unfixed
+                    elif found:
+                        say(f"{found} block{'' if found == 1 else 's'} differ from the parity; Correct what differs was not ticked, so nothing was written\n")
+                    if found:
+                        rc = 0
+                _state_set(last_verify=int(time.time()), verify={"at": int(time.time()), "ok": rc == 0, "found": found,
+                                                                  "fixed": fixed, "unfixed": unfixed,
+                                                                  "corrected": cfg.get("correct") is True})
+            finally:
+                _state_set(running="", progress="")
         elif action in ("sync", "scrub", "check"):
             if not rec:
                 say("refused: no array here yet\n")

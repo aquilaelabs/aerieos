@@ -1889,7 +1889,7 @@ def schedule_queue(s, argv, by):
             return {"error": f"a system job is already running on {n['name']}; one at a time"}
         r = nodes.job_add(principal, {"node": nid}, "system",
                           {"apply": s["system"]["apply"], "config": dict(s["system"].get("config") or {}),
-                           "timeout": schedules.SYSTEM_TIMEOUT.get(s["system"]["apply"], 900)})
+                           "timeout": schedules.system_timeout(s["system"])})
     elif s.get("as") == "root":
         if not (n.get("reported") or {}).get("sandbox"):
             return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so root there is its owner's: "

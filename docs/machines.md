@@ -340,7 +340,17 @@ time: a file written since the last sync is unprotected until the next,
 which the section says; the usual pair is a sync daily and a scrub weekly,
 saved from the section as rows on the Schedules page (one of the machine's
 own jobs, its log on the Jobs page), with Sync now, Scrub and Check on the
-section. A parity disk is at least as large as the largest data disk,
+section. **Check parity** reads every block of every data disk back against
+the parity, where a scrub reads only a part: hours for a large array, its
+progress (the percent and the rate) on the section while it runs. What
+differs is counted and said; it is corrected only when Check and correct
+is pressed, the count said before anything is written: a block whose parity
+was wrong is rewritten from the data, a file that changed silently is
+restored from the parity. Its result (all good, or how many differed and
+were or could not be corrected) is a fact on the section and a row on the
+bell, and it can be scheduled monthly beside the sync and the scrub; it
+never corrects on a schedule. A held start offers it once the array is up.
+A parity disk is at least as large as the largest data disk,
 which both the page and the agent hold to. Add a disk formats it and
 takes the next slot; Replace on a slot formats the new disk and rebuilds
 that slot from parity (a data disk) or the parity on it (a parity disk),

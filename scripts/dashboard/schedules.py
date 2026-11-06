@@ -50,6 +50,14 @@ SYSTEM_APPLIES = {"storage-snapshot": {"pool": str, "kind": str, "keep": int},
 # How long each may run as a job: a snapshot is quick, a parity sync or
 # scrub of a large array takes hours.
 SYSTEM_TIMEOUT = {"storage-snapshot": 900, "storage-array": 86400, "storage-backup": 86400}
+
+
+def system_timeout(sysj):
+    """A scheduled system job's time limit: a parity check reads every disk
+    whole, two days for a large array (R163 step 15)."""
+    if sysj.get("apply") == "storage-array" and (sysj.get("config") or {}).get("array") == "verify":
+        return 172800
+    return SYSTEM_TIMEOUT.get(sysj.get("apply"), 900)
 SCAN_ID = "scan"           # the row the built-in scan kept before 0.9.0, unlisted now (migration 0016)
 DAYS = ("Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays")
 DAY_NAMES = {d[:3].lower(): i for i, d in enumerate(DAYS)}
@@ -153,7 +161,8 @@ def system_words(sysj):
         return f"the backup {cfg.get('name', '')}: its source copied to its destination, a run kept beside the ones before"
     if sysj.get("apply") == "storage-array":
         return {"sync": "a SnapRAID sync of the array: the parity brought up to date", "scrub": "a SnapRAID scrub of the array: a part of it read back and checked",
-                "check": "a SnapRAID status of the array"}.get(cfg.get("array", ""), f"the array's {cfg.get('array', '')}")
+                "check": "a SnapRAID status of the array",
+                "verify": "a parity check of the array: every block read back against the parity, nothing corrected"}.get(cfg.get("array", ""), f"the array's {cfg.get('array', '')}")
     return str(sysj.get("apply") or "")
 
 
@@ -303,8 +312,8 @@ def _clean(req, was):
             for k, kind in shape.items():
                 if not isinstance(cfg.get(k), kind) or isinstance(cfg.get(k), bool):
                     return None, f"the {sysj['apply']} job's {k} is missing or not a {kind.__name__}"
-            if sysj["apply"] == "storage-array" and cfg.get("array") not in ("sync", "scrub", "check"):
-                return None, "the array's schedule runs sync, scrub or check"
+            if sysj["apply"] == "storage-array" and cfg.get("array") not in ("sync", "scrub", "check", "verify"):
+                return None, "the array's schedule runs sync, scrub, check or a parity check (verify)"
             s["system"] = {"apply": sysj["apply"], "config": {k: cfg[k] for k in shape}}
             s["script"] = ""
             s["as"] = "root"

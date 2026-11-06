@@ -169,13 +169,60 @@ class TheAgent(unittest.TestCase):
         self.assertNotIn("builderbot-array", open(self.env["BB_ARRAY_FSTAB"]).read())
 
 
+    def test_a_parity_check_reads_everything_and_corrects_only_when_asked(self):
+        # R163 step 15: a whole scrub, its findings read off SnapRAID's own
+        # log (summary:error_*, and each file whose hash failed), the count
+        # said, and the fix only with Correct: -e for the blocks SnapRAID
+        # marked, and the files it named by name (as walked on the stick:
+        # a silent change to a file is a file error -e fix does not touch).
+        logs = {"scrub": "error:1:d1:TV Shows/a.bin: Data error at position 1, diff bits 62/128\n"
+                         "summary:error_file:1\nsummary:error_io:0\nsummary:error_data:2\nsummary:exit:error\n",
+                "-e": "summary:error_recovered:2\nsummary:error_unrecoverable:0\n",
+                "-f": "fixed:1:d1:TV Shows/a.bin: Fixed\nsummary:error_recovered:0\nsummary:error_unrecoverable:1\n"}
+        calls = []
+
+        def watched(argv, say, progress, timeout=0):
+            calls.append(argv[1:])
+            log = argv[argv.index("-l") + 1]
+            kind = "scrub" if "scrub" in argv else "-e" if "-e" in argv else "-f"
+            with open(log, "w") as f:
+                f.write(logs[kind])
+            progress(55, 120)
+            return (0, "")
+        with mock.patch.object(self.am, "run_watched", side_effect=watched):
+            state, code, text, _ = self.run_job({"array": "verify"}, REC)
+            self.assertEqual(state, "succeeded", text)
+            self.assertEqual([c[0] for c in calls], ["scrub"])
+            self.assertIn("3 blocks differ from the parity; Correct what differs was not ticked, so nothing was written", text)
+            with mock.patch.dict(os.environ, self.env):
+                st = self.am._state()
+            self.assertEqual((st["verify"]["found"], st["verify"]["fixed"], st["running"], st["progress"]), (3, 0, "", ""))
+            calls.clear()
+            state, code, text, _ = self.run_job({"array": "verify", "correct": True}, REC)
+            self.assertEqual([[x for x in c if not x.startswith("/tmp")] for c in calls][1:],
+                             [["-l", "-e", "fix"], ["-l", "fix", "-f", "/TV Shows/a.bin"]])
+            self.assertIn("3 blocks differ from the parity: correcting them", text)
+            with mock.patch.dict(os.environ, self.env):
+                v = self.am.array_now()["verify"]
+            self.assertEqual((v["found"], v["fixed"], v["unfixed"], v["corrected"], v["ok"]), (3, 2, 1, True, True))
+        self.assertEqual(self.am.counts("  0 data errors\n  12 io errors"), {"data": 0, "io": 12})
+
+    def test_progress_is_read_off_snapraids_redrawn_line(self):
+        seen, said = [], []
+        sh = "printf 'Scrubbing...\\n10%%, 100 MB, 50 MB/s, CPU 1%%, 0:10 ETA\\r60%%, 600 MB, 80 MB/s\\r\\n  0 data errors\\n'"
+        rc, text = self.am.run_watched(["sh", "-c", sh], said.append, lambda p, r: seen.append((p, r)))
+        self.assertEqual((rc, seen), (0, [(10, 50), (60, 80)]))
+        self.assertIn("0 data errors", text)
+        self.assertNotIn("ETA", "".join(said))
+
+
 class TheController(unittest.TestCase):
     def test_the_census_keeps_the_array_to_its_shape(self):
         import nodes
         got = nodes._census({"array": {"policy": "mfs<b>", "mount": "/mnt/array", "mounted": True, "last_sync": "x", "last_scrub": 5, "status": "ok", "running": "",
                                        "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}, {"slot": 0}, "junk"],
                                        "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": "yes"}]}})
-        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "",
+        self.assertEqual(got["array"], {"policy": "mfsb", "mount": "/mnt/array", "mounted": True, "last_sync": 0, "last_scrub": 5, "last_check": 0, "status": "ok", "running": "", "progress": "",
                                         "data": [{"slot": 1, "id": "ata-A", "fs": "xfs", "size_mb": 10, "used_mb": 2, "mounted": True}],
                                         "parity": [{"slot": 1, "id": "ata-P", "fs": "xfs", "size_mb": 10, "used_mb": 1, "mounted": False}]})
         self.assertEqual(nodes._census({"array": {"data": []}})["array"], {})
@@ -205,6 +252,26 @@ class TheController(unittest.TestCase):
             self.assertIn("typed again", nodes.node_storage_array("user:t", "n1", {"array": "destroy"})["error"])
             r = nodes.node_storage_array("user:t", "n1", {"array": "check"})
             self.assertEqual(add.call_args[0][3]["timeout"], 900)
+            self.assertIn("from before Check parity", nodes.node_storage_array("user:t", "n1", {"array": "verify"})["error"])
+            n["reported"]["array"]["verify"] = {}
+            r = nodes.node_storage_array("user:t", "n1", {"array": "verify", "correct": True})
+            self.assertTrue(r.get("ok"), r)
+            self.assertEqual((add.call_args[0][3]["config"], add.call_args[0][3]["timeout"]), ({"array": "verify", "correct": True}, 172800))
+
+    def test_a_parity_checks_result_is_on_the_bell(self):
+        import nodes
+        base = {"id": "n1", "name": "box", "kind": "agent", "reported": {"array": {"data": [{"slot": 1, "mounted": True}], "parity": []}}}
+        def rows(v):
+            base["reported"]["array"]["verify"] = v
+            with mock.patch.object(nodes, "node_list", return_value=[base]), mock.patch.object(nodes, "own_machine", return_value=True):
+                return [r for r in nodes.storage_attention() if r["what"] == "parity"]
+        self.assertEqual(rows({}), [])
+        clean = rows({"at": 100, "ok": True, "found": 0})[0]
+        self.assertEqual((clean["bad"], clean["said"]), (False, "the array's parity check read every block back: all good"))
+        part = rows({"at": 101, "ok": True, "found": 3, "fixed": 2, "unfixed": 1, "corrected": True})[0]
+        self.assertTrue(part["bad"])
+        self.assertIn("3 blocks differing: 2 corrected, 1 could not be", part["said"])
+        self.assertIn("Correct to fix them", rows({"at": 102, "ok": True, "found": 4})[0]["said"])
 
 
 if __name__ == "__main__":

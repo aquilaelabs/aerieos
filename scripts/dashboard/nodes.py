@@ -1621,7 +1621,13 @@ def _census(c):
             "policy": aw(ar.get("policy"), 8), "mount": aw(ar.get("mount"), 40), "mounted": ar.get("mounted") is True,
             "data": rows("data", 24), "parity": rows("parity", 2),
             **{k: mb(ar.get(k)) for k in ("last_sync", "last_scrub", "last_check")},
-            "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16)}
+            "status": aw(ar.get("status"), 400), "running": aw(ar.get("running"), 16),
+            "progress": aw(ar.get("progress"), 40)}
+        # The last full parity check (R163 step 15), kept only from an agent that has it.
+        if out["array"] and isinstance(ar.get("verify"), dict):
+            v = ar["verify"]
+            out["array"]["verify"] = {k: mb(v.get(k)) for k in ("at", "found", "fixed", "unfixed")} | {
+                "ok": v.get("ok") is True, "corrected": v.get("corrected") is True} if v else {}
     # ...and whether its console takes a password (R194, AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
         out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
@@ -3379,7 +3385,7 @@ def node_storage_snapshot(principal, node_id, req):
     return r
 
 
-ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "destroy")
+ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "destroy")
 ARRAY_POLICIES = ("mfs", "lfs", "epmfs", "ff")
 ARRAY_LONG = 86400
 
@@ -3468,6 +3474,12 @@ def node_storage_array(principal, node_id, req):
         cfg["confirm"] = "array"
     elif not have.get("data"):
         return {"error": "no array on the machine yet"}
+    elif action == "verify":
+        # Check parity (R163 step 15): an agent that has it says its last
+        # one in the census, even as none yet.
+        if "verify" not in have:
+            return {"error": f"{n['name']}'s agent is from before Check parity: it updates itself within the hour"}
+        cfg["correct"] = req.get("correct") is True
     why = node_locked(n)
     if why:
         return {"error": why}
@@ -3476,7 +3488,9 @@ def node_storage_array(principal, node_id, req):
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "storage-array", "config": cfg, "timeout": 900 if action in ("check", "destroy") else ARRAY_LONG})
+                {"apply": "storage-array", "config": cfg,
+                 # A parity check reads every disk whole: two days for a large array.
+                 "timeout": 900 if action in ("check", "destroy") else 2 * ARRAY_LONG if action == "verify" else ARRAY_LONG})
     if r.get("ok"):
         audit(principal, "storage-array", node_id, {"job": r["job"], **cfg})
     return r
@@ -3889,6 +3903,18 @@ def storage_attention():
                 if not x.get("mounted"):
                     out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "array", "bad": True, "key": f"array:{n['id']}:{kind}{x.get('slot')}",
                                 "said": f"the array's {kind}{x.get('slot')} ({x.get('id') or 'unknown disk'}) is not mounted: the disk is gone or failed; Replace on the Storage page rebuilds it"})
+        # The last Check parity's result (R163 step 15), until dismissed:
+        # clean, or what differed and what was or could not be corrected.
+        v = ar.get("verify") if isinstance(ar.get("verify"), dict) else {}
+        if v.get("at"):
+            found, fixed, unfixed = v.get("found", 0), v.get("fixed", 0), v.get("unfixed", 0)
+            said = ("the array's parity check read every block back: all good" if v.get("ok") and not found
+                    else f"the array's parity check found {found} block{'' if found == 1 else 's'} differing: "
+                         + (f"{fixed} corrected" + (f", {unfixed} could not be" if unfixed else "") if v.get("corrected")
+                            else "nothing written; Check parity again with Correct to fix them") if found
+                    else "the array's parity check did not finish: its job's log says why")
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "parity", "bad": bool(unfixed or (found and not fixed) or not v.get("ok")),
+                        "key": f"array:verify:{n['id']}:{v['at']}", "said": said})
     return out
 
 

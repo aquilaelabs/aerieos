@@ -389,6 +389,11 @@ function wireStoragePools(root, n){
       }
       const names = body.disks.map(d => { const x = (n.disks || []).find(y => y.name === d); return x ? `${d} (${x.model || "unnamed"}, ${humanBytes((x.size_mb || 0) * 1048576)}, serial ${x.serial || "none"})` : d; });
       if (!await askYes(`Make the pool ${body.name} as a ${body.layout} of:\n\n${names.join("\n")}\n\nEverything on these disks is gone.${body.encrypt ? `\n\nEncrypted, its key ${body.keep_key ? "kept on this machine" : "asked for after every boot"}; nothing recovers it without the passphrase.` : ""}`, {title: "Make the pool?", verb: "Make it", danger: true})) return;
+    } else if (act === "verify"){
+      const how = await ask({title: "Check the parity?", text: "Every block of every data disk is read back against the parity: hours for a large array, the disks busy throughout. What differs is counted; it is corrected only if you ask for that here, and the count is said before anything is written.",
+                             choices: [{label: "Check", value: "check"}, {label: "Check and correct", value: "correct"}]});
+      if (!how) return;
+      body.correct = how === "correct";
     } else if (act === "destroy"){
       if (!await askYes(`Destroy the pool ${body.name}?\n\nEverything on it is gone; its disks hold nothing after.`, {title: "Destroy the pool?", verb: "Destroy it", danger: true})) return;
       body.confirm = body.name;
@@ -492,7 +497,15 @@ function wireStorageSnapshots(root, n){
 // serial and says the whole again before anything is written.
 const ARRAY_POLICIES = [["mfs", "most free space: the emptiest disk"], ["epmfs", "existing path first: a folder's files stay together"],
                         ["lfs", "fill up: one disk fills before the next is used"], ["ff", "the first disk with room"]];
-const ARRAY_KINDS = [["sync", "Sync", "0 4 * * *", "Daily, at 4:00"], ["scrub", "Scrub", "0 5 * * 0", "Weekly, Sundays at 5:00"]];
+const ARRAY_KINDS = [["sync", "Sync", "0 4 * * *", "Daily, at 4:00"], ["scrub", "Scrub", "0 5 * * 0", "Weekly, Sundays at 5:00"],
+                     ["verify", "Parity check", "0 3 1 * *", "Monthly, the 1st at 3:00"]];
+// The last full parity check (R163 step 15), in words.
+function arrayVerifyWord(v){
+  if (!v?.at) return "never";
+  const r = !v.ok ? "did not finish" : !v.found ? "all good" : v.corrected
+    ? `${v.found} differed, ${v.fixed} corrected${v.unfixed ? `, ${v.unfixed} could not be` : ""}` : `${v.found} differed, not corrected`;
+  return `${ago(v.at)}: ${r}`;
+}
 function storageArray(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
@@ -516,15 +529,18 @@ function storageArray(n){
     const kinds = ARRAY_KINDS.map(([k, label]) => { const sch = scheds.find(x => x.array === k); return `<span class="pill${sch?.on ? " ok" : ""}">${label.toLowerCase()}: ${sch ? `${esc(sch.words || "")}${sch.on ? "" : ", off"}` : "not scheduled"}</span>`; }).join(" ");
     const total = (a.data || []).reduce((s, x) => s + (x.size_mb || 0), 0), usedT = (a.data || []).reduce((s, x) => s + (x.used_mb || 0), 0);
     body = `<div class="row stack2"><div class="grow">
-        <div class="name">${esc(a.mount || "/mnt/array")} <span class="pill${a.mounted ? " ok" : " bad"}">${a.mounted ? "mounted" : "not mounted"}</span>${a.running ? ` <span class="pill warn">${esc(a.running)} running</span>` : ""}</div>
+        <div class="name">${esc(a.mount || "/mnt/array")} <span class="pill${a.mounted ? " ok" : " bad"}">${a.mounted ? "mounted" : "not mounted"}</span>${a.running ? ` <span class="pill warn">${esc(a.running === "verify" ? "parity check" : a.running)} running${a.progress ? `, ${esc(a.progress)}` : ""}</span>` : ""}</div>
         <div class="ndmeters">${meter("used", total ? usedT / total * 100 : 0, `${sgb(usedT)} / ${sgb(total)}`, `${(a.data || []).length} data, ${(a.parity || []).length} parity`)}</div>
-        ${factGrid([["Last sync", when(a.last_sync)], ["Last scrub", when(a.last_scrub)], ["Last check", when(a.last_check)], ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
+        ${factGrid([["Last sync", when(a.last_sync)], ["Last scrub", when(a.last_scrub)], ["Last check", when(a.last_check)],
+                    ...("verify" in a ? [["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}]] : []),
+                    ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
         <div class="hint">Parity is periodic: what was written since the last sync is not protected until the next one runs.</div>
       </div>${admin && !why ? `<span class="acts"><button type="button" data-starray="sync" title="bring the parity up to date now">Sync now</button>${actMore([
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
         `<button type="button" data-starray="check" title="SnapRAID's status: what is out of date and what it found">Check</button>`,
+        ...("verify" in a ? [`<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`] : []),
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>
       ${admin && !why ? `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>
@@ -594,7 +610,7 @@ function wireStorageArray(root, n){
       if (String(typed).trim() !== "array"){ notify("the word typed is not array; nothing destroyed", true); return; }
       body.confirm = "array";
     }
-    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking"}[act] || "Working");
+    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking"}[act] || "Working");
     const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
     notify(j.error || `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, !!j.error);
     await refresh();
