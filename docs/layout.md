@@ -245,6 +245,7 @@ scripts/
     router.py                    a model router on a node (R144): LiteLLM with the provider keys and Ollama as a written container, a key per allowed project, the models and the spend read at the router
     reach.py                     the bell's rows sent elsewhere per person (R149): email over SMTP, a webhook and its presets, each destination's kinds and quiet window, the minute loop holding a repeat while unchanged
     releasecheck.py              a newer AerieOS release for a bare-metal install (R90 step 5): asked of GitHub daily, said on the bell and under Controller settings, applied through the own node
+    releasegaps.py               what a release owes the changelog (R217): the bugs fixed since the last release that it carried, with no Fixed line or answer
     checks.py                    update checks on one clock (R176): each check's cadence a setting under Controller settings, when it last ran, Check for updates
     firstboot.py                 a stick's prepared configuration at its first boot (R161 step 8): the owner and the people made, the setup page skipped where asked, the rest kept waiting, said on This machine
     adoptapps.py                 the containers another system ran, made again here (R163 step 10): each template's compose with the exact image it ran, its network of fixed addresses, started with the machine where it was, its paths said where the adopted disks do not hold or may not write them; made and started through the Containers page's own calls

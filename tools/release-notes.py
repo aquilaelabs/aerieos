@@ -3,8 +3,10 @@
 
     tools/release-notes.py TAG
 
-The changelog's Unreleased section at TAG, less the lines it already held at
-the last published release before it, under their headings. Unreleased only
+The changelog's own section for TAG's version when it has one: a pre-release
+of any name is cut with its section written (aerie version release, R217).
+Before that, the changelog's Unreleased section at TAG, less the lines it
+already held at the last published release before it, under their headings. Unreleased only
 grows between two stable releases, so the section whole repeated every earlier
 dev build's lines. Published, not merely tagged: a draft nobody published, or a
 tag with no release, showed nobody its lines, so they come with this one. A line
@@ -40,18 +42,39 @@ def unreleased(text):
     return out
 
 
+def own_section(text, ver):
+    """[(heading, line)] of the section titled `ver` (with its date), or None."""
+    out, on, head = [], False, ""
+    title = re.compile(rf"^## {re.escape(ver)}(?=$|[:\s])")
+    for line in (text or "").splitlines():
+        if line.startswith("## "):
+            if on:
+                break
+            on = bool(title.match(line))
+        elif on and line.startswith("### "):
+            head = line.strip()
+        elif on and line.strip():
+            out.append((head, line.rstrip()))
+    return out if on or out else None
+
+
 def key(line):
     return HASH.sub("", line)
 
 
-def notes(now, before, since="", compare=""):
-    """The markdown: what `now` holds of Unreleased that `before` did not.
+def notes(now, before, since="", compare="", ver=""):
+    """The markdown: the section `now` has for `ver`, else what `now` holds
+    of Unreleased that `before` did not.
     With nothing new, the build says so and points at the commits
     (`compare`, the forge's view of them), since a build with no changelog
     line is not an empty build (v0.9.0-dev.4818, 2 Nov: six fixes and the
     notes said nothing a person would see)."""
-    had = {key(line) for _, line in unreleased(before)}
-    new = [(h, line) for h, line in unreleased(now) if key(line) not in had]
+    own = own_section(now, ver) if ver else None
+    if own is not None:
+        new = own
+    else:
+        had = {key(line) for _, line in unreleased(before)}
+        new = [(h, line) for h, line in unreleased(now) if key(line) not in had]
     lead = f"What changed since {since}." if since else ""
     if not new:
         return (lead + "\n\n" if lead else "") + "Nothing a person would see: the changelog gained no line" \
@@ -92,7 +115,7 @@ def main(argv):
     before = git("show", f"{since}:CHANGELOG.md") if since else ""
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     compare = f"https://github.com/{repo}/compare/{since}...{tag}" if repo and since else ""
-    sys.stdout.write(notes(now, before or "", since, compare))
+    sys.stdout.write(notes(now, before or "", since, compare, ver=tag.removeprefix("v")))
     return 0
 
 

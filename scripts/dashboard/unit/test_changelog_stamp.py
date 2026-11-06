@@ -24,6 +24,12 @@ class Stamp(unittest.TestCase):
         changelog.add(self.d, "A change", sha="9999fff", cat="Added")
         self.assertEqual(self.line(), "- A change (9999fff)")
 
+    def test_no_notebook_ids(self):
+        r = changelog.add(self.d, "A fix (B655)", sha="9999fff", cat="Fixed")
+        self.assertIn("B655", r.get("error", ""))
+        self.assertIn("R209.3", changelog.add(self.d, "Per R209.3, a change", cat="Added").get("error", ""))
+        self.assertTrue(changelog.add(self.d, "A Model 3B12x keeps working", cat="Fixed").get("ok"))
+
     def test_head_named_once(self):
         changelog.add(self.d, "A change (9999fff)", sha="9999fff", cat="Added")
         self.assertEqual(self.line(), "- A change (9999fff)")

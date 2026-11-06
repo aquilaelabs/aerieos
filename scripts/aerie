@@ -83,8 +83,14 @@ aerie version release --why "..." [--without-apk] [--dev|--stable]
                    whose Android APK could not be signed is refused before the
                    tag, saying why; --without-apk goes on, and aerie sign release
                    signs it once that is put right. --dev tags the dev
-                   build instead (vX.Y.Z-dev.N, no bump, no changelog section),
-                   which CI publishes as a pre-release on the dev channel.
+                   build instead (vX.Y.Z-dev.N, no bump), which CI publishes as
+                   a pre-release on the dev channel; --pre NAME a pre-release of
+                   any other name (vX.Y.Z-rc.1, counting up). A pre-release
+                   first moves Unreleased into its own changelog section,
+                   committed and pushed, and is tagged on that commit; a stable
+                   one gathers every pre-release section since the last stable
+                   into its own. Refused while aerie changelog missing lists a
+                   bug the last release carried with no Fixed line.
                    From a branch other than the one builds ship from it is a
                    dev release unless --stable says otherwise; the first line
                    printed names the channel it lands on
@@ -124,13 +130,13 @@ aerie version policy  what a session may move here, and who decides. A
                    after), patch, patch and minor, or anything
 aerie changelog       this space's user-facing changelog (--for DIR for a component)
 aerie changelog add "..." --cat NAME   log what a change means for the person using
-                   it; the next version bump dates the accumulated lines. A
+                   it; the next release or bump files them under its version. A
                    category is required, and the tool is where the rule lives:
                    Added (somebody can do something they could not), Changed
                    (already here, now different), Deprecated (going away),
                    Removed (gone), Fixed (was wrong in a released version,
-                   now right), Security (act on it because of what it
-                   exposed). When two fit, the one a reader would look under;
+                   now right; --bug N says which bug), Security (act on it
+                   because of what it exposed). When two fit, the one a reader would look under;
                    something nobody using the product would notice gets no
                    entry, and neither does a fix to something no release has
                    carried yet (a published dev pre-release is a release:
@@ -157,6 +163,12 @@ aerie changelog edit N "..."  reword one of them: a change that tweaks something
 aerie changelog merge N M "..."   one line for several, carrying all their commits
 aerie changelog split N     back into one line per commit it carries
 aerie changelog rm N        drop one that stopped being true
+aerie changelog missing [TAG]  the bugs fixed since the last release (or TAG)
+                   that it carried, or may have, with no Fixed line and no
+                   answer: a release is refused while there are any
+aerie changelog skip N "why"   a fixed bug that needs no Fixed line, and why
+                   (the release never had it, nobody using it meets it); kept
+                   in the bug's notes, as add's --bug N is for the line itself
 aerie projects        the space dirs here and their branches
 aerie shell           login shell as the builder user
 aerie login           Claude Code subscription auth flow, on the machine it is

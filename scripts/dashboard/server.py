@@ -4778,7 +4778,7 @@ signing.node_tools = toolchains.node_has
 phone.signer = signing.start
 
 
-def _releaser(project, comp, asker_name, principal, dev=False):
+def _releaser(project, comp, asker_name, principal, dev=False, pre=""):
     """A session's release, run as the Artifacts view's Release runs it
     (version.verb's release), under the asking account's commit identity
     and with the project's own credentials (R138)."""
@@ -4786,7 +4786,7 @@ def _releaser(project, comp, asker_name, principal, dev=False):
     # carries a token minted for the project and no account.
     who = (users.get(asker_name) if asker_name else None) or users.get(membership.owner_name(project) or "") \
         or {"name": asker_name or "claude"}
-    return version.verb(project, "release", {"component": comp, "dev": bool(dev)}, who, principal)
+    return version.verb(project, "release", {"component": comp, "dev": bool(dev), "pre": pre or ""}, who, principal)
 
 
 phone.releaser = _releaser
@@ -10143,7 +10143,8 @@ class Handler(BaseHTTPRequestHandler):
                                             "Tag and publish a release); a person cuts it with Release on "
                                             "the Artifacts view"}, 403)
             comp = field(req, "component") or ""
-            plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True)
+            plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True,
+                                        pre=field(req, "pre") or "")
             if plan.get("error"):
                 return self._json(plan, 400)
             dev = plan["dev"]
@@ -10158,11 +10159,13 @@ class Handler(BaseHTTPRequestHandler):
                                    "unsigned": rs["why"]}, 409)
             acct = users.account_of(who) or {}
             if mode == "auto":
-                got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev)
+                got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev,
+                                      pre=plan.get("pre") or "")
                 return self._json({**got, "channel": plan["channel"]} if isinstance(got, dict) else got, code)
             r = phone.ask_release(field(req, "why"), name, comp, plan, membership.owner_of(name),
                                   membership.owner_name(name) or "the space's owner",
-                                  asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev)
+                                  asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev,
+                                  pre=plan.get("pre") or "")
             return self._json({**r, "channel": plan["channel"]}, 400 if r.get("error") else 200)
         if act == "release-remove":
             # Files off a published release: its own ask, never part of an

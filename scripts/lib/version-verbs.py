@@ -157,10 +157,14 @@ if argv and argv[0] == "release":
               "    Agents may: Tag and publish a release: auto releases at once, ask waits for the\n"
               "    space's owner, deny refuses. A release whose Android APK could not be signed (bb\n"
               "    sign status) is refused before the tag; --without-apk releases it anyway, to be\n"
-              "    signed after with aerie sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N):\n"
-              "    no bump, no changelog section; CI publishes it as a pre-release for the dev channel.\n"
-              "    From any branch but the one builds ship from, a release is a dev one unless --stable\n"
-              "    says otherwise; the first line printed names the channel it lands on.\n"
+              "    signed after with aerie sign release. --dev cuts the dev build's tag instead (vX.Y.Z-dev.N),\n"
+              "    --pre NAME a pre-release of any other name (vX.Y.Z-rc.1, -beta.2, counting up): no bump;\n"
+              "    the changelog's Unreleased becomes the pre-release's own section, committed and pushed\n"
+              "    before the tag. A stable release gathers every pre-release section since the last stable\n"
+              "    one into its own, leaving out fixes to what only they had. Either is refused while a bug\n"
+              "    fixed since the last release, which that release carried, has no Fixed line (aerie\n"
+              "    changelog missing). From any branch but the one builds ship from, a release is a dev\n"
+              "    one unless --stable says otherwise; the first line printed names the channel.\n"
               'aerie version [--for DIR] release --edit --why "..." [--tag TAG] [--notes FILE] [--attach FILE]...\n'
               "    change the published release: its notes replaced whole (- reads stdin), a file from\n"
               "    dist/ or the committed tree attached (one of the same name replaced), (asset:NAME) in\n"
@@ -187,12 +191,20 @@ if argv and argv[0] == "release":
     # ...and a stable one from a branch other than main is said in so many
     # words (R190 step 1): without it, it is a dev one.
     stable = "--stable" in rest
+    # A pre-release of any name (R217): rc, beta, nightly, as the tag says it.
+    pre = ""
+    if "--pre" in rest:
+        i = rest.index("--pre")
+        if i + 1 >= len(rest):
+            fail("--pre needs the pre-release's name: --pre rc, --pre beta")
+        pre = rest[i + 1]
+        rest = rest[:i] + rest[i + 2:]
     rest = [x for x in rest if x not in ("--without-apk", "--dev", "--stable")]
     if rest:
-        fail(f"aerie version release takes --why \"...\" [--without-apk] [--dev|--stable] and nothing else, not {rest[0]}")
+        fail(f"aerie version release takes --why \"...\" [--without-apk] [--dev|--pre NAME|--stable] and nothing else, not {rest[0]}")
     auth = os.environ.get("BB_VERSION_AUTH", "")
     r = bbapi.call("/api/version", {"action": "release", "project": proj, "component": comp, "why": why, "dev": dev,
-                                    "stable": stable, "unsigned": unsigned}, auth=auth, timeout=240)
+                                    "pre": pre, "stable": stable, "unsigned": unsigned}, auth=auth, timeout=240)
     if r.get("error"):
         fail(f"[builderbot] ERROR: {r['error']}")
     if r.get("channel"):
@@ -208,6 +220,9 @@ if argv and argv[0] == "release":
     rel = r.get("released") or {}
     print(f"{rel.get('tag')} on {rel.get('sha')}" + (", pushed" if rel.get("pushed") else "")
           + (f"; {rel['note']}" if rel.get("note") else ""))
+    if rel.get("section"):
+        print(f"the changelog's section for it is commit {rel['section']}, pushed to the branch: pull it "
+              "(aerie git pull) before the next commit")
     forge = rel.get("forge") or {}
     if forge.get("url"):
         print(f"the release: {forge['url']}")

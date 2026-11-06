@@ -894,6 +894,111 @@ def channel_of(project, dev=False, stable=False):
                  else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
 
 
+# A pre-release's name (R217): dev, rc, beta, nightly, anything a tag can
+# carry after the version. dev keeps its number from the commit's ordinal, as
+# every dev build is stamped; any other name counts up from 1 per version.
+_LABEL = re.compile(r"^[a-z][a-z0-9]{0,15}$")
+
+
+def pre_label(dev=False, pre=""):
+    """(label, error): the pre-release's name, "" for a stable release."""
+    pre = (pre or "").strip().lower()
+    if pre and not _LABEL.match(pre):
+        return "", f"a pre-release's name is a word of letters and digits starting with a letter, not {pre!r}"
+    return (pre or ("dev" if dev else "")), ""
+
+
+def _owes_section(project, comp=""):
+    """Whether a release now writes the changelog's section first: there is
+    a CHANGELOG.md with lines under Unreleased."""
+    where = _sub(project, comp)
+    return bool(changelog is not None and where is not None and changelog.unreleased(where))
+
+
+def _pre_tgt(project, comp, tgt, label, ahead=0):
+    """`tgt` with its pre-release part: X.Y.Z-dev.N (N the ordinal of the
+    commit the tag will be on, `ahead` commits from HEAD), or X.Y.Z-LABEL.N
+    counting up from the newest such tag. (tgt, error)."""
+    if label == "dev":
+        pp = parts(project, comp) or {}
+        if not pp.get("ordinal"):
+            return None, "a dev release needs the commit's ordinal, which this tree has no history for"
+        return f"{pp.get('target') or tgt}-dev.{pp['ordinal'] + ahead}", ""
+    pre = f"{comp}-v" if comp else "v"
+    have = (_git(project, "tag", "--list", f"{pre}{tgt}-{label}.*") or "").split()
+    nums = [int(m.group(1)) for t in have if (m := re.fullmatch(rf"{re.escape(pre + tgt)}-{label}\.(\d+)", t))]
+    return f"{tgt}-{label}.{max(nums, default=0) + 1}", ""
+
+
+def _owes_stable_section(project, comp, tgt):
+    """Whether a stable release of `tgt` writes its changelog section first:
+    there is none for it yet, and Unreleased or a pre-release section since
+    the last stable one has lines (a version moved by hand, or by set_line,
+    and never bumped)."""
+    where = _sub(project, comp)
+    if changelog is None or where is None:
+        return False
+    text = changelog.read(where)
+    if not text or any(changelog.is_stable(sec["title"]) and sec["title"].split(":")[0].split()[0] == tgt
+                       for sec in changelog.sections(text)):
+        return False
+    return bool(changelog.unreleased(where) or changelog.since_stable(text))
+
+
+def _stable_keep(project, comp=""):
+    """keep(entry) for a stable release's gathering: a Fixed line stays unless
+    the bug it is about was not in the last stable release (releasegaps)."""
+    if bugs is None:
+        return None
+    try:
+        import releasegaps  # noqa: PLC0415
+        releasegaps.configure(version_mod=sys.modules[__name__], bugs_mod=bugs, changelog_mod=changelog)
+        return releasegaps.stable_keep(project, comp)
+    except Exception as e:  # noqa: BLE001
+        print(f"dashboard: version: no stable keep for {project}: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+
+
+def _section_commit(project, comp, title, env=None, keep=None):
+    """The changelog's section for the release `title`, written and committed
+    on its own before the tag (R217): a pre-release's from Unreleased, a
+    stable one's gathering every pre-release since the last stable. Returns
+    an error sentence, or ""."""
+    where = _sub(project, comp)
+    rel = str((where / changelog.FILE).relative_to(root(project).resolve()))
+    staged = (_git(project, "diff", "--cached", "--name-only") or "").splitlines()
+    if staged:
+        return (f"{', '.join(staged[:4])} {'is' if len(staged) == 1 else 'are'} staged for another commit, and the "
+                f"changelog's commit for {title} would carry {'it' if len(staged) == 1 else 'them'}: commit or unstage first")
+    def cite(text):
+        # The commit that introduced the entry's line, as a bump cites it (B284).
+        out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
+        shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+        return shas[-1:] if shas else []
+
+    if not changelog.roll(where, title, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
+        return ""
+    if _git(project, "add", "--", rel) is None:
+        return f"{rel} has its section for {title} but could not be staged; commit it by hand"
+    msg = f"The changelog's section for {title}: what it carries"
+    if _git(project, "commit", "-m", msg, "--", rel, timeout=30, env=env) is None:
+        return f"{rel} has its section for {title} but committing failed; commit it by hand"
+    return ""
+
+
+def _gaps_refusal(project, comp=""):
+    """Why a release is refused while the changelog owes a Fixed line, or ""."""
+    if bugs is None or changelog is None:
+        return ""
+    try:
+        import releasegaps  # noqa: PLC0415  (beside this file)
+        releasegaps.configure(version_mod=sys.modules[__name__], bugs_mod=bugs, changelog_mod=changelog)
+        return releasegaps.refusal(releasegaps.gaps(project, comp))
+    except Exception as e:  # noqa: BLE001  (the check must not stop a release by crashing)
+        print(f"dashboard: version: the changelog check failed for {project}: {type(e).__name__}: {e}", file=sys.stderr)
+        return ""
+
+
 def _uncommitted(project, comp=""):
     """What would make the tag mark something other than the commit: a
     tracked file changed, or the VERSION file the tag's number comes from
@@ -916,7 +1021,7 @@ def _uncommitted(project, comp=""):
     return rows
 
 
-def release_plan(project, comp="", dev=False, stable=False):
+def release_plan(project, comp="", dev=False, stable=False, pre=""):
     """What a release here would tag, without doing it: {tag, sha, target}
     or {error}, from the same refusals release() makes first. A session's
     ask is made from this (aerie version release, R138), so the person asked
@@ -924,9 +1029,13 @@ def release_plan(project, comp="", dev=False, stable=False):
     refused before anybody is asked. With `dev` the tag is the dev build's
     (R179), as release() names it; planned as the plain one, a dev release
     was refused because the last release's tag already existed."""
-    if dev and stable:
-        return {"error": "a release is --dev or --stable, not both"}
-    dev, channel = channel_of(project, dev, stable)
+    if (dev or pre) and stable:
+        return {"error": "a release is a pre-release or --stable, not both"}
+    label, err = pre_label(dev, pre)
+    if err:
+        return {"error": err}
+    dev, channel = channel_of(project, bool(label), stable)
+    label = label or ("dev" if dev else "")
     tgt, err = target(project, comp)
     if err:
         return {"error": err}
@@ -938,22 +1047,26 @@ def release_plan(project, comp="", dev=False, stable=False):
     sha = _git(project, "rev-parse", "--short=7", "HEAD")
     if sha is None:
         return {"error": no_history(project)}
+    # A pre-release writes its changelog section in a commit of its own
+    # first (R217), so its tag is on the commit after this one.
+    ahead = 1 if dev and _owes_section(project, comp) else 0
     if dev:
         # The dev build's own number, as its stamp reads it: the branch's
         # line where that is newer than VERSION (R112), so a 0.9.0 branch
         # after 0.8.2 shipped tags v0.9.0-dev.N, never v0.8.2-dev.N.
-        pp = parts(project, comp) or {}
-        if not pp.get("ordinal"):
-            return {"error": "a dev release needs the commit's ordinal, which this tree has no history for"}
-        tgt = f"{pp.get('target') or tgt}-dev.{pp['ordinal']}"
+        tgt, err = _pre_tgt(project, comp, tgt, label, ahead)
+        if err:
+            return {"error": err}
     name = f"{comp}-v{tgt}" if comp else f"v{tgt}"
     if _git(project, "rev-parse", "--verify", "--quiet", f"refs/tags/{name}") is not None:
         # Tagged here and pushed by hand after the release's push failed:
         # what is left is its page on the forge (B399).
         on = _git(project, "rev-list", "-n", "1", "--abbrev-commit", name) or ""
         if on and (sha.startswith(on) or on.startswith(sha)):
-            return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "channel": channel}
+            return {"tag": name, "sha": sha, "target": tgt, "finish": True, "dev": dev, "pre": label, "channel": channel}
         return {"error": f"{name} already exists: bump to the next number first"}
+    if why := _gaps_refusal(project, comp):
+        return {"error": why}
     dirty = _uncommitted(project, comp)
     if dirty:
         # Named, since the copy a session works in can be clean while the
@@ -966,7 +1079,8 @@ def release_plan(project, comp="", dev=False, stable=False):
     # snapshot, as release() has it; planned with one, it was refused.
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
         return {"error": why}
-    return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "channel": channel}
+    return {"tag": name, "sha": sha, "target": tgt, "dev": dev, "pre": label, "channel": channel,
+            **({"section": True} if ahead or (not dev and _owes_stable_section(project, comp, tgt)) else {})}
 
 
 # A tree that keeps a /config snapshot per release (AerieOS's own, R79)
@@ -1006,7 +1120,7 @@ def _remote_has_tag(project, name, env=None):
     return r.returncode == 0 and f"refs/tags/{name}" in r.stdout
 
 
-def release(project, comp="", env=None, may_push=True, push=True, dev=False):
+def release(project, comp="", env=None, may_push=True, push=True, dev=False, pre=""):
     """Cut the release: an annotated tag on this commit, pushed. With `dev`
     (R179) the tag is the dev build's, vX.Y.Z-dev.N, a pre-release on the
     dev channel: no bump, no changelog section, no snapshot gate, and the
@@ -1030,6 +1144,10 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
     published tag is somebody else's checkout, and taking one back is a
     thing to do deliberately in a terminal, having thought about it.
     """
+    label, err = pre_label(dev, pre)
+    if err:
+        return {"error": err}
+    dev = bool(label)
     tgt, err = target(project, comp)
     if err:
         return {"error": err}
@@ -1042,14 +1160,18 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
     sha = _git(project, "rev-parse", "--short=7", "HEAD")
     if sha is None:
         return {"error": no_history(project)}
+    base = tgt
+    # A pre-release writes its changelog section first, in a commit of its
+    # own, and is tagged on that commit (R217); a stable one does when no
+    # bump wrote its section, gathering the pre-releases since the last.
+    section = _owes_section(project, comp) if dev else _owes_stable_section(project, comp, tgt)
     if dev:
         # The dev build's own number, as its stamp reads it: the branch's
         # line where that is newer than VERSION (R112), so a 0.9.0 branch
         # after 0.8.2 shipped tags v0.9.0-dev.N, never v0.8.2-dev.N.
-        pp = parts(project, comp) or {}
-        if not pp.get("ordinal"):
-            return {"error": "a dev release needs the commit's ordinal, which this tree has no history for"}
-        tgt = f"{pp.get('target') or tgt}-dev.{pp['ordinal']}"
+        tgt, err = _pre_tgt(project, comp, tgt, label, 1 if section else 0)
+        if err:
+            return {"error": err}
     name = f"{comp}-v{tgt}" if comp else f"v{tgt}"
     if _git(project, "rev-parse", "--verify", "--quiet", f"refs/tags/{name}") is not None:
         # Which commit it is on, because "it already exists" and "it is on
@@ -1110,10 +1232,32 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
                              f"it to {tip}. A build comes from {branch}, so a tag "
                              f"here would name a commit nothing was ever built "
                              f"from. Check out {branch} and pull, then release."}
+    if why := _gaps_refusal(project, comp):
+        return {"error": why}
+    wrote = ""
+    if section:
+        if why := _section_commit(project, comp, tgt, env=env, keep=None if dev else _stable_keep(project, comp)):
+            return {"error": why}
+        sha = _git(project, "rev-parse", "--short=7", "HEAD") or sha
+        wrote = sha
+        # The branch carries the section's commit before the tag names it, so
+        # the tag is never on a commit only the tag reaches; a branch that
+        # will not take it (somebody pushed meanwhile) undoes the commit here
+        # and tags nothing.
+        if push and may_push and (why := _push_branch(project, env)):
+            _git(project, "reset", "--keep", "HEAD~1")
+            return {"error": f"the changelog's section for {tgt} could not be pushed ({why}); nothing is tagged "
+                             "and the commit is taken back: pull, then release again"}
+        if dev:
+            now, _ = _pre_tgt(project, comp, base, label)
+            if now != tgt:
+                return {"error": f"the changelog's commit for {tgt} landed, but the commit after it reads {now}: "
+                                 "release again to tag that"}
     msg = f"{comp} {tgt}" if comp else f"{project} {tgt}"
     if _git(project, "tag", "-a", name, "-m", msg, env=env) is None:
         return {"error": f"could not create the tag {name}"}
-    out = {"ok": True, "tag": name, "sha": sha, "target": tgt, "pushed": False}
+    out = {"ok": True, "tag": name, "sha": sha, "target": tgt, "pushed": False,
+           **({"section": wrote} if wrote else {})}
     if not push:
         return out
     if not may_push:
@@ -1124,6 +1268,22 @@ def release(project, comp="", env=None, may_push=True, push=True, dev=False):
                        f"rights, so nothing was pushed.")
         return out
     return _push_tag(project, name, out, env)
+
+
+def _push_branch(project, env=None):
+    """HEAD pushed to its branch on origin, never forced: the error said, or ""."""
+    branch = _git(project, "symbolic-ref", "--short", "-q", "HEAD")
+    if not branch:
+        return "this tree is on no branch"
+    try:
+        r = subprocess.run(["git", "-C", str(root(project)), *_creds_c(project), "push", "origin",
+                            f"HEAD:refs/heads/{branch}"], capture_output=True, text=True, timeout=120,
+                           check=False, env={**os.environ, **(env or {})})
+    except (OSError, subprocess.SubprocessError) as e:
+        return str(e)
+    if r.returncode == 0:
+        return ""
+    return re.sub(r"(https?://)[^@/\s]*@", r"\1", (r.stderr or r.stdout or "the push failed").strip())[-300:]
 
 
 def _push_tag(project, name, out, env=None):
@@ -1175,7 +1335,8 @@ def _cl_guard(project, where):
     actually happen: with nothing unreleased the commit never touches the
     file, and a staged edit is none of this function's business.
     """
-    if changelog is None or where is None or not changelog.unreleased(where):
+    if changelog is None or where is None or not (changelog.unreleased(where)
+                                                  or changelog.since_stable(changelog.read(where) or "")):
         return None
     rel = str((where / changelog.FILE).relative_to(root(project).resolve()))
     staged = (_git(project, "diff", "--cached", "--name-only") or "").splitlines()
@@ -1234,7 +1395,7 @@ def _stamp(project, value, part, env=None):
     return sorted(touched() - before), ""
 
 
-def _seal(project, where, ver_rel, value, msg, env=None, extra=()):
+def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
     """Roll the changelog, stage, and commit: the tail init and bump share.
 
     Every failure names what actually happened to BOTH files, because by this
@@ -1255,8 +1416,11 @@ def _seal(project, where, ver_rel, value, msg, env=None, extra=()):
         shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
         return shas[-1:] if shas else []
 
+    # A stable version gathers the pre-releases since the last stable one,
+    # leaving out the fixes to what only they had (R217).
+    keep = None if changelog is None or changelog.is_pre(value) else _stable_keep(project, comp)
     if changelog is not None and changelog.roll(
-            where, value, time.strftime("%Y-%m-%d"), resolve=cite):
+            where, value, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
         cl_rel = str((where / changelog.FILE)
                      .relative_to(root(project).resolve()))
     if _git(project, "add", "--", ver_rel) is None:
@@ -1343,7 +1507,7 @@ def init(project, value, by="claude", comp="", env=None):
     # BECAME this first version, so _seal dates them as its section. Left
     # unreleased they would ride into the NEXT bump and be labeled as changes
     # since a release they are actually part of.
-    r = _seal(project, where, rel, value, msg, env=env)
+    r = _seal(project, where, rel, value, msg, env=env, comp=comp)
     if r.get("ok"):
         r["component"] = comp
     return r
@@ -1498,7 +1662,7 @@ def bump(project, part, by="claude", comp="", env=None, to=None, fold=False):
             return {"error": why}
     if folded:
         msg += f"\n\n{tgt} was never released: its changelog section is dated {new} with the rest."
-    r = _seal(project, where, rel, new, msg, env=env, extra=extra)
+    r = _seal(project, where, rel, new, msg, env=env, extra=extra, comp=comp)
     if r.get("ok"):
         r.update(was=tgt, part=part, component=comp, stamped=extra)
         if folded:
@@ -1863,9 +2027,10 @@ def verb(name, act, req, who, principal):
         # tag. A person's from here; a session asks through its own
         # dial (Agents may: Tag and publish a release, R138), whose Allow
         # comes back through this same branch.
-        dev = req.get("dev") is True
+        pre = field(req, "pre") or ""
+        dev = req.get("dev") is True or bool(pre)
         r = release(name, comp=comp, env={**CREDS_ENV(), **GIT_ENV(who, name)},
-                    may_push=MAY_PUSH(name), dev=dev)
+                    may_push=MAY_PUSH(name), dev=dev, pre=pre)
         if r.get("error"):
             return r, 400
         # A tag on GitHub gets GitHub's release beside it (R123): titled with
@@ -1881,6 +2046,7 @@ def verb(name, act, req, who, principal):
             MADE(name, r["tag"])
         if dev:
             r["dev"] = True
+            r["pre"] = pre or "dev"
         AUDIT(principal, "version-release", name,
               {"tag": r.get("tag"), "pushed": bool(r.get("pushed")),
                "forge": (r.get("forge") or {}).get("url") or ""})

@@ -160,10 +160,20 @@ def groups(d):
     return out
 
 
+# A bug's or a roadmap item's number (B655, R209, R209.3): the notebook's,
+# which nobody reading the repository can open. A line names the commit it
+# landed in, as every line does, and the bug is linked with --bug.
+_NOTEBOOK_ID = re.compile(r"\b[BR]\d{2,}(?:\.\d+)?\b")
+
+
 def _clean_text(t):
     t = " ".join(str(t or "").split())
     if not t:
         raise _Refused("an empty changelog entry says nothing to anybody")
+    if m := _NOTEBOOK_ID.search(t):
+        raise _Refused(f"a changelog line names no bug or roadmap number ({m.group(0)}): those are the "
+                       "notebook's, which nobody reading the repository can open; the line names the "
+                       "commit it landed in, and `--bug N` ties a Fixed line to its bug")
     if len(t) > MAX_TEXT:
         raise _Refused(f"keep an entry under {MAX_TEXT} characters: it is one "
                        "line of a list a person reads, not the whole story "
@@ -226,7 +236,10 @@ def rules():
             "When two fit, the one a reader would look under: a bug's fix is Fixed even\n"
             "if fixing it added a button. Something nobody using the product would\n"
             "notice gets no entry at all. A space that files its own way names its own\n"
-            "category (this is a default, and a house rule is where a space says so).")
+            "category (this is a default, and a house rule is where a space says so).\n"
+            "Fixed is for what a published release had, a pre-release of any name\n"
+            "included: --bug N says which bug, and aerie changelog missing lists the\n"
+            "fixes the last release carried that still have no line.")
 
 
 def _clean_name(n):
@@ -639,20 +652,102 @@ def _tidy(lines):
     return out
 
 
+# A section's title is a release's: a stable one (1.2.0) or a pre-release of
+# any name (1.2.0-dev.4951, 1.2.0-rc.2, 1.2.0-beta), each followed by its date.
+_PRE_TITLE = re.compile(r"^\d+\.\d+\.\d+-[A-Za-z][0-9A-Za-z]*(?:\.\d+)?(?=$|[:\s])")
+_STABLE_TITLE = re.compile(r"^\d+\.\d+\.\d+(?=$|[:\s])")
+
+
+def is_pre(title):
+    """Whether a section title (or a version) is a pre-release's."""
+    return bool(_PRE_TITLE.match((title or "").strip()))
+
+
+def is_stable(title):
+    return bool(_STABLE_TITLE.match((title or "").strip()))
+
+
+def since_stable(text):
+    """The titles of the pre-release sections above the newest stable one:
+    what the next stable release gathers."""
+    out = []
+    for t, _ in _blocks(text)[1]:
+        if is_stable(t):
+            break
+        if is_pre(t):
+            out.append(t)
+    return out
+
+
+def _entry_line(text, shas):
+    return f"- {text}" + (f" ({', '.join(shas)})" if shas else "")
+
+
+def _fold(text, version, date, keep=None):
+    """The file with its pre-release sections since the last stable one and
+    its Unreleased gathered into one section for the stable `version`: each
+    category's lines oldest first, a line said in two of them once, and a
+    line `keep(entry)` answers False for left out (a fix to something only
+    those pre-releases had, which nobody upgrading from the last stable met).
+    The pre-release sections go: their notes are their releases' own."""
+    head, blocks = _blocks(text)
+    pend = set(since_stable(text))
+    gathered = [b for t, b in blocks if t in pend][::-1] + [b for t, b in blocks if t == "Unreleased"]
+    order, seen, by_cat = [], {}, {}
+    for b in gathered:
+        for sec in sections("\n".join(b)):
+            for e in sec["entries"]:
+                if e["text"] in seen:
+                    have = seen[e["text"]]
+                    have["shas"] += [x for x in e["shas"] if x not in have["shas"]]
+                    continue
+                if keep is not None and not keep(e):
+                    continue
+                e = {"text": e["text"], "shas": list(e["shas"]), "cat": e["cat"]}
+                seen[e["text"]] = e
+                if e["cat"] not in by_cat:
+                    by_cat[e["cat"]] = []
+                    order.append(e["cat"])
+                by_cat[e["cat"]].append(e)
+    std = [n for n, _ in CATEGORIES]
+    cats = [c for c in order if not c] + [c for c in std if c in by_cat] + [c for c in order if c and c not in std]
+    sec = [f"## {version}: {date}", ""]
+    for c in cats:
+        if c:
+            sec += [f"{CATEGORY}{c}", ""]
+        sec += [_entry_line(e["text"], e["shas"]) for e in by_cat[c]] + [""]
+    out, placed = list(head), False
+    for t, b in blocks:
+        if t in pend or t == "Unreleased":
+            if not placed:
+                out += sec
+                placed = True
+            continue
+        out += b
+    return "\n".join(_tidy(out)) + "\n"
+
+
 @_held
-def roll(d, version, date, resolve=None):
+def roll(d, version, date, resolve=None, keep=None):
     """Date the Unreleased section as `version`, ready to commit with it.
 
     Returns True when there was something to roll. An empty cycle rolls
     nothing rather than writing a section holding only a date. The warning
     about that belongs at the moment of bumping, not in the shipped file.
 
+    A pre-release's version (1.2.0-dev.N, 1.2.0-rc.1) takes Unreleased as its
+    own section, so the changelog says what each published build carried and
+    Unreleased only what none has. A stable version gathers the pre-release
+    sections since the last stable one with Unreleased (_fold), `keep`
+    choosing which of their lines a reader upgrading from that stable needs.
+
     `resolve(text)` answers the commits that carry an entry, when the caller
     has git: add() stamps the HEAD of the moment, which is the commit
     before the one the entry lands in, so the record cited the wrong
     commit until the roll fixed it up (B284).
     """
-    if not unreleased(d):
+    pending = [] if is_pre(version) else since_stable(read(d) or "")
+    if not unreleased(d) and not pending:
         return False
     if resolve is not None:
         gs, moved = groups(d), False
@@ -664,6 +759,12 @@ def roll(d, version, date, resolve=None):
         if moved:
             put(d, gs)
     text = read(d)
+    if pending:
+        try:
+            _write(d, _fold(text, version, date, keep))
+        except OSError:
+            return False
+        return True
     out, renamed = [], False
     for ln in text.splitlines():
         if not renamed and ln.strip() == UNRELEASED:

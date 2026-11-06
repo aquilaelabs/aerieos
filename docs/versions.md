@@ -48,9 +48,10 @@ dev build heading for it, a dev build by its ordinal), so a dev build
 moves to a later dev build or to the release it was heading for. A dev
 build is not a release: it may not come up, and the OS image's slot
 fallback is what brings the machine back. `aerie version release --dev` cuts
-such a tag on this commit (no bump, no changelog section) and pushes it,
-which is what a session's release from a branch other than main is unless
-`--stable` says otherwise;
+such a tag (no bump) and pushes it, which is what a session's release from a
+branch other than main is unless `--stable` says otherwise; `--pre NAME`
+cuts a pre-release of any other name, `vX.Y.Z-rc.1`, `-beta.2`, counting up
+per version;
 the stick maker's `--latest` takes the normal channel unless `--channel dev`
 says otherwise, and `--release` names any tag.
 
@@ -67,15 +68,39 @@ image tags people follow are not. A tag pushes the image under its exact
 version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
 and for a stable release `:latest` and `:0.9` too.
 
-A dev build's notes are what the changelog's Unreleased section gained since
-the last published release before it; a stable release's are its version's whole section.
-
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating
 AerieOS to one fetches the draft's files with that token and takes the
 update from them, checked as an update from a folder is. A controller
 installed on another system, and a container, take a draft only once it is
 published.
+
+## The changelog across releases
+
+A published pre-release is a release: somebody ran it and met its bugs. So
+the changelog keeps a section for each one, and Unreleased holds only what
+no published build has carried. Cutting a pre-release first moves
+Unreleased's lines under `## X.Y.Z-NAME.N: date`, commits that one file and
+pushes the branch, then tags that commit; its notes are that section. A
+stable release gathers every pre-release section since the last stable one,
+with Unreleased, into `## X.Y.Z: date`, each category's lines in the order
+they came, and leaves out a Fixed line about a bug the last stable release
+never had, since nobody upgrading from it met that bug; its notes are that
+section, the whole backlog since the last stable release. A bump to a stable
+version gathers the same way.
+
+A release is refused while the changelog owes a line: a bug fixed since the
+last release (of any name) that the release carried, with no Fixed line and
+no answer. A bug was carried when it was seen in a build of that release or
+before it, or when its fix (a commit naming the bug, or the one it was closed
+on) changes a line the release's own copy has; a fix touching only tests and
+CI, or code that came after the release, owes nothing. `aerie changelog
+missing` lists what is owed at any time; `aerie changelog add "..." --cat
+Fixed --bug N` writes the line and ties it to the bug, and `aerie changelog
+skip N "why"` answers for a bug that needs none. Both answers are kept in
+the bug's notes. A line never names a bug's or a roadmap item's number: the
+tool refuses one, since those are the notebook's and a reader of the
+repository cannot open them.
 
 ## What a release upgrades from
 
