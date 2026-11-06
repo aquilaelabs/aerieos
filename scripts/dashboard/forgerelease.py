@@ -189,11 +189,14 @@ _BY_TAG = re.compile(re.escape(API) + r"/repos/([^/?#]+/[^/?#]+)/releases/tags/(
 
 def _draft_by_tag(repo, tag, token, pages=3):
     """The release (a draft among them) whose tag is `tag`, from the listed
-    releases, newest first, or None."""
+    releases, newest first, or None. A draft GitHub moved to a name of its
+    own (untagged-ID: a PATCH that left out tag_name, B696) is found by its
+    title, the tag, and every PATCH here sends the tag back with it."""
     for page in range(1, pages + 1):
         rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=50&page={page}", token) or []
         for r in rows if isinstance(rows, list) else []:
-            if isinstance(r, dict) and r.get("tag_name") == tag:
+            if isinstance(r, dict) and (r.get("tag_name") == tag or (
+                    r.get("draft") and r.get("name") == tag and str(r.get("tag_name") or "").startswith("untagged-"))):
                 return r
         if not isinstance(rows, list) or len(rows) < 50:
             return None
@@ -649,7 +652,8 @@ def _github_edit(project, repo, token, tag, notes, files):
             skipped.append(f"{x['name']}: {e}")
     if notes is not None:
         # Its draft said back with the notes, or a draft is published (B590).
-        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls), "draft": rel.get("draft") is True})
+        _req("PATCH", f"{base}/{int(rel['id'])}", token, {"body": _with_assets(notes, urls), "draft": rel.get("draft") is True,
+                                                          "tag_name": tag})
     return _said(rel.get("html_url") or "", notes, urls, attached, replaced, skipped)
 
 
@@ -956,7 +960,8 @@ def draft_notes(project, tag, notes):
     published: {ok, tag} or {error}."""
     try:
         repo, token, rel = _draft(project, tag)
-        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, {"body": str(notes)[:120000], "draft": True})
+        _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token,
+             {"body": str(notes)[:120000], "draft": True, "tag_name": tag})
     except Refused as e:
         return {"error": str(e)}
     return {"ok": True, "tag": tag}
@@ -970,7 +975,7 @@ def publish_draft(project, tag, notes=None, missing=()):
         return {"error": f"{tag} is not whole yet: {', '.join(missing)} still missing. CI may still be building it"}
     try:
         repo, token, rel = _draft(project, tag)
-        body = {"draft": False, **({"body": str(notes)[:120000]} if notes is not None else {})}
+        body = {"draft": False, "tag_name": tag, **({"body": str(notes)[:120000]} if notes is not None else {})}
         out = _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, body) or {}
     except Refused as e:
         return {"error": str(e)}
