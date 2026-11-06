@@ -631,6 +631,21 @@ class Agent(unittest.TestCase):
             got, why = hw.clean({"share": {"path": "/workspace/web/data"}}, 2, 2048, project="web")
             self.assertEqual((why, got["share"]["path"]), ("", "/workspace/web/store/data"))
 
+    def test_a_tpm_where_the_host_has_swtpm_and_refused_by_name_where_not(self):
+        # R163 step 16: Windows 11 will not install without a TPM 2.0.
+        from unittest import mock
+        hw = sys.modules[self.av.__name__.rsplit(".", 1)[0] + ".vmhw"]
+        x = self.av.domain_xml("bbvm-web-win", "web", 2, 4096, "/v/d.qcow2", "/v/s.iso", "bbvm-n00", boot="uefi")
+        with mock.patch.object(hw, "tpm_here", return_value=False):
+            self.assertIn("no software TPM", hw.clean({"tpm": True}, 2, 4096)[1])
+            self.assertEqual(hw.clean({"tpm": False}, 2, 4096), ({"tpm": False}, ""))
+        with mock.patch.object(hw, "tpm_here", return_value=True):
+            want, why = hw.clean({"tpm": True}, 2, 4096)
+        out = hw.apply(x, want, 2, 4096).replace('"', "'").replace(" />", "/>")
+        self.assertIn("<tpm model='tpm-crb'><backend type='emulator' version='2.0'/></tpm>", out)
+        self.assertTrue(hw.read(out)["tpm"])
+        self.assertFalse(hw.read(hw.apply(out, {"tpm": False}, 2, 4096))["tpm"])
+
     def test_a_vm_s_hardware_lands_in_its_domain_and_reads_back(self):
         # R100: what clean() lets through, apply() writes, and read() finds
         # again, so the row says what the VM has.

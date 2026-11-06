@@ -1382,6 +1382,8 @@ def _vm_hw(hw):
     if sh and str(sh.get("path") or "").startswith("/workspace/"):
         out["share"] = {"path": str(sh["path"])[:300], "tag": re.sub(r"[^a-z0-9_-]", "", str(sh.get("tag") or ""))[:31],
                         "ro": sh.get("ro") is True}
+    if isinstance(hw.get("tpm"), bool):
+        out["tpm"] = hw["tpm"]
     out["devices"] = [{"type": d.get("type"), **({"addr": str(d.get("addr"))[:12]} if d.get("type") == "pci" else
                                                   {"vendor": str(d.get("vendor"))[:6], "product": str(d.get("product"))[:6]})}
                       for d in (hw.get("devices") or [])[:8] if isinstance(d, dict) and d.get("type") in ("usb", "pci")]
@@ -1782,7 +1784,9 @@ def _census(c):
                         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))
                         and not re.fullmatch(r"docker\d+|br-[0-9a-f]{12}|bbvm-.*", str(x))],
             "vnets": [str(x) for x in (vh.get("vnets") or [])[:32]
-                      if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))]}
+                      if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))],
+            # Whether a VM can be given a TPM here (swtpm).
+            "tpm": vh.get("tpm") is True}
     # ...and the installer ISOs fetched onto it (R99).
     if isinstance(c.get("vm_isos"), list):
         out["vm_isos"] = [{"name": str(i["name"]), "mb": int(i.get("mb") or 0) if isinstance(i.get("mb"), int) else 0}

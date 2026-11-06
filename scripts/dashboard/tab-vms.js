@@ -409,7 +409,7 @@ function openNewVm(forProject = ""){
       <div class="hint" id="vmAgentHint" hidden>It joins your LAN as its own machine and appears on the Nodes page once it has booted, a node like any other, marked as a VM on its host; removing the VM retires the node and revokes its credential.</div></div>
     </div>
     <div class="prefrow ctlrow" id="vmFwRow" hidden>
-      <div class="setrow col ctlrow">${lbl("vmFw", "Firmware", "UEFI for most current installers (and Windows 11); BIOS for an older one")}
+      <div class="setrow col ctlrow">${lbl("vmFw", "Firmware", "UEFI for most current installers (Windows 11 also wants the TPM, under More); BIOS for an older one")}
         <select id="vmFw">${optionList([["uefi", "UEFI"], ["bios", "BIOS"]], "uefi")}</select></div>
     </div>
     <details class="vmmore"><summary>More: disks, network, screen password, hardware</summary>
@@ -500,13 +500,14 @@ function openNewVm(forProject = ""){
 // ---- a VM's hardware beyond size (R100) -----------------------------------
 // One set of fields for New VM's More and the Hardware dialog of a stopped VM:
 // CPU threads in their core pairs (as a hypervisor's form draws them), a memory ceiling it
-// may balloon to, its network, a folder of the project shared in, and the
-// host's devices passed through, which only an administrator is shown.
+// may balloon to, its network, a TPM, a folder of the project shared in, and
+// the host's devices passed through, which only an administrator is shown.
 function vmHwLine(v){
   const hw = v.hw || {}, bits = [];
   if ((hw.cpuset || []).length) bits.push(`pinned to threads ${hw.cpuset.join(", ")}`);
   if (hw.mem_max_mb) bits.push(`memory up to ${+(hw.mem_max_mb / 1024).toFixed(1)} GB`);
   if (hw.net === "lan" && !v.node_id) bits.push("on the LAN");
+  if (hw.tpm) bits.push("TPM 2.0");
   if (hw.share?.path) bits.push(`sees ${hw.share.path.replace(/^\/workspace\//, "")}${hw.share.ro ? " read-only" : ""} as "${hw.share.tag}"`);
   // The USB devices it was given from its node's page, by name (R116);
   // the rest of what is passed through, counted.
@@ -542,6 +543,9 @@ function vmHwFields(host, hw, admin){
         <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
     </div>
     ${vmNetFields(host, hw, !!hw?.mac)}
+    <div class="field"><label class="ndcap"><input type="checkbox" id="vmHwTpm"${hw?.tpm ? " checked" : ""}${host?.hw?.tpm || hw?.tpm ? "" : " disabled"}> TPM 2.0</label>
+      <div class="hint">${host?.hw?.tpm || hw?.tpm ? "An emulated TPM whose state stays with the VM: Windows 11 will not install without one."
+        : "This node has no software TPM (swtpm) yet: turning VM host on again under its Features installs it."}</div></div>
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
         <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
@@ -593,7 +597,8 @@ function vmHwRead(root){
           model: root.querySelector("#vmHwModel")?.value || "",
           mac: root.querySelector("#vmHwMac")?.value.trim() || "",
           share: share ? {path: share === "." ? "" : share, ro: !!root.querySelector("#vmHwShareRo")?.checked} : {},
-          ...(root.querySelector("#vmHwDevs") ? {devices} : {})};
+          ...(root.querySelector("#vmHwDevs") ? {devices} : {}),
+          ...(root.querySelector("#vmHwTpm") ? {tpm: !!root.querySelector("#vmHwTpm").checked} : {})};
 }
 function vmHwWire(root, nodeId, project){
   const mb = root.querySelector("#vmHwMacNew");

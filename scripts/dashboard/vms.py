@@ -679,6 +679,12 @@ def hardware(req, project, node_id, admin, mem_mb, but="", person=True):
         if not re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac) or int(mac[:2], 16) & 1:
             return None, "a MAC is six pairs of hex digits, and not a multicast one"
         out["mac"] = mac
+    if hw.get("tpm") is not None:
+        # A TPM 2.0 (Windows 11 will not install without one), swtpm's on
+        # the node: refused by name where the node has none.
+        if hw["tpm"] is True and not ((((node(node_id) or {}).get("reported") or {}).get("vm_host") or {}).get("tpm")):
+            return None, "this node has no software TPM (swtpm): VM host, turned on again under its Features, installs it"
+        out["tpm"] = hw["tpm"] is True
     if hw.get("share") is not None:
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
         if sh:

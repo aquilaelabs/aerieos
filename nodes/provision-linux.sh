@@ -2878,13 +2878,15 @@ pkgs_drop() {
         alpine) apk del -q "$@" ;;
     esac
 }
+# swtpm gives a VM a TPM 2.0 (Windows 11 needs one); Alpine's is left out,
+# so a TPM is refused by name there.
 vmhost_pkgs() {
     case "$1:$(uname -m)" in
-        deb:x86_64)  echo "qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients cloud-image-utils ovmf virtiofsd" ;;
-        deb:aarch64) echo "qemu-system-arm qemu-efi-aarch64 qemu-utils libvirt-daemon-system libvirt-clients cloud-image-utils virtiofsd" ;;
-        rhel:*)      echo "qemu-kvm qemu-img libvirt-daemon-kvm libvirt-client edk2-ovmf xorriso virtiofsd" ;;
-        arch:x86_64) echo "qemu-base libvirt dnsmasq edk2-ovmf libisoburn virtiofsd" ;;
-        suse:x86_64) echo "qemu-kvm libvirt-daemon-qemu libvirt-client qemu-ovmf-x86_64 xorriso virtiofsd" ;;
+        deb:x86_64)  echo "qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients cloud-image-utils ovmf virtiofsd swtpm swtpm-tools" ;;
+        deb:aarch64) echo "qemu-system-arm qemu-efi-aarch64 qemu-utils libvirt-daemon-system libvirt-clients cloud-image-utils virtiofsd swtpm swtpm-tools" ;;
+        rhel:*)      echo "qemu-kvm qemu-img libvirt-daemon-kvm libvirt-client edk2-ovmf xorriso virtiofsd swtpm swtpm-tools" ;;
+        arch:x86_64) echo "qemu-base libvirt dnsmasq edk2-ovmf libisoburn virtiofsd swtpm" ;;
+        suse:x86_64) echo "qemu-kvm libvirt-daemon-qemu libvirt-client qemu-ovmf-x86_64 xorriso virtiofsd swtpm" ;;
         alpine:x86_64) echo "qemu-system-x86_64 qemu-img libvirt-daemon libvirt-qemu ovmf xorriso dnsmasq virtiofsd" ;;
     esac
 }

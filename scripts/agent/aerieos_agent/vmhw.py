@@ -101,7 +101,7 @@ def host_hw(sys_root="/sys"):
                     "group": os.path.basename(os.readlink(link)) if os.path.islink(link) else "",
                     "driver": os.path.basename(os.readlink(drv)) if os.path.islink(drv) else "", "host": host})
     return {"cpus": pairs[:256], "usb": usb[:64], "pci": pci[:64], "iommu": bool(groups),
-            "bridges": bridges(sys_root), "vnets": vnets()}
+            "bridges": bridges(sys_root), "vnets": vnets(), "tpm": tpm_here()}
 
 
 # What a VM's interface can be (R219 step 4, as the old system's form
@@ -289,6 +289,18 @@ def usb_refresh(xml, kept, usb):
     return ET.tostring(root, encoding="unicode") if moved else None
 
 
+def tpm_here():
+    """Whether libvirt can give a VM a TPM here: swtpm and its setup tool."""
+    return bool(shutil.which("swtpm") and shutil.which("swtpm_setup"))
+
+
+def tpm_xml(machine=""):
+    """The TPM a VM is given: CRB on a q35 machine, TIS on an older one."""
+    el = ET.Element("tpm", model="tpm-crb" if "q35" in (machine or "q35") else "tpm-tis")
+    ET.SubElement(el, "backend", type="emulator", version="2.0")
+    return el
+
+
 def clean(hw, vcpus, mem_mb, project=""):
     """The record as it may be applied, or (None, why). `project`, where the
     job names it, is the one whose folder a shared folder must be in."""
@@ -318,6 +330,12 @@ def clean(hw, vcpus, mem_mb, project=""):
         if not MAC_RE.fullmatch(mac) or int(mac[:2], 16) & 1:
             return None, "a MAC is six pairs of hex digits, and not a multicast one"
         out["mac"] = mac
+    if hw.get("tpm") is not None:
+        # A TPM 2.0 emulated by swtpm, its state kept by libvirt with the
+        # domain: Windows 11 will not install without one.
+        if hw["tpm"] is True and not tpm_here():
+            return None, "this machine has no software TPM (swtpm); VM host, turned on again under its Features, installs it"
+        out["tpm"] = hw["tpm"] is True
     if hw.get("share") is not None:
         sh = hw["share"] if isinstance(hw["share"], dict) else {}
         if sh:
@@ -451,6 +469,12 @@ def apply(xml, hw, vcpus, mem_mb, lan="", network="", vbios_dir="", fsd=""):
             dev.remove(nic)
         else:
             dev.append(new)
+    if "tpm" in hw:
+        for old in dev.findall("tpm"):
+            dev.remove(old)
+        if hw["tpm"]:
+            t = root.find("os/type")
+            dev.append(tpm_xml(t.get("machine", "") if t is not None else ""))
     if "share" in hw:
         for old in dev.findall("filesystem"):
             dev.remove(old)
@@ -541,6 +565,7 @@ def read(xml):
                 devs.append({"type": "pci", "addr": "%s:%s:%s.%s" % tuple(str(a.get(k) or "0x0")[2:].zfill(w) for k, w in
                                                                          (("domain", 4), ("bus", 2), ("slot", 2), ("function", 1)))})
     out["devices"] = devs
+    out["tpm"] = root.find("devices/tpm") is not None
     return out
 
 
