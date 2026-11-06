@@ -969,6 +969,15 @@ def adopt(owner, people):
     return {"ok": True, "made": made, "skipped": skipped}
 
 
+def accounts_in_use():
+    """The accounts a person has made or used: any with a password or that
+    has signed in. One a stick's first boot made from the old system's share
+    users (adopt: no password, never seen) is not, so a controller carrying
+    only those is still a fresh one a move may land on (B715)."""
+    return sum(1 for u in load()["users"].values()
+               if isinstance(u, dict) and (u.get("password") or int(u.get("seen") or 0) > 0))
+
+
 # ---- SMB passwords (R164 step 1) ----
 # A share on the controller's own machine is reached as the account's own
 # Unix user there (bbu- and the id's hex, accounts.py), by the account's name

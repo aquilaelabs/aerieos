@@ -12863,7 +12863,7 @@ class Handler(BaseHTTPRequestHandler):
         # and on a stick only once the projects have a place on the disks.
         # A move lands only while this controller is first set up (the
         # operator, 6 Nov: never a merge into one in use).
-        fresh = len(users.all_users()) <= 1 and nodes.only_this_machine() and (not settings.get("setup_done") or bool(move.cut_landing()))
+        fresh = users.accounts_in_use() <= 1 and nodes.only_this_machine() and (not settings.get("setup_done") or bool(move.cut_landing()))
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
         owner = (users.account_of(me) or {}).get("role") == "owner"
@@ -13183,7 +13183,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
         if settings.get("setup_done") and not move.cut_landing():
             return self._json({"error": "a move lands only while a controller is first being set up: this one has finished its setup, and a move is never merged into a controller in use"}, 409)
-        if len(users.all_users()) > 1 or not nodes.only_this_machine():
+        if users.accounts_in_use() > 1 or not nodes.only_this_machine():
             return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
         where = Path(STATE)
         if nodes.on_stick():

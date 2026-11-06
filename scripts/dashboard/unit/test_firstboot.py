@@ -234,6 +234,18 @@ class Apply(unittest.TestCase):
         self.assertNotIn(NT, kept)
         self.assertEqual(firstboot.view()["waiting"][0]["what"], "shares")
 
+    def test_the_old_systems_people_leave_the_controller_fresh_for_a_move(self):
+        # B715: accounts the stick made from the old system's share users (no
+        # password, never signed in) are not in use; a move may still land.
+        firstboot.apply(str(self.handed))
+        self.assertGreater(len(users.all_users()), 1, "the plan's people are made")
+        self.assertEqual(users.accounts_in_use(), 1, "the owner alone is in use")
+        d = users.load()
+        other = next(n for n, u in d["users"].items() if u.get("role") != "owner")
+        d["users"][other]["seen"] = 1
+        users._save(d)
+        self.assertEqual(users.accounts_in_use(), 2, "one that has signed in is")
+
     def test_it_never_makes_an_owner_on_a_store_that_has_one(self):
         users.claim("first", "a long password")
         r = firstboot.apply(self.handed)
