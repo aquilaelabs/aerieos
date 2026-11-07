@@ -336,7 +336,14 @@ def pieces():
         if path and not str(path).startswith(str(STATE)):
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
-        out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
+        if os.access(SECRETS, os.R_OK | os.X_OK):
+            out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
+        else:
+            # Root's alone on a machine of its own: the dashboard cannot
+            # list it, and a walk of it carried nothing without a word (B728).
+            out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                        "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
+                                 "and ssh/ to the new home by hand, as root"})
     out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     return out

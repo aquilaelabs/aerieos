@@ -527,6 +527,17 @@ class Move(unittest.TestCase):
         self.assertFalse(move.tell_old(force=True), "the old address does not answer from here; told again next tick")
         self.assertIn("tell_error", move.restored())
 
+    def test_a_secrets_folder_the_dashboard_cannot_list_is_said_on_its_piece(self):
+        # B728: root's folder on a machine of its own was walked as empty,
+        # and the piece said nothing of it.
+        os.chmod(self.secrets, 0o100)
+        self.addCleanup(os.chmod, self.secrets, 0o700)
+        if os.access(self.secrets, os.R_OK):
+            self.skipTest("run as root: every folder reads")
+        pc = next(p for p in move.pieces() if p["key"] == "secrets")
+        self.assertFalse(pc["on"])
+        self.assertIn("root's alone here, so a bundle carries none of it", pc["about"])
+
     def test_the_pieces_say_their_sizes_and_the_ticks_hold(self):
         pcs = {p["key"]: p for p in move.pieces()}
         self.assertTrue(pcs["state"]["fixed"] and pcs["state"]["on"] and pcs["state"]["size"] > 0)
