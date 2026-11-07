@@ -122,9 +122,11 @@ function instState(r){
   return w("");
 }
 
-// The row's verbs: Remove where it is here (a pack's Remove is the
-// dialog's own, which asks where it is still installed), and a service's
-// Install once something is behind it.
+// The row's verbs: Update where its state says one is available, as the
+// Library's card has it (a row saying so with nothing to press was out of
+// step with it), Remove where it is here (a pack's Remove is the dialog's
+// own, which asks where it is still installed), and a service's Install
+// once something is behind it.
 function instActs(r, may){
   const a = (act, words, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} data-instact="${act}" data-instkind="${esc(r.kind)}" data-instname="${esc(r.name)}">${esc(words)}</button>`;
   if (r.running) return "";
@@ -132,8 +134,9 @@ function instActs(r, may){
     : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
-  if (r.kind === "pack" && r.pack) return `${a("edit", "Edit")}${r.installed ? a("remove", "Remove", "danger") : ""}`;
-  return r.installed ? a("remove", "Remove", "danger") : "";
+  const upd = r.installed && r.update ? a("update", "Update", "primary") : "";
+  if (r.kind === "pack" && r.pack) return `${upd}${a("edit", "Edit")}${r.installed ? a("remove", "Remove", "danger") : ""}`;
+  return r.installed ? `${upd}${a("remove", "Remove", "danger")}` : "";
 }
 
 // The open row: what the node knows of it, and what a person sets here.
@@ -397,6 +400,20 @@ async function instAct(b, act, kind, name){
     const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
     if (j.error) notify(j.error, true);
     else if (j.job) notify(`${act === "remove" ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build`);
+    await loadInstalled();
+    return;
+  }
+  if (act === "update"){
+    if (kind === "agent"){
+      if (!await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
+      busy(b, "Asking");
+      const j = await (await postJSON("/api/agents", {action: "install", node: instNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
+      if (j.error) notify(j.error, true);
+    } else {
+      busy(b, "Updating");
+      if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+      await tcAct("install", [r.name]);
+    }
     await loadInstalled();
     return;
   }

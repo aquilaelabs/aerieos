@@ -187,12 +187,14 @@ function phonePanel(n){
     // what a network flags as port scanning (the operator, 9 Oct).
     `<div class="row">
        <div class="grow name phstep">Connect</div>
-       <div class="grow setrow col ctlrow">${lbl("phIp", "Phone IP address", "from its wireless debugging screen, before the colon")}
+       <div class="grow prefrow ctlrow">
+         <div class="grow setrow col ctlrow">${lbl("phIp", "Phone IP address", "from its wireless debugging screen, before the colon")}
          <input id="phIp" maxlength="15" autocomplete="off"
          placeholder="192.168.0.10" value="${esc(phIp)}"${off ? " disabled" : ""}></div>
-       <div class="setrow col ctlrow">${lbl("phConnPort", "Port", "after the colon on the wireless debugging screen; it changes each time that is turned on")}
+         <div class="setrow col ctlrow">${lbl("phConnPort", "Port", "after the colon on the wireless debugging screen; it changes each time that is turned on")}
          <input id="phConnPort" maxlength="5" inputmode="numeric" autocomplete="off"
          placeholder="41235" value="${esc(phConnPort)}"${off ? " disabled" : ""}></div>
+       </div>
        <span class="acts"><button type="button" id="phConnect" class="primary"${off ? ' data-off="1"' : ""}${
          off || !phIp.trim() || !phConnPort.trim() ? " disabled" : ""} title="${offWhy}"
          >${dev ? "Reconnect" : "Connect"}</button></span>
