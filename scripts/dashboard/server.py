@@ -3055,6 +3055,38 @@ def newest_transcript(project_dir, uid=""):
     return next((f for _, f in sorted(files, key=lambda x: x[0], reverse=True) if transcripts.has_turn(f)), None)
 
 
+# The newest conversations, kept per project and account while the folders
+# they are read from have not changed (a conversation begun or removed moves
+# its folder's time), and for half a minute at most, so a conversation still
+# being written shows its time that late at worst. Read on every status
+# poll, for every project: the folders' globs were most of the poll's time.
+_LAST_KEEP_S = 30
+_last_kept = {}
+
+
+def _folders_seen(dirs):
+    out = []
+    for d in dirs:
+        try:
+            out.append((str(d), os.stat(d).st_mtime_ns))
+        except OSError:
+            out.append((str(d), 0))
+    return tuple(out)
+
+
+def _last_cached(kind, project_dir, uid, folders, read):
+    key = (kind, str(project_dir), uid)
+    seen, now = _folders_seen(folders), time.monotonic()
+    got = _last_kept.get(key)
+    if got and got[0] == seen and now - got[1] < _LAST_KEEP_S:
+        return got[2]
+    value = read()
+    if len(_last_kept) > 4096:
+        _last_kept.clear()
+    _last_kept[key] = (seen, now, value)
+    return value
+
+
 def last_claude(project_dir, uid=""):
     """The most recent Claude transcript for a working directory, or None.
 
@@ -3064,10 +3096,18 @@ def last_claude(project_dir, uid=""):
     is a link onto the projects share (lib/common.sh's claude_projects_link),
     so this reads what a session on a node wrote.
     """
-    newest = newest_transcript(project_dir, uid)
-    if newest is None:
-        return None
-    return {"id": newest.stem, "when": int(newest.stat().st_mtime)}
+    folders = transcripts.dirs(uid, Path(str(project_dir)).name) if uid else [CLAUDE_PROJECTS / str(project_dir).replace("/", "-")]
+
+    def read():
+        newest = newest_transcript(project_dir, uid)
+        if newest is None:
+            return None
+        try:
+            return {"id": newest.stem, "when": int(newest.stat().st_mtime)}
+        except OSError:
+            return None
+    got = _last_cached("claude", project_dir, uid, folders, read)
+    return dict(got) if got else None
 
 
 def last_agents(project_dir, uid=""):
@@ -3076,18 +3116,26 @@ def last_agents(project_dir, uid=""):
     folder its Stop hook copies a session's log into (transcripts.py)."""
     if not uid:
         return {}
-    out = {}
-    for d in transcripts.dirs(uid, Path(str(project_dir)).name):
-        for a in transcripts.OTHER_AGENTS:
-            try:
-                files = [f for f in (d / a).glob("*.jsonl") if f.is_file()]
-            except OSError:
-                continue
-            for f in files:
-                when = int(f.stat().st_mtime)
-                if when > (out.get(a) or {}).get("when", 0):
-                    out[a] = {"id": f.stem, "when": when}
-    return out
+    roots = transcripts.dirs(uid, Path(str(project_dir)).name)
+
+    def read():
+        out = {}
+        for d in roots:
+            for a in transcripts.OTHER_AGENTS:
+                try:
+                    files = [f for f in (d / a).glob("*.jsonl") if f.is_file()]
+                except OSError:
+                    continue
+                for f in files:
+                    try:
+                        when = int(f.stat().st_mtime)
+                    except OSError:
+                        continue
+                    if when > (out.get(a) or {}).get("when", 0):
+                        out[a] = {"id": f.stem, "when": when}
+        return out
+    folders = [d / a for d in roots for a in transcripts.OTHER_AGENTS]
+    return {k: dict(v) for k, v in _last_cached("agents", project_dir, uid, folders, read).items()}
 
 
 MODEL_FAMILY = re.compile(r'"model"\s*:\s*"claude-(opus|sonnet|haiku|fable)')

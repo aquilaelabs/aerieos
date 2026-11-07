@@ -70,7 +70,21 @@ function libPick(){
   return live.find(n => n.id === want) || null;
 }
 
+// A read for a node already on its way is shared by the calls that come in
+// while it has only just set out: a rail press, the tab's open and the
+// revisions poll each asked at once, and the page waited on three reads
+// where one would do. A call later than that reads again, so nothing it
+// was asked about is missed.
+let libFlight = null;
 async function loadLibrary(){
+  if (libFlight && libFlight.node === libNode && Date.now() - libFlight.at < 500) return libFlight.p;
+  const flight = {node: libNode, at: Date.now(), p: null};
+  libFlight = flight;
+  flight.p = loadLibraryNow().finally(() => { if (libFlight === flight) libFlight = null; });
+  return flight.p;
+}
+
+async function loadLibraryNow(){
   const asked = ++libSeq;
   if (nodesList === null || nodesStale) await loadNodes();
   if (asked !== libSeq) return;
