@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020)
+
+### Fixed
+
+- A controller whose secrets folder is root's alone (every install on a machine of its own, a stick included, and a container whose secrets folder is closed as the install guide says) could not reach the install key it made there, so it sealed nothing and a move carrying the old controller's key stopped at landing with permission denied (ee7e020)
+
+### Upgrading
+
+- Such a controller seals what it kept open at its first start on this release; nothing is asked of you (ee7e020)
+
 ## 0.9.0-dev.5065: 2026-11-07
 
 ### Changed
