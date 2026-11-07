@@ -212,8 +212,19 @@ note_owners() {
         printf 'chmod %s .\n' "$mode"
         printf 'rm -f -- %q\n' "$GIVE_BACK"
     } > "$s.new" || { rm -f "$s.new"; echo "system-pool: could not write in $f, so it stays as it is" >&2; return 2; }
+    # The copy Let it go runs as root is root's own, outside the folder: the
+    # one in it is handed to the controller's account with the rest, and
+    # anything running as that account could add to it (B719). It goes into
+    # the folder by its path, not its own place.
+    local own; own="$(give_back_of "$f")"
+    mkdir -p "$(dirname "$own")"; chmod 0700 "$(dirname "$own")"
+    { printf '#!/bin/bash\nset -e\ncd -- %q\n' "$f"; sed '1,/^cd /d' "$s.new"; } > "$own.new" \
+        || { rm -f "$s.new" "$own.new"; echo "system-pool: could not keep the give-back beside the system, so $f stays as it is" >&2; return 2; }
+    chmod 0700 "$own.new"; mv -f "$own.new" "$own"
     mv -f "$s.new" "$s"
 }
+# Where root keeps the give-back of folder $1.
+give_back_of() { printf '%s/give-back/%s.sh\n' "$WORK" "$(printf '%s' "$1" | sha256sum | cut -c1-16)"; }
 
 set_projects() {
     local f="${1:-}"; shift || true
@@ -283,9 +294,14 @@ release_projects() {
     fi
     rm -f "$PFILE"
     echo "system-pool: $f is no longer the spaces folder; its files stay where they are"
-    if [ -f "$f/$GIVE_BACK" ]; then
-        if bash "$f/$GIVE_BACK"; then echo "system-pool: $f is given back to who had it"
-        else echo "system-pool: $f could not be given back: run bash $f/$GIVE_BACK as root" >&2; fi
+    local own; own="$(give_back_of "$f")"
+    if [ -f "$own" ]; then
+        if bash "$own"; then echo "system-pool: $f is given back to who had it"; rm -f "$own"
+        else echo "system-pool: $f could not be given back: run bash $own as root" >&2; fi
+    elif [ -f "$f/$GIVE_BACK" ]; then
+        # Only the folder's own copy, which its files' owner could have
+        # changed: never run as root here, said instead.
+        echo "system-pool: $f has its give-back inside it only ($GIVE_BACK): read it, then run it as root to give the folder back" >&2
     fi
     local p; p="$(pool || true)"
     if [ -n "$p" ] && mounted "$p" && [ -z "${BB_SP_NO_MOUNT:-}" ]; then
@@ -302,6 +318,15 @@ set_pool() {
     stick || { echo "system-pool: only a stick boot takes a system pool" >&2; return 2; }
     case "$p" in /*) ;; *) echo "system-pool: a pool is named by its mount point" >&2; return 2 ;; esac
     mounted "$p" || { echo "system-pool: $p is not a mounted pool" >&2; return 2; }
+    # A pool is a disk's: the stick's own root (/, in memory on a stick) or
+    # any folder of memory would take the system's data and lose it at the
+    # next boot (B719).
+    local fst="${BB_SP_FSTYPE:-}"
+    [ -n "$fst" ] || [ -n "${BB_SP_MOUNTED:-}" ] || fst="$(findmnt -rn -o FSTYPE --target "$p" 2>/dev/null || echo unknown)"
+    case "$fst" in
+        tmpfs|ramfs|overlay|squashfs|devtmpfs|proc|sysfs|unknown)
+            echo "system-pool: $p is not on a disk (memory, or the system's own image): name a pool on the machine's disks" >&2; return 2 ;;
+    esac
     local var_src p_src
     var_src="$(findmnt -rn -o SOURCE --target "${BB_SP_VAR:-/var}" 2>/dev/null || true)"
     p_src="$(findmnt -rn -o SOURCE --target "$p" 2>/dev/null || true)"

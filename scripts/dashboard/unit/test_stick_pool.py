@@ -151,6 +151,14 @@ class TheImage(unittest.TestCase):
                 self.assertEqual(read(d, "pool2", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
                 # ...and set again by the same install, holding its own data now.
                 self.assertEqual(self.tool(d, "set", f"{d}/pool2").returncode, 0)
+                # A pool in memory (the stick's own root, a tmpfs) is never one (B719).
+                os.makedirs(f"{d}/pool3")
+                for fst in ("tmpfs", "overlay"):
+                    with mock.patch.dict(os.environ, {"BB_SP_FSTYPE": fst}):
+                        r = self.tool(d, "set", f"{d}/pool3")
+                    self.assertEqual(r.returncode, 2, fst)
+                    self.assertIn("is not on a disk", r.stderr)
+                    self.assertFalse(os.path.exists(f"{d}/pool3/aerieos-system"), "nothing moved")
 
     def test_the_projects_are_held_until_they_have_a_place_on_the_disks(self):
         # The operator, 1 Nov: never on the stick, on any stick.
@@ -220,7 +228,12 @@ class TheImage(unittest.TestCase):
             self.assertIn(f"chmod {oct(was)[2:]} .", said)
             self.assertIn(back, run("projects", share).stdout)
             os.chmod(share, 0o750)
+            # The folder's copy is its files' owner's to change: what is
+            # added there never runs as root (B719).
+            with open(back, "a") as f:
+                f.write(f"touch {d}/ran-as-root\n")
             r = run("projects", "--release")
+            self.assertFalse(os.path.exists(f"{d}/ran-as-root"), "Let it go runs root's own copy, never the folder's")
             self.assertIn("no longer the spaces folder; its files stay", r.stdout)
             self.assertIn("given back to who had it", r.stdout)
             self.assertEqual(os.stat(share).st_mode & 0o7777, was)
