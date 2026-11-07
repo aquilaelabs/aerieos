@@ -138,7 +138,7 @@ function wireOlderVersions(root){
 // what writes all day (docker, the VMs, the toolchains, the projects) is on
 // the system pool picked here, or waits for one. What still lives on the
 // stick and what it has written, in the facts voice.
-const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces"};
+const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces", secrets: "the secrets and the install key"};
 // The system pool's picker: The stick's own, and the first-run walk's.
 function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
   // An adopted pool counts whatever its filesystem (B663): the census's
@@ -174,7 +174,7 @@ function stickSection(n){
   ];
   const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. The secrets and the install key go there too, so the stick alone opens nothing. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -219,7 +219,7 @@ function wireStick(root){
   b.onclick = () => pressing(b, async () => {
     const path = sel.value;
     if (!path) return notify("pick a pool first", true);
-    if (!await askYes(`Put docker, the VMs, the toolchains and the spaces on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, and the stick keeps the configuration alone.`,
+    if (!await askYes(`Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
         {title: "Use this pool?", verb: "Move"})) return;
     busy(b, "Moving");
     const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path})).json().catch(() => ({error: "no answer"}));

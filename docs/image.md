@@ -79,10 +79,14 @@ controller's own logs and the journal are kept in memory, so they start
 again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
 containers, the VMs, the toolchains and the spaces, lives on a **system
-pool**: picked under This machine's **Pool and spaces** from the pools and the
+pool**, and so does the secrets folder with the install key, so the stick
+alone opens nothing the controller sealed: picked under This machine's **Pool and spaces** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
-picked, docker and the VMs wait, and the spaces are held: the spaces
+picked, docker and the VMs wait, and the spaces are held (the secrets stay
+on the stick until a pool is picked; once one is, a boot where it is not
+mounted holds the secrets folder empty, makes no key, and restarts the
+controller when the pool mounts): the spaces
 folder is an empty read-only mount of its own, no space is made, cloned
 or moved in, and they are never written to the stick. **Pool and spaces**
 also says what still lives on the stick and how much has been written to it,

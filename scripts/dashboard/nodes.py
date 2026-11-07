@@ -1800,7 +1800,7 @@ def _census(c):
         kb = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None  # noqa: E731
         out["os_stick"] = {"stick": True, "pool": str(s.get("pool") or "")[:200] if str(s.get("pool") or "").startswith("/") else "",
                            "ready": s.get("ready") is True,
-                           "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects")],
+                           "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects", "secrets")],
                            "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb")),
                            # A folder of the machine's own as the projects folder (R163).
                            "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",

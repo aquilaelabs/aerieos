@@ -91,9 +91,10 @@ install_key_file() {
 install_key_adopt() {
     local key="$1" prev="$2" dir="$BB_SECRETS_DIR/install-key"
     export BB_INSTALL_KEY_ADOPTED=no
-    if ! [ -d "$BB_SECRETS_DIR" ] || ! [ -w "$BB_SECRETS_DIR" ]; then
+    if ! [ -d "$BB_SECRETS_DIR" ] || ! [ -w "$BB_SECRETS_DIR" ] || secrets_held; then
         return 0
     fi
+    secrets_enterable
     mkdir -p "$dir" || return 0
     if [ ! -s "$dir/key" ]; then
         ( umask 077; printf '%s' "$key" > "$dir/key" ) || return 0
@@ -113,6 +114,22 @@ install_key_adopt() {
     fi
 }
 
+# The key folder sits inside the secrets folder, which is root's: the
+# controller's account may pass through it to its own key folder, and may not
+# list it or open anything else there (the *.env files and ssh/ stay root's
+# alone). With the folder 0700 the dashboard could not reach its key at all,
+# so nothing was sealed and a landing could not take the key it carried.
+secrets_enterable() {
+    local g="${PGID:-}"
+    [ -n "$g" ] || g="$(id -g "$BB_ACCOUNT" 2>/dev/null)" || return 0
+    { chgrp "$g" "$BB_SECRETS_DIR" && chmod 0710 "$BB_SECRETS_DIR"; } 2>/dev/null \
+        || warn "install key: ${BB_SECRETS_DIR} could not be opened to ${BB_ACCOUNT} for its key folder, so the dashboard may not reach the key"
+}
+
+# On a stick whose system pool is not mounted yet, the secrets folder is held
+# empty and read only (usr/lib/aerieos-os/system-pool) until it is.
+secrets_held() { [ -e "$BB_SECRETS_DIR/.aerieos-held" ]; }
+
 # With no INSTALL_KEY set, the install makes its own (R154) and the page
 # changes it: a key folder only the controller's account reads, in the
 # secrets folder when root may write there, else beside the state, which
@@ -122,8 +139,16 @@ install_key_adopt() {
 install_key_made() {
     local state="${DASHBOARD_STATE:-/config}" dir in=secrets
     local spare="$state/.install-key"
+    if secrets_held; then
+        # Neither made nor looked for beside the state: one made now would
+        # take the place of the key on the pool, and what is sealed under
+        # that would stay shut once the pool is back.
+        warn "install key: the secrets folder waits for the system pool, so nothing is sealed or opened until it mounts; the controller starts again then"
+        return 0
+    fi
     if [ -d "$BB_SECRETS_DIR" ] && [ -w "$BB_SECRETS_DIR" ]; then
         dir="$BB_SECRETS_DIR/install-key"
+        secrets_enterable
     else
         dir="$spare" in=state
     fi

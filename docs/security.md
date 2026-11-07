@@ -30,7 +30,14 @@ controller can; nobody else reads anything whole.
 
 **The install key** (`BB_SECRETS_DIR/install-key`, or `/config/.install-key`
 where there is no secrets folder; made at the first start, changed from the
-Keys page). Everything the controller keeps sealed is sealed under a key
+Keys page). The secrets folder is root's: the controller's account may pass
+through it to its own key folder (mode 0710, the account's group), and may
+not list it or read the `*.env` files and `ssh/` beside the key. On a stick
+the whole secrets folder lives on the system pool once one is picked, so the
+stick alone, lost or taken, carries the sealed state without the key that
+opens it; while that pool is not mounted the folder is held empty and the
+controller starts with nothing sealed or opened, then starts again when the
+pool mounts. Everything the controller keeps sealed is sealed under a key
 derived from it: the accounts' keys, the signing keys, two-factor secrets,
 the deploy keys' passphrases, a space's own git line from before 0.8.0.
 
@@ -38,7 +45,8 @@ the deploy keys' passphrases, a space's own git line from before 0.8.0.
   restored on another machine (refused until the key is given), an
   operator of the share the state lives on.
 - Does not protect against: root on the running controller, who reads the
-  key where the controller does; a secrets folder copied along with
+  key where the controller does; the stick and its pool's disks taken
+  together; a secrets folder copied along with
   `/config`, which is why the key belongs in a folder the state is not in.
 
 **An account's key** (`account-keys.json`, sealed under the install key).

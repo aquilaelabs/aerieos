@@ -26,7 +26,7 @@
 #   /opt/aerieos                  -> /opt/aerieos-releases/VERSION, root's
 #   /etc/aerieos-controller/      root:builderbot 0750
 #     controller.env                 the settings, root:builderbot 0640
-#     secrets/                       *.env and ssh/, root's alone (0700)
+#     secrets/                       *.env and ssh/, root's alone; the account passes through (0710) to install-key/, its own
 #   /var/lib/aerieos-controller/  root:builderbot 0750
 #     config/ home/ sdk/             the state, the home, the toolchain store: the account's, 0700
 #   /srv/aerieos/projects         the projects (--workspace), the account's

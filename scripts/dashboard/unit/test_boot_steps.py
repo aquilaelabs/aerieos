@@ -241,6 +241,33 @@ class MadeKey(unittest.TestCase):
         self.assertEqual(open(kf).read(), key)
         self.assertFalse(os.path.exists(os.path.join(st, ".install-key")))
 
+    def test_secrets_held_for_their_pool_make_no_key_anywhere(self):
+        # A stick whose pool is not mounted holds the secrets folder empty:
+        # a key made now, there or beside the state, would replace the one
+        # on the pool and leave what it sealed shut.
+        d = tempfile.mkdtemp()
+        sec, st = os.path.join(d, "secrets"), os.path.join(d, "config")
+        os.makedirs(sec)
+        os.makedirs(st)
+        open(os.path.join(sec, ".aerieos-held"), "w").close()
+        r = sh('BB_ACCOUNT=$(id -un); install_key_made; echo "in=${BB_INSTALL_KEY_IN:-}"',
+               {"BB_SECRETS_DIR": sec, "DASHBOARD_STATE": st})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.splitlines()[-1], "in=")
+        self.assertIn("waits for the system pool", r.stdout + r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(sec, "install-key")))
+        self.assertFalse(os.path.exists(os.path.join(st, ".install-key")))
+
+    def test_the_account_may_enter_the_secrets_folder_and_not_list_it(self):
+        # Root's 0700 folder kept the dashboard from its own key folder in it.
+        d = tempfile.mkdtemp()
+        sec, st = os.path.join(d, "secrets"), os.path.join(d, "config")
+        os.makedirs(sec, mode=0o700)
+        os.makedirs(st)
+        self.run_it(sec, st)
+        self.assertEqual(os.stat(sec).st_mode & 0o777, 0o710)
+        self.assertEqual(os.stat(sec).st_gid, os.getgid())
+
     def adopt(self, sec, env):
         d = tempfile.mkdtemp()
         body = (f'eval "$(declare -f install_key_file | sed "s#/run/builderbot-key#{d}/key#")"\n'
