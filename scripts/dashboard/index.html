@@ -3138,6 +3138,10 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .nb .nbview[data-view="wiki"]>.nbhead{flex-wrap:wrap}
 .nb .nbview[data-view="wiki"]>.nbhead>#wkNetState{flex:1 1 12rem;min-width:0;overflow-wrap:anywhere}
 .nb .nbhead>.nbsaidslot:empty{display:none}
+/* A view toggle before the status line (the Docker view's Cards and List)
+   leaves it a sliver between itself and the buttons on a phone: there it
+   takes a line of its own under them, the toggle and the buttons on one. */
+@media (max-width:600px){.nb .nbhead>.pseg~.nbsaidslot:not(:empty),.nb .nbhead>#dkSeg:not(:empty)~.nbsaidslot:not(:empty){order:5;flex:1 1 100%}}
 /* On the git host's Allow and Deny: wide enough for the word, which was
    cut to "allov" beside a long ability's two lines. */
 .permhost .row>.pick{flex:0 0 auto}
