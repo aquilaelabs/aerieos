@@ -1255,6 +1255,12 @@ def _project_cards(who, ps):
     return out
 
 
+def _tpart(name, fn, *a):
+    """fn(*a), its time added to the request's part `name` (timing.py)."""
+    with timing.timed(name):
+        return fn(*a)
+
+
 def _project_columns(who, facts):
     """The row the page reads for each project _projects_on_disk found: its
     facts, and everything else a row carries. The project's own settings
@@ -1437,7 +1443,7 @@ def _project_columns(who, facts):
                     # Any model through a router (R144): the models the
                     # router allows this project, with their context and
                     # price, and what the project has spent through it.
-                    "router": _router_row(d.name),
+                    "router": _tpart("projects:router", _router_row, d.name),
                     # Whether a commit here would carry an author, asked WITH
                     # the override: somebody whose Profile has no email can
                     # still set one for this project, and then a session may
@@ -1446,39 +1452,39 @@ def _project_columns(who, facts):
                     # nothing is committed there.
                     "git_ready": True if f.get("work") else _row_git_ready(base_git, mine_prefs.get(d.name))
                                  if users.uid_of(who) else True,
-                    "push_how": projects.push_how(d.name),
+                    "push_how": _tpart("projects:push_how", projects.push_how, d.name),
                     # Whether its settings are this account's to change (B19):
                     # the page locks them, with the reason, where not.
-                    "may_settings": not users.may(who, "settings", d.name) if who else True,
+                    "may_settings": not _tpart("projects:may", users.may, who, "settings", d.name) if who else True,
                     # ...and the reason where not, which the Snapshots and
                     # Running sessions sections say without asking for what
                     # they would only be refused (B89).
-                    "settings_why": users.may(who, "settings", d.name) if who else "",
+                    "settings_why": _tpart("projects:may", users.may, who, "settings", d.name) if who else "",
                     # ...and why its notebook, its tree and the project itself
                     # are not this account's to change, or "" (B86): a role
                     # that gives Projects Read alone sees the page with every
                     # writing control dead and this said under it, rather
                     # than each refused only at the press.
-                    "write_why": users.may(who, "write", d.name) if who else "",
-                    "trash_why": users.may(who, "trash", d.name) if who else "",
+                    "write_why": _tpart("projects:may", users.may, who, "write", d.name) if who else "",
+                    "trash_why": _tpart("projects:may", users.may, who, "trash", d.name) if who else "",
                     # ...and why its version is not this account's to move or
                     # release (Releases and versions Write), for the
                     # Artifacts view's bumps, Release and Set (B101).
-                    "release_why": users.may(who, "version", d.name) if who else "",
+                    "release_why": _tpart("projects:may", users.may, who, "version", d.name) if who else "",
                     # Whether this project has a compose file, which is the
                     # same question as "could its tests run in a container of
                     # its own": the settings dialog offers that choice only
                     # where there is something to run in (R68 step 6).
-                    "has_compose": devapp.project_has_compose(d.name),
+                    "has_compose": _tpart("projects:compose", devapp.project_has_compose, d.name),
                     # The newest transcript, read through the home's link
                     # onto the projects share (lib/common.sh's
                     # claude_projects_link), so a conversation a node's
                     # session had is offered here and continued there.
-                    "last_claude": last_claude(d, users.uid_of(who)),
+                    "last_claude": _tpart("projects:last_claude", last_claude, d, users.uid_of(who)),
                     # ...and each other coding agent's newest, for its own
                     # Resume in the chooser (the operator, 23 Oct: a ChatGPT
                     # conversation was there and nothing offered it back).
-                    "last_agents": last_agents(d, users.uid_of(who)),
+                    "last_agents": _tpart("projects:last_agents", last_agents, d, users.uid_of(who)),
                     # Where this project's sessions run (roadmap #24): the
                     # node's name, or "" for here, and why the button is
                     # dead when its node cannot take one. The proxy decides
@@ -1499,7 +1505,7 @@ def _project_columns(who, facts):
                     # {since, cmd, by}, or null. The companion app times
                     # its turn note by it and the project's During-a-test-run
                     # setting.
-                    "testing": testreg.running(d.name),
+                    "testing": _tpart("projects:testing", testreg.running, d.name),
                     "rules": rule_counts.get(d.name, 0),
                     "pending": pend_counts.get(d.name, 0),
                     # Why nothing routed to this project's node runs right
@@ -1528,7 +1534,7 @@ def _project_columns(who, facts):
                         project_prefs.get(d.name, {}).get("node") or "", "")
                     # ...or its map is still building (mapping.py): the
                     # same ghosting, for the seconds it takes.
-                    or mapping.held(d.name),
+                    or _tpart("projects:mapping", mapping.held, d.name),
                     "issues": issues})
     return out
 
