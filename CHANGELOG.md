@@ -5,6 +5,8 @@
 ### Changed
 
 - On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020, 5fb699a)
+- Pages open faster: the status read every page waits on takes about a third of the time it did (the newest conversations and the roles are no longer read again on every poll), Controller settings measures what a move would carry side by side, the Library reads once when it opens, and a pointer resting on Containers or Build reads ahead what that page shows first (5897793, 31e5ea6, 2b03cbc, dee915b)
+- Profile waits with every section it always has, and a person's roles on the Users page wait in their places, so nothing grows in after the page has drawn (e3d8adb)
 
 ### Fixed
 
@@ -15,6 +17,10 @@
 - A session's commit after a command the controller ran for it (a release's changelog section, a pull) no longer carries the old files back over what the controller committed (e9c1fef)
 - A release keeps a changelog line's commit when the line was committed on its own right after its change (4108ed5)
 - aerie settings names the hosting-only nodes ticked under Also works on (2daf041)
+- The dock's tab on show, pressed, puts the dock down on the first press, also after a click in the page above (42d145c)
+- An OS update takes the configuration's copy before anything else and stops when it cannot; a slot whose write was cut short reads as empty rather than as its old version, which the next update would have kept in place of the good copy; and the older slot picked by hand from the boot menu takes back its own configuration when a newer build wrote the one there, where its controller sat refusing to start (7c9c50c)
+- A new OS image's boot menu goes on only once the health check marks its slot good, so a release with a broken menu cannot take away the way back to the slot before (6659f2a)
+- Visiting an older version is refused while an update is on trial, which the visit would have spent a boot of or ended (84e5f03)
 
 ### Security
 
