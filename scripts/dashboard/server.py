@@ -3064,26 +3064,36 @@ _LAST_KEEP_S = 30
 _last_kept = {}
 
 
-def _folders_seen(dirs):
+def _times(paths):
     out = []
-    for d in dirs:
+    for d in paths:
         try:
-            out.append((str(d), os.stat(d).st_mtime_ns))
+            out.append(os.stat(d).st_mtime_ns)
         except OSError:
-            out.append((str(d), 0))
+            out.append(0)
     return tuple(out)
 
 
 def _last_cached(kind, project_dir, uid, folders, read):
+    """read(), kept while the account's transcripts folder and the folders
+    under it that existed at the last read keep their times: a folder made
+    moves the first, a conversation begun or removed moves its own. The
+    candidates are a hundred or so per space (every agent and slot), on the
+    projects share, and statting each on every poll was the cost itself."""
     key = (kind, str(project_dir), uid)
-    seen, now = _folders_seen(folders), time.monotonic()
+    now = time.monotonic()
     got = _last_kept.get(key)
-    if got and got[0] == seen and now - got[1] < _LAST_KEEP_S:
+    if got and now - got[1] < _LAST_KEEP_S and _times(got[3]) == got[0]:
         return got[2]
+    folders = {Path(f) for f in folders}
+    cands = folders | {f.parent for f in folders}
+    tops = {c.parent for c in cands} - cands
+    watch = sorted({str(t) for t in tops} | {str(c) for c in cands if c.is_dir()})
+    seen = _times(watch)
     value = read()
     if len(_last_kept) > 4096:
         _last_kept.clear()
-    _last_kept[key] = (seen, now, value)
+    _last_kept[key] = (seen, now, value, watch)
     return value
 
 
