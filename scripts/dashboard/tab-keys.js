@@ -224,7 +224,13 @@ function keyStoreHeld(m){
 }
 
 function keyMineSection(){
-  if (keyMine === null){ if (!keyMineAsked) loadKeyMine(); return ""; }
+  // Its two sections in their places while the store is read, so they do
+  // not arrive after the rest of Profile.
+  if (keyMine === null){
+    if (!keyMineAsked) loadKeyMine();
+    return docSection("profile", "mykey", "Your key store", "", `<div class="field loading">${skRows(2)}</div>`)
+      + docSection("profile", "uses", "Uses of your tokens", "", `<div class="field loading">${skRows(1)}</div>`);
+  }
   const m = keyMine;
   if (m.error || !m.sealing) return "";
   const forgesHtml = (m.forges || []).length
