@@ -1235,7 +1235,10 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 marker.unlink()
             if swapped:
                 for p in list(state_dir.iterdir()):
-                    if p.name.startswith(NEVER_PACKED) or p == work:
+                    # A mount point stayed where it was through the swap (its
+                    # rename refused): what it holds is this controller's, and
+                    # is never deleted on the way back (B725).
+                    if p.name.startswith(NEVER_PACKED) or p == work or os.path.ismount(p):
                         continue
                     if p.is_dir() and not p.is_symlink():
                         shutil.rmtree(p, ignore_errors=True)
