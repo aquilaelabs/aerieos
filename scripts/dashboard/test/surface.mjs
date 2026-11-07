@@ -100,7 +100,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'renderDoc', 'renderDockerInto', 'renderGuarded', 'typingIn', 'typingBack', 'renderJobsInto', 'renderNodesInto', 'renderNotebookInto', 'renderSettingsInto',
   'renderProjectsInto', 'repoOfUrl',
   // The Library (R170): its functions (a let or a const is no property of the window).
-  'openLibrary', 'openLibraryOn', 'libPick', 'loadLibrary', 'loadLibraryNow', 'libMatch', 'libPills', 'libState', 'libActs', 'libDetail', 'libRow',
+  'openLibrary', 'openLibraryOn', 'libPick', 'loadLibrary', 'loadLibraryNow', 'railWarm', 'dockerWarm', 'libMatch', 'libPills', 'libState', 'libActs', 'libDetail', 'libRow',
   'libFilterBand', 'libSections', 'renderLibraryInto', 'wireLibrary', 'keepFocus', 'libWithToolchains', 'libAct', 'libLook', 'libDriverPick',
   'openNewContainerApp', 'tpAppHtml', 'tpAppSeen', 'tpAppLook', 'tpOpenApp', 'tpWhatHtml', 'openInstalledTab', 'openInstalledOn', 'instPick', 'loadInstalled', 'instHere', 'instState', 'instActs', 'instConfigField', 'instConfigForm', 'instConfigRead', 'instServiceLines', 'instRow', 'renderInstalledInto', 'wireInstalled', 'instAct',
   'reschedRevs', 'rnDrawAuth', 'rnDrawKey', 'rnDrawStore', 'rnKeyAct', 'drawSetup', 'setupCard', 'setupWalking', 'setupWalkArrive', 'setupPlaceSig', 'setupPlaceCard', 'setupPlaceAuto', 'setupInTurn', 'setupSharesCard', 'setupWalkPick', 'setupLandLoad', 'setupWalkSig', 'setupBootBack', 'setupWalkHtml', 'stickPoolPick', 'adoptParts', 'moveLandBox', 'setupFinish', 'setupNeeded', 'setupNode', 'setupOwn',

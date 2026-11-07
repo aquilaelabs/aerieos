@@ -161,6 +161,22 @@ function dmBootLoad(u){
   loadDocker();
 }
 
+// The node's list read ahead while a pointer rests on the rail's
+// Containers, into the cache the page draws from while its own read is out
+// (dockerSeen): the first open waited the node's whole answer (a second or
+// so, through its agent) on the placeholder. Once a node, and not while
+// the page is reading already.
+let dockerWarmAt = 0;
+function dockerWarm(){
+  const node = dockerNode || "";
+  if (dockerSeen[node] || dockerFetching || Date.now() - dockerWarmAt < 10000) return;
+  dockerWarmAt = Date.now();
+  fetch("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))
+    .then(r => r.ok ? r.json() : null)
+    .then(got => { if (got && !got.error){ const k = got.node || node; if (!dockerSeen[k]) dockerSeen[k] = got; if (!node && !dockerSeen[""]) dockerSeen[""] = got; } })
+    .catch(() => {});
+}
+
 let dockerAsk = 0;                       // which ask is newest, so an older
                                          // answer landing late cannot win
 let dockerFetching = false;        // an answer is on its way: the tab says so

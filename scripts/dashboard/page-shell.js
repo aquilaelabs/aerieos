@@ -144,6 +144,11 @@ const OPENERS = {
   // group's first page): Scanners, Audit, This machine and Network.
   scanners: () => openScannersTab(), audit: () => openAuditTab(), machine: () => openMachineTab(), network: () => openNetworkTab(),
 };
+function railWarm(key){
+  if (key === "containers" && typeof dockerWarm === "function") dockerWarm();
+  else if (key === "build" && typeof loadLibrary === "function" && !lib) loadLibrary();
+}
+
 function railGo(key, tool){
   const g = RAIL.find(x => x.key === key);
   if (!g) return;
@@ -340,7 +345,12 @@ function drawRail(){
   // attributes, an entity), it never matched, and the rail was rebuilt on
   // every draw with the pointer on it (R218 step 10).
   if (paint(rail, html, true)){
-    rail.querySelectorAll("[data-rail]").forEach(b => b.onclick = () => railGo(b.dataset.rail));
+    rail.querySelectorAll("[data-rail]").forEach(b => {
+      b.onclick = () => railGo(b.dataset.rail);
+      // A pointer resting on a group reads ahead what its page waits on
+      // first, so the press opens on it (a mouse only: a touch is the press).
+      b.onpointerenter = e => { if (e.pointerType === "mouse") railWarm(b.dataset.rail); };
+    });
   }
   // ...and the bar beside the group on show slides to the one pressed.
   slideMark(rail, "rail", true);
