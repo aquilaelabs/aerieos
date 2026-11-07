@@ -105,9 +105,12 @@ spaces folder held before stays underneath, unseen, until **Let it go**
 binds the pool's again.
 
 The system that had the folder cannot read it after that, so it is given back
-before going back. Who had it is written in the folder first, as
-`.aerieos-give-back.sh`, and **Let it go** runs that. It stays with the disks, so
-from the old system, as root, the same is `bash FOLDER/.aerieos-give-back.sh`.
+before going back. Who had it is written down first: a copy the machine keeps
+for itself, which **Let it go** runs, and `.aerieos-give-back.sh` in the folder,
+which stays with the disks, so from the old system, as root, the same is
+`bash FOLDER/.aerieos-give-back.sh`. The folder's copy belongs to the
+controller's account with the rest of the folder, so read it before running
+it; **Let it go** never runs that one.
 
 **A move onto a stick lands last,** since it would otherwise land on the stick.
 The first page asks whether you are moving a controller here. Say yes and make
@@ -308,6 +311,17 @@ file lands on the first pool that holds its share's folder and on the data
 disks where none does, so the agent keeps each share's folder where it
 lands and removes its empty folders elsewhere; a folder with anything in it
 is never touched.
+
+The takeover finds the old parity disk by the serial the adoption read, never
+by its device name, which a reboot or a stick plugged in can give another
+disk, and stops before writing anything unless every data disk is mounted.
+The mover moves a file only when both its places are mounted (an empty
+mount point is the stick's memory), leaves one whose path is already on the
+other side, one a program holds open and one written in the last ten
+minutes for its next run, and never follows a share folder that is a link.
+A sync, scrub or parity check is refused while any disk of the array is not
+mounted.
+
 **Going back to the old system** on This machine says the way back for the
 state the disks are in: nothing to do while they are read-only, a parity
 check there once they were written to, and a new configuration with its

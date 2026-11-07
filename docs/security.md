@@ -172,11 +172,11 @@ sessions, which run as their account's own user in a view of their own
 |---|---|
 | 2, TLS | someone on the LAN reading the page's traffic, a session cookie or a token typed into a form; http stays a choice for an install with no CA, said on the page with what then crosses in the clear |
 | 3, vetted cryptography | the hand-built seal and key exchange, replaced with a library somebody else has reviewed |
-| 4, the page hardened | a tampered or injected script on the page, a secret parked in the browser's storage, a cookie sent cross-site |
+| 4, the page hardened | a tampered or injected script on the page, a secret parked in the browser's storage, a cookie sent cross-site, a change posted with the cookie from another origin of the same site (an app this install routes): a cookie's POST is taken only from the dashboard's own page |
 | 5, an unlock that gives up less | the controller holding a person's whole store open while they are signed in |
 | 6, memory and process | a core dump, swap or a neighboring process reading a key the controller holds |
 | 7, outside review | this page and the cryptography being right by their authors' word alone |
-| 8, sign-in hardened | a stolen cookie used from another device; what was done to the host read back by person and machine |
+| 8, sign-in hardened | a stolen cookie used from another device; guessing a password at any way in (the sign-in page, the command line, the app, file access), where an address is held after 100 wrong in a quarter of an hour and an account only slowed; what was done to the host read back by person and machine |
 
 What no step closes: root on the running controller, and a person's own
 agent acting as them on their own spaces, which is what it is for. The
