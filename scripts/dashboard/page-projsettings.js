@@ -958,8 +958,8 @@ function rnSpaceMarks(name, door){
   const band = () => {
     const d = document.createElement("div");
     d.className = "field rnspaceband";
-    d.innerHTML = `<div class="hint">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</div>
-      <div class="actbar"><span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`;
+    d.innerHTML = `<div class="actbar"><span class="state">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</span>
+      <span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`;
     d.querySelector("[data-rnspacego]").onclick = () => renameProject(name, "project");
     return d;
   };
