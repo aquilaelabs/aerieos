@@ -243,6 +243,41 @@ class Move(unittest.TestCase):
         said = " ".join(str(x) for x in (got.get("said") or []))
         self.assertIn("alpha: this controller had a space folder of that name", said)
 
+    def land_with_copy_failing(self, which):
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        (new_state / "fresh.json").write_text("{}")
+        (new_ws / "alpha").mkdir(parents=True)
+        (new_ws / "alpha" / "mine.txt").write_text("here first\n")
+        self.configure(new_state, bare=True)
+        real = shutil.copytree
+
+        def copy(src, dst, *a, **k):
+            if Path(src).name == which:
+                raise PermissionError(13, "Permission denied", str(dst))
+            return real(src, dst, *a, **k)
+        with mock.patch.object(move.shutil, "copytree", copy):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        return got, new_state
+
+    def test_a_workspace_copy_that_fails_is_said_with_what_was_set_aside(self):
+        # B725: the copy's error escaped restore() after this controller's
+        # alpha had gone to the trash, and the line saying so was lost.
+        got, new_state = self.land_with_copy_failing("workspace")
+        self.assertIn("could not be copied", got.get("error", ""), got)
+        self.assertIn("alpha: this controller had a space folder", got["error"])
+        self.assertTrue((new_state / "fresh.json").is_file(), "the state here not changed")
+        self.assertFalse((new_state / "users.json").exists())
+
+    def test_secrets_the_home_cannot_take_are_said_and_the_rest_lands(self):
+        # B728: a secrets folder that is root's stopped the whole landing.
+        got, new_state = self.land_with_copy_failing("secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertIn("secrets were not written", " ".join(got.get("said") or []))
+        self.assertTrue((new_state / "users.json").exists())
+
     def test_a_backup_arms_nothing_and_lands_under_its_own_token(self):
         # The operator, 6 Nov: a copy of the controller to keep, under a token
         # the person records, no move armed and no node told; landed, it

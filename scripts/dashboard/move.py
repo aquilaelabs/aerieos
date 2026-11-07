@@ -1186,12 +1186,27 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         # the swap left the new state half restored, the old one aside and
         # not said where.
         if (work / "workspace").is_dir():
-            workspace_dir.mkdir(parents=True, exist_ok=True)
-            said += _set_aside_clashes(work / "workspace", workspace_dir, stamp, state_dir)
-            shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
+            set_aside = []
+            try:
+                workspace_dir.mkdir(parents=True, exist_ok=True)
+                set_aside = _set_aside_clashes(work / "workspace", workspace_dir, stamp, state_dir)
+                said += set_aside
+                shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
+            except (OSError, shutil.Error) as e:
+                # Said, with what was set aside and where, rather than
+                # escaping the landing with those lines lost (B725).
+                return {"error": f"the spaces could not be copied into {workspace_dir} ({str(e)[:300]}); the state here was not changed"
+                                 + (". Set aside before the copy: " + "; ".join(set_aside) if set_aside else "")}
         if (work / "secrets").is_dir() and secrets_dir:
-            secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
+            try:
+                secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
+            except (OSError, shutil.Error) as e:
+                # A secrets folder that is root's takes nothing the dashboard
+                # writes (and root never reads what the dashboard's account
+                # left for it): the rest lands, and this is said (B728).
+                said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
+                            "copy its *.env files and ssh/ there as root, then restart the controller")
         swapped = False
         # The landing marked while the state is half old and half new, so a
         # power loss midway leaves a word of it for the next start (B622):
