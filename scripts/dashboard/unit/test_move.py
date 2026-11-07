@@ -278,6 +278,32 @@ class Move(unittest.TestCase):
         self.assertIn("secrets were not written", " ".join(got.get("said") or []))
         self.assertTrue((new_state / "users.json").exists())
 
+    def test_share_users_made_here_are_kept_through_a_landing(self):
+        # B716: the accounts a stick made from the old system's share users
+        # went with the state the move replaced, and the shares lost them.
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        here = {"users": {
+            "setup": {"uid": "u_00000001", "role": "owner", "password": "pbkdf2_sha256$1$x$y"},
+            "carol": {"uid": "u_0000000c", "role": "user", "password": "", "smb_nt": "A" * 32},
+            "ann": {"uid": "u_0000000a", "role": "user", "password": "", "smb_nt": "B" * 32},
+            "dave": {"uid": "u_0000000d", "role": "user", "password": ""}}}
+        (new_state / "users.json").write_text(json.dumps(here))
+        self.configure(new_state, bare=True)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        users = json.loads((new_state / "users.json").read_text())["users"]
+        self.assertEqual(users["carol"], here["users"]["carol"], "kept whole, its id with it")
+        self.assertNotIn("setup", users, "the setup account goes with what was here")
+        self.assertNotIn("dave", users, "no SMB password: not a share user")
+        self.assertNotEqual(users["ann"].get("smb_nt"), "B" * 32, "the moved controller's ann is its own")
+        said = " ".join(got.get("said") or [])
+        self.assertIn("kept as accounts with their SMB passwords: carol", said)
+        self.assertIn("already has are its accounts now: ann", said)
+        self.assertEqual(os.stat(new_state / "users.json").st_mode & 0o777, 0o600)
+
     def test_a_backup_arms_nothing_and_lands_under_its_own_token(self):
         # The operator, 6 Nov: a copy of the controller to keep, under a token
         # the person records, no move armed and no node told; landed, it

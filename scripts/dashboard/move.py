@@ -1108,6 +1108,52 @@ def _set_aside_clashes(carried, workspace_dir, stamp, state_dir):
     return said
 
 
+def _carry_share_people(aside, state_dir):
+    """The accounts this controller made from an old system's share users
+    (users.adopt: no password of their own, an SMB password's hash) carried
+    into the landed accounts under the same id, so the shares already served
+    to them keep their people (B716); a name or an id the landed accounts
+    already have is left and said. What was carried or left, said."""
+    try:
+        was = json.loads((aside / "users.json").read_text())
+        now = json.loads((state_dir / "users.json").read_text())
+    except (OSError, ValueError):
+        return []
+    if not isinstance(was, dict) or not isinstance(now, dict):
+        return []
+    old, new = was.get("users") or {}, now.setdefault("users", {})
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return []
+    uids = {str((u or {}).get("uid") or "") for u in new.values() if isinstance(u, dict)}
+    carried, left = [], []
+    for name, u in sorted(old.items()):
+        if not isinstance(u, dict) or u.get("password") or not u.get("smb_nt") or u.get("role") == "owner":
+            continue
+        if name in new or str(u.get("uid") or "") in uids:
+            left.append(name)
+            continue
+        new[name] = u
+        carried.append(name)
+    said = []
+    if carried:
+        tmp = state_dir / ".users.json.carry"
+        try:
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                json.dump(now, f, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, state_dir / "users.json")
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                tmp.unlink()
+            return [f"the share users made here ({', '.join(carried)}) could not be kept ({e}): make them again on the Users page"]
+        said.append(f"the share users made here are kept as accounts with their SMB passwords: {', '.join(carried)}")
+    if left:
+        said.append(f"share users made here whose name the moved controller already has are its accounts now: {', '.join(left)}")
+    return said
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1239,6 +1285,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 except OSError:
                     _store_here(state_dir, kind_dir.name)
                     _into(kind_dir, state_dir / kind_dir.name)
+            said += _carry_share_people(aside, state_dir)
             if (work / "install-key").is_file():
                 # A key the landing could not take is said in the result
                 # and kept on the record (B623), never swallowed.
