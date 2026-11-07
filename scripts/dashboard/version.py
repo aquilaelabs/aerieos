@@ -1401,8 +1401,19 @@ def _cite(project, rel, text, have=()):
     intro = shas[-1]
     before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
     have = [h for h in have if h]
-    if not have or (before and all(before.startswith(h) or h.startswith(before) for h in have)):
+    if not have:
         return [intro]
+    if before and all(before.startswith(h) or h.startswith(before) for h in have):
+        # The stamp is the commit before the line's. That is add's HEAD of
+        # the moment when the line landed with its change; when the line's
+        # commit touched the changelog alone and the one before it changed
+        # something else, that one is the change, and the stamp already
+        # names it (B710).
+        def others(c):
+            out = _git(project, "show", "--format=", "--name-only", c, timeout=30) or ""
+            return [f for f in out.split() if f != rel]
+        if others(intro) or not others(before):
+            return [intro]
     return have
 
 

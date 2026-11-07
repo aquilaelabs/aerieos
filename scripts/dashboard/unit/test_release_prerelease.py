@@ -91,6 +91,21 @@ class PreRelease(unittest.TestCase):
         self.assertIn(f"- Named by hand ({change})", text, r)
         self.assertIn(f"- Stamped with HEAD ({intro})", text)
 
+    def test_a_line_committed_after_its_change_keeps_naming_the_change(self):
+        # B710: the change, then its line in a commit of the changelog's
+        # alone, stamped with the change: the cut kept naming the line's
+        # commit, the one after.
+        change = self.commit_file("b.py", "b = 1\n", "the change")
+        self.log("Said after its change", "Fixed")
+        # And a line that lands with its change still names that commit.
+        (self.app / "c.py").write_text("c = 1\n")
+        changelog.add(self.app, "Said with its change", sha=self.git("rev-parse", "--short=7", "HEAD"), cat="Added")
+        together = self.commit("change and line")
+        self.release(dev=True)
+        text = (self.app / "CHANGELOG.md").read_text()
+        self.assertIn(f"- Said after its change ({change})", text)
+        self.assertIn(f"- Said with its change ({together})", text)
+
     def commit_file(self, name, body, msg):
         (self.app / name).write_text(body)
         return self.commit(msg)
