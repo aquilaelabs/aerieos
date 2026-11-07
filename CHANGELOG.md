@@ -4,15 +4,27 @@
 
 ### Changed
 
-- On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020)
+- On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020, 5fb699a)
 
 ### Fixed
 
-- A controller whose secrets folder is root's alone (every install on a machine of its own, a stick included, and a container whose secrets folder is closed as the install guide says) could not reach the install key it made there, so it sealed nothing and a move carrying the old controller's key stopped at landing with permission denied (ee7e020)
+- A controller whose secrets folder is root's alone (every install on a machine of its own, a stick included, and a container whose secrets folder is closed as the install guide says) could not reach the install key it made there, so it sealed nothing and a move carrying the old controller's key stopped at landing with permission denied; the boot now says so if the controller's account cannot read its key (ee7e020, f957998)
+- A move landing on a stick keeps the accounts the stick made from the old system's share users, with their SMB passwords, so shares already served to them keep their people; a name the moved controller already has is its account, and the landing says so (275cfe6)
+- A landing whose spaces cannot be copied says so with what it set aside, instead of stopping with those lines lost; secrets the new home cannot write no longer stop a landing, which lands the rest and says to copy them by hand (2b4bef3)
+- A bundle's secrets piece says when the secrets folder is root's alone and the bundle carries none of it, instead of packing it as empty without a word (1114a0b)
+- A session's commit after a command the controller ran for it (a release's changelog section, a pull) no longer carries the old files back over what the controller committed (e9c1fef)
+- A release keeps a changelog line's commit when the line was committed on its own right after its change (4108ed5)
+- aerie settings names the hosting-only nodes ticked under Also works on (2daf041)
+
+### Security
+
+- A move or backup bundle's outer details (its kind, origin and versions) are held to its sealed body, and a bundle changed after it was made is refused before anything changes; bundles made before still land (679ccaf)
+- The audit's digest of a change's parameters is keyed by the install's own key, so a short secret in a request cannot be guessed from the audit (808926d)
+- A session's aerie nodes reads its space's own nodes, as the Nodes page narrows them; an owner's or an administrator's seat reads every node (6c75b33)
 
 ### Upgrading
 
-- Such a controller seals what it kept open at its first start on this release; nothing is asked of you (ee7e020)
+- A controller that could not reach its install key (under Fixed) seals what it kept open at its first start on this release; nothing is asked of you (ee7e020)
 
 ## 0.9.0-dev.5065: 2026-11-07
 
