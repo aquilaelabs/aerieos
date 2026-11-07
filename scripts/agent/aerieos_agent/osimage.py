@@ -133,20 +133,25 @@ def keep_state_before(say, running):
     src = _env("BB_OS_STATE", "/var/lib/aerieos-controller/config")
     if not os.path.isdir(src):
         say("no controller configuration here to copy before the update\n")
-        return
+        return True
     keep = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before")
     os.makedirs(keep, mode=0o700, exist_ok=True)
     dest = os.path.join(keep, f"{running or 'unknown'}.tar.gz")
     r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs", "--exclude=os-draft", "--exclude=.moved-*", "--exclude=.move-*",
                         os.path.basename(src)], capture_output=True, text=True, check=False)
-    if r.returncode != 0:
-        say(f"the configuration's copy before the update did not take: {r.stderr.strip()[-300:]}\n")
-        return
+    # 1 is GNU tar's word for a file that changed as it was read (a log,
+    # the database between its writes): the copy is whole. 2 is a failure.
+    if r.returncode not in (0, 1):
+        with contextlib.suppress(OSError):
+            os.unlink(dest + ".new")
+        say(f"the configuration's copy before the update did not take, so nothing was written: {r.stderr.strip()[-300:]}\n")
+        return False
     os.replace(dest + ".new", dest)
     say(f"the configuration as it is, kept at {dest}\n")
     olds = sorted((os.path.join(keep, f) for f in os.listdir(keep) if f.endswith(".tar.gz")), key=os.path.getmtime)
     for old in olds[:-2]:
         os.unlink(old)
+    return True
 
 
 # ---- older versions kept (R201, the operator, 1 Nov) ---------------------------
@@ -292,6 +297,11 @@ def _keep_slot(say, dev, where, keep):
         return
     d = os.path.join(kept_dir(), ver)
     new = d + ".new"
+    # A copy kept already is the one taken from a whole slot: it is never
+    # replaced by what the slot holds now.
+    if os.path.isfile(os.path.join(d, "root.squashfs")):
+        say(f"{ver} is kept already, on the boot menu\n")
+        return
     try:
         with open(dev, "rb") as f:
             head = f.read(48)
@@ -709,9 +719,29 @@ class OsImageMixin:
         if self._sh(job, ["bash", tool, "hold"], timeout=30) != 0:
             say("GRUB's environment could not be set back to this slot: nothing written\n")
             return "failed", 73
+        # The configuration as it is, first: going back to this slot needs
+        # it, so an update that could not take it does not go ahead.
+        if not keep_state_before(say, rel.get("version") or ""):
+            return "failed", 74
         # What the slot holds goes on the boot menu before it is overwritten.
         job.step(f"keeping what slot {other} holds")
         keep_slot(say, dev, os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
+        # The slot's old release named off it before its root is written: a
+        # write cut short leaves a slot that reads as empty, never as the
+        # old version, which the next update's keep would have taken and
+        # put in place of the good copy kept before it.
+        try:
+            stale = os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other, "release")
+            if os.path.exists(stale):
+                os.unlink(stale)
+                fd = os.open(os.path.dirname(stale), os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except OSError as e:
+            say(f"slot {other}'s old release could not be taken off it before writing: {e}; nothing written\n")
+            return "failed", 72
         job.step(f"writing slot {other}")
         try:
             with open(files["root.squashfs"], "rb") as f, open(dev, "r+b") as d:
@@ -736,7 +766,6 @@ class OsImageMixin:
         except OSError as e:
             say(f"the ESP did not take slot {other}'s kernel: {e}\n")
             return "failed", 72
-        keep_state_before(say, rel.get("version") or "")
         # Named for the next boot and put on trial (R161 step 2) in one
         # write: two boots without the health check's word go back to the
         # slot running now. Not set, it is said, and the next boot stays here

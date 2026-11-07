@@ -379,6 +379,7 @@ def _load(path):
 def main(argv):
     """`stateversion.py check [STATE]`: the gate's question alone, for the
     entrypoint: exit 0 when this build may start, else the sentence and 78.
+    `stateversion.py newer [STATE]`: exit 0 when a newer build wrote it.
     `stateversion.py policy`: the state this build writes and the oldest it
     migrates from, as JSON, for the upgrade suite and the snapshot tool.
     `stateversion.py restore STATE VERSION`: the copy VERSION took before it
@@ -394,6 +395,13 @@ def main(argv):
             return 1
         print(f"{argv[1]} is back to the copy from before {argv[2]}; what it held is in {aside}")
         return 0
+    if argv[:1] == ["newer"]:
+        # Whether the state was written by a newer build than this one, and
+        # only that (restore-before: a slot picked by hand from the boot
+        # menu puts back its own copy only then, never over a state that
+        # is unreadable or too old).
+        n, _ = read(argv[1] if len(argv) > 1 else os.environ.get("DASHBOARD_STATE", "/config"))
+        return 0 if n is not None and n > current() else 1
     if argv[:1] != ["check"]:
         print("usage: stateversion.py check [STATE] | policy | restore STATE VERSION", file=sys.stderr)
         return 2

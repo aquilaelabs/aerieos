@@ -34,12 +34,16 @@ if [ -z "$kept" ] && [ -s "$MARK" ]; then
     rm -f "$MARK"
 fi
 # The mark is read and left for the health check, which says it.
-if [ -z "$kept" ]; then
-    [ "$(bash "$SLOT" fell-back keep 2>/dev/null)" = yes ] || exit 0
-fi
 [ -d "$STATE" ] || exit 0
 ver="$(sed -n "s/^BUILDERBOT_OS_VERSION=//p" "$RELEASE" 2>/dev/null | head -1 || true)"
 bbver="$(sed -n "s/^BB_VERSION=//p" "$OPT/build.env" 2>/dev/null | head -1 || true)"
+if [ -z "$kept" ] && [ "$(bash "$SLOT" fell-back keep 2>/dev/null)" != yes ]; then
+    # Not a fall back: the older slot picked by hand from the boot menu.
+    # Its copy goes back only when a newer build wrote the configuration,
+    # never over one that is unreadable or too old, or the controller sits
+    # refusing the newer state with no word on the screen.
+    BB_VERSION="$bbver" python3 "$OPT/scripts/dashboard/stateversion.py" newer "$STATE" >/dev/null 2>&1 || exit 0
+fi
 if BB_VERSION="$bbver" python3 "$OPT/scripts/dashboard/stateversion.py" check "$STATE" >/dev/null 2>&1; then
     echo "restore-before: this slot reads the configuration as it is: nothing put back"
     exit 0

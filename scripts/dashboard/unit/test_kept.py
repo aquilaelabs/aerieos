@@ -84,6 +84,17 @@ class Keeping(unittest.TestCase):
                      "root=/dev/loop0", "panic=15", "export aerie_data"):
             self.assertIn(word, menu)
 
+    def test_a_copy_kept_already_is_never_replaced_by_the_slot(self):
+        # A slot whose write was cut short still read as its old version, and
+        # the next update's keep took it in place of the good copy.
+        self.keep("0.9.1")
+        good = os.path.join(av.kept_dir(), "0.9.1", "root.squashfs")
+        open(good, "ab").write(b"whole")
+        said = []
+        av.keep_slot(said.append, os.path.join(self.w.d, "dev-0.9.1"), os.path.join(self.w.d, "esp-0.9.1"), 3)
+        self.assertIn("kept already", "".join(said))
+        self.assertTrue(open(good, "rb").read().endswith(b"whole"))
+
     def test_the_oldest_goes_first_and_none_is_none(self):
         for i, v in enumerate(("0.9.1", "0.9.2", "0.9.3", "0.9.4")):
             self.keep(v)
@@ -227,6 +238,41 @@ class TheBoot(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(d, "work", "kept-set-aside")))
             seen = [x for x in os.listdir(os.path.join(d, "work")) if x.endswith("-visit")]
             self.assertEqual(read(d, "work", seen[0], "config", "state.json"), "its, changed on the visit", "never deleted")
+
+
+class MenuPick(unittest.TestCase):
+    def run_it(self, newer_rc):
+        with tempfile.TemporaryDirectory() as d:
+            slot = os.path.join(d, "slot")
+            open(slot, "w").write('#!/bin/sh\necho no\n')
+            opt = os.path.join(d, "opt")
+            os.makedirs(os.path.join(opt, "scripts", "dashboard"))
+            open(os.path.join(opt, "scripts", "dashboard", "stateversion.py"), "w").write(
+                f"import sys\nsys.exit({newer_rc} if sys.argv[1] == 'newer' else 78)\n")
+            rel = os.path.join(d, "release")
+            open(rel, "w").write("BUILDERBOT_OS_VERSION=0.9.1\n")
+            state = os.path.join(d, "var", "config")
+            os.makedirs(state)
+            open(os.path.join(state, "state.json"), "w").write("newer")
+            os.makedirs(os.path.join(d, "old", "config"))
+            open(os.path.join(d, "old", "config", "state.json"), "w").write("before")
+            os.makedirs(os.path.join(d, "work", "before"))
+            with tarfile.open(os.path.join(d, "work", "before", "0.9.1.tar.gz"), "w:gz") as t:
+                t.add(os.path.join(d, "old", "config"), arcname="config")
+            cmd = os.path.join(d, "cmd")
+            open(cmd, "w").write("aerieslot=a\n")
+            env = dict(os.environ, BB_OS_SLOT=slot, BB_OS_WORK=os.path.join(d, "work"), BB_OS_STATE=state, BB_OS_OPT=opt,
+                       BB_OS_RELEASE=rel, BB_CMDLINE=cmd)
+            r = subprocess.run(["bash", os.path.join(OS, "restore-before")], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return read(state, "state.json")
+
+    def test_the_older_slot_picked_from_the_menu_takes_its_copy_back(self):
+        # Not a fall back: the controller sat refusing the newer state.
+        self.assertEqual(self.run_it(0), "before")
+
+    def test_never_over_a_state_that_is_not_newer(self):
+        self.assertEqual(self.run_it(1), "newer")
 
 
 class TheController(unittest.TestCase):
