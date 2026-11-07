@@ -351,17 +351,33 @@ def run(me, req, project):
     if not _SLOTS.acquire(timeout=120):
         return {"error": "the controller is busy with other sessions' aerie; try again",
                 "code": 75, "out": "", "err": ""}, 503
+    limit = relay_limit(argv)
     try:
         r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
-                           env=env, capture_output=True, text=True, timeout=180)
+                           env=env, capture_output=True, text=True, timeout=limit)
     except subprocess.TimeoutExpired:
-        return {"error": f"aerie {argv[0]} took longer than three minutes",
+        return {"error": f"aerie {' '.join(argv[:2])} took longer than {limit // 60} minutes and was ended here: "
+                         "what it had started on the controller may have gone on without it",
                 "code": 124, "out": "", "err": ""}, 504
     except OSError as e:
         return {"error": str(e), "code": 1, "out": "", "err": ""}, 500
     finally:
         _SLOTS.release()
     return {"code": r.returncode, **_cut(r.stdout, r.stderr)}, 200
+
+
+# How long a relayed verb may run here. Three minutes for any verb; a
+# release or a rehearsal asks the controller to tag, push and publish, which
+# alone may take its four (version-verbs.py waits 240 s), and ending it at
+# three printed nothing and left the release half made (B717).
+RELAY_S = 180
+RELAY_LONG_S = 900
+
+
+def relay_limit(argv):
+    if argv[:1] == ["version"] and any(a in ("release", "rehearse") for a in argv[1:]):
+        return RELAY_LONG_S
+    return RELAY_S
 
 
 # What a relayed verb prints comes back whole up to this, so a record printed

@@ -44,7 +44,9 @@ r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                               # along for the record to name.
                               "from": "session" if os.environ.get("CLAUDECODE") or os.environ.get("BB_AGENT") else "operator",
                               "agent": os.environ.get("BB_AGENT", "")},
-               auth=auth, timeout=200)
+               # Past the controller's own limit for the verb (bbrelay.relay_limit),
+               # so its sentence comes back rather than this side's timeout.
+               auth=auth, timeout=960 if argv[:1] == ["version"] and any(a in ("release", "rehearse") for a in argv[1:]) else 200)
 if r.get("error") and "code" not in r:
     # The controller's own sentence, and nothing of how it traveled (B58).
     sys.exit(f"[builderbot] ERROR: {r['error']}")
@@ -62,6 +64,10 @@ if tree and r.get("sync_rev"):
     syncwait.down(project, r["sync_rev"])
 sys.stdout.write(r.get("out") or "")
 sys.stderr.write(r.get("err") or "")
+# A verb the controller ended (its time limit) printed nothing of its own:
+# the controller's sentence is the only word of why (B717).
+if r.get("error") and not (r.get("out") or r.get("err")):
+    sys.stderr.write(f"[builderbot] ERROR: {r['error']}\n")
 sys.stdout.flush()
 sys.stderr.flush()
 code = int(r.get("code") or 0)
