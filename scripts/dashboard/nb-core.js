@@ -815,15 +815,20 @@ function makeNotebook(project){
     }catch(e){ viewGlance($("nvHint"), [], esc("VMs: " + e), "", "bad"); return; }
     const rows = (vmsData.vms || []).filter(v => v.project === project);
     const up = rows.filter(v => v.state === "running").length;
-    // The glance (R109): what runs of how many, as the VMs page counts.
-    viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : []);
+    // The glance (R109): what runs of how many, as the VMs page counts,
+    // and on the row with VMs page and New VM what a session here may do
+    // about VMs, so those two are never on a line of their own (the sweep,
+    // 7 Nov, on a phone).
+    const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
+    viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
+               dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
+                 : "a session here may not make VMs");
     const may = (vmsData.can || {})[project] === "write";
     const nb = $("nvNew");
     nb.hidden = !may;
     nb.disabled = !(vmsData.hosts || []).length;
     nb.onclick = () => openNewVm(project);
     $("nvOpen").onclick = () => openVmsTab();
-    const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
     // What the view is for, as its empty state (R119 step 4).
     $("nvList").innerHTML = rows.length ? vmGroupsHtml(rows)
       : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length

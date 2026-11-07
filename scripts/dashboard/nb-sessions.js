@@ -17,7 +17,9 @@
 // the same: when, its size, the first thing you said, Resume, Read and
 // Download, and behind its ⋯ Make visible (to every session on the project)
 // and Delete. An anchor for the download, since a download is a link the
-// browser saves. Another account's, made visible, is read and downloaded
+// browser saves. Its time is said once, as how long ago, the date and time
+// on its title (the sweep, 7 Nov: both read as the same fact twice). Another
+// account's, made visible, is read and downloaded
 // only, with whose it is.
 function convRows(project, rows, theirs = false){
   const size = b => b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
@@ -27,7 +29,7 @@ function convRows(project, rows, theirs = false){
   return `<div class="cvlogs">${rows.map(r => `
     <div class="artrow">
       <div class="grow">
-        <div class="top"><b>${esc(fmtTime(r.at * 1000))}</b> <span class="pill cvagent" title="the coding agent this conversation is with">${esc(agentById(r.agent)?.name || "Claude")}</span> <span class="dim">${esc(ago(r.at))} · ${esc(size(r.bytes))}${
+        <div class="top"><b title="${esc(fmtTime(r.at * 1000))}">${esc(ago(r.at))}</b> <span class="pill cvagent" title="the coding agent this conversation is with">${esc(agentById(r.agent)?.name || "Claude")}</span> <span class="dim">${esc(size(r.bytes))}${
           theirs ? ` · ${esc(r.by || "")}'s` : ""}</span>${r.shared ? ` <span class="pill">visible to every session</span>` : ""}</div>
         ${r.first ? `<div class="dim first">${esc(r.first)}</div>` : ""}</div>
       <div class="acts actbar">${theirs ? "" : `<button type="button" data-cvresume="${esc(r.id)}" data-cvat="${esc(String(r.at))}" data-cvagent="${esc(r.agent || "claude")}">Resume</button>`}<button type="button" data-cvread="${esc(r.id)}">Read</button><a class="btn" href="/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(r.id)}&tz=${encodeURIComponent(tz)}" download>Download</a>${
