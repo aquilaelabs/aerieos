@@ -482,6 +482,39 @@ class Move(unittest.TestCase):
         pcs = {p["key"]: p for p in move.pieces()}
         self.assertEqual(pcs["secrets"]["size"], len("DEPLOY=1\n"), "the tick's size leaves the key's folder out too")
 
+    def test_the_install_key_beside_the_state_travels_only_by_its_tick(self):
+        # B720: an install with no secrets folder keeps its key at
+        # /config/.install-key (lib/boot.sh), which the state's walk packed.
+        (self.state / ".install-key").mkdir()
+        (self.state / ".install-key" / "key").write_bytes(b"k" * 32)
+        for carry in (False, True):
+            raw, counts = move.pack(carry_key=carry)
+            names = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz").getnames()
+            self.assertFalse([n for n in names if ".install-key" in n], f"carry_key={carry}: the state's key folder stays out")
+            self.assertEqual("install-key" in names, carry)
+
+    def test_the_database_goes_as_a_snapshot_never_a_file_copy(self):
+        # B720: the server writes its database all the while; a copy of the
+        # file read across a write is torn. What a backup reads is whole,
+        # its log folded in, with no -wal or -shm beside it.
+        import sqlite3
+        db = sqlite3.connect(str(self.state / "builderbot.db"))
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("CREATE TABLE t (x)")
+        db.executemany("INSERT INTO t VALUES (?)", [(i,) for i in range(100)])
+        db.commit()
+        self.assertTrue((self.state / "builderbot.db-wal").exists(), "the rows are in the log, not yet the file")
+        raw, _counts = move.pack()
+        tf = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz")
+        names = tf.getnames()
+        db.close()
+        self.assertEqual([n for n in names if "builderbot.db" in n], ["state/builderbot.db"])
+        self.assertFalse([n for n in names if "/.move-" in n], "the snapshot's own file is never packed by its name")
+        out = self.tmp / "out.db"
+        out.write_bytes(tf.extractfile("state/builderbot.db").read())
+        self.assertEqual(sqlite3.connect(str(out)).execute("SELECT count(*) FROM t").fetchone()[0], 100)
+        self.assertFalse([p for p in self.state.iterdir() if p.name.startswith(".move-db-")], "the snapshot is gone after")
+
 
 if __name__ == "__main__":
     unittest.main()

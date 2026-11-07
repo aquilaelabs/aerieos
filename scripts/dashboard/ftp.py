@@ -358,7 +358,10 @@ def login(node, project, name, password, addr):
         return denied
     if _throttled(addr):
         return {"access": "", "why": "Too many failed logins from this address; try again in a few minutes."}
-    u = users.authenticate(str(name or ""), str(password or ""))
+    # Counted against the node the login came through as well as the
+    # address it names (B721): the node writes that address, so a node
+    # changing it on every try was never held.
+    u = users.authenticate(str(name or ""), str(password or ""), where=f"node:{node}")
     if not u:
         _failed(addr)
         audit(f"ftp:{addr}", "ftp-login-failed", project, {"name": str(name or "")[:60]})

@@ -64,7 +64,11 @@ HEADER = b"BBMOVE1\n"
 BACKUP_HEADER = b"BBBACKUP1\n"
 # What the state carries that is nobody's to move: logs, CI logs, the job
 # trees, the apps fetched from the releases, this module's own output.
-LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next"}
+# The install key kept beside the state (an install with no secrets folder,
+# lib/boot.sh install_key_made) is left out too: it travels only as the
+# ticked install-key entry, as the one under the secrets does (B720).
+LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next",
+         ".install-key"}
 
 _lock = threading.Lock()
 write_json = None
@@ -444,6 +448,10 @@ def split_form(src, content_type, file_field, dest, small=64 << 10):
                 if state == "body":
                     sink(buf[:at])
                     if out is not None:
+                        # A handful of fields is all a landing's form has
+                        # (B720): a form of thousands kept each in memory.
+                        if name not in fields and len(fields) >= 16:
+                            raise ValueError("the form has more fields than a landing's")
                         fields[name] = bytes(out).decode("utf-8", "replace").strip()
                 buf = buf[at + len(delim):]
                 while len(buf) < 2:
@@ -523,13 +531,53 @@ def pack(repos=False, carry_key=False, stores=None):
     return buf.getvalue(), counts
 
 
+DB_FILES = ("builderbot.db", "builderbot.db-wal", "builderbot.db-shm", "builderbot.db-journal")
+
+
+def _db_snapshot():
+    """A consistent copy of the state's database, by SQLite's backup, in a
+    file under the state the walk never packs (.move-); None where there is
+    no database there or it could not be read, and the file goes as it is."""
+    src = STATE / DB_FILES[0]
+    if not src.is_file():
+        return None
+    import sqlite3
+    dest = STATE / f".move-db-{os.getpid()}-{threading.get_ident()}"
+    try:
+        a = sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=30)
+        try:
+            b = sqlite3.connect(str(dest))
+            try:
+                a.backup(b)
+            finally:
+                b.close()
+        finally:
+            a.close()
+        os.chmod(dest, 0o600)
+        return dest
+    except (sqlite3.Error, OSError):
+        dest.unlink(missing_ok=True)
+        return None
+
+
 def _pack_into(tar, repos=False, carry_key=False, stores=None):
     """Into `tar`, the tree a move or a backup carries: the state without
     its logs and job trees, the stores kept outside it (`stores` names the
     kinds; None is every kind but STORES_OFF), the repositories when asked,
     the secrets, the install key when asked. Returns the counts."""
     counts = {}
-    counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE)
+    # The database by SQLite's own backup, never as a file copy (B720):
+    # the server writes it all the while (its minute's fold among it), and
+    # a copy read across a write is torn. The file and its log are left out
+    # of the walk, the snapshot put in their place.
+    snap = _db_snapshot()
+    try:
+        counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE | (set(DB_FILES) if snap else set()))
+        if snap:
+            tar.add(str(snap), arcname=f"state/{DB_FILES[0]}", recursive=False)
+    finally:
+        if snap:
+            snap.unlink(missing_ok=True)
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
             counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
@@ -944,8 +992,21 @@ def fetch_bundle(old_url, token, dest):
             why = room_for(int(r.headers.get("Content-Length") or 0), Path(dest).parent)
             if why:
                 return why
+            # Never past what an upload may be, nor what room there is: an
+            # answer with no length was read without end (B720).
+            most = 16 << 30
+            got = 0
             with open(dest, "wb") as f:
-                shutil.copyfileobj(r, f, 1 << 20)
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    got += len(chunk)
+                    if got > most:
+                        return "the old controller's answer ran past 16 GB, more than any bundle: stopped"
+                    if got % (256 << 20) < len(chunk) and room_for(1 << 30, Path(dest).parent):
+                        return "the disk here is filling up with the old controller's answer: stopped"
+                    f.write(chunk)
     except urllib.error.HTTPError as e:
         try:
             why = json.loads(e.read()).get("error") or f"answered {e.code}"
@@ -1205,13 +1266,21 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         if m.get("kind") == "token-backup":
             rec.update(key_b64=base64.b64encode(key).decode(), token_hash=m.get("token_hash", ""), made_at=int(m.get("made_at") or 0))
         rec["said"] = list(said)
-        with contextlib.suppress(OSError):
-            marker.unlink()
         for k in ("moved_to", "moved_at", "moved_how", "landed_at", "asked_at", "asked_error", "fetch_nonces", "told_at", "tell_tried_at",
                   "tell_error", "told_how", "told", "here"):
             rec.pop(k, None)
-        with open(rec_path, "w") as f:
+        # The record whole before the mark comes off (B720): a stop between
+        # the two left a swapped state with the old controller's record, or
+        # an empty one, and no word that the landing had not ended.
+        tmp = rec_path.with_name(rec_path.name + ".new")
+        with open(tmp, "w") as f:
             json.dump(rec, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, rec_path)
+        with contextlib.suppress(OSError):
+            marker.unlink()
         # A bare-metal home keeps its own node and its stick's plan (above).
         here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
         return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),

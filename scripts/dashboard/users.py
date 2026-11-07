@@ -353,12 +353,69 @@ def owner_name():
 
 # --- signing in ------------------------------------------------------------
 
-def authenticate(name, password):
-    """The account, or None. The only place a password is checked."""
+# A hash nobody's password matches, checked for a name that has no account,
+# so a wrong name costs what a wrong password does and the time taken does
+# not say which names are accounts (B721).
+_NOBODY = "pbkdf2_sha256$600000$" + "00" * 16 + "$" + "00" * 32
+
+
+def authenticate(name, password, where=""):
+    """The account, or None. The only place a password is checked. `where`
+    (the address asking, a node's id and the address it names) is what
+    wrong passwords are counted against: past PW_HOLD_AFTER in a quarter of
+    an hour from one place, every door says no without looking until the
+    oldest ages out, and each wrong one past PW_SLOW_AFTER for one account
+    waits a little longer."""
+    if where and pw_held(where):
+        return None
     u = get(name)
-    if not u or not check_password(u.get("password", ""), password or ""):
+    if not check_password(u.get("password", "") if u else _NOBODY, password or "") or not u:
+        if where:
+            time.sleep(pw_missed(name, where))
         return None
     return u
+
+
+# Wrong passwords counted (B721): sign-in page, Basic, an app's sign-in,
+# a node's file door. An address is held, an account only slowed, so
+# nobody can lock its owner out by guessing at it.
+PW_WINDOW = 900
+PW_SLOW_AFTER = 5
+PW_HOLD_AFTER = 100
+_pw_misses = {}
+_pw_lock = threading.Lock()
+
+
+def _pw_recent(key, now, add=False):
+    ts = [t for t in _pw_misses.get(key, []) if now - t < PW_WINDOW]
+    if add:
+        ts = (ts + [now])[-PW_HOLD_AFTER:]
+    if ts:
+        _pw_misses[key] = ts
+    else:
+        _pw_misses.pop(key, None)
+    return ts
+
+
+def pw_held(where):
+    """Seconds left before `where` is asked for a password again, or 0."""
+    now = time.time()
+    with _pw_lock:
+        ts = _pw_recent(f"at:{where}", now)
+    return int(PW_WINDOW - (now - ts[0])) + 1 if len(ts) >= PW_HOLD_AFTER else 0
+
+
+def pw_missed(name, where):
+    """A wrong password counted against the account and the place; the
+    seconds to wait before answering it."""
+    now = time.time()
+    with _pw_lock:
+        if len(_pw_misses) > 10000:
+            for k in list(_pw_misses):
+                _pw_recent(k, now)
+        _pw_recent(f"at:{where}", now, add=True)
+        n = len(_pw_recent(f"name:{str(name or '').lower()[:64]}", now, add=True))
+    return min(5.0, 0.5 * (n - PW_SLOW_AFTER + 1)) if n >= PW_SLOW_AFTER else 0.0
 
 
 # Basic auth arrives on EVERY request `aerie` makes and on every request the test
@@ -371,7 +428,7 @@ _recent = {}
 _RECENT_S = 60
 
 
-def authenticate_pair(pair):
+def authenticate_pair(pair, where=""):
     """`user:password` as Basic auth and `aerie` send it.
 
     Split on the FIRST colon: a password may contain one, a username may not.
@@ -387,7 +444,7 @@ def authenticate_pair(pair):
         u = get(hit[0])
         if u and hmac.compare_digest(stamp(u), hit[2]):
             return u
-    u = authenticate(name, password)
+    u = authenticate(name, password, where=where)
     if u:
         with _lock:
             if len(_recent) > 64:            # a bounded cache, not a leak

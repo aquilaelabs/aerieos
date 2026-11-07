@@ -942,11 +942,12 @@ def _refused(node_id, why):
 
 
 # A node offers at most this many of its old tokens in one recovery call.
-RECOVER_MOST = 200
+RECOVER_MOST = 9000
+RECOVER_WINDOW_S = 20
 _recover_at = {}
 
 
-def recover_token(node_id, bearers):
+def recover_token(node_id, bearers, peer=""):
     """A node this controller no longer knows by its newest token, taken
     back by an older one it still holds (the operator, 6 Nov: a controller
     restored from a backup re-adopts every node still there): the node's
@@ -956,19 +957,30 @@ def recover_token(node_id, bearers):
     revoked ends the search with nothing, never the alarm a stolen copy
     raises, since a node offering its own past is not a copy. The tokens
     themselves are offered, never their hashes, which the record keeps and a
-    backup's reader would hold. Once in twenty seconds a node. The bearer,
-    or None."""
+    backup's reader would hold.
+
+    An agent offers its month (up to 9000) a few hundred a call, back to
+    back, so the limit is on how many one address offers for one node in
+    twenty seconds, not on calls (B721: the second call of a sweep was
+    always refused, and a node never reached past its newest 200). Kept per
+    address, so a stranger naming a node cannot use up the node's own, and
+    only for a node this record has. The bearer, or None."""
     if not (isinstance(node_id, str) and re.fullmatch(r"n_[0-9a-f]{8,32}", node_id)) or not isinstance(bearers, list):
         return None
-    now = time.monotonic()
-    if now - _recover_at.get(node_id, -60.0) < 20:
-        return None
-    _recover_at[node_id] = now
     n = node(node_id)
     if not n or n.get("kind") != "agent" or n.get("state") == "retired":
         return None
+    now = time.monotonic()
+    for k in [k for k, (at, _c) in _recover_at.items() if now - at >= RECOVER_WINDOW_S]:
+        _recover_at.pop(k, None)
+    key = (node_id, str(peer or ""))
+    at, used = _recover_at.get(key, (now, 0))
+    offered = bearers[:RECOVER_MOST]
+    if used + len(offered) > RECOVER_MOST:
+        return None
+    _recover_at[key] = (at, used + len(offered))
     pre = TOKEN_PREFIX["node"]
-    for b in bearers[:RECOVER_MOST]:
+    for b in offered:
         if not isinstance(b, str) or not b.startswith(pre):
             continue
         rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = 'node'", (_hash(b[len(pre):]),))

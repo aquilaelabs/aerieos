@@ -84,6 +84,19 @@ ok(r.status === 200, 'the cookie alone opens the API');
 r = await bare('/termws?arg=shell', { headers: { Cookie: cookie } });
 ok(r.status === 400 && (await r.json()).error.includes('a websocket is asked for here'),
    'the cookie alone opens a terminal, whose socket is what a plain request is told to ask for');
+// B721: SameSite=Strict keeps the cookie from other sites, not from another
+// origin of the same site (an app this install routes); a change asked for
+// by such a page is refused, the dashboard's own page and a token's client not.
+const change = headers => bare('/api/settings', { method: 'POST', body: JSON.stringify({ set: {} }),
+  headers: { Cookie: cookie, 'Content-Type': 'text/plain', ...headers } });
+for (const [h, why] of [[{ 'Sec-Fetch-Site': 'same-site' }, 'a page of another origin of the same site'],
+                        [{ 'Sec-Fetch-Site': 'cross-site' }, 'a page of another site'],
+                        [{ Origin: 'http://app.example.test' }, 'an Origin not this Host, from a browser that sends no Sec-Fetch-Site']]){
+  r = await change(h);
+  ok(r.status === 403 && (await r.json()).error.includes("this dashboard's own page"), `a change with the cookie from ${why} is refused`);
+}
+r = await change({ 'Sec-Fetch-Site': 'same-origin', Origin: URL.replace(/\/$/, '') });
+ok(r.status !== 403, `...and the dashboard's own page asks as before (${r.status})`);
 r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=test&next=//evil.example/' });

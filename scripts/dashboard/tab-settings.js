@@ -366,7 +366,9 @@ function moveSection(){
   // by its owner, from Controller settings, which on a stick is the only way
   // in, once its disks hold the projects.
   const ld = m.land || {};
-  const land = ld.fresh && ld.owner && !m.prepared && !ar.restored_at ? moveLandBox(ld) : "";
+  // A landing cut midway carried the old controller's record in with it,
+  // so it reads as armed and landed: landing again is still what ends it.
+  const land = ld.fresh && ld.owner && (ld.cut || (!m.prepared && !ar.restored_at)) ? moveLandBox(ld) : "";
   // What is in the bundle, as the record says it: the state always, then
   // what was ticked.
   const inside = ["the state", ...stores, ...(m.repos ? ["the repositories"] : []), ...(m.carries_key ? ["the install key"] : [])].join(", ");

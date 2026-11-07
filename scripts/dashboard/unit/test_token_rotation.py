@@ -119,7 +119,24 @@ class Restored(unittest.TestCase):
         fresh = nodes.recover_token(self.nid, self.past)
         self.assertTrue(fresh and fresh.startswith("bbn_"))
         self.assertIn("node", nodes.authenticate(fresh), "the fresh token is the node's")
-        self.assertIsNone(nodes.recover_token(self.nid, self.past), "once in twenty seconds a node")
+        self.assertIsNone(nodes.recover_token(self.nid, self.past), "the past it offered is retired by the fresh one")
+
+    def test_a_sweep_reaches_past_its_first_chunk_and_a_stranger_does_not_use_it_up(self):
+        # B721: the agent offers its month 200 a call, back to back; the
+        # second call was always refused, so a token past the newest 200
+        # never brought a node back.
+        self.restore()
+        junk = [f"bbn_{i:064x}" for i in range(250)]
+        nodes.recover_token(self.nid, ["bbn_x"] * nodes.RECOVER_MOST, peer="10.9.9.9")
+        self.assertIsNone(nodes.recover_token(self.nid, junk[:200], peer="10.0.0.5"))
+        fresh = nodes.recover_token(self.nid, junk[200:] + self.past, peer="10.0.0.5")
+        self.assertTrue(fresh and fresh.startswith("bbn_"), "the second chunk is read, a stranger's offers aside")
+        self.assertIsNone(nodes.recover_token(self.nid, ["bbn_x"] * nodes.RECOVER_MOST, peer="10.0.0.6"), "a month at a time an address")
+        self.assertIsNone(nodes.recover_token(self.nid, ["bbn_x"], peer="10.0.0.6"))
+        before = len(nodes._recover_at)
+        for i in range(50):
+            nodes.recover_token(f"n_{i:08x}", ["bbn_x"], peer="10.0.0.7")
+        self.assertEqual(len(nodes._recover_at), before, "a node this record does not have is never counted")
 
     def test_a_retired_token_ends_the_search_and_raises_no_alarm(self):
         # Without the restore the record knows the newest: offering only the

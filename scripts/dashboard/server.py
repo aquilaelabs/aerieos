@@ -6155,6 +6155,22 @@ POST_ROUTES = (
 )
 
 
+
+# The mark a Finish of the setup leaves under the state, never taken off: a
+# move lands only on a controller never finished (Handler._move_land), and
+# the setup_done setting alone could be turned back (B720).
+SETUP_FINISHED = ".setup-finished"
+
+
+def setup_finished():
+    return (Path(STATE) / SETUP_FINISHED).is_file()
+
+
+# One landing at a time, held from its upload through the restart it ends in
+# (Handler._receive_move, B720).
+_landing_lock = threading.Lock()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "builderbot-dashboard"
 
@@ -6195,6 +6211,14 @@ class Handler(BaseHTTPRequestHandler):
         fwd = self.headers.get("X-Forwarded-For", "")
         if fwd:
             return fwd.split(",")[0].strip()[:45]
+        try:
+            return str(self.client_address[0])[:45]
+        except (AttributeError, IndexError, TypeError):
+            return ""
+
+    def _peer(self):
+        """The socket's own address, which a client cannot write: what
+        wrong passwords are counted against (users.authenticate)."""
         try:
             return str(self.client_address[0])[:45]
         except (AttributeError, IndexError, TypeError):
@@ -6246,7 +6270,7 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             # The whole "user:password" is checked at once, so a correct name
             # with a wrong password is indistinguishable from both being wrong.
-            u = users.authenticate_pair(given)
+            u = users.authenticate_pair(given, where=self._peer())
             # A password alone does not open an account with a second factor
             # (R127): bb from a dashboard terminal carries its token instead.
             if u and mfa.enabled(u.get("uid", "")):
@@ -6467,7 +6491,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError):
             return self._json({"error": "bad request"}, 400)
         u = users.authenticate(form.get("username", [""])[0],
-                               form.get("password", [""])[0])
+                               form.get("password", [""])[0], where=self._peer())
         if u:
             users.smb_take_up(form.get("username", [""])[0], form.get("password", [""])[0])
         if not u:
@@ -6679,6 +6703,25 @@ class Handler(BaseHTTPRequestHandler):
         if urllib.parse.urlsplit(o).netloc in hosts:
             return ""
         return f"a terminal opens from this dashboard's own page, not from {o}"
+
+    def _post_cross_site(self):
+        """Why a POST signed in by the browser's cookie is refused as sent by
+        a page of another origin, or "" (B721). SameSite=Strict keeps the
+        cookie from other sites, not from another origin of the same site
+        (an app this install routes, another of its hostnames), whose page
+        could post a form here as whoever is signed in. The browser's own
+        Sec-Fetch-Site says where the request came from whatever a proxy did
+        to the Host; where it is not sent, the Origin is held to the Host as
+        a terminal's socket is. A client with a token of its own (an
+        Authorization header) is not a page."""
+        if self.headers.get("Authorization"):
+            return ""
+        site = self.headers.get("Sec-Fetch-Site", "")
+        if site in ("cross-site", "same-site"):
+            return "a change is asked for from this dashboard's own page, not from another site's"
+        if not site and self._ws_cross_origin():
+            return f"a change is asked for from this dashboard's own page, not from {self.headers.get('Origin', '')}"
+        return ""
 
     def _logout(self):
         # The browser's sign-in is over (R159): its row goes, so its
@@ -8832,6 +8875,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._csp_report()
         if not self._authed():
             return self._deny()
+        why = self._post_cross_site()
+        if why:
+            return self._json({"error": why}, 403)
         if self._two_factor_gate(self.path.split("?")[0]):
             return None
         # The one body that is not JSON: an archive to start a project from,
@@ -8995,9 +9041,15 @@ class Handler(BaseHTTPRequestHandler):
                                         "answer" if own else
                                "enroll a node that runs sessions first: Finish needs one enrolled and "
                                "answering, and not hosting only"}, 409)
+        finishing = want.get("setup_done") is True and not settings.get("setup_done")
         r = settings.set_many(req.get("set") or {})
         if r.get("error"):
             return self._json(r, 400)
+        if finishing:
+            # Finished once is finished for a landing (B720): the setting
+            # may be turned back, the mark of the Finish is not.
+            with contextlib.suppress(OSError):
+                (Path(STATE) / SETUP_FINISHED).write_text(str(int(time.time())))
         if ending and settings.get("maintenance_mode"):
             end_others_sessions(ending)
             r["ended"] = len(ending)
@@ -9534,7 +9586,8 @@ class Handler(BaseHTTPRequestHandler):
             # ...and a node taken back by a token from before its newest,
             # as a restored record holds (the operator, 6 Nov).
             if verb == "recover" and auth["error"] == "unknown token":
-                got = nodes.recover_token(req.get("node"), req.get("tokens"))
+                got = nodes.recover_token(req.get("node"), req.get("tokens"),
+                                          peer=self.client_address[0] if self.client_address else "")
                 if got:
                     db.audit(f"node:{req.get('node')}", "node-recovered", "", {})
                     return self._json({"ok": True, "token": got})
@@ -9578,7 +9631,7 @@ class Handler(BaseHTTPRequestHandler):
             req = self._read_json()
             if req is None:
                 return None
-            u = users.authenticate(str(req.get("username") or ""), str(req.get("password") or ""))
+            u = users.authenticate(str(req.get("username") or ""), str(req.get("password") or ""), where=self._peer())
             if not u:
                 # As the sign-in page: a beat of delay, and not saying which half.
                 time.sleep(0.5)
@@ -12863,11 +12916,14 @@ class Handler(BaseHTTPRequestHandler):
         # and on a stick only once the projects have a place on the disks.
         # A move lands only while this controller is first set up (the
         # operator, 6 Nov: never a merge into one in use).
-        fresh = users.accounts_in_use() <= 1 and nodes.only_this_machine() and (not settings.get("setup_done") or bool(move.cut_landing()))
+        # A landing cut midway is finished by landing again, whatever it
+        # carried in before it stopped (its accounts, its nodes, its record).
+        cut = bool(move.cut_landing())
+        fresh = cut or (users.accounts_in_use() <= 1 and nodes.only_this_machine() and not settings.get("setup_done") and not setup_finished())
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
         owner = (users.account_of(me) or {}).get("role") == "owner"
-        out["land"] = {"fresh": fresh, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
+        out["land"] = {"fresh": fresh, "cut": cut, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
         if q.get("pieces", [""])[0] == "1":
             out["pieces"] = move.pieces()
         return self._json(out)
@@ -13068,6 +13124,23 @@ class Handler(BaseHTTPRequestHandler):
             n = -1
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
+        # Room for it said before a byte is taken, as a landing's is (B720).
+        no_room = move.room_for(n, Path(STATE))
+        if no_room:
+            return self._restore_page(no_room)
+        # ...and one at a time, as a landing is: they share the spool's name.
+        if not _landing_lock.acquire(blocking=False):
+            return self._restore_page("a restore or a move is landing here already: wait for it to end")
+        self._landed = False
+        try:
+            return self._setup_restore_held(n)
+        finally:
+            if not self._landed:
+                _landing_lock.release()
+
+    def _setup_restore_held(self, n):
+        """_setup_restore_post's own work, under the landing lock, which is
+        let go unless it ends in the restart."""
         spool = Path(STATE) / f".move-restore-upload-{os.getpid()}"
         file_part = spool.with_name(spool.name + ".file")
         try:
@@ -13115,6 +13188,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
         self.wfile.flush()
+        self._landed = True
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
 
     def _move_page(self, error=""):
@@ -13181,9 +13255,12 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
-        if settings.get("setup_done") and not move.cut_landing():
+        cut = bool(move.cut_landing())
+        if (settings.get("setup_done") or setup_finished()) and not cut:
             return self._json({"error": "a move lands only while a controller is first being set up: this one has finished its setup, and a move is never merged into a controller in use"}, 409)
-        if users.accounts_in_use() > 1 or not nodes.only_this_machine():
+        # A landing cut midway left the bundle's accounts and nodes here:
+        # landing it again is what finishes it, so they do not refuse it.
+        if not cut and (users.accounts_in_use() > 1 or not nodes.only_this_machine()):
             return self._json({"error": "a move lands only on a fresh controller: this one has other accounts or nodes, which it would replace"}, 409)
         where = Path(STATE)
         if nodes.on_stick():
@@ -13195,8 +13272,10 @@ class Handler(BaseHTTPRequestHandler):
         if why:
             return self._json({"error": why}, 400)
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
-        self._json({"ok": True, "nodes": len(r.get("nodes") or []), "from": r.get("from") or ""})
+        # The restart set off before the answer is written, so a browser gone
+        # meanwhile does not leave the dashboard serving the state it swapped.
         threading.Timer(1.5, lambda: os.execv(sys.executable, [sys.executable, *sys.argv])).start()
+        self._json({"ok": True, "nodes": len(r.get("nodes") or []), "from": r.get("from") or ""})
         return None
 
     def _receive_move(self, where, work_root=None):
@@ -13209,8 +13288,28 @@ class Handler(BaseHTTPRequestHandler):
             n = -1
         if not 0 < n <= 16 << 30:
             return None, "the upload is empty or past 16 GB"
-        # What a power loss left of a landing before this one (B601).
+        # One landing at a time (B720): two at once shared a spool, one's
+        # sweep deleted the other's, and the first one's restart came in the
+        # middle of the second's swap. Held through the restart a landing
+        # ends in; let go when it fails.
+        if not _landing_lock.acquire(blocking=False):
+            return None, "a move is landing here already: wait for it to end"
+        try:
+            r, why = self._receive_move_held(where, n, work_root)
+        except BaseException:
+            _landing_lock.release()
+            raise
+        if why:
+            _landing_lock.release()
+        return r, why
+
+    def _receive_move_held(self, where, n, work_root):
+        # What a power loss left of a landing before this one (B601): its
+        # spool and working folders, never the mark of a landing cut midway
+        # nor the backup a landing keeps, which say what is where (B720).
         for old in Path(where).glob(".move-*"):
+            if old.name in (move.LANDING_MARK, move.BACKUP_DIR):
+                continue
             shutil.rmtree(old, ignore_errors=True) if old.is_dir() else old.unlink(missing_ok=True)
         spool = Path(where) / f".move-upload-{os.getpid()}"
         # Room for it and what it unpacks to, said before a byte is taken
