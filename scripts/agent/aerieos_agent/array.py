@@ -142,6 +142,43 @@ def place_of(root, place, share):
     return os.path.join(root, "user0" if place == "array" else place, share)
 
 
+def _mounted(path):
+    """Whether something is mounted at `path`: what the mover and SnapRAID
+    ask before they write under it."""
+    return os.path.ismount(path)
+
+
+def _open_paths():
+    """Every file a process here holds open, by the path /proc names it:
+    what the mover leaves in place. A FUSE tree's own process (mergerfs)
+    holds the file underneath, so a file open through /mnt/user is seen
+    on its disk or pool as well."""
+    out = set()
+    try:
+        pids = [p for p in os.listdir("/proc") if p.isdigit()]
+    except OSError:
+        return out
+    for pid in pids:
+        fd = f"/proc/{pid}/fd"
+        try:
+            names = os.listdir(fd)
+        except OSError:
+            continue
+        for n in names:
+            with contextlib.suppress(OSError):
+                out.add(os.readlink(os.path.join(fd, n)))
+    return out
+
+
+def unmounted_slots(rec):
+    """The slots of the record whose disk is not mounted where SnapRAID
+    reads it: any one stops a sync, scrub, check or fix, which would
+    otherwise write the parity into memory or read a missing disk as
+    emptied."""
+    return [slot_mount(kind, x) for kind, key in (("d", "data"), ("p", "parity"))
+            for x in rec.get(key) or [] if not _mounted(slot_mount(kind, x))]
+
+
 def adopted_pools():
     """The pools in front of the data disks in the old system's merged
     tree, by name, in its order."""
@@ -330,50 +367,93 @@ class ArrayMixin:
                 m = slot_mount(kind, x)
                 if not os.path.ismount(m) and os.path.isdir(m):
                     subprocess.run(["mount", m], capture_output=True, timeout=60, check=False)
-        if rec.get("data") and not rec.get("adopted") and not os.path.ismount(MOUNT) and os.path.isdir(MOUNT):
+        # The merged tree only over every data disk mounted: mergerfs reads
+        # its glob at mount, and a disk missing then is left out of it.
+        if rec.get("data") and not rec.get("adopted") and not os.path.ismount(MOUNT) and os.path.isdir(MOUNT) \
+                and all(os.path.ismount(slot_mount("d", x)) for x in rec["data"]):
             subprocess.run(["mount", MOUNT], capture_output=True, timeout=60, check=False)
 
     def _mover(self, job, moves, root=None, age_s=600):
         """The mover, for an array taken over: each share's files from the
         place its entry names to the other (a pool, or the data disks by
-        /mnt/user0), a file written in the last ten minutes left for next
-        time; the folders it empties removed, the share's own kept. 0, or
-        rsync's exit."""
+        /mnt/user0). Left for next time, said: a file written in the last ten
+        minutes, one a process holds open, and one whose path is on the other
+        side already (the copy there is the one the merged tree shows, and it
+        is never overwritten). Nothing moves unless both places are mounted
+        (an empty mount point is the stick's memory) and neither share folder
+        is a link. The folders it empties are removed, the share's own and
+        any it did not empty kept. 0, or rsync's exit."""
         from . import adopt
         root = root or adopt.mnt()
         say, worst = job.say, 0
         now = time.time()
+        held = None
         for mv in moves:
             if not mv.get("from") or not mv.get("to"):
                 continue
+            said = {"array": "the data disks"}
             src, dst = place_of(root, mv["from"], mv["share"]), place_of(root, mv["to"], mv["share"])
-            if not os.path.isdir(src):
+            if not os.path.isdir(src) or os.path.islink(src):
+                if os.path.islink(src):
+                    say(f"{mv['share']}: its folder on {said.get(mv['from'], mv['from'])} is a link, and the mover never follows one: left\n")
                 continue
-            files = []
+            down = [said.get(k, k) for k, d in ((mv["from"], src), (mv["to"], dst)) if not _mounted(os.path.dirname(d))]
+            if down:
+                say(f"{mv['share']}: {' and '.join(down)} {'is' if len(down) == 1 else 'are'} not mounted, so nothing moves "
+                    "(a file put in an empty mount point would be in memory)\n")
+                worst = worst or 1
+                continue
+            if os.path.islink(dst) or (os.path.exists(dst) and not os.path.isdir(dst)):
+                say(f"{mv['share']}: its folder on {said.get(mv['to'], mv['to'])} is a link or not a folder, and the mover never writes through one: left\n")
+                continue
+            if held is None:
+                held = _open_paths()
+            files, kept, busy = [], 0, 0
             for here, _dirs, names in os.walk(src):
                 for nm in names:
                     f = os.path.join(here, nm)
+                    rel = os.path.relpath(f, src)
                     try:
                         st = os.lstat(f)
                     except OSError:
                         continue
-                    if now - st.st_mtime >= age_s:
-                        files.append(os.path.relpath(f, src))
+                    if now - st.st_mtime < age_s:
+                        continue
+                    if f in held or os.path.join(root, "user", mv["share"], rel) in held:
+                        busy += 1
+                        continue
+                    if os.path.lexists(os.path.join(dst, rel)):
+                        kept += 1
+                        continue
+                    files.append(rel)
+            if kept:
+                say(f"{mv['share']}: {kept} file{'' if kept == 1 else 's'} left on {said.get(mv['from'], mv['from'])}: "
+                    f"the same path is on {said.get(mv['to'], mv['to'])} already, and that copy is never overwritten\n")
+            if busy:
+                say(f"{mv['share']}: {busy} file{'' if busy == 1 else 's'} held open by a program, left for next time\n")
             if not files:
                 continue
             with tempfile.NamedTemporaryFile("w", delete=False, suffix=".list") as fl:
-                fl.write("".join(x + "\n" for x in files))
-            said = {"array": "the data disks"}
+                fl.write("".join(x + "\0" for x in files))
             try:
                 say(f"{mv['share']}: {len(files)} file{'' if len(files) == 1 else 's'} from {said.get(mv['from'], mv['from'])} to {said.get(mv['to'], mv['to'])}\n")
-                rc = self._sh(job, ["rsync", "-aHAX", "--remove-source-files", f"--files-from={fl.name}", src + "/", dst + "/"], timeout=86400)
+                # rsync itself leaves a source in place whose size or time
+                # changed while it was copied; --ignore-existing keeps a file
+                # that appeared on the other side since the list was made.
+                rc = self._sh(job, ["rsync", "-aHAXS", "--ignore-existing", "--remove-source-files", "--from0",
+                                    f"--files-from={fl.name}", src + "/", dst + "/"], timeout=86400)
             finally:
                 os.unlink(fl.name)
             worst = worst or rc
-            for here, _dirs, _names in sorted(os.walk(src), key=lambda w: -w[0].count("/")):
-                if here != src:
-                    with contextlib.suppress(OSError):
-                        os.rmdir(here)
+            emptied = set()
+            for rel in files:
+                d = os.path.dirname(rel)
+                while d:
+                    emptied.add(d)
+                    d = os.path.dirname(d)
+            for d in sorted(emptied, key=lambda x: -x.count("/")):
+                with contextlib.suppress(OSError):
+                    os.rmdir(os.path.join(src, d))
         return worst
 
     def _landing(self, say, moves, pools, root=None):
@@ -441,14 +521,36 @@ class ArrayMixin:
         if not datas:
             say("refused: no adopted data disk to take over\n")
             return "failed", 66
-        pars = [x for x in plan_.get("parity") or [] if x.get("dev") in disks][:MAX_PARITY]
+        if not dry and str(cfg.get("confirm") or "") != "parity":
+            say("refused: taking the array over overwrites the old parity, and takes the word parity as the confirmation\n")
+            return "failed", 64
+        if not dry and not shutil.which("mkfs.xfs"):
+            say("refused: no mkfs.xfs on this machine to give the parity partition its filesystem; install Storage on its Features section first\n")
+            return "failed", 65
+        # The parity disk found again by what the adoption read of it (its
+        # by-id link or serial), never by the kernel name it had then: a
+        # stick plugged in or a reboot moves sdX to another disk, which this
+        # would format (B718).
+        pars = []
+        for x in (plan_.get("parity") or [])[:MAX_PARITY]:
+            if not x.get("id"):
+                say(f"refused: the parity disk was adopted as {x.get('dev') or 'a disk'} by its name alone, which may be another disk now: "
+                    "adopt the old system again (Read only) so its parity disk is known by its serial, then take it over\n")
+                return "failed", 66
+            d = adopt.find_disk(list(disks.values()), x["id"])
+            if d is not None:
+                pars.append(d)
         if not pars:
             say("refused: the old system's parity disk is not on this machine: SnapRAID's parity needs a disk of its own\n")
             return "failed", 66
+        unmounted = [m["where"] for m in datas if not _mounted(m["where"])]
+        if unmounted:
+            say(f"refused: {', '.join(unmounted)} {'is' if len(unmounted) == 1 else 'are'} not mounted: every data disk is mounted read-only "
+                "before the array is taken over\n")
+            return "failed", 66
         biggest = max(_df(m["where"])[0] for m in datas)
         parity, slot = [], 0
-        for x in pars:
-            d = disks[x["dev"]]
+        for d in pars:
             slot += 1
             parts = d.get("parts") or []
             if d.get("system") or d.get("mounted"):
@@ -459,13 +561,16 @@ class ArrayMixin:
                 return "failed", 65
             part = parts[0]["name"]
             held = parts[0].get("holds") or ""
-            if held not in ("nothing", ""):
+            # A takeover that stopped after the parity took its filesystem
+            # is taken up again: the partition this gave it, by its label.
+            again = held == "xfs" and _out(["blkid", "-s", "LABEL", "-o", "value", f"/dev/{part}"]).strip() == f"aerie-p{slot}"
+            if held not in ("nothing", "") and not again:
                 say(f"refused: {part}, the old parity disk's partition, holds {held}: only a partition holding no filesystem is given one\n")
                 return "failed", 65
             if d.get("size_mb", 0) < biggest:
                 say(f"refused: {d['name']} is smaller than the largest data disk, so it cannot hold SnapRAID's parity\n")
                 return "failed", 64
-            parity.append({"slot": slot, "dev": d["name"], "part": part})
+            parity.append({"slot": slot, "dev": d["name"], "part": part, "again": again})
         say("Taking the array over, as SnapRAID's: " + "; ".join(f"{os.path.basename(m['where'])} at {m['where']}, made writable where it is" for m in datas) + "\n")
         for p in parity:
             say(f"p{p['slot']}: {p['part']} on {p['dev']} given an xfs filesystem for SnapRAID's parity file; the old system's parity on it is gone, "
@@ -497,7 +602,10 @@ class ArrayMixin:
             if os.path.ismount(m["where"]):
                 self._sh(job, ["umount", m["where"]], timeout=120)
             if self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
-                say(f"{m['where']} did not mount writable (above): stopped before the parity was touched\n")
+                for w in sorted(plan_.get("merged") or {}):
+                    self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+                say(f"{m['where']} did not mount writable (above): stopped before the parity disk was touched. The disks before it are "
+                    "writable now, so the old system's parity no longer matches them; run the takeover again once it mounts\n")
                 return "failed", 1
         for w in sorted(plan_.get("merged") or {}):
             self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
@@ -507,10 +615,16 @@ class ArrayMixin:
             new["data"].append({"slot": int(os.path.basename(m["where"])[4:]), "id": m.get("what", ""), "uuid": m["what"].split("=", 1)[-1],
                                 "fs": m["fs"], "where": m["where"]})
         for p in parity:
-            if self._sh(job, ["mkfs.xfs", "-L", f"aerie-p{p['slot']}", f"/dev/{p['part']}"], timeout=600) != 0:
+            if p["again"]:
+                say(f"{p['part']} has the xfs an earlier takeover gave it: kept\n")
+            elif self._sh(job, ["mkfs.xfs", "-L", f"aerie-p{p['slot']}", f"/dev/{p['part']}"], timeout=600) != 0:
                 say(f"{p['part']} did not take xfs (above): the data disks are writable, and no parity is kept yet\n")
                 return "failed", 1
             uuid = _out(["blkid", "-s", "UUID", "-o", "value", f"/dev/{p['part']}"]).strip()
+            if not uuid:
+                say(f"{p['part']} was given xfs but blkid gives it no UUID to mount it by: the data disks are writable, and no parity is kept yet; "
+                    "run the takeover again\n")
+                return "failed", 1
             new["parity"].append({"slot": p["slot"], "id": by_id(p["dev"]), "uuid": uuid, "fs": "xfs"})
         rec.clear()
         rec.update(new)
@@ -610,6 +724,12 @@ class ArrayMixin:
             write_record(rec)
 
         def run_snapraid(what, *extra, key=None, timeout=86400):
+            missing = unmounted_slots(rec)
+            if missing:
+                say(f"refused: {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not mounted, and SnapRAID run without "
+                    f"{'it' if len(missing) == 1 else 'them'} would write its parity into memory or read a missing disk as emptied: "
+                    "nothing run\n")
+                return 65
             _state_set(running=what)
             try:
                 rc = self._sh(job, [snapraid, what, *extra], timeout=timeout)
@@ -795,6 +915,11 @@ class ArrayMixin:
             if _state().get("running"):
                 say(f"refused: a {_state()['running']} is running on the array already; one at a time\n")
                 return "failed", 75
+            missing = unmounted_slots(rec)
+            if missing:
+                say(f"refused: {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not mounted: nothing is read or corrected "
+                    "until every disk of the array is\n")
+                return "failed", 65
             _state_set(running="verify", progress="")
             last = [0.0]
 

@@ -3594,6 +3594,9 @@ def node_storage_array(principal, node_id, req):
         cfg["dry"] = req.get("dry") is True
         if not cfg["dry"] and str(req.get("confirm") or "") != "parity":
             return {"error": "taking the array over overwrites the old parity: it takes the word parity typed"}
+        if not cfg["dry"]:
+            # The agent asks for the word itself (B718), as destroy's does.
+            cfg["confirm"] = "parity"
         # Each share's places (where its new files land, the mover's from
         # and to): as the person set them on the takeover, else from the
         # stick's plan as the old system had them.

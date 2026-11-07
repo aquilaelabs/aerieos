@@ -193,7 +193,9 @@ def plan(want, disks, blk=blkid):
             say(f"{what}: not on this machine; nothing is done with parity in any case")
             continue
         seen.add(d["name"])
-        out["parity"].append({"slot": str(x.get("slot") or "parity"), "dev": d["name"]})
+        # Its id kept with it: a takeover finds the disk again by it, never
+        # by the kernel name, which a reboot may give another disk (B718).
+        out["parity"].append({"slot": str(x.get("slot") or "parity"), "dev": d["name"], "id": str(x.get("id") or "")})
         say(f"{what}: {d['name']}, left alone: never mounted or written")
 
     pools = []
@@ -661,6 +663,11 @@ def apps_now():
             "said": [str(x)[:300] for x in d.get("said") or []][:16]}
 
 
+def branches_mounted(branches):
+    """Whether each branch of a merged tree (PATH=RW, PATH=RO) is mounted."""
+    return all(os.path.ismount(str(b).split("=", 1)[0]) for b in branches or [])
+
+
 class AdoptMixin:
     """The agent's storage-adopt job: one of the parts class Agent is made of."""
     _sh: "Callable[..., int]"
@@ -679,8 +686,11 @@ class AdoptMixin:
         for m in p.get("mounts") or []:
             if not os.path.ismount(m["where"]) and os.path.isdir(m["where"]):
                 subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
-        for where in p.get("merged") or {}:
-            if not os.path.ismount(where) and os.path.isdir(where):
+        for where, branches in (p.get("merged") or {}).items():
+            # Only over every branch mounted: a disk missing at boot leaves
+            # its empty folder, which mergerfs would take as the disk, its
+            # files gone from the tree and new ones written to memory (B718).
+            if not os.path.ismount(where) and os.path.isdir(where) and branches_mounted(branches):
                 subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
 
     def _zfs_import(self, job, z):
@@ -940,10 +950,12 @@ class AdoptMixin:
             if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
                 failed.append(m["where"])
                 if m.get("ro"):
-                    say(f"{m['where']} would not mount without its journal replayed, which writes the disk: mount it once on the "
-                        "old system and shut that down cleanly, or adopt writable\n")
-        for where in p["merged"]:
-            if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
+                    say(f"{m['where']} did not mount read-only (above). A disk the old system did not shut down cleanly may need its "
+                        "journal replayed, which writes it: mount it once on the old system and shut that down cleanly, or adopt writable\n")
+        for where, branches in p["merged"].items():
+            # Never over a branch that did not mount: its empty folder would
+            # stand in for the disk (B718).
+            if not branches_mounted(branches) or self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
                 failed.append(where)
         if failed:
             say(f"adopted, but not mounted yet: {', '.join(failed)}; tried again every minute, and Release undoes all of it\n")

@@ -59,7 +59,7 @@ class Plan(unittest.TestCase):
                                "/mnt/cache": ("UUID=u-cache", "btrfs", False)})
         self.assertEqual(p["merged"]["/mnt/user"], ["/mnt/cache=RW", "/mnt/disk1=RO", "/mnt/disk2=RO"])
         self.assertEqual(p["merged"]["/mnt/user0"], ["/mnt/disk1=RO", "/mnt/disk2=RO"])
-        self.assertEqual(p["parity"], [{"slot": "parity", "dev": "sdc"}])
+        self.assertEqual(p["parity"], [{"slot": "parity", "dev": "sdc", "id": "ST10000_PPP999"}], "kept by its id, which a takeover finds it by")
         self.assertTrue(any("left alone" in s for s in p["said"]))
 
     def test_writable_says_what_it_costs(self):
