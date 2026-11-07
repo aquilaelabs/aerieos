@@ -291,7 +291,7 @@ SIZE_BUDGET_S = 1.0
 _sizes = {}      # path: (at, bytes, over), kept a while
 
 
-def _size_of(src, leave=()):
+def _size_of(src, leave=(), budget=None):
     """(bytes, over) under a tree, symlinks not followed, within
     SIZE_BUDGET_S: `over` says the walk stopped and the bytes are a floor.
     Kept for ten minutes per path."""
@@ -315,11 +315,28 @@ def _size_of(src, leave=()):
                 continue
             if not os.path.islink(os.path.join(root, f)):
                 n += st.st_size
-        if time.monotonic() - t0 > SIZE_BUDGET_S:
+        if time.monotonic() - t0 > (SIZE_BUDGET_S if budget is None else budget):
             over = True
             break
     _sizes[key] = (time.time(), n, over)
     return n, over
+
+
+# A piece whose walk ran out of time is walked whole once more behind the
+# page, so the next read says its size rather than a floor; one at a time.
+SIZE_BEHIND_S = 120
+_behind = threading.Lock()
+
+
+def _measure_behind(jobs):
+    def run():
+        with _behind:
+            for path, leave in jobs:
+                _sizes.pop((str(Path(path)), tuple(sorted(leave))), None)
+                with contextlib.suppress(OSError):
+                    _size_of(path, leave, budget=SIZE_BEHIND_S)
+    if not _behind.locked():
+        threading.Thread(target=run, name="move-sizes", daemon=True).start()
 
 
 def pieces():
@@ -328,9 +345,14 @@ def pieces():
     outside it (on unless it is logs or the job trees); the repositories
     (off: both homes may mount the same share); the install key (off: the
     new home asks for it)."""
+    # Each tree walked beside the others, so the page waits a walk's budget
+    # once rather than once per piece (two seconds and more on a cold read).
+    asked = []
+
     def piece(key, label, about, path, on, fixed=False, leave=()):
-        size, over = _size_of(path, leave)
-        return {"key": key, "label": label, "about": about, "size": size, "over": over, "on": on, "fixed": fixed}
+        row = {"key": key, "label": label, "about": about, "size": 0, "over": False, "on": on, "fixed": fixed}
+        asked.append((row, path, tuple(leave)))
+        return row
     out = [piece("state", "The state", "accounts, nodes, spaces, settings, the notebooks, the database, what is sealed", STATE, True, True, LEAVE)]
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)):
@@ -346,6 +368,14 @@ def pieces():
                                  "and ssh/ to the new home by hand, as root"})
     out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max(1, len(asked))) as pool:
+        got = list(pool.map(lambda a: _size_of(a[1], a[2]), asked))
+    for (row, _, _), (size, over) in zip(asked, got):
+        row["size"], row["over"] = size, over
+    behind = [(path, leave) for (row, path, leave) in asked if row["over"]]
+    if behind:
+        _measure_behind(behind)
     return out
 
 
