@@ -720,6 +720,9 @@ await firstRun(false);
     // its containers to make and start and its VMs to define and run.
     const apps = await page.evaluate(async () => {
       const n = ownMachine();
+      // A status poll between the two evaluates can bring the record back
+      // without it (it crashed here under a whole gate's load).
+      state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
       nodesRev++; drawPanes();
