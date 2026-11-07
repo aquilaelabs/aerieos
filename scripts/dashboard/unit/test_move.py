@@ -135,6 +135,26 @@ class Move(unittest.TestCase):
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
 
+    def test_a_manifest_changed_after_the_bundle_was_made_is_refused(self):
+        # B724: the plain line's origin, kind and versions were believed.
+        r = move.prepare("user:ann", "https://new.example")
+        path = self.tmp / "config" / "move" / r["bundle"]
+        head, line, body = path.read_bytes().split(b"\n", 2)
+        m = json.loads(line)
+        self.assertTrue(m.get("mac"))
+        for why, edit in (("origin", lambda x: x.update({"from": "https://elsewhere.example/"})),
+                          ("mac taken off", lambda x: x.pop("mac"))):
+            changed = dict(m)
+            edit(changed)
+            bad = self.tmp / f"bad-{len(why)}.bbmove"
+            bad.write_bytes(head + b"\n" + json.dumps(changed).encode() + b"\n" + body)
+            got = self._land(bad, r["token"])
+            self.assertIn("outer details were changed", got.get("error", ""), why)
+            self.assertFalse((self.tmp / "new-config" / "users.json").exists(), f"{why}: nothing here changed")
+        got = self._land(path, r["token"])
+        self.assertTrue(got.get("ok"), got)
+        self.assertNotIn("bundle.json", got.get("counts", {}))
+
     def test_the_bundle_moves_the_state_and_the_nodes_follow(self):
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
         self.assertTrue(r.get("ok"), r)

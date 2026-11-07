@@ -29,8 +29,9 @@ is followed by hand with one line the new controller's Nodes page gives
 
 The bundle's shape: a header line BBMOVE1, a JSON manifest (version, state
 version, made at, the old address, what it carries, the sha256 of the
-token, nothing secret), a newline, then the sealed tar.gz (ChaCha20-Poly1305
-under HKDF(token)).
+token, nothing secret, and a MAC under the bundle's key over the rest), a
+newline, then the sealed tar.gz (ChaCha20-Poly1305 under HKDF(token)), whose
+first entry, bundle.json, says the manifest carries that MAC.
 """
 import base64
 import contextlib
@@ -494,6 +495,39 @@ def split_form(src, content_type, file_field, dest, small=64 << 10):
                 state = "body"
 
 
+# The manifest line is plain, read before anything is opened, so it is held
+# to the body by a MAC under the bundle's key, checked once the body is
+# unpacked and before anything here changes (B724). A bundle that carries
+# the mark below as its first sealed entry has one, so a MAC taken off the
+# line is caught too; a bundle made before (no mark) lands as it did.
+MANIFEST_MARK = "bundle.json"
+
+
+def _manifest_mac(key, m):
+    body = json.dumps({k: v for k, v in m.items() if k != "mac"}, sort_keys=True, separators=(",", ":")).encode()
+    return hmac.new(hmac.new(key, b"builderbot bundle manifest", hashlib.sha256).digest(), body, hashlib.sha256).hexdigest()
+
+
+def _manifest_held(path, key, work):
+    """Why the manifest line is not the one the bundle was sealed with, or
+    "" when it is (or the bundle is from before manifests were held)."""
+    try:
+        mark = json.loads((Path(work) / MANIFEST_MARK).read_text())
+    except (OSError, ValueError):
+        mark = None
+    if not isinstance(mark, dict) or not mark.get("mac"):
+        return ""
+    try:
+        with open(path, "rb") as f:
+            f.readline()
+            m = json.loads(f.readline())
+    except (OSError, ValueError):
+        m = None
+    if not isinstance(m, dict) or not hmac.compare_digest(str(m.get("mac") or ""), _manifest_mac(key, m)):
+        return "the bundle's outer details were changed after it was made (its kind, origin or version): nothing here was changed"
+    return ""
+
+
 def write_bundle(dest, header, manifest, key, **pack_kw):
     """A bundle written to `dest` as it is packed, never whole in memory:
     `header`, the manifest line (`manifest(counts)`, a dict, its format
@@ -509,9 +543,14 @@ def write_bundle(dest, header, manifest, key, **pack_kw):
         with open(body, "wb") as f:
             sealer = _Sealer(f, key)
             with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
+                mark = json.dumps({"mac": True}).encode()
+                info = tarfile.TarInfo(MANIFEST_MARK)
+                info.size, info.mtime, info.mode = len(mark), int(time.time()), 0o600
+                tar.addfile(info, io.BytesIO(mark))
                 counts = _pack_into(tar, **pack_kw)
             sealer.finish()
         m = dict(manifest(counts), format=FORMAT)
+        m["mac"] = _manifest_mac(key, m)
         with open(dest, "wb") as out, open(body, "rb") as f:
             out.write(header)
             out.write(json.dumps(m).encode() + b"\n")
@@ -1190,6 +1229,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     fh = open(path, "rb")
     fh.readline(); fh.readline()
     if m.get("format") == 1:
+        # The format before was opened whole in memory; a bundle that big
+        # was never one of them (B724: the format is read from the plain line).
+        if os.path.getsize(path) > (2 << 30):
+            fh.close()
+            return {"error": "the bundle says it is of the format before, which was never this big: not opened"}
         try:
             src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
         except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
@@ -1217,6 +1261,10 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             unpacked = f"the bundle is damaged or cut short ({e}); nothing here was changed"
         if unpacked:
             return {"error": unpacked}
+        counts.pop(MANIFEST_MARK, None)
+        changed = _manifest_held(path, key, work)
+        if changed:
+            return {"error": changed}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir / f".moved-{stamp}"
         # A landing within the same second as one before (a retry after a
