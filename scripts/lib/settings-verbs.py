@@ -174,13 +174,18 @@ def show():
         nodes = dash.load("nodes", here)
         nodes.db.open_readonly(state)
         named = {n["id"]: n["name"] for n in nodes.node_list(all=True)}
-    for k in ("node", "nodes", "reads", "sees", "model", "effort", "build", "test", "outputs", "policy", "locked",
+    # Hosting-only nodes ticked under Also works on (prefs' hosts), named
+    # as the dialog shows them, so a session reads it has them (B712).
+    for k in ("node", "nodes", "hosts", "reads", "sees", "model", "effort", "build", "test", "outputs", "policy", "locked",
               "toolchains_off"):
         v = rec.get(k)
         if v in (None, "", [], False):
             continue
-        if k in ("node", "nodes"):
+        if k in ("node", "nodes", "hosts"):
             v = [named.get(x, x) for x in v] if isinstance(v, list) else named.get(v, v)
+        if k == "hosts":
+            print(f"  hosts    {', '.join(v) if isinstance(v, list) else v} (hosting only: its containers, never a session)")
+            continue
         print(f"  {k:<8} {', '.join(v) if isinstance(v, list) else v}")
     # The agents' settings as the dialog names them, so a session can read
     # its own dials (the review of 26 Sep: the briefing said the refusal

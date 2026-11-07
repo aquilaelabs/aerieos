@@ -31,12 +31,14 @@ class NodeNames(unittest.TestCase):
         db._exec(f"INSERT INTO nodes ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
                  tuple(row[c] for c in cols))
         with open(os.path.join(st, "claude-prefs.json"), "w") as f:
-            json.dump({"projects": {"alpha": {"node": "n_abc123", "nodes": ["n_abc123", "n_gone"]}}}, f)
+            json.dump({"projects": {"alpha": {"node": "n_abc123", "nodes": ["n_abc123", "n_gone"], "hosts": ["n_abc123"]}}}, f)
         out = subprocess.run([sys.executable, os.path.join(LIB, "settings-verbs.py"), "show", DASH, "alpha"],
                              env={**os.environ, "DASHBOARD_STATE": st, "PYTHONPATH": LIB},
                              capture_output=True, text=True, check=False).stdout
         self.assertIn("  node     bigbox\n", out)
         self.assertIn("  nodes    bigbox, n_gone\n", out)
+        # B712: the hosting-only nodes ticked under Also works on, said too.
+        self.assertIn("  hosts    bigbox (hosting only: its containers, never a session)\n", out)
 
 
 if __name__ == "__main__":
