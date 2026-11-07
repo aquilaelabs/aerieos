@@ -135,6 +135,16 @@ class InstallKey(unittest.TestCase):
         self.assertFalse(signing.current(blob))
         self.assertEqual(signing.unseal(blob), b"x")
 
+    def test_a_carried_key_it_cannot_write_is_said_and_never_raised(self):
+        # Root's secrets folder on a machine of its own: the landing went on
+        # raising, and the whole move was undone for the key (a file stands
+        # in for the folder here, since the tests may run as root).
+        (self.d / "notadir").write_text("")
+        os.environ["BB_INSTALL_KEY_DIR"] = str(self.d / "notadir" / "install-key")
+        why = installkey.landed(b"b" * 64)
+        self.assertIn("could not be written", why or "")
+        self.assertEqual((self.kd / "key").read_bytes(), OLD)
+
 
 if __name__ == "__main__":
     unittest.main()

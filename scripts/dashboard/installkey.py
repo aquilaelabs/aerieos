@@ -197,11 +197,18 @@ def landed(key, state_dir=None):
         return ("this install's key is set in its environment (INSTALL_KEY), so the carried key was not taken: "
                 "set INSTALL_KEY to the old install's, or its sealed settings and sign-ins stay locked")
     d = _dir()
-    d.mkdir(parents=True, exist_ok=True, mode=0o700)
-    was = (d / "key").read_bytes().strip() if (d / "key").is_file() else b""
-    if was and was != key:
-        _write(d / "key-previous", was)
-    _write(d / "key", key)
+    # A folder this account may not write (root's secrets on a machine of
+    # its own) is said too: raised, it undid the whole landing for a key
+    # Controller, Keys takes afterwards.
+    try:
+        d.mkdir(parents=True, exist_ok=True, mode=0o700)
+        was = (d / "key").read_bytes().strip() if (d / "key").is_file() else b""
+        if was and was != key:
+            _write(d / "key-previous", was)
+        _write(d / "key", key)
+    except OSError as e:
+        return (f"the carried install key could not be written in {d} ({e.strerror or e}), so it was not taken: "
+                "give the old install's key under Controller, Keys, or its sealed settings and sign-ins stay locked")
     with contextlib.suppress(Exception):
         signing.MASTER = key
         signing.PREVIOUS = was if was and was != key else None
