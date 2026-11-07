@@ -167,6 +167,9 @@ class Keeping(unittest.TestCase):
         with mock.patch.dict(os.environ, {"BB_OS_SLOT": tool}):
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "next", "version": "0.9.1"}), ("succeeded", 0))
             self.assertEqual(A.ran[-1][-2:], ["kept-next", "0.9.1"])
+            # An update on trial is not spent on a visit.
+            with mock.patch.object(av, "os_release", return_value={"trial": True}):
+                self.assertEqual(A()._apply_os_kept(Job(), {"verb": "next", "version": "0.9.1"}), ("failed", 79))
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "next", "version": "../../etc"}), ("failed", 64))
             self.assertEqual(A()._apply_os_kept(Job(), {"verb": "other", "version": "0.9.1"}), ("failed", 64))
             open(self.w.env["BB_CMDLINE"], "w").write("aerieslot=a aeriekept=0.9.1\n")

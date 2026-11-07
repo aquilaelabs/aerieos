@@ -435,6 +435,11 @@ class OsImageMixin:
         if not KEPT_VER.fullmatch(ver) or not os.path.isdir(os.path.join(kept_dir(), ver)):
             job.say(f"refused: {ver or 'that version'} is not kept here\n")
             return "failed", 64
+        if verb == "next" and os_release().get("trial"):
+            # A visit now spends one of the trial's two boots, and a trial
+            # not yet booted would end on the slot it came from.
+            job.say("refused: an update is on trial and not marked good yet: let it boot and the health check mark it, then visit an older version\n")
+            return "failed", 79
         if verb == "next":
             rc = self._sh(job, ["bash", tool, "kept-next", ver], timeout=30)
             if rc == 0:
