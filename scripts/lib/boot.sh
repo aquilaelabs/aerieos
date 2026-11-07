@@ -167,6 +167,11 @@ install_key_made() {
     chown -R "$BB_ACCOUNT" "$dir" 2>/dev/null || true
     chmod 700 "$dir"; chmod 600 "$dir"/key* 2>/dev/null || true
     [ "$in" = state ] && warn "install key: kept beside the state in ${dir}, so a copy of it carries the key; a secrets folder root may write moves it there"
+    # Read as the dashboard will read it: a key root alone can reach is no
+    # key at all to the controller, which then seals nothing.
+    if [ "$(id -u)" = 0 ] && [ "$BB_ACCOUNT" != root ] && ! as_account test -r "$dir/key" 2>/dev/null; then
+        warn "install key: ${BB_ACCOUNT} cannot read ${dir}/key, so the controller seals and opens nothing: let it through the folders above it"
+    fi
     export BB_INSTALL_KEY_DIR="$dir" BB_INSTALL_KEY_IN="$in"
     export BB_SIGNING_SECRET_FILE="$dir/key" BB_INSTALL_KEY_PREVIOUS_FILE="$dir/key-previous"
 }
