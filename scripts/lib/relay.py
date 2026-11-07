@@ -88,7 +88,20 @@ if isinstance(ap, dict):
             os.remove(bundle)
         if u.returncode:
             sys.exit(f"{u.stderr}[builderbot] ERROR: the objects the controller fetched did not go into this tree")
-    lines = "".join(f"update {n} {v}\n" if v else f"delete {n}\n" for n, v in ap.get("refs") or [])
+    # The branch this tree has checked out moves by a fast-forward, which
+    # brings the index and the files with it: update-ref moved the branch
+    # alone, and the next commit carried the files as they were back over
+    # what the controller committed (B711: a release's changelog section
+    # undone by the commit after).
+    here = git("symbolic-ref", "-q", "HEAD", text="").stdout.strip()
+    ff = [v for n, v in ap.get("refs") or [] if n == here and v]
+    lines = "".join(f"update {n} {v}\n" if v else f"delete {n}\n" for n, v in ap.get("refs") or []
+                    if not (here and n == here and v))
+    if ff and git("rev-parse", "HEAD", text="").stdout.strip() != ff[0]:
+        if subprocess.run(["git", "merge", "--ff-only", "-q", ff[0]], check=False).returncode:
+            sys.exit(f"[builderbot] ERROR: {here} moved on the controller to {ff[0][:9]}, and this tree could not "
+                     "follow it by a fast-forward (a change here in the way, or the branch moved here too): "
+                     f"commit or stash, then git merge --ff-only {ff[0][:9]}")
     if lines:
         u = git("update-ref", "--stdin", text=lines)
         if u.returncode:
