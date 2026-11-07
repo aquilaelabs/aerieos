@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5096: 2026-11-07
 
 ### Changed
 
 - On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020, 5fb699a)
 - Pages open faster: the status read every page waits on takes about a third of the time it did (the newest conversations and the roles are no longer read again on every poll), Controller settings measures what a move would carry side by side, the Library reads once when it opens, and a pointer resting on Containers or Build reads ahead what that page shows first (5897793, 31e5ea6, 2b03cbc, dee915b)
-- Profile waits with every section it always has, and a person's roles on the Users page wait in their places, so nothing grows in after the page has drawn (e3d8adb)
+- Profile waits with every section it always has, and a person's roles on the Users page wait in their places, so nothing grows in after the page has drawn (d3e13de)
 - On a phone, a space's Docker view keeps its view toggle and buttons on one line and its status under them, where the status was squeezed between them (bf59b20, e610c71)
 
 ### Fixed
