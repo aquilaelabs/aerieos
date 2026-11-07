@@ -150,10 +150,7 @@ function nbTestsView({$, nb, project}){
     // appears with the first run.
     $("tstOut").hidden = !all.length;
     if (!all.length){
-      // The head row says so, as every view's does when it has nothing
-      // yet (Analysis's "no findings"), rather than the view opening on
-      // its paragraph alone.
-      viewGlance($("tstHint"), [], going || "no test run recorded yet");
+      viewGlance($("tstHint"), [], going);
       $("tstStats").hidden = false;
       // What the view is for, as its empty state, in one sentence as every
       // view's is (the a-notebook/views rule): a command box the page's
