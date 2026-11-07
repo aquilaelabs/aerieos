@@ -515,12 +515,20 @@ within ten minutes restarts, a kernel or initramfs that panics restarts
 after fifteen seconds, and a kernel that will not load falls to the slot
 before at once; a second boot without the health check's word goes back to
 the slot before by itself, and This machine says so until the next update.
-Picking the slot before from the menu during a trial ends the trial there.
+Picking the slot before from the menu during a trial ends the trial there,
+and visiting an older version is refused while one runs. The new image's
+own boot menu goes on the disk only once its slot is marked good, so a
+release whose menu is broken cannot take away the way back.
 Before an update the controller's configuration is copied to
-`/var/lib/aerieos-os/before/` (the two newest kept). A boot that fell
+`/var/lib/aerieos-os/before/` (the two newest kept), first, and an update
+that cannot take that copy writes nothing. The other slot's old release is
+taken off it before its root is written, so a write cut short leaves a slot
+that reads as empty, never as the version it held. A boot that fell
 back puts that copy back before the controller starts, when the newer slot
-moved the configuration on further than the slot before reads; what it held
-is kept in `/var/lib/aerieos-os/rolled-back-TIME/`. A patch carries no
+moved the configuration on further than the slot before reads, and so does
+the slot before picked by hand from the boot menu, when a newer build wrote
+the configuration; what it held is kept in
+`/var/lib/aerieos-os/rolled-back-TIME/`. A patch carries no
 configuration change, so falling back on one boots the same configuration
 as it is.
 
@@ -538,7 +546,8 @@ configuration has moved on further than that version reads, its copy is used and
 yours is set aside, and comes back when the visit ends; what the visit changed
 is set aside in `/var/lib/aerieos-os/rolled-back-TIME-visit/`. Updates wait
 until a visit ends. An image built before this feature cannot boot from files,
-so it is said and not kept. The menu on the ESP follows the image running, so a
+so it is said and not kept, and a version kept already is never replaced by
+what the slot holds later. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.
 
 **The short address.** On a controller's own machine the dashboard stays on its

@@ -386,7 +386,15 @@ container to a machine of its own, and back.
    aside, not deleted), and the dashboard restarts on it. Sign in with an
    account it had. A move lands only while the new home is first being set
    up, before its Finish: it replaces what is there, and is never merged into
-   a controller already in use. **Download a backup**, beside Prepare to
+   a controller already in use. On a stick, the accounts it made from the old
+   system's share users (with their SMB passwords) stay accounts after the
+   landing, so the shares already served to them keep their people; one whose
+   name the moved controller already has is that controller's account, and
+   the landing says which. A bundle changed after it was made (its kind, where
+   it came from, its versions) is refused before anything here changes. On a
+   machine of its own the secrets folder is root's, so a bundle carries none of
+   its `*.env` files or `ssh/`: the section says so, and they are copied to the
+   new home by hand, as root. **Download a backup**, beside Prepare to
    move, packs the same bundle under a token of its own without arming a
    move: no node hears of it and the controller it came from is never told
    when it lands. Neither the token nor the file expires, and the token is
