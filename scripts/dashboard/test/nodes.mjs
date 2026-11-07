@@ -234,7 +234,7 @@ print(json.dumps(out))
   // make a mutation, and a log that calls everybody that answers nothing.
   ok(row && row.principal === 'user:test' && row.target === 'alpha',
      `a mutation writes an audit row naming the account: who, what, on what (${row?.principal})`);
-  ok(row && /^sha256:[0-9a-f]{12}·\d+b$/.test(row.params),
+  ok(row && /^mac:[0-9a-f]{12}·\d+b$/.test(row.params),
      '...with a parameter digest in a fixed shape');
   ok(!JSON.stringify(tail).includes('sekrit'),
      '...and never the parameters themselves, which carry tokens and env text');

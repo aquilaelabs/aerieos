@@ -371,7 +371,7 @@ def pieces():
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max(1, len(asked))) as pool:
         got = list(pool.map(lambda a: _size_of(a[1], a[2]), asked))
-    for (row, _, _), (size, over) in zip(asked, got):
+    for (row, _, _), (size, over) in zip(asked, got, strict=True):
         row["size"], row["over"] = size, over
     behind = [(path, leave) for (row, path, leave) in asked if row["over"]]
     if behind:
