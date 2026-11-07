@@ -90,6 +90,9 @@ hold_secrets() {
     local place; place="$(secrets_place)"
     mkdir -p "$place"
     held "$place" && return 0
+    # Secrets the stick still holds (a pool named by an earlier release,
+    # not mounted yet to take them) are the controller's key: used, not hidden.
+    [ -n "$(ls -A "$place" 2>/dev/null)" ] && return 0
     [ -n "${BB_SP_NO_MOUNT:-}" ] && return 0
     if mount -t tmpfs -o size=64k,mode=0700 "$HELD_SECRETS" "$place" 2>/dev/null; then
         : > "$place/.aerieos-held"
