@@ -197,11 +197,17 @@ class TheBoot(unittest.TestCase):
             open(os.path.join(d, "grub", "grub.cfg"), "w").write("old")
             open(os.path.join(d, "new"), "w").write("new")
             open(os.path.join(d, "cmd"), "w").write("aerieslot=a aeriekept=0.9.1\n")
-            env = dict(os.environ, BB_ESP=d, BB_OS_GRUBCFG=os.path.join(d, "new"), BB_CMDLINE=os.path.join(d, "cmd"))
+            slot = os.path.join(d, "slot")
+            open(slot, "w").write('#!/bin/sh\necho "trial: slot a, 1 boot(s) so far, back to slot b"\n')
+            env = dict(os.environ, BB_ESP=d, BB_OS_GRUBCFG=os.path.join(d, "new"), BB_CMDLINE=os.path.join(d, "cmd"), BB_OS_SLOT=slot)
             tool = os.path.join(OS, "boot-menu")
             subprocess.run(["bash", tool], env=env, check=True)
             self.assertEqual(read(d, "grub", "grub.cfg"), "old")
             open(os.path.join(d, "cmd"), "w").write("aerieslot=a\n")
+            # On trial: the menu that would bring it back stays until it is good.
+            subprocess.run(["bash", tool], env=env, check=True)
+            self.assertEqual(read(d, "grub", "grub.cfg"), "old")
+            open(slot, "w").write('#!/bin/sh\necho "slot a"\n')
             subprocess.run(["bash", tool], env=env, check=True)
             self.assertEqual(read(d, "grub", "grub.cfg"), "new")
 

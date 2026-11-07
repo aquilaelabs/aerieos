@@ -31,6 +31,8 @@ for i in $(seq 1 120); do
     fi
     if [ "$streak" -ge 3 ]; then
         bash "$SLOT" good
+        # The new image's boot menu, held while it was on trial (boot-menu).
+        /usr/lib/aerieos-os/boot-menu || true
         echo "healthy after $((i * 5)) s: the dashboard answers $code and the agent runs; slot $(bash "$SLOT" current) is marked good"
         exit 0
     fi
