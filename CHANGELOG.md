@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A row on the Installed page that says an update is available has its Update button there, as the Library's card does (dbba5cea)
+
+### Fixed
+
+- The mover moves nothing to or from a pool or the data disks that is not mounted, never overwrites a copy already on the other side, never follows a linked share folder and leaves a file a program holds open; a sync, scrub or check is refused while any disk of the array is not mounted, and the merged share tree is mounted only over disks that are (3c90807)
+- A move lands one at a time, and a landing cut midway lands again from Controller settings; the database in a bundle is a whole copy however busy the controller is while it is made (2a693f3)
+- A node whose controller came back from an older backup is taken back by any of its last month's credentials, not only its newest 200 (2a693f3)
+- aerie version release run from a session no longer stops after three minutes with nothing printed, leaving the release half made (1653df6)
+
+### Security
+
+- Taking an adopted array over finds the old parity disk by its serial before giving it a filesystem: a reboot or a stick plugged in that moved the disks' names could have put another disk under it, and the takeover now asks for the confirmation on the machine itself and checks every data disk is mounted first (3c90807)
+- Let it go no longer runs a spaces folder's give-back script from inside the folder as root, and a system pool is never a folder in memory (047ccd5)
+- A move or backup bundle carries the install key only when its box is ticked, also on an install that keeps the key beside its configuration (2a693f3)
+- A change made with the browser's sign-in is taken only from the dashboard's own page, never from another app on the same domain; wrong passwords are counted at every way in (the sign-in page, the command line, the app, file access): one address is held after 100 in a quarter of an hour (2a693f3)
+
+### Upgrading
+
+- A disk array adopted before this release is released and adopted again (Read only) before Take the array over, which now finds its parity disk by the serial the adoption keeps (3c90807)
+
 ## 0.9.0-dev.5053: 2026-11-07
 
 ### Fixed

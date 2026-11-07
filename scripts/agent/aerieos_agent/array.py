@@ -535,7 +535,7 @@ class ArrayMixin:
         for x in (plan_.get("parity") or [])[:MAX_PARITY]:
             if not x.get("id"):
                 say(f"refused: the parity disk was adopted as {x.get('dev') or 'a disk'} by its name alone, which may be another disk now: "
-                    "adopt the old system again (Read only) so its parity disk is known by its serial, then take it over\n")
+                    "release the adoption and adopt the old system again (Read only) so its parity disk is known by its serial, then take it over\n")
                 return "failed", 66
             d = adopt.find_disk(list(disks.values()), x["id"])
             if d is not None:
