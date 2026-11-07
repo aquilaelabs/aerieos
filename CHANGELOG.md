@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5053: 2026-11-07
 
 ### Fixed
 
