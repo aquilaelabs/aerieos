@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A controller moves onto a new AerieOS stick whose old system had share users; the landing was refused as the stick having other accounts (3a1d38e)
+
 ## 0.9.0-dev.5049: 2026-11-06
 
 ### Changed
