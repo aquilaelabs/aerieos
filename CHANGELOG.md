@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5065: 2026-11-07
 
 ### Changed
 
-- A row on the Installed page that says an update is available has its Update button there, as the Library's card does (dbba5cea)
+- A row on the Installed page that says an update is available has its Update button there, as the Library's card does (760de66)
 
 ### Fixed
 
