@@ -237,7 +237,7 @@ const TABKINDS = {
   // A machine's files (R224): its roots through its agent, its own node.
   files:     { multi: false, label: () => "Files",
               icon: TOOL_ICONS.nodes,
-              render: (i) => renderFilesInto(i), live: () => `${fxRev}/${nodesRev}`,
+              render: (i) => renderFilesInto(i), live: () => `${flRev}/${nodesRev}`,
               open: () => loadFiles() },
   // A Library entry's own page (R183): the Library's read, one card of it,
   // opened by its Details and named for the entry.
@@ -389,7 +389,7 @@ const TABKINDS = {
               // stale copy: moves it nowhere, and the tab never heard.
               live: () => `${state?.reports_mtime ?? ""}:${
                 (state?.reports_ages || []).map(r => r.name + (r.stale ? "!" : ""))
-                  .join(",")}:${fxRev}`,
+                  .join(",")}:${flRev}`,
               open: () => loadFindings() },
 };
 

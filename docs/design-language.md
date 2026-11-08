@@ -1871,3 +1871,27 @@ This page's own rules:
 Applies to: scripts/dashboard/tab-network.js, scripts/dashboard/tab-settings.js; network page, reach from outside
 
 Connection and Reach from outside are one table (tab-settings.js SETTING_GROUPS) drawn on the Network page and nowhere else; a group about reaching the controller goes there, never back under Controller settings.
+
+### the Files page (Web app)
+
+Platform: a responsive web app: the layout holds at phone and desktop widths, and every tap target is at least 44px on a coarse pointer.
+Layout of the Files page on a desktop frame (12 columns by 8 rows), from the Blank template, numbered in drawing order (a later block draws over an earlier one where they overlap):
+  1. Header (the band at the top): the Machines group's header: the node picked once, its own machine among them on a machine install, across the top, row 1 of 8
+  2. Text (a block of prose): the page head: the root and how many folders and files are here, across the middle, row 2 of 8
+  3. Tabs (a strip of tabs switching one area): the roots as chips: the spaces folder, pools, the array, adopted disks, shares, across the middle, row 3 of 8
+  4. Navigation (the way around: tabs or a menu): where in the root: the root's name then each folder, the last one plain, across the middle, row 4 of 8
+  5. Search (a search box): the filter, New folder and Upload; with rows ticked: Rename, Move, Download, Delete, Clear, across the middle, row 5 of 8
+  6. Table (columns of data): the folder: a tick and the name, size, modified, owner, a download at the row's end; folders first, across the bottom, rows 6 to 8 of 8
+  7. Overlay (a dialog, sheet, drawer, popover or toast over the page): a file shown over the page: picture, video, sound or PDF as itself, else its first 256 KB as text; Download and Close, in the middle, columns 3 to 10 of 12, rows 3 to 7 of 8
+Notes:
+  R224, the operator 8 Nov: administrators only, every change audited; the roots alone, never the system's folders; a delete goes to the root's .aerieos-trash. Preview and download first; editing a text file in place is a later step.
+This page's own rules:
+  files/roots-only: files page, file explorer (`aerie design show files/roots-only` reads it)
+
+#### Rules of the Files page's own
+
+##### files/roots-only
+
+Applies to: files page, file explorer
+
+The Files page reaches a node's roots and nothing else: the system's own folders are never offered, and a root's chip says its kind in words (share, adopted), never a path alone; the path is the chip's title.

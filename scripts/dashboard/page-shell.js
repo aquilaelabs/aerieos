@@ -181,14 +181,14 @@ function shellPush(to, from = location.hash){
 // The Jobs page has no node; its second segment is the chip it is narrowed
 // to (#/jobs/failed-today, which Home's "failed today" opens, B74).
 const NODE_PICKED = {jobs: () => jobsShow, nodes: () => nodesPick, storage: () => storageNode, nginx: () => nginxNode,
-  library: () => libNode, installed: () => instNode, files: () => fxNode, emulator: () => emuNode, phone: () => phNode,
+  library: () => libNode, installed: () => instNode, files: () => flNode, emulator: () => emuNode, phone: () => phNode,
   runner: () => runnerNode, docker: () => dockerNode};
 // A page that keeps what it read for one node forgets it when Back names
 // another, or the other node's list showed under this one until the read.
 const NODE_SET = {jobs: v => jobsShowSet(v), nodes: v => { nodesPick = v; }, storage: v => { storageNode = v; }, nginx: v => { nginxNode = v; },
   library: v => { if (v !== libNode){ libNode = v; lib = null; } },
   installed: v => { if (v !== instNode){ instNode = v; inst = null; } },
-  files: v => { if (v !== fxNode){ fxNode = v; fx = null; fxRoot = ""; fxPath = ""; fxSel.clear(); } },
+  files: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },
   emulator: v => { if (v !== emuNode){ emuNode = v; emu = null; emuTicked.clear(); } },
   phone: v => { if (v !== phNode){ phNode = v; phIp = ""; } },
   runner: v => { runnerNode = v; },

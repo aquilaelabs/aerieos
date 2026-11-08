@@ -103,6 +103,8 @@ The machines that do the work ([machines.md](machines.md), [nodes.md](nodes.md))
 - An **SSH door** through cloudflared, switched on and off from the node's row.
 - Each node's **storage**, **network**, sessions and logs on its page, and
   its agent updated from the dashboard.
+- **Files**: browse, preview, upload, download, rename, move and delete
+  on a node's pools, array and shares, with a trash, for administrators.
 - **Jobs**: every build, install and container action as a job, with its
   log, on the Jobs page.
 
