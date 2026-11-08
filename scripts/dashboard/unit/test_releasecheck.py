@@ -29,7 +29,12 @@ class ReleaseCheck(unittest.TestCase):
         self.was = releasecheck.RELEASES_URL
         releasecheck.RELEASES_URL = "file://" + path
         self.addCleanup(setattr, releasecheck, "RELEASES_URL", self.was)
-        self.addCleanup(lambda: releasecheck._latest.update(version="", tag="", at=0, error="", url=""))
+        # What the check keeps is the module's, shared with any test that ran
+        # before in this process (B731): set to nothing before, as after.
+        clear = lambda: releasecheck._latest.update(version="", tag="", at=0, error="", url="",  # noqa: E731
+                                                    dev={"version": "", "tag": "", "url": ""})
+        clear()
+        self.addCleanup(clear)
 
     def test_the_newest_published_release_and_whether_it_is_newer(self):
         releasecheck.configure(version=lambda: "0.8.2", bare_metal=lambda: True)
@@ -54,7 +59,7 @@ class ReleaseCheck(unittest.TestCase):
 
     def test_a_registry_that_does_not_answer_is_said(self):
         releasecheck.RELEASES_URL = "file:///nonexistent/releases.json"
-        releasecheck.configure(version=lambda: "0.8.2", bare_metal=lambda: True)
+        releasecheck.configure(version=lambda: "0.8.2", bare_metal=lambda: True, channel=lambda: "normal", debug=lambda: False)
         got = releasecheck.check()
         self.assertIn("did not answer", got["error"])
         self.assertEqual(releasecheck.newer(), "")
