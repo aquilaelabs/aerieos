@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- A stick offered a pool that holds another AerieOS install's folder now offers to set that folder aside (renamed to aerieos-system.old, then .old-2 and on, untouched) and use the pool, where it only refused; the picker says so before you press (ee21eac)
+
 ### Fixed
 
 - Downloading a move's bundle needs only the bundle's own size free on the old controller's disk, where it needed up to three times that and could end in a bare "No space left on device"; a full disk is now said with what to do (95cc75d)
