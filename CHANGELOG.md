@@ -10,6 +10,7 @@
 ### Fixed
 
 - Downloading a move's bundle needs only the bundle's own size free on the old controller's disk, where it needed up to three times that and could end in a bare "No space left on device"; a full disk is now said with what to do (95cc75d)
+- A stick that goes back to the configuration from before an update keeps its logs in memory as before, instead of writing them to the stick (510d31c)
 
 ## 0.9.0-dev.5096: 2026-11-07
 
