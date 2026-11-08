@@ -5239,6 +5239,13 @@ button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block
 .row code{font:11px/1.5 var(--mono);background:var(--btn);padding:1px 5px;
   border-radius:var(--r-small);white-space:nowrap}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* A bar for a measure the running thing reports itself (pctBar, page-docs.js):
+   a thin track in the line color, the accent as far as it has come. */
+progress.pbar{display:block;width:100%;max-width:var(--ctl-w);height:6px;margin:6px 0 2px;appearance:none;-webkit-appearance:none;border:0;
+  background:var(--line);border-radius:3px;overflow:hidden;color:var(--accent)}
+progress.pbar::-webkit-progress-bar{background:var(--line)}
+progress.pbar::-webkit-progress-value{background:var(--accent);border-radius:3px;transition:width .4s ease-out}
+progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
 /* A press still going after a moment (pressing(), tab-nodes.js): a small ring
    after its word, so it reads as taken rather than missed. */
 button.working::after,a.btn.working::after{content:"";display:inline-block;width:.8em;height:.8em;margin-left:6px;vertical-align:-.1em;

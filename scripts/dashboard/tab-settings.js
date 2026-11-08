@@ -413,12 +413,28 @@ function wireMove(root){
     if (!tok || !(file || from)) return notify("the move token is needed, with the old controller's address or the bundle", true);
     if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
         {title: "Land the move?", verb: "Land it", danger: true})) return;
-    busy(b, "Landing");
+    busy(b, file ? "Sending" : "Landing");
     const fd = new FormData();
     fd.append("token", tok);
     fd.append("from", file ? "" : from);
     if (file) fd.append("bundle", file, file.name);
-    const j = await (await fetch("/api/move-land", {method: "POST", body: fd})).json().catch(() => ({error: "no answer"}));
+    // The bundle's bytes as they go, a bar under the button (the operator,
+    // 8 Nov: a large bundle sat for minutes with nothing moving); once sent,
+    // the landing itself (unpacking, the swap) with the word alone.
+    const box = b.closest("[data-movelandbox]"), prog = document.createElement("div");
+    prog.className = "field landprog";
+    if (box) box.append(prog);
+    const draw = (sent, total) => { prog.innerHTML = `<div class="sub">Sending the bundle: ${moveSize(sent)} of ${moveSize(total)}</div>${pctBar(total ? sent / total * 100 : 0, "bundle sent")}`; };
+    const j = await new Promise(resolve => {
+      const x = new XMLHttpRequest();
+      x.open("POST", "/api/move-land");
+      if (file) x.upload.onprogress = e => { if (e.lengthComputable) draw(e.loaded, e.total); };
+      x.upload.onload = () => { prog.innerHTML = `<div class="sub">Sent. Landing it: unpacking, then the swap<span class="dots"></span></div>`; busy(b, "Landing"); };
+      x.onload = () => { let r = {}; try{ r = JSON.parse(x.responseText); }catch(e){ r = {error: x.status === 200 ? "no answer" : `HTTP ${x.status}`}; } resolve(r); };
+      x.onerror = () => resolve({error: "the landing stopped: the connection dropped"});
+      x.send(fd);
+    });
+    prog.remove();
     if (j.error){ notify(j.error, true); unbusy(b, "Land it here"); return; }
     notify(`landed${j.from ? ` from ${j.from}` : ""}: the dashboard restarts on it, then sign in with an account it had${
       (j.said || []).length ? `. ${j.said.join(". ")}` : ""}`, (j.said || []).length > 0);

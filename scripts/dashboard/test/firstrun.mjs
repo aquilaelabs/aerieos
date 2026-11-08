@@ -406,10 +406,15 @@ await firstRun(false);
       out.orderHeld = !!step('Where the spaces and containers go')?.classList.contains('held')
         && /After step \d+, The old system's disks/.test(words('Where the spaces and containers go'));
       out.orderSaid = [step('Where the spaces and containers go')?.className, titles().join('|'), [...panel().querySelectorAll('section.setstep')].map(c => c.className + ':' + (c.querySelector('h3')?.textContent || '')).join(' / ')].join(' ## ');
-      { const jobsWere = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt' }]; redraw({});
+      { const jobsWere = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt', step: 'mounting /mnt/disk2', started: Math.floor(Date.now() / 1000) - 400 }]; redraw({});
         out.jobBand = panel().querySelector('.setjobband')?.textContent.replace(/\s+/g, ' ') || '';
         out.jobHeld = step("The old system's disks")?.querySelector('[data-adopt="adopt"]')?.disabled === true;
         n.jobs = jobsWere; redraw({}); out.jobGone = !panel().querySelector('.setjobband'); }
+      // Adopted writable, not taken over: the walk offers no Take (the
+      // operator, 8 Nov: the parity comes after, from This machine), and
+      // says where it comes from.
+      redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
+      out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -466,8 +471,9 @@ await firstRun(false);
     ok(walk.adopt && walk.toDo === 'to do' && walk.links === 0, `...the disks adopted in place, with no link leading away (${JSON.stringify([walk.adopt, walk.toDo, walk.links])})`);
     ok(walk.landHeld === true && walk.heldWhy, '...Land waiting on the disks, saying why');
     ok(walk.orderHeld, `...the pool step waits on the disks step, saying which (${walk.orderSaid})`);
-    ok(/adopting the old system's disks/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
-       `...and while a system job runs every step that would start another waits, the page saying what runs (${walk.jobBand})`);
+    ok(/adopting the old system's disks/.test(walk.jobBand) && /mounting \/mnt\/disk2, 6 min so far/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
+       `...and while a system job runs every step that would start another waits, the page saying what runs, its step and how long (${walk.jobBand})`);
+    ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);

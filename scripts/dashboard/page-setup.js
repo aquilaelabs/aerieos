@@ -82,7 +82,7 @@ function drawSetup(){
   // would otherwise take what was typed with it.
   setupPlaceAuto(s);
   const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
-                              s.git, s.claude, s.project, ((s.node || s.own)?.jobs || []).map(j => j.apply || ""), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
+                              s.git, s.claude, s.project, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
   const typed = setupKeepTyped(el);
@@ -384,7 +384,7 @@ function setupWalkHtml(s){
   if (s.own) cards.push(setupCard(++i, "This machine", !!s.node, !s.node, s.node
     ? `<p><b>${esc(s.node.name)}</b> is answering${s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}.</p>`
     : `<p>Its agent is coming up. The steps below need it, and this turns to done by itself.</p>`));
-  const parts = n && (plan || had?.mounts?.length) ? adoptParts(n) : null;
+  const parts = n && (plan || had?.mounts?.length) ? adoptParts(n, {take: false}) : null;
   if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
@@ -686,7 +686,14 @@ function setupInOrder(el, s){
   const head = el.querySelector(".setuphead, .setuppage > :first-child");
   const band = document.createElement("div");
   band.className = "field setjobband";
-  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span> One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
+  // What it is on and how long it has run, so a long one reads as going
+  // rather than stuck (the operator, 8 Nov); no bar, since a job measures
+  // nothing but its time (the progress rule).
+  const since = job.started ? Math.max(0, Math.floor(Date.now() / 1000 - job.started)) : 0;
+  const took = since >= 3600 ? `${Math.floor(since / 3600)} h ${Math.floor(since % 3600 / 60)} min` : since >= 60 ? `${Math.floor(since / 60)} min` : since ? `${since} s` : "";
+  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
+      job.step || took ? ` <span class="dim">${[job.step && esc(job.step), took && `${esc(took)} so far`].filter(Boolean).join(", ")}</span>` : ""
+    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
   if (head) head.after(band); else el.prepend(band);
   if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }

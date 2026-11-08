@@ -130,9 +130,11 @@ def _node_list(all=False):
     # followed the press: pressing() grays it for the round trip, and then
     # the render put a fresh, enabled one in its place. Update agent did
     # exactly that, which is what the operator kept seeing.
-    for j in _rows("SELECT id, node, type, spec, state FROM jobs WHERE "
+    for j in _rows("SELECT id, node, type, spec, state, step, started FROM jobs WHERE "
                    "state IN ('queued', 'assigned', 'running')"):
-        entry = {"id": j["id"], "type": j["type"], "state": j["state"]}
+        # Its step and when it started ride along (the operator, 8 Nov): a
+        # page holding its steps behind the job says what runs and how long.
+        entry = {"id": j["id"], "type": j["type"], "state": j["state"], "step": (j["step"] or "")[:60], "started": j["started"] or 0}
         inflight.setdefault(j["node"], []).append(entry)
         if j["type"] != "system":
             continue
@@ -1807,7 +1809,9 @@ def _census(c):
                            "projects_bound": s.get("projects_bound") is True,
                            "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else "",
                            # Pools holding another install's folder, set aside if picked.
-                           "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16]}
+                           "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16],
+                           # The stick's own partition: its size and its room, from an agent that says them.
+                           **{k: kb(s.get(k)) for k in ("var_total_mb", "var_free_mb") if kb(s.get(k)) is not None}}
     # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
@@ -4078,6 +4082,26 @@ def storage_attention():
                 if not x.get("mounted"):
                     out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "array", "bad": True, "key": f"array:{n['id']}:{kind}{x.get('slot')}",
                                 "said": f"the array's {kind}{x.get('slot')} ({x.get('id') or 'unknown disk'}) is not mounted: the disk is gone or failed; Replace on the Storage page rebuilds it"})
+        # An old system's array adopted writable and not taken over (the
+        # operator, 8 Nov): its files change with no parity behind them until
+        # Take the array over on This machine builds SnapRAID's. A standing
+        # row, not dismissed: it leaves when the array is taken or released.
+        ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+        if ad.get("writable") and "taken" in ad and not ad.get("taken") and (ad.get("parity") or []) and not (ar.get("data") or []):
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "untaken", "bad": False, "key": "",
+                        "said": "the old system's disks are writable with no parity behind them: Take the array over, under Adopted disks on This "
+                                "machine, builds SnapRAID's parity on the old parity disk, in the background; until then a disk lost loses its files"})
+        # The stick's own partition running out of room (the operator, 8
+        # Nov: it filled, and the controller went down with it): said while
+        # it has under a tenth left or under a gigabyte, with what takes the
+        # weight off it.
+        st = rep.get("os_stick") if isinstance(rep.get("os_stick"), dict) else {}
+        total, free = st.get("var_total_mb"), st.get("var_free_mb")
+        if st.get("stick") and isinstance(total, int) and isinstance(free, int) and total > 0 and (free < 1024 or free * 10 < total):
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "stick", "bad": free < 512, "key": f"stick:room:{n['id']}:{free // 256}",
+                        "said": f"the stick's own partition has {free / 1024:.1f} GB free of {total / 1024:.1f} GB, and the controller stops when it is full"
+                                + (": name a system pool under Pool and spaces on This machine, which takes docker, the VMs, the spaces and the secrets off it"
+                                   if not st.get("ready") else ": the Storage page says what is on it")})
         # The last Check parity's result (R163 step 15), until dismissed:
         # clean, or what differed and what was or could not be corrected.
         v = ar.get("verify") if isinstance(ar.get("verify"), dict) else {}

@@ -175,6 +175,9 @@ function stickSection(n){
     ["The spaces", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
+    // The stick's own partition, which the controller stops with when it is full (the operator, 8 Nov).
+    ...(typeof s.var_total_mb === "number" ? [["Room on the stick", `${gb(s.var_free_mb * 1024)} free of ${gb(s.var_total_mb * 1024)}`,
+        {cls: s.var_free_mb < 1024 || s.var_free_mb * 10 < s.var_total_mb ? (s.var_free_mb < 512 ? "bad" : "warn") : ""}]] : []),
   ];
   const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
@@ -313,7 +316,7 @@ function adoptBackSection(n){
 
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
-function adoptParts(n){
+function adoptParts(n, {take = true} = {}){
   const had = n.reported?.adopted;
   if (had && (had.mounts || []).length){
     const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
@@ -322,10 +325,14 @@ function adoptParts(n){
     // Taking the array over (R163 step 3): SnapRAID's parity on the old
     // parity disk, the data disks writable where they are; offered by an
     // agent that has it, where the old parity disk is here.
-    const canTake = "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
+    // The first-run walk leaves it out (the operator, 8 Nov): the parity
+    // is built after the walk, from here, and the bell says so until it is.
+    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
+        : had.writable && !take
+        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on This machine, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
         : had.writable
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>

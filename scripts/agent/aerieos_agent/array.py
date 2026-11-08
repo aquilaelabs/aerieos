@@ -20,8 +20,10 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 
+from .base import log
 from .disks import disks_now, moved
 from .pools import by_id, _out
 
@@ -198,15 +200,30 @@ def stale_content():
             os.unlink(x)
 
 
+def on_stick():
+    """Whether this machine runs AerieOS from a stick (its root in memory,
+    its /var the stick's own small partition): the kernel's command line
+    says so (aerietoram=1)."""
+    try:
+        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
+            return "aerietoram=1" in f.read().split()
+    except OSError:
+        return False
+
+
 def render_snapraid(rec):
     """snapraid.conf from the record: the parity files on the parity disks,
-    a content file on the system and on every data disk, each data disk by
-    its slot."""
+    a content file on every data disk and, on a machine installed to a disk,
+    one on the system too; never on a stick (the operator, 8 Nov): the
+    content file is a catalogue of every block of the array, gigabytes for
+    a large one and rewritten whole at every autosave, which filled the
+    stick's own partition and took the controller down with it."""
     out = ["# Written by AerieOS (the Storage page): the array's SnapRAID layout. Do not edit; the page writes it whole.\n"]
     for p in rec.get("parity") or []:
         n = int(p["slot"])
         out.append(f"{'' if n == 1 else f'{n}-'}parity {slot_mount('p', p)}/snapraid.{'' if n == 1 else f'{n}-'}parity\n")
-    out.append(f"content {CONTENT}\n")
+    if not on_stick():
+        out.append(f"content {CONTENT}\n")
     for d in rec.get("data") or []:
         out.append(f"content {slot_mount('d', d)}/.snapraid.content\n")
     for d in rec.get("data") or []:
@@ -260,6 +277,17 @@ def _df(path):
         return 0, 0
 
 
+# The SnapRAID run going in the background (background_run): one at a time,
+# its progress in the state for the census, and the thread itself so a
+# state left by an agent that restarted mid-run is told from a live one.
+_BG = {"thread": None, "what": ""}
+
+
+def bg_alive():
+    t = _BG.get("thread")
+    return bool(t and t.is_alive())
+
+
 def array_now():
     """{policy, mount, data: [{slot, id, fs, size_mb, used_mb, mounted}],
     parity: [...], last_sync, last_scrub, last_check, status, running} for
@@ -268,6 +296,12 @@ def array_now():
     if not rec:
         return {}
     st = _state()
+    # A run the state says is going with no thread behind it stopped with
+    # the agent (a restart, an update): said once, and Sync now resumes it
+    # from the content files SnapRAID saved as it went.
+    if st.get("running") in ("sync", "scrub") and not bg_alive() and st.get("bg"):
+        _state_set(running="", progress="", bg=False, status=f"the {st['running']} stopped with the agent; Sync now resumes it")
+        st = _state()
 
     def row(kind, x):
         m = slot_mount(kind, x)
@@ -638,10 +672,64 @@ class ArrayMixin:
                 return "failed", 1
         arec["taken"] = True
         adopt.write_record(arec)
-        say("building the parity: the array is unprotected until this ends\n")
-        rc = run_snapraid("sync", key="last_sync")
+        # The first sync builds the parity from nothing, hours for a large
+        # array: run in the background, so this job ends and the machine's
+        # other jobs (a system pool, a spaces folder) are not held behind
+        # it (the operator, 8 Nov); its progress is the array's, on This
+        # machine and the Storage page.
+        why = self.background_run("sync", [snapraid, "sync"], key="last_sync", rec=rec)
+        if why:
+            say(f"taken over, but the first sync did not start: {why}\n")
+            self.hello_again("the array was taken over")
+            return "failed", 1
+        say("taken over: the parity is being built in the background, hours for a large array; the array is unprotected until it ends, "
+            "and its progress is on This machine and the Storage page\n")
         self.hello_again("the array was taken over")
-        return ("succeeded", 0) if rc == 0 else ("failed", rc)
+        return "succeeded", 0
+
+    def background_run(self, what, argv, key=None, rec=None, timeout=172800):
+        """A long SnapRAID run (a sync, a scrub) on a thread of its own, the
+        job that asked for it ending at once: its progress in the array's
+        state every ten seconds for the census, the lines it says in the
+        agent's journal, and last_* and status set when it ends. "" when it
+        started, else why not (one at a time; a disk not mounted)."""
+        rec = rec if rec is not None else read_record()
+        st = _state()
+        if st.get("running"):
+            return f"a {st['running']} is running on the array already; one at a time"
+        missing = unmounted_slots(rec)
+        if missing:
+            return (f"{', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not mounted, and SnapRAID run without "
+                    f"{'it' if len(missing) == 1 else 'them'} would write its parity into memory or read a missing disk as emptied")
+        _state_set(running=what, progress="", bg=True, status="")
+        last = [0.0]
+
+        def progressed(pct, rate):
+            if time.time() - last[0] >= 10 or pct >= 100:
+                last[0] = time.time()
+                _state_set(progress=f"{pct}%" + (f", {rate} MB/s" if rate else ""))
+
+        def run():
+            began = time.time()
+            log(f"array: {what} started in the background")
+            try:
+                rc, text = run_watched(argv, lambda line: None, progressed, timeout=timeout)
+            except OSError as e:
+                rc, text = 1, f"{argv[0]}: {e}"
+            took = int(time.time() - began)
+            tail = " ".join(text.splitlines()[-3:])[:400]
+            if rc == 0:
+                _state_set(running="", progress="", bg=False, status="", **({key: int(time.time())} if key else {}))
+                log(f"array: {what} finished in {took} s")
+            else:
+                _state_set(running="", progress="", bg=False, status=f"the {what} failed ({rc}): {tail}"[:400])
+                log(f"array: {what} failed ({rc}) after {took} s: {tail}")
+            with contextlib.suppress(Exception):
+                self.hello_again(f"the array's {what} ended")
+        t = threading.Thread(target=run, name=f"array-{what}", daemon=True)
+        _BG.update(thread=t, what=what)
+        t.start()
+        return ""
 
     def _apply_storage_array(self, job, cfg):
         say = job.say
@@ -973,10 +1061,16 @@ class ArrayMixin:
             if action == "check":
                 rc = run_snapraid("status", key="last_check", timeout=3600)
                 _state_set(status=" ".join(job.text().splitlines()[-3:])[:400] if hasattr(job, "text") else "")
-            elif action == "sync":
-                rc = run_snapraid("sync", key="last_sync")
             else:
-                rc = run_snapraid("scrub", key="last_scrub")
+                # Hours for a large array: in the background, the job ending
+                # now, so nothing else on the machine waits behind it.
+                why = self.background_run(action, [snapraid, action], key=f"last_{action}", rec=rec)
+                if why:
+                    say(f"refused: {why}\n")
+                    return "failed", 75
+                say(f"{action} started in the background: its progress is on the Storage page, and the array's row says when it ends\n")
+                self.hello_again(f"the array's {action} started")
+                return "succeeded", 0
         else:
             if not rec:
                 say("refused: no array here yet\n")

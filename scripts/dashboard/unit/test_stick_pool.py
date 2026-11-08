@@ -318,6 +318,8 @@ class TheAgent(unittest.TestCase):
                 f.write('echo \'{"stick": true, "pool": "/mnt/fast", "ready": true, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12}\'\n')
             with mock.patch.dict(os.environ, {"BB_OS_POOL": fake}):
                 got = self.av.stick_status()
+            # The stick's own partition's room rides along, measured here.
+            self.assertTrue(isinstance(got.pop("var_total_mb"), int) and isinstance(got.pop("var_free_mb"), int))
             self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12,
                                    "projects": "", "projects_bound": False, "projects_home": "", "others": []})
             with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "none")}):

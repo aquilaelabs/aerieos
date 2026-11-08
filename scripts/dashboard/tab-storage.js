@@ -587,6 +587,7 @@ function storageArray(n){
     const total = (a.data || []).reduce((s, x) => s + (x.size_mb || 0), 0), usedT = (a.data || []).reduce((s, x) => s + (x.used_mb || 0), 0);
     body = `<div class="row stack2"><div class="grow">
         <div class="name">${esc(a.mount || "/mnt/array")} <span class="pill${a.mounted ? " ok" : " bad"}">${a.mounted ? "mounted" : "not mounted"}</span>${a.running ? ` <span class="pill warn">${esc(a.running === "verify" ? "parity check" : a.running)} running${a.progress ? `, ${esc(a.progress)}` : ""}</span>` : ""}</div>
+        ${pctBar(a.running ? a.progress : "", `${a.running === "verify" ? "parity check" : a.running} progress`)}
         <div class="ndmeters">${meter("used", total ? usedT / total * 100 : 0, `${sgb(usedT)} / ${sgb(total)}`, `${(a.data || []).length} data, ${(a.parity || []).length} parity`)}</div>
         ${factGrid([["Last sync", when(a.last_sync)], ["Last scrub", when(a.last_scrub)], ["Last check", when(a.last_check)],
                     ...("verify" in a ? [["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}]] : []),

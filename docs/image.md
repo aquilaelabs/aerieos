@@ -130,7 +130,10 @@ line saying which step it waits for, until the ones before it are done, and
 while the machine runs a job (adopting the disks, moving to a pool) every step
 that would start another waits for it, the page saying what runs. **Walk me
 through it** and **Set up a new one instead** go between the walk and a new
-start. A
+start. The stick's own partition is small (a few gigabytes until a system
+pool takes docker, the spaces and the secrets off it), and This machine says
+how much room it has left, as the bell does when it runs low: the
+controller stops when it is full. A
 pool the machine adopted can be the system pool whatever its filesystem; a
 data disk cannot, since it carries the old system's parity. **Read only**
 writes nothing to the data disks, so with no writable pool nothing new has
@@ -307,9 +310,19 @@ share settings offered to serve as the old system did. **Take the array
 over** (after **Check the takeover**, which says every step and changes
 nothing) makes the data disks writable where they are, never formatting
 one, gives the old parity disk's first partition a filesystem for
-SnapRAID's parity, and builds the parity with a first sync, the array
-unprotected until it ends. The array then appears on the Storage page with
-its sync, scrub and Check parity. Each share keeps its places as the old
+SnapRAID's parity, and starts the first sync, which builds the parity from
+nothing. That sync runs in the background, hours for a large array, with
+its progress on This machine and the Storage page (a bar, since SnapRAID
+says how far it is): the takeover's job ends at once, so the machine's
+other jobs are not held behind it. The array is unprotected until the sync
+ends. Taking the array over is not a step of the first-run walk: it is
+done from here afterwards, and the bell carries a row saying the array
+has no parity yet, with This machine on it, until it is taken over or the
+disks are released. SnapRAID's content files, its catalogue of every block
+of the array, live on the data disks; on a stick none goes on the stick's
+own partition, where one for a large array would fill it. The array then
+appears on the Storage page with its sync, scrub and Check parity, each a
+run in the background too. Each share keeps its places as the old
 system had them: where its new files land (a pool, or the array) and what
 the mover does with them, from what to what (a pool to the array, the
 array to a pool, one pool to another, or nothing). They are set before the

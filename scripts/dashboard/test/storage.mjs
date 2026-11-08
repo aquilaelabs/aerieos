@@ -139,6 +139,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     if (!sect){ lay(ARR); sect = await sectOf(); }
     const out = { sects: [...document.querySelectorAll('.storagetab details[data-sect]')].map(x => x.dataset.sect),
                   text: sect?.textContent.replace(/\s+/g, ' ') || '', btn: !!sect?.querySelector('[data-starray="verify"]'),
+                  bar: sect?.querySelector('progress.pbar')?.value,
                   sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
     // Pressing it asks first: Check, or Check and correct.
     sect.querySelector('[data-starray="verify"]').click();
@@ -167,6 +168,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     out.older = !!document.querySelector('.storagetab details[data-sect="storage:array"]') && !document.querySelector('.storagetab [data-starray="verify"]');
     return out;
   });
+  ok(got.bar === 45, `a run that says how far it is wears a bar at that mark (${got.bar})`);
   ok(got.btn && /parity check running, 45%, 120 MB\/s/.test(got.text) && /Last parity check.*3 differed, 2 corrected, 1 could not be/.test(got.text) && got.sched.includes('verify'),
      `the array offers Check parity, says its progress and its last result, and schedules it (${got.text.slice(0, 220) || JSON.stringify(got)})`);
   ok(got.older, 'an agent from before Check parity is not offered it');

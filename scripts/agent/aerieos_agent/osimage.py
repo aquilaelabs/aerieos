@@ -412,7 +412,14 @@ def stick_status():
         return {}
     if not isinstance(d, dict) or not d.get("stick"):
         return {"stick": False}
-    return {"stick": True, "pool": str(d.get("pool") or "")[:200], "ready": d.get("ready") is True,
+    # The stick's own partition (/var): how much room it has, since what
+    # fills it takes the controller down (the operator, 8 Nov).
+    try:
+        du = shutil.disk_usage(_env("BB_SP_VAR", "/var"))
+        room = {"var_total_mb": du.total >> 20, "var_free_mb": du.free >> 20}
+    except OSError:
+        room = {}
+    return {"stick": True, "pool": str(d.get("pool") or "")[:200], "ready": d.get("ready") is True, **room,
             "on_stick": [str(x)[:20] for x in (d.get("on_stick") or [])][:8],
             "written_kb": d.get("written_kb") if isinstance(d.get("written_kb"), int) else None,
             "boot_written_kb": d.get("boot_written_kb") if isinstance(d.get("boot_written_kb"), int) else None,
