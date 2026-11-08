@@ -4,6 +4,7 @@ menu and This machine; only an image that can boot that way, the oldest going
 first, never stopping the update. A visit lasts one boot: the configuration a
 visit needs goes in and comes back when it ends."""
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -247,6 +248,51 @@ class TheBoot(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(d, "work", "kept-set-aside")))
             seen = [x for x in os.listdir(os.path.join(d, "work")) if x.endswith("-visit")]
             self.assertEqual(read(d, "work", seen[0], "config", "state.json"), "its, changed on the visit", "never deleted")
+
+
+class LogsKept(unittest.TestCase):
+    def test_the_logs_ram_disks_come_across_by_a_bind_and_the_rest_by_a_move(self):
+        # B730: mount --move is refused under systemd's shared mounts, so a
+        # stick's logs RAM disk landed on the stick; ci-logs was not carried.
+        with tempfile.TemporaryDirectory() as d:
+            fakes = os.path.join(d, "bin")
+            os.makedirs(fakes)
+            calls = os.path.join(d, "calls")
+            for name, body in (("mountpoint", 'case "$2" in */logs) exit 0 ;; esac\nexit 1\n'),
+                               ("mount", f'echo "mount $*" >> {calls}\n'), ("umount", f'echo "umount $*" >> {calls}\n')):
+                with open(os.path.join(fakes, name), "w") as f:
+                    f.write("#!/bin/sh\n" + body)
+                os.chmod(os.path.join(fakes, name), 0o755)
+            slot = os.path.join(d, "slot")
+            open(slot, "w").write('#!/bin/sh\necho no\n')
+            opt = os.path.join(d, "opt")
+            os.makedirs(os.path.join(opt, "scripts", "dashboard"))
+            open(os.path.join(opt, "scripts", "dashboard", "stateversion.py"), "w").write(
+                "import sys\nsys.exit(0 if sys.argv[1] == 'newer' else 78)\n")
+            rel = os.path.join(d, "release")
+            open(rel, "w").write("BUILDERBOT_OS_VERSION=0.9.1\n")
+            state = os.path.join(d, "var", "config")
+            for sub in ("logs", "ci-logs"):
+                os.makedirs(os.path.join(state, sub))
+            open(os.path.join(state, "state.json"), "w").write("newer")
+            open(os.path.join(state, "ci-logs", "run.log"), "w").write("a run")
+            os.makedirs(os.path.join(d, "old", "config"))
+            open(os.path.join(d, "old", "config", "state.json"), "w").write("before")
+            os.makedirs(os.path.join(d, "work", "before"))
+            with tarfile.open(os.path.join(d, "work", "before", "0.9.1.tar.gz"), "w:gz") as t:
+                t.add(os.path.join(d, "old", "config"), arcname="config")
+            cmd = os.path.join(d, "cmd")
+            open(cmd, "w").write("aerieslot=a\n")
+            env = dict(os.environ, PATH=fakes + ":" + os.environ["PATH"], BB_OS_SLOT=slot, BB_OS_WORK=os.path.join(d, "work"),
+                       BB_OS_STATE=state, BB_OS_OPT=opt, BB_OS_RELEASE=rel, BB_CMDLINE=cmd)
+            r = subprocess.run(["bash", os.path.join(OS, "restore-before")], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(read(state, "state.json"), "before", r.stdout + r.stderr)
+            self.assertEqual(read(state, "ci-logs", "run.log"), "a run", "ci-logs came across with the configuration")
+            said = open(calls).read()
+            self.assertRegex(said, r"mount --bind \S+/config/logs " + re.escape(os.path.join(state, "logs")))
+            self.assertIn("umount -l", said)
+            self.assertNotIn("--move", said)
 
 
 class MenuPick(unittest.TestCase):

@@ -1054,16 +1054,14 @@ ok(execFileSync('git', ['-C', A, 'log', '-1', '--format=%s'], { env }).toString(
 ok(!execFileSync('git', ['-C', A, 'status', '--porcelain'], { env }).toString().includes('VERSION'),
    '...leaving no dirty VERSION behind');
 
-// The policy control is the answer to "when should this be incremented" for
-// a session: the operator decides how much of the decision to delegate.
-// Staged like a bump: the pick alone writes nothing, and the Version
-// section's own Save is what commits it (docs/design-language.md, Settings).
-await page.selectOption(`${NB} #verPolicy`, 'minor');
-await page.waitForFunction(() => [...document.querySelectorAll('.nb #verBox .verpol')]
-  .some(e => /staged: on Save/.test(e.textContent)), null, { timeout: 10000 });
-ok((await page.evaluate(async () => (await (await fetch('/api/version?project=alpha')).json()).policy)) !== 'minor',
-   'picking a policy stages it and writes nothing yet');
-await page.click(`${NB} [data-ssave="artifacts:version"]`);
+// The policy is the answer to "when should this be incremented" for a
+// session: the operator decides how much of the decision to delegate. The
+// Version section says it and opens the Permissions view, where it is set
+// beside every other dial (R223); that view writes it with the same call.
+ok(await page.$eval(`${NB} #verBox .verpol`, e => /Agent access/.test(e.textContent) && !!e.querySelector('[data-verpolgo]')),
+   'the Version section says the agent\'s access and offers Change on Permissions');
+const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).status);
+ok(polSet === 200, `the policy is written as the Permissions view writes it (${polSet})`);
 await page.waitForFunction(async () => {
   const r = await fetch('/api/version?project=alpha');
   return (await r.json()).policy === 'minor';

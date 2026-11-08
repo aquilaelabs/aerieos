@@ -1443,7 +1443,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // Oct): it is a row under Also works on, marked Hosting only, and
     // nothing else.
     await page.evaluate(async () => { nodesList = null; await loadNodes(); });
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     await page.waitForFunction(id => [...document.querySelectorAll('#rnNodesMore input')].some(i => i.value === id), minted.id, { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id))
@@ -1539,7 +1539,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        && /disabled/.test(await page.$eval(`${ROW} .name .pill`, e => e.textContent))
        && /disabled on the Nodes page/.test(dis.error || ''),
        `Disable asks, marks the row disabled, and a space may not add it until Enable (${dis.error})`);
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id)),
        '...and the space settings\' node picker does not offer it');
@@ -1584,7 +1584,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const hostsNow = await gammaHosts(minted.id);
     ok(!hosted.error && hostsNow.join() === minted.id,
        `...but a space may name it under Hosts its containers on (${hosted.error || hostsNow.join()})`);
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector(`#rnNodesMore:not([hidden]) input[value="${minted.id}"]:checked`, { timeout: 10000 });
     ok(/\(Hosting only\)$/.test(await page.$eval(`#rnNodesMore input[value="${minted.id}"]`, i => i.parentElement.querySelector('span').textContent))
        && await page.$eval('.rnbar[data-rnbar="runs"] [data-rnsave]', b => b.disabled),
