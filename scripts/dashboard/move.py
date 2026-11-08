@@ -35,6 +35,7 @@ first entry, bundle.json, says the manifest carries that MAC.
 """
 import base64
 import contextlib
+import errno
 import hashlib
 import hmac
 import io
@@ -565,35 +566,41 @@ def _manifest_held(path, key, work):
     return ""
 
 
+# The manifest's room ahead of the body: the line is padded to it with
+# spaces (whitespace JSON reads past), so the body is written once, in
+# place, rather than to a file beside it and copied after, which needed
+# twice the bundle's size free on the disk it was packed on.
+MANIFEST_SLOT = 64 << 10
+
+
 def write_bundle(dest, header, manifest, key, **pack_kw):
     """A bundle written to `dest` as it is packed, never whole in memory:
     `header`, the manifest line (`manifest(counts)`, a dict, its format
-    set here), then the body sealed under `key` a piece at a time. The body
-    goes first to a file beside `dest`, since the manifest names its counts,
-    and is copied after it. Returns (manifest, counts)."""
+    set here), then the body sealed under `key` a piece at a time. The
+    manifest names the body's counts, so its line is a slot of spaces
+    filled in once the body is written. Returns (manifest, counts)."""
     dest = Path(dest)
-    body = dest.with_name(dest.name + ".body")
     # The database's log folded into it first, so the copy is not torn (B601).
     with contextlib.suppress(Exception):
         checkpoint()
-    try:
-        with open(body, "wb") as f:
-            sealer = _Sealer(f, key)
-            with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
-                mark = json.dumps({"mac": True}).encode()
-                info = tarfile.TarInfo(MANIFEST_MARK)
-                info.size, info.mtime, info.mode = len(mark), int(time.time()), 0o600
-                tar.addfile(info, io.BytesIO(mark))
-                counts = _pack_into(tar, **pack_kw)
-            sealer.finish()
+    with open(dest, "wb") as out:
+        out.write(header)
+        out.write(b" " * (MANIFEST_SLOT - 1) + b"\n")
+        sealer = _Sealer(out, key)
+        with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
+            mark = json.dumps({"mac": True}).encode()
+            info = tarfile.TarInfo(MANIFEST_MARK)
+            info.size, info.mtime, info.mode = len(mark), int(time.time()), 0o600
+            tar.addfile(info, io.BytesIO(mark))
+            counts = _pack_into(tar, **pack_kw)
+        sealer.finish()
         m = dict(manifest(counts), format=FORMAT)
         m["mac"] = _manifest_mac(key, m)
-        with open(dest, "wb") as out, open(body, "rb") as f:
-            out.write(header)
-            out.write(json.dumps(m).encode() + b"\n")
-            shutil.copyfileobj(f, out, 1 << 20)
-    finally:
-        body.unlink(missing_ok=True)
+        line = json.dumps(m).encode()
+        if len(line) >= MANIFEST_SLOT:
+            raise OSError(f"the bundle's details ran past their {MANIFEST_SLOT >> 10} KiB")
+        out.seek(len(header))
+        out.write(line + b" " * (MANIFEST_SLOT - 1 - len(line)))
     return m, counts
 
 
@@ -730,23 +737,39 @@ def pack_bundle():
                 "packed_at": int(time.time()), "from": page_url(), "to": d.get("to", ""), "repos": bool(d.get("repos")),
                 "carries_key": bool(d.get("carries_key") and counts.get("install_key")),
                 "nodes": list(node_ids()), "bare_metal": bool(bare_metal()), "counts": counts, "token_hash": d.get("token_hash", "")}
+    # The bundle before goes first: it is the state as it was then, never
+    # what moves, and kept while the new one was packed it took its room
+    # twice over on a disk the bundle may only just fit.
+    for old in out_dir.glob("*"):
+        if old.suffix in BUNDLE_SUFFIXES or old.name.endswith((".partial", ".body")):
+            old.unlink(missing_ok=True)
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
                                         stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
+        os.replace(tmp, out_dir / name)
+        with _lock:
+            d = _load()
+            d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
+            _save(d)
     except OSError as e:
         tmp.unlink(missing_ok=True)
-        return {"error": f"the bundle could not be written: {e.strerror or e}"}
-    os.replace(tmp, out_dir / name)
-    with _lock:
-        d = _load()
-        for old in out_dir.glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
-            if old.name != name:
-                old.unlink(missing_ok=True)
-        d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
-        _save(d)
+        (out_dir / name).unlink(missing_ok=True)
+        return {"error": f"the bundle could not be written: {_no_room_said(e, out_dir, bool(d.get('repos')))}"}
     return {"ok": True, "bundle": name, "size": d["size"], "counts": counts}
+
+
+def _no_room_said(e, where, repos):
+    """An error packing a bundle as a sentence; a full disk said with
+    where it is and what to do about it."""
+    if getattr(e, "errno", None) != errno.ENOSPC:
+        return str(e.strerror or e)
+    try:
+        free = f"{shutil.disk_usage(str(where)).free / 1e9:.1f} GB"
+    except OSError:
+        free = "too little"
+    return (f"the disk holding this controller's state ({where}) filled up: {free} free once the unfinished bundle was removed. "
+            + ("Free room there, or prepare the move again without the repositories, which then move by naming their folder on the new home"
+               if repos else "Free room there and try again"))
 
 
 # A backup of the controller under a token of its own (the operator, 6 Nov):
@@ -782,10 +805,10 @@ def backup_bundle(principal, repos=False, carry_key=False, stores=None):
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(repos), carry_key=bool(carry_key),
                                         stores=set(stores) if stores is not None else None)
+        os.replace(tmp, out_dir / name)
     except OSError as e:
         tmp.unlink(missing_ok=True)
-        return {"error": f"the backup could not be written: {e.strerror or e}"}
-    os.replace(tmp, out_dir / name)
+        return {"error": f"the backup could not be written: {_no_room_said(e, out_dir, bool(repos))}"}
     for old in out_dir.glob("*"):
         if old.name != name:
             old.unlink(missing_ok=True)

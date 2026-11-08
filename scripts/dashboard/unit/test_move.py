@@ -91,6 +91,43 @@ class Move(unittest.TestCase):
         self.assertTrue(got.get("ok"), got)
         self.assertEqual((self.tmp / "new-ws" / "alpha" / "big.bin").read_bytes(), (self.ws / "alpha" / "big.bin").read_bytes())
 
+    def test_a_bundle_is_packed_in_place_and_the_one_before_goes_first(self):
+        # A full disk on the old home (the operator, 8 Nov): the body went to
+        # a file beside the bundle and was copied after, and the bundle
+        # before stayed until the new one was done, so packing took three
+        # times the bundle's room.
+        (self.ws / "alpha" / "big.bin").write_bytes(os.urandom(256 << 10))
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        first = move.bundle_path()
+        seen, real = [], move._pack_into
+
+        def watching(tar, **kw):
+            seen.append(sorted(p.name for p in first.parent.iterdir()))
+            return real(tar, **kw)
+        with mock.patch.object(move, "_pack_into", watching):
+            self.assertTrue(move.pack_bundle().get("ok"))
+        self.assertEqual(len(seen), 1)
+        self.assertNotIn(first.name, seen[0], "the bundle before is gone before the new one is packed")
+        self.assertTrue(all(n.endswith(".partial") for n in seen[0]), seen[0])
+        now = move.bundle_path()
+        self.assertEqual(sorted(p.name for p in now.parent.iterdir()), [now.name], "no body beside it, nothing left over")
+        line = now.read_bytes().split(b"\n")[1]
+        self.assertEqual(len(move.HEADER) + len(line) + 1, len(move.HEADER) + move.MANIFEST_SLOT)
+        self.assertEqual(json.loads(line)["format"], 2, "the slot reads as the manifest")
+        self.assertTrue(self._land(now, r["token"]).get("ok"))
+
+    def test_a_full_disk_while_packing_is_said_as_a_sentence(self):
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        self.assertTrue(r.get("ok"))
+
+        def full(tar, **kw):
+            raise OSError(28, "No space left on device")
+        with mock.patch.object(move, "_pack_into", full):
+            got = move.pack_bundle()
+        self.assertIn("filled up", got.get("error", ""))
+        self.assertIn("without the repositories", got["error"])
+        self.assertEqual([p for p in (self.state / "move").iterdir() if p.suffix != ".json"], [], "nothing half written is left")
+
     def test_a_landings_upload_is_read_a_megabyte_at_a_time(self):
         # The bundle part straddles the reader's megabyte edges, and its
         # bytes hold the boundary's start (never the whole: a browser picks
