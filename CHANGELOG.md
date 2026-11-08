@@ -5,6 +5,7 @@
 ### Added
 
 - A stick offered a pool that holds another AerieOS install's folder now offers to set that folder aside (renamed to aerieos-system.old, then .old-2 and on, untouched) and use the pool, where it only refused; the picker says so before you press (ee21eac)
+- A Files page under Machines: browse, preview, upload, download, rename, move and delete files on a node's pools, array, shares and mounted disks, for administrators, every change in the audit log; a delete goes to that disk's .aerieos-trash folder. A node's agent serves it once updated (8458483)
 
 ### Fixed
 
