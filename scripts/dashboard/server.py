@@ -6088,8 +6088,8 @@ GET_ROUTES = (
     ("prefix", "/api/docker", "_get_docker"),
     ("prefix", "/api/containers", "_get_containers"),
     ("exact", "/api/vms", "_get_vms"),
-    ("exact", "/api/files", "_get_files"),
-    ("exact", "/api/files/read", "_get_files_read"),
+    ("exact", "/api/node-files", "_get_node_files"),
+    ("exact", "/api/node-files/read", "_get_node_files_read"),
     ("prefix", "/api/project-job", "_get_project_job"),
     ("prefix", "/api/trash", "_get_trash"),
     ("prefix", "/api/claude-now", "_get_claude_now"),
@@ -6165,7 +6165,7 @@ POST_ROUTES = (
     ("prefix", "/api/pin", "_pin"),
     ("exact", "/api/reset", "_reset"),
     ("exact", "/api/move", "_move"),
-    ("exact", "/api/files", "_files"),
+    ("exact", "/api/node-files", "_node_files"),
     ("exact", "/api/backup", "_backup"),
     ("prefix", "/api/create", "_create"),
     ("prefix", "/api/profile", "_profile"),
@@ -8496,17 +8496,17 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return self._json(devapp.containers())
 
-    def _files_admin(self):
+    def _node_files_admin(self):
         """Whether the asker may use the file explorer: an administrator,
         signed in as themselves (R224)."""
         me = self._who() or {}
         return bool(users.is_admin(me)) and not me.get("session")
 
-    def _get_files(self):
-        """GET /api/files?node=&root=&path= (R224): the node's roots, and
+    def _get_node_files(self):
+        """GET /api/node-files?node=&root=&path= (R224): the node's roots, and
         with a root the folder's listing; an administrator's."""
         q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-        if not self._files_admin():
+        if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         nid, root = q.get("node", [""])[0], q.get("root", [""])[0]
         n = nodes.node(nid) if nid else None
@@ -8521,12 +8521,12 @@ class Handler(BaseHTTPRequestHandler):
             out.update(got)
         return self._json(out)
 
-    def _get_files_read(self):
-        """GET /api/files/read?node=&root=&path=[&dl=1] (R224): a file's
+    def _get_node_files_read(self):
+        """GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's
         bytes streamed from its node, a download or shown in the page;
         nothing it holds runs here (a page or a script is sent as text)."""
         q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-        if not self._files_admin():
+        if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         nid, root, path = q.get("node", [""])[0], q.get("root", [""])[0], q.get("path", [""])[0]
         tg = fileexplorer._target(True, nid, root)
@@ -8576,12 +8576,12 @@ class Handler(BaseHTTPRequestHandler):
             up.close()
         return None
 
-    def _files_upload(self):
-        """POST /api/files/upload?node=&root=&path=&name= (R224): the
+    def _node_files_upload(self):
+        """POST /api/node-files/upload?node=&root=&path=&name= (R224): the
         request's body, the file itself, streamed to its node a megabyte
         at a time; an administrator's, audited."""
         q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-        if not self._files_admin():
+        if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         if (cross := self._ws_cross_origin()):
             return self._json({"error": cross}, 403)
@@ -8621,10 +8621,10 @@ class Handler(BaseHTTPRequestHandler):
             db.audit(self._principal(), "files-upload", f"{tg['node'].get('name')}:{root}/{path.strip('/')}/{name}"[:120], {"size": n})
         return self._json(got, status)
 
-    def _files(self, req):
-        """POST /api/files (R224): mkdir, rename or delete (into the root's
+    def _node_files(self, req):
+        """POST /api/node-files (R224): mkdir, rename or delete (into the root's
         trash) on a node's root; an administrator's, audited."""
-        got, status = fileexplorer.act(self._principal(), self._files_admin(), field(req, "node"), field(req, "root"),
+        got, status = fileexplorer.act(self._principal(), self._node_files_admin(), field(req, "node"), field(req, "root"),
                                        field(req, "action"), path=str(req.get("path") or ""), name=str(req.get("name") or ""),
                                        dest=str(req.get("dest") or ""))
         return self._json(got, status)
@@ -9097,8 +9097,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0] == "/api/move-land":
             return self._move_land()
         # ...and a file put on a machine from the file explorer (R224), streamed through.
-        if self.path.split("?")[0] == "/api/files/upload":
-            return self._files_upload()
+        if self.path.split("?")[0] == "/api/node-files/upload":
+            return self._node_files_upload()
         req = self._read_json()
         if req is None:
             return None

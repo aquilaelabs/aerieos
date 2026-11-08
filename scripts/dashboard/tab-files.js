@@ -47,7 +47,7 @@ async function loadFiles(){
   }
   const node = flNode, root = flRoot, path = flPath;
   try{
-    const r = await fetch("/api/files?" + flQuery());
+    const r = await fetch("/api/node-files?" + flQuery());
     const got = await r.json();
     if (asked !== flSeq) return;
     if (!r.ok) throw new Error(got.error || "HTTP " + r.status);
@@ -101,7 +101,7 @@ function flLine(e){
   const name = `<span class="fxname">${tick}<button type="button" class="namelink" data-fxopen="${esc(e.name)}" data-fxdir="${dir ? 1 : ""}">${
     icon ? `<span aria-hidden="true">${icon}</span> ` : ""}${esc(e.name)}</button></span>${e.target ? `<div class="sub dim">to ${esc(e.target)}</div>` : ""}`;
   return tblLine(FL_COLS, [name, dir ? "" : esc(flSize(e.size || 0)), esc(fmtTime(e.mtime * 1000)), esc(e.owner || ""),
-    dir ? "" : `<a class="btn icon" href="/api/files/read?${flQuery({path: (flPath ? flPath + "/" : "") + e.name, dl: "1"})}" download="${esc(e.name)}"
+    dir ? "" : `<a class="btn icon" href="/api/node-files/read?${flQuery({path: (flPath ? flPath + "/" : "") + e.name, dl: "1"})}" download="${esc(e.name)}"
        title="Download ${esc(e.name)}" aria-label="Download ${esc(e.name)}">↓</a>`], "div", flSel.has(e.name) ? "on" : "", `data-fxrow="${esc(e.name)}"`);
 }
 
@@ -158,7 +158,7 @@ function renderFilesInto(i){
 function flFull(name){ return (flPath ? flPath + "/" : "") + name; }
 
 async function flPost(body){
-  const j = await (await postJSON("/api/files", {node: flNode, root: flRoot, ...body})).json().catch(() => ({error: "no answer"}));
+  const j = await (await postJSON("/api/node-files", {node: flNode, root: flRoot, ...body})).json().catch(() => ({error: "no answer"}));
   if (j.error) notify(j.error, true);
   return !j.error;
 }
@@ -199,7 +199,7 @@ async function flAct(what, root){
   if (what === "download"){
     for (const n of ticked){
       const a = document.createElement("a");
-      a.href = "/api/files/read?" + flQuery({path: flFull(n), dl: "1"}); a.download = n;
+      a.href = "/api/node-files/read?" + flQuery({path: flFull(n), dl: "1"}); a.download = n;
       document.body.appendChild(a); a.click(); a.remove();
       await new Promise(r => setTimeout(r, 300));
     }
@@ -249,7 +249,7 @@ async function flUpload(list){
     flRev++; drawPanes();
     const err = await new Promise(resolve => {
       const x = new XMLHttpRequest();
-      x.open("POST", "/api/files/upload?" + new URLSearchParams({node, root, path, name: file.name, ...(replace ? {replace: "1"} : {})}));
+      x.open("POST", "/api/node-files/upload?" + new URLSearchParams({node, root, path, name: file.name, ...(replace ? {replace: "1"} : {})}));
       x.upload.onprogress = e => { if (flUp){ flUp.done = e.loaded; flRev++; drawPanes(); } };
       x.onload = () => { let j = {}; try{ j = JSON.parse(x.responseText); }catch(e){ /* not JSON */ } resolve(x.status === 200 ? "" : j.error || "HTTP " + x.status); };
       x.onerror = () => resolve("the upload stopped");
@@ -266,7 +266,7 @@ async function flUpload(list){
 const FL_SHOWN = {img: /\.(png|jpe?g|gif|webp|avif|bmp|ico)$/i, video: /\.(mp4|webm|mov|m4v)$/i, audio: /\.(mp3|m4a|ogg|wav|flac)$/i, pdf: /\.pdf$/i};
 async function flPreview(name){
   const e = (fl?.entries || []).find(x => x.name === name) || {};
-  const src = "/api/files/read?" + flQuery({path: flFull(name)});
+  const src = "/api/node-files/read?" + flQuery({path: flFull(name)});
   const kind = Object.keys(FL_SHOWN).find(k => FL_SHOWN[k].test(name)) || "text";
   const m = document.createElement("div");
   m.className = "modal fxview";
