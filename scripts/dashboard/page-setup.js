@@ -658,11 +658,12 @@ function setupHoldCard(card, why){
     if (x.tagName === "A"){ x.setAttribute("aria-disabled", "true"); x.tabIndex = -1; x.classList.add("dead"); }
     else x.disabled = true;
   });
-  if (why && !card.querySelector(":scope > .setwhy.held")){
+  const body = card.querySelector(":scope > .setstepbody") || card;
+  if (why && !body.querySelector(":scope > .setwhy.held")){
     const d = document.createElement("div");
     d.className = "sub note setwhy held";
     d.textContent = why;
-    (card.querySelector(":scope > .actbar") || card).before(d);
+    body.append(d);
   }
 }
 function setupInOrder(el, s){

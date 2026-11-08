@@ -400,6 +400,16 @@ await firstRun(false);
         toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
         heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the spaces need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
         back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
+      // In order (the operator, 8 Nov): the pool step waits on the disks,
+      // saying so; and a system job in flight holds every step that would
+      // start another, the page saying what runs.
+      out.orderHeld = !!step('Where the spaces and containers go')?.classList.contains('held')
+        && /After step \d+, The old system's disks/.test(words('Where the spaces and containers go'));
+      out.orderSaid = [step('Where the spaces and containers go')?.className, titles().join('|'), [...panel().querySelectorAll('section.setstep')].map(c => c.className + ':' + (c.querySelector('h3')?.textContent || '')).join(' / ')].join(' ## ');
+      { const jobsWere = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt' }]; redraw({});
+        out.jobBand = panel().querySelector('.setjobband')?.textContent.replace(/\s+/g, ' ') || '';
+        out.jobHeld = step("The old system's disks")?.querySelector('[data-adopt="adopt"]')?.disabled === true;
+        n.jobs = jobsWere; redraw({}); out.jobGone = !panel().querySelector('.setjobband'); }
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -455,6 +465,9 @@ await firstRun(false);
        `...the token and the bundle said first, that the old controller may be off, and how to go and make them (${walk.first.slice(0, 200)})`);
     ok(walk.adopt && walk.toDo === 'to do' && walk.links === 0, `...the disks adopted in place, with no link leading away (${JSON.stringify([walk.adopt, walk.toDo, walk.links])})`);
     ok(walk.landHeld === true && walk.heldWhy, '...Land waiting on the disks, saying why');
+    ok(walk.orderHeld, `...the pool step waits on the disks step, saying which (${walk.orderSaid})`);
+    ok(/adopting the old system's disks/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
+       `...and while a system job runs every step that would start another waits, the page saying what runs (${walk.jobBand})`);
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);

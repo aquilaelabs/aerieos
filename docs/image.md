@@ -125,8 +125,12 @@ go, landing the controller, what comes after it, and the way back. Every install
 takes the same walk with the steps it has: a stick made from another system's
 backup adopts that system's disks in it and says what going back costs, any
 other stick makes its own, and an install with no stick goes straight to
-landing. **Walk me through it** and **Set up a new one instead** go between the
-walk and a new start. A
+landing. The steps it cannot go on without come in order: each waits, with a
+line saying which step it waits for, until the ones before it are done, and
+while the machine runs a job (adopting the disks, moving to a pool) every step
+that would start another waits for it, the page saying what runs. **Walk me
+through it** and **Set up a new one instead** go between the walk and a new
+start. A
 pool the machine adopted can be the system pool whatever its filesystem; a
 data disk cannot, since it carries the old system's parity. **Read only**
 writes nothing to the data disks, so with no writable pool nothing new has

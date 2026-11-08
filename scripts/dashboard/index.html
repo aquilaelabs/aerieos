@@ -1211,7 +1211,7 @@ body.firstrun #panes{display:none}
 .setstep.done .setnum{color:var(--pass);border-color:var(--green2-edge)}
 /* A step waiting on the one before it, or on the machine's job (setupInOrder):
    read, never pressed; the line under it says what it waits for. */
-.setstep.held .setstepbody{opacity:.6}
+.setstep.held .setstepbody > :not(.setwhy){opacity:.6}
 .setstep.held a.btn.dead{pointer-events:none;opacity:.5}
 .setstep .setwhy.held{margin:8px 0 0}
 .setjobband{margin:0 0 12px}
@@ -2145,7 +2145,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .fxtbl .tline.on{background:color-mix(in srgb, var(--accent) 10%, transparent)}
 .fxpage.drop{outline:2px dashed var(--accent);outline-offset:4px}
 .fxselbar .said{font:var(--f-ui)}
-.filestab .actbar .flfilter{flex:1 1 12rem;max-width:22rem;min-width:7rem}
+.filestab .actbar .flfilter{flex:0 1 14rem;min-width:7rem}
 @media(max-width:899px){ .filestab .actbar .flfilter{flex-basis:100%;max-width:none} }
 .fxview .box{width:min(960px, calc(100vw - 32px));max-width:none}
 .fxview .fxbody{max-height:70vh;overflow:auto;margin:8px 0}
