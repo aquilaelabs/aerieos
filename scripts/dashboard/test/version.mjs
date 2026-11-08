@@ -1094,11 +1094,13 @@ NB = nb('beta');
 // same thing initWith below works around.
 let polOpts = [];
 for (let t = 0; t < 30 && !polOpts.length; t++){
-  polOpts = await page.$$eval(`${NB} #verBox #verPolicy option`,
-                              os => os.map(o => o.value)).catch(() => []);
+  // Move the version is a dial on the Permissions view (R223), its first
+  // choice on a repository the space's own (inherit), left out here.
+  polOpts = await page.$$eval('#rnGateVersion option',
+                              os => os.map(o => o.value).filter(v => v !== 'inherit')).catch(() => []);
   if (polOpts.length) break;
   await page.evaluate(() => openNotebook('beta'));
-  await nbGo(page, 'artifacts', NB).catch(() => {});
+  await nbGo(page, 'permissions', NB).catch(() => {});
   await sleep(300);
 }
 ok(polOpts.join(",") === "locked,start,patch,minor,open",
