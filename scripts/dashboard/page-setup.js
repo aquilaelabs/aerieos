@@ -82,13 +82,14 @@ function drawSetup(){
   // would otherwise take what was typed with it.
   setupPlaceAuto(s);
   const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
-                              s.git, s.claude, s.project, !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
+                              s.git, s.claude, s.project, ((s.node || s.own)?.jobs || []).map(j => j.apply || ""), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
   const typed = setupKeepTyped(el);
   if (setupWalking()){
     el.innerHTML = setupWalkHtml(s);
     wireSetup(el, s);
+    setupInOrder(el, s);
     typed();
     return;
   }
@@ -145,6 +146,7 @@ function drawSetup(){
     </div>
   </div>`;
   wireSetup(el, s);
+  setupInOrder(el, s);
   typed();
 }
 
@@ -634,4 +636,56 @@ function wireSetupDisks(el){
     await setupDisksLoad();
     setupSig = ""; drawSetup();
   });
+}
+
+// ---- one step at a time ----------------------------------------------------
+// The steps a setup cannot go on without are taken in order (the operator,
+// 8 Nov: a later step pressed early failed, or queued behind the one before
+// and was refused): each waits, its controls dead, until every one before it
+// is done, and says which. The rest (shares, your name, Claude, a first space,
+// what to have with you) stay open in any order. And one system job runs on a
+// machine at a time, so while one runs every step that would start another
+// waits for it, the page saying what runs.
+const SETUP_NEEDED = new Set(["This machine", "Your first node", "The old system's disks", "Where the spaces and containers go", "Land the controller"]);
+const SETUP_FREE = "[data-setwalk], [data-setvm], [data-setenroll], [data-setgit], #setName, #setEmail, [data-setclaude], [data-setproject], [data-heldstart]";
+const SETUP_JOB_WORDS = {"storage-adopt": "adopting the old system's disks", "storage-pool": "making the pool", "storage-array": "setting up the array",
+  "system-pool": "moving to the system pool", "projects-folder": "taking the spaces folder", "storage-share": "setting up the shares",
+  "console": "setting the console password", "machine": "setting its name and clock"};
+function setupHoldCard(card, why){
+  card.classList.add("held");
+  card.querySelectorAll("button, select, input, textarea, a.btn").forEach(x => {
+    if (x.matches(SETUP_FREE)) return;
+    if (x.tagName === "A"){ x.setAttribute("aria-disabled", "true"); x.tabIndex = -1; x.classList.add("dead"); }
+    else x.disabled = true;
+  });
+  if (why && !card.querySelector(":scope > .setwhy.held")){
+    const d = document.createElement("div");
+    d.className = "sub note setwhy held";
+    d.textContent = why;
+    (card.querySelector(":scope > .actbar") || card).before(d);
+  }
+}
+function setupInOrder(el, s){
+  const n = s.node || s.own;
+  const stick = setupStickOf(s);
+  const cards = [...el.querySelectorAll("section.setstep")];
+  let first = null;     // the earliest needed step not yet done
+  for (const c of cards){
+    const title = c.querySelector(".setstephead h3")?.textContent || "";
+    const need = SETUP_NEEDED.has(title) || (title === "Your disks" && !!stick);
+    if (!need) continue;
+    const done = c.classList.contains("done");
+    if (first && !done) setupHoldCard(c, `After step ${first.num}, ${first.title}.`);
+    if (!done && !first) first = {num: c.querySelector(".setnum")?.textContent || "", title};
+  }
+  const job = (n?.jobs || []).find(j => j.apply);
+  if (!job) return;
+  const words = SETUP_JOB_WORDS[job.apply] || String(job.apply).replace(/-/g, " ");
+  for (const c of cards) if (!c.classList.contains("done")) setupHoldCard(c, "");
+  const head = el.querySelector(".setuphead, .setuppage > :first-child");
+  const band = document.createElement("div");
+  band.className = "field setjobband";
+  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span> One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
+  if (head) head.after(band); else el.prepend(band);
+  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }

@@ -13161,6 +13161,12 @@ class Handler(BaseHTTPRequestHandler):
             if r.get("ok"):
                 db.audit(self._principal(), "move-backup", "", {"repos": req.get("repos") is True, "size": r.get("size", 0)})
             return self._json(r, 400 if r.get("error") else 200)
+        if act == "pack":
+            # The bundle packed now, the page waiting on it with its button
+            # saying so (the operator, 8 Nov: a download link said nothing
+            # for as long as the packing took); then fetched by name.
+            r = move.pack_bundle()
+            return self._json(r, 400 if r.get("error") else 200)
         if act == "forget":
             r = move.forget(self._principal())
             if r.get("ok"):
@@ -13173,7 +13179,7 @@ class Handler(BaseHTTPRequestHandler):
         if act == "ask":
             learned = move.ask_new(force=True)
             return self._json({"ok": True, "moved": learned, **move.status()})
-        return self._json({"error": "action is prepare, backup, forget, moved or ask"}, 400)
+        return self._json({"error": "action is prepare, pack, backup, forget, moved or ask"}, 400)
 
     def _move_peer(self):
         """/api/v1/move/* (R175): what the two controllers say to each
@@ -13208,15 +13214,23 @@ class Handler(BaseHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile)
 
     def _get_move_bundle(self):
-        """GET /api/move-bundle: the bundle as a download, packed fresh under
-        the armed move's key at this moment (R175 step 1); the owner's."""
+        """GET /api/move-bundle[?name=]: the bundle as a download, packed
+        fresh under the armed move's key at this moment (R175 step 1), or the
+        one just packed by name; the owner's."""
         me = self._who() or {}
         if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
             return self._json({"error": "the move bundle is its owner's"}, 403)
-        r = move.pack_bundle()
-        if r.get("error"):
-            return self._json({"error": r["error"]}, 404)
+        # ?name= is the bundle the page just packed (action pack), served as
+        # it is; with no name, packed fresh here as before.
+        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        name = q.get("name", [""])[0]
+        if not name:
+            r = move.pack_bundle()
+            if r.get("error"):
+                return self._json({"error": r["error"]}, 404)
         p = move.bundle_path()
+        if p and name and p.name != name:
+            return self._json({"error": "that bundle has been packed again since: press Download the bundle again"}, 404)
         if not p:
             return self._json({"error": "no move is prepared"}, 404)
         self.send_response(200)

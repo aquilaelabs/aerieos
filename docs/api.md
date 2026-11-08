@@ -17,7 +17,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/status` | prefix | `_get_status` | GET /api/status. |  |
 | GET | `/api/reset` | exact | `_get_reset` | GET /api/reset: how a Reset that un-enrolls its nodes first is getting on: each node, done or why not, and the error that stopped it. | refused: controller-read |
 | GET | `/api/move` | exact | `_get_move` | GET /api/move (R90 step 12): a move armed here (and, asked with ?pieces=1, what a bundle may carry with each piece's size), or this controller moved, or this state arrived by a move with the nodes not yet here; an admini |  |
-| GET | `/api/move-bundle` | exact | `_get_move_bundle` | GET /api/move-bundle: the bundle as a download, packed fresh under the armed move's key at this moment (R175 step 1); the owner's. |  |
+| GET | `/api/move-bundle` | exact | `_get_move_bundle` | GET /api/move-bundle[?name=]: the bundle as a download, packed fresh under the armed move's key at this moment (R175 step 1), or the one just packed by name; the owner's. |  |
 | GET | `/api/move-backup` | exact | `_get_move_backup` | GET /api/move-backup?name=: the controller's backup packed under a token of its own, as a download; the owner's. |  |
 | GET | `/api/backup` | exact | `_get_backup` | GET /api/backup (R161 step 4): the password set or not, the last copy, where the copies go and the copies found; an administrator's. |  |
 | GET | `/api/backup-file` | exact | `_get_backup_file` | GET /api/backup-file?name=NAME: a copy under the state as a download, the owner's; sealed, so a download is only ever a sealed file. |  |

@@ -1209,6 +1209,12 @@ body.firstrun #panes{display:none}
 .setnum{flex:0 0 auto;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
   font:var(--f-pill);color:var(--dim);border:var(--hair) solid var(--line)}
 .setstep.done .setnum{color:var(--pass);border-color:var(--green2-edge)}
+/* A step waiting on the one before it, or on the machine's job (setupInOrder):
+   read, never pressed; the line under it says what it waits for. */
+.setstep.held .setstepbody{opacity:.6}
+.setstep.held a.btn.dead{pointer-events:none;opacity:.5}
+.setstep .setwhy.held{margin:8px 0 0}
+.setjobband{margin:0 0 12px}
 /* The disks step (R161 step 3): each disk a row to tick, the plan in words. */
 .setstep .setdisk .grow{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
 .setstep .setdisk .sub{flex:1 1 100%}
@@ -5233,6 +5239,11 @@ button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block
 .row code{font:11px/1.5 var(--mono);background:var(--btn);padding:1px 5px;
   border-radius:var(--r-small);white-space:nowrap}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* A press still going after a moment (pressing(), tab-nodes.js): a small ring
+   after its word, so it reads as taken rather than missed. */
+button.working::after,a.btn.working::after{content:"";display:inline-block;width:.8em;height:.8em;margin-left:6px;vertical-align:-.1em;
+  border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+@media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after{animation:none;border-right-color:currentColor;opacity:.6} }
 
 pre{margin:0;padding:9px 11px;font:var(--f-code);white-space:pre-wrap;
   word-break:break-word;max-height:300px;overflow:auto;color:color-mix(in srgb, var(--ink) 80%, var(--dim))}
@@ -7829,6 +7840,10 @@ document.querySelectorAll(".modal:not(.inline)").forEach(armModal);
 // once (page-motion.js). Before the page's other keydown listeners, so a
 // dialog's Escape is not also a menu's or an armed arrow's.
 document.addEventListener("keydown", modalKeys);
+// A press that is taken (pressTrackDown, page-motion.js): the button clicked,
+// and every request it starts, held to it until answered.
+document.addEventListener("click", pressTrackDown, true);
+window.fetch = pressTrackFetch(window.fetch);
 // A big chip already on is no change, so its press is none (B317, the
 // operator 24 Oct): no list drawn again, no fade, as the rail does nothing
 // for the group already on. Taken before any chip's own handler.
