@@ -415,6 +415,18 @@ await firstRun(false);
       // says where it comes from.
       redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
       out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
+      // The screen's password: optional, offered while the screen is open,
+      // never waiting on the steps before it, and gone once set.
+      { redraw({ console: { os: true, set: false, open: true } });
+        const c = step('A password for this screen');
+        out.conPill = c?.querySelector('.pill')?.textContent;
+        out.conSaid = words('A password for this screen');
+        out.conLive = !!c && !c.querySelector('#conPw').disabled && !c.querySelector('[data-console=set]').disabled;
+        out.conHeld = c?.classList.contains('held');
+        redraw({ console: { os: true, set: true, open: false } });
+        out.conDone = step('A password for this screen')?.querySelector('.pill')?.textContent;
+        out.conFields = !!step('A password for this screen')?.querySelector('#conPw');
+        redraw({}); out.conOff = !step('A password for this screen'); }
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -474,6 +486,9 @@ await firstRun(false);
     ok(/adopting the old system's disks/.test(walk.jobBand) && /mounting \/mnt\/disk2, 6 min so far/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
        `...and while a system job runs every step that would start another waits, the page saying what runs, its step and how long (${walk.jobBand})`);
     ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
+    ok(walk.conPill === 'optional' && /with no password/.test(walk.conSaid) && walk.conLive && !walk.conHeld,
+       `...a password for the screen is offered as optional, saying the screen is open until setup ends, and waits on no step (${walk.conPill}, ${walk.conLive}, ${walk.conHeld})`);
+    ok(walk.conDone === 'done' && !walk.conFields && walk.conOff, `...done with no fields once set, and not drawn where the machine has no such screen (${walk.conDone}, ${walk.conFields}, ${walk.conOff})`);
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);

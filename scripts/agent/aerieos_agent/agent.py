@@ -914,6 +914,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 # every minute is on the box's own record (B644).
                 self.hello_again("the controller asked for a fresh census")
                 continue
+            if st == 200 and r.get("console_close"):
+                # ...or setup has ended on a machine whose screen still
+                # takes admin with no password (R194).
+                self.console_close()
+                continue
             if st == 200 and r.get("id"):
                 self.take(r)
                 continue

@@ -247,9 +247,14 @@ function machineConsoleSection(n){
   return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
       <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with this password; <code>sudo</code> gives root${
         helpIcon("It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.")}</div>
-      <div class="fgrid"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
-        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>
+      ${consolePwFields()}
       <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);
+}
+
+// The two fields, here and on the first-run page's step.
+function consolePwFields(cls = ""){
+  return `<div class="fgrid${cls ? ` ${cls}` : ""}"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
+        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>`;
 }
 
 function wireMachineConsole(root){

@@ -364,7 +364,13 @@ This machine's Console section: it logs in as `admin`, with `sudo` for
 root, and it is separate from the dashboard's password. The image's root
 forgets everything at each boot, so the password's hash is kept on the
 data partition and the account is made from it at every start; until one
-is set, the screen says where to set it. Root itself has no password. When
+is set, the screen says where to set it. While a machine is first set up,
+`admin` logs in with no password and `sudo` asks for none, so there is a way
+in if the agent or the dashboard stops partway. The first-run page offers a
+password; setup's end, or setting one, closes that login. It opens only on a
+machine's first boot, so an update never opens it on an install already set
+up, and it is a login at the screen or serial line only. Root itself has no
+password. When
 nothing else answers, the boot menu's **Rescue** entry, beside Safe mode,
 starts nothing and opens a root shell at the screen: whoever is at the
 keyboard can already take the disks out, so it opens nothing they do not

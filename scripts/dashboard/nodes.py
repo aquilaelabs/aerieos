@@ -1714,7 +1714,7 @@ def _census(c):
                 "ok": v.get("ok") is True, "corrected": v.get("corrected") is True} if v else {}
     # ...and whether its console takes a password (R194, AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
-        out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
+        out["console"] = {k: c["console"].get(k) is True for k in ("os", "set", "open")}
     # ...and what it adopted of another NAS (R163 step 8): each mount, its
     # filesystem, read-only or not and mounted now, the merged trees, and
     # the parity disk left alone.
@@ -6526,6 +6526,10 @@ def job_next(node_id, wait, runner="node", alive=None):
                 # answer. This is how the next one does not.
                 if _hello_wanted.pop(node_id, None):
                     return {"hello": True}
+                # ...and setup having ended where the screen still takes
+                # admin with no password (R194).
+                if _console_close_due(node_id):
+                    return {"console_close": True}
                 # ...and the synced projects that moved (R162, wssync.py):
                 # the agent asks what changed, so a save on another node or
                 # in VS Code reaches this one in a second, not at its next
@@ -6537,6 +6541,29 @@ def job_next(node_id, wait, runner="node", alive=None):
             if left <= 0:
                 return None
             _wake.wait(min(left, 5))
+
+
+# Whether this controller has finished being first set up (R194): joined by
+# server.py, which holds the accounts, the settings and the move.
+setup_over = lambda: False
+_console_asked = {}
+
+
+def _console_close_due(node_id):
+    """Whether to tell a node to close the login with no password at its
+    screen: setup has ended and its census says the login is open. Not by
+    the machine being the own one, since the row a landed move brings may
+    not be marked so. At most once a minute, so a machine that cannot close
+    it is not asked on every poll; its census says when it has."""
+    if not setup_over():
+        return False
+    if not (((node(node_id) or {}).get("reported") or {}).get("console") or {}).get("open"):
+        return False
+    now = time.time()
+    if now - _console_asked.get(node_id, 0) < 60:
+        return False
+    _console_asked[node_id] = now
+    return True
 
 
 UPDATE_QUIET_S = 600

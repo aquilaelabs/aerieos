@@ -4427,6 +4427,10 @@ try:
     # The accounts' SMB passwords and a share's names (R164 step 1).
     nodes.smb_users = users.smb_users
     nodes.smb_resolve = users.smb_resolve
+    # ...and whether setup has ended, which closes a screen's open login
+    # (R194). A landing cut midway is not an end: its setting came with the
+    # bundle, and the way in is wanted most then.
+    nodes.setup_over = lambda: bool(users.owner_name() and settings.get("setup_done") and not move.cut_landing())
     # ...and the weeks-long record of the own machine's samples (R164 step 4).
     history.configure(state=STATE)
     nodes.history_add = history.add

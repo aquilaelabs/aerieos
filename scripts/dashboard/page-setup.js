@@ -82,7 +82,7 @@ function drawSetup(){
   // would otherwise take what was typed with it.
   setupPlaceAuto(s);
   const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
-                              s.git, s.claude, s.project, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
+                              s.git, s.claude, s.project, s.own?.reported?.console || null, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
   const typed = setupKeepTyped(el);
@@ -138,6 +138,7 @@ function drawSetup(){
       ? `<p>The Spaces page holds it, and every one after it.</p>`
       : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the spaces have a place, in step 3.</div>`}`,
       s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New space</button>`)}
+    ${setupConsoleWanted(s) ? setupConsoleCard(next++, s) : ""}
     <div class="setfinish">
       <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
@@ -152,6 +153,20 @@ function drawSetup(){
 
 // What a disk's row shows, for the redraw test: a disk's temperature and the
 // like move on every read and are not the page's business.
+// A password for the machine's screen (R194): the machine takes admin with
+// none until setup ends, so this is for keeping a way in past that. Never in
+// the needed order: a person may leave it, and This machine sets one later.
+function setupConsoleWanted(s){
+  return !!s.own?.reported?.console?.os;
+}
+function setupConsoleCard(num, s){
+  const c = s.own.reported.console;
+  return setupCard(num, "A password for this screen", !!c.set, false, c.set
+    ? `<p>Log in at this machine's screen or a KVM as <code>admin</code> with it; <code>sudo</code> gives root. This machine changes it, after Finish.</p>`
+    : `<p>${c.open ? "Until setup ends, this machine's screen or a KVM logs in as <code>admin</code> with no password, in case something here stops answering. Set one to keep that way in afterwards" : "Set one to log in at this machine's screen or a KVM as <code>admin</code>"}. It is not your dashboard password, and This machine can set one later.</p>${consolePwFields("setfields")}`,
+    c.set ? "" : `<button type="button" class="primary" data-console="set">Set it</button>`, c.set ? "" : "optional");
+}
+
 function setupDisksSig(dk){
   return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.ok]));
 }
@@ -175,6 +190,7 @@ function wireSetup(el, s){
   // The walk's steps are This machine's and Controller settings' own, so
   // their own wiring serves them; nothing here sends anything else.
   if (setupWalking()){ wireHeld(el); wireMove(el); }
+  wireMachineConsole(el);
   const vm = el.querySelector("[data-setvm]"), en = el.querySelector("[data-setenroll]");
   if (vm) vm.onclick = () => ndDialogs().openVm();
   if (en) en.onclick = () => ndDialogs().openEnroll();
@@ -389,6 +405,7 @@ function setupWalkHtml(s){
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick) cards.push(setupPlaceCard(++i, s, true));
+  if (setupConsoleWanted(s)) cards.push(setupConsoleCard(++i, s));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
