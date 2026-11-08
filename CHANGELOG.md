@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The bell says when an adopted array is writable with no parity yet, with This machine on the row, and when a stick's own partition is running out of room; This machine shows that partition's room (80b84fe)
+
+### Changed
+
+- Taking the array over no longer holds the machine for the hours the first parity sync takes: the job ends once the parity disk is ready and the sync runs in the background, as Sync now and Scrub do too, its progress on This machine and the Storage page; the first-run walk no longer offers the takeover, which comes after it from This machine (80b84fe)
+- A bar shows how far a sync, scrub or parity check is, and how much of a bundle has been sent when a move lands; a first-run step held behind a job says the job's step and how long it has run (80b84fe)
+
+### Fixed
+
+- On a stick, SnapRAID's content file (a catalogue of every block of the array, gigabytes for a large one, rewritten whole as a sync goes) no longer goes on the stick's own partition, which it filled during a first sync, taking the controller down with it; it lives on the data disks (80b84fe)
+
 ## 0.9.0-dev.5119: 2026-11-08
 
 ### Changed
