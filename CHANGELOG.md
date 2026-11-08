@@ -5,8 +5,8 @@
 ### Changed
 
 - A new Unraid or compose install keeps its state in /mnt/user/appdata/Aerie-Workshop, and the template's hostname is aerie-workshop; an install already running keeps its own folders. Upgrading: a compose install that never set APPDATA_PATH must set APPDATA_PATH=/mnt/user/appdata/BuilderBot in its .env before it updates, or it starts on an empty folder (9c94749)
-- Every button that starts something shows it was taken: one still working after a moment wears a spinner, and Download the bundle says Packing until the file is ready, a failure said on the page rather than as a page of its own (ad6cbd5)
-- The first-run walk takes its steps in order: a step that needs the one before waits, saying which, and while the machine runs a job (adopting the disks, moving to a pool) the steps that would start another wait for it, the page saying what runs, where a press used to fail with 'one at a time' (ad6cbd5)
+- Every button that starts something shows it was taken: one still working after a moment wears a spinner, and Download the bundle says Packing until the file is ready, a failure said on the page rather than as a page of its own (56f8685)
+- The first-run walk takes its steps in order: a step that needs the one before waits, saying which, and while the machine runs a job (adopting the disks, moving to a pool) the steps that would start another wait for it, the page saying what runs, where a press used to fail with 'one at a time' (56f8685)
 
 ### Deprecated
 
