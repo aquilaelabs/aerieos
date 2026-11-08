@@ -83,8 +83,8 @@ it needs no login.
 In the Unraid terminal:
 
 ```bash
-mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
-chown -R 99:100 /mnt/user/appdata/BuilderBot
+mkdir -p /mnt/user/appdata/Aerie-Workshop/{home,config/startup.d}
+chown -R 99:100 /mnt/user/appdata/Aerie-Workshop
 
 # The controller's toolchain store: the browsers `aerie capture shot` uses. A node
 # keeps its own toolchains, in a directory of its own on the store its Nodes
@@ -103,19 +103,19 @@ chown 99:100 /mnt/user/sdk
 Get the template onto the flash drive, from the Unraid terminal:
 
 ```bash
-curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-builderbot.xml \
+curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-aerie-workshop.xml \
   https://raw.githubusercontent.com/aquilaelabs/aerieos/main/platforms/unraid/aerie-workshop.xml
 ```
 
 **Or copy it over.** The flash drive is an SMB share: open
 `platforms/unraid/aerie-workshop.xml` on GitHub → **Raw** → save, then drop it into
 `\\<TOWER>\flash\config\plugins\dockerMan\templates-user\` as
-`my-builderbot.xml`.
+`my-aerie-workshop.xml`.
 
 **Or copy it out of a clone**, if you already cloned the repo for Option B.
 
 Then in the WebUI: **Docker** tab → **Add Container** → in the *Template*
-dropdown pick **builderbot**. You get a form with everything already wired:
+dropdown pick **Aerie-Workshop**. You get a form with everything already wired:
 
 * the spaces folder (`/mnt/user/projects`) mapped to `/workspace`: one
   mapping for all of them, so every space AerieOS makes lands in that
@@ -343,12 +343,12 @@ metadata before it reached any code.
 
 1. **Apps** tab → install **Compose Manager** (by *dcflachs*).
 2. ```bash
-   STACK=/boot/config/plugins/compose.manager/projects/builderbot
+   STACK=/boot/config/plugins/compose.manager/projects/aerie-workshop
    mkdir -p "$STACK"
    cd /mnt/user/appdata
    git clone https://github.com/aquilaelabs/aerieos.git
-   cp builderbot/docker-compose.yml "$STACK"/
-   cp builderbot/.env.example "$STACK"/.env
+   cp aerieos/docker-compose.yml "$STACK"/
+   cp aerieos/.env.example "$STACK"/.env
    nano "$STACK"/.env && chmod 600 "$STACK"/.env
    ```
 3. ```bash
@@ -371,19 +371,19 @@ root-only folder:
 
 1. Create it on the host and drop your secrets in:
    ```bash
-   mkdir -p /mnt/user/appdata/BuilderBot/secrets/ssh
+   mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
 
    # any publishing token a session should use but never read (optional);
    # the install key is made here by the first start, saved from Controller, Keys
-   cat > /mnt/user/appdata/BuilderBot/secrets/builderbot.env <<'EOF'
+   cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
    NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
    EOF
 
    # any git ssh keys (no passphrase; filename doesn't matter)
-   cp /path/to/id_ed25519 /mnt/user/appdata/BuilderBot/secrets/ssh/
+   cp /path/to/id_ed25519 /mnt/user/appdata/Aerie-Workshop/secrets/ssh/
 
-   chown -R root:root /mnt/user/appdata/BuilderBot/secrets
-   chmod -R go-rwx   /mnt/user/appdata/BuilderBot/secrets
+   chown -R root:root /mnt/user/appdata/Aerie-Workshop/secrets
+   chmod -R go-rwx   /mnt/user/appdata/Aerie-Workshop/secrets
    ```
 2. Set the template's **Secrets directory** field (or uncomment the
    `/secrets` volume in compose) to that folder, read-write, so the first
@@ -547,7 +547,7 @@ not host-root.
 
 | Log | Where | Survives image updates? |
 |---|---|---|
-| Startup + supervisor | `/mnt/user/appdata/BuilderBot/config/logs/builderbot.log` (also `docker logs Aerie-Workshop` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
+| Startup + supervisor | `/mnt/user/appdata/Aerie-Workshop/config/logs/builderbot.log` (also `docker logs Aerie-Workshop` / WebUI **Log** button) | ✅ file yes; `docker logs` no |
 | ...or your own location | Map the optional **Logs directory** path (template, advanced view) / the `/logs` volume (compose) to any share, e.g. on the array, and the log moves there automatically | ✅ |
 | CI job output | GitHub → repo → *Actions* → the run | ✅ (kept by GitHub) |
 | A node's own logs (its agent and its terminals, CI runner, its nginx, the system journal, the kernel ring, the previous boot) | on the node: `aerie logs --node NAME` from a session granted it, or the machine's journal | ✅ |

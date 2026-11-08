@@ -32,7 +32,7 @@ trap 'BB_TTY_LINE=$LINENO' ERR
 bb_tty_ended() {
     local rc=$?
     [ "$rc" -eq 0 ] && return 0
-    printf '\r\nBuilderBot: this terminal ended before it started (exit %s, bb-tty line %s).\r\nClose the tab, or press Enter to try again.\r\n' \
+    printf '\r\nAerieOS: this terminal ended before it started (exit %s, bb-tty line %s).\r\nClose the tab, or press Enter to try again.\r\n' \
         "$rc" "${BB_TTY_LINE:-?}" >&2
     if [ -t 0 ]; then read -r -t 3600 _ || true; fi
 }

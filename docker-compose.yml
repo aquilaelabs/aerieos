@@ -2,17 +2,17 @@
 # agents, and a GitHub Actions runner, beside what the host already runs.
 #
 #   docker compose up -d
-#   docker exec -it builderbot claude
+#   docker exec -it Aerie-Workshop claude
 #
 # Settings live in .env next to this file (copy .env.example).
 
 services:
   aerie-workshop:
-    image: ghcr.io/aquilaelabs/aerieos:${BUILDERBOT_TAG:-dev}
+    image: ghcr.io/aquilaelabs/aerieos:${AERIE_TAG:-${BUILDERBOT_TAG:-dev}}
     # An install pulls the image; AerieOS's own dev instance on a node
     # builds this checkout instead, the way any project's dev instance is
-    # built from its tree: its env file sets BUILDERBOT_PULL=build and a tag
-    # of its own (BUILDERBOT_TAG=dev). With the default policy compose pulls
+    # built from its tree: its env file sets AERIE_PULL=build and a tag
+    # of its own (AERIE_TAG=dev; the BUILDERBOT_ names are read too, until 0.10). With the default policy compose pulls
     # what is missing and never builds unless asked, so `docker compose up`
     # on a fresh install is unchanged.
     build:
@@ -26,7 +26,7 @@ services:
         IMAGE_REV: ${BB_BUILD_REV:-}
         IMAGE_BUILT: ${BB_BUILD_AT:-}
         IMAGE_VERSION: ${BB_BUILD_VERSION:-}
-    pull_policy: ${BUILDERBOT_PULL:-missing}
+    pull_policy: ${AERIE_PULL:-${BUILDERBOT_PULL:-missing}}
     # The dashboard locks its memory from swap, where the keys it holds
     # would otherwise be written (R158 step 6): the default limit is a few
     # kilobytes, and the Doctor says when it was too low.
@@ -45,7 +45,7 @@ services:
       options: {max-size: "20m", max-file: "3"}
     restart: unless-stopped
 
-    # Keeps a TTY attached so `docker exec -it builderbot claude` behaves like a
+    # Keeps a TTY attached so `docker exec -it Aerie-Workshop claude` behaves like a
     # real terminal.
     stdin_open: true
     tty: true
@@ -104,9 +104,9 @@ services:
       # --- persistent container state --------------------------------------
       # Each account's home on the controller, and its state: accounts,
       # settings, notebooks, logs.
-      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/home:/home/builder
+      - ${APPDATA_PATH:-/mnt/user/appdata/Aerie-Workshop}/home:/home/builder
       # Drop your own *.sh startup hooks in here.
-      - ${APPDATA_PATH:-/mnt/user/appdata/BuilderBot}/config:/config
+      - ${APPDATA_PATH:-/mnt/user/appdata/Aerie-Workshop}/config:/config
       # The runners' registration tokens, root-only (0700) by design so a
       # session can never read one. A named volume rather than a directory
       # under /config: on an appdata path that is a squashed NFS share
@@ -129,7 +129,7 @@ services:
       # Optional: send the persistent log somewhere else (e.g. an array
       # share). The container auto-detects a /logs mount; without it, logs
       # stay in config/logs.
-      # - /mnt/user/logs/builderbot:/logs
+      # - /mnt/user/logs/aerie-workshop:/logs
 
       # Cosmetic, a NAS host's container-icon cache. With this
       # mounted rw the container drops <name>-icon.png in on every start, and
@@ -144,7 +144,7 @@ services:
       # is mounted read-write. Secrets provided here are shielded from Claude
       # sessions (keys are served via a root-owned ssh-agent); keys in
       # home/.ssh are not.
-      # - /mnt/user/appdata/BuilderBot/secrets:/secrets
+      # - /mnt/user/appdata/Aerie-Workshop/secrets:/secrets
 
       # --- host Docker access (OFF by default) ------------------------------
 

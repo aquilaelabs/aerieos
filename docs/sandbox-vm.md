@@ -339,10 +339,10 @@ below are what to add to it when this machine is not the plain case:
 
 The repository is private, so the VM cannot fetch the script itself: copy it
 over. **From the Unraid terminal**, where that path is the host's own; inside
-AerieOS the same file is `/workspace/builderbot/nodes/provision-linux.sh`.
+AerieOS the same file is `/workspace/aerieos/nodes/provision-linux.sh`.
 
 ```bash
-scp /mnt/user/projects/builderbot/nodes/provision-linux.sh bb@<vm-ip>:
+scp /mnt/user/projects/aerieos/nodes/provision-linux.sh bb@<vm-ip>:
 ssh bb@<vm-ip>
 ```
 
@@ -397,7 +397,7 @@ reason silently breaks the sandbox. On the host:
 
 ```bash
 ssh-keygen -t ed25519 -N "" -C bb-sandbox \
-    -f /mnt/user/appdata/BuilderBot/secrets/ssh/bb_sandbox
+    -f /mnt/user/appdata/Aerie-Workshop/secrets/ssh/bb_sandbox
 ```
 
 The private half lands where the entrypoint loads it into the agent at boot;

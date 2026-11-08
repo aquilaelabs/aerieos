@@ -248,8 +248,8 @@ projects folder,
 so `SDK` is known to be a share rather than a project, wherever the shares
 are moved to next, and still without a list of what to skip. A name that is a
 valid project is never taken this way, whatever it is mounted from: an
-appdata directory called `BuilderBot` would otherwise teach it to ignore the
-BuilderBot project's own findings, which is the one mistake here that hides
+appdata directory called `Aerie-Workshop` would otherwise teach it to ignore
+an Aerie-Workshop space's own findings, which is the one mistake here that hides
 real work instead of noise.
 
 **A report a whole cycle behind its siblings is not counted**, and the
@@ -304,7 +304,7 @@ app (Hear asks at once) runs a foreground service holding GET
 /api/phone/wait open; the dashboard answers it the moment this account's
 phone asks, lease or grants change, or after 45 s, and the app runs its
 usual round. No Firebase: every install would need its own project and
-keys, and the phone already reaches its BuilderBot directly. Android still
+keys, and the phone already reaches its AerieOS directly. Android still
 cuts a sleeping phone's network unless the app is exempt from battery
 optimisation, so the switch offers that too.
 
@@ -374,7 +374,7 @@ signs in on each node they work on, from that node's row, and signs out
 there. It was asked for as a simplification and it is one: there is no
 account-wide identity to keep, no rule that a second node must be the same
 Anthropic account as the first, no sign-out that has to reach machines that
-are not listening, and no switch for two BuilderBot accounts on one login,
+are not listening, and no switch for two AerieOS accounts on one login,
 because nothing refuses that any more; the Users tab says it on both rows,
 since Anthropic's terms allow one person per Claude account. What is kept is
 what each node reported, per account. The cost is a sign-in per node, which
@@ -394,7 +394,7 @@ written into `CLAUDE.md` itself, between `<!-- BUILDERBOT:ENV:BEGIN -->` and
 its history and its working copy now: prose about machinery that is gone,
 which nothing here reads and nothing here will ever update. It does no harm
 beyond being wrong. Removing it is an ordinary edit to the project's own
-`CLAUDE.md`, made and committed by whoever owns the project; BuilderBot does
+`CLAUDE.md`, made and committed by whoever owns the project; AerieOS does
 not offer to do it, because that was always a commit to somebody else's
 repository. A leftover `CLAUDE.local.md` is the same text outside git and can
 simply be deleted.
@@ -459,7 +459,7 @@ refused and this project's own code goes into Docker with `bb devapp new`.
 
 **Each module's build folder is on the node's own disk, with a link at its
 usual place (by 13 Oct 2026).** The project tree is copied up to the
-controller as it is saved, and build output is not worth that: so BuilderBot
+controller as it is saved, and build output is not worth that: so AerieOS
 points Gradle's build directories at the node's disk and leaves `app/build`
 as a link, and its outputs are read where they always were. That holds for
 builds that use the project's own Gradle home, the one `$GRADLE_USER_HOME`
@@ -523,15 +523,15 @@ install; `bb version release` refuses a version that has none.
 fixed table, under a dial a project sets (21 Oct 2026, R91).** The operator
 asked for VMs a project's session can make, looking and asking like the
 Containers page. libvirt over KVM on any node with VM host installed, rather
-than a hypervisor of BuilderBot's own: it is what every Linux distribution
+than a hypervisor of AerieOS's own: it is what every Linux distribution
 ships and what Proxmox and other KVM hosts run underneath. The agent builds every
 virsh and qemu-img command itself from the job's checked fields, so the
 controller, and anything that reaches it, names what to make and never a
 command line. An OS is a publisher's cloud image checked against the
-checksum file the publisher posts, not a copy BuilderBot keeps, so the trust
+checksum file the publisher posts, not a copy AerieOS keeps, so the trust
 is the distribution's. Windows and macOS are refused by name: their license
 is a person's to accept. Each project gets its own NAT network per node and
-a firewall of BuilderBot's own keeps a VM off the LAN and off other
+a firewall of AerieOS's own keeps a VM off the LAN and off other
 projects', for the same reason a session is kept to its own containers. A
 software-emulated VM is never offered: a node without /dev/kvm says what to
 change on its host instead.
@@ -610,7 +610,7 @@ everything, as it does on any node; what the dashboard lets a signed-in
 person ask of the controller's own daemon is what it lets them ask on a
 container install, no more. The record it amends: [nodes.md](nodes.md) §0
 rule 2 and §18 for this install alone, and the provisioner's and
-[sandbox-vm.md](sandbox-vm.md)'s "BuilderBot stays the container".
+[sandbox-vm.md](sandbox-vm.md)'s opening: the controller stays the container.
 
 ## Coding agents beside Claude
 
@@ -627,7 +627,7 @@ the controller keeps only who each node said is signed in, never a token.
 A session's name carries its agent and an agent other than Claude works in a
 worktree of its own on `<agent>/<name>`, so one person's Claude and Codex
 sessions on one project meet through git as two people's do. The guards are
-the agents' own hooks running BuilderBot's, the dials say "Agents may" and
+the agents' own hooks running AerieOS's, the dials say "Agents may" and
 hold for every agent alike, and a conversation is kept beside Claude Code's
 at the end of every turn and resumed only in the agent it is with. What an
 agent has no hook for is said in the project's settings rather than implied.
@@ -659,13 +659,13 @@ their vetting).
 ## A NAS without a storage engine
 
 **The installed edition stores data the way the kernel and its daemons
-already do, and BuilderBot manages them from Python without ever being the
+already do, and AerieOS manages them from Python without ever being the
 data path (the operator, 18 to 27 Oct 2026, R56 steps 4 to 6, R115 and
 R162).** Two storage profiles are offered, each said for what it gives up:
 ZFS pools (mirrors or RAIDZ2, the default for matched disks) and an
 an array of mixed disks (a filesystem per disk under mergerfs with SnapRAID's
 periodic parity) for disks of mixed sizes; pools are by purpose, an SSD pool
-for BuilderBot's hot data and the array for shares, with no cache tier and
+for AerieOS's hot data and the array for shares, with no cache tier and
 nothing moved behind a person's back. Not built: a storage engine, real-time
 parity, tiering on bcachefs while its kernel standing is unsettled, and any
 path that puts the dashboard between a client and its bytes; every change
@@ -690,7 +690,7 @@ persists is two things and no more, both on the data partition and both
 mounted by the initramfs so PID 1 sees them from its first read: /var, and
 /etc as an overlay whose upper half is on /var, so a changed file is kept
 and the next image's files still show through. Every partition has a fixed
-UUID, the same on every disk BuilderBot makes, so a slot is found by what it
+UUID, the same on every disk AerieOS makes, so a slot is found by what it
 is and not by where a firmware put it. apt is diverted to a stub that says
 why: a package installed into a root that forgets would be gone at the next
 boot without a word, and a package the node needs is the image's to carry.

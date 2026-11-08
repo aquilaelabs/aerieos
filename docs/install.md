@@ -28,8 +28,8 @@ there before going on.
 ### 1. Create the state directories
 
 ```bash
-mkdir -p /mnt/user/appdata/BuilderBot/{home,config/startup.d}
-chown -R 99:100 /mnt/user/appdata/BuilderBot
+mkdir -p /mnt/user/appdata/Aerie-Workshop/{home,config/startup.d}
+chown -R 99:100 /mnt/user/appdata/Aerie-Workshop
 ```
 
 | Dir | Holds |
@@ -45,18 +45,18 @@ Keep `home/` on a cache/SSD-backed share: it does heavy small-file IO.
 Root-owned, so its contents are **never readable by sessions**:
 
 ```bash
-mkdir -p /mnt/user/appdata/BuilderBot/secrets/ssh
+mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
 
-cp /path/to/git-key /mnt/user/appdata/BuilderBot/secrets/ssh/id_ed25519
+cp /path/to/git-key /mnt/user/appdata/Aerie-Workshop/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
 # is loaded the same way. The install key is made here by the first start.
-cat > /mnt/user/appdata/BuilderBot/secrets/builderbot.env <<'EOF'
+cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF
 
-chown -R root:root /mnt/user/appdata/BuilderBot/secrets
-chmod -R go-rwx    /mnt/user/appdata/BuilderBot/secrets
+chown -R root:root /mnt/user/appdata/Aerie-Workshop/secrets
+chmod -R go-rwx    /mnt/user/appdata/Aerie-Workshop/secrets
 ```
 
 The install key seals the settings' tokens, the signing keys and the git
@@ -93,7 +93,7 @@ Required / usually touched:
 | Field | Set it to |
 |---|---|
 | Spaces folder | One mapping for all of them: `/mnt/user/projects` → `/workspace`. Every folder inside it is a space |
-| State paths | Pre-wired to `/mnt/user/appdata/BuilderBot/{home,config}` |
+| State paths | Pre-wired to `/mnt/user/appdata/Aerie-Workshop/{home,config}` |
 | **Secrets directory** | The folder from step 2 (or leave empty if unshielded) |
 
 Everything else has sane defaults: full reference in [reference.md](reference.md#configuration-reference).
@@ -217,8 +217,8 @@ and move it on when you choose to upgrade.
 **What is supported:**
 
 - From any release to any later release, in one step, from 0.9 on.
-- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from BuilderBot
-  0.8 or earlier: install fresh, with a new `/config`, and add your spaces
+- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from any version
+  before it: install fresh, with a new `/config`, and add your spaces
   again from their repositories.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
   below, with the older image.

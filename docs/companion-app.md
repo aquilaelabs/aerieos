@@ -3,7 +3,7 @@
 The companion app is AerieOS on an Android phone: the spaces and their
 notebooks, the approvals and the notifications, without the terminals.
 Download it from its card on the **Library**, under Build on the rail, in the For you section. This doc covers what it
-does, pairing it with several BuilderBots, its lock, Claude from the phone,
+does, pairing it with several AerieOS controllers, its lock, Claude from the phone,
 its notifications, and how it is kept in step with the dashboard and built.
 
 `apps/android/` is an Android app that does most of what the dashboard does,
