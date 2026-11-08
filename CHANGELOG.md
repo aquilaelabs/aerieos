@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A new Unraid or compose install keeps its state in /mnt/user/appdata/Aerie-Workshop, and the template's hostname is aerie-workshop; an install already running keeps its own folders. Upgrading: a compose install that never set APPDATA_PATH must set APPDATA_PATH=/mnt/user/appdata/BuilderBot in its .env before it updates, or it starts on an empty folder (9c94749)
+
+### Deprecated
+
+- BUILDERBOT_TAG and BUILDERBOT_PULL in a compose .env are now AERIE_TAG and AERIE_PULL; the old names are read until 0.10 (9c94749)
+
 ## 0.9.0-dev.5114: 2026-11-08
 
 ### Added
