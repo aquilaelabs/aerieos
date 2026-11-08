@@ -49,6 +49,10 @@ const TOUR_STEPS = {
     {say: "Analysis is what the linters and the code map found across your spaces, worst first."},
     {at: TOUR_BAR, say: "Narrow it by space or by kind here."},
   ],
+  files: [
+    {say: "Files is what is on a node's pools, arrays and shares: open a folder, preview or download a file, upload, and rename, move or delete what you tick. A delete goes to the root's trash folder first."},
+    {at: TOUR_MHEAD, say: "The node picked above is the one you are browsing. Only an administrator sees this page, and the system's own folders are never on it."},
+  ],
   installed: [
     {say: "Installed is what a node has from the Library: its coding agents, toolchains, tool packs and services, and what each is set to there."},
     {at: TOUR_MHEAD, say: "The node picked above holds here too. Open on a row, or Configure where it asks for anything, opens that thing's own page: your sign-in to an agent, a toolchain's system packages, a pack's or a service's settings."},
