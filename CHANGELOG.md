@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Downloading a move's bundle needs only the bundle's own size free on the old controller's disk, where it needed up to three times that and could end in a bare "No space left on device"; a full disk is now said with what to do (95cc75d)
+
 ## 0.9.0-dev.5096: 2026-11-07
 
 ### Changed
