@@ -62,6 +62,9 @@ class Files(unittest.TestCase):
     def test_the_roots_come_from_the_census(self):
         got = fileexplorer.roots(self.node)
         self.assertEqual([r["kind"] for r in got], ["pool", "share"])
+        self.node["reported"]["mounts"] = [{"path": "/workspace", "mounted": True}, {"path": "/mnt/gone", "mounted": False}]
+        self.node["reported"]["ext_mounts"] = [{"name": "usb", "mounted": True}]
+        self.assertEqual([r["path"] for r in fileexplorer.roots(self.node)][2:], ["/workspace", "/mnt/other/usb"])
         self.assertEqual(got[0]["path"], self.pool)
 
     def test_a_folder_is_listed_and_a_file_read(self):

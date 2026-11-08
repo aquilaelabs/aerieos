@@ -4,7 +4,7 @@ uploaded, downloaded, renamed and put in the trash, through its agent.
 Administrators only (the operator, 8 Nov), every change audited. What it
 reaches is the machine's roots, read from its census: its pools, its
 array, its shares, the old system's merged view where disks were adopted,
-and the spaces folder a stick names; never the system's own folders, which
+the disks and network shares it mounts, and the spaces folder a stick names; never the system's own folders, which
 the agent refuses whatever is asked. Each request goes to the agent's
 screen relay port signed for that request and this minute, as a terminal
 is (files.py on the agent), and its answer is streamed through.
@@ -60,6 +60,14 @@ def roots(n):
     for sh in rep.get("shares") or []:
         if isinstance(sh, dict) and sh.get("path"):
             add(sh["path"], f"{sh.get('name')} (share)", "share")
+    # The disks and network shares it mounts (its Storage section's mounts,
+    # and the other disks under /mnt/other), on any node, not only a NAS.
+    for m in rep.get("mounts") or []:
+        if isinstance(m, dict) and m.get("mounted") and not m.get("stale"):
+            add(m.get("path"), f"{str(m.get('path') or '').rstrip('/').rsplit('/', 1)[-1] or m.get('path')} (mount{', read only' if m.get('ro') else ''})", "mount")
+    for m in rep.get("ext_mounts") or []:
+        if isinstance(m, dict) and m.get("mounted") and m.get("name"):
+            add(f"/mnt/other/{m['name']}", f"{m['name']} (other disk)", "mount")
     return out
 
 

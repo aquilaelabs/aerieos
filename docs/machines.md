@@ -504,8 +504,9 @@ picked in the Machines header; on a machine AerieOS is installed on, its
 own machine is one of them. It is an administrator's alone, and every
 change is written to the audit log. What it reaches is the node's
 **roots**, a chip each over the list: the spaces folder a stick names,
-its pools, its array, the disks it adopted from another system and its
-shares. The system's own folders (`/`, `/etc`, `/usr`, `/var` and the
+its pools, its array, the disks it adopted from another system, its
+shares, and the disks and network shares it mounts (its Storage
+section's mounts and its other disks). The system's own folders (`/`, `/etc`, `/usr`, `/var` and the
 like) are never a root, and nothing in a root leads out of it: a path
 with `..` or a link pointing elsewhere is refused by the node itself.
 Aerie Workshop's own container has no Files page of its own, since its
