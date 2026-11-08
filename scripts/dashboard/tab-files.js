@@ -68,7 +68,7 @@ function flGo(root, path){
   loadFiles();
 }
 
-const FL_COLS = [{label: "Name", w: "minmax(0,4fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "8rem"},
+const FL_COLS = [{label: "Name", w: "minmax(0,4fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "11rem"},
                  {label: "Owner", w: "minmax(4rem,.8fr)"}, {act: true, w: "2.5rem"}];
 
 function flSize(n){
@@ -81,7 +81,7 @@ function flCrumbs(){
   const parts = flPath ? flPath.split("/") : [];
   const at = (i) => parts.slice(0, i + 1).join("/");
   return `<nav class="fxcrumbs" aria-label="where in ${esc(root?.label || "the root")}">
-    <button type="button" class="namelink" data-fxgo="">${esc(root?.label || flRoot)}</button>${
+    <button type="button" class="namelink" data-fxgo="">${esc((root?.label || flRoot).replace(/ \([^)]*\)$/, ""))}</button>${
       parts.map((p, i) => `<span class="dim" aria-hidden="true">/</span>${i === parts.length - 1
         ? `<span class="fxhere" aria-current="page">${esc(p)}</span>`
         : `<button type="button" class="namelink" data-fxgo="${esc(at(i))}">${esc(p)}</button>`}`).join("")}</nav>`;
@@ -138,7 +138,7 @@ function renderFilesInto(i){
         <button type="button" data-fxact="download"${ticked.some(n => (fl.entries || []).find(e => e.name === n && e.kind === "dir")) ? " disabled title=\"a folder downloads one file at a time\"" : ""}>Download</button>
         <button type="button" class="danger" data-fxact="delete">Delete</button>
         <button type="button" data-fxact="none">Clear</button></div>`
-    : `<div class="actbar"><input type="search" id="flFilter" placeholder="Filter this folder" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
+    : `<div class="actbar"><input type="search" id="flFilter" class="flfilter" placeholder="Filter" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
         <span class="sp"></span><button type="button" data-fxact="mkdir">New folder</button>
         <button type="button" class="primary" data-fxact="upload"${fl.serves ? "" : " disabled"}>Upload</button>
         <input type="file" id="flPick" multiple hidden></div>`;
@@ -149,7 +149,9 @@ function renderFilesInto(i){
   const body = fl.error ? `<div class="field"><div class="notice bad">${esc(fl.error)}</div></div>`
     : rows.length ? tblWrap(FL_COLS, rows.map(flLine).join(""), "fxtbl") + (fl.truncated ? `<div class="sub dim">The first ${(fl.entries || []).length} are shown: this folder holds more.</div>` : "")
     : `<div class="empty">${flFilter ? "Nothing here matches the filter." : "This folder is empty."}</div>`;
-  const head = pageHead({facts: [["Root", flRoot], ["Here", `${(fl.entries || []).filter(e => e.kind === "dir").length} folders, ${(fl.entries || []).filter(e => e.kind !== "dir").length} files`]]});
+  const nd = (fl.entries || []).filter(e => e.kind === "dir").length, nf = (fl.entries || []).length - nd;
+  const head = pageHead({facts: [["Path", flRoot + (flPath ? "/" + flPath : "")],
+                                 ["Here", `${nd} folder${nd === 1 ? "" : "s"}, ${nf} file${nf === 1 ? "" : "s"}`]]});
   paint(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}${head}${chips}${docSection("files", "list", "Files", "", `${flCrumbs()}${bar}${up}${body}`)}</div>`);
   wireFiles(d.el);
   if (rows.length > 120) paginate(d.el.querySelector(".fxtbl"), ".tline", {key: `fx:${flNode}:${flRoot}:${flPath}`, noun: "items"});
@@ -279,8 +281,8 @@ async function flPreview(name){
     : kind === "audio" ? `<audio src="${esc(src)}" controls preload="metadata"></audio>`
     : kind === "pdf" ? `<iframe src="${esc(src)}" title="${esc(name)}"></iframe>`
     : `<pre class="fxtext">${skRows(4)}</pre>`;
-  m.innerHTML = `<div class="box"><h3>${esc(name)}</h3><div class="sub dim">${esc(flSize(e.size || 0))}, ${esc(fmtTime((e.mtime || 0) * 1000))}</div>
-    <div class="fxbody">${body}</div>
+  m.innerHTML = `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, ${esc(fmtTime((e.mtime || 0) * 1000))}</div></div>
+    <div class="field fxbody">${body}</div>
     <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" class="primary" data-fxclose>Close</button></div></div>`;
   document.body.appendChild(m);
   armModal(m);
