@@ -20,6 +20,7 @@ from .base import (
     CLAUDE_DIR,
     OS_RELEASE,
     SANDBOX_BIN,
+    SCREEN_PORT,
     SESSION,
     SHARE,
     TAILSCALE_BIN,
@@ -446,6 +447,8 @@ def census(state):
         "services": services_now(),
         # The session half (roadmap #24), as this process is holding it.
         "session": session_now(state),
+        # The file explorer's requests, on the screen relay's port (R224).
+        "files": {"port": SCREEN_PORT},
         # What the disks hold (the Storage tab): the last hourly walk, never
         # one taken here, since a walk of a big store is minutes.
         "storage": storage.last(),

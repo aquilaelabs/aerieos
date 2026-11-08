@@ -1,5 +1,6 @@
 """The node's one port for the controller's sockets: AerieOS's own
-terminals (R133, term.py) at /term, and a VM's screen for the dock (R99),
+terminals (R133, term.py) at /term, the file explorer's requests (R224,
+files.py) at /files, and a VM's screen for the dock (R99),
 relaying one connection to one of this machine's VMs' VNC, which libvirt
 listens for on the loopback alone.
 
@@ -20,7 +21,7 @@ import threading
 import time
 import urllib.parse
 
-from . import term
+from . import files, term
 from .base import SCREEN_PORT, _run, log, log_once
 from .vms import DOMAIN_RE, VIRSH
 
@@ -160,6 +161,9 @@ def serve_one(conn, key, kinds=None):
     path = lines[0].split(" ")[1] if len(lines[0].split(" ")) > 1 else ""
     hdr = {k.strip().lower(): v.strip() for k, _, v in (ln.partition(":") for ln in lines[1:])}
     q = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
+    if files.route(path):
+        # The file explorer's one request (R224), the body's start with it.
+        return files.serve(conn, key, hdr, q, head.split(b"\r\n\r\n", 1)[1])
     if urllib.parse.urlsplit(path).path == "/term":
         return serve_term(conn, key, hdr, q, kinds or (lambda: {}))
     domain = (q.get("vm") or [""])[0]

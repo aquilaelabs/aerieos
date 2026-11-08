@@ -148,7 +148,7 @@ scripts/
     server.py                    the routes, the transport and the gates; each handler one call into a module beside it
     index.html                   the markup, the stylesheet and the wiring that runs at load
     terminal.html                one terminal on a page of its own: a tab popped out of the dock, and the Android app's session screen (R133)
-    tab-*.js                     one per document tab (Docker, Nodes, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
+    tab-*.js                     one per document tab (Docker, Nodes, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Files, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
     nb-*.js                      one per notebook view; nb-core.js is the notebook itself
     page-*.js                    one per part of the page that is neither: the state, the tabs, the panes and the dock, a project's rows, the polls, the bell, the doctor and the rest
     static/                      the favicon set and the SVG marks the page draws
@@ -208,6 +208,7 @@ scripts/
     snapshots.py                 each project's tree as it was each day, stored once by content, pruned to the project's days, and restored whole or a file at a time (R165)
     paths.py                     where the controller keeps what grows (snapshots, the git relay, logs), as the Settings page's Storage section sets it, and the move between two
     claudesync.py                a synced node's agents' conversations: the listing, get and put (whole, a tail, gone) for its agent's mirror (B613)
+    fileexplorer.py              the Files page (R224): a machine's roots from its census, and each list, read, upload and change sent to its agent signed for that request
     files.py                     a project's files for a person's editor (R159): stat, list, read, write, rename, delete, search and changes, inside the project and never .git
     git.py                       the notebook's Git view: the repository read out, and its writes
     codebase.py                  the code base counted, by language, for the notebook's Overview
@@ -349,6 +350,7 @@ scripts/
     http80.py                    plain http://THE-MACHINE/ on a controller's own machine: a redirect to the dashboard on port 80, letting go for nginx and for a compose job (R202)
     console.py                   a way in at AerieOS's screen (R194): the admin account made with sudo from the console password's hash kept on the data partition, at every start, and the console job that sets or takes it
     power.py                     the machine's UPS through NUT and its own packages' updates for the census, and the host-update job (R164 step 3)
+    files.py                     the Files page's requests on the screen relay's port (R224): list, read, write, mkdir, rename and delete into the trash, held inside a root that is never the system's own
     extmounts.py                 the other disks and shares the hello names (R162 step 4): each mounted at /mnt/other/NAME or unmounted as the record says, an SMB share's credentials root's alone, the census's rows
     packconfig.py                what each added pack is configured with here (R172): the hello's rows written as one env file per pack under the store's .bb/config, the session account's alone, which aerie tool reads into a verb's environment
     backups.py                   the storage-backup job (R162 step 5): rsync of a folder to another place, each run hard-linked to the one before, the oldest pruned, the last run for the census

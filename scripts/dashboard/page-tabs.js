@@ -234,6 +234,11 @@ const TABKINDS = {
               icon: TOOL_ICONS.nodes,
               render: (i) => renderInstalledInto(i), live: () => `${instRev}/${nodesRev}/${signinRev()}`,
               open: () => loadInstalled() },
+  // A machine's files (R224): its roots through its agent, its own node.
+  files:     { multi: false, label: () => "Files",
+              icon: TOOL_ICONS.nodes,
+              render: (i) => renderFilesInto(i), live: () => `${fxRev}/${nodesRev}`,
+              open: () => loadFiles() },
   // A Library entry's own page (R183): the Library's read, one card of it,
   // opened by its Details and named for the entry.
   entry:     { multi: false, label: () => entryLabel(),

@@ -46,7 +46,7 @@ def configure(*, state, write_json, lock):
 # (the Toolchains, Agents and Apps tabs, the Library since R170): no migration.
 # "findings" is the Analysis tab the Static analysis button opens, the
 # report as a document tab beside the notebook's own view of it.
-TAB_KINDS = {"term", "library", "installed", "emulator", "notebook", "projects", "docker", "findings", "roles", "nginx", "vms", "storage",
+TAB_KINDS = {"term", "library", "installed", "files", "emulator", "notebook", "projects", "docker", "findings", "roles", "nginx", "vms", "storage",
              "nodes", "settings", "jobs", "users", "profile", "phone", "runner", "home", "notices", "help",
              "sessions", "chat", "schedules", "debug", "keys", "audit", "scanners", "machine", "network",
              # An installed thing's own page (R181 step 2), a press's.

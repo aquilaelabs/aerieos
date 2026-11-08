@@ -5477,6 +5477,10 @@ if BARE_METAL:
 import backup                                                    # noqa: E402
 # Moving this controller to another home (R90 step 12, move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
+# The file explorer (R224, fileexplorer.py): a machine's roots through its agent.
+import fileexplorer                                              # noqa: E402
+fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.route_host(nid), key=lambda nid: nodes.screen_key(nid),
+                       audit=lambda who, what, detail, params: db.audit(who, what, detail, params))
 import move                                                      # noqa: E402
 move.checkpoint = db.checkpoint
 move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
@@ -6084,6 +6088,8 @@ GET_ROUTES = (
     ("prefix", "/api/docker", "_get_docker"),
     ("prefix", "/api/containers", "_get_containers"),
     ("exact", "/api/vms", "_get_vms"),
+    ("exact", "/api/files", "_get_files"),
+    ("exact", "/api/files/read", "_get_files_read"),
     ("prefix", "/api/project-job", "_get_project_job"),
     ("prefix", "/api/trash", "_get_trash"),
     ("prefix", "/api/claude-now", "_get_claude_now"),
@@ -6159,6 +6165,7 @@ POST_ROUTES = (
     ("prefix", "/api/pin", "_pin"),
     ("exact", "/api/reset", "_reset"),
     ("exact", "/api/move", "_move"),
+    ("exact", "/api/files", "_files"),
     ("exact", "/api/backup", "_backup"),
     ("prefix", "/api/create", "_create"),
     ("prefix", "/api/profile", "_profile"),
@@ -8489,6 +8496,139 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return self._json(devapp.containers())
 
+    def _files_admin(self):
+        """Whether the asker may use the file explorer: an administrator,
+        signed in as themselves (R224)."""
+        me = self._who() or {}
+        return bool(users.is_admin(me)) and not me.get("session")
+
+    def _get_files(self):
+        """GET /api/files?node=&root=&path= (R224): the node's roots, and
+        with a root the folder's listing; an administrator's."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        nid, root = q.get("node", [""])[0], q.get("root", [""])[0]
+        n = nodes.node(nid) if nid else None
+        if not n or n.get("kind") != "agent":
+            return self._json({"error": "no such node"}, 404)
+        out = {"node": nid, "name": n.get("name") or nid, "roots": fileexplorer.roots(n),
+               "serves": bool(((n.get("reported") or {}).get("files") or {}).get("port")), "live": n.get("live") is not False}
+        if root:
+            got, status = fileexplorer.act(self._principal(), True, nid, root, "list", path=q.get("path", [""])[0])
+            if status != 200:
+                return self._json({**out, "error": got.get("error") or f"the agent answered {status}"}, 200)
+            out.update(got)
+        return self._json(out)
+
+    def _get_files_read(self):
+        """GET /api/files/read?node=&root=&path=[&dl=1] (R224): a file's
+        bytes streamed from its node, a download or shown in the page;
+        nothing it holds runs here (a page or a script is sent as text)."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        nid, root, path = q.get("node", [""])[0], q.get("root", [""])[0], q.get("path", [""])[0]
+        tg = fileexplorer._target(True, nid, root)
+        if tg.get("error"):
+            return self._json(tg, 400)
+        start = 0
+        rng = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range") or "")
+        if rng:
+            start = int(rng.group(1))
+        try:
+            up = fileexplorer.open_request(tg, {"op": "read", "root": root.rstrip("/"), "path": path, "from": start})
+        except OSError as e:
+            return self._json({"error": f"{tg['node'].get('name')} did not answer: {e}"}, 502)
+        try:
+            status, hdr, rest = fileexplorer.read_head(up)
+            if status != 200:
+                return self._json(fileexplorer.read_json(up, hdr, rest), status)
+            name = path.rstrip("/").rsplit("/", 1)[-1] or "file"
+            length, size = int(hdr.get("content-length") or 0), int(hdr.get("x-size") or 0)
+            self.send_response(206 if rng else 200)
+            if q.get("dl", [""])[0]:
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(name))
+            else:
+                ctype = fileexplorer.shown_as(name)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", "inline; filename*=UTF-8''" + urllib.parse.quote(name))
+                if ctype != "application/pdf":
+                    self.send_header("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Accept-Ranges", "bytes")
+            if rng:
+                self.send_header("Content-Range", f"bytes {start}-{max(start, size - 1)}/{size}")
+            self.send_header("Content-Length", str(length))
+            self.end_headers()
+            if rest:
+                self.wfile.write(rest[:length])
+            left = length - len(rest[:length])
+            while left > 0:
+                got = up.recv(min(1 << 20, left))
+                if not got:
+                    break
+                self.wfile.write(got)
+                left -= len(got)
+        finally:
+            up.close()
+        return None
+
+    def _files_upload(self):
+        """POST /api/files/upload?node=&root=&path=&name= (R224): the
+        request's body, the file itself, streamed to its node a megabyte
+        at a time; an administrator's, audited."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        if (cross := self._ws_cross_origin()):
+            return self._json({"error": cross}, 403)
+        nid, root, path, name = (q.get(k, [""])[0] for k in ("node", "root", "path", "name"))
+        try:
+            n = int(self.headers.get("Content-Length", "-1"))
+        except ValueError:
+            n = -1
+        if n < 0:
+            return self._json({"error": "the upload says no length"}, 411)
+        tg = fileexplorer._target(True, nid, root)
+        if tg.get("error") or not fileexplorer.NAME.fullmatch(name or ""):
+            self.close_connection = True
+            return self._json(tg if tg.get("error") else {"error": "a file's name is needed, without a slash"}, 400)
+        try:
+            up = fileexplorer.open_request(tg, {"op": "write", "root": root.rstrip("/"), "path": path, "name": name,
+                                                 "replace": q.get("replace", [""])[0] == "1"}, method="PUT", length=n)
+        except OSError as e:
+            self.close_connection = True
+            return self._json({"error": f"{tg['node'].get('name')} did not answer: {e}"}, 502)
+        try:
+            left = n
+            while left > 0:
+                chunk = self.rfile.read(min(1 << 20, left))
+                if not chunk:
+                    break
+                up.sendall(chunk)
+                left -= len(chunk)
+            status, hdr, rest = fileexplorer.read_head(up)
+            got = fileexplorer.read_json(up, hdr, rest)
+        except OSError as e:
+            self.close_connection = True
+            return self._json({"error": f"the upload to {tg['node'].get('name')} stopped: {e}"}, 502)
+        finally:
+            up.close()
+        if status == 200:
+            db.audit(self._principal(), "files-upload", f"{tg['node'].get('name')}:{root}/{path.strip('/')}/{name}"[:120], {"size": n})
+        return self._json(got, status)
+
+    def _files(self, req):
+        """POST /api/files (R224): mkdir, rename or delete (into the root's
+        trash) on a node's root; an administrator's, audited."""
+        got, status = fileexplorer.act(self._principal(), self._files_admin(), field(req, "node"), field(req, "root"),
+                                       field(req, "action"), path=str(req.get("path") or ""), name=str(req.get("name") or ""),
+                                       dest=str(req.get("dest") or ""))
+        return self._json(got, status)
+
     def _get_vms(self):
         """GET /api/vms (R91): the VMs of the projects this account may read
         them on (a session: its own), the OS catalog and the VM hosts."""
@@ -8956,6 +9096,9 @@ class Handler(BaseHTTPRequestHandler):
         # ...and a move landed from Controller settings, its bundle streamed.
         if self.path.split("?")[0] == "/api/move-land":
             return self._move_land()
+        # ...and a file put on a machine from the file explorer (R224), streamed through.
+        if self.path.split("?")[0] == "/api/files/upload":
+            return self._files_upload()
         req = self._read_json()
         if req is None:
             return None

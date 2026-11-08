@@ -2129,6 +2129,22 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
    side of it and its Configure. */
 .installedtab .irow:not(.open) .idetail{display:none}
 .installedtab .irow .idetail{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+/* The Files page (tab-files.js, R224): where in the root as a line of names,
+   a row's tick beside its name, and a file shown over the page at the size
+   the screen has for it. A drag of files over the page outlines it. */
+.fxcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:0 0 8px;font:var(--f-ui)}
+.fxcrumbs .fxhere{font-weight:600;overflow-wrap:anywhere}
+.fxtbl .fxname{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.fxtbl .fxname .namelink{overflow-wrap:anywhere}
+.fxtbl .tline.on{background:color-mix(in srgb, var(--accent) 10%, transparent)}
+.fxpage.drop{outline:2px dashed var(--accent);outline-offset:4px}
+.fxselbar .said{font:var(--f-ui)}
+.fxview .box{width:min(960px, calc(100vw - 32px));max-width:none}
+.fxview .fxbody{max-height:70vh;overflow:auto;margin:8px 0}
+.fxview .fxbody img,.fxview .fxbody video{display:block;max-width:100%;max-height:68vh;margin:0 auto}
+.fxview .fxbody audio{width:100%}
+.fxview .fxbody iframe{width:100%;height:68vh;border:0;background:#fff}
+.fxview .fxtext{margin:0;font:var(--f-data);white-space:pre-wrap;overflow-wrap:anywhere}
 /* An installed thing's page and a Library entry's (R181, R183): each line of
    what it is a line of its own, and the card's icon beside the name. */
 :is(.thingtab,.entrytab) .idetail,.entrytab .ldetail{display:flex;flex-direction:column;gap:6px}
@@ -7601,6 +7617,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 <script src="page-toolchains.js"></script>
 <script src="tab-library.js"></script>
 <script src="tab-installed.js"></script>
+<script src="tab-files.js"></script>
 <script src="tab-thing.js"></script>
 <script src="tab-entry.js"></script>
 <script src="tab-emulator.js"></script>

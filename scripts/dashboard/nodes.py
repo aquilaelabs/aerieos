@@ -2057,6 +2057,9 @@ def _census(c):
     # said, so the row can tell "no sessions here" from "did not say"; the
     # proxy relays a project's session to a node only on the
     # strength of this.
+    # The file explorer's port (R224): its presence says the agent serves it.
+    if isinstance(c.get("files"), dict):
+        out["files"] = {"port": _mb(c["files"].get("port")) or 0}
     se = c.get("session")
     if isinstance(se, dict):
         out["session"] = {

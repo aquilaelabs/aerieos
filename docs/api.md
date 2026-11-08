@@ -69,6 +69,8 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read. |  |
 | GET | `/api/containers` | prefix | `_get_containers` | GET /api/containers. | refused: containers-read |
 | GET | `/api/vms` | exact | `_get_vms` | GET /api/vms (R91): the VMs of the projects this account may read them on (a session: its own), the OS catalog and the VM hosts. |  |
+| GET | `/api/files` | exact | `_get_files` | GET /api/files?node=&root=&path= (R224): the node's roots, and with a root the folder's listing; an administrator's. |  |
+| GET | `/api/files/read` | exact | `_get_files_read` | GET /api/files/read?node=&root=&path=[&dl=1] (R224): a file's bytes streamed from its node, a download or shown in the page; nothing it holds runs here (a page or a script is sent as text). |  |
 | GET | `/api/project-job` | prefix | `_get_project_job` | GET /api/project-job. | refused: create |
 | GET | `/api/trash` | prefix | `_get_trash` | GET /api/trash. | refused: trash |
 | GET | `/api/claude-now` | prefix | `_get_claude_now` | GET /api/claude-now. |  |
@@ -131,6 +133,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |
 | POST | `/api/move` | exact | `_move` | POST /api/move (R90 step 12): prepare (the move armed, the token answered once, a bundle packed), forget (withdrawn), moved (this controller marked moved to the new one, read-only from here on), ask (the new address aske |  |
+| POST | `/api/files` | exact | `_files` | A project's files for a person's own editor (files.py, R159): the account this request proved, a project it sees, and the file access its settings give it through the editor's door, asked on this request (ftp.access_for) |  |
 | POST | `/api/backup` | exact | `_backup` | POST /api/backup {action: now}: a copy written now, the owner's. |  |
 | POST | `/api/create` | prefix | `_create` | New project: a fresh local repo, a clone or a link, and what the dialog chose besides (projects.create_from_dialog). | refused: create |
 | POST | `/api/profile` | prefix | `_profile` | The signed-in account's own settings (the Profile page): read on GET, saved on POST, by profiletab.py. |  |

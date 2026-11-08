@@ -45,7 +45,7 @@ const RAIL = [
   // the USB edition add beside Settings (R90, R56). After Containers, so a
   // phone's bar keeps its four.
   {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This machine"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
-  {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"]]},
+  {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"], ["files", "Files"]]},
   {key: "sessions", label: "Sessions", icon: "sessions", tools: [["sessions", "Sessions"]]},
   {key: "jobs", label: "Jobs", icon: "jobs", tools: [["jobs", "Jobs"], ["schedules", "Schedules"]]},
   {key: "people", label: "People", icon: "people", tools: [["users", "Users"], ["roles", "Roles"]], admin: true},
@@ -92,6 +92,8 @@ function railAllows(kind){
     case "library": case "entry": return !!a.install || !!a.curate || !!a.nodes;
     // What is installed on a node (R172): the same areas as the Library.
     case "installed": case "thing": return !!a.install || !!a.configure || !!a.nodes;
+    // A machine's files (R224): an administrator's alone.
+    case "files": return !!state?.can?.admin;
     case "jobs": return !!a.jobs;
     // An administrator's own cron (R117), its own area.
     case "schedules": return !!a.schedules;
@@ -133,7 +135,7 @@ function railOn(){
 const OPENERS = {
   home: () => openHome(),
   projects: () => openProjectsTab(), findings: () => openFindingsTab(), docker: () => openDocker(),
-  nodes: () => openNodesTab(), storage: () => openStorageTab(), installed: () => openInstalledTab(), nginx: () => openNginxTab(), vms: () => openVmsTab(),
+  nodes: () => openNodesTab(), storage: () => openStorageTab(), installed: () => openInstalledTab(), files: () => openFilesTab(), nginx: () => openNginxTab(), vms: () => openVmsTab(),
   // The Toolchains, Agents and Apps pages are the Library since R170: every
   // door a person presses lands there, and their addresses open the group.
   library: () => openLibrary(), emulator: () => openEmulator(), phone: () => openPhoneTab(),
@@ -179,13 +181,14 @@ function shellPush(to, from = location.hash){
 // The Jobs page has no node; its second segment is the chip it is narrowed
 // to (#/jobs/failed-today, which Home's "failed today" opens, B74).
 const NODE_PICKED = {jobs: () => jobsShow, nodes: () => nodesPick, storage: () => storageNode, nginx: () => nginxNode,
-  library: () => libNode, installed: () => instNode, emulator: () => emuNode, phone: () => phNode,
+  library: () => libNode, installed: () => instNode, files: () => fxNode, emulator: () => emuNode, phone: () => phNode,
   runner: () => runnerNode, docker: () => dockerNode};
 // A page that keeps what it read for one node forgets it when Back names
 // another, or the other node's list showed under this one until the read.
 const NODE_SET = {jobs: v => jobsShowSet(v), nodes: v => { nodesPick = v; }, storage: v => { storageNode = v; }, nginx: v => { nginxNode = v; },
   library: v => { if (v !== libNode){ libNode = v; lib = null; } },
   installed: v => { if (v !== instNode){ instNode = v; inst = null; } },
+  files: v => { if (v !== fxNode){ fxNode = v; fx = null; fxRoot = ""; fxPath = ""; fxSel.clear(); } },
   emulator: v => { if (v !== emuNode){ emuNode = v; emu = null; emuTicked.clear(); } },
   phone: v => { if (v !== phNode){ phNode = v; phIp = ""; } },
   runner: v => { runnerNode = v; },
@@ -488,13 +491,15 @@ const GROUP_HEADS = {
   containers: {},
 };
 // What a page keeps in this browser about its node, written on a pick.
-const GROUP_KEEP = {library: "bb.libnode", emulator: "bb.emunode", storage: "bb.stnode", installed: "bb.instnode", nginx: "bb.ngnode"};
+const GROUP_KEEP = {library: "bb.libnode", emulator: "bb.emunode", storage: "bb.stnode", installed: "bb.instnode", nginx: "bb.ngnode", files: "bb.filenode"};
 // What the page on show reads again after a pick; the rest redraw from
 // what NODE_SET left them.
-const GROUP_LOAD = {library: () => loadLibrary(), emulator: () => loadEmulator(), installed: () => loadInstalled(), docker: () => loadDocker(),
+const GROUP_LOAD = {library: () => loadLibrary(), emulator: () => loadEmulator(), installed: () => loadInstalled(), files: () => loadFiles(), docker: () => loadDocker(),
                     phone: () => phFetch(null, true)};
-function machinesLive(){
-  return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own));
+function machinesLive(kind = ""){
+  // The machine's own node is This machine's (B635), but its files are the
+  // Files page's like any node's (R224).
+  return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && kind !== "files"));
 }
 function machinesNode(kind){
   return NODE_PICKED[kind]?.() || "";
@@ -512,7 +517,7 @@ function groupKeep(g, nid){
   try{ localStorage.setItem("bb.group." + g.key, nid); }catch(e){ /* private */ }
 }
 function groupNode(g, kind){
-  const live = machinesLive();
+  const live = machinesLive(kind);
   const ok = id => !!id && live.some(n => n.id === id);
   const page = machinesNode(kind);
   let cur = ok(GROUP_CUR[g.key]) ? GROUP_CUR[g.key] : groupKept(g);
@@ -580,7 +585,7 @@ function groupHeader(t, g){
     if (!have.length) return `<span class="phead mchead">${nodePick("", null)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>`;
     return `<span class="phead mchead">${nodePick("ndPick", have, machinesNode(t.kind) || have[0].id)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>`;
   }
-  const live = machinesLive();
+  const live = machinesLive(t.kind);
   const cur = groupNode(g, t.kind);
   const n = live.find(x => x.id === cur);
   const seen = n?.agent?.last_seen ? `seen ${ago(n.agent.last_seen)}` : n ? "never seen" : "";
