@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- While a machine is first set up, its screen or a KVM logs in as admin with no password, even if the dashboard or the agent has stopped, and the first-run page offers a password to keep a way in after setup ends (cf50004)
+
 ## 0.9.0-dev.5123: 2026-11-08
 
 ### Added
