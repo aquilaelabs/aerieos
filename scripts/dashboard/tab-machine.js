@@ -155,9 +155,13 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
       optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
       <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
-      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
+      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>` : "";
   return pick;
 }
+// A pool holding another install's folder (the operator, 8 Nov): never taken,
+// set aside beside it when picked, for a person to delete once sure.
+const STICK_OTHER = "This pool holds another AerieOS install's folder, aerieos-system. Using it renames that folder to aerieos-system.old (or .old-2 and on) and leaves it as it is, to delete once nothing in it is wanted.";
+const stickPoolOther = (s, path) => !!path && (s?.others || []).includes(path);
 
 function stickSection(n){
   const s = n?.reported?.os_stick;
@@ -216,13 +220,16 @@ function wireStick(root){
   }));
   const b = root.querySelector("[data-stickpool]"), sel = root.querySelector("#stickPool");
   if (!b || !sel) return;
+  const s = (ownMachine()?.reported?.os_stick) || {};
+  const note = root.querySelector("#stickPoolOther");
+  sel.onchange = () => { if (note) note.hidden = !stickPoolOther(s, sel.value); };
   b.onclick = () => pressing(b, async () => {
-    const path = sel.value;
+    const path = sel.value, aside = stickPoolOther(s, path);
     if (!path) return notify("pick a pool first", true);
-    if (!await askYes(`Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
-        {title: "Use this pool?", verb: "Move"})) return;
+    if (!await askYes(`${aside ? `${path} holds another AerieOS install's folder. It is renamed to ${path}/aerieos-system.old (or .old-2 and on) and nothing in it is read, taken or deleted: delete it yourself once nothing in it is wanted.\n\n` : ""}Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
+        {title: aside ? "Set it aside and use this pool?" : "Use this pool?", verb: aside ? "Set aside and move" : "Move"})) return;
     busy(b, "Moving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path})).json().catch(() => ({error: "no answer"}));
+    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside})).json().catch(() => ({error: "no answer"}));
     notify(j.error || "moving to the pool: This machine says when it is done", !!j.error);
     await loadNodes();
   });

@@ -417,7 +417,9 @@ def stick_status():
             "written_kb": d.get("written_kb") if isinstance(d.get("written_kb"), int) else None,
             "boot_written_kb": d.get("boot_written_kb") if isinstance(d.get("boot_written_kb"), int) else None,
             "projects": str(d.get("projects") or "")[:300], "projects_bound": d.get("projects_bound") is True,
-            "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else ""}
+            "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else "",
+            # The pools holding another install's folder, which a pick there sets aside.
+            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16]}
 
 
 class OsImageMixin:
@@ -552,7 +554,9 @@ class OsImageMixin:
         if not path.startswith("/") or ".." in path.split("/"):
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
-        rc = self._sh(job, ["bash", tool, "set", path], timeout=6 * 3600)
+        # Another install's folder there is set aside only when asked (the
+        # operator, 8 Nov); the tool refuses it otherwise.
+        rc = self._sh(job, ["bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
         self.hello_again("the system pool was set")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 

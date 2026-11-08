@@ -69,6 +69,23 @@ pool_owner() {
     if [ -n "$mark" ] && [ "$mark" = "$(install_id)" ]; then echo mine; else echo other; fi
 }
 mark_pool() { mkdir -p "$1/$SUB" && install_id > "$1/$SUB/$OWNER_MARK"; }
+# Where another install's folder goes when set aside: SUB.old, then
+# SUB.old-2, -3 and on, never over one set aside before.
+aside_name() {
+    local n=1 d="$1/$SUB.old"
+    while [ -e "$d" ] || [ -L "$d" ]; do n=$((n + 1)); d="$1/$SUB.old-$n"; done
+    printf '%s' "$d"
+}
+# The mounted filesystems holding another install's folder, said before a
+# pool is picked so the page can offer to set it aside.
+others() {
+    local t
+    while IFS= read -r t; do
+        case "$t" in /|/proc*|/sys*|/dev*|/run*|/boot*|/usr*|/etc*|/var*|/home*|/srv*|/tmp*) continue ;; esac
+        if [ -d "$t/$SUB" ] && [ "$(pool_owner "$t")" = other ]; then printf '"%s"\n' "${t//\"/}"; fi
+    done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
+    return 0
+}
 CONTROLLER="aerieos-controller"
 
 envget() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null | tr -d '"' | tail -1; }
@@ -377,8 +394,17 @@ set_pool() {
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
     if [ "$(pool_owner "$p")" = other ]; then
-        echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, or pick a pool without it; nothing on $p was touched" >&2
-        return 3
+        if [ "${2:-}" != --aside ]; then
+            echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, set it aside, or pick a pool without it; nothing on $p was touched" >&2
+            return 3
+        fi
+        # Set aside, never taken (the operator, 8 Nov): renamed beside it
+        # as it is, to be deleted by a person once sure, and this install
+        # starts on an empty folder.
+        local aside
+        aside="$(aside_name "$p")"
+        mv -T "$p/$SUB" "$aside" || { echo "system-pool: $p/$SUB could not be set aside; nothing on $p was touched" >&2; return 1; }
+        echo "system-pool: the other install's $p/$SUB is set aside as $aside, untouched: delete it once nothing in it is wanted"
     fi
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "${SERVICES[@]/%/.service}" 2>/dev/null || true
     mark_pool "$p"
@@ -468,16 +494,17 @@ status() {
     # Where the projects are: a named folder on the disks, the pool's, or
     # held (nowhere yet: never the stick).
     if [ -n "$pf" ]; then home="folder"; elif [ -n "$p" ] && [ "$ready" = true ]; then home="pool"; else home="held"; fi
-    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s"}\n' \
+    local oth; oth="$(others | paste -sd, -)"
+    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s]}\n' \
         "${p//\"/}" "$ready" "${on_stick[*]}" "${kb:-null}" "${since:-null}" "${pf//\"/}" \
-        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home"
+        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth"
 }
 
 case "${1:-}" in
     apply) apply ;;
-    set) set_pool "${2:-}" ;;
+    set) set_pool "${2:-}" "${3:-}" ;;
     projects)
         if [ "${2:-}" = --release ]; then release_projects; else shift; set_projects "$@"; fi ;;
     status) status ;;
-    *) echo "usage: system-pool apply | set PATH | spaces PATH [NAME...] | spaces --release | status" >&2; exit 64 ;;
+    *) echo "usage: system-pool apply | set PATH [--aside] | spaces PATH [NAME...] | spaces --release | status" >&2; exit 64 ;;
 esac

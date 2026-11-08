@@ -1805,7 +1805,9 @@ def _census(c):
                            # A folder of the machine's own as the projects folder (R163).
                            "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
                            "projects_bound": s.get("projects_bound") is True,
-                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else ""}
+                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else "",
+                           # Pools holding another install's folder, set aside if picked.
+                           "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16]}
     # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
@@ -4432,7 +4434,7 @@ def adopted_pools(rep):
             and not re.search(r"/disk\d+$", str(m["where"]))]
 
 
-def node_system_pool(principal, node_id, path=""):
+def node_system_pool(principal, node_id, path="", aside=False):
     """A stick's system pool (R161 step 10): the pool, by its mount point,
     where docker, containerd, libvirt, the toolchains and the projects write
     instead of the stick; a system job on the own machine's node, whose root
@@ -4460,9 +4462,9 @@ def node_system_pool(principal, node_id, path=""):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path}, "timeout": 6 * 3600})
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True}, "timeout": 6 * 3600})
     if r.get("ok"):
-        audit(principal, "system-pool", node_id, {"job": r["job"], "path": path})
+        audit(principal, "system-pool", node_id, {"job": r["job"], "path": path, "aside": aside is True})
     return r
 
 
@@ -7553,7 +7555,7 @@ def verb(principal, req):
              "feature": lambda: node_feature(principal, nid, field(req, "feature"), field(req, "op")),
              "controller-update": lambda: node_controller_update(principal, nid, field(req, "release")),
              "os-update": lambda: node_os_update(principal, nid, field(req, "release"), field(req, "from")),
-             "system-pool": lambda: node_system_pool(principal, nid, field(req, "path")),
+             "system-pool": lambda: node_system_pool(principal, nid, field(req, "path"), aside=req.get("aside") is True),
              "os-kept": lambda: node_os_kept(principal, nid, field(req, "verb"), field(req, "version")),
              "projects-folder": lambda: node_projects_folder(principal, nid, field(req, "path"), req.get("release") is True),
              "machine": lambda: node_machine(principal, nid, field(req, "hostname"), field(req, "timezone"), req.get("spindown")),

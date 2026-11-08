@@ -278,8 +278,9 @@ function setupPlaceAuto(s){
   const n = s.node, stick = setupStickOf(s);
   if (!n || !stick || stick.pool || stick.projects || setupWalking() || setupDisks.making || state?.firstboot?.adopt || !state?.can?.admin) return;
   if ((n.jobs || []).some(j => j.apply)) return;
-  const pools = (n.reported?.pools || []).filter(p => p.mount);
-  const mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || n.reported?.array?.mount || "";
+  // Never a pool holding another install's folder: setting it aside is the person's press.
+  const pools = (n.reported?.pools || []).filter(p => p.mount && !(stick.others || []).includes(p.mount));
+  const arr = n.reported?.array?.mount, mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || (arr && !(stick.others || []).includes(arr) ? arr : "");
   if (!mount || setupPlaceTried === mount) return;
   setupPlaceTried = mount;
   postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))

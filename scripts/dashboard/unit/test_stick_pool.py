@@ -152,6 +152,22 @@ class TheImage(unittest.TestCase):
                 self.assertEqual(read(d, "pool2", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
                 # ...and set again by the same install, holding its own data now.
                 self.assertEqual(self.tool(d, "set", f"{d}/pool2").returncode, 0)
+                # Set aside when asked (the operator, 8 Nov): renamed beside it,
+                # .old then .old-2, nothing in it read or deleted, and the pool
+                # taken on an empty folder.
+                for n, was in ((1, "aerieos-system.old"), (2, "aerieos-system.old-2")):
+                    os.makedirs(f"{d}/pool4/aerieos-system/home", exist_ok=True)
+                    with open(f"{d}/pool4/aerieos-system/.aerieos-install", "w") as f:
+                        f.write(f"earlier-{n}")
+                    r = self.tool(d, "set", f"{d}/pool4", "--aside")
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertIn("set aside as", r.stdout)
+                    self.assertEqual(read(d, "pool4", was, ".aerieos-install"), f"earlier-{n}", "kept as it was")
+                    self.assertEqual(read(d, "pool4", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
+                    # The next round's folder is another install's again.
+                    with open(f"{d}/pool4/aerieos-system/.aerieos-install", "w") as f:
+                        f.write("x")
+                self.assertTrue(os.path.isdir(f"{d}/pool4/aerieos-system.old/home"))
                 # A pool in memory (the stick's own root, a tmpfs) is never one (B719).
                 os.makedirs(f"{d}/pool3")
                 for fst in ("tmpfs", "overlay"):
@@ -303,7 +319,7 @@ class TheAgent(unittest.TestCase):
             with mock.patch.dict(os.environ, {"BB_OS_POOL": fake}):
                 got = self.av.stick_status()
             self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12,
-                                   "projects": "", "projects_bound": False, "projects_home": ""})
+                                   "projects": "", "projects_bound": False, "projects_home": "", "others": []})
             with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "none")}):
                 self.assertEqual(self.av.stick_status(), {})
 
@@ -388,7 +404,7 @@ class TheController(unittest.TestCase):
         got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets", "evil"],
                                           "written_kb": 2048, "boot_written_kb": -1}})
         self.assertEqual(got["os_stick"], {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets"],
-                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": ""})
+                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": "", "others": []})
         self.assertNotIn("os_stick", nodes._census({"os_stick": {"stick": False}}))
 
     def test_the_verb_is_a_sticks(self):
