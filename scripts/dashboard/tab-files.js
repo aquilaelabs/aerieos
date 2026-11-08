@@ -68,7 +68,7 @@ function flGo(root, path){
   loadFiles();
 }
 
-const FL_COLS = [{label: "Name", w: "minmax(0,4fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "11rem"},
+const FL_COLS = [{label: "Name", w: "minmax(0,4fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "13.5rem"},
                  {label: "Owner", w: "minmax(4rem,.8fr)"}, {act: true, w: "2.5rem"}];
 
 function flSize(n){
