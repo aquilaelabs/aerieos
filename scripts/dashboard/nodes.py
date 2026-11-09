@@ -641,11 +641,12 @@ def node_update(principal, node_id, fields):
             # socket is not something this container mounts by default.
             return {"error": "the local node cannot be a docker host"}
         if own_machine(n) and "docker-host" in caps:
-            # Nor is the controller's own machine, installed bare metal
-            # (R90): its job account is out of the docker group, since docker
-            # is root there and root holds the controller's state.
-            return {"error": "this machine is the controller's own, so it runs no containers as a node: "
-                             "docker is root here, and the wall keeps the controller's state from the node's accounts"}
+            # Nor the controller's own machine, installed bare metal (R90):
+            # its job account stays out of the docker group, since docker is
+            # root there and root holds the controller's state. Its containers
+            # are the root agent's (B743), which this capability has no say in.
+            return {"error": "this machine is the controller's own: its containers run through its root agent, "
+                             "and the wall keeps docker from the node's accounts"}
         sets.append("capabilities = ?"); args.append(json.dumps(caps))
     if "labels" in fields and isinstance(fields["labels"], dict):
         clean = {str(k)[:40]: str(v)[:120]
@@ -1132,9 +1133,10 @@ def enroll_mint(principal, name, capabilities=None, user="bb", tunnel=None, host
     leaves a pending row the tab offers to remove, never a reused id.
 
     With `own` (R90), the row is the controller's own machine, installed
-    bare metal: builds and sessions and no containers (its job account is
-    out of the docker group), and each session in a network of its own from
-    its first hello, since the wall a session there meets needs one.
+    bare metal: builds and sessions, its containers run by the root agent
+    (its job account is out of the docker group), and each session in a
+    network of its own from its first hello, since the wall a session there
+    meets needs one.
     """
     name = (name or "").strip()[:60] or "node"
     caps = [c for c in (capabilities or CAPABILITIES) if c in CAPABILITIES]
@@ -5802,7 +5804,7 @@ def exec_out(log):
 
 
 def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
-             sizes=None, project="", forget=False, outputs=None, title="", cwd=""):
+             sizes=None, project="", forget=False, outputs=None, title="", cwd="", docker=False):
     """One command on a node, waited for: queued as an exec job, picked up
     by the agent's next poll (which is held open, so at once), and its log
     and exit code handed back: the Nodes page's Test, generalised. For the
@@ -5828,6 +5830,11 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
         spec["project"] = project
     if forget:
         spec["probe"] = True
+    # Docker work, which on the controller's own machine the root agent runs
+    # itself, its job account being out of the docker group (B743). Only the
+    # controller's own docker verbs say so: a queued job carries no such field.
+    if docker:
+        spec["docker"] = True
     if env:
         spec["env"] = {str(k): str(v) for k, v in env.items()}
     if files:

@@ -23,9 +23,8 @@ recognized as the same store a node mounts; that is plumbing, not a node on
 the page.) A controller installed bare metal can be a node of itself
 ([install.md](install.md#bare-metal)): its machine is then a node here
 like any other, tagged **this machine**, and in the picker of every page
-about a node but the containers' (it hosts none: see
-[This controller](#this-controller)), offered in a space's node pickers as
-such, its session network always on, and the Doctor says whether the wall
+about a node but the nginx and Scanners pages', offered in a space's node
+pickers as such, its session network always on, and the Doctor says whether the wall
 between its sessions and the controller holds. Its row carries, besides a
 node's sections, where it keeps things (on a stick, **The stick** and the
 system pool), its **Console** password, what a stick's prepared configuration
@@ -551,8 +550,10 @@ the spaces on it, its sessions, GPU, USB, features, storage, network and the
 advanced verbs, reboot and shut down among them, is its row on the
 [Nodes page](#the-nodes-page). A space picks it as its node, shown as **This
 machine** in every space's node picker, so its sessions and builds run there
-as on any node. It hosts no containers: docker there is root over the
-controller. The container edition has no machine of its own and does not draw
+as on any node. It runs containers too, through its root agent, since its
+job and session accounts stay out of the docker group: a person's press
+starts them and a session's build waits for a person (Auto is Ask there), and
+it opens no Shell in a container. The container edition has no machine of its own and does not draw
 the page (R90 step 8, R56 step 8).
 
 **A held start** (R56 step 9). Not by default: after a shutdown that was

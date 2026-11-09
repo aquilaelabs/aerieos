@@ -595,11 +595,6 @@ it, once per release, and the restart still waits for you.
 
 ## What is not here yet
 
-Containers do not run on the controller's own machine yet: Docker is here and
-its images have their place on the system pool, but it is root over the
-controller, so the machine's own node is no docker host and the Containers
-page sends work to another enrolled machine.
-
 The boot in CI does not yet try a ZFS pool and an array on virtual disks, a
 share over SMB, a node enrolled and a container started, or the browser
 suites against the booted system; those are proved by hand on a machine

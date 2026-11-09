@@ -10,7 +10,7 @@ import threading
 import time
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, RUNNER_DIAG_KEEP, cap_file, log, log_once, own_digest, own_path, prune_dir
+from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, cap_file, log, log_once, own_digest, own_path, prune_dir
 from .controller import Controller
 from .stores import load_state, save_state, use_scope
 from .toolchains import share_images
@@ -150,6 +150,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if not who:
             env.setdefault("HOME", self.job_home())
         return who
+
+    def docker_by_root(self):
+        """Whether docker work here is the root agent's own (B743): the
+        controller's machine, where the job and session accounts stay out of
+        the docker group because docker is root over the controller, so
+        docker runs from this process, as this machine's VMs do."""
+        try:
+            return os.geteuid() == 0 and os.path.getsize(SESSION_WALL) > 0
+        except OSError:
+            return False
 
     def job_home(self):
         """A home a job run as this agent's own account can write: its own,

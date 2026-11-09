@@ -2558,6 +2558,12 @@ def ctr_target(name, instance):
         return {"where": "local"}
     nm = n.get("name") or nid
     se = (n.get("reported") or {}).get("session")
+    if nodes.own_machine(n):
+        # The container terminal runs from the job account's store, and that
+        # account stays off docker here, so this machine has no Shell; its
+        # log is read by the controller, as a node with no terminal's is.
+        return {"where": "node", "id": nid, "name": nm, "term": False,
+                "no_shell": f"{nm} is the controller's own machine, which opens no shell in a container"}
     if nodes.host_only(n):
         why = f"{nm} hosts containers only and runs no terminal, so a shell in this one opens on a node that runs sessions"
     elif n.get("state") != "online" or n.get("live") is False:
@@ -7042,6 +7048,8 @@ class Handler(BaseHTTPRequestHandler):
         t = ctr_target(name, inst)
         if t["where"] == "refused":
             return t["why"]
+        if t.get("no_shell"):
+            return t["no_shell"]
         if ctr not in devactions.running_names(name, inst):
             return f"{ctr} is not a running container of {devapp.pname(name, inst)} now"
         return ""
@@ -12186,8 +12194,7 @@ class Handler(BaseHTTPRequestHandler):
                            "rows": library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), services, pack_values, pack_mine),
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
                            # Whether this node runs Docker, for an app's card (R170 step 7).
-                           # Never the controller's own machine (nodes.own_machine), whose daemon is no docker host.
-                           "docker": bool(((n or {}).get("reported") or {}).get("docker")) and not nodes.own_machine(n),
+                           "docker": bool(((n or {}).get("reported") or {}).get("docker")),
                            "may": {"install": may_install, "apps": may_apps, "packs": not users.may(who, "curate"),
                                    "configure": bool(n) and not users.may_node(who, "configure", nid), "yours": yours_ok},
                            "store": {"root": tc.get("root", ""), "free_mb": tc.get("free_mb"), "checked": tc.get("checked") or 0},

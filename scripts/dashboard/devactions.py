@@ -298,7 +298,10 @@ def _plan(project, instance, action, extra=None):
         rebuild = rebuild[:-1] + up
     if at is not None and not ship:
         ref = str(devapp._read_rec(project, instance).get("ref") or "").strip()
-        checkout = {"name": "checking out", "timeout": 600, "env": {}, "argv": [
+        # as_job: no docker in it, so on the controller's own machine it stays
+        # the job account's rather than the root agent's (the tree is that
+        # account's, and git as root refuses a tree another account owns).
+        checkout = {"name": "checking out", "timeout": 600, "env": {}, "as_job": True, "argv": [
             # A worktree there already is the controller's own, on a disk this
             # node shares, put on the ref before the plan was sent: left alone.
             # ...and a folder there that is not a build tree (no .bbignore of
@@ -1397,7 +1400,7 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
                    check=lambda: devapp.room_gate(project, instance) or devapp.gpu_gate(project, instance)
                    or _env_gate(project, instance)
                    or devapp._beside_gate(project, instance, beside if gate else "")
-                   or (devapp._risk_gate(project, instance, ack) if gate else ""))
+                   or (devapp._risk_gate(project, instance, ack) if gate or devapp.on_own_machine(project, instance) else ""))
 
 
 def run_compose_job(job, run):
@@ -1770,6 +1773,10 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     sess = me.get("session") or ""
     if action == "probe":
         return probe(project, instance, req, principal)
+    # On the controller's own machine docker is root over the controller, so
+    # Auto is Ask there: what a session builds waits for a person (B743).
+    if sess and dial == "auto" and devapp.on_own_machine(project, instance):
+        dial = "ask"
     # An override on a container that exists is a person's under ask: a
     # session names one for a new container (new's override), which the
     # request carries to Allow.

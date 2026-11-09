@@ -13,7 +13,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -565,7 +565,15 @@ class Job(threading.Thread):
         env = dict(sdk_env(self.agent.state))
         env.update({"BUILDERBOT_NODE": self.agent.state.get("node_id", ""),
                     "BUILDERBOT_JOB": self.job["id"]})
-        who = self.agent.drop_privileges(env)
+        # Docker work on the controller's own machine runs from the root
+        # agent (docker_by_root), on the system's programs alone; on any
+        # other node the mark means nothing and the job drops as ever.
+        by_root = bool(spec.get("docker")) and self.agent.docker_by_root()
+        if by_root:
+            env = root_docker_env()
+            env.update({"BUILDERBOT_NODE": self.agent.state.get("node_id", ""),
+                        "BUILDERBOT_JOB": self.job["id"]})
+        who = {} if by_root else self.agent.drop_privileges(env)
         bbv = [str(a) for a in (spec.get("bb") or [])]
         if bbv:
             # A bb verb, run from the bundle this controller ships with the

@@ -12,7 +12,7 @@ import time
 import urllib.request
 import zipfile
 from . import keyops, storage
-from .base import DRIVER, SANDBOX_BIN, SIGN_WORK, TOOLKIT
+from .base import DRIVER, OWN_COMPOSE, SANDBOX_BIN, SIGN_WORK, TOOLKIT, root_docker_env
 from .stores import tc_root, tc_scope
 from .backends import pkg_backend
 from .toolchains import held_recipes, read_catalog, sdk_env, sysdeps_missing, tc_dir, tc_users, tc_users_said, tc_verbs
@@ -65,10 +65,16 @@ class WorkMixin:
             job.say("refused: this node has no docker\n")
             return "failed", 78
         name = re.sub(r"[^A-Za-z0-9._-]", "_", str(spec.get("name") or "compose"))
-        cdir = os.path.join((self.state.get("stores") or {}).get("data") or "/tmp",
-                            "compose", name)
+        by_root = self.docker_by_root()
+        cdir = os.path.join(OWN_COMPOSE if by_root else (self.state.get("stores") or {}).get("data") or "/tmp",
+                            *([] if by_root else ["compose"]), name)
         who = self.drop_privileges({})
-        self.own_dir(cdir, who)
+        if by_root:
+            os.makedirs(os.path.dirname(cdir), mode=0o700, exist_ok=True)
+            os.makedirs(cdir, mode=0o700, exist_ok=True)
+            os.chmod(cdir, 0o700)
+        else:
+            self.own_dir(cdir, who)
         job.say(f"compose for {name} in {cdir}\n")
         # The compose file and the env, as the controller holds them: this
         # node never reads the project's tree for them, so a file edited on
@@ -80,7 +86,7 @@ class WorkMixin:
             path = os.path.join(cdir, base)
             with open(path, "w") as f:
                 f.write(str(body))
-            if who:
+            if who and not by_root:
                 with contextlib.suppress(OSError):
                     os.chown(path, who["user"], who["group"])
             job.say(f"wrote {base} ({len(str(body))} bytes)\n")
@@ -174,12 +180,17 @@ class WorkMixin:
             # job's drop gives HOME, USER and LOGNAME their account's, and
             # OpenRC hands a root service HOME=/root, which docker run as
             # another account cannot read and then finds no compose plugin.
-            env = {k: v for k, v in os.environ.items() if k not in ("HOME", "USER", "LOGNAME")}
-            env.update(sdk_env(self.state))
+            # A step that is no docker work (the checkout's git) stays the
+            # job account's, in a folder that account may enter.
+            as_root = by_root and not stp.get("as_job")
+            env = root_docker_env() if as_root else {
+                k: v for k, v in os.environ.items() if k not in ("HOME", "USER", "LOGNAME")}
+            if not as_root:
+                env.update(sdk_env(self.state))
             env.update({k: str(v).replace("{cdir}", cdir)
                         for k, v in (stp.get("env") or {}).items()})
-            st_, code = job.exec({"argv": argv, "cwd": cdir, "env": env,
-                                  "timeout": stp.get("timeout") or 1800})
+            st_, code = job.exec({"argv": argv, "cwd": cdir if as_root or not by_root else "/tmp", "env": env,
+                                  "timeout": stp.get("timeout") or 1800, **({"docker": True} if as_root else {})})
             if st_ != "succeeded":
                 job.outputs.append({"kind": "compose", "steps_done": done,
                                     "failed_at": stp.get("name")})

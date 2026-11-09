@@ -584,8 +584,8 @@ await firstRun(false);
     sects: [...document.querySelectorAll('.nodestab .ndsections details.sect')].map(d => d.dataset.sect),
     live: Object.fromEntries(['library', 'installed', 'files', 'emulator', 'docker', 'nginx'].map(k => [k, machinesLive(k).some(n => n.id === ownMachine().id)])) }));
   ok(np.tag && np.sects.includes('nodes:health') && np.sects.includes('nodes:advanced'), `the machine is a row on the Nodes page, with a node's sections (${np.sects.join(',')})`);
-  ok(np.live.library && np.live.installed && np.live.files && np.live.emulator && !np.live.docker && !np.live.nginx,
-     `its node is in the Library's and every node page's picker, and not in the containers' pages, which it does not host (${JSON.stringify(np.live)})`);
+  ok(np.live.library && np.live.installed && np.live.files && np.live.emulator && np.live.docker && !np.live.nginx,
+     `its node is in the Library's and every node page's picker, the Containers page's too, and not the nginx page's (${JSON.stringify(np.live)})`);
   // A held start (R56 step 9): not held on this first boot, armed for the
   // next by its press, and Start says there was nothing to lift.
   const h0 = await page.evaluate(() => state?.held || null);

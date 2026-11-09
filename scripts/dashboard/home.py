@@ -51,9 +51,7 @@ def _containers(ns):
     """Running and all containers across the docker nodes, and whether any
     count came from a kept answer (the node's own, or Home's last listing of
     it) or none at all."""
-    # The controller's own machine carries a daemon and is no docker host
-    # (nodes.own_machine): asked, it never answers, so it would read as unknown.
-    docker = [n for n in ns if (n.get("reported") or {}).get("docker") and not (n.get("config") or {}).get("own")]
+    docker = [n for n in ns if (n.get("reported") or {}).get("docker")]
 
     def one(nid):
         with devapp.on_node(nid):

@@ -5305,7 +5305,7 @@ spec = importlib.util.spec_from_file_location("dvp", ${JSON.stringify(DASH + '/d
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 ran = []
 m._agent_here = lambda: {"id": "n1", "name": "box"}
-m.queue = types.SimpleNamespace(run_wait=lambda who, nid, argv, timeout=0, forget=False: (ran.append([nid, list(argv)]), {"code": 0, "out": "hello"})[1],
+m.queue = types.SimpleNamespace(run_wait=lambda who, nid, argv, timeout=0, forget=False, docker=False: (ran.append([nid, list(argv)]), {"code": 0, "out": "hello"})[1],
                                 job_running=lambda nid: 0)
 m._docker_log = lambda *a, **k: None
 m._docker_result = lambda *a, **k: None

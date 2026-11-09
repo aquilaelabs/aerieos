@@ -4064,7 +4064,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
 // step 8): minted from a shell with --own, its row wears "this machine",
 // its session network is set and its box cannot be cleared (said on the
 // row), a project's node pickers say which it is, and the container
-// picker does not offer it, since it runs no containers.
+// picker offers it, its containers being the root agent's.
 {
   const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
   const base = URL.replace(/\/$/, '');
@@ -4079,7 +4079,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
   const own = await page.evaluate(async () => { await loadNodes(); return nodesList.find(n => n.name === 'nasbox'); });
   ok(own?.kind === 'agent' && own.config?.own === true && own.config?.session_net === true
      && JSON.stringify(own.capabilities) === '["package-build"]',
-     `...as an ordinary agent row: this machine, its sessions in a network of their own, no containers (${JSON.stringify(own?.capabilities)})`);
+     `...as an ordinary agent row: this machine, its sessions in a network of their own, not a docker host by capability (${JSON.stringify(own?.capabilities)})`);
   await page.evaluate(() => openNodesTab());
   await page.waitForSelector('.nodestab .ndrow', { timeout: 15000 });
   await pickNode(page, own.id);
@@ -4120,7 +4120,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
   await page.keyboard.press('Escape');
   ok(opts.proj.some(o => /^nasbox \(this machine, agent/.test(o)),
      `a space's node picker offers it, saying it is this machine (${JSON.stringify(opts.proj)}; nodes ${JSON.stringify(opts.list)})`);
-  ok(!opts.ctr.some(o => /nasbox/.test(o)), `the container picker does not offer it (${JSON.stringify(opts.ctr)})`);
+  ok(opts.ctr.some(o => /nasbox/.test(o)), `the container picker offers it (${JSON.stringify(opts.ctr)})`);
   // A session there with the wall down is refused before anything starts,
   // in bb-session's own words, though the node's session half is up and
   // its copy of the project is there: the census says the wall does not

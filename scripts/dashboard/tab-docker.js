@@ -517,11 +517,8 @@ const dockerSlug = (s) => (s || "").toLowerCase()
 function fillNodeSelect(sel, wrap, prefer, again, allow){
   // Every node when nothing narrows: a node does everything for the
   // projects bound to it (docs/nodes.md §13).
-  // ...but the controller's own machine, installed bare metal (R90), whose
-  // job account is out of the docker group behind the wall: it runs no
-  // containers as a node.
   const dnodes = (nodesList || []).filter(n =>
-    n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && !n.config?.own
+    n.kind !== "local" && n.state !== "retired" && n.state !== "disabled"
     && (!allow || allow.includes(n.id)));
   // ...and drawn again when they land: loadNodes repaints only a Nodes tab,
   // so a draw here during a node-list reload lost the picker until something
@@ -1777,6 +1774,8 @@ function dmHostOnly(){
 // questions again, and of the daemon, before anything runs (_ctr_refused).
 function dmShellWhy(d){
   const owner = d.owner || d.project;
+  if ((nodesList || []).find(n => n.id === machinesNode("docker"))?.config?.own)
+    return "this is the controller's own machine, which opens no shell in a container";
   if (!state?.admin && (state?.projects || []).find(p => p.name === owner)?.prefs?.devbuild === "deny")
     return `${projLabel(owner)}'s Agents may: Run its container is Deny, so a shell in its containers is an administrator's`;
   return "";

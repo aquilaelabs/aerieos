@@ -497,9 +497,9 @@ const GROUP_KEEP = {library: "bb.libnode", emulator: "bb.emunode", storage: "bb.
 const GROUP_LOAD = {library: () => loadLibrary(), emulator: () => loadEmulator(), installed: () => loadInstalled(), files: () => loadFiles(), docker: () => loadDocker(),
                     phone: () => phFetch(null, true)};
 // The controller's own machine is a node like any (the operator, 9 Nov), on
-// every page about a node but those of containers: docker there is root over
-// the controller, so it hosts none (nodes.own_machine).
-const NOT_ON_OWN = new Set(["docker", "nginx", "scanners"]);
+// every page about a node but nginx's and the scanners', which are not built
+// for a machine whose docker is root over the controller (nodes.own_machine).
+const NOT_ON_OWN = new Set(["nginx", "scanners"]);
 function machinesLive(kind = ""){
   return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
 }

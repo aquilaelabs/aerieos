@@ -624,7 +624,9 @@ check a container nginx reaches before a route goes in. Acting on one is the
 space's dial (Agents may: Run its container):
 `aerie devapp start|stop|restart NAME`, and `--container NAME` on `aerie devapp
 rebuild` or `aerie devapp env` for one written for this space. You have no
-Docker socket of your own. A container that does not exist yet is an ask
+Docker socket of your own. On the controller's own machine, where docker is
+root over the controller, Auto is Ask for this dial: a build waits for a person
+there, and a container there opens no shell. A container that does not exist yet is an ask
 (`aerie container new`, under Asking a person): it belongs to this space
 unless `--for` names another, lives on one of the space's nodes, and has
 no space tree behind it, so a compose that builds from a path (`build: .`)

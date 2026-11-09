@@ -168,6 +168,22 @@ CLAUDE_INSTALL = {"id": "claude", "command": "claude", "product": "Claude Code",
                   "fresh": ".local/share/claude/versions/{v}", "also": (".local/share/claude",)}
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
 SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/builderbot-session")
+# The wall the installer writes on a controller's own machine (docs/decisions.md),
+# and where the root agent keeps that machine's compose files: under /var/lib
+# and root's alone, since the job account owns the data store and could swap
+# anything kept under it between the write and the run.
+SESSION_WALL = os.environ.get("BUILDERBOT_SESSION_WALL", "/etc/bb-session.wall")
+OWN_COMPOSE = os.environ.get("BUILDERBOT_OWN_COMPOSE", "/var/lib/aerieos-docker/compose")
+
+
+def root_docker_env():
+    """The environment docker runs with when the root agent runs it: the
+    system's programs alone. A job's PATH leads into the toolchain store,
+    which the job account writes, and a docker found there would run as root."""
+    return {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8",
+            "HOME": "/root", "USER": "root", "LOGNAME": "root"}
+
+
 # Each session kept to its own project's network (R79): the folder this agent
 # shares with bb-session (its resolver file for sessions, its mark that the
 # table is in place, and a file per session saying which project an address

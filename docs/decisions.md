@@ -580,9 +580,15 @@ its gate), nor its Docker. How each is held:
   groups, in no docker group, with no sudo but the one command that starts a
   view (`bb-session`). On this node the job account is kept out of the
   docker group, which every other node puts it in: docker is root on a
-  machine with a daemon, and the root here is the controller's. So this
-  node is enrolled without containers (`package-build` only); a project's
-  containers go where they go on a container install.
+  machine with a daemon, and the root here is the controller's. Its
+  containers are the root agent's instead (9 Nov 2026): the agent runs
+  docker on the system's programs alone, from a folder under `/var/lib` only
+  root opens, and the job account stays off the daemon. A session's build
+  there waits for a person whatever its dial says, since a session writes
+  the compose and a compose is root on this machine; what a compose asks of
+  the host, the controller's own folders named with it, is shown once to
+  the person who presses. It opens no Shell in a container, whose terminal
+  runs from the job account's store.
 - **Files.** The state is 0700, the env file 0640 root's and the
   controller's group's, `/run/builderbot` 0700 root's, the deploy-key
   agent's socket in a folder only the controller's group enters.

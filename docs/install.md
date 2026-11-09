@@ -294,9 +294,9 @@ account (`builder`), neither of which can read the controller's state, env
 file or secrets, reach its loopback ports or use docker. A session there is
 covered from all of it and runs in a network of its own, and none starts
 when any of that does not hold: the Doctor and the node's row say why. The
-node builds and runs sessions, and runs no containers (its job account is
-out of the docker group, since docker is root on the machine that holds the
-controller). The reasons and the threat model are in
+node builds and runs sessions and its containers; a session's build there
+waits for a person, since docker is root on the machine that holds the
+controller and its job account stays out of the docker group. The reasons and the threat model are in
 [decisions.md](decisions.md#a-controller-installed-bare-metal-and-its-own-node).
 
 **Updating** is the image pull's equivalent:

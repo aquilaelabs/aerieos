@@ -821,6 +821,17 @@ def _forget_reads(node_id):
             del _last_reads[k]
 
 
+def on_own_machine(project, instance=MAIN):
+    """Whether this instance lives on the controller's own machine, where
+    docker is root over the controller and a session's build waits for a
+    person (B743)."""
+    if queue is None:
+        return False
+    nid = _instance_node(project, instance)
+    n = queue.node(nid) if nid else None
+    return bool(n) and n.get("kind") == "agent" and bool((n.get("config") or {}).get("own"))
+
+
 def _agent_exec(n, argv, timeout):
     """One docker verb on one container, run on the agent node as a probe
     job the Jobs page never keeps, in _run's own {"code", "out"} shape. Not
@@ -831,7 +842,7 @@ def _agent_exec(n, argv, timeout):
     # (B249: a build cache's prune was killed at 25s, partway through).
     cap = 600 if argv[1:] in [list(p) for p in PRUNES.values()] else 25
     r = queue.run_wait("dashboard", n["id"], argv, timeout=min(int(timeout), cap),
-                       forget=True)
+                       forget=True, docker=True)
     out = ({"code": 1, "out": r["error"]} if r.get("error")
            else {"code": int(r.get("code") or 0), "out": r.get("out") or ""})
     _docker_result(argv, out["code"], out["out"])
@@ -854,7 +865,7 @@ def _agent_read(n, argv, timeout):
     # answer at all.
     _docker_log("$ " + " ".join(argv) + f"   (on {n['name']})")
     r = queue.run_wait("dashboard", n["id"], argv, timeout=min(int(timeout), 25),
-                       forget=True)
+                       forget=True, docker=True)
     if r.get("error"):
         with _reads_lock:
             hit = _last_reads.get(key)
@@ -899,9 +910,9 @@ def _no_daemon_why():
     enrolled = [n["name"] for n in rows if not (n.get("config") or {}).get("own")]
     if rows and not enrolled:
         # Docker is on this machine, so "install Docker" would send a person
-        # the wrong way: what it lacks is the arrangement, not the program.
-        return ("containers do not run on the controller's own machine yet, since Docker here "
-                "is root over the controller: enroll another machine on the Nodes page to run them")
+        # the wrong way: on a stick it starts once a system pool is named.
+        return ("Docker on this machine is not answering yet: on a stick it starts once a system pool "
+                "is named, under The stick on this machine's row on the Nodes page")
     if enrolled:
         return (f"no node runs Docker that docker work can be sent to ({', '.join(enrolled[:3])}"
                 f"{' and more' if len(enrolled) > 3 else ''}): install Docker on one, "
@@ -958,7 +969,10 @@ def _available_agent(n):
                        "reports no daemon there. Install docker on that "
                        "machine, or check the agent's account is in its "
                        "docker group"} | source()
-    if not rep.get("sandbox"):
+    # The controller's own machine is never stamped a sandbox (it is not a box
+    # to be wrecked) and its containers are the root agent's, so a person's
+    # press reaches its daemon (B743).
+    if not rep.get("sandbox") and not (n.get("config") or {}).get("own"):
         return {"on": False,
                 "why": f"{n['name']} is not an AerieOS sandbox: it does "
                        "not report the provisioner's stamp, and a container "
@@ -3569,7 +3583,8 @@ def session_net_own(node_id):
         rep = n.get("reported") or {}
         # A hosting-only node is a public box: what it says of itself does
         # not open it whole, only its containers' ports (R92).
-        if not rep.get("sandbox") and not (n.get("config") or {}).get("host_only"):
+        # ...nor does the controller's own machine.
+        if not rep.get("sandbox") and not (n.get("config") or {}).get("host_only") and not (n.get("config") or {}).get("own"):
             o["hosts"].add(addr)
             return
         pub = rep.get("published") or {}
@@ -4086,6 +4101,7 @@ def risks(project, cfg):
     if cfg is None:
         return []
     out = []
+    tree = str(WORKSPACE / project) + "/"
     for name, sv in sorted(_services(cfg).items()):
         if sv.get("privileged"):
             out.append(f"{name} runs privileged: root on the host, in effect")
@@ -4121,8 +4137,20 @@ def risks(project, cfg):
         for host in _bind_sources(sv):
             if host == "/var/run/docker.sock" or host.endswith("/docker.sock"):
                 out.append(f"{name} mounts the docker socket: every container on the node, and root through it")
-            elif _system_path(host):
+            elif _system_path(host) or _behind_wall(host, tree):
                 out.append(f"{name} mounts {host} of the host: the node's own system, not a share")
+        # What compose reads off the host as it starts or builds, not a bind
+        # and so not above: an env file, a build's folders.
+        for host in _read_sources(sv):
+            if (_system_path(host) and not host.startswith(tree) and os.path.basename(host) != "instance.env") \
+                    or _behind_wall(host, tree):
+                out.append(f"{name} reads {host} of the host into itself: the node's own system, not a share")
+    # A top-level secret or config from a file is a bind by another name.
+    for kind in ("secrets", "configs"):
+        for key, item in sorted(((cfg.get(kind) if isinstance(cfg, dict) else None) or {}).items()):
+            host = str(item.get("file") or "") if isinstance(item, dict) else ""
+            if host and (_system_path(host) or _behind_wall(host, tree)):
+                out.append(f"{key} ({kind[:-1]}) is read from {host} of the host: the node's own system, not a share")
     return out
 
 
@@ -4142,6 +4170,39 @@ def _bind_sources(sv):
     return out
 
 
+def _behind_wall(host, tree):
+    """Whether a host path is in what the wall covers on the controller's own
+    machine (/etc/bb-session.wall, read here since this is that machine): the
+    controller's state and every space's tree, this space's own excepted."""
+    path = os.path.normpath(str(host)) + "/"
+    if not path.startswith("/") or path.startswith(tree):
+        return False
+    try:
+        with open(WALL_FILE, encoding="utf-8") as f:
+            cover = next((ln[6:].strip() for ln in f if ln.startswith("COVER=")), "")
+    except OSError:
+        return False
+    return any(c and (path.startswith(c.rstrip("/") + "/") or c.startswith(path)) for c in cover.split(":"))
+
+
+def _read_sources(sv):
+    """The absolute host paths compose reads for a service beyond its binds:
+    its env files and its build's context and extra contexts."""
+    out = []
+    env = sv.get("env_file") or []
+    for e in [env] if isinstance(env, (str, dict)) else env:
+        out.append(str(e.get("path") or "") if isinstance(e, dict) else str(e))
+    b = sv.get("build")
+    if isinstance(b, str):
+        out.append(b)
+    elif isinstance(b, dict):
+        out.append(str(b.get("context") or ""))
+        extra = b.get("additional_contexts") or {}
+        out += [str(v) for v in (extra.values() if isinstance(extra, dict) else extra)]
+    return [p for p in out if p.startswith("/")]
+
+
+WALL_FILE = os.environ.get("BUILDERBOT_SESSION_WALL", "/etc/bb-session.wall")
 SYSTEM_ROOTS = ("/etc", "/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/boot", "/root",
                 "/var", "/proc", "/sys", "/dev", "/run", "/home", "/opt")
 
@@ -4151,6 +4212,10 @@ def _system_path(host):
     directories: what a container could take the machine over through."""
     path = os.path.normpath(str(host))
     if path == "/":
+        return True
+    # A stick's system pool (image/.../system-pool) holds the controller's
+    # secrets and home under this folder, whatever the pool is called.
+    if "aerieos-system" in path.split("/"):
         return True
     return any(path == r or path.startswith(r + "/") for r in SYSTEM_ROOTS)
 
