@@ -59,14 +59,18 @@ class Home(unittest.TestCase):
             "n_b": {"containers": [{"state": "running"}], "stale": True},
         }
 
-    def test_the_own_machine_is_not_asked_for_containers(self):
-        """Docker is on it and it is no docker host, so a fresh machine reads
-        0 of 0, not an unknown count "as last seen"."""
+    def test_the_own_machine_is_asked_once_its_docker_answers(self):
+        """Its containers count once its daemon does; a stick whose Docker
+        waits for a system pool reports none, so it reads 0 of 0, not an
+        unknown count "as last seen"."""
         Nodes.rows = [{"id": "n_own", "kind": "agent", "state": "online", "live": True,
-                       "config": {"own": True}, "reported": {"docker": "26"}}]
+                       "config": {"own": True}, "reported": {}}]
         Devapp.listings = {"n_own": {"error": "no daemon"}}
         got, _ = home.read([], {}, True)
         self.assertEqual(got["containers"], {"running": 0, "all": 0, "nodes": 0, "stale": 0, "unknown": 0})
+        Nodes.rows[0]["reported"] = {"docker": "26"}
+        got, _ = home.read([], {}, True)
+        self.assertEqual(got["containers"]["nodes"], 1)
 
     def test_jobs_running_failed_today_and_the_last_ten(self):
         now = time.time()

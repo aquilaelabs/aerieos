@@ -28,7 +28,7 @@ class PruneTime(unittest.TestCase):
 
         class Q:
             @staticmethod
-            def run_wait(principal, nid, argv, timeout, forget):
+            def run_wait(principal, nid, argv, timeout, forget, docker=False):
                 asked.append(timeout)
                 return {"code": 0, "out": ""}
         devapp.queue = Q

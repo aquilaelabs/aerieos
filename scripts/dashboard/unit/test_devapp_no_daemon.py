@@ -33,8 +33,8 @@ class NoDaemon(unittest.TestCase):
 
     def test_the_own_machine_alone_is_not_told_to_install_docker(self):
         w = self.why([{"name": "aerieos", "kind": "agent", "state": "active", "config": {"own": True}}])
-        self.assertIn("controller's own machine", w)
-        self.assertIn("enroll another machine", w)
+        self.assertIn("Docker on this machine is not answering yet", w)
+        self.assertIn("system pool", w)
         self.assertNotIn("install Docker", w)
 
     def test_another_node_beside_the_own_machine_is_the_one_named(self):
