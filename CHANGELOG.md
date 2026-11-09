@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- A controller's own machine now runs containers: the Containers page, the Library's apps and Make and start under Containers and VMs from the old system all work there. A session's build on that machine waits for a person, and a container there has no Shell (0da04aa)
+
 ### Changed
 
 - Moving a controller here asks only for its move token on the first page, not for an account the move then replaces (4cc9d2c)
