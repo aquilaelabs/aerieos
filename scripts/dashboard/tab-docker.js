@@ -1763,10 +1763,11 @@ function dmUnrouted(d){
 
 // A hosting-only node runs no terminal, so its containers draw no Shell, and
 // the page says so once on its status line rather than under every row: it
-// is the node's policy, not a fault (the operator, 22 Oct).
+// is the node's policy, not a fault (the operator, 22 Oct). The controller's
+// own machine is the same, its container terminal being the job account's.
 function dmHostOnly(){
   const n = (nodesList || []).find(x => x.id === (dockerList?.node || dockerNode));
-  return n?.config?.host_only ? n : null;
+  return n?.config?.host_only || n?.config?.own ? n : null;
 }
 // A shell inside one of the instance's running containers, in the dock
 // (R218 step 4): why it cannot open here, or "" when it can, said under the
@@ -1774,8 +1775,6 @@ function dmHostOnly(){
 // questions again, and of the daemon, before anything runs (_ctr_refused).
 function dmShellWhy(d){
   const owner = d.owner || d.project;
-  if ((nodesList || []).find(n => n.id === machinesNode("docker"))?.config?.own)
-    return "this is the controller's own machine, which opens no shell in a container";
   if (!state?.admin && (state?.projects || []).find(p => p.name === owner)?.prefs?.devbuild === "deny")
     return `${projLabel(owner)}'s Agents may: Run its container is Deny, so a shell in its containers is an administrator's`;
   return "";
@@ -2737,7 +2736,7 @@ function dmStatus(d){
   // where a shell in one opens.
   return pageHead({cls: "dmimgbar", facts: [
     ["Images checked", !d ? GHOST : d.images_at ? ago(d.images_at) : "not yet"],
-    ["Shells", host && mayShell() ? `from a node that runs sessions: ${host.name} hosts containers only` : ""]]});
+    ["Shells", host && mayShell() ? (host.config?.own ? "none on this machine: it is the controller's own" : `from a node that runs sessions: ${host.name} hosts containers only`) : ""]]});
 }
 
 // The rows' settings dialogs open before a redraw, by key: shown again after

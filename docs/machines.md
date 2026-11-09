@@ -553,7 +553,7 @@ machine** in every space's node picker, so its sessions and builds run there
 as on any node. It runs containers too, through its root agent, since its
 job and session accounts stay out of the docker group: a person's press
 starts them and a session's build waits for a person (Auto is Ask there), and
-it opens no Shell in a container. The container edition has no machine of its own and does not draw
+it draws no Shell in a container. The container edition has no machine of its own and does not draw
 the page (R90 step 8, R56 step 8).
 
 **A held start** (R56 step 9). Not by default: after a shutdown that was

@@ -4121,6 +4121,10 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
   ok(opts.proj.some(o => /^nasbox \(this machine, agent/.test(o)),
      `a space's node picker offers it, saying it is this machine (${JSON.stringify(opts.proj)}; nodes ${JSON.stringify(opts.list)})`);
   ok(opts.ctr.some(o => /nasbox/.test(o)), `the container picker offers it (${JSON.stringify(opts.ctr)})`);
+  const noShell = await page.evaluate(id => {
+    const keepL = dockerList, keepN = dockerNode; dockerList = null; dockerNode = id;
+    const n = dmHostOnly(); dockerList = keepL; dockerNode = keepN; return n?.id || ''; }, own.id);
+  ok(noShell === own.id, `its containers draw no Shell, as a hosting-only node's do, and the page says so once (${noShell})`);
   // A session there with the wall down is refused before anything starts,
   // in bb-session's own words, though the node's session half is up and
   // its copy of the project is there: the census says the wall does not
