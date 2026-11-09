@@ -338,6 +338,25 @@ def _keep_slot(say, dev, where, keep):
         say(f"{ver} was not kept as an older version: {e}\n")
 
 
+def pin_hostid():
+    """This machine's host id written through /etc's overlay, so it is kept on
+    the data partition. Each image carries its own /etc/hostid, ZFS holds a
+    pool to the host id that last had it, and every update otherwise looked
+    to its own pools like another machine. Once only: the copy kept is what
+    every later image shows."""
+    kept = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "etc", "upper", "hostid")
+    hostid = _env("BB_HOSTID", "/etc/hostid")
+    if not os.path.isdir(os.path.dirname(kept)) or os.path.exists(kept):
+        return
+    with contextlib.suppress(OSError):
+        with open(hostid, "rb") as f:
+            raw = f.read()
+        if len(raw) == 4:
+            with open(hostid + ".new", "wb") as f:
+                f.write(raw)
+            os.replace(hostid + ".new", hostid)
+
+
 def _sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -430,6 +449,10 @@ def stick_status():
 
 
 class OsImageMixin:
+    def hostid_pass(self):
+        """Once a minute, and nothing once it is done (pin_hostid)."""
+        pin_hostid()
+
     """Agent's AerieOS update: one of the parts class Agent (agent.py)
     is made of."""
 
@@ -787,6 +810,7 @@ class OsImageMixin:
         # slot running now. Not set, it is said, and the next boot stays here
         # (B470: a next without its trial booted the new slot with no way
         # back, and was reported a success).
+        pin_hostid()
         if self._sh(job, ["bash", tool, "switch", other, cur, ver], timeout=30) != 0:
             self._sh(job, ["bash", tool, "hold"], timeout=30)
             say(f"GRUB was not told to boot slot {other} on trial: the slot is written and the next boot stays on slot {cur}\n")

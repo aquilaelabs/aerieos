@@ -412,5 +412,44 @@ class TheController(unittest.TestCase):
         self.assertEqual(releasecheck.window_pass(at), "", "another weekday")
 
 
+
+class HostIdKept(unittest.TestCase):
+    """Each image has its own /etc/hostid: a pool is held to the one that last
+    had it, so the machine's is written through /etc's overlay and kept."""
+
+    def setUp(self):
+        agent = agentpkg.load("aerieos_agent_hostid")
+        self.av = sys.modules[agent.Agent.__module__.rsplit(".", 1)[0] + ".osimage"]
+
+    def test_it_is_written_through_the_overlay_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            work, hostid = os.path.join(d, "work"), os.path.join(d, "hostid")
+            os.makedirs(os.path.join(work, "etc", "upper"))
+            with open(hostid, "wb") as f:
+                f.write(b"\xcd\x65\x63\x3e")
+            before = os.stat(hostid).st_ino
+            with mock.patch.dict(os.environ, {"BB_OS_WORK": work, "BB_HOSTID": hostid}):
+                self.av.pin_hostid()
+                self.assertNotEqual(os.stat(hostid).st_ino, before, "written, which is what copies it up")
+                with open(hostid, "rb") as f:
+                    self.assertEqual(f.read(), b"\xcd\x65\x63\x3e")
+                # ...and once the overlay holds it, never again.
+                with open(os.path.join(work, "etc", "upper", "hostid"), "wb") as f:
+                    f.write(b"kept")
+                again = os.stat(hostid).st_ino
+                self.av.pin_hostid()
+                self.assertEqual(os.stat(hostid).st_ino, again)
+
+    def test_nothing_where_there_is_no_overlay(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"BB_OS_WORK": os.path.join(d, "none"), "BB_HOSTID": os.path.join(d, "hostid")}):
+            self.av.pin_hostid()
+            self.assertFalse(os.path.exists(os.path.join(d, "hostid")))
+
+    def test_the_image_imports_its_own_pools_by_force(self):
+        conf = os.path.join(os.path.dirname(__file__), "..", "..", "..", "image", "mkosi.extra", "usr", "lib", "systemd", "system", "zfs-import-cache.service.d", "60-aerieos.conf")
+        with open(conf, encoding="utf-8") as f:
+            self.assertIn("-aN -f", f.read())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -122,6 +122,7 @@ class TheAgent(unittest.TestCase):
                  mock.patch.object(self.pm.os, "geteuid", return_value=0), mock.patch.object(self.pm.subprocess, "run") as run:
                 self.A().pools_pass()
             self.assertEqual(run.call_args[0][0][-2:], ["1234567890", "nas"])
+            self.assertIn("-f", run.call_args[0][0], "this machine had it before, and each image has its own host id")
             state, code, text = self.run_job({"pool": "import", "name": "tank"})
             self.assertIn("is here already", text)
             with open(rec, "w") as f:

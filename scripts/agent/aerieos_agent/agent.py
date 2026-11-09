@@ -815,6 +815,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             timed("account_users", self.account_users_pass)
             timed("array", self.array_pass)
             timed("adopted", self.adopt_pass)
+            timed("hostid", self.hostid_pass)
             timed("pools-imported", self.pools_pass)
             timed("ext_mounts", self.ext_mounts_pass)
             timed("spindown", self.spindown_pass)

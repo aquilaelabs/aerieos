@@ -166,10 +166,12 @@ def _imported_set(rows):
     os.replace(path + ".new", path)
 
 
-def import_argv(zpool, name, pid):
-    """A pool imported as it is: no -f, never upgraded, its mountpoints
-    under /mnt, kept out of zpool.cache (the minute pass imports it again)."""
-    return [zpool, "import", "-o", f"altroot={MOUNT_ROOT}", "-o", "cachefile=none", pid or name, name]
+def import_argv(zpool, name, pid, force=False):
+    """A pool imported as it is: never upgraded, its mountpoints under /mnt,
+    kept out of zpool.cache (the minute pass imports it again). Not by force
+    when a person imports it; again by the minute pass it is, since this
+    machine imported it before and its disks are in no other machine."""
+    return [zpool, "import", *(["-f"] if force else []), "-o", f"altroot={MOUNT_ROOT}", "-o", "cachefile=none", pid or name, name]
 
 
 def _snapshots():
@@ -264,7 +266,7 @@ class PoolsMixin:
         have = {p["name"] for p in pools_now()}
         for x in rows:
             if x["name"] not in have:
-                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or "")), capture_output=True, timeout=120, check=False)
+                subprocess.run(import_argv(zpool, x["name"], str(x.get("id") or ""), force=True), capture_output=True, timeout=120, check=False)
 
     def _apply_storage_snapshot(self, job, cfg):
         say = job.say
