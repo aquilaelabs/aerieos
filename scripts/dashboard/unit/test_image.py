@@ -544,6 +544,15 @@ class Workflow(unittest.TestCase):
             self.assertIn("is not a hostname", r.stderr)
 
     @unittest.skipUnless(shutil.which("sfdisk"), "sfdisk is not here")
+    def test_the_data_partition_is_found_under_the_initramfs_path_it_was_mounted_by(self):
+        # A stick's /var is named /root/dev/sda5 in the mount table, which is
+        # no device here: the script gave up on it at every boot and a stick
+        # of any size kept its 2 GB. Its own device is what it must test.
+        tool = read(EXTRA, "usr", "lib", "aerieos-os", "grow")
+        self.assertIn('case "$part" in /root/dev/*) part="${part#/root}"; lead=1 ;; esac', tool)
+        self.assertLess(tool.index("ln -s /dev /root/dev"), tool.index('resize2fs "$part"'), "resize2fs needs that path to lead to the device")
+        self.assertLess(tool.index('part="${part#/root}"'), tool.index('[ -b "$part" ]'))
+
     def test_the_data_partition_grows_to_its_disk_up_to_the_cap(self):
         # R161 step 13: a stick bigger than the image has its data partition,
         # the last, grown to the disk's end at boot, no further than

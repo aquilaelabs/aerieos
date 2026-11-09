@@ -12,6 +12,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${BB_PARTITIONS:-$HERE/partitions.sh}"
 ENVF="${BB_OS_RUN:-/run/aerieos-os}/env"
 say() { echo "grow: $*"; }
+lead=""
 
 cap="$( [ -r "$ENVF" ] && sed -n 's/^BB_DATA_MAX=//p' "$ENVF" | tail -n 1 || true)"
 cap_mib=""
@@ -33,6 +34,9 @@ if [ -n "${BB_GROW_DISK:-}" ]; then
     disk="$BB_GROW_DISK"; part=""
 else
     part="$(findmnt -no SOURCE "${BB_GROW_VAR:-/var}" 2>/dev/null | head -n 1 || true)"
+    # On a stick the initramfs mounted it under its own root and moved it, and
+    # the mount table goes on naming the device by that path.
+    case "$part" in /root/dev/*) part="${part#/root}"; lead=1 ;; esac
     [ -b "$part" ] || { say "/var is not on a partition: nothing to grow"; exit 0; }
     [ "$(blkid -s PARTUUID -o value "$part" 2>/dev/null || true)" = "$BB_PART_DATA" ] \
         || { say "/var is not on AerieOS's data partition: nothing to grow"; exit 0; }
@@ -67,5 +71,10 @@ fi
 # Its filesystem to the partition's size, at every boot: nothing to do once
 # it is, and a boot the kernel missed the new size on is caught up by the next.
 if [ -n "$part" ]; then
+    # resize2fs finds the mount through the mount table, so the path that
+    # names the device there has to lead to it for as long as this runs.
+    made=""
+    if [ -n "$lead" ] && [ ! -e /root/dev ]; then ln -s /dev /root/dev && made=1; fi
     resize2fs "$part" >/dev/null 2>&1 || say "resize2fs could not grow $part"
+    [ -z "$made" ] || rm -f /root/dev
 fi
