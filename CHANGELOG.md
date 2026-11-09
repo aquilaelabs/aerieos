@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5138: 2026-11-09
 
 ### Added
 
@@ -15,7 +15,7 @@
 ### Fixed
 
 - On a stick the data partition now grows to fill the stick at boot, as it was meant to; it had stayed at 2 GB on a stick of any size, which filled up and left no room for an update (c783e0f)
-- An OS update no longer loses the machine's ZFS pools at its first boot, which took the spaces, the sign-ins and the secrets with them (7718664)
+- An OS update no longer loses the machine's ZFS pools at its first boot, which took the spaces, the sign-ins and the secrets with them (e914d08)
 
 ## 0.9.0-dev.5128: 2026-11-08
 
