@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Moving a controller here asks only for its move token on the first page, not for an account the move then replaces (4cc9d2c)
+- A controller's own machine is now a node like any other: it is on the Nodes page and in the picker of the Library, Installed, the Emulator, the Phone and the CI runner, so toolchains and coding agents install on it; its name, disks, console password, restart and shut down moved to its row on the Nodes page, and the Controller group's page, now This controller, keeps its release, updates and older versions (4cc9d2c)
+- The first-run page has Generate console login and Shut down at its top, in place of a step asking for a console password (4cc9d2c)
+
+### Fixed
+
+- On a stick the data partition now grows to fill the stick at boot, as it was meant to; it had stayed at 2 GB on a stick of any size, which filled up and left no room for an update (c783e0f)
+
 ## 0.9.0-dev.5128: 2026-11-08
 
 ### Added
