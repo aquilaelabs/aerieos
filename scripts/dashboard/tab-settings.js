@@ -548,7 +548,7 @@ function wireUpdates(root){
   }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
-      if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
+      if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from the Nodes page, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
       busy(b, "Updating");
       const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
       notify(j.error || j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);

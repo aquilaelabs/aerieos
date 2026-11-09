@@ -5475,7 +5475,7 @@ def _update_in_window(version):
     r = nodes.node_os_update("system:update-window", nid, tag) if _own_os() else nodes.node_controller_update("system:update-window", nid, tag)
     print(f"[dashboard] update window: {tag}: {r.get('job') or r.get('error')}", flush=True)
 # A held start on a bare-metal install (R56 step 9, held.py): read at the
-# start, lifted by Start on This machine, armed for the next restart.
+# start, lifted by Start on This controller, armed for the next restart.
 import held                                                      # noqa: E402
 held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_json)
 # A prepared configuration a stick's first boot handed over (R161 step 8,
@@ -5871,7 +5871,7 @@ def _snapshot(who):
         # ...and whether its start is held (R56 step 9), with why.
         "held": held.status(),
         # ...and what a stick's prepared configuration did (R161 step 8), an
-        # administrator's to read on This machine.
+        # administrator's to read on the Nodes page.
         "firstboot": firstboot.view((nodes.node(_own_node_id() or "") or {}).get("reported")) if BARE_METAL and users.is_admin(who) else None,
         # ...and each update check's cadence and last run (R176), for
         # Controller settings' Update checks.
@@ -7092,7 +7092,7 @@ class Handler(BaseHTTPRequestHandler):
         me = me or self._who()
         uid = users.uid_of(me)
         # A held start (R56 step 9): no agent session runs until Start is
-        # pressed on This machine; a shell is a person's and still opens.
+        # pressed on This controller; a shell is a person's and still opens.
         if held.is_held() and agents.of_arg(arg)[0]:
             return held.said()
         # No author, no terminal: every project is a repository, a commit

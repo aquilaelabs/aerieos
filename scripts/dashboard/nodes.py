@@ -4084,7 +4084,7 @@ def storage_attention():
                                 "said": f"the array's {kind}{x.get('slot')} ({x.get('id') or 'unknown disk'}) is not mounted: the disk is gone or failed; Replace on the Storage page rebuilds it"})
         # An old system's array adopted writable and not taken over (the
         # operator, 8 Nov): its files change with no parity behind them until
-        # Take the array over on This machine builds SnapRAID's. A standing
+        # Take the array over on the Nodes page builds SnapRAID's. A standing
         # row, not dismissed: it leaves when the array is taken or released.
         ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
         if ad.get("writable") and "taken" in ad and not ad.get("taken") and (ad.get("parity") or []) and not (ar.get("data") or []):

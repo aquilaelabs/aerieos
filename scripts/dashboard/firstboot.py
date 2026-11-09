@@ -82,7 +82,7 @@ def apply(path=None):
         else:
             waiting.append({"what": "accounts", "said": "no owner's password came with it: the first-run page makes the owner"})
         # Held on the disks (R161 step 11): the start this configuration came
-        # with shows them on This machine before anything mounts.
+        # with shows them on the Nodes page before anything mounts.
         if cfg.get("hold_first_start"):
             hold_first()
             done.append({"what": "first start", "said": "held: Start on This controller once the disks are as they should be"})
