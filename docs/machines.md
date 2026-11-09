@@ -3,7 +3,7 @@
 The Machines group on the rail: **Nodes**, every machine work runs on,
 **Storage**, what a node's disks hold, **Installed**, what the Library
 put on a node, and **Files**, what is on a node's disks. Beside it, the **Controller** group holds what the
-controller owns: **This machine** on a bare-metal install, **Settings**
+controller owns: **This controller** on a bare-metal install, **Settings**
 (Controller settings), **Network**, **Keys** and **Audit**. **Jobs**, the
 queue of work placed on the nodes, and **Schedules** are a group of their
 own on the rail. This doc covers enrolling and
@@ -21,11 +21,15 @@ nothing enrolled the page says so and offers the one thing there is to do.
 (It does keep a node record of its own, which is how a share it mounts is
 recognized as the same store a node mounts; that is plumbing, not a node on
 the page.) A controller installed bare metal can be a node of itself
-([install.md](install.md#bare-metal)): its machine is then
-[This machine](#this-machine) in the Controller group rather than a node
-here, offered in a space's node pickers as such, its session network
-always on, and the Doctor says whether the wall between its sessions and
-the controller holds. The
+([install.md](install.md#bare-metal)): its machine is then a node here
+like any other, tagged **this machine**, and in the picker of every page
+about a node but the containers' (it hosts none: see
+[This controller](#this-controller)), offered in a space's node pickers as
+such, its session network always on, and the Doctor says whether the wall
+between its sessions and the controller holds. Its row carries, besides a
+node's sections, where it keeps things (on a stick, **The stick** and the
+system pool), its **Console** password, what a stick's prepared configuration
+did, and the disks and apps taken over from an old system. The
 page shows one node, picked in the Machines header over it: one band for
 Nodes, Storage and Installed, with the node pulldown where a space's name
 is, when it was seen, where it dials in from (the address of its last
@@ -532,29 +536,29 @@ only the controller can reach, each one signed by the controller for
 that request and that minute. A node whose agent is older says so, and
 updating it from the Nodes page brings the Files page to it.
 
-## This machine
+## This controller
 
 On a controller installed bare metal ([install.md](install.md#bare-metal)),
-**This machine**, first in the rail's Controller group (`#/controller/machine`),
-is the computer the controller runs on: its head says what it is (its name,
-system, cores and memory, the release this install runs and how long it
-has been up, its agent and whether the wall between its sessions and the
-controller is in force), then the **Updates** section (the release running
-against the newest, **Check for updates**, **Update**: [Controller settings](#controller-settings)),
-then the machine as a node, drawn exactly as a node's page draws any node:
-its health, the spaces on it, its sessions, GPU, USB, features,
-storage, network and the advanced verbs, reboot and power off
-among them. The machine is not a row on the Nodes page and not in its
-picker; a space still picks it as its node, shown as **This machine** in
-every space's node picker, so its sessions, builds and containers run
-there as on any node. The container edition has no machine of its own and
-does not draw the page (R90 step 8, R56 step 8).
+**This controller**, first in the rail's Controller group (`#/controller/machine`),
+is what belongs to the controller and not to the node under it: its head says
+what it is (its system, the release this install runs and how long it has been
+up, and whether the wall between its sessions and the controller is in force,
+with a link to the machine's row on the Nodes page), then the **Updates**
+section (the release running against the newest, **Check for updates**,
+**Update**: [Controller settings](#controller-settings)) and the **Older
+versions** kept to boot. Everything about the computer as a node, its health,
+the spaces on it, its sessions, GPU, USB, features, storage, network and the
+advanced verbs, reboot and shut down among them, is its row on the
+[Nodes page](#the-nodes-page). A space picks it as its node, shown as **This
+machine** in every space's node picker, so its sessions and builds run there
+as on any node. It hosts no containers: docker there is root over the
+controller. The container edition has no machine of its own and does not draw
+the page (R90 step 8, R56 step 8).
 
 **A held start** (R56 step 9). Not by default: after a shutdown that was
 not clean (the service writes a marker on a clean stop and the next start
 misses it), when **hold the next start** was ticked before a restart (the
-checkbox beside Restart and Shut down, under Controller settings' Power and
-in this machine's Reboot or shut down row; that one boot), or on the first
+checkbox in the machine's Reboot or shut down row on the Nodes page; that one boot), or on the first
 start of a stick's prepared configuration that asks for it, so its disks are
 seen before anything mounts, the install comes up with the dashboard,
 its agent and the network and nothing else: no agent session starts (a
@@ -612,7 +616,7 @@ https with the install's own certificate or a Let's Encrypt one for the
 hostname; the certificate's fingerprint a phone or the companion pins, and
 its download) and **Reach from outside** (the home tunnel the controller
 runs itself, with its setup steps). On a bare-metal install the machine's
-own ports, addresses and bridge are This machine's Network section.
+own ports, addresses and bridge are the Network section of its row on the Nodes page.
 
 ## Controller settings
 
@@ -638,12 +642,9 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
   carries a **Channel** pulldown, Releases or Dev builds
   ([versions.md](versions.md#two-channels)); everywhere else the releases
   are the only channel and no pulldown is drawn.
-- **Power** (a controller installed bare metal, the OS and the USB edition
-  among them, R175): Restart and Shut down for the machine the controller
-  runs on, through its own node's reboot and power-off verbs with This
-  machine's words and ask, dead with why while its agent is away or a
-  system job runs there. The container edition has neither this nor
-  Updates: its image and its container are its Docker manager's.
+- The container edition has no **Updates**: its image and its container
+  are its Docker manager's. Restarting or shutting down a machine is its row
+  on the Nodes page, under Advanced.
 - **Backup** and **Backup copies** (R161): the backup password, under which
   a sealed copy of the configuration is written after every change onto the
   machine's pools and under the state (the five newest kept), Back up now,

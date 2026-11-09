@@ -387,7 +387,7 @@ function attRow(a){
       <div class="bsum">${esc(a.said)}</div>
       <div class="bfoot"><span>${until}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          ${machine ? `<a href="#" data-bmachine="${machine}">This machine</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
+          ${machine ? `<a href="#" data-bmachine="${machine}">Nodes page</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
   }
   // The controller's own machine's power (R164 step 3): on its UPS
   // battery, the battery low or to be replaced, the UPS silent; and its
@@ -414,13 +414,13 @@ function attRow(a){
   }
   if (a.kind === "power" || a.kind === "host"){
     const title = {battery: "On the UPS battery", low: "The UPS battery is low", replace: "The UPS battery needs replacing", silent: "The UPS does not answer",
-                   security: "Security updates waiting", reboot: "A restart is needed"}[a.what] || "This machine";
+                   security: "Security updates waiting", reboot: "A restart is needed"}[a.what] || "This controller";
     return `<div class="bnote att${a.bad ? " bad" : ""}">
       <div class="bt">${esc(title)} on ${esc(a.node)}</div>
       <div class="bsum">${esc(a.said)}</div>
-      <div class="bfoot"><span>${a.kind === "power" ? "until the power is back" : "under This machine's Updates"}</span>
+      <div class="bfoot"><span>${a.kind === "power" ? "until the power is back" : a.what === "reboot" ? "under Advanced on the Nodes page" : "under This controller's Updates"}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          <a href="#" data-bmachine="${a.kind === "power" ? "power" : "updates"}">This machine</a></span></div></div>`;
+          ${a.kind === "power" || a.what === "reboot" ? `<a href="#" data-bmachine="${a.kind === "power" ? "power" : "advanced"}">Nodes page</a>` : `<a href="#" data-bmachine="updates">This controller</a>`}</span></div></div>`;
   }
   // A move's landing cut midway (B622): what is where, and the press that
   // finishes it, under Controller settings.
@@ -888,7 +888,8 @@ function wireNeeds(root, after = () => {}){
   });
   root.querySelectorAll("[data-bmachine]").forEach(a => a.onclick = e => {
     e.preventDefault();
-    openMachineTab(a.dataset.bmachine);
+    const what = a.dataset.bmachine;
+    if (what === "updates") openMachineTab(what); else openNodesTab(ownMachine()?.id, what);
   });
   root.querySelectorAll("[data-bstorage]").forEach(a => a.onclick = e => {
     e.preventDefault();

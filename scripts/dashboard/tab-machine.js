@@ -1,25 +1,28 @@
 "use strict";
-// This machine (R90 step 8, R56 step 8): the controller's own machine on a
-// bare-metal install, a page of its own in the Controller rail group and
-// not a row among Machines' nodes. Its head says what the machine is (its
-// name, system, cores and memory, the release this install runs and how
-// long it has been up, its agent, the wall); under it the Updates section
-// (Controller settings' own, R90 step 5) and the own node's row as the
-// Nodes page draws any node's (tab-nodes.js ndRowHtml): its health, the
-// projects on it, its sessions, GPU, USB, router, features, storage,
-// network and the advanced verbs (reboot and power off among them). The
-// container edition has no own machine and says so if the page is opened.
+// This controller (R90 step 8, split the operator, 9 Nov): on a bare-metal
+// install, what is the controller's and not the node's, in the Controller
+// rail group: the head (the release this install runs, how long it has been
+// up, a held start's Start), the Updates section (Controller settings' own,
+// R90 step 5) and the older versions kept to boot. The machine as a node is
+// the Nodes page's row like any node's, with the sections only it carries
+// (machineNodeSections). The container edition has no own machine and says
+// so if the page is opened.
 // Chrome from docSurface(); the hard rules are uniform.mjs's.
 
 function openMachineTab(what){
   if (what) sectOpen["nodes:" + what] = true;
-  openTab({kind: "machine", arg: "__machine", label: "This machine"});
+  openTab({kind: "machine", arg: "__machine", label: "This controller"});
   loadNodes();
 }
 
 // The own machine's row, or null before the node list lands.
 function ownMachine(){
   return (nodesList || []).find(n => n.config?.own && n.state !== "retired") || null;
+}
+
+// The own node's row on the Nodes page, as an address.
+function ownNodeAt(){
+  return `#/machines/nodes/${encodeURIComponent(ownMachine()?.id || "")}`;
 }
 
 function machineHead(n){
@@ -45,7 +48,8 @@ function machineHead(n){
     ...(r.os_image?.version ? [["Image", `AerieOS ${r.os_image.version}, slot ${r.os_image.slot || "?"}${r.os_image.next && r.os_image.next !== r.os_image.slot ? `; slot ${r.os_image.next} boots next: restart to finish the update` : r.os_image.trial ? "; on trial until the health check marks it good" : ""}${r.os_image.fell_back ? `; ${r.os_image.fell_back}` : ""}`]] : []),
     ["Up", shortUptime(state?.uptime || 0)],
     ...(r.timezone ? [["Time zone", r.timezone]] : []),
-    ["Sessions kept apart", wall]]});
+    ["Sessions kept apart", wall],
+    ["As a node", pageLink("nodes", `${n.name} on the Nodes page`, ownNodeAt()), {html: true}]]});
 }
 
 function renderMachineInto(i){
@@ -53,12 +57,12 @@ function renderMachineInto(i){
   if (!d) return;
   d.setBar("");
   if (!state?.bare_metal){
-    d.list.innerHTML = `<div class="empty">This machine is a bare-metal install's page: the machine the controller runs on, its system, its updates and what it runs as a node. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
+    d.list.innerHTML = `<div class="empty">This controller is a bare-metal install's page: the release it runs on its own computer and that computer's updates. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
     return;
   }
   if (nodesList === null){
-    d.list.innerHTML = skTpl(`<div class="row stack2 ndrow"><div class="grow"><div class="name">${skv(7)}</div>${ndFacts(null)}</div>
-      <div class="ndsections">${ND_SECTS.filter(([k]) => k !== "gpu" && k !== "usb").map(([k, t], j) => docSection("nodes", k, t, "", skRows(j ? 1 : 3))).join("")}</div></div>`);
+    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
+      + docSection("nodes", "updates", "Updates", "", skRows(2)));
     loadNodes();
     return;
   }
@@ -67,22 +71,21 @@ function renderMachineInto(i){
     d.list.innerHTML = `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`;
     return;
   }
-  const inflight = t => (n.jobs || []).some(j => j.type === t || j.apply === t);
-  d.list.innerHTML = machineHead(n) + ndRowHtml(n, ""
+  d.list.innerHTML = machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
-    + olderVersionsSection(n)
-    + stickSection(n)
-    + machineConsoleSection(n)
-    + firstbootSection()
-    + adoptSection(n)
-    + adoptBackSection(n)
-    + adoptAppsSection(n));
+    + olderVersionsSection(n);
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);
   wireOlderVersions(d.el);
   wireHeld(d.el);
-  void inflight;
+}
+
+// What only the controller's own machine carries, among its sections on the
+// Nodes page: where it keeps things, its screen, what its stick prepared and
+// the disks and apps it took over from an old system.
+function machineNodeSections(n){
+  return stickSection(n) + machineConsoleSection(n) + firstbootSection() + adoptSection(n) + adoptBackSection(n) + adoptAppsSection(n);
 }
 
 // Hold the next start (R56 step 9, R161 step 11): a checkbox beside Restart
@@ -98,7 +101,8 @@ function wireHoldNext(root){
     const on = c.checked;
     c.disabled = true;
     const j = await (await postJSON("/api/v1/nodes", {action: "hold-next", on})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (on ? "the next start is held: nothing runs after the restart until Start is pressed on This machine" : "the next start runs as usual"), !!j.error);
+    notify(j.error || (on ? "the next start is held: nothing runs after the restart until Start is pressed on This controller" : "the next start runs as usual"), !!j.error);
+    nodesRev++;
     await refresh();
   });
 }
@@ -233,7 +237,7 @@ function wireStick(root){
         {title: aside ? "Set it aside and use this pool?" : "Use this pool?", verb: aside ? "Set aside and move" : "Move"})) return;
     busy(b, "Moving");
     const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "moving to the pool: This machine says when it is done", !!j.error);
+    notify(j.error || "moving to the pool: the Nodes page says when it is done", !!j.error);
     await loadNodes();
   });
 }
@@ -337,7 +341,7 @@ function adoptParts(n, {take = true} = {}){
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
         : had.writable && !take
-        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on This machine, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
+        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on the Nodes page, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
         : had.writable
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>
@@ -590,7 +594,7 @@ function wireAdopt(root){
     busy(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing");
     const want = act === "release" ? undefined : {...(state?.firstboot?.adopt?.want || {}), writable: adoptWritable};
     const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: This machine shows each mount as it lands" : "releasing"), !!j.error);
+    notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: the Nodes page shows each mount as it lands" : "releasing"), !!j.error);
     await loadNodes();
   }));
 }

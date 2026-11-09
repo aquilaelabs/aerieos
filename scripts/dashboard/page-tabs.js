@@ -363,7 +363,7 @@ const TABKINDS = {
               icon: TOOL_ICONS.network,
               render: (i) => renderNetworkInto(i), live: () => settingsLive() + nodesRev,
               open: () => loadNodes() },
-  machine:  { multi: false, label: () => "This machine",
+  machine:  { multi: false, label: () => "This controller",
               icon: TOOL_ICONS.machine,
               // ...and on the held start and the stick's report, which ride the
               // status poll: Start and the hold-next box show what they did.

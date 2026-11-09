@@ -8,7 +8,7 @@ adopted disks do not hold is said, and so is a writable path that may sit on
 a read-only data disk.
 
 What it asks for beyond its own folder (those paths, devices, privileges)
-is shown once on This machine, and the press that starts the containers
+is shown once on the Nodes page, and the press that starts the containers
 acknowledges it for each, as Build on the Containers page does for one.
 """
 import json

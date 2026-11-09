@@ -793,7 +793,7 @@ class OsImageMixin:
             return "failed", 73
         with contextlib.suppress(OSError):
             os.unlink(os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "fell-back"))
-        say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under This machine's Advanced). "
+        say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under Advanced on the Nodes page). "
             f"Slot {cur} keeps {rel.get('version') or 'the image running now'} to fall back to.\n")
         self.hello_again(f"AerieOS {ver} written to slot {other}")
         return "succeeded", 0

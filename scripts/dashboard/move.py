@@ -142,6 +142,17 @@ def new_token():
     return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
 
 
+# The account the first page makes for a person moving a controller here,
+# whose password is the move token, and which goes when the move lands.
+SETUP_ACCOUNT = "setup"
+
+
+def token_shaped(token):
+    """Whether a string could be what new_token() printed. Only the shape: a
+    move token is proved against its bundle when the move lands."""
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{43}", str(token or "")))
+
+
 def key_of(token):
     """The sealing key from the token: HKDF-SHA256 with a fixed info."""
     from cryptography.hazmat.primitives import hashes
@@ -367,7 +378,7 @@ def pieces():
             out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
                         "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
                                  "and ssh/ to the new home by hand, as root"})
-    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
+    out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where the Nodes page names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max(1, len(asked))) as pool:
@@ -1073,7 +1084,7 @@ def room_for(size, where):
     gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
     return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
             "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
-            "the folder they are in as the spaces folder on This machine")
+            "the folder they are in as the spaces folder on the Nodes page")
 
 
 def fetch_bundle(old_url, token, dest):
@@ -1552,7 +1563,7 @@ def carry_here(aside, state_dir):
     fb_old, fb_new = Path(aside) / "firstboot.json", Path(state_dir) / "firstboot.json"
     if fb_old.is_file() and not fb_new.exists():
         shutil.copyfile(str(fb_old), str(fb_new))
-        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on This machine")
+        said.append("the stick's plan (its disks, shares, containers and VMs) is still offered on the Nodes page")
     return said
 
 

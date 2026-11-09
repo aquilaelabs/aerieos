@@ -100,13 +100,13 @@ function drawSetup(){
   let next = 2;
   el.innerHTML = `<div class="setuppage">
     <div class="setuphead">
-      <h2>Set up AerieOS</h2>
+      <div class="setuptitle"><h2>Set up AerieOS</h2>${setupTopActs(s)}</div>
       <p>AerieOS works on nodes: machines you enroll, where spaces are kept, built and worked on. One is all it needs to start.</p>
       <div class="setwalkask"><span class="grow">Moving a controller or an old system here?</span><button type="button" data-setwalk="move">Walk me through it</button></div>
     </div>
     ${s.own ? card(1, "This machine", !!s.node, !s.node, s.node
       ? `<p><b>${nodeName}</b>, the machine this controller runs on, is enrolled and answering: it is your first node${
-          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on This machine, after Finish.</p>`
+          s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}${s.node.reported?.timezone ? `, its clock on ${esc(s.node.reported.timezone)}` : ""}. Its name and time zone are set on the Nodes page, after Finish.</p>`
       : `<p>The machine this controller runs on is its first node, set up by the installer: ${
           s.own.state === "pending" ? "its agent is being installed and enrolled"
           : s.own.live === false ? "enrolled, and waiting for it to answer"
@@ -138,7 +138,6 @@ function drawSetup(){
       ? `<p>The Spaces page holds it, and every one after it.</p>`
       : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the spaces have a place, in step 3.</div>`}`,
       s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New space</button>`)}
-    ${setupConsoleWanted(s) ? setupConsoleCard(next++, s) : ""}
     <div class="setfinish">
       <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
@@ -153,18 +152,47 @@ function drawSetup(){
 
 // What a disk's row shows, for the redraw test: a disk's temperature and the
 // like move on every read and are not the page's business.
-// A password for the machine's screen (R194): the machine takes admin with
-// none until setup ends, so this is for keeping a way in past that. Never in
-// the needed order: a person may leave it, and This machine sets one later.
-function setupConsoleWanted(s){
-  return !!s.own?.reported?.console?.os;
+// The two presses at the top of the page on a machine that is its own
+// controller (the operator, 9 Nov): off, and a login for its screen. Neither
+// is a step, so neither waits for one; one job runs on a machine at a time,
+// and the page's band says which while they are dead for it.
+function setupTopActs(s){
+  if (!s.own) return "";
+  const c = s.own.reported?.console;
+  const dead = !s.node || (s.own.jobs || []).some(j => j.apply) ? " disabled" : "";
+  return `<div class="actbar">${c?.os ? `<button type="button" data-setconsole${dead}>${c.set ? "New console login" : "Generate console login"}</button>${
+      helpIcon(`For this machine's screen or a KVM: the name admin, sudo gives root. ${c.open ? "Until setup ends that screen takes admin with no password; generating one ends that, and keeps a way in afterwards." : "Not your dashboard password."}`)}` : ""}<button type="button" class="danger" data-setoff${dead}>Shut down</button></div>${
+      s.node ? "" : `<div class="sub dim setupwait">These wait for this machine's agent to answer.</div>`}`;
 }
-function setupConsoleCard(num, s){
-  const c = s.own.reported.console;
-  return setupCard(num, "A password for this screen", !!c.set, false, c.set
-    ? `<p>Log in at this machine's screen or a KVM as <code>admin</code> with it; <code>sudo</code> gives root. This machine changes it, after Finish.</p>`
-    : `<p>${c.open ? "Until setup ends, this machine's screen or a KVM logs in as <code>admin</code> with no password, in case something here stops answering. Set one to keep that way in afterwards" : "Set one to log in at this machine's screen or a KVM as <code>admin</code>"}. It is not your dashboard password, and This machine can set one later.</p>${consolePwFields("setfields")}`,
-    c.set ? "" : `<button type="button" class="primary" data-console="set">Set it</button>`, c.set ? "" : "optional");
+// Sixteen characters a person can read off a page and type at a KVM: no
+// look-alikes, in fours.
+function consoleLogin(){
+  const abc = "abcdefghjkmnpqrstuvwxyz23456789", out = [];
+  while (out.length < 16){
+    for (const b of crypto.getRandomValues(new Uint8Array(32))) if (b < 248 && out.length < 16) out.push(abc[b % abc.length]);
+  }
+  return out.join("").replace(/(.{4})(?=.)/g, "$1-");
+}
+async function setupGenerateConsole(b){
+  const n = ownMachine();
+  if (n?.reported?.console?.set && !await askYes("Make a new console login?\n\nThe password this machine has now stops working.", {title: "New console login?", verb: "Make a new one"})) return;
+  const was = b.textContent;
+  busy(b, "Generating");
+  const password = consoleLogin();
+  const j = await (await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", password})).json().catch(() => ({error: "no answer"}));
+  if (j.error){ notify(j.error, true); unbusy(b, was); return; }
+  await ask({title: "Console login", text: "At this machine's screen or a KVM, log in as admin with this password; sudo gives root. It takes a few seconds to reach the machine.\n\nIt is shown this once and never kept here, so note it now.",
+             choices: [{label: "Done", value: true}], cancel: null, field: {value: password, label: "Password"}});
+  await loadNodes();
+}
+async function setupShutDown(b){
+  const n = ownMachine();
+  if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down", danger: true})) return;
+  busy(b, "Shutting down");
+  const j = await (await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""})).json().catch(() => ({error: "no answer"}));
+  if (j.error){ notify(j.error, true); unbusy(b, "Shut down"); return; }
+  notify("shutting down");
+  await loadNodes();
 }
 
 function setupDisksSig(dk){
@@ -190,7 +218,8 @@ function wireSetup(el, s){
   // The walk's steps are This machine's and Controller settings' own, so
   // their own wiring serves them; nothing here sends anything else.
   if (setupWalking()){ wireHeld(el); wireMove(el); }
-  wireMachineConsole(el);
+  el.querySelectorAll("[data-setconsole]").forEach(b => b.onclick = () => pressing(b, () => setupGenerateConsole(b)));
+  el.querySelectorAll("[data-setoff]").forEach(b => b.onclick = () => pressing(b, () => setupShutDown(b)));
   const vm = el.querySelector("[data-setvm]"), en = el.querySelector("[data-setenroll]");
   if (vm) vm.onclick = () => ndDialogs().openVm();
   if (en) en.onclick = () => ndDialogs().openEnroll();
@@ -405,7 +434,6 @@ function setupWalkHtml(s){
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick) cards.push(setupPlaceCard(++i, s, true));
-  if (setupConsoleWanted(s)) cards.push(setupConsoleCard(++i, s));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
@@ -414,7 +442,7 @@ function setupWalkHtml(s){
   cards.push(setupCard(++i, "After it lands", false, false,
     `${factGrid([["Sign in", "with an account the old controller had"],
                  ["Your nodes", "follow by themselves. Any that does not is listed on the Nodes page, with the one line to run on it"],
-                 ...(state?.firstboot?.apps_from ? [["Containers and VMs", "This machine reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
+                 ...(state?.firstboot?.apps_from ? [["Containers and VMs", "The Nodes page reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
                  ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
   cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
@@ -422,13 +450,13 @@ function setupWalkHtml(s){
      <p>${old ? esc(setupBootBack(had)) : "Nothing here has touched the old controller."}</p><p>If you pressed Prepare to move on the old controller, press Forget it there, so its nodes stop expecting a new home. Once a move has landed the old controller stays read-only for good, and going back is another move.</p>`, "", "any time"));
   return `<div class="setuppage">
     <div class="setuphead">
-      <h2>Moving here</h2>
+      <div class="setuptitle"><h2>Moving here</h2>${setupTopActs(s)}</div>
       <p>The steps in the order they have to happen, each done on this page. ${old ? "Nothing on the old system's disks changes until a step says so." : "The old controller runs on, untouched, until the move lands."}</p>
       <div class="setwalkask"><span class="grow">Starting new, with nothing to bring?</span><button type="button" data-setwalk="fresh">Set up a new one instead</button></div>
     </div>
     ${cards.join("")}
     <div class="setfinish">
-      <p class="dim">${s.node ? `Not landing a controller: Finish keeps this setup account as the owner and opens Home.${s.own ? " This machine holds all of the above." : ""}` : s.own ? "Finish opens once this machine answers." : "Not moving after all? Set up a new one instead, above."}</p>
+      <p class="dim">${s.node ? `Not landing a controller: Finish keeps this setup account as the owner and opens Home.${state?.me === "setup" ? " Its name is setup and its password the move token until you change them, under Users and in your Profile." : ""}${s.own ? " The Nodes page holds all of the above." : ""}` : s.own ? "Finish opens once this machine answers." : "Not moving after all? Set up a new one instead, above."}</p>
       <div class="actbar"><button type="button" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
       <div class="hint bad" id="setupWhy" hidden></div>
     </div>

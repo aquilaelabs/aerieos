@@ -631,7 +631,7 @@ class Workflow(unittest.TestCase):
             self.assertIn("Open http://\\4:8443/ in a browser on this network.", issue)
             # B621: the way in when the dashboard is what does not answer, on
             # the screen itself (the console password needs the dashboard).
-            self.assertIn("set a console password on This machine", issue)
+            self.assertIn("set a console password on the Nodes page", issue)
             marked = os.path.join(d, "open"); open(marked, "w").close()
             sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file, "BB_CONSOLE_OPEN": marked})
             self.assertIn("Until setup is finished, log in here as admin with no password.", open(os.path.join(out, "10-aerieos.issue")).read())

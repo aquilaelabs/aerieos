@@ -360,7 +360,7 @@ container to a machine of its own, and back.
    the bundle carries beyond the state and the deploy key (each store kept
    outside the state, with its size; the repositories, unless the new home
    reaches the same folder, a share both mount or the disks the new machine
-   adopts, where This machine names it as the spaces folder (see
+   adopts, where the Nodes page names it as the spaces folder (see
    [image.md](image.md)); the install key, when the new home should not ask
    for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
@@ -370,12 +370,13 @@ container to a machine of its own, and back.
    many nodes have heard it.
 2. Install the new home (the image, an AerieOS stick or disk, or bare metal)
    and open its page. It asks whether you are moving a controller here: say yes
-   and make a setup account, and the next page, **Moving here**, walks through
+   and give the move token, with no account to make, and the next page, **Moving here**, walks through
    what the move takes, in order and on that page: on a stick its disks and where
    the spaces go, then the token with the old controller's address, while it
    still runs (the new home pulls the bundle from it, packed at that moment,
-   under a proof derived from the token). The setup account goes when the move
-   lands. Anywhere but a stick, the first page also lands it at once with no
+   under a proof derived from the token). Until the move lands, signing in from
+   another browser is the name `setup` with the move token; that account goes
+   when it lands. Anywhere but a stick, the first page also lands it at once with no
    account. If the old controller ran on the same machine it is off by then, so
    have the bundle with you before you shut it down. An old home that is already off is moved from
    a bundle instead: **Download the bundle** on the old controller (packed

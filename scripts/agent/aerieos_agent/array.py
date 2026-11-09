@@ -683,7 +683,7 @@ class ArrayMixin:
             self.hello_again("the array was taken over")
             return "failed", 1
         say("taken over: the parity is being built in the background, hours for a large array; the array is unprotected until it ends, "
-            "and its progress is on This machine and the Storage page\n")
+            "and its progress is on the Nodes page and the Storage page\n")
         self.hello_again("the array was taken over")
         return "succeeded", 0
 

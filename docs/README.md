@@ -53,7 +53,7 @@ dashboard's rail.
 
 ## Machines, people and devices
 
-- [machines.md](machines.md): This machine, Controller settings, Network, Nodes, Storage, Installed, the logs and the Jobs page
+- [machines.md](machines.md): This controller, Controller settings, Network, Nodes, Storage, Installed, the logs and the Jobs page
 - [people.md](people.md): accounts and roles, a space's owner and invitations, the chat, and your Profile
 - [companion-app.md](companion-app.md): the Android companion app: pairing, approvals and notifications from a phone
 

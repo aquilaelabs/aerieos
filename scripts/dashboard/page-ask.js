@@ -40,7 +40,7 @@ function ask({title = "", text = "", choices = [{label: "Yes", value: true}], ca
     m.hidden = true;
     const btn = (c, i) => `<button type="button" data-ai="${i}" class="${
       [i === 0 && !c.danger ? "primary" : "", c.danger ? "danger" : ""].filter(Boolean).join(" ")}">${esc(c.label)}</button>`;
-    const cancelBtn = `<button type="button" data-acancel>${esc(cancel)}</button>`;
+    const cancelBtn = cancel === null ? "" : `<button type="button" data-acancel>${esc(cancel)}</button>`;
     // The primary first and anything destructive last: a question whose
     // answer destroys something puts Cancel before it.
     const verbs = choices.map(btn).join("");
@@ -66,7 +66,8 @@ function ask({title = "", text = "", choices = [{label: "Yes", value: true}], ca
     // A press on the backdrop is Cancel, and so is Escape, which the
     // page's one dialog keydown (modalKeys) sends here as a backdrop press.
     m.onclick = e => { if (e.target === m) done(null); };
-    m.querySelector("[data-acancel]").onclick = () => done(null);
+    const cancelBack = m.querySelector("[data-acancel]");
+    if (cancelBack) cancelBack.onclick = () => done(null);
     m.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => done(value(+b.dataset.ai)));
     if (field) m.querySelector("[data-afield]").onkeydown = e => {
       if (e.key === "Enter"){ e.preventDefault(); done(value(0)); }
@@ -81,7 +82,7 @@ function ask({title = "", text = "", choices = [{label: "Yes", value: true}], ca
         .then(i => requestAnimationFrame(() => {
           if (field && typeof i === "object" && i){ m.querySelector("[data-afield]").value = i.text ?? ""; i = i.index ?? 0; }
           const b = i === -1 || i === null ? m.querySelector("[data-acancel]") : m.querySelector(`[data-ai="${i ?? 0}"]`);
-          (b || m.querySelector("[data-acancel]")).click();
+          (b || m.querySelector("[data-acancel]"))?.click();
         }));
     }
   });

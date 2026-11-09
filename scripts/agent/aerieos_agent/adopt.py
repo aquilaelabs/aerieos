@@ -873,7 +873,7 @@ class AdoptMixin:
             for w in why:
                 say(w + "\n")
         if pci_wanted and not glob.glob("/sys/kernel/iommu_groups/*"):
-            say("the IOMMU is off on this machine, so a VM given a PCI device will not start: This machine, Features, IOMMU, then restart\n")
+            say("the IOMMU is off on this machine, so a VM given a PCI device will not start: the Nodes page, Features, IOMMU, then restart\n")
         self.hello_again("VMs were defined")
         return ("succeeded", 0) if not bad else ("failed", 1)
 

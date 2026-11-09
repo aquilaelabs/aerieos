@@ -1,5 +1,5 @@
 """A way in at the console of AerieOS (R194, the operator, 1 Nov): a
-password set on This machine logs in at the screen as admin, with sudo for
+password set on the Nodes page logs in at the screen as admin, with sudo for
 root. Root itself stays without one. The image's root is read-only and
 forgets at every boot, so the password's hash is kept on the data partition
 (/var) and the account is made again from it at each start of the agent.

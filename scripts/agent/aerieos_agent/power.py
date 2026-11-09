@@ -112,7 +112,7 @@ class PowerMixin:
             self.hello_again("the system's packages updated; restarting")
             self._sh(job, ["shutdown", "-r", "+1", "AerieOS: restarting after the system's updates"], timeout=30)
         elif reboot:
-            say("done; a restart is needed to run the new kernel or libraries: This machine's Reboot does it\n")
+            say("done; a restart is needed to run the new kernel or libraries: Reboot on the Nodes page does it\n")
             self.hello_again("the system's packages updated; a restart is needed")
         else:
             say("done; nothing needs a restart\n")

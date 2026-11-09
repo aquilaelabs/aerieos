@@ -252,7 +252,7 @@ scripts/
     checks.py                    update checks on one clock (R176): each check's cadence a setting under Controller settings, when it last ran, Check for updates
     firstboot.py                 a stick's prepared configuration at its first boot (R161 step 8): the owner and the people made, the setup page skipped where asked, the rest kept waiting, said on This machine
     adoptapps.py                 the containers another system ran, made again here (R163 step 10): each template's compose with the exact image it ran, its network of fixed addresses, started with the machine where it was, its paths said where the adopted disks do not hold or may not write them; made and started through the Containers page's own calls
-    held.py                      a held start on a bare-metal install (R56 step 9): held after an unclean stop or when armed for the next restart, lifted by Start on This machine
+    held.py                      a held start on a bare-metal install (R56 step 9): held after an unclean stop or when armed for the next restart, lifted by Start on This controller
     move.py                      moving this controller to another home (R90 step 12): the sealed bundle and its token, the nodes' challenges, the restore under the version gate, the old home marked moved
     backup.py                    the configuration backed up (R161 step 4): the move's bundle under a password's key, written onto the pools after every change, found and restored at a first run
     scanners.py                  AerieOS's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows

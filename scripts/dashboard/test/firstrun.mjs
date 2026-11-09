@@ -381,7 +381,7 @@ await firstRun(false);
   // steps in the order they have to happen, each done in place with This
   // machine's and Controller settings' own controls, read from the machine.
   {
-    const walk = await page.evaluate(() => {
+    const walk = await page.evaluate(async () => {
       const keep = state.firstboot, n = (nodesList || []).find(x => x.config?.own), was = n.reported;
       const panel = () => document.getElementById('setupPanel');
       const titles = () => [...panel().querySelectorAll('.setstep h3')].map(h => h.textContent);
@@ -415,18 +415,22 @@ await firstRun(false);
       // says where it comes from.
       redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
       out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
-      // The screen's password: optional, offered while the screen is open,
-      // never waiting on the steps before it, and gone once set.
-      { redraw({ console: { os: true, set: false, open: true } });
-        const c = step('A password for this screen');
-        out.conPill = c?.querySelector('.pill')?.textContent;
-        out.conSaid = words('A password for this screen');
-        out.conLive = !!c && !c.querySelector('#conPw').disabled && !c.querySelector('[data-console=set]').disabled;
-        out.conHeld = c?.classList.contains('held');
+      // The two presses at the top (the operator, 9 Nov), in place of a step:
+      // live while nothing runs, dead for a job, and the login's says so once
+      // the machine has one. Generating shows the password once and sends it.
+      { const top = () => panel().querySelector('.setuptitle');
+        redraw({ console: { os: true, set: false, open: true } });
+        out.conGen = top()?.querySelector('[data-setconsole]')?.textContent;
+        out.conOffBtn = top()?.querySelector('[data-setoff]')?.textContent;
+        out.conLive = !top()?.querySelector('[data-setconsole]')?.disabled && !top()?.querySelector('[data-setoff]')?.disabled;
+        out.conNoStep = !titles().includes('A password for this screen');
+        const was = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt', started: Math.floor(Date.now() / 1000) }]; redraw({ console: { os: true, set: false, open: true } });
+        out.conDead = !!top()?.querySelector('[data-setconsole]')?.disabled && !!top()?.querySelector('[data-setoff]')?.disabled;
+        n.jobs = was;
+        redraw({ console: { os: true, set: false, open: true } });
         redraw({ console: { os: true, set: true, open: false } });
-        out.conDone = step('A password for this screen')?.querySelector('.pill')?.textContent;
-        out.conFields = !!step('A password for this screen')?.querySelector('#conPw');
-        redraw({}); out.conOff = !step('A password for this screen'); }
+        out.conAgain = top()?.querySelector('[data-setconsole]')?.textContent;
+        redraw({}); out.conNone = !top()?.querySelector('[data-setconsole]') && !!top()?.querySelector('[data-setoff]'); }
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -466,6 +470,21 @@ await firstRun(false);
       out.fresh = { head: panel().querySelector('h2')?.textContent, kept: localStorage.getItem('bb.setupWalk'), ask: panel().querySelector('[data-setwalk="move"]')?.textContent };
       panel().querySelector('[data-setwalk="move"]').click();
       out.backIn = panel().querySelector('h2')?.textContent;
+      // Last, since it waits: a node list read meanwhile would take the
+      // block's fixtures with it.
+      { redraw({ console: { os: true, set: false, open: true } }); const top = () => panel().querySelector('.setuptitle');
+        const sent = [], keep = postJSON, keepAsk = ask; let shown = null;
+        const keepLoad = loadNodes;
+        ask = async o => { shown = o; return true; }; loadNodes = async () => {};
+        postJSON = async (u, b) => { sent.push(b); return new Response('{"ok":true}'); };
+        top().querySelector('[data-setconsole]').click();
+        for (let t = 0; t < 40 && !shown; t++) await new Promise(r => setTimeout(r, 50));
+        out.conShown = shown?.field?.value;
+        out.conAsked = shown?.text;
+        out.conSent = sent[0];
+        await new Promise(r => setTimeout(r, 150));
+        postJSON = keep; ask = keepAsk; loadNodes = keepLoad;
+      }
       return out;
     });
     if (process.env.BB_SHOTS){
@@ -486,9 +505,12 @@ await firstRun(false);
     ok(/adopting the old system's disks/.test(walk.jobBand) && /mounting \/mnt\/disk2, 6 min so far/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
        `...and while a system job runs every step that would start another waits, the page saying what runs, its step and how long (${walk.jobBand})`);
     ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
-    ok(walk.conPill === 'optional' && /with no password/.test(walk.conSaid) && walk.conLive && !walk.conHeld,
-       `...a password for the screen is offered as optional, saying the screen is open until setup ends, and waits on no step (${walk.conPill}, ${walk.conLive}, ${walk.conHeld})`);
-    ok(walk.conDone === 'done' && !walk.conFields && walk.conOff, `...done with no fields once set, and not drawn where the machine has no such screen (${walk.conDone}, ${walk.conFields}, ${walk.conOff})`);
+    ok(walk.conGen === 'Generate console login' && walk.conOffBtn === 'Shut down' && walk.conLive && walk.conNoStep,
+       `...the top of the page has Generate console login and Shut down, live, and no step asks for a password (${walk.conGen}, ${walk.conOffBtn}, ${walk.conLive}, ${walk.conNoStep})`);
+    ok(walk.conDead, '...both dead while the machine runs a job');
+    ok(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/.test(walk.conShown || '') && walk.conSent?.action === 'console' && walk.conSent?.password === walk.conShown && /log in as admin/.test(walk.conAsked || ''),
+       `...Generate sends a password a person can type at a KVM and shows it once, with the name (${walk.conShown}, ${JSON.stringify(walk.conSent)})`);
+    ok(walk.conAgain === 'New console login' && walk.conNone, `...it reads New console login once one is set, and Shut down is there on a machine with no such screen (${walk.conAgain}, ${walk.conNone})`);
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);
@@ -537,23 +559,33 @@ await firstRun(false);
      `...and makes it with the Storage page's own calls: the raidz1 and the fast pool (${JSON.stringify(sent)})`);
   const fin2 = await bm.finish();
   ok(!fin2.error, `a bare-metal first run finishes with only its own node (${fin2.error || 'ok'})`);
-  // This machine (R90 step 8): the rail's Controller group opens on it, its
-  // page draws the own node's row with the machine's head and the Updates
-  // section, the Nodes page's picker leaves it out, and a project's node
-  // picker names it This machine.
+  // This controller (R90 step 8; split the operator, 9 Nov): the rail's
+  // Controller group opens on it, with what is the controller's; the machine
+  // as a node is on the Nodes page, in its picker and every other node page's
+  // but the containers', and a project's node picker names it This machine.
   await page.evaluate(async () => { await refresh(); await loadNodes(); });
   await page.waitForFunction(() => !!state?.own_node, null, { timeout: 15000 }).catch(() => {});
   const rail = await page.evaluate(() => (railGroups().find(g => g.key === 'controller')?.tools || []).filter(([k]) => railAllows(k)).map(([k]) => k));
-  ok(rail[0] === 'machine', `the rail's Controller group offers This machine first on a bare-metal install (${rail.join(',')})`);
+  ok(rail[0] === 'machine', `the rail's Controller group offers This controller first on a bare-metal install (${rail.join(',')})`);
   await page.evaluate(() => openMachineTab());
-  await page.waitForSelector('.machinetab .ndrow[data-node]', { timeout: 15000 });
+  await page.waitForSelector('.machinetab .pghead', { timeout: 15000 });
   const mp = await page.evaluate(() => ({
     head: document.querySelector('.machinetab .pghead')?.textContent.replace(/\s+/g, ' ') || '',
-    tag: !!document.querySelector('.machinetab .ndrow .tag.ndown'),
+    link: document.querySelector('.machinetab .pghead a.pagelink')?.getAttribute('href') || '',
     updates: !!document.querySelector('.machinetab details[data-sect="nodes:updates"]'),
-    sects: [...document.querySelectorAll('.machinetab .ndsections details.sect')].map(d => d.dataset.sect) }));
-  ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.tag && mp.updates && mp.sects.includes('nodes:health') && mp.sects.includes('nodes:advanced'),
-     `This machine draws the machine's head, the Updates section and the own node's row with its sections (${mp.sects.join(',')})`);
+    row: !!document.querySelector('.machinetab .ndrow'),
+    own: ownMachine()?.id }));
+  ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.updates && !mp.row && mp.link === `#/machines/nodes/${mp.own}`,
+     `This controller draws the head and the Updates section, no node row, and links to the machine's row on the Nodes page (${mp.link})`);
+  await page.evaluate(() => { openNodesTab(ownMachine().id); nodesRev++; drawPanes(); });
+  await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
+  const np = await page.evaluate(() => ({
+    tag: !!document.querySelector('.nodestab .ndrow .tag.ndown'),
+    sects: [...document.querySelectorAll('.nodestab .ndsections details.sect')].map(d => d.dataset.sect),
+    live: Object.fromEntries(['library', 'installed', 'files', 'emulator', 'docker', 'nginx'].map(k => [k, machinesLive(k).some(n => n.id === ownMachine().id)])) }));
+  ok(np.tag && np.sects.includes('nodes:health') && np.sects.includes('nodes:advanced'), `the machine is a row on the Nodes page, with a node's sections (${np.sects.join(',')})`);
+  ok(np.live.library && np.live.installed && np.live.files && np.live.emulator && !np.live.docker && !np.live.nginx,
+     `its node is in the Library's and every node page's picker, and not in the containers' pages, which it does not host (${JSON.stringify(np.live)})`);
   // A held start (R56 step 9): not held on this first boot, armed for the
   // next by its press, and Start says there was nothing to lift.
   const h0 = await page.evaluate(() => state?.held || null);
@@ -570,10 +602,10 @@ await firstRun(false);
   // (R161 step 11), ticked while armed, the head's button gone.
   {
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: true });
-    await page.evaluate(async () => { await refresh(); drawPanes(); });
+    await page.evaluate(async () => { await refresh(); nodesRev++; drawPanes(); });
     const box = await page.evaluate(() => ({
-      row: !!document.querySelector('.machinetab details[data-sect="nodes:advanced"] [data-holdnextbox]:checked'),
-      head: !!document.querySelector('.machinetab .pghead [data-holdnext]') }));
+      row: !!document.querySelector('.nodestab details[data-sect="nodes:advanced"] [data-holdnextbox]:checked'),
+      head: !!document.querySelector('.nodestab .pghead [data-holdnext]') }));
     ok(box.row && !box.head, `hold the next start is a checkbox in the Reboot or shut down row, ticked while armed (${JSON.stringify(box)})`);
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: false });
   }
@@ -585,7 +617,7 @@ await firstRun(false);
       n.reported = { ...n.reported, os_stick: { stick: true, pool: '', ready: false, on_stick: ['projects'], written_kb: 3145728, boot_written_kb: 20480 },
                      pools: [{ name: 'fast', mount: '/mnt/pools/fast' }] };
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:stick"]');
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:stick"]');
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '', pick: [...(sect?.querySelectorAll('#stickPool option') || [])].map(o => o.value) };
     });
     ok(st.there && /waiting for a system pool/.test(st.text) && /the configuration, and the spaces/.test(st.text) && /3\.0 GB in its life/.test(st.text)
@@ -606,8 +638,8 @@ await firstRun(false);
                  skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
       window.__fbPlan = state.firstboot;
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopt"]');
-      window.__machineSections = [...document.querySelectorAll('.machinetab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopt"]');
+      window.__machineSections = [...document.querySelectorAll('.nodestab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                radios: [...(sect?.querySelectorAll('input[name="adoptMode"]') || [])].map(r => r.value + (r.checked ? '*' : '')),
                acts: [...(sect?.querySelectorAll('[data-adopt]') || [])].map(x => x.dataset.adopt) };
@@ -615,7 +647,7 @@ await firstRun(false);
     if (process.env.BB_SHOTS){
       console.log('[machine sections] ' + (await page.evaluate(() => window.__machineSections.join(' | '))));
       const vp = page.viewportSize();
-      const openAll = () => page.evaluate(() => document.querySelectorAll('.machinetab details.sect').forEach(d => { d.open = true; }));
+      const openAll = () => page.evaluate(() => document.querySelectorAll('.nodestab details.sect').forEach(d => { d.open = true; }));
       await openAll();
       await page.setViewportSize({ width: 1440, height: 7000 }); await sleep(500);
       await page.screenshot({ path: `${process.env.BB_SHOTS}/machine-desk.png` });
@@ -637,8 +669,8 @@ await firstRun(false);
       state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
                                  notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
-      return { there: !!sect, gone: !document.querySelector('.machinetab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
+      return { there: !!sect, gone: !document.querySelector('.nodestab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
                release: !!sect?.querySelector('[data-adopt="release"]'), serve: !!sect?.querySelector('[data-adoptshares]') };
     });
     ok(done.serve && /1 share \(media\) can be served from \/mnt\/user/.test(done.text) && /docs: secure/.test(done.text),
@@ -655,7 +687,7 @@ await firstRun(false);
       const n = ownMachine();
       n.reported = { ...n.reported, adopted: { ...n.reported.adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { offered: [...(sect?.querySelectorAll('[data-adoptfolder]') || [])].map(x => x.dataset.adoptfolder),
                ticked: [...(sect?.querySelectorAll('[data-adoptfolder]:checked') || [])].length, btn: !!sect?.querySelector('[data-adoptfolders]') };
     });
@@ -665,8 +697,8 @@ await firstRun(false);
     const take = await page.evaluate(() => {
       const n = ownMachine(), was = n.reported.adopted;
       const read = () => { nodesRev++; drawPanes();
-        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
-        const back = document.querySelector('.machinetab details[data-sect="nodes:adoptback"]');
+        const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
+        const back = document.querySelector('.nodestab details[data-sect="nodes:adoptback"]');
         return { take: [...(sect?.querySelectorAll('[data-adopttake]') || [])].map(x => x.dataset.adopttake), release: !!sect?.querySelector('[data-adopt="release"]'),
                  status: sect?.querySelector('summary')?.textContent.replace(/\s+/g, ' ') || '', back: back?.textContent.replace(/\s+/g, ' ') || '' }; };
       const old = read();
@@ -676,7 +708,7 @@ await firstRun(false);
       const fbWas = state.firstboot;
       state.firstboot = { ...fbWas, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *' };
       const offered = read();
-      const msect = () => document.querySelector('.machinetab details[data-sect="nodes:adopted"]');
+      const msect = () => document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       offered.moves = [...(msect()?.querySelectorAll('[data-admove]') || [])].map(r => `${r.dataset.admove}:${r.querySelector('[data-moveland]').value}:${r.querySelector('[data-movemover]').value}`);
       offered.when = [...(msect()?.querySelectorAll('#adoptMoverWhen option') || [])].map(o => o.value);
       const isos = msect()?.querySelector('[data-admove="isos"]');
@@ -704,7 +736,7 @@ await firstRun(false);
         n.reported.adopted = { ...n.reported.adopted, taken: false };
         state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] };
         nodesRev++; drawPanes();
-        const sect = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); sect.open = true;
+        const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); sect.open = true;
         const take = sect.querySelector('#adoptTake'), lbl = take.querySelector('label, .lblrow, .ctllbl') || take.firstElementChild;
         const left = el => Math.round(el.getBoundingClientRect().left);
         const bars = [...sect.querySelectorAll('.actbar')].map(b => { const bs = [...b.querySelectorAll(':scope > button')].map(x => x.getBoundingClientRect());
@@ -727,8 +759,8 @@ await firstRun(false);
         await page.evaluate(() => { const n = ownMachine();
           n.reported.adopted = { ...window.__adWas[0], taken: false };
           state.firstboot = { ...window.__adWas[1], moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
-          nodesRev++; drawPanes(); const d = document.querySelector('.machinetab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
-        await page.locator('.machinetab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
+          nodesRev++; drawPanes(); const d = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await sleep(200);
+        await page.locator('.nodestab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
       }
       await page.setViewportSize(vp);
       await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; nodesRev++; drawPanes(); });
@@ -739,7 +771,7 @@ await firstRun(false);
        && /nothing on its data disks was written here/.test(take.old.back) && /never written/.test(take.old.back),
        `once taken over Release waits, and Going back says a parity sync there; read-only, it says nothing was written (${take.taken.back.slice(0, 160)})`);
     const onStorage = await page.evaluate(async () => {
-      window.__fbKeep = state.firstboot;
+      window.__fbKeep = state.firstboot || window.__fbPlan;
       openStorageTab(); await new Promise(r => setTimeout(r, 400));
       const own = ownMachine();
       storageList = [{ node: own.id, name: own.name, measured: true, age_s: 60, fs: [], disks: [], projects: [] }];
@@ -749,7 +781,7 @@ await firstRun(false);
     });
     ok(onStorage.there && onStorage.release && onStorage.folder,
        `the Storage page of the machine draws the same Adopted disks, Release and the folders to serve (${JSON.stringify(onStorage)})`);
-    await page.evaluate(() => { openMachineTab(); state.firstboot = state.firstboot || window.__fbKeep; nodesRev++; drawPanes(); });
+    await page.evaluate(() => { openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep; nodesRev++; drawPanes(); });
     // ...and what the old system ran (R163 steps 10, 11): read first, then
     // its containers to make and start and its VMs to define and run.
     const apps = await page.evaluate(async () => {
@@ -760,13 +792,13 @@ await firstRun(false);
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
       nodesRev++; drawPanes();
-      const unread = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
+      const unread = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
       n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
         adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
                                                    vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
                                                    said: ['Docker: 1 container ran, 1 started with the machine'] } } };
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.machinetab details[data-sect="nodes:adoptapps"]');
+      const sect = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
     });
@@ -778,10 +810,10 @@ await firstRun(false);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
     const picked = await page.evaluate(() => {
-      const box = document.querySelector('.machinetab [data-adpick="v:Ubuntu"]');
+      const box = document.querySelector('.nodestab [data-adpick="v:Ubuntu"]');
       const was = box?.checked;
       box.checked = false; box.dispatchEvent(new Event('change'));
-      const b = document.querySelector('.machinetab [data-adoptapp="define"]');
+      const b = document.querySelector('.nodestab [data-adoptapp="define"]');
       const after = { was, label: b?.textContent.trim(), dead: !!b?.disabled };
       adoptSkip.clear();
       return after;
@@ -799,7 +831,7 @@ await firstRun(false);
   // Name and time (R161 step 3): the own machine's section, Apply asleep
   // until a field moves, and the press a system job on its node.
   const nt = await page.evaluate(() => {
-    const sect = document.querySelector('.machinetab details[data-sect="nodes:machine"]');
+    const sect = document.querySelector('.nodestab details[data-sect="nodes:machine"]');
     const b = sect?.querySelector('[data-nd="machine-apply"]'), tz = sect?.querySelector('[data-k="machinetz"]');
     const before = b?.disabled;
     if (tz){ tz.value = 'Europe/Paris'; tz.dispatchEvent(new Event('input')); }
@@ -814,8 +846,8 @@ await firstRun(false);
   await page.evaluate(() => openNodesTab());
   await page.waitForFunction(() => document.querySelector('#ndPick'), null, { timeout: 15000 }).catch(() => {});
   const picks = await page.evaluate(() => [...document.querySelectorAll('#ndPick option')].map(o => o.textContent));
-  ok(!picks.some(t => /thismachine/.test(t)) && picks.some(t => /otherbox/.test(t)),
-     `...and the Nodes page's picker offers the other node and not this machine (${picks.join(' | ')})`);
+  ok(picks.some(t => /thismachine.*\(this machine\)/.test(t)) && picks.some(t => /otherbox/.test(t)),
+     `...and the Nodes page's picker offers the other node and this machine, named as such (${picks.join(' | ')})`);
   await page.close();
   bm.stop();
 
@@ -847,7 +879,13 @@ await firstRun(false);
          `the first page asks whether a controller is moving here, and anywhere but a stick can land it at once (${JSON.stringify(ask)})`);
       if (process.env.BB_SHOTS) await lp.screenshot({ path: `${process.env.BB_SHOTS}/landing-desk.png` });
       await lp.check('input[name="walk"][value="move"]');
-      await lp.fill('#u', 'setupper'); await lp.fill('#p', 'longenough1'); await lp.fill('#p2', 'longenough1');
+      const swap = await lp.evaluate(() => ({ acct: document.querySelector('#forNew').hidden, tok: !document.querySelector('#forMove').hidden, btn: document.querySelector('#setupGo').textContent }));
+      ok(swap.acct && swap.tok && swap.btn === 'Continue', `...yes asks for the move token in place of an account (${JSON.stringify(swap)})`);
+      await lp.fill('#mt', 'not a token');
+      await Promise.all([lp.waitForNavigation(), lp.click('button[type=submit]')]);
+      const said = await lp.evaluate(() => ({ err: document.querySelector('.err')?.textContent, moving: document.querySelector('input[name="walk"]:checked')?.value }));
+      ok(/not a move token/.test(said.err || '') && said.moving === 'move', `...something that is not one is refused, still on the move (${JSON.stringify(said)})`);
+      await lp.fill('#mt', 'A'.repeat(43));
       await Promise.all([lp.waitForNavigation(), lp.click('button[type=submit]')]);
       await lp.waitForFunction(() => document.querySelector('#setupPanel h2')?.textContent === 'Moving here', null, { timeout: 20000 });
       const arrived = await lp.evaluate(() => ({ search: location.search, kept: localStorage.getItem('bb.setupWalk'),

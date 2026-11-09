@@ -44,7 +44,7 @@ const RAIL = [
   // AerieOS behaves, with room for the pages a bare-metal install and
   // the USB edition add beside Settings (R90, R56). After Containers, so a
   // phone's bar keeps its four.
-  {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This machine"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
+  {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This controller"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
   {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"], ["files", "Files"]]},
   {key: "sessions", label: "Sessions", icon: "sessions", tools: [["sessions", "Sessions"]]},
   {key: "jobs", label: "Jobs", icon: "jobs", tools: [["jobs", "Jobs"], ["schedules", "Schedules"]]},
@@ -143,7 +143,7 @@ const OPENERS = {
   roles: () => openRolesTab(), settings: () => openSettingsTab(), keys: () => openKeysTab(), profile: () => openProfileTab(),
   sessions: () => openSessionsTab(), help: () => openHelp(),
   // The pages of 0.9.0 (B410: an address with no opener landed on its
-  // group's first page): Scanners, Audit, This machine and Network.
+  // group's first page): Scanners, Audit, This controller and Network.
   scanners: () => openScannersTab(), audit: () => openAuditTab(), machine: () => openMachineTab(), network: () => openNetworkTab(),
 };
 function railWarm(key){
@@ -496,10 +496,12 @@ const GROUP_KEEP = {library: "bb.libnode", emulator: "bb.emunode", storage: "bb.
 // what NODE_SET left them.
 const GROUP_LOAD = {library: () => loadLibrary(), emulator: () => loadEmulator(), installed: () => loadInstalled(), files: () => loadFiles(), docker: () => loadDocker(),
                     phone: () => phFetch(null, true)};
+// The controller's own machine is a node like any (the operator, 9 Nov), on
+// every page about a node but those of containers: docker there is root over
+// the controller, so it hosts none (nodes.own_machine).
+const NOT_ON_OWN = new Set(["docker", "nginx", "scanners"]);
 function machinesLive(kind = ""){
-  // The machine's own node is This machine's (B635), but its files are the
-  // Files page's like any node's (R224).
-  return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && kind !== "files"));
+  return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
 }
 function machinesNode(kind){
   return NODE_PICKED[kind]?.() || "";
@@ -592,9 +594,10 @@ function groupHeader(t, g){
   const from = n?.agent?.addr ? `dials in from ${n.agent.addr}` : "";
   const ag = n?.agent?.version ? `agent ${n.agent.version}` : "";
   const facts = [seen, from, ag].filter(Boolean).join(" · ");
-  // The machine's own node is This machine's, not this list's (B635).
+  // The containers' pages leave the own machine out, so on a machine alone
+  // there is no other node to show them for.
   const ownHere = state?.bare_metal && (nodesList || []).some(x => x.config?.own && x.state !== "retired");
-  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.name, live: x.live})), cur) : `<span class="pname">${!ownHere ? "No node yet" : t.kind === "nodes" ? "No other node yet" : esc((nodesList || []).find(x => x.config?.own && x.state !== "retired")?.name || "This machine")}</span>`;
+  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
   return `<span class="phead mchead">${pick}${facts ? `<span class="pfacts">${esc(facts)}</span>` : ""}<span class="sp"></span></span>`;
 }
 // The Machines group's actions, on the sub-nav's line: dead with the enroll

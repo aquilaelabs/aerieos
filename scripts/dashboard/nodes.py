@@ -4100,7 +4100,7 @@ def storage_attention():
         if st.get("stick") and isinstance(total, int) and isinstance(free, int) and total > 0 and (free < 1024 or free * 10 < total):
             out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "stick", "bad": free < 512, "key": f"stick:room:{n['id']}:{free // 256}",
                         "said": f"the stick's own partition has {free / 1024:.1f} GB free of {total / 1024:.1f} GB, and the controller stops when it is full"
-                                + (": name a system pool under Pool and spaces on This machine, which takes docker, the VMs, the spaces and the secrets off it"
+                                + (": name a system pool under Pool and spaces on the Nodes page, which takes docker, the VMs, the spaces and the secrets off it"
                                    if not st.get("ready") else ": the Storage page says what is on it")})
         # The last Check parity's result (R163 step 15), until dismissed:
         # clean, or what differed and what was or could not be corrected.
@@ -4217,7 +4217,7 @@ def node_host_update(principal, node_id, reboot=False):
     if not n:
         return {"error": "no such node"}
     if not own_machine(n):
-        return {"error": f"{n['name']}'s packages are its own administrator's: This machine updates the controller's own"}
+        return {"error": f"{n['name']}'s packages are its own administrator's: This controller updates the controller's own"}
     rep = n.get("reported") or {}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot update its packages"}
@@ -4246,7 +4246,7 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     if not n:
         return {"error": "no such node"}
     if not own_machine(n):
-        return {"error": f"{n['name']}'s name and time zone are its own to set: This machine sets the controller's own"}
+        return {"error": f"{n['name']}'s name and time zone are its own to set: only the controller's own machine is set from here"}
     rep = n.get("reported") or {}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot set its name"}
@@ -4378,7 +4378,7 @@ def workspace_held():
         if not s.get("stick"):
             return ""
         if s.get("projects_home") == "held":
-            return ("this machine runs from a stick, and the spaces are never kept on it: on This machine, create or adopt "
+            return ("this machine runs from a stick, and the spaces are never kept on it: on the Nodes page, create or adopt "
                     "a pool and name it the system pool, or name the folder on its disks the spaces are in")
         if s.get("projects_home") == "folder" and not s.get("projects_bound"):
             return f"the spaces folder {s.get('projects') or ''} is waiting for its disks to mount"

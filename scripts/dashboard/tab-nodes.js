@@ -45,8 +45,6 @@ const nodesUpdating = {};
 // operator, 4 Oct).
 let nodesReveal = null;
 function openNodesTab(nid, what){
-  // The controller's own machine has its own page (R90 step 8).
-  if (nid && state?.bare_metal && (nodesList || []).find(n => n.id === nid)?.config?.own){ openMachineTab(what); return; }
   if (nid){
     nodesPick = nid;
     nodesFocus = null;
@@ -2041,24 +2039,17 @@ function renderNodesInto(i){
   // not a machine anybody configures from here: it runs no work (roadmap
   // #16), takes no toolchains (#26), and every section on this tab is about
   // something it does not have. So it is registry plumbing, not a row.
-  // ...and on a bare-metal install the controller's own machine is This
-  // machine's page in the Controller group (R90 step 8), not a row here.
-  const live = nodesList.filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own));
+  const live = nodesList.filter(n => n.state !== "retired" && n.kind !== "local");
   if (!live.some(n => n.id === nodesPick)) nodesPick = live[0]?.id || "";
   const n = live.find(x => x.id === nodesPick);
   // Picked as every node-scoped page picks one (nodePick, R218 step 26).
   d.setBar(ndBar(live));
-  const rows = n ? ndRowHtml(n) : "";
+  const rows = n ? ndRowHtml(n, state?.bare_metal && n.config?.own ? machineNodeSections(n) : "") : "";
   // Nothing enrolled. Said where the rows would be, rather than an empty
   // picker over an empty page: the Enroll button above is the whole of what
   // there is to do here.
-  // On AerieOS the machine is its own node, drawn on This machine and kept
-  // off this list, so an empty list is not "no node yet" (B635).
-  const ownHere = state?.bare_metal ? (nodesList || []).find(x => x.config?.own && x.state !== "retired") : null;
   const none = live.length ? "" : state?.can?.admin === false
     ? `<div class="empty ndnone">None of your spaces is on a node yet. An administrator sets a space's node.</div>`
-    : ownHere ? `<div class="empty ndnone">This machine is its own node: ${pageLink("machine", "This machine")} under Controller is its page.
-      Press <b>Enroll node</b> to get the command that adds another machine for builds, tests and sessions.</div>`
     : `<div class="empty ndnone">No node yet. Press <b>Enroll node</b> to get the command
       that adds a machine for builds, tests and sessions.</div>`;
   // Enrolling is a dialog now (#ndmodal), not two panels appended here; see
@@ -2077,6 +2068,7 @@ function renderNodesInto(i){
     notify("the line is on the clipboard");
   });
   wireNodesTab(d.el);
+  if (state?.bare_metal && n?.config?.own) wireHeld(d.el);
   nodesReadOnly(d.el);
   // What openNodesTab was asked to show, once it is drawn.
   const want = nodesReveal && d.el.querySelector(nodesReveal);

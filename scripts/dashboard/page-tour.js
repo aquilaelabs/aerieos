@@ -118,7 +118,7 @@ const TOUR_STEPS = {
     {at: `${TOUR_PANE} .snav, ${TOUR_FIRST}`, say: "Pick a section here: Connection sets http or https and its certificate; Reach from outside runs the home tunnel."},
   ],
   machine: [
-    {say: "This machine: the computer this AerieOS runs on, installed bare metal. What it is, the release it runs and its updates, and what it runs as a node."},
+    {say: "This controller: the release this AerieOS runs on its own computer, its updates and the older versions kept to boot. The computer as a node, its disks, its name and how it restarts, is on the Nodes page like every machine."},
     {at: `${TOUR_FIRST}, ${TOUR_PANE} .empty`, say: "Its sections are a node's: health, the spaces on it, its sessions, its features, storage and network, and the verbs at the end, reboot and power off among them."},
   ],
   audit: [

@@ -2,7 +2,7 @@
 dashboard, its agent and the network come up, and nothing else runs (no
 agent session starts; the pools, shares, apps, VMs and containers the
 installed OS adds are held by their own modules reading this) until a
-person presses Start on This machine. Not by default: held only after an
+person presses Start on This controller. Not by default: held only after an
 unclean shutdown (a clean-shutdown marker written on the way down and
 missing on the way up), or when the next start was asked to hold (This
 hold the next start checkbox beside Restart and Shut down, that one boot). Safe mode at the boot menu
@@ -119,7 +119,7 @@ def said():
     """The sentence a refusal carries while the start is held."""
     d = _load()
     return ("the start is held" + (f" ({'; '.join(d.get('why') or [])})" if d.get("why") else "")
-            + ": press Start on This machine, and sessions run again")
+            + ": press Start on This controller, and sessions run again")
 
 
 def status():

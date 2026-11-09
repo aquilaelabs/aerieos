@@ -68,7 +68,7 @@ A machine's own kernel arguments (the IOMMU, CPUs kept for VMs) are
 `aerie_args` in the same environment, which every boot entry ends with:
 `slot args NAME=VALUE...` sets them, each in place of one of that name,
 `slot args-off NAME...` takes them off, and plain `slot args` prints them;
-each counts from the next boot. The IOMMU switch on This machine's
+each counts from the next boot. The IOMMU switch on the Nodes page's
 Features sets its arguments this way.
 
 **The stick is written rarely.** Flash wears with every write, and many
@@ -80,7 +80,7 @@ again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
 containers, the VMs, the toolchains and the spaces, lives on a **system
 pool**, and so does the secrets folder with the install key, so the stick
-alone opens nothing the controller sealed: picked under This machine's **Pool and spaces** from the pools and the
+alone opens nothing the controller sealed: picked on the Nodes page under **Pool and spaces** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
 picked, docker and the VMs wait, and the spaces are held (the secrets stay
@@ -117,8 +117,8 @@ controller's account with the rest of the folder, so read it before running
 it; **Let it go** never runs that one.
 
 **A move onto a stick lands last,** since it would otherwise land on the stick.
-The first page asks whether you are moving a controller here. Say yes and make
-a setup account, and the next page is **Moving here**, a walk of the steps in
+The first page asks whether you are moving a controller here. Say yes and give
+the move token, with no account to make, and the next page is **Moving here**, a walk of the steps in
 the order they have to happen, each done on that page: what to have with you
 (the move token and the bundle), the disks, where the spaces and containers
 go, landing the controller, what comes after it, and the way back. Every install
@@ -131,7 +131,7 @@ while the machine runs a job (adopting the disks, moving to a pool) every step
 that would start another waits for it, the page saying what runs. **Walk me
 through it** and **Set up a new one instead** go between the walk and a new
 start. The stick's own partition is small (a few gigabytes until a system
-pool takes docker, the spaces and the secrets off it), and This machine says
+pool takes docker, the spaces and the secrets off it), and the Nodes page says
 how much room it has left, as the bell does when it runs low: the
 controller stops when it is full. A
 pool the machine adopted can be the system pool whatever its filesystem; a
@@ -251,10 +251,10 @@ hash (the dashboard's own scheme, so a tool that writes the file hashes what
 was typed) and each person by name and role, with their SMB password where
 it came with them and no dashboard password until the owner sets one on the
 Users page. `"first_run": "skip"` marks the setup page done unless the plan names disks, which that page walks through, and `"hold_first_start": true`
-holds that first start, so the disks are on This machine before anything
+holds that first start, so the disks are on the Nodes page before anything
 mounts; without an
 owner's hash the first-run page makes the owner as on any stick. The shares,
-pools, array and apps wait until their disks are adopted. This machine's
+pools, array and apps wait until their disks are adopted. The machine's row's
 **First boot** section says what was applied, what waits and what could
 not be, and nothing of a hash is kept on the controller beyond the accounts
 themselves. It runs as root (sudo) on Linux and a
@@ -273,7 +273,7 @@ a container that asks for the card gets it; nouveau is kept off the card.
 On a machine without a card the modules stay unloaded. An AMD card or APU
 runs on the kernel's own amdgpu driver with the firmware the image carries.
 Which way a card is used, by this machine and its containers or by one VM
-through vfio, is a choice under This machine's Features (R207).
+through vfio, is a choice under Features on the Nodes page (R207).
 
 ## Its disks at the first run
 
@@ -302,9 +302,9 @@ password as the dashboard. The Storage page does all of this too, later, the sam
 way, with each share's security and each person's access. On a stick made with a prepared configuration that
 names disks to adopt, those disks are the old system's: each is listed as
 such, with no box, and the step makes nothing of them; they are taken as
-they are in the first-run page's walk, and later on This machine under The old system's disks.
+they are in the first-run page's walk, and later on the Nodes page under The old system's disks.
 
-Once they are adopted, This machine and the Storage page show them under
+Once they are adopted, the Nodes page and the Storage page show them under
 **Adopted disks**, with the folders at the top of `/mnt/user` that had no
 share settings offered to serve as the old system did. **Take the array
 over** (after **Check the takeover**, which says every step and changes
@@ -312,12 +312,12 @@ nothing) makes the data disks writable where they are, never formatting
 one, gives the old parity disk's first partition a filesystem for
 SnapRAID's parity, and starts the first sync, which builds the parity from
 nothing. That sync runs in the background, hours for a large array, with
-its progress on This machine and the Storage page (a bar, since SnapRAID
+its progress on the Nodes page and the Storage page (a bar, since SnapRAID
 says how far it is): the takeover's job ends at once, so the machine's
 other jobs are not held behind it. The array is unprotected until the sync
 ends. Taking the array over is not a step of the first-run walk: it is
 done from here afterwards, and the bell carries a row saying the array
-has no parity yet, with This machine on it, until it is taken over or the
+has no parity yet, with the Nodes page on it, until it is taken over or the
 disks are released. SnapRAID's content files, its catalogue of every block
 of the array, live on the data disks; on a stick none goes on the stick's
 own partition, where one for a large array would fill it. The array then
@@ -343,7 +343,7 @@ minutes for its next run, and never follows a share folder that is a link.
 A sync, scrub or parity check is refused while any disk of the array is not
 mounted.
 
-**Going back to the old system** on This machine says the way back for the
+**Going back to the old system** on the Nodes page says the way back for the
 state the disks are in: nothing to do while they are read-only, a parity
 check there once they were written to, and a new configuration with its
 parity rebuilt once the array was taken over. Nothing here repartitions or
@@ -360,14 +360,14 @@ comes up. The installer opens on the same logo. Both are plain characters,
 so a serial console or a server's remote screen draws them too.
 
 To log in at the screen (a monitor or a KVM), set a console password on
-This machine's Console section: it logs in as `admin`, with `sudo` for
+the Console section of its row on the Nodes page: it logs in as `admin`, with `sudo` for
 root, and it is separate from the dashboard's password. The image's root
 forgets everything at each boot, so the password's hash is kept on the
 data partition and the account is made from it at every start; until one
 is set, the screen says where to set it. While a machine is first set up,
 `admin` logs in with no password and `sudo` asks for none, so there is a way
-in if the agent or the dashboard stops partway. The first-run page offers a
-password; setup's end, or setting one, closes that login. It opens only on a
+in if the agent or the dashboard stops partway. **Generate console login** at the top
+of the first-run page shows a password once; setup's end, or setting one, closes that login. It opens only on a
 machine's first boot, so an update never opens it on an install already set
 up, and it is a login at the screen or serial line only. Root itself has no
 password. When
@@ -442,7 +442,7 @@ waits for the controller, which the image's own service started, puts up
 the wall between the controller and the sessions, and enrolls the machine as
 its controller's own node, as a bare-metal install's last step does. From
 there the machine is what [install.md](install.md)'s bare-metal section
-describes, and its page is This machine.
+describes, and its row is on the Nodes page.
 
 `/usr/lib/aerieos-os/slot` is the slot tool: `current` (the slot this
 boot came from), `other`, `next [a|b]` (the one GRUB boots next time, which
@@ -499,7 +499,7 @@ trial, in one write. An update is refused while the slot running now is
 itself on trial, since the other slot is then the only good one, and when
 a second AerieOS disk or stick in the machine carries the same slot.
 Nothing running changes until you restart
-from This machine, and the slot running now stays to fall back to: at the
+from This controller, and the slot running now stays to fall back to: at the
 GRUB menu, or with `slot next a`. The Updates section says which slot runs
 and which boots next.
 
@@ -537,7 +537,7 @@ node's agent runs. A trial boot that is not healthy
 within ten minutes restarts, a kernel or initramfs that panics restarts
 after fifteen seconds, and a kernel that will not load falls to the slot
 before at once; a second boot without the health check's word goes back to
-the slot before by itself, and This machine says so until the next update.
+the slot before by itself, and This controller says so until the next update.
 Picking the slot before from the menu during a trial ends the trial there,
 and visiting an older version is refused while one runs. The new image's
 own boot menu goes on the disk only once its slot is marked good, so a
@@ -561,7 +561,7 @@ version in it is kept instead of lost, as files under
 `/var/lib/aerieos-os/kept/` with the configuration's copy from when it was
 left: about 2 GB each, the three newest by default (Update window's **Older
 versions kept on the boot menu**, 0 for none). Each is an entry under **Older
-versions** on the boot menu and a row on This machine, whose **Boot this next**
+versions** on the boot menu and a row on This controller, whose **Boot this next**
 visits it once. A visit loads its root into memory from the data partition, on
 a disk as on a stick. It lasts one boot: the next restart is the version it came
 from, and one that does not come up restarts into it by itself. If the
@@ -586,7 +586,7 @@ dashboard a route of its own on the nginx page.
 boots is the default after four seconds, and **Safe mode** boots the slot
 that runs now with the start held: the dashboard and the shares come up
 and nothing else starts (no container, VM or session) until Start is
-pressed on This machine.
+pressed on This controller.
 
 **Update window.** By default nothing is applied by itself. Under
 Controller settings, *Update window* names a day (daily, or one weekday)

@@ -146,7 +146,6 @@ function renderSettingsInto(i){
            `<div class="row stack2" data-group="Idle sessions"><div class="grow">${withRevert(idleSection(), "idle")}</div></div>`)}
     ${pathsSection() ? sect("paths", "Storage on this controller", `${paths.length} path${paths.length === 1 ? "" : "s"}`, withRevert(pathsSection(), "paths")) : ""}
     ${state?.release?.running !== undefined ? sect("updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : ""}
-    ${state?.bare_metal && state?.own_node && state?.can?.admin ? sect("power", "Power", "", powerSection()) : ""}
     ${groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})
         // The copies made go right under the Backup group that makes them.
         + (g.key === "backup" ? sect("copies", "Backup copies", backupData?.made_at ? `last ${ago(backupData.made_at)}` : backupData?.on === false ? "off" : "", backupSection()) : "")).join("")}
@@ -504,42 +503,6 @@ function wireMove(root){
   }));
 }
 
-// Power (R175, the operator, 28 Oct): the machine this controller runs on,
-// restarted or shut down from here on a bare-metal install and the OS,
-// the same verbs This machine's Advanced section has; the container
-// edition has no machine of its own here.
-function powerSection(){
-  const n = typeof ownMachine === "function" ? ownMachine() : null;
-  const live = !!n?.live;
-  const busyWith = (n?.jobs || []).find(j => j.type === "system" && !["reboot", "poweroff"].includes(j.apply));
-  const inflight = w => (n?.jobs || []).some(j => j.apply === w);
-  const why = !n ? "This install's own machine is not enrolled as a node yet." : !live ? "Its agent is not dialing in: power the machine from its console." : busyWith ? "A system job is running on it; wait for it to finish." : "";
-  return `<div class="row stack2" data-group="Power"><div class="grow">
-      <div class="sub">Restart ends every session on this machine, everybody's, each closed first, and the machine comes back on its own with the dashboard. Shut down does the same and the machine stays off until somebody switches it on.</div>
-      ${why ? `<div class="sub warn">${esc(why)}</div>` : ""}
-      <div class="actbar">${typeof holdNextBox === "function" ? holdNextBox() : ""}<span class="sp"></span>
-        <button type="button" class="danger" data-power="reboot"${why || inflight("reboot") ? " disabled" : ""}>${inflight("reboot") ? "Restarting…" : "Restart"}</button>
-        <button type="button" class="danger" data-power="poweroff"${why || inflight("poweroff") ? " disabled" : ""}>${inflight("poweroff") ? "Shutting down…" : "Shut down"}</button></div>
-    </div></div>`;
-}
-function wirePower(root){
-  if (typeof wireHoldNext === "function") wireHoldNext(root);
-  root.querySelectorAll("[data-power]").forEach(b => b.onclick = () => pressing(b, async () => {
-    const act = b.dataset.power, id = state?.own_node || "";
-    const here = (state?.sessions || []).filter(x => x.node_id === id);
-    const open = here.length ? `It ends the ${here.length} session${here.length === 1 ? "" : "s"} open here, everybody's, each closed before the machine goes; transcripts are kept. ` : "";
-    if (!await askYes(act === "reboot"
-          ? `Restart this machine?\n\n${open}Whatever is running here stops; the dashboard is back once the machine is.`
-          : `Shut this machine down?\n\n${open}It does not come back on its own: switch it on from its console.`,
-        {title: act === "reboot" ? "Restart?" : "Shut down?", verb: act === "reboot" ? "Restart" : "Shut down", danger: true})) return;
-    busy(b, act === "reboot" ? "Restarting" : "Shutting down");
-    const j = await (await postJSON("/api/v1/nodes", {action: act, id})).json().catch(() => ({error: "no answer"}));
-    if (j.error){ notify(j.error, true); unbusy(b, act === "reboot" ? "Restart" : "Shut down"); return; }
-    notify(act === "reboot" ? "restarting: the page comes back with the machine" : "shutting down");
-    if (typeof loadNodes === "function") await loadNodes();
-  }));
-}
-
 function wireUpdates(root){
   // The channel's pick (R179): saved, then the newest asked for again.
   root.querySelectorAll("[data-relchannel]").forEach(s => s.onchange = async () => {
@@ -573,7 +536,7 @@ function wireUpdates(root){
     if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
     busy(b, "Updating");
     const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from})).json().catch(() => ({error: "no answer"}));
-    notify(j.error || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+    notify(j.error || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
   }));
   root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tag = $("relPick")?.value;
@@ -588,7 +551,7 @@ function wireUpdates(root){
       if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from This machine, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
       busy(b, "Updating");
       const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
-      notify(j.error || j.said || "updating: the job writes the other slot; restart from This machine when it is done", !!j.error);
+      notify(j.error || j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
@@ -1134,7 +1097,6 @@ function wireSettingsSections(el){
   wireUpdates(el);
   wireBackup(el);
   wireMove(el);
-  wirePower(el);
   // Ask Let's Encrypt now (R158 step 2): the Connection section's own press.
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
     busy(b, "Asking");

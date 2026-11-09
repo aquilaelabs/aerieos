@@ -223,7 +223,7 @@ function moveRead(share, land, mover){
 function storageShares(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("machine", "Features section")} installs them.`
+  const why = !n.smb && !n.nfs ? `No Samba or NFS on this machine yet: Shares on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const shares = n.shares || [];
   // On an array taken over, each share at the top of /mnt/user has its
@@ -356,7 +356,7 @@ function wireStorageShares(root, n){
 function storagePools(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs it.`
+  const why = !n.zfs ? `No zpool on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [];
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
@@ -468,7 +468,7 @@ const SNAP_KINDS = [["hourly", "Hourly", "0 * * * *"], ["daily", "Daily, at 4:00
 function storageSnapshots(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs it.`
+  const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const pools = n.pools || [], snaps = n.snapshots || {}, scheds = n.snapshot_schedules || [];
   const when = at => at ? new Date(at * 1000).toLocaleString() : "";
@@ -562,7 +562,7 @@ function arrayVerifyWord(v){
 function storageArray(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
-  const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("machine", "Features section")} installs them.`
+  const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
   const a = n.array || {}, has = (a.data || []).length > 0, scheds = (n.snapshot_schedules || []).filter(x => x.array);
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));

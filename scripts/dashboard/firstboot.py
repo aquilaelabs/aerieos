@@ -11,7 +11,7 @@ the plan names disks, which that page walks through. What
 needs disks adopted first (the shares, the pools, the array) and the apps
 are kept for the piece that adopts them, said as waiting. The handed file is
 removed; what is kept in /config/firstboot.json never holds the password
-hash nor an SMB hash. This machine draws the report (view()).
+hash nor an SMB hash. The own node's row draws the report (view()).
 
 Format 1:
     {"format": 1, "first_run": "skip" | "ask",
@@ -35,8 +35,8 @@ PCI_ADDR = re.compile(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]")
 write_json = users = settings = None
 hold_first = lambda: None    # noqa: E731 (held.arm_first, R161 step 11)
 WAITS = {"shares": "a share is served from a pool or the array once they are adopted",
-         "pools": "adopted on This machine, under The old system's disks: Check, then Adopt",
-         "array": "adopted on This machine, under The old system's disks: Check, then Adopt",
+         "pools": "adopted on the Nodes page, under The old system's disks: Check, then Adopt",
+         "array": "adopted on the Nodes page, under The old system's disks: Check, then Adopt",
          "apps": "an app is a container made from New container once its folders' disks are here"}
 
 
@@ -85,7 +85,7 @@ def apply(path=None):
         # with shows them on This machine before anything mounts.
         if cfg.get("hold_first_start"):
             hold_first()
-            done.append({"what": "first start", "said": "held: Start on This machine once the disks are as they should be"})
+            done.append({"what": "first start", "said": "held: Start on This controller once the disks are as they should be"})
         for k, why in WAITS.items():
             if cfg.get(k):
                 waiting.append({"what": k, "said": why, "count": len(cfg[k]) if isinstance(cfg[k], list) else 1})
@@ -286,7 +286,7 @@ def met(waiting, done, reported):
 
 
 def view(reported=None):
-    """This machine's section: what the stick's prepared configuration did,
+    """The own node's section: what the stick's prepared configuration did,
     and what its plan names to adopt; None when this install had none.
     `reported` is the machine's own node's census, which says which waits
     have been met since (B634)."""

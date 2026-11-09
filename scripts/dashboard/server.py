@@ -207,11 +207,12 @@ SETUP_FIELDS = """  <!--ERR-->
   <fieldset class="moveask">
     <legend>Are you moving a controller here from somewhere else?</legend>
     <label><input type="radio" name="walk" value="fresh"<!--WALKNEW-->> No, this is a new start</label>
-    <label><input type="radio" name="walk" value="move"<!--WALKMOVE-->> Yes: the next page walks you through it. This account is for setting up, and goes when the move lands</label>
+    <label><input type="radio" name="walk" value="move"<!--WALKMOVE-->> Yes: its move token is all this asks, and the next page walks you through it. Its accounts arrive with it</label>
     <!--MOVENOW-->
   </fieldset>
   <p class="note">Nobody owns this install yet, and until you make the first account anyone who can reach this page can claim it.
     <a href="/login/restore">Restoring a saved configuration?</a></p>
+  <div id="forNew">
   <label for="u">Username</label>
   <input id="u" name="username" autocomplete="username" autocapitalize="none"
     required autofocus>
@@ -221,7 +222,29 @@ SETUP_FIELDS = """  <!--ERR-->
   <label for="p2">Password again</label>
   <input id="p2" name="password2" type="password" autocomplete="new-password"
     minlength="8" required>
-  <button type="submit">Create the account</button>"""
+  </div>
+  <div id="forMove" hidden>
+  <label for="mt">The move token, shown once when the old controller prepared the move</label>
+  <input id="mt" name="move_token" type="password" autocomplete="off" spellcheck="false" disabled required>
+  <p class="note">Until the move lands, signing in here is the name <b>setup</b> with this token.</p>
+  </div>
+  <button type="submit" id="setupGo">Create the account</button>
+  <script data-cfasync="false">
+  (() => {
+    const radios = [...document.querySelectorAll("input[name=walk]")];
+    const neu = document.getElementById("forNew"), mv = document.getElementById("forMove"), go = document.getElementById("setupGo");
+    const show = () => {
+      const moving = radios.some(r => r.checked && r.value === "move");
+      neu.hidden = moving; mv.hidden = !moving;
+      neu.querySelectorAll("input").forEach(i => { i.disabled = moving; });
+      document.getElementById("mt").disabled = !moving;
+      go.textContent = moving ? "Continue" : "Create the account";
+      document.querySelector(".said").textContent = moving ? "Move a controller here" : "Make the first account";
+    };
+    radios.forEach(r => { r.onchange = show; });
+    show();
+  })();
+  </script>"""
 
 RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps a sealed copy of its configuration on
     its disks and lets you download one. Pick a copy and give the password, and this install becomes
@@ -237,9 +260,9 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
 
 # On a stick the first run's move door is shut (the operator, 1 Nov): the
 # bundle never lands on the stick, so the disks come first.
-STICK_MOVE_FIRST = ("This machine runs from a stick, and a move lands on its disks, never on the stick. Make a setup account: "
-                    "the next page walks you through the disks, where the spaces go and landing the move, in that order. "
-                    "Have the old controller's move token and its bundle with you. The setup account goes when the move lands.")
+STICK_MOVE_FIRST = ("This machine runs from a stick, and a move lands on its disks, never on the stick. Answer yes on the first page "
+                    "and give the move token: the next page walks you through the disks, where the spaces go and landing the move, "
+                    "in that order. Have the old controller's bundle with you too.")
 
 MOVE_FIELDS = """  <p class="note">A controller prepared to move shows a move token once.
     Give the token here with its bundle, or with the old controller's address while it still
@@ -2961,7 +2984,7 @@ MAINTENANCE_SAID = "AerieOS is down for maintenance: only its owner can sign in 
 # A held start's band (R56 step 9): sent hidden on every page of a bare-metal
 # install and shown by the poll while the start is held.
 HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The start is held: nothing runs until '
-             '<a href="#/controller/machine" data-heldgo>Start on This machine</a>. <span data-heldwhy></span></div>')
+             '<a href="#/controller/machine" data-heldgo>Start on This controller</a>. <span data-heldwhy></span></div>')
 # A moved controller's band (R90 step 12): read-only here, the new home named.
 MOVED_BAND = ('<div class="banner moved" id="movedband" role="status" hidden>This controller moved to '
               '<a data-movedto href="#"></a>: what is here is read-only, for a look back. Should the new home be lost, '
@@ -5465,7 +5488,7 @@ if BARE_METAL:
         _fb = firstboot.apply()
         if _fb:
             print(f"dashboard: a prepared configuration from the stick: {len(_fb['done'])} applied, "
-                  f"{len(_fb['waiting'])} waiting, {len(_fb['failed'])} not applied (This machine says which)", flush=True)
+                  f"{len(_fb['waiting'])} waiting, {len(_fb['failed'])} not applied (the Nodes page says which)", flush=True)
     except Exception as e:                                # noqa: BLE001 (a start must not fail on this)
         print(f"dashboard: the stick's prepared configuration was not applied: {e}", flush=True)
     # The catalog's mirror the stick carries (R169 step 6), handed over by
@@ -6469,7 +6492,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def _login_page(self, error="", setup=False, name="", nxt="/"):
+    def _login_page(self, error="", setup=False, name="", nxt="/", walk=""):
         """The sign-in card, or the first-run card when nobody owns this box.
 
         One template: the difference between them is three fields and the
@@ -6479,10 +6502,14 @@ class Handler(BaseHTTPRequestHandler):
         if not error and not setup and settings.get("maintenance_mode"):
             error = MAINTENANCE_SAID
         err = f'<p class="err">{error}</p>' if error else ""
+        # A browser that lost its way back in while a move is being set up:
+        # the account has no password anybody chose (_setup_post).
+        if not setup and users.owner_name() == move.SETUP_ACCOUNT and not settings.get("setup_done"):
+            err += f'<p class="note">Setting up a move here? Sign in as <b>{move.SETUP_ACCOUNT}</b> with the move token.</p>'
         # The first page asks (the operator, 4 Nov): moving here, or a new
         # start. A stick's plan that names disks has answered it already, and
         # an install that takes a move with no account says that it can.
-        moving = bool(setup and ((firstboot.view() or {}).get("adopt")))
+        moving = bool(setup and (walk == "move" or (firstboot.view() or {}).get("adopt")))
         move_now = "" if nodes.on_stick() else ('<p class="note"><a href="/login/move">Already have the token and the bundle?'
                                                  ' Land it now, with no account</a>.</p>')
         body = (LOGIN_HTML
@@ -6526,6 +6553,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "bad request"}, 400)
         name = form.get("username", [""])[0]
         pw, pw2 = form.get("password", [""])[0], form.get("password2", [""])[0]
+        # Moving here (the operator, 9 Nov): the accounts arrive with the
+        # move, so nobody invents one to set the disks up with. The walk's
+        # steps still need somebody signed in, so the token the person has
+        # with them anyway is that account's password, and the way back in
+        # from another browser; it goes when the move lands.
+        if form.get("walk", [""])[0] == "move":
+            token = form.get("move_token", [""])[0].strip()
+            if not move.token_shaped(token):
+                return self._login_page("That is not a move token. It is shown once, when the old controller prepares the move.", setup=True, walk="move")
+            name, pw, pw2 = move.SETUP_ACCOUNT, token, token
         if pw != pw2:
             return self._login_page("Those two passwords are not the same.",
                                     setup=True)
@@ -12149,7 +12186,8 @@ class Handler(BaseHTTPRequestHandler):
                            "rows": library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), services, pack_values, pack_mine),
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
                            # Whether this node runs Docker, for an app's card (R170 step 7).
-                           "docker": bool(((n or {}).get("reported") or {}).get("docker")),
+                           # Never the controller's own machine (nodes.own_machine), whose daemon is no docker host.
+                           "docker": bool(((n or {}).get("reported") or {}).get("docker")) and not nodes.own_machine(n),
                            "may": {"install": may_install, "apps": may_apps, "packs": not users.may(who, "curate"),
                                    "configure": bool(n) and not users.may_node(who, "configure", nid), "yours": yours_ok},
                            "store": {"root": tc.get("root", ""), "free_mb": tc.get("free_mb"), "checked": tc.get("checked") or 0},
@@ -13421,7 +13459,7 @@ class Handler(BaseHTTPRequestHandler):
         controller's bundle and its token, before anybody owns this one."""
         # On a stick the form is not offered: the disks come first, under a
         # setup account (STICK_MOVE_FIRST).
-        fields = (f'  <p class="note">{html_escape(STICK_MOVE_FIRST)}</p>\n  <p class="note"><a href="/">Make the setup account</a>.</p>'
+        fields = (f'  <p class="note">{html_escape(STICK_MOVE_FIRST)}</p>\n  <p class="note"><a href="/">Back to the first page</a>.</p>'
                   if nodes.on_stick() else MOVE_FIELDS)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "move a controller here")
