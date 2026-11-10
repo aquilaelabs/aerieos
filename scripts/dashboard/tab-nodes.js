@@ -392,6 +392,8 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
       // and what went wrong follows it.
       failed && rep.installed ? [`reinstall failed ${when(failed.ended)}: ${failed.why || "its job on the Jobs page says why"}`, "bad"] : null,
       !stored ? [`no token stored: Add runner with this address stores one, to ${rep.installed ? "reinstall or remove it" : "install it"}`, "warn"] : null,
+      // On a public repository a stranger's pull request runs here (B761).
+      exposedOf(n.id, slot) ? [exposedOf(n.id, slot), "warn"] : null,
     ].filter(Boolean);
     const ro = mayOn(slot) !== "write";
     return `<div class="row stack2 ndrun${ro ? " ndrunro" : ""}" data-slot="${esc(slot)}"><div class="grow">
@@ -2114,6 +2116,10 @@ function openRunnerTab(nid){
 // cannot answer (the sidebar's Runner card's, until R218 step 3). A runner
 // job in flight comes first, a failure carries its time, and a row picks
 // its node.
+// What the controller says of a runner on a public repository, or "".
+function exposedOf(nid, slot){
+  return (state?.node_runners || []).find(r => r.id === nid && r.slot === slot)?.exposed || "";
+}
 function runnerRows(){
   const rows = state?.node_runners || [];
   if (!rows.length) return "";

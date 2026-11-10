@@ -37,6 +37,15 @@ jobs:
     # with it and stopped the compose and XML checks below from running at
     # all. Every tool in THIS job is deterministic, so a red run here means
     # something is genuinely wrong.
+    # Not for a fork's pull request: this runner is a machine on its owner's
+    # network and its jobs account reaches Docker there. This line stops a
+    # fork's request that leaves the workflow as it is; one that changes the
+    # workflow runs its own copy, so the protection that holds is the
+    # repository's setting (Settings, Actions, General: require approval for
+    # all external contributors) and reading a request's workflow changes
+    # before approving its run. A request from a branch of this repository,
+    # and a manual run, go on as before.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, bb-sandbox]
     # `bash` rather than the default `bash -e`, because that one difference is
     # pipefail, and every check below is piped into tee. Without it the tee's

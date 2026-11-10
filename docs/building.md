@@ -114,6 +114,19 @@ removing), above the chosen node's runner section, where one is installed,
 started or removed, with the `runs-on` line that pins a job to its node. A
 row picks its node.
 
+**A runner on a public repository takes a stranger's pull request.** On a
+host where anybody may open a pull request from a fork, that request can
+carry its own workflow, and a self-hosted runner runs it: on the node, as
+its jobs account, which reaches Docker there and through it the whole
+machine. A runner's row says so when its repository is public (asked of
+GitHub once an hour). What holds: on GitHub, Settings, Actions, General,
+"Approval for running fork pull request workflows", set to require approval
+for all external contributors, and reading what a request changes under
+`.github/workflows` before approving its run. A check written in the
+workflow file itself does not hold, since the fork's copy of the file is
+the one that runs; this repository's own carry one all the same, for a
+request that leaves them as they are.
+
 **CI runners per node, one per git host.** The runner section lists the
 node's runners and adds one with its host, address and token (kept root-only on
 the controller): GitHub's runner and Gitea's `act_runner` (published as gitea-runner since it moved to gitea/runner) side by side,

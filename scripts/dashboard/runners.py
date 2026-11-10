@@ -5,8 +5,13 @@ The helper is the builder account's one sudo rule (Dockerfile). Nothing here
 ever sees a token: store hands one in on stdin, every other verb prints a
 derived answer, and --list says only which runners have one.
 """
+import json
 import re
 import subprocess
+import threading
+import time
+import urllib.error
+import urllib.request
 
 # Injected by configure(): the server's subprocess runner, and the nodes
 # module, or None when the node store would not open.
@@ -77,6 +82,63 @@ def reset():
     return run(["sudo", "-n", HELPER, "--reset"], timeout=20)["code"] == 0
 
 
+# Whether a runner's repository is public, asked of its host once an hour
+# and never on the page's own read: {url: (when, True|False|None)}.
+_public = {}
+_public_lock = threading.Lock()
+PUBLIC_EVERY_S = 3600
+urlopen = urllib.request.urlopen     # the seam a test replaces
+
+
+def _ask_public(url):
+    """GitHub alone answers this without a token: a repository it shows to
+    nobody signed in is public. None where it cannot be told."""
+    m = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?", url or "")
+    if not m:
+        return None
+    try:
+        req = urllib.request.Request(f"https://api.github.com/repos/{m.group(1)}/{m.group(2)}",
+                                     headers={"Accept": "application/vnd.github+json", "User-Agent": "aerieos"})
+        with urlopen(req, timeout=8) as r:
+            return json.loads(r.read().decode(errors="replace") or "{}").get("private") is False
+    except urllib.error.HTTPError as e:
+        return False if e.code == 404 else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def is_public(url):
+    """True, False or None (not known yet): read from what was last asked,
+    and asked again on a thread when that is an hour old."""
+    now = time.time()
+    with _public_lock:
+        at, got = _public.get(url, (0, None))
+        due = now - at > PUBLIC_EVERY_S
+        if due:
+            _public[url] = (now, got)
+
+    def go():
+        ans = _ask_public(url)
+        with _public_lock:
+            _public[url] = (time.time(), ans if ans is not None else got)
+    if due and url:
+        threading.Thread(target=go, name="runner-public", daemon=True).start()
+    return got
+
+
+def exposed(url, node_name, docker):
+    """What a runner on a public repository means, for its row (B761): a
+    pull request from a fork runs whatever workflow it carries on this
+    machine, as its jobs account. "" for a repository that is not public."""
+    if is_public(url) is not True:
+        return ""
+    return (f"This repository is public, so a pull request from anybody can run its own workflow on {node_name}, "
+            "as the jobs account" + (", which reaches Docker there and through it the whole machine" if docker else "")
+            + ". On GitHub: Settings, Actions, General, Approval for running fork pull request workflows, "
+              "Require approval for all external contributors; and read what a pull request changes under "
+              ".github/workflows before approving its run.")
+
+
 def listing():
     """[{node, name, listening, busy, labels, url}] for every node whose
     census reports a runner, or that has been asked for one. Quiet nodes are
@@ -106,6 +168,9 @@ def listing():
                         "listening": bool(rep.get("active")), "busy": bool(rep.get("busy")),
                         "name": rep.get("name") or "", "url": rep.get("url") or want.get("url") or "",
                         "labels": rep.get("labels") or want.get("labels") or [],
+                        # A public repository's runner takes a stranger's pull request (B761).
+                        "exposed": exposed(rep.get("url") or want.get("url") or "", n["name"],
+                                           bool((n.get("reported") or {}).get("docker"))),
                         # Why a runner that was asked for is not there, and
                         # whether the install that would put it there runs now.
                         "failed": failed if failed and (failed.get("slot") or slot) == slot else None,
