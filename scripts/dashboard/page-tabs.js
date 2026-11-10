@@ -387,9 +387,11 @@ const TABKINDS = {
               // The ages list as well as the mtime: the mtime is a MAX, so a
               // report appearing with an OLD stamp: the exact shape of a
               // stale copy: moves it nowhere, and the tab never heard.
+              // ...and its own counter, which a load and a filter move
+              // (B756: the Files page's took its place in a rename).
               live: () => `${state?.reports_mtime ?? ""}:${
                 (state?.reports_ages || []).map(r => r.name + (r.stale ? "!" : ""))
-                  .join(",")}:${flRev}`,
+                  .join(",")}:${fxRev}`,
               open: () => loadFindings() },
 };
 
