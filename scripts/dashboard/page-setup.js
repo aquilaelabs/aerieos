@@ -306,16 +306,19 @@ function setupPlaceCard(num, s, moving){
     : moved ? `<p>Moving them to the pool. Docker and the VMs are stopped until it ends.</p>`
     : `<p>They write all day, so they live on a pool and never on the stick. This is done by itself when your first pool is made.</p>${
        (n?.reported?.pools || []).length ? pick : ""}`);
+  const pool = stickPoolPick(n, stick, old && adopted ? "None of these disks can hold them: a data disk carries the old parity. Name a folder below, or add a disk."
+    : "Nothing to pick yet: the step before gives this one its disks.", true);
+  const folder = projectsFolderField(n, stick, !!state?.can?.admin, true);
   return setupCard(num, "Where the spaces and containers go", placed, false,
-    `<p>They write all day, so they live on the disks and never on the stick. There are two choices here.</p>
-     ${factGrid([["System pool", `where Docker, the VMs and the toolchains write: ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}`],
-                 ["Spaces folder", `only if your spaces already sit on these disks: the folder they are in. Nothing is copied. Its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back`]], "stickfacts")}
-     <p>${moving ? "The Spaces page stays empty until the controller lands: its list comes with the move. " : ""}Where they are now:</p>
+    `<p>They write all day, so they live on the disks and never on the stick.</p>
+     <p><b>System pool</b>: where Docker, the VMs and the toolchains write; ${old ? "the old system's cache pool, usually" : "the pool you made in the step before"}.</p>
+     <p><b>Spaces folder</b>: only if your spaces already sit on these disks, the folder they are in. Nothing is copied: its files are handed to AerieOS's account, and ${old ? "the old system" : "the system that had them"} cannot read them until they are given back.</p>
+     ${moving ? "<p>The Spaces page stays empty until the controller lands: its list comes with the move.</p>" : ""}
      ${factGrid([["Docker and the VMs", stick.ready ? `on ${stick.pool}` : stick.pool ? `waiting for ${stick.pool} to mount` : "waiting for a system pool", {cls: stick.ready ? "ok" : "warn"}],
                  ["The spaces", stick.projects ? (stick.projects_bound ? `in ${stick.projects}` : `${stick.projects}, waiting for its disks`) : stick.ready ? `on ${stick.pool}` : "waiting for a pool or a folder",
                   {cls: stick.projects_bound || stick.ready ? "ok" : "warn"}]], "stickfacts")}
      ${roOnly ? `<div class="sub warn">These disks were adopted read only, with no writable pool, so nothing can go on them. Release them in the step before and adopt Writable, or add a disk.</div>` : ""}
-     ${pick}${projectsFolderField(n, stick, !!state?.can?.admin)}`);
+     ${pool || folder ? `<div class="fgrid setpicks">${pool}${folder}</div>` : ""}`);
 }
 // The first pool of a new start named, once a press, so nobody has to know what
 // a system pool is. Not on a move or with another system's disks: there it is
@@ -437,13 +440,15 @@ function setupWalkHtml(s){
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
-    : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed)}`;
+    : `<p>The moved controller's accounts, nodes, spaces and settings take this one's place, and this setup account goes with what was here, set aside and not deleted. Add no people or nodes here first: a move lands only on a fresh controller.${placed ? "" : " It waits for the step before."}</p>${moveLandBox(ld, true, !placed, old)}`;
   cards.push(setupCard(++i, "Land the controller", false, !placed, landing));
+  // Said as sentences, a word in bold to find each by (the operator, 10 Nov:
+  // long values in a grid of two columns read as wonky).
   cards.push(setupCard(++i, "After it lands", false, false,
-    `${factGrid([["Sign in", "with an account the old controller had"],
-                 ["Your nodes", "follow by themselves. Any that does not is listed on the Nodes page, with the one line to run on it"],
-                 ...(state?.firstboot?.apps_from ? [["Containers and VMs", "The Nodes page reads what the old system ran, and brings back what you tick. Home keeps this until it is done"]] : []),
-                 ...(state?.held?.held ? [["Start", "nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be"]] : [])], "stickfacts")}`,
+    `<p><b>Sign in</b> with an account the old controller had.</p>
+     <p><b>Your nodes</b> follow by themselves once they can reach this address. Any that does not is listed on the Nodes page, with the one line to run on it${old ? "; a node that was a VM on the old system is off until its VM runs here" : ""}.</p>
+     ${old ? `<p><b>Containers and VMs</b>: this machine's Containers page reads what the old system ran and brings back what you tick, a VM that was one of your nodes with it. Home keeps this until it is done.</p>` : ""}
+     ${state?.held?.held ? `<p><b>Start</b>: nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be.</p>` : ""}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
   cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
        <pre class="setcmd">bash ${esc(stick.projects)}/.aerieos-give-back.sh</pre>` : ""}

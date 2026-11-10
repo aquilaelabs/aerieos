@@ -376,7 +376,8 @@ function moveSection(){
   const armed = m.prepared ? `${factGrid([["New home", m.to || "not named yet"], ["Armed", ago(m.made_at)],
       ["Nodes that heard it", `${m.heard} of ${m.nodes}`], ["Last packed", m.packed_at ? `${ago(m.packed_at)}, ${sizeMb}` : "not yet: Download packs it"],
       ["In the bundle", inside], ["Asked whether it landed", m.asked_at ? `${ago(m.asked_at)}: ${m.asked_error || "not yet"}` : ""]])}
-      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>` : "";
+      <div class="sub">Every node follows by itself once the new home answers, however long that takes; Mark as moved makes this controller read-only now.</div>
+      ${m.far ? `<div class="sub warn">${esc(m.far)}.</div>` : ""}` : "";
   return `<div class="row stack2" data-group="Move"><div class="grow">
       ${land}
       ${arrived}
@@ -394,22 +395,30 @@ function moveSection(){
 // and the first-run walk's last step.
 // In the walk the card around it says what it is, and says it waits while the
 // step before is not done: only a hold the walk has not explained is said here.
-function moveLandBox(ld, inWalk = false, heldSaid = false){
-  return `<div class="field" data-movelandbox>
+function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
+  const off = ld.held ? " disabled" : "";
+  // The token given on the first page is kept for this (the operator, 10 Nov:
+  // asked twice), and where the old controller ran on this machine its
+  // address cannot answer, so the bundle is the one way.
+  const tok = ld.token_kept ? "" : `<label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}></label>`;
+  const from = bundleOnly ? "" : `<label class="pick"><span class="pickw">${ld.token_kept ? "Old controller, while it runs" : "Old controller"}</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${off}></label>`;
+  const file = `<label class="pick fwide"><span class="pickw">${bundleOnly ? "The bundle" : "Or the bundle"}</span><input type="file" id="landFile" accept=".aeriemove,.bbmove"${off}></label>`;
+  return `<div class="field" data-movelandbox${ld.token_kept ? " data-tokkept" : ""}>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${
         helpIcon(`This setup account goes with the old state, set aside and not deleted; you sign in with an account the moved controller had.${
           ld.stick ? " On this stick the bundle lands on the machine's disks, in the spaces' folder, never on the stick." : ""}`)}</div>
 `}
       ${ld.held && !heldSaid ? `<div class="hint warn">${esc(ld.held)}.</div>` : ""}
-      <div class="fgrid"><label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick"><span class="pickw">Old controller</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${ld.held ? " disabled" : ""}></label>
-        <label class="pick fwide"><span class="pickw">Or the bundle</span><input type="file" id="landFile" accept=".aeriemove,.bbmove"${ld.held ? " disabled" : ""}></label></div>
-      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${ld.held ? " disabled" : ""}>Land it here</button></div></div>`;
+      ${ld.token_kept ? `<div class="sub dim">The move token is the one you gave on the first page.</div>` : ""}
+      <div class="fgrid">${tok}${from}${file}</div>
+      <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${off}>Land it here</button></div></div>`;
 }
 function wireMove(root){
   root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tok = ($("landTok")?.value || "").trim(), from = ($("landFrom")?.value || "").trim(), file = $("landFile")?.files?.[0];
-    if (!tok || !(file || from)) return notify("the move token is needed, with the old controller's address or the bundle", true);
+    const kept = !!b.closest("[data-movelandbox]")?.hasAttribute("data-tokkept");
+    if (!tok && !kept) return notify("the move token is needed, with the old controller's address or the bundle", true);
+    if (!(file || from)) return notify($("landFrom") ? "pick the bundle, or give the old controller's address" : "pick the bundle first", true);
     if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
         {title: "Land the move?", verb: "Land it", danger: true})) return;
     busy(b, file ? "Sending" : "Landing");
@@ -445,6 +454,7 @@ function wireMove(root){
     const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
     const j = await (await postJSON("/api/move", {action: "prepare", to: $("moveTo")?.value || "", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
     if (j.error){ notify(j.error, true); unbusy(b, "Prepare to move"); return; }
+    if ((j.said || []).length) notify(j.said.join(". "), true);
     moveToken = j.token;
     await loadMove();
   }));

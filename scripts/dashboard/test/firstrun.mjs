@@ -449,6 +449,18 @@ await firstRun(false);
       stick.ready = true; stick.pool = '/mnt/cache'; setupLand = { fresh: true, owner: true, stick: true, held: '' }; redraw({ adopted: { writable: true, mounts: [{ where: '/mnt/cache', fs: 'btrfs', ro: false, mounted: true }] } });
       out.placed = pill('Where the spaces and containers go'); out.landLive = !step('Land the controller')?.querySelector('[data-moveland]')?.disabled;
       out.landFields = !!step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile');
+      // The old controller ran on this machine, so its address cannot answer:
+      // the bundle alone; and the token given on the first page is not asked
+      // again (the operator, 10 Nov).
+      out.oldNoFrom = !step('Land the controller')?.querySelector('#landFrom');
+      setupLand = { fresh: true, owner: true, stick: true, held: '', token_kept: true }; setupSig = ''; drawSetup();
+      out.keptNoTok = !step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile')
+        && /the one you gave on the first page/.test(words('Land the controller'));
+      // The two picks: each label over its field, the field and its verb on one line.
+      { const sp = step('Where the spaces and containers go'), sel = sp?.querySelector('#stickPool'), go = sp?.querySelector('[data-stickpool]'), lbl = sp?.querySelector('label[for="stickPool"]');
+        const r = e => e?.getBoundingClientRect();
+        out.pickLine = !!(sel && go && lbl) && Math.abs(r(sel).top + r(sel).height / 2 - (r(go).top + r(go).height / 2)) < 4 && r(lbl).bottom <= r(sel).top + 1; }
+      setupLand = { fresh: true, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
       setupLand = { fresh: true, owner: true, stick: true, held: 'kept back for a reason' }; setupSig = ''; drawSetup();
       out.heldSaid = /kept back for a reason/.test(words('Land the controller'));
       setupLand = { fresh: false, owner: true, stick: true, held: '' }; setupSig = ''; drawSetup();
@@ -521,6 +533,8 @@ await firstRun(false);
        `...naming a spaces folder says what it costs and when the spaces show (${walk.costs.slice(0, 260)})`);
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
+    ok(walk.oldNoFrom && walk.keptNoTok, `...the land form asks for the bundle alone where the old controller ran here, and not the token given on the first page (${JSON.stringify([walk.oldNoFrom, walk.keptNoTok])})`);
+    ok(walk.pickLine, '...the system pool is a label over its field, and the field and its button share a line');
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
     ok(walk.typed === 'typed', '...what is typed survives a redraw that moved nothing');
@@ -781,24 +795,35 @@ await firstRun(false);
     });
     ok(onStorage.there && onStorage.release && onStorage.folder,
        `the Storage page of the machine draws the same Adopted disks, Release and the folders to serve (${JSON.stringify(onStorage)})`);
-    await page.evaluate(() => { openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep; nodesRev++; drawPanes(); });
+    // The Nodes page points to the Containers page, where they are (the
+    // operator, 10 Nov: looked for there and never found on the Nodes page).
+    const pointer = await page.evaluate(() => {
+      openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep;
+      state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
+                                    networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
+      window.__fbKeep = state.firstboot; nodesRev++; drawPanes();
+      const p = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]');
+      return { there: !!p, button: !!p?.querySelector('[data-oldapps]'), read: !!p?.querySelector('[data-adoptapp]') };
+    });
+    ok(pointer.there && pointer.button && !pointer.read, `the Nodes page says the old system's containers and VMs are on the Containers page (${JSON.stringify(pointer)})`);
     // ...and what the old system ran (R163 steps 10, 11): read first, then
     // its containers to make and start and its VMs to define and run.
-    const apps = await page.evaluate(async () => {
+    const apps = await page.evaluate(() => {
       const n = ownMachine();
+      openDockerOn(n.id);
       // A status poll between the two evaluates can bring the record back
       // without it (it crashed here under a whole gate's load).
       state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
       nodesRev++; drawPanes();
-      const unread = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]')?.textContent.replace(/\s+/g, ' ') || '';
+      const unread = document.querySelector('.dmtab details[data-sect="docker:oldapps"]')?.textContent.replace(/\s+/g, ' ') || '';
       n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
         adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
                                                    vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
                                                    said: ['Docker: 1 container ran, 1 started with the machine'] } } };
       nodesRev++; drawPanes();
-      const sect = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]');
+      const sect = document.querySelector('.dmtab details[data-sect="docker:oldapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
     });
@@ -810,10 +835,10 @@ await firstRun(false);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
     const picked = await page.evaluate(() => {
-      const box = document.querySelector('.nodestab [data-adpick="v:Ubuntu"]');
+      const box = document.querySelector('.dmtab [data-adpick="v:Ubuntu"]');
       const was = box?.checked;
       box.checked = false; box.dispatchEvent(new Event('change'));
-      const b = document.querySelector('.nodestab [data-adoptapp="define"]');
+      const b = document.querySelector('.dmtab [data-adoptapp="define"]');
       const after = { was, label: b?.textContent.trim(), dead: !!b?.disabled };
       adoptSkip.clear();
       return after;

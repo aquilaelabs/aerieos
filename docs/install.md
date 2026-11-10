@@ -365,16 +365,22 @@ container to a machine of its own, and back.
    for it), and press **Prepare to move**. That arms the move: it
    shows the **move token** once (write it down) and from its next hello
    every node hears the new address and a challenge of its own, which it
-   keeps. The move stays armed until it lands or you press **Forget it**,
+   keeps. A node knocks there once the old controller goes quiet, so the new
+   address must be one each node reaches: a node that dials in from outside
+   the local network cannot reach an address of it, and the section names
+   any such node while the move is armed. The move stays armed until it lands or you press **Forget it**,
    so a controller can be prepared days ahead, and the section says how
    many nodes have heard it.
 2. Install the new home (the image, an AerieOS stick or disk, or bare metal)
    and open its page. It asks whether you are moving a controller here: say yes
    and give the move token, with no account to make, and the next page, **Moving here**, walks through
    what the move takes, in order and on that page: on a stick its disks and where
-   the spaces go, then the token with the old controller's address, while it
+   the spaces go, then the bundle, or the old controller's address while it
    still runs (the new home pulls the bundle from it, packed at that moment,
-   under a proof derived from the token). Until the move lands, signing in from
+   under a proof derived from the token). The token given on the first page
+   is kept for the landing, sealed, so it is not asked for again; where the
+   old controller ran on the same machine the step asks for the bundle alone.
+   Until the move lands, signing in from
    another browser is the name `setup` with the move token; that account goes
    when it lands. Anywhere but a stick, the first page also lands it at once with no
    account. If the old controller ran on the same machine it is off by then, so

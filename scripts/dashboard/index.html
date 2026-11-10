@@ -1231,6 +1231,14 @@ body.firstrun #panes{display:none}
    and what is pressed, and no gutter of their own inside the card. */
 .setstepbody>p+p,.setstepbody>p+.facts,.setstepbody>.facts+p,.setstepbody>.field{margin-top:8px}
 .setstepbody>.field{padding:0}
+/* The walk's picks, a pool or a folder each (the operator, 10 Nov: a select
+   pushed to the right, a field with its button on a line of its own): the
+   label over its field, the control and its verb on one line. */
+.setpicks{margin-top:10px}
+.setpick{display:flex;flex-direction:column;gap:4px;min-width:0}
+.setpickline{display:flex;gap:8px;align-items:center;min-width:0}
+.setpickline>select,.setpickline>input{flex:1 1 auto;min-width:0;width:auto}
+.setpickline>button{flex:0 0 auto}
 .setstepbody>.actbar{padding:0;margin-top:8px}
 .setstepbody .setshares{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0}
 .stnewshare{margin-top:12px;border-top:var(--hair) solid var(--line)}
@@ -6953,12 +6961,14 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 <div id="cmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cTitle">
   <div class="box wide">
     <h3 id="cTitle">New container</h3>
-    <!-- Apps a NAS runs (R164 step 2): a ready app from the catalog fills
-         the name, the compose file and the environment from a few blanks;
-         none picked, the dialog is the image-or-compose one it always was. -->
-    <div class="field" id="cAppField">
-      <label for="cApp">From the catalog</label>
-      <select id="cApp"><option value="">none: an image, or a compose file of your own</option></select>
+    <!-- Apps a NAS runs (R164 step 2): an app's New container on the
+         Library opens this on it, and its few blanks fill the name, the
+         compose file and the environment. Apps are picked on the Library
+         alone (the operator, 10 Nov): opened anywhere else, this part is
+         hidden and the dialog is the image-or-compose one. -->
+    <div class="field" id="cAppField" hidden>
+      <label>From the Library: <b id="cAppName"></b></label>
+      <select id="cApp" hidden aria-hidden="true" tabindex="-1"><option value=""></option></select>
       <div class="hint" id="cAppWhat"></div>
       <div id="cAppFields" hidden>
         <div class="prefrow ctlrow">

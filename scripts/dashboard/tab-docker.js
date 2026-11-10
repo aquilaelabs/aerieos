@@ -108,7 +108,17 @@ function dockerTab(){ return tabs.find(t => t.kind === "docker"); }
 function dmNodesKey(){
   if (nodesList === null) return "?";
   return nodesList.filter(n => n.kind !== "local")
-    .map(n => [n.id, n.name, n.kind, n.state].join(",")).join(";");
+    .map(n => [n.id, n.name, n.kind, n.state].join(",")).join(";") + dmOldAppsKey();
+}
+// ...and, on the controller's own machine, what the old system's section
+// draws from: the disks, what was read, the VMs defined, the plan and the
+// picks, so a read landing or a tick redraws it.
+function dmOldAppsKey(){
+  const own = ownMachine();
+  if (!own || dockerNode !== own.id) return "";
+  const ad = own.reported?.adopted || {};
+  return "|" + JSON.stringify([(ad.mounts || []).length, ad.apps || null, own.reported?.vms_other || null, !!oldAppsFrom(own),
+                               adoptPlan === null ? null : adoptPlan.length, [...adoptSkip]]);
 }
 
 function openDocker(){
@@ -1527,14 +1537,20 @@ function openNewContainer(){
   cLock(false);
   cEditing = null;
   $("cApp").value = ""; $("cAppFields").hidden = true; $("cAppWhat").textContent = "";
+  $("cAppField").hidden = true;
   for (const id of ["cAppData", "cAppMedia", "cAppTz", "cAppPort"]) $(id).value = "";
-  loadNasApps().then(apps => {
-    if ($("cmodal").hidden) return;
-    $("cApp").innerHTML = `<option value="">none: an image, or a compose file of your own</option>` + apps.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");
-    if (cAppWant && apps.some(a => a.id === cAppWant)){ $("cApp").value = cAppWant; cAppPicked(); }
-    cAppWant = "";
+  // Only the app the Library opened this on: the catalog is browsed there.
+  const want = cAppWant;
+  cAppWant = "";
+  if (want) loadNasApps().then(apps => {
+    const a = apps.find(x => x.id === want);
+    if ($("cmodal").hidden || !a) return;
+    $("cApp").innerHTML = `<option value="${esc(a.id)}">${esc(a.name)}</option>`;
+    $("cApp").value = a.id;
+    $("cAppName").textContent = a.name;
+    $("cAppField").hidden = false;
+    cAppPicked();
   });
-  $("cApp").onchange = cAppPicked;
   $("cAppFill").onclick = cAppFill;
   $("cTabForm").hidden = false;
   $("cEnvHint").hidden = true;
@@ -2739,6 +2755,13 @@ function dmStatus(d){
     ["Shells", host && mayShell() ? (host.config?.own ? "none on this machine: it is the controller's own" : `from a node that runs sessions: ${host.name} hosts containers only`) : ""]]});
 }
 
+// The old system's containers and VMs on the controller's own machine
+// (tab-machine.js adoptAppsSection), above the rows: where a person looks for
+// them after a move off another NAS.
+function dmOldApps(){
+  const own = ownMachine();
+  return own && dockerNode === own.id && state?.can?.admin ? adoptAppsSection(own) : "";
+}
 // The rows' settings dialogs open before a redraw, by key: shown again after
 // it without their opening animation (the operator, 26 Oct: each redraw
 // played it again, a flicker under the pointer).
@@ -2765,11 +2788,15 @@ function renderDockerInto(i){
     // beside the page fell behind it): the bar, the tiles, the status line,
     // then the rows.
     el.__dmHtml = "";
-    el.innerHTML = `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}
+    // The old system's containers and VMs need nothing of the daemon's
+    // answer, so they are drawn while it is on its way.
+    const old = dmOldApps();
+    el.innerHTML = `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}`)}${old}${skTpl(`
       ${dmView === "list" ? skTable(DM_COLS, 4)
         // ...the rows in a project group's card, as they land (R262).
         : `<section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(3)}</section>`}
       ${dmImagesSection()}`)}</div>`;
+    if (old) wireAdoptApps(el);
     return;
   }
   // The daemon did not answer; it is off, it is not a sandbox VM, or the VM
@@ -2892,7 +2919,7 @@ function renderDockerInto(i){
   const html = `<div class="doctab dmtab${slow || dockerList?.stale ? " dmstale" : ""}">${picker}${tiles}${
     // The page's own boxes under the tiles and the chips, never between
     // them (the operator, 26 Oct): what every page has comes first.
-    chipBar(chips, dmChip, "data-dmchip")}${status}${askRows}${note
+    chipBar(chips, dmChip, "data-dmchip")}${status}${askRows}${dmOldApps()}${note
       ? `<div class="field"><div class="notice warn dmnote">${esc(note)}</div></div>` : srcLine}${
     // Blind, the list is what is on record here rather than what is on the
     // daemon, and "nothing on this daemon yet" would be a claim about a
@@ -2918,6 +2945,7 @@ function renderDockerInto(i){
   el.innerHTML = html;
   el.__dmHtml = html;
   gateDocker(el, off);
+  wireAdoptApps(el);
   // The asks answer through the phone's endpoint, which holds the one list of
   // them; phFetch redraws this tab when the answer comes back.
   el.querySelectorAll("[data-rallow]").forEach(b => b.onclick = () => {

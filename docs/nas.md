@@ -84,11 +84,15 @@ the bell, and a dead SSD is restored from last night's.
   so it writes nothing at all and the old parity stays good; Writable says
   that going back then takes a parity sync. Its shares are served from the
   merged folder as their security said, its Docker and libvirt image files
-  are read read-only for what ran, and its containers are made again on the
-  Containers page with the exact image each ran and started with the
-  machine where they were; its VMs are defined on this machine's QEMU and
-  firmware with their disks where they are. Everything is said on This
-  machine before it happens, and Release undoes the mounts.
+  are read read-only for what ran (from where the stick's plan says they
+  are, or from their usual places under the merged folder when the stick
+  was made with no plan), and its containers are made again with the exact
+  image each ran and started with the machine where they were; its VMs are
+  defined on this machine's QEMU and firmware with their disks where they
+  are. All of it is on this machine's Containers page, under Containers and
+  VMs from the old system, and a VM that was one of the controller's nodes
+  comes back as that node once it runs. Everything is said before it
+  happens, and Release undoes the mounts.
 
 ## What AerieOS does not build
 

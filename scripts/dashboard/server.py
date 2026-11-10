@@ -5516,6 +5516,7 @@ fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.
                        audit=lambda who, what, detail, params: db.audit(who, what, detail, params))
 import move                                                      # noqa: E402
 move.checkpoint = db.checkpoint
+move.unseal = signing.unseal
 move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
 move.configure(state=STATE, workspace=WORKSPACE, secrets_dir=os.environ.get("BB_SECRETS_DIR", ""), write_json_fn=write_json,
                seal_fn=signing.seal, open_fn=signing.open_with, state_version_fn=stateversion.current,
@@ -6569,6 +6570,7 @@ class Handler(BaseHTTPRequestHandler):
             if not move.token_shaped(token):
                 return self._login_page("That is not a move token. It is shown once, when the old controller prepares the move.", setup=True, walk="move")
             name, pw, pw2 = move.SETUP_ACCOUNT, token, token
+            move.keep_setup_token(token)
         if pw != pw2:
             return self._login_page("Those two passwords are not the same.",
                                     setup=True)
@@ -6612,6 +6614,10 @@ class Handler(BaseHTTPRequestHandler):
                                form.get("password", [""])[0], where=self._peer())
         if u:
             users.smb_take_up(form.get("username", [""])[0], form.get("password", [""])[0])
+            # The setup account of a move signs in with the move token, which
+            # the landing then needs no second time.
+            if u.get("name") == move.SETUP_ACCOUNT and not settings.get("setup_done"):
+                move.keep_setup_token(form.get("password", [""])[0])
         if not u:
             # A beat of delay, so guessing costs something; the message does
             # not say which half was wrong for the same reason the store
@@ -9306,6 +9312,7 @@ class Handler(BaseHTTPRequestHandler):
             # may be turned back, the mark of the Finish is not.
             with contextlib.suppress(OSError):
                 (Path(STATE) / SETUP_FINISHED).write_text(str(int(time.time())))
+            move.drop_setup_token()
         if ending and settings.get("maintenance_mode"):
             end_others_sessions(ending)
             r["ended"] = len(ending)
@@ -13168,6 +13175,11 @@ class Handler(BaseHTTPRequestHandler):
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
             move.ask_new()
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
+        # An armed move to an address some node cannot reach, said while it stands.
+        if out.get("prepared") and not out.get("moved"):
+            far = move.far_nodes(out.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr")) for n in nodes.node_list()
+                                                     if n.get("kind") == "agent" and n.get("state") != "retired"])
+            out["far"] = move.far_said(far, out.get("to", "")) if far else ""
         # Whether a move may land here (_move_land): a fresh controller's,
         # and on a stick only once the projects have a place on the disks.
         # A move lands only while this controller is first set up (the
@@ -13179,7 +13191,9 @@ class Handler(BaseHTTPRequestHandler):
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
         owner = (users.account_of(me) or {}).get("role") == "owner"
-        out["land"] = {"fresh": fresh, "cut": cut, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else ""}
+        out["land"] = {"fresh": fresh, "cut": cut, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else "",
+                       # The token given on the first page: the landing asks for the bundle alone.
+                       "token_kept": bool(fresh and owner and move.setup_token())}
         if q.get("pieces", [""])[0] == "1":
             out["pieces"] = move.pieces()
         return self._json(out)
@@ -13200,6 +13214,10 @@ class Handler(BaseHTTPRequestHandler):
                              stores=[str(k) for k in stores if isinstance(k, str)] if isinstance(stores, list) else None)
             if r.get("ok"):
                 db.audit(self._principal(), "move-prepare", "", {"to": r.get("to", ""), "repos": req.get("repos") is True})
+                far = move.far_nodes(r.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr")) for n in nodes.node_list()
+                                                       if n.get("kind") == "agent" and n.get("state") != "retired"])
+                if far:
+                    r["said"] = [move.far_said(far, r["to"])]
             return self._json(r, 400 if r.get("error") else 200)
         if act == "backup":
             # A copy to keep under a token of its own, no move armed (the
@@ -13497,6 +13515,7 @@ class Handler(BaseHTTPRequestHandler):
         r, why = self._receive_move(Path(STATE))
         if why:
             return self._move_page(why)
+        move.drop_setup_token()
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "moved")
@@ -13541,6 +13560,7 @@ class Handler(BaseHTTPRequestHandler):
         r, why = self._receive_move(where, work_root=where if where != Path(STATE) else None)
         if why:
             return self._json({"error": why}, 400)
+        move.drop_setup_token()
         print(f"dashboard: a controller moved here from {r.get('from') or 'another home'}: {r.get('counts')}; restarting on its state", flush=True)
         # The restart set off before the answer is written, so a browser gone
         # meanwhile does not leave the dashboard serving the state it swapped.
@@ -13600,7 +13620,7 @@ class Handler(BaseHTTPRequestHandler):
             # The form read a megabyte at a time, its file part to a file of
             # its own (B558: never whole in memory).
             fields, bundle = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", file_part)
-            token, frm = fields.get("token", ""), fields.get("from", "")
+            token, frm = fields.get("token", "") or move.setup_token(), fields.get("from", "")
             if not token or not (bundle or frm):
                 return None, "the move token is needed, with the bundle file or the old controller's address"
             if bundle:

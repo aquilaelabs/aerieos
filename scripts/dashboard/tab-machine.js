@@ -85,7 +85,7 @@ function renderMachineInto(i){
 // Nodes page: where it keeps things, its screen, what its stick prepared and
 // the disks and apps it took over from an old system.
 function machineNodeSections(n){
-  return stickSection(n) + machineConsoleSection(n) + firstbootSection() + adoptSection(n) + adoptBackSection(n) + adoptAppsSection(n);
+  return stickSection(n) + machineConsoleSection(n) + firstbootSection() + adoptSection(n) + adoptBackSection(n) + adoptAppsPointer(n);
 }
 
 // Hold the next start (R56 step 9, R161 step 11): a checkbox beside Restart
@@ -144,7 +144,7 @@ function wireOlderVersions(root){
 // stick and what it has written, in the facts voice.
 const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces", secrets: "the secrets and the install key"};
 // The system pool's picker: The stick's own, and the first-run walk's.
-function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
+function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here.", row = false){
   // An adopted pool counts whatever its filesystem (B663): the census's
   // pools are zpools alone. A data disk does not: it carries the old parity.
   const seen = new Set((n.reported?.pools || []).map(p => p.mount));
@@ -156,11 +156,17 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   const admin = !!state?.can?.admin;
   const why = !mounts.length ? none
     : !n.live ? "Its agent is not dialing in." : busy ? "Moving to the pool now: docker and the VMs are stopped until it ends." : "";
-  const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
-      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
-      <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
-      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>` : "";
-  return pick;
+  if (!admin) return "";
+  const sel = `<select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
+      optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select>`;
+  const go = `<button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button>`;
+  const under = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>`;
+  // A field of the setup walk's picks (setpicks): its label over it, the
+  // control and its one verb on one line, what is said under them.
+  if (row) return `<div class="setpick"><label class="pickw" for="stickPool">System pool</label><div class="setpickline">${sel}${go}</div>${under}</div>`;
+  return `<div class="actbar"><label class="pick"><span class="pickw">System pool</span>${sel}</label><span class="sp"></span>
+      ${go}</div>
+      ${under}`;
 }
 // A pool holding another install's folder (the operator, 8 Nov): never taken,
 // set aside beside it when picked, for a person to delete once sure.
@@ -193,7 +199,7 @@ function stickSection(n){
 // controller moved here without its repositories takes the folder its
 // projects already sit in on the adopted disks, nothing copied. Offered
 // where those disks are: the plan's shares, then the merged views.
-function projectsFolderField(n, s, admin){
+function projectsFolderField(n, s, admin, row = false){
   if (!admin) return "";
   const ad = n.reported?.adopted || {};
   const roots = Object.keys(ad.merged || {}).filter(k => ad.merged[k]);
@@ -203,11 +209,15 @@ function projectsFolderField(n, s, admin){
   const offer = [...new Set([...shares, ...roots.map(r => `${r}/projects`)])];
   const busy = (n.jobs || []).some(j => j.apply === "projects-folder");
   const why = !n.live ? "Its agent is not dialing in." : busy ? "Taking the folder now: the controller restarts on it when it ends." : "";
-  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span><input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off"
-      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}></label>
-      <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist></div>
-    <div class="actbar"><span class="sp"></span>${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
-      <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button></div>
+  const input = `<input id="projFolder" type="text" list="projFolderOffer" spellcheck="false" autocomplete="off" aria-label="spaces folder"
+      value="${esc(s.projects || "")}" placeholder="${esc(offer[0] || (roots[0] || pools[0]) + "/projects")}"${why ? " disabled" : ""}>
+      <datalist id="projFolderOffer">${offer.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`;
+  const acts = `${s.projects ? `<button type="button" data-projfolder="release"${why ? " disabled" : ""}>Let it go</button>` : ""}
+      <button type="button" data-projfolder="use"${why ? " disabled" : ""}>Use this folder</button>`;
+  // The walk's row: the step's own words say what the folder is for.
+  if (row) return `<div class="setpick"><label class="pickw" for="projFolder">Spaces folder</label><div class="setpickline">${input}${acts}</div>${why ? `<div class="sub dim">${esc(why)}</div>` : ""}</div>`;
+  return `<div class="field"><div class="fgrid"><label class="pick fwide"><span class="pickw">Spaces folder</span>${input}</label></div>
+    <div class="actbar"><span class="sp"></span>${acts}</div>
     ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}
     <div class="hint">Only if the spaces already sit on these disks: the controller works there, and nothing is copied${
       helpIcon("Its files become AerieOS's own, nothing in them changes, and a move here can then leave its repositories out of the bundle. The system that had it cannot read it until Let it go gives it back.")}</div></div>`;
@@ -385,14 +395,29 @@ let adoptPlan = null, adoptPlanFor = "";
 // What the person unticked, kept across redraws: "c:NAME" a container, "v:NAME"
 // a VM (the operator, 1 Nov: pick which to bring back, not all of them).
 const adoptSkip = new Set();
+// Where the old system's Docker and VMs kept what ran: the stick's plan's
+// words when it was made with one, else their usual places on the adopted
+// disks (the operator, 10 Nov: a stick made with no plan had no way to bring
+// its containers back at all). A guess the read says plainly when it misses.
+function oldAppsFrom(n){
+  const from = state?.firstboot?.apps_from;
+  if (from) return from;
+  const ad = n?.reported?.adopted || {};
+  const root = Object.keys(ad.merged || {}).filter(k => ad.merged[k]).find(k => /^\/mnt\/user$/.test(k)) || Object.keys(ad.merged || {}).find(k => ad.merged[k]);
+  if (!root) return null;
+  return {docker: {image: `${root}/system/docker/docker.img`, autostart_file: ""}, vms: {image: `${root}/system/libvirt/libvirt.img`, vfio: []}, networks: {}, guessed: true};
+}
+// The old system's containers and VMs (R163 steps 10, 11), drawn on the
+// Containers page of the controller's own machine, where they are looked
+// for (the operator, 10 Nov: it was on the Nodes page and never found).
 function adoptAppsSection(n){
-  const had = n.reported?.adopted, from = state?.firstboot?.apps_from;
+  const had = n.reported?.adopted, from = oldAppsFrom(n);
   if (!had || !(had.mounts || []).length || !from) return "";
   const apps = had.apps;
   const btn = (attr, word, cls = "") => `<button type="button"${cls ? ` class="${cls}"` : ""} ${attr}>${word}</button>`;
   if (!apps){
-    return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "not read yet",
-      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run.</div>
+    return docSection("docker", "oldapps", "Containers and VMs from the old system", "not read yet",
+      `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks${from.guessed ? ", read from where they usually are" : ""} (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run. A VM that was one of your nodes comes back as that node once it runs here.</div>
         <div class="actbar">${btn('data-adoptapp="read"', "Read what ran", "primary")}</div></div>`);
   }
   const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r");
@@ -417,7 +442,7 @@ function adoptAppsSection(n){
       btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}${
       // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
       btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${["stopped", "shut off", "crashed"].includes(s.state) ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
-  return docSection("nodes", "adoptapps", "Containers and VMs from the old system",
+  return docSection("docker", "oldapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
       ${adoptPlan === null ? skRows(2) : `<div class="adpick">${rows}</div>`}
@@ -429,6 +454,13 @@ function adoptAppsSection(n){
     </div>`);
 }
 
+// On the Nodes page, where it was: one line to the Containers page.
+function adoptAppsPointer(n){
+  if (!adoptAppsSection(n)) return "";
+  return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "on the Containers page",
+    `<div class="field"><div class="actbar"><span class="grow sub">Read what the old system ran and bring back what you tick, on this machine's Containers page.</span>
+      <button type="button" data-oldapps>Containers page</button></div></div>`);
+}
 async function loadAdoptPlan(){
   const j = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""})).json().catch(() => ({error: "no answer"}));
   adoptPlan = j.apps || [];
@@ -436,6 +468,7 @@ async function loadAdoptPlan(){
 }
 
 function wireAdoptApps(root){
+  root.querySelectorAll("[data-oldapps]").forEach(b => b.onclick = () => openDockerOn(ownMachine()?.id || ""));
   root.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const n = ownMachine();
   root.querySelectorAll("[data-adpick]").forEach(c => c.onchange = () => {
@@ -443,7 +476,7 @@ function wireAdoptApps(root){
     nodesRev++; drawPanes();
   });
   root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
-    const act = b.dataset.adoptapp, from = state?.firstboot?.apps_from || {};
+    const act = b.dataset.adoptapp, from = oldAppsFrom(n) || {};
     if (act === "read"){
       busy(b, "Reading");
       const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms})).json().catch(() => ({error: "no answer"}));

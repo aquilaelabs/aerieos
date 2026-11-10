@@ -75,6 +75,7 @@ LEAVE = {"os-draft", "logs", "ci-logs", "snapshots", "apps", "move", "csp-report
 _lock = threading.Lock()
 write_json = None
 seal = None
+unseal = None
 open_with = None
 checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
 
@@ -145,6 +146,53 @@ def new_token():
 # The account the first page makes for a person moving a controller here,
 # whose password is the move token, and which goes when the move lands.
 SETUP_ACCOUNT = "setup"
+
+
+# The move token the person gave on the first page, kept for the landing
+# (the operator, 10 Nov: the walk asked for it twice). Sealed under the
+# install key where there is one, since the walk's steps restart the
+# controller; in memory where there is none yet. Dropped when the move
+# lands or the setup ends.
+SETUP_TOKEN_FILE = "move-setup-token.sealed"
+_setup_token = {"tok": ""}
+
+
+def keep_setup_token(token):
+    if not token_shaped(token):
+        return
+    _setup_token["tok"] = token
+    if seal is None:
+        return
+    with contextlib.suppress(Exception):     # noqa: BLE001 (no install key yet: memory alone)
+        blob = seal(token.encode())
+        f = STATE / SETUP_TOKEN_FILE
+        tmp = f.with_name(f.name + ".new")
+        with open(tmp, "wb") as g:
+            g.write(blob)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, f)
+
+
+def setup_token():
+    """The token kept from the first page, or ""."""
+    if _setup_token["tok"]:
+        return _setup_token["tok"]
+    if unseal is None:
+        return ""
+    try:
+        tok = unseal((STATE / SETUP_TOKEN_FILE).read_bytes()).decode()
+    except Exception:                        # noqa: BLE001 (missing, or under a key no longer here)
+        return ""
+    if token_shaped(tok):
+        _setup_token["tok"] = tok
+        return tok
+    return ""
+
+
+def drop_setup_token(state_dir=None):
+    _setup_token["tok"] = ""
+    with contextlib.suppress(OSError):
+        (Path(state_dir or STATE) / SETUP_TOKEN_FILE).unlink()
 
 
 def token_shaped(token):
@@ -723,6 +771,36 @@ def prepare(principal, to, repos=False, carry_key=False, stores=None):
     if r.get("error"):
         return r
     return {"ok": True, "token": token, "bundle": r["bundle"], "size": r["size"], "counts": r["counts"], "to": to, "made_at": made_at}
+
+
+def far_nodes(to, nodes):
+    """The nodes that cannot follow a move to `to`: a new home named by an
+    address of the local network, and a node that dials in from outside it
+    (the operator, 10 Nov: a node on a server elsewhere stayed quiet after a
+    move to a LAN address). `nodes` is [(name, address)]; the names."""
+    import ipaddress
+    host = urllib.parse.urlsplit(str(to or "")).hostname or ""
+    try:
+        here = ipaddress.ip_address(host)
+    except ValueError:
+        return []
+    if not (here.is_private or here.is_loopback or here.is_link_local):
+        return []
+    out = []
+    for name, addr in nodes:
+        try:
+            a = ipaddress.ip_address(str(addr or "").split("%")[0])
+        except ValueError:
+            continue
+        if a.is_global:
+            out.append(str(name))
+    return out
+
+
+def far_said(far, to):
+    return (f"{', '.join(far)} {'dials' if len(far) == 1 else 'dial'} in from outside this network, so {to}, an address of the local network, "
+            f"cannot be reached from {'it' if len(far) == 1 else 'them'}: Forget this move and prepare it again with an address "
+            f"{'it reaches' if len(far) == 1 else 'they reach'}, or run the line the new home's Nodes page gives on {'it' if len(far) == 1 else 'each'} once it has landed")
 
 
 def pack_bundle():
@@ -1466,7 +1544,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         with contextlib.suppress(OSError):
             marker.unlink()
         # A bare-metal home keeps its own node and its stick's plan (above).
-        here = carry_here(aside, state_dir) if swapped and rec["here_bare_metal"] else []
+        here = carry_here(aside, state_dir, source_bare_metal=rec["source_bare_metal"]) if swapped and rec["here_bare_metal"] else []
         return {"ok": True, "moved_aside": str(aside), "counts": counts, "from": m.get("from", ""),
                 "nodes": list(m.get("nodes") or []), "kept_here": here, "said": said}
     finally:
@@ -1518,7 +1596,7 @@ def _unpack(src, mode, work, counts):
     return ""
 
 
-def carry_here(aside, state_dir):
+def carry_here(aside, state_dir, source_bare_metal=True):
     """What belongs to this machine rather than to the controller that moved
     in, carried from the state set aside into the one put in place (the
     operator, 1 Nov: a stick that came with a plan and a node of its own,
@@ -1546,7 +1624,12 @@ def carry_here(aside, state_dir):
                     # The old home's own machine, where it was bare metal, is
                     # that machine's, not this one: retired here (step 5 of
                     # Moving a controller in docs/install.md).
-                    for oid, ocfg in dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall():
+                    # Only where the old home was bare metal: a container
+                    # install has no machine of its own, and a node it
+                    # holds is a node of its own to follow, never retired
+                    # and its spaces handed to this machine (the operator,
+                    # 10 Nov: a space's container listed here after a move).
+                    for oid, ocfg in (dst.execute("SELECT id, config FROM nodes WHERE state != 'retired'").fetchall() if source_bare_metal else []):
                         if (json.loads(ocfg or "{}") or {}).get("own"):
                             dst.execute("UPDATE nodes SET state = 'retired' WHERE id = ?", (oid,))
                             said += _own_node_handed_on(state_dir, oid, nid)

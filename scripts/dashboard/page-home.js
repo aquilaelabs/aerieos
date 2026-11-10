@@ -203,7 +203,8 @@ function homeStartHtml(){
     ["A first space", s.project, `<button type="button" data-hstart="project">New space</button>`],
     // What a move from an old system leaves for after it lands.
     state?.held?.held ? ["Start this machine: nothing runs until then", false, `<button type="button" data-hstart="machine">This controller</button>`] : null,
-    state?.firstboot?.apps_from ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="ownnode">Nodes page</button>`] : null,
+    ownMachine() && oldAppsFrom(ownMachine()) && (ownMachine().reported?.adopted?.mounts || []).length
+      ? ["The old system's containers and VMs", !!ownMachine()?.reported?.adopted?.apps, `<button type="button" data-hstart="ownnode">Containers page</button>`] : null,
   ].filter(Boolean);
   const left = steps.filter(x => !x[1]).length;
   if (!left) return "";
@@ -274,7 +275,7 @@ function renderHomeInto(i){
     else if (k === "claude" && s.node) openNodeClaude(s.node.id);
     else if (k === "project") openNewProject();
     else if (k === "machine") openMachineTab();
-    else if (k === "ownnode") openNodesTab(ownMachine()?.id);
+    else if (k === "ownnode") openDockerOn(ownMachine()?.id || "");
     else if (k === "hide"){ homeStartHidden = true; try{ localStorage.setItem("bb.gsHidden", "1"); }catch(e){ /* private */ } drawPanes(); }
   });
   // The Claude step's state is the nodes list's, read on open and again

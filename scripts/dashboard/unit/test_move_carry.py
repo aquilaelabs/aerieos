@@ -65,6 +65,23 @@ class Carry(unittest.TestCase):
         self.assertEqual(json.load(open(os.path.join(state, "move.json")))["nodes"], ["n_far"], "the old machine is not waited for")
         self.assertTrue(any("1 space that ran" in x for x in said), said)
 
+    def test_a_container_install_has_no_machine_to_hand_on(self):
+        # The old home ran in a container: a node it marked as its own is a
+        # node like any other, never retired here, its spaces kept on it.
+        d = tempfile.mkdtemp()
+        aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
+        os.makedirs(aside)
+        os.makedirs(state)
+        db(os.path.join(aside, "builderbot.db"), [("n_here", "tower", True, "online")], [("t_here", "n_here")])
+        db(os.path.join(state, "builderbot.db"), [("n_vm", "sandbox", True, "online")], [])
+        with open(os.path.join(state, "claude-prefs.json"), "w") as f:
+            json.dump({"projects": {"demo": {"node": "n_vm", "nodes": ["n_vm"]}}, "users": {}}, f)
+        said = move.carry_here(aside, state, source_bare_metal=False)
+        c = sqlite3.connect(os.path.join(state, "builderbot.db"))
+        self.assertEqual(dict(c.execute("SELECT id, state FROM nodes").fetchall()), {"n_here": "online", "n_vm": "online"})
+        self.assertEqual(json.load(open(os.path.join(state, "claude-prefs.json")))["projects"]["demo"]["node"], "n_vm")
+        self.assertFalse(any("space" in x for x in said), said)
+
     def test_nothing_the_moved_state_has_is_replaced(self):
         d = tempfile.mkdtemp()
         aside, state = os.path.join(d, "aside"), os.path.join(d, "state")
