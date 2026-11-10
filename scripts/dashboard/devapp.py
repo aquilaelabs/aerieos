@@ -1180,7 +1180,7 @@ def _mount_ok(root):
 
     The second used to be covered by the first by accident, because the store
     was /devdata and a one-component path is a share root. A node that reports
-    /var/lib/builderbot/appdata got its own module refused by its own guard,
+    /var/lib/aerieos/appdata got its own module refused by its own guard,
     on every poll, and the refusal said so: AerieOS asking AerieOS for
     something and being told no is a bug in it, which is how this was found.
 

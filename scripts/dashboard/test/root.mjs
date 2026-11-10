@@ -257,7 +257,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   // The other two streams are one shape each and have nowhere to differ.
   {
     const a = await ranArgv(await readLog('agent'));
-    ok(/journalctl -u builderbot-agent --no-pager -n 5;/.test(a) && /tail -n 5 \/var\/log\/builderbot-agent\.log/.test(a),
+    ok(/journalctl -u aerieos-agent -u builderbot-agent --no-pager -n 5;/.test(a) && /aerieos-agent\.log 2>\/dev\/null \| tail -n 5/.test(a),
        `...the agent's own log is its journal, or the file its service writes where there is none (${a.slice(0, 80)})`);
   }
   // The terminals are the agent's own (R133), in its journal: there is no

@@ -263,10 +263,10 @@ What was run, in order:
 2. **`--guest --controller ... --token ...`**, no sudo. It laid down
    `~/.builderbot`, fetched the agent and checked it against the digest the
    controller sent, enrolled as `labowner`, and wrote one systemd user unit.
-   *Snag:* the four store paths default to `/var/lib/builderbot` for the
+   *Snag:* the four store paths default to `/var/lib/aerieos` for the
    managed shape, and the guest path read those defaults rather than its own
    footprint, so the agent reported it could not create
-   `/var/lib/builderbot/artifacts`. Fixed: a guest keeps its stores in the
+   `/var/lib/aerieos/artifacts`. Fixed: a guest keeps its stores in the
    footprint unless a flag actually named one.
 3. **The row.** Online, and `sandbox` false: the managed marker is the thing
    the per-verb gate reads, so its absence is what makes the class mean
@@ -277,7 +277,7 @@ What was run, in order:
    is reached. So the instruction the script itself prints was wrong. Fixed
    by skipping the managed remove for a guest.
 5. **What was left.** `~/.builderbot` gone, the unit gone and inactive. The
-   `builderbot-agent` still running on the box is the MANAGED node's own, at
+   `aerieos-agent` still running on the box is the MANAGED node's own, at
    `/usr/local/sbin`, untouched. Two agents on one machine, and taking the
    guest away left the other one working.
 

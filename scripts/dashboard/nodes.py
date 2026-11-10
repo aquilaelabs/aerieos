@@ -2190,7 +2190,7 @@ def store_path_ok(path, what="a store"):
         return f"{path!r} must be a plain absolute path, with no spaces or .."
     if p in STORE_DENY_EXACT:
         return (f"{p} is a system directory (or the root of the mounts): {what} "
-                "is a directory of its own, like /var/lib/builderbot/x or /mnt/<share>/<dir>")
+                "is a directory of its own, like /var/lib/aerieos/x or /mnt/<share>/<dir>")
     for bad in STORE_DENY_UNDER:
         if (p + "/").startswith(bad):
             return f"{p} is inside {bad.rstrip('/')}, which the agent will not write to"
@@ -2330,7 +2330,7 @@ def node_config_set(principal, node_id, cfg):
 # A session on a node reads the logs of its own WORK by default (the CI runs
 # for its project, what its test runs left), and nothing of the machine. The
 # machine's own logs are root's there: the enrolled account is in neither
-# `adm` nor `systemd-journal`, so `journalctl -u builderbot-agent` from a
+# `adm` nor `systemd-journal`, so `journalctl -u aerieos-agent` from a
 # session answers "No journal files were opened due to insufficient
 # permissions". That is a real boundary and not a convention.
 #
@@ -2348,12 +2348,14 @@ def node_config_set(principal, node_id, cfg):
 # through this door however it is asked for.
 LOG_STREAMS = {
     # The journal where there is one; on an OpenRC or runit node, the file
-    # the provisioner has its service write (/var/log/builderbot-agent.log),
-    # which read nothing at all before.
+    # the provisioner has its service write (/var/log/aerieos-agent.log),
+    # which read nothing at all before. Under both names the service has
+    # had (R204): a node the Enroll script has not met since still runs the
+    # one before, and one it has met keeps the journal of both.
     "agent": {"what": "the agent's own journal: what it did, and why a job failed",
               "argv": ["sh", "-c", "if command -v journalctl >/dev/null 2>&1; "
-                       "then journalctl -u builderbot-agent --no-pager -n {lines}; "
-                       "else tail -n {lines} /var/log/builderbot-agent.log; fi"]},
+                       "then journalctl -u aerieos-agent -u builderbot-agent --no-pager -n {lines}; "
+                       "else cat /var/log/builderbot-agent.log /var/log/aerieos-agent.log 2>/dev/null | tail -n {lines}; fi"]},
     # TWO SHAPES, and the node says which it is in. Under systemd the runner
     # is a service and its output is the journal's; with no systemd the agent
     # runs run.sh itself and redirects it into runner.log under the data

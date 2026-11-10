@@ -7,7 +7,7 @@ Description=AerieOS: this machine made its own controller's first node, once
 # before /usr/local lasted left it (B669): it provisions the node again, on the
 # identity it has, and enrolls nothing new. Either condition is enough (|).
 ConditionPathExists=|!/etc/aerieos-controller/own-node
-ConditionPathExists=|!/usr/local/sbin/builderbot-agent
+ConditionPathExists=|!/usr/local/sbin/aerieos-agent
 # Never under the ISO's installer, where no controller runs to enrol with
 # and a root agent on the LAN is the last thing wanted (B475).
 ConditionKernelCommandLine=!bbinstaller=1

@@ -20,6 +20,7 @@ import time
 
 from .base import log
 from .disks import disks_now, moved
+from .names import ETC
 
 POOL_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}")
 # A pool mounts at /mnt/NAME, so a name is not one of the folders there that
@@ -33,7 +34,7 @@ ACTIONS = ("create", "add", "scrub", "replace", "export", "destroy", "import")
 # under /mnt by their own mountpoints (altroot /mnt, as a NAS that mounts its
 # pools there does), which zpool.cache does not keep, so each is imported
 # again from this record at the agent's minute pass after a reboot.
-IMPORTED = "/etc/builderbot/pools-imported.json"
+IMPORTED = ETC + "/pools-imported.json"
 MOUNT_ROOT = "/mnt"
 SNAP_KINDS = ("hourly", "daily", "weekly", "manual")
 SNAP_RE = re.compile(r"bb-(hourly|daily|weekly|manual)-(\d{8})-(\d{4})")

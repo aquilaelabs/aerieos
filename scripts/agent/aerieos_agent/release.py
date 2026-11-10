@@ -8,10 +8,10 @@ build signs with it), so a controller taken over cannot make one.
 
 The key is pinned when the node is enrolled (`enroll --release-key HEX`, as
 the Enroll script carries it) or at the machine's own console afterwards
-(`builderbot-agent release-key HEX`), and is never taken from the
+(`aerieos-agent release-key HEX`), and is never taken from the
 controller's word on a running node. A node with no key pinned updates as
 before. A build from a branch carries no signature: a node its owner uses
-for those says so at its console (`builderbot-agent unsigned on`), which is
+for those says so at its console (`aerieos-agent unsigned on`), which is
 kept in node.json like the key.
 
 Ed25519, by the `cryptography` library the nodes are provisioned with
@@ -19,6 +19,8 @@ Ed25519, by the `cryptography` library the nodes are provisioned with
 and lacks the library refuses the update rather than taking it unchecked.
 """
 import re
+
+from . import names
 
 # What is signed: this line, then the agent zip's digest as hello names it
 # ("sha256:" and 64 hex characters). The line keeps a signature made for
@@ -79,4 +81,4 @@ def may_install(state, digest, sig):
         return True, f"not checked ({why}): this node's console allows unsigned builds"
     return False, (f"refused: {why}. This node takes only updates signed by the release key it pinned ({key[:16]}…); "
                    "a controller built from a branch ships an unsigned agent. To allow those on this machine, at its "
-                   "own console: sudo builderbot-agent unsigned on")
+                   f"own console: sudo {names.command()} unsigned on")

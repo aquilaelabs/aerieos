@@ -34,8 +34,9 @@ import time
 from . import tokenseal
 from .accounts import UID_RE, user_of
 from .base import log, wipe
+from .names import VAR
 
-SEAL_DIR = "/var/lib/builderbot/tokens"
+SEAL_DIR = VAR + "/tokens"
 OPEN_DIR = "/run/bb-tokens"
 GRACE_S = 300
 EVERY_S = 10

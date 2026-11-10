@@ -17,8 +17,9 @@ import time
 
 from .base import log
 from .stores import save_state
+from .names import VAR
 
-STATE_FILE = "/var/lib/builderbot/backups-state.json"
+STATE_FILE = VAR + "/backups-state.json"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
 ROOTS = ("/mnt/", "/var/lib/aerieos-controller", "/srv/")
 

@@ -1545,7 +1545,7 @@ def _store_share(n):
 
     Two machines pointing `toolchains` at one share ARE one store, and the
     controller has to know which pairs those are: the same path STRING says
-    nothing: /var/lib/builderbot/toolchains is every node's default and is a
+    nothing: /var/lib/aerieos/toolchains is every node's default and is a
     different disk on each.
 
     The store's own id first (nodes.store_id, a marker file inside it),

@@ -21,11 +21,12 @@ import time
 
 from .base import log
 from .stores import save_state
+from .names import ETC
 
 SMB_FILE = "/etc/samba/smb.conf.d/builderbot.conf"
 # The shares nothing serves: a folder that is a share, kept here since neither
 # Samba's file nor NFS's says it (the operator, 4 Nov).
-INTERNAL_FILE = "/etc/builderbot/shares-internal.json"
+INTERNAL_FILE = ETC + "/shares-internal.json"
 SMB_MAIN = "/etc/samba/smb.conf"
 SMB_MAP = "/etc/samba/aerieos-users.map"
 NFS_FILE = "/etc/exports.d/builderbot.exports"

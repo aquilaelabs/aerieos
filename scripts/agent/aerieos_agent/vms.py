@@ -20,11 +20,12 @@ from xml.sax.saxutils import escape, quoteattr  # nosemgrep: python.lang.securit
 
 from . import lanbridge, vmhw
 from .base import _run
+from .names import VAR
 
 VIRSH = ["virsh", "-c", "qemu:///system"]
 # Where the VM host feature keeps the cached cloud images and each VM's disk,
 # its cloud-init seed and its XML: the jobs account's, made by the install.
-VM_DIR = os.environ.get("BUILDERBOT_VM_DIR", "/var/lib/builderbot/vms")
+VM_DIR = os.environ.get("BUILDERBOT_VM_DIR", VAR + "/vms")
 DOMAIN_RE = re.compile(r"bbvm-[a-z0-9][a-z0-9-]{0,62}")
 NETWORK_RE = re.compile(r"bbvm-[a-z0-9][a-z0-9-]{0,14}")
 IMAGE_RE = re.compile(r"[a-z0-9][a-z0-9._-]{0,40}")

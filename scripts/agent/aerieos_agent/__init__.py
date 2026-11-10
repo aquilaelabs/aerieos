@@ -49,14 +49,14 @@ Three rules this file keeps that are worth knowing before changing it:
 
 Runs anywhere Python 3.8+ is, with nothing installed:
 
-    builderbot-agent enroll --controller URL --token bbe_… [--user bb]
+    aerieos-agent enroll --controller URL --token bbe_… [--user bb]
                             [--session-user builder] [--store data=/path]
                             [--pin sha256:…]
-    builderbot-agent follow URL EXPECT   # after a controller moved while this node was off
-    builderbot-agent release-key [HEX]   # show or pin AerieOS's release key (release.py)
-    builderbot-agent unsigned on|off     # take an agent no release signed, or not
-    builderbot-agent run            # the loop; what the unit runs
-    builderbot-agent status         # what this node is, and does it answer
+    aerieos-agent follow URL EXPECT   # after a controller moved while this node was off
+    aerieos-agent release-key [HEX]   # show or pin AerieOS's release key (release.py)
+    aerieos-agent unsigned on|off     # take an agent no release signed, or not
+    aerieos-agent run            # the loop; what the unit runs
+    aerieos-agent status         # what this node is, and does it answer
 """
 
 # WINDOW.BUILD, and the two halves answer different questions.
@@ -74,4 +74,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.419"
+AGENT_VERSION = "0.9.420"

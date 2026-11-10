@@ -3,7 +3,7 @@ disks of mixed sizes, each its own XFS or btrfs filesystem, pooled into one
 tree by mergerfs with parity on one or two disks kept by SnapRAID, which
 is periodic rather than real time: a file written since the last sync is
 unprotected until the next, and the page says so. AerieOS's own record
-(/etc/builderbot/array.json, written whole by the storage-array job) is
+(/etc/aerieos/array.json, written whole by the storage-array job) is
 what snapraid.conf and the array's fstab lines are rendered from; the
 census reads the record, each disk's room and the state file the last
 sync, scrub or check left. Disks are named to the record by their
@@ -26,9 +26,10 @@ import time
 from .base import log
 from .disks import disks_now, moved
 from .pools import by_id, _out
+from .names import ETC, VAR
 
-RECORD = "/etc/builderbot/array.json"
-STATE = "/var/lib/builderbot/array-state.json"
+RECORD = ETC + "/array.json"
+STATE = VAR + "/array-state.json"
 SNAPRAID_CONF = "/etc/snapraid.conf"
 FSTAB = "/etc/fstab"
 MARK = "# builderbot-array"
@@ -42,7 +43,7 @@ MOVE_PLACE = re.compile(r"array|[a-z][a-z0-9_-]{0,31}")
 MAX_MOVES = 128
 DISKS = "/mnt/disks"
 PARITY = "/mnt/parity"
-CONTENT = "/var/lib/builderbot/snapraid.content"
+CONTENT = VAR + "/snapraid.content"
 FS = ("xfs", "btrfs")
 # mergerfs's create policies as the page offers them.
 POLICIES = {"mfs": "most free space", "lfs": "fill up (least free space)", "epmfs": "existing path, then most free space", "ff": "first disk with room"}

@@ -76,10 +76,10 @@ in rings (the operator, 11 Oct), with a box saying what un-enrolling takes
 off a machine and what it leaves, the same one Reset AerieOS shows. Always: the runners deregistered on their
 forges, then the agent and its unit, the sessions' firewall rules and their
 own networks (nothing of the isolation outlives the agent), the `aerie` and
-`builder` accounts with their homes, `/etc/builderbot` with the tunnel to
+`builder` accounts with their homes, `/etc/aerieos` with the tunnel to
 the controller, and bb-sandbox itself. Three boxes to tick: the stores on
 the machine's own disk (toolchains, caches, artifacts, dev instance data, the
-synced space copies, `/var/lib/builderbot`); what was configured from the
+synced space copies, `/var/lib/aerieos`); what was configured from the
 dashboard after enrolling (the mounts and their fstab lines, the runners'
 units, the GPU display); and, ticked for a hosting node, what it was given
 as a host (cloudflared with its token, the port 22 rule,
@@ -159,12 +159,12 @@ exists. `docs/sandbox-vm.md` is the long version.
 it makes a pending node and mints a one-time token (`bbe_…`, good for a day),
 shown once inside the command to run on the machine,
 `sudo bash provision-linux.sh --controller URL --token bbe_…`, or the two-line
-version that fetches `builderbot-agent` by hand. The provisioner downloads
+version that fetches `aerieos-agent` by hand. The provisioner downloads
 the agent from the controller itself (checking it against the digest the
 controller sends), enrolls, and leaves it running under systemd. From then
 on the node **dials out**: no port is opened on it, the controller holds no
 key that logs in anywhere, and the credential the node keeps
-(`/etc/builderbot/node.json`, 0600) opens its own record and nothing else.
+(`/etc/aerieos/node.json`, 0600) opens its own record and nothing else.
 **Revoke**, under Advanced, ends it; the agent says so in its journal and the node goes
 quiet, keeping its history. The one-day life belongs to the *enrollment*
 token only: the credential the node keeps afterwards does not expire, so an
@@ -365,7 +365,7 @@ which both the page and the agent hold to. Add a disk formats it and
 takes the next slot; Replace on a slot formats the new disk and rebuilds
 that slot from parity (a data disk) or the parity on it (a parity disk),
 hours during which the array is readable, or unprotected, as the job says.
-The record is AerieOS's own (`/etc/builderbot/array.json`), from which
+The record is AerieOS's own (`/etc/aerieos/array.json`), from which
 `snapraid.conf` and the array's fstab lines (by filesystem UUID, `nofail`)
 are written whole. Destroying the array unmounts it and forgets it: every
 data disk keeps its files, readable on any Linux. There is no cache tier and no mover (see Pools by purpose below), except on an array taken over from another system, which keeps its pools in front of its data disks and its mover ([image.md](image.md)).
@@ -773,7 +773,7 @@ boot, so a generation number means the same boot in every one of them, and
 | Startup, the runner supervisor, and every later warning | `config/logs/builderbot.log` |
 | The dashboard server, in full | `config/logs/dashboard.log` |
 | Every compose call the Docker manager made | `config/logs/docker.log` |
-| Runner diagnostics | `_diag/` under the runner's directory on its node (`/var/lib/builderbot/runner/<slot>/_work/`) |
+| Runner diagnostics | `_diag/` under the runner's directory on its node (`/var/lib/aerieos/runner/<slot>/_work/`) |
 | CI job output | GitHub → Actions → the run |
 | Emulator | `home/.android/emulator.log` |
 

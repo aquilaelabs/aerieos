@@ -54,7 +54,7 @@ class Helper(unittest.TestCase):
     def test_state_reads_the_marker(self):
         r = self.run_helper("state", "vmhost")
         self.assertEqual((r.returncode, r.stdout.strip()),
-                         (0, "installed" if os.path.exists("/etc/builderbot/features/vmhost") else "absent"))
+                         (0, "installed" if os.path.exists("/etc/aerieos/features/vmhost") else "absent"))
 
 
 class Controller(unittest.TestCase):

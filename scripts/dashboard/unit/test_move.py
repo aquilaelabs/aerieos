@@ -241,10 +241,10 @@ class Move(unittest.TestCase):
         self.configure(new_state, bare=True, url="https://new.example/")
         nh = move.not_yet_here()
         self.assertEqual([x["name"] for x in nh], ["alpha", "beta"])
-        self.assertEqual(nh[0]["line"], f"builderbot-agent follow https://new.example/ {fn['expect']}")
+        self.assertEqual(nh[0]["line"], f"aerieos-agent follow https://new.example/ {fn['expect']}")
         move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
         try:
-            self.assertTrue(move.not_yet_here()[1]["line"].startswith("builderbot-agent follow https://aerie.example.com "),
+            self.assertTrue(move.not_yet_here()[1]["line"].startswith("aerieos-agent follow https://aerie.example.com "),
                             "a node at the public hostname is followed there")
         finally:
             move.tunnel_host = lambda nid: ""

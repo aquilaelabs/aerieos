@@ -24,7 +24,7 @@ names, so the signature is of the sources (bundle.py builds the same zip
 from the same sources anywhere).
 """
 import hashlib
-import importlib.util
+import importlib
 import json
 import os
 import sys
@@ -37,10 +37,10 @@ PUB = os.environ.get("AERIEOS_RELEASE_PUB") or os.path.join(HERE, "..", "config"
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location(name, os.path.join(AGENT, "aerieos_agent", name + ".py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """One of the agent's own modules, as the agent loads it (its package)."""
+    if AGENT not in sys.path:
+        sys.path.insert(0, AGENT)
+    return importlib.import_module("aerieos_agent." + name)
 
 
 def digest():

@@ -238,7 +238,7 @@ out: a directory that holds one of the view's own places (the toolchain
 store under `/mnt`, say) is covered and that place put back inside it, and
 one that holds none is hidden whole, with the mounts inside either let go so
 the mount table names no export. The agent's own directory
-(`/var/lib/builderbot`) is covered the same way, so other spaces' build
+(`/var/lib/aerieos`) is covered the same way, so other spaces' build
 caches, their containers' data and the agent's tools are not there. The
 base home, which belongs to the account every session runs as, is new in
 the view and holds what a session runs from it, read-only: the launchers on

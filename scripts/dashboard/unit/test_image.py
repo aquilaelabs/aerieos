@@ -674,10 +674,10 @@ class WhatAMachineKeeps(unittest.TestCase):
 
     def test_a_machine_that_lost_its_agent_takes_it_back(self):
         s = self.read("image/mkosi.extra/usr/lib/systemd/system/aerieos-os-firstboot.service")
-        self.assertIn("ConditionPathExists=|!/usr/local/sbin/builderbot-agent", s)
+        self.assertIn("ConditionPathExists=|!/usr/local/sbin/aerieos-agent", s)
         self.assertIn("ConditionPathExists=|!/etc/aerieos-controller/own-node", s)
         p = self.read("nodes/provision-linux.sh")
-        self.assertIn('elif [ -f /etc/builderbot/node.json ]; then', p, "not only where the agent is still there")
+        self.assertIn('elif [ -f /etc/aerieos/node.json ]; then', p, "not only where the agent is still there")
 
     def door(self, d, verb, **env):
         """console-door in a scratch tree, each account tool a stub that logs

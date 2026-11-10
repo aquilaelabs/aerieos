@@ -433,7 +433,7 @@ container to a machine of its own, and back.
    and TLS pin, and goes on; its containers kept running and its synced
    copies kept meanwhile. The new controller's Nodes page lists the nodes
    not yet here since the move, each with one line to run on it as root
-   (`builderbot-agent follow ADDRESS CHALLENGE`, the address its public
+   (`aerieos-agent follow ADDRESS CHALLENGE`, the address its public
    hostname for a node enrolled at one) for a node that outlived
    the old controller and so was never told: it knocks there at once, and
    nothing is enrolled again (the node keeps its id, its token, its

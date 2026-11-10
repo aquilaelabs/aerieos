@@ -1002,7 +1002,7 @@ await firstRun(false);
     const knock = await (await fetch(dst.base + '/api/v1/agent/moved', { method: 'POST', headers: nH, body: JSON.stringify({ node: en.node_id }) })).json();
     ok(knock.answer === told.move.expect, `the node's knock is answered with the challenge it holds (${(knock.answer || '').slice(0, 12)})`);
     const nh = (await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).move || {};
-    ok((nh.not_here || []).map(x => x.name).sort().join(',') === 'late,mover' && (nh.not_here || []).every(x => new RegExp(`^builderbot-agent follow \\S+ [0-9a-f]{64}$`).test(x.line)),
+    ok((nh.not_here || []).map(x => x.name).sort().join(',') === 'late,mover' && (nh.not_here || []).every(x => new RegExp(`^aerieos-agent follow \\S+ [0-9a-f]{64}$`).test(x.line)),
        `the destination's Nodes page lists both as not yet here, each with its follow line (${JSON.stringify((nh.not_here || []).map(x => x.name))})`);
     // The source learns the landing by asking (the destination has no page
     // address to tell it at), marks itself moved, and the late node, which

@@ -35,6 +35,7 @@ import threading
 import time
 import urllib.parse
 from .base import hello_again, SHARE, log, log_once
+from .names import VAR
 
 # What is not synced, the same set as the controller's (wssync.SKIP_DIRS
 # there; the unit tier holds the two equal).
@@ -365,7 +366,7 @@ class WorkspaceSync:
         return out
 
     def record_dir(self):
-        data = ((self.agent.state.get("stores") or {}).get("data")) or "/var/lib/builderbot/data"
+        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
         d = os.path.join(data, "sync")
         os.makedirs(d, exist_ok=True)
         return d
@@ -468,7 +469,7 @@ class WorkspaceSync:
         return self.cleaned or None
 
     def cleaned_path(self):
-        data = ((self.agent.state.get("stores") or {}).get("data")) or "/var/lib/builderbot/data"
+        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
         return os.path.join(data, "sync-cleaned.json")
 
     def clean(self, token):

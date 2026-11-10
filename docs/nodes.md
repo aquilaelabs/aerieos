@@ -123,9 +123,9 @@ somewhere-elses.
     "docker": "27.3.1", "gpu": "nvidia GeForce RTX 3070 Ti",
     "toolchains": { "java": "21", "android-sdk": "35.0.2", "flutter": null },
     "stores": {                // each ROLE's location and headroom, see §6
-      "toolchains": { "path": "/var/lib/builderbot/toolchains", "free_mb": 118000 },
+      "toolchains": { "path": "/var/lib/aerieos/toolchains", "free_mb": 118000 },
       "data":       { "path": "/appdata",                       "free_mb": 800000 },
-      "cache":      { "path": "/var/lib/builderbot/cache",      "free_mb": 118000 }
+      "cache":      { "path": "/var/lib/aerieos/cache",      "free_mb": 118000 }
     }
   },
   "routing": { "public_ip": false, "tailscale": "", "wildcard": "" }
@@ -135,7 +135,7 @@ somewhere-elses.
 Points worth arguing about:
 
 **The id is the node's, not the address's.** Generated at enrollment, written
-to `/etc/builderbot/node.json` on the node, and used as the key for everything
+to `/etc/aerieos/node.json` on the node, and used as the key for everything
 the controller remembers about it: caches, last-known container lists, build
 records. An address is not an identity: two VMs can wear one IP, and one VM
 changes address when it moves. The Docker manager already learned this the
@@ -251,6 +251,24 @@ pure function `pick(job, nodes) -> node`, called in one place, so
 fair-share-per-pool or quota checks are one function swapped later rather than
 logic scraped out of four call sites. Until someone needs that, the function is
 ten lines.
+
+**A node's own names.** A node keeps its record in `/etc/aerieos` and its
+state in `/var/lib/aerieos`, and runs the service `aerieos-agent`; the
+command is `aerieos-agent`, and `aerie-sandbox` is the tool for the machine
+itself. A node provisioned before AerieOS had its name kept them under
+`builderbot`, and comes to the new ones in two steps, neither of which
+moves anything under a running agent, since an agent that cannot find its
+`node.json` cannot be reached to be told where it went. Every agent, as it
+starts, makes the new names answer where they do not yet: a link for each
+folder and a command for itself, added, nothing moved. The Enroll script,
+run on the machine, makes them the real ones: each folder renamed in place
+with the old name left as a link to it (so a store's path in a record, a
+container's bind and a session's environment go on resolving), the service
+installed as `aerieos-agent` with the old one taken off, and
+`builderbot-agent` left as a command that runs it. A folder that will not
+move (a mount of its own, or VMs' disks defined by its path) stays, with
+the new name a link to it. The session tools (`bb-session`, `bb-tty`) and
+`bb-sandbox`'s own file keep their names; so do the internal variables.
 
 **A press is never refused because something else is running.** A job that
 would collide with one already at work is queued behind it and handed over
@@ -447,7 +465,7 @@ refreshes them itself.)
      pipeline can have it.
 2. The provisioner (or cloud-init) runs with the token; the agent posts it once
    and receives its **node id** and a **node token** (32 random bytes), both
-   written to `/etc/builderbot/node.json`, mode 0600.
+   written to `/etc/aerieos/node.json`, mode 0600.
 3. Every later request carries the node token as a bearer credential over TLS.
    TLS is not optional: the token is a bearer credential. On a LAN that can be
    a self-signed certificate pinned by the agent at enrollment.
@@ -615,7 +633,7 @@ agent on every hello (`share_images()`) and by the controller at boot
   the source of truth and the only writable copy.
 - **On a node: a synced copy, for sessions** (below), and nothing
   permanent for a job. A job gets
-  `/var/lib/builderbot/jobs/<job-id>/workspace`, materialized before the first
+  `/var/lib/aerieos/jobs/<job-id>/workspace`, materialized before the first
   step and deleted after, with a retention window (keep the last failed job
   per space), so failures can be inspected.
 - **The GUI's node browser reads that path**, read-only, for debugging: a
@@ -757,7 +775,7 @@ file with its hash and the revision it last changed at, deletions kept.
 
 ### Caches are the whole cost of this approach
 
-Per node, persistent, never job-scoped: `/var/lib/builderbot/cache/<project>/…`
+Per node, persistent, never job-scoped: `/var/lib/aerieos/cache/<project>/…`
 mounted into the job for Gradle, npm and friends; the Android SDK once per
 node; Docker layer cache is the node's own daemon. Cross-node image builds use
 buildx `--cache-to/--cache-from` against a registry: the first genuinely
@@ -873,7 +891,7 @@ page says what is missing and links to the Library.
 
 - **The store is a role with a location, not a mount.** Each node has a
   `toolchains` store: default an internal path
-  (`/var/lib/builderbot/toolchains`), because a node with its own disk should
+  (`/var/lib/aerieos/toolchains`), because a node with its own disk should
   not need NFS to hold a JDK. A share is allowed as the location where that
   is what the operator wants (the controller's own toolchain store is exactly
   this case, so the local node needs nothing migrated). **Sharing one store
@@ -888,7 +906,7 @@ page says what is missing and links to the Library.
   than by rule. What the machines on a share still write together is the
   Android system images under `<store>/shared`: `toolchains.store_sharers`
   identifies the machines on a share by the census's mount SOURCE under
-  the store path, never by the path string (`/var/lib/builderbot/toolchains`
+  the store path, never by the path string (`/var/lib/aerieos/toolchains`
   is every node's default and a different disk on each), and an image job
   waits while another machine's is running (`store_areas`, `store_busy`),
   naming it.
@@ -1257,7 +1275,7 @@ ID`, the node's own root helper: Enroll node's ticks hand the provisioner
 that install once the node has enrolled, and the node's Features section on
 the Nodes page runs the same one later as a `feature` system job
 (`node_feature`), so the two ways cannot drift. A marker in
-`/etc/builderbot/features` says AerieOS installed it and lists the
+`/etc/aerieos/features` says AerieOS installed it and lists the
 packages it added, so a remove takes those and leaves what the machine had
 before. The census reports each (`features`), and the section reads that.
 **VM host** is KVM through libvirt, run by the jobs account in the libvirt
@@ -1466,11 +1484,11 @@ each taking either an internal path or a mount the script sets up:
 
 `--share`/`--nfs` remain the *transport* half for anything else the operator
 mounts; a role flag pointing at a mount implies it. Roles land in
-`/etc/builderbot/node.json`, the agent reports them (with headroom) in its
+`/etc/aerieos/node.json`, the agent reports them (with headroom) in its
 census, and nothing on the controller ever hard-codes a path on a node again.
 *Where phase 3 landed it:* the three role flags take a path (the `nfs:` form
 waits for phase 5, where mounts become jobs), default under
-`/var/lib/builderbot/`, and `--controller URL --token bbe_…` is what turns a
+`/var/lib/aerieos/`, and `--controller URL --token bbe_…` is what turns a
 provisioning run into an enrollment: the script fetches the agent from the
 controller, checks it against the digest header, enrolls as the docker
 account and enables the unit. Package-manager abstraction and
@@ -1515,13 +1533,13 @@ runs on the node: end them first, and the refusal counts them. What always
 goes is what the provisioner put there for AerieOS alone: the agent and
 its unit, the sessions' firewall rules and their own networks (every piece
 of the isolation, R79), the `aerie` and `builder` accounts with their homes
-(Claude Code, the runners' directories, caches), `/etc/builderbot` with the
+(Claude Code, the runners' directories, caches), `/etc/aerieos` with the
 tunnel to the controller, the sandbox label in `daemon.json` (docker keeps
 running; it takes at its next restart) and bb-sandbox itself. Three rings
 are asked for, in the Un-enroll dialog as boxes and on the machine as flags:
 `--stores` takes the stores on the machine's own disk (the toolchains, the
 caches, the artifacts, a dev instance's data, the synced space copies,
-`/var/lib/builderbot`); `--configured` undoes what was set up from the
+`/var/lib/aerieos`); `--configured` undoes what was set up from the
 dashboard after enrolling (the mounts AerieOS used, `/workspace` and
 whatever a store sits on, taken out of fstab; the runners' units; the GPU
 display); `--doors`, ticked by default for a hosting node, shuts what it was
@@ -2029,7 +2047,7 @@ installed/removed from the Nodes screen.
 *Where phase 7 landed it:* the fold on a sandbox node's row grows a *CI
 runner* section. Install is a `system` job with `apply: runner`: the agent
 fetches GitHub's latest runner release for the node's architecture into
-`/var/lib/builderbot/runner`, asks the controller for a registration token
+`/var/lib/aerieos/runner`, asks the controller for a registration token
 through the new `runner-token` agent verb: minted on request from the
 root-only stash by the same helper the container's runner uses, audited,
 never stored; the PAT stays here: registers as the enrolled account with
@@ -2350,7 +2368,7 @@ each is a real fork rather than a detail:
 6. **The shielding.** The sibling-project deny list, the shielded ssh keys and
    the PAT stash are all mechanisms of this image. They have to exist on the
    node or the bargain quietly changes. And measured on bb-sandbox on 4 Sep:
-   a job runs as `aerie`, which has no sudo and cannot read `/etc/builderbot`
+   a job runs as `aerie`, which has no sudo and cannot read `/etc/aerieos`
    (0700 root, so the node token is out of reach), but it IS in the `docker`
    group, which is root-equivalent on any machine running a daemon. That is
    acceptable while the sandbox is the blast radius and a session is only
@@ -2433,7 +2451,7 @@ above, in order:
    `--session-user`), made with the controller's PUID:PGID so files it saves
    on the share are owned as the controller's are; in `kvm` for the
    emulator, in **no docker group**, no sudo. Jobs stay `aerie`; the agent stays
-   root and drops to each. The node token lives in `/etc/builderbot`
+   root and drops to each. The node token lives in `/etc/aerieos`
    (0700 root) and never enters a session's environment: the sessions get
    the controller's URL and certificate pin, and nothing else of the agent's.
 

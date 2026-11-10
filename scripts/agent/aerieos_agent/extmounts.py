@@ -16,9 +16,10 @@ import subprocess
 
 from .base import log
 from .stores import save_state
+from .names import ETC
 
 ROOT = "/mnt/other"
-CREDS = "/etc/builderbot/creds"
+CREDS = ETC + "/creds"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
 
 

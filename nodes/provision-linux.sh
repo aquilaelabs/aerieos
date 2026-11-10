@@ -48,14 +48,14 @@ TOKEN=""
 # AerieOS's release key, as the Enroll script carries it: pinned by the agent
 # at enrollment, after which the node takes only agent updates signed by it.
 RELEASE_KEY=""
-STORE_DATA=/var/lib/builderbot/data
-STORE_TOOLCHAINS=/var/lib/builderbot/toolchains
-STORE_CACHE=/var/lib/builderbot/cache
-STORE_ARTIFACTS=/var/lib/builderbot/artifacts
+STORE_DATA=/var/lib/aerieos/data
+STORE_TOOLCHAINS=/var/lib/aerieos/toolchains
+STORE_CACHE=/var/lib/aerieos/cache
+STORE_ARTIFACTS=/var/lib/aerieos/artifacts
 # What a dev instance KEEPS on this node: its databases, its uploads, the
 # caches its containers write. A store like the other four (R17 step 2), so
 # the node reports its headroom and the Storage section edits it here.
-STORE_APPDATA=/var/lib/builderbot/appdata
+STORE_APPDATA=/var/lib/aerieos/appdata
 # --remove and its --yes, off unless asked; read before the checks run.
 REMOVE=0; YES=""
 declare -a SHARES=() NFS=()
@@ -214,7 +214,7 @@ it, which is a paste rather than a questionnaire.
                        and its Features section on the Nodes page installs
                        and removes it later.
   --data PATH          the four stores, all defaulting under
-  --toolchains PATH      /var/lib/builderbot/: a job's working tree and AVDs,
+  --toolchains PATH      /var/lib/aerieos/: a job's working tree and AVDs,
   --cache PATH         the toolchains installed on this node, the build
   --artifacts PATH     caches, and this node's copy of what spaces built
                        (per space underneath, so one VM can be several
@@ -434,12 +434,12 @@ guest_run() {
     say "the footprint: $foot"
     mkdir -p "$foot/bin" "$foot/log" "$foot/runner"
     chmod 700 "$foot"
-    # The four store paths default to /var/lib/builderbot for the MANAGED
+    # The four store paths default to /var/lib/aerieos for the MANAGED
     # shape, which a guest has no root to make and no business making. So a
     # guest keeps them in the footprint unless a flag actually named one,
     # which is what the _SET vars are for: `${STORE_X:-...}` never falls back
     # here, because the default is not empty. Found by running this for real,
-    # where the agent said it could not create /var/lib/builderbot/artifacts.
+    # where the agent said it could not create /var/lib/aerieos/artifacts.
     local s_data s_cache s_art s_app
     s_data="${STORE_DATA_SET:+$STORE_DATA}";           s_data="${s_data:-$foot/data}"
     s_cache="${STORE_CACHE_SET:+$STORE_CACHE}";        s_cache="${s_cache:-$foot/cache}"
@@ -765,6 +765,82 @@ EOF
     esac
 }
 
+# --- AerieOS's own names on a machine provisioned before it had them (R204) --
+# /etc/builderbot, /var/lib/builderbot and the builderbot-agent service
+# become /etc/aerieos, /var/lib/aerieos and aerieos-agent here, by a person
+# running this script on the machine, and nowhere else: an agent whose
+# node.json moved from under it cannot be reached to be told where it went,
+# so nothing moves on an agent's own update (its names.py only adds links).
+#
+# Each folder is renamed in place and the old name left as a link to it, so
+# every path a record still holds under the old name (a store in node.json,
+# a container's bind, a session's environment) goes on resolving, and what
+# is running keeps the files it has open. A folder that will not move (a
+# mount of its own, something mounted inside it) stays, with the new name a
+# link to it: both names answer either way, and the run goes on.
+names_move() {
+    local new old
+    for pair in /etc/aerieos:/etc/builderbot /var/lib/aerieos:/var/lib/builderbot; do
+        new="${pair%%:*}" old="${pair##*:}"
+        [ -d "$old" ] && [ ! -L "$old" ] || continue
+        # The link an agent or the tool added so the new name answers.
+        if [ -L "$new" ]; then rm -f "$new"; fi
+        if [ -e "$new" ]; then
+            warn "$new and $old are both here: left as they are, $new is used"
+            continue
+        fi
+        # Where VMs keep their disks under it, the folder stays: libvirt and
+        # its confinement hold each disk by the path it was defined with.
+        if [ "$old" = /var/lib/builderbot ] && [ -n "$(ls -A "$old/vms/disks" 2>/dev/null)" ]; then
+            ln -s "$old" "$new"
+            say "$old holds VMs' disks, defined by that path, so it stays; $new is a link to it"
+            continue
+        fi
+        if mv -T "$old" "$new" 2>/dev/null; then
+            ln -s "$new" "$old"
+            say "$old is $new now (the old name is a link to it)"
+        else
+            ln -s "$old" "$new"
+            warn "$old could not be renamed (a mount of its own, or one inside it): it stays, and $new is a link to it"
+        fi
+    done
+}
+
+# The service and the command under the old name, once the new ones are in
+# place: the old unit stopped and taken off, what was dropped in beside it
+# carried over, and builderbot-agent left as a command that runs the agent.
+names_old_service() {
+    local old=builderbot-agent new=aerieos-agent u
+    [ -e "/etc/systemd/system/${old}.service" ] || [ -e "/etc/init.d/${old}" ] || [ -d "/etc/sv/${old}" ] \
+        || [ -e /etc/systemd/system/builderbot-session-ports.service ] || [ -e /etc/local.d/builderbot-session-ports.start ] \
+        || [ -e "/usr/local/sbin/${old}" ] || return 0
+    case "$INIT" in
+        systemd)
+            if [ -d "/etc/systemd/system/${old}.service.d" ] && [ ! -e "/etc/systemd/system/${new}.service.d" ]; then
+                mv "/etc/systemd/system/${old}.service.d" "/etc/systemd/system/${new}.service.d"
+            fi
+            for u in "$old" builderbot-session-ports; do
+                [ -e "/etc/systemd/system/${u}.service" ] || continue
+                systemctl disable --now "$u" >/dev/null 2>&1 || true
+                rm -f "/etc/systemd/system/${u}.service"
+            done
+            systemctl daemon-reload ;;
+        openrc)
+            rc-service "$old" stop >/dev/null 2>&1 || true
+            rc-update del "$old" default >/dev/null 2>&1 || true
+            [ -e "/etc/conf.d/${old}" ] && [ ! -e "/etc/conf.d/${new}" ] && mv "/etc/conf.d/${old}" "/etc/conf.d/${new}"
+            rm -f "/etc/init.d/${old}" /etc/local.d/builderbot-session-ports.start ;;
+        runit)
+            sv stop "$old" >/dev/null 2>&1 || true
+            rm -f "/var/service/${old}"; rm -rf "/etc/sv/${old}" ;;
+    esac
+    # The old command, for whoever types it and for what still names it.
+    if [ -e "/usr/local/sbin/${new}" ] && { [ ! -e "/usr/local/sbin/${old}" ] || ! grep -q "exec /usr/local/sbin/${new}" "/usr/local/sbin/${old}" 2>/dev/null; }; then
+        printf '#!/bin/sh\n# The agent under the name it had before: aerieos-agent, as installed.\nexec /usr/local/sbin/%s "$@"\n' "$new" > "/usr/local/sbin/${old}"
+        chmod 0755 "/usr/local/sbin/${old}"
+    fi
+}
+
 # pkg_refresh, pkg and pkg_names are the family's (nodes/families/*.sh),
 # sourced below once the machine's family is known.
 
@@ -928,6 +1004,9 @@ if [ "${BB_PROVISION_LIB:-0}" = 1 ]; then
 fi
 
 preflight
+if [ "$CHECK_ONLY" != 1 ] && [ "$(id -u)" = 0 ]; then
+    names_move
+fi
 if [ "$CHECK_ONLY" = 1 ]; then
     printf '\n   %s can be provisioned by this script' "${PRETTY_NAME:-$ID}"
     [ "${#WARNINGS[@]}" -eq 0 ] && printf '.\n' || printf ', with %d warning(s) above.\n' "${#WARNINGS[@]}"
@@ -1173,7 +1252,7 @@ START
             "/etc/local.d/${FENCE}.start"
             # The agent's own cgroup, held to the same number by OpenRC.
             install -d -m 0755 /etc/conf.d
-            printf 'rc_cgroup_settings="memory.max %s"\n' "$max" > /etc/conf.d/builderbot-agent ;;
+            printf 'rc_cgroup_settings="memory.max %s"\n' "$max" > /etc/conf.d/aerieos-agent ;;
         *)
             warn "${INIT} has no cgroups of its own: AerieOS's work is not fenced from the system's memory here"
             return 1 ;;
@@ -1275,16 +1354,16 @@ authorize() {
 say "user ${USER_NAME}"
 # An account here before AerieOS is somebody's own: noted, so Uninstall
 # leaves it and its home where it found them.
-KEPT_ACCOUNTS=/etc/builderbot/kept-accounts
+KEPT_ACCOUNTS=/etc/aerieos/kept-accounts
 keep_account() {
-    install -d -m 0755 /etc/builderbot
+    install -d -m 0755 /etc/aerieos
     grep -qx "$1" "$KEPT_ACCOUNTS" 2>/dev/null || echo "$1" >> "$KEPT_ACCOUNTS"
 }
 # ...and each one this script makes, the moment it makes it: what Uninstall
 # deletes is this list, never a name it guessed (B516).
-MADE_ACCOUNTS=/etc/builderbot/made-accounts
+MADE_ACCOUNTS=/etc/aerieos/made-accounts
 made_account() {
-    install -d -m 0755 /etc/builderbot
+    install -d -m 0755 /etc/aerieos
     grep -qx "$1" "$MADE_ACCOUNTS" 2>/dev/null || echo "$1" >> "$MADE_ACCOUNTS"
 }
 # Never one that is already here and not AerieOS's: an account is
@@ -1292,7 +1371,7 @@ made_account() {
 # ours to do, whatever it is called. A machine already enrolled has made its
 # own, which a run again keeps using.
 if id -u "$USER_NAME" >/dev/null 2>&1; then
-    if [ ! -f /etc/builderbot/node.json ]; then
+    if [ ! -f /etc/aerieos/node.json ]; then
         keep_account "$USER_NAME"
         warn "${USER_NAME} is already an account on this machine, and not one AerieOS made: run again with --user NAME, a name that is not taken (bbjobs, say)"; exit 1
     fi
@@ -1371,7 +1450,7 @@ elif [ "$SESSION_NAME" = "$USER_NAME" ]; then
     warn "--session-user ${SESSION_NAME} is the docker account: a session must not be it"
     printf '   pick a different --session-user, or none\n'
     SESSION_NAME=""
-elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/builderbot/node.json ]; then
+elif id -u "$SESSION_NAME" >/dev/null 2>&1 && [ ! -f /etc/aerieos/node.json ]; then
     # Already an account here, and not one AerieOS made: somebody's, and
     # maybe one that can sudo, which a session never may (a cloud image's own
     # account, R97's walk). Left as it is; sessions wait for another name.
@@ -1494,6 +1573,16 @@ cat > "$BBSANDBOX_TMP" <<'BBSANDBOX'
 # an emulator here renders on it (R20); `gpu-display` is that server's unit.
 set -euo pipefail
 
+# AerieOS's own names (R204), made to answer on a machine that still has the
+# folders under the name before: a link for each, added, nothing moved (the
+# Enroll script is what makes them the folders themselves).
+for pair in /etc/aerieos:/etc/builderbot /var/lib/aerieos:/var/lib/builderbot; do
+    new="${pair%%:*}" old="${pair##*:}"
+    if [ "$(id -u)" = 0 ] && [ -d "$old" ] && [ ! -L "$old" ] && [ ! -e "$new" ] && [ ! -L "$new" ]; then
+        ln -s "$old" "$new" 2>/dev/null || true
+    fi
+done
+
 CONF=/etc/bb-sandbox.conf
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
@@ -1552,7 +1641,7 @@ fstab_line() {
 # list of where the stores are (the agent's node.json), and this reads it
 # rather than keeping a copy. A store repointed from the dashboard is
 # visible here on the next command, with nothing to keep in step.
-NODE_JSON=/etc/builderbot/node.json
+NODE_JSON=/etc/aerieos/node.json
 stores_under() {
     [ -r "$NODE_JSON" ] || return 0
     python3 - "$NODE_JSON" "$1" <<'PY' 2>/dev/null || true
@@ -2066,7 +2155,7 @@ EOF
 # What goes is in three rings (the operator, 11 Oct), the first always and
 # the other two asked for: --stores takes the stores on this disk (the
 # toolchains, the caches, the artifacts, a dev instance's data, the synced
-# project copies) and /var/lib/builderbot; --configured undoes what was set
+# project copies) and /var/lib/aerieos; --configured undoes what was set
 # up from the dashboard after enrolling (the mounts and their fstab lines,
 # the runners' units, the GPU display); --doors shuts what a hosting node
 # was given (cloudflared and its token, Tailscale's login, the port 22
@@ -2088,8 +2177,8 @@ cmd_uninstall() {
     # The session account node.json names; an older node.json that names
     # none had builder, while one enrolled with --session-user none has
     # none at all, and its machine's own builder is not ours (B516).
-    session_user="$(python3 -c 'import json; d = json.load(open("/etc/builderbot/node.json")); print(d["session_user"] if "session_user" in d else "builder")' 2>/dev/null || true)"
-    store_dirs="$(python3 -c 'import json; print(" ".join(sorted(set(str(v) for v in (json.load(open("/etc/builderbot/node.json")).get("stores") or {}).values() if str(v).startswith("/")))))' 2>/dev/null || true)"
+    session_user="$(python3 -c 'import json; d = json.load(open("/etc/aerieos/node.json")); print(d["session_user"] if "session_user" in d else "builder")' 2>/dev/null || true)"
+    store_dirs="$(python3 -c 'import json; print(" ".join(sorted(set(str(v) for v in (json.load(open("/etc/aerieos/node.json")).get("stores") or {}).values() if str(v).startswith("/")))))' 2>/dev/null || true)"
     for p in $(ours); do
         case "$p" in
             /workspace) mounts="$mounts $p" ;;
@@ -2098,9 +2187,9 @@ cmd_uninstall() {
     done
     say "uninstall AerieOS from this machine"
     printf '   goes:  the agent and its unit, the session firewall rules and the sessions'"'"' own networks,\n'
-    printf '          the account%s %s with their homes (those AerieOS made), /etc/builderbot, and this tool\n' \
+    printf '          the account%s %s with their homes (those AerieOS made), /etc/aerieos, and this tool\n' \
         "${session_user:+s}" "${DOCKER_USER}${session_user:+ and ${session_user}}"
-    [ "$stores" = 1 ] && printf '   also:  the stores on this disk (%s), /workspace, /var/lib/builderbot\n' "${store_dirs:- none}"
+    [ "$stores" = 1 ] && printf '   also:  the stores on this disk (%s), /workspace, /var/lib/aerieos\n' "${store_dirs:- none}"
     [ "$configured" = 1 ] && printf '   also:  the mounts AerieOS used (%s), the runners, the GPU display\n' "${mounts:- none}"
     [ "$doors" = 1 ] && printf '   also:  cloudflared and its token, Tailscale'"'"'s login, the port 22 rule, the hosting firewall, the nginx container\n'
     printf '   stays: docker, nfs-common, python3, tmux, jq, curl, the empty mountpoints,\n'
@@ -2115,7 +2204,9 @@ cmd_uninstall() {
     say "stopping the agent and the session port's rule"
     # The GPU display's unit too (B394): left enabled, a machine AerieOS
     # had left still started an Xorg on the card at every boot.
-    local units="builderbot-agent builderbot-session-ports"
+    # Under both names (R204): a node not yet met by the Enroll script since
+    # the rename still runs the ones before.
+    local units="aerieos-agent aerieos-session-ports builderbot-agent builderbot-session-ports"
     [ "$configured" = 1 ] && units="$units builderbot-gpu-display builderbot-gpu-nodes"
     for u in $units; do
         if have systemctl; then
@@ -2126,7 +2217,7 @@ cmd_uninstall() {
         [ -d "/etc/sv/$u" ] && { rm -f "/var/service/$u"; rm -rf "/etc/sv/$u"; }
     done
     if [ "$configured" = 1 ]; then
-        for f in /var/lib/builderbot/runner/*/.service /var/lib/builderbot/runner/.service; do
+        for f in /var/lib/aerieos/runner/*/.service /var/lib/aerieos/runner/.service; do
             [ -f "$f" ] || continue
             u="$(cat "$f")"
             have systemctl && { systemctl disable --now "$u" >/dev/null 2>&1 || true; rm -f "/etc/systemd/system/$u"; }
@@ -2149,10 +2240,10 @@ cmd_uninstall() {
         have tailscale && tailscale logout >/dev/null 2>&1 || true
         have systemctl && { systemctl disable --now builderbot-door-22 >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-door-22.service; }
         have nft && nft delete table inet builderbot_door >/dev/null 2>&1 || true
-        rm -f /etc/builderbot/door-22.nft
+        rm -f /etc/aerieos/door-22.nft
         have systemctl && { systemctl disable --now builderbot-hosting-fw >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-hosting-fw.service; }
         have nft && nft delete table inet builderbot_hosting >/dev/null 2>&1 || true
-        rm -f /etc/builderbot/hosting-fw.nft
+        rm -f /etc/aerieos/hosting-fw.nft
         if have docker; then
             for a in $(docker ps -aq --filter "label=com.docker.compose.project" --format '{{.ID}} {{.Label "com.docker.compose.project"}}' 2>/dev/null | awk '$2 ~ /^nginx-/ {print $1}'); do
                 docker rm -f "$a" >/dev/null 2>&1 || true
@@ -2204,7 +2295,7 @@ cmd_uninstall() {
         fi
         rm -f "$f"
     fi
-    rm -f /etc/systemd/system/builderbot.slice /etc/local.d/builderbot.slice.start /etc/conf.d/builderbot-agent
+    rm -f /etc/systemd/system/builderbot.slice /etc/local.d/builderbot.slice.start /etc/conf.d/aerieos-agent /etc/conf.d/builderbot-agent
     have systemctl && systemctl daemon-reload >/dev/null 2>&1 || true
     say "removing the accounts and their homes"
     for u in "$session_user" "$DOCKER_USER"; do
@@ -2212,13 +2303,13 @@ cmd_uninstall() {
         [ "$(id -u "$u")" != 0 ] || continue
         # One that was here before AerieOS is somebody's own: left, home
         # and all (it took the session account's name on a cloud image).
-        if grep -qx "$u" /etc/builderbot/kept-accounts 2>/dev/null; then
+        if grep -qx "$u" /etc/aerieos/kept-accounts 2>/dev/null; then
             say "kept ${u}: it was an account here before AerieOS"
             continue
         fi
         # Only one this script made, where it has kept that list; a node
         # provisioned before the list keeps the old reading (B516).
-        if [ -f /etc/builderbot/made-accounts ] && ! grep -qx "$u" /etc/builderbot/made-accounts; then
+        if [ -f /etc/aerieos/made-accounts ] && ! grep -qx "$u" /etc/aerieos/made-accounts; then
             say "kept ${u}: AerieOS did not make it"
             continue
         fi
@@ -2246,11 +2337,15 @@ cmd_uninstall() {
             esac
             rm -rf --one-file-system "$p"
         done
-        rm -rf --one-file-system /var/lib/builderbot
+        # The folder itself, whichever name is the link to it (R204), then both names.
+        rm -rf --one-file-system "$(readlink -f /var/lib/aerieos 2>/dev/null || echo /var/lib/aerieos)"
+        rm -rf --one-file-system /var/lib/aerieos /var/lib/builderbot
     else
-        rm -rf /var/lib/builderbot/agent /var/lib/builderbot/runner
+        rm -rf /var/lib/aerieos/agent /var/lib/aerieos/runner
     fi
-    rm -rf /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/builderbot-agent
+    rm -rf "$(readlink -f /etc/aerieos 2>/dev/null || echo /etc/aerieos)"
+    rm -rf /etc/aerieos /etc/builderbot /etc/bb-sandbox.conf /etc/profile.d/builderbot-session.sh /usr/local/sbin/aerieos-agent \
+        /usr/local/sbin/builderbot-agent /usr/local/sbin/aerie-sandbox
     # A ttyd binary an earlier provisioner fetched into /usr/local/bin, on a
     # node provisioned before the agent opened its own terminals; a package's
     # copy is the distribution's and stays.
@@ -2823,10 +2918,10 @@ cmd_gpu_container() {
 # What a node has beyond the base, each an install and a remove, run by the
 # provisioner's flag at enrollment and by the agent's `feature` system job
 # from the Nodes page: one copy, so the two ways cannot drift. A marker
-# under /etc/builderbot/features says AerieOS put it there, and lists the
+# under /etc/aerieos/features says AerieOS put it there, and lists the
 # packages it added, so a remove takes those and leaves what the machine
 # had before.
-FEATURES_DIR=/etc/builderbot/features
+FEATURES_DIR=/etc/aerieos/features
 os_family() {
     local ids
     ids="$(. /etc/os-release 2>/dev/null; printf ' %s %s ' "${ID:-}" "${ID_LIKE:-}")"
@@ -2979,7 +3074,7 @@ feature_vmhost() {
             # root write over the file it named (B552).
             vmown="$DOCKER_USER"
             { [ "$BESIDE_CONTROLLER" = 1 ] || [ -s /etc/bb-session.wall ]; } && vmown=root
-            install -d -m 0755 -o "$vmown" /var/lib/builderbot/vms /var/lib/builderbot/vms/images /var/lib/builderbot/vms/disks
+            install -d -m 0755 -o "$vmown" /var/lib/aerieos/vms /var/lib/aerieos/vms/images /var/lib/aerieos/vms/disks
             vmhost_virtiofsd
             # Run again on a machine that has it (a package the feature has
             # gained since, UEFI's firmware), what it added before is kept.
@@ -2993,9 +3088,9 @@ feature_vmhost() {
             if have virsh; then
                 n="$(virsh -c qemu:///system list --all --name 2>/dev/null | grep -c . || true)"
                 [ "${n:-0}" -eq 0 ] || die "${n} VM(s) are on this machine: remove them first, then VM host"
-            elif [ -n "$(ls -A /var/lib/builderbot/vms/disks 2>/dev/null)" ]; then
+            elif [ -n "$(ls -A /var/lib/aerieos/vms/disks 2>/dev/null)" ]; then
                 # No virsh to ask: disks still here are VMs' until shown otherwise.
-                die "virsh is not here to say which VMs are defined, and /var/lib/builderbot/vms/disks holds disks: nothing removed"
+                die "virsh is not here to say which VMs are defined, and /var/lib/aerieos/vms/disks holds disks: nothing removed"
             fi
             say "taking VM host off"
             rm -f "$VIRTIOFSD_WRAP"
@@ -3004,7 +3099,7 @@ feature_vmhost() {
                 [ -f "/etc/apparmor.d/local/$prof" ] && sed -i "\#$VIRTIOFSD_WRAP#d" "/etc/apparmor.d/local/$prof"
             done
             getent group libvirt >/dev/null 2>&1 && gpasswd -d "$DOCKER_USER" libvirt >/dev/null 2>&1 || true
-            rm -rf /var/lib/builderbot/vms
+            rm -rf /var/lib/aerieos/vms
             added="$(sed -n 's/^packages=//p' "$FEATURES_DIR/vmhost")"
             # shellcheck disable=SC2086
             [ -z "${added// /}" ] || pkgs_drop "$fam" $added || warn "the packages did not all come off; the output above says why"
@@ -3021,9 +3116,9 @@ feature_vmhost() {
 feature_firewall() {
     local ssh_rule su
     case "$1" in
-        state) [ -f /etc/builderbot/hosting-fw.nft ] && echo installed || echo absent ;;
+        state) [ -f /etc/aerieos/hosting-fw.nft ] && echo installed || echo absent ;;
         install)
-            su="$(python3 -c 'import json; print(json.load(open("/etc/builderbot/node.json")).get("session_user", ""))' 2>/dev/null || true)"
+            su="$(python3 -c 'import json; print(json.load(open("/etc/aerieos/node.json")).get("session_user", ""))' 2>/dev/null || true)"
             [ -z "$su" ] || die "the firewall is for a hosting-only node: it would shut the session port the controller reaches ${su}'s sessions on"
             have nft || pkgs_add "$(os_family)" nftables || true
             have nft || die "nft is not here and could not be installed"
@@ -3035,8 +3130,8 @@ feature_firewall() {
             else
                 printf '   port 22: open, as no door closed it\n'
             fi
-            install -d -m 0755 /etc/builderbot
-            cat > /etc/builderbot/hosting-fw.nft <<NFT
+            install -d -m 0755 /etc/aerieos
+            cat > /etc/aerieos/hosting-fw.nft <<NFT
 # Written by bb-sandbox feature install firewall: 80 and 443 in, and port 22 as the door left it.
 table inet builderbot_hosting
 delete table inet builderbot_hosting
@@ -3068,7 +3163,7 @@ table inet builderbot_hosting {
     }
 }
 NFT
-            nft -f /etc/builderbot/hosting-fw.nft || { rm -f /etc/builderbot/hosting-fw.nft; die "nft could not apply the firewall, so this box takes in what it did before"; }
+            nft -f /etc/aerieos/hosting-fw.nft || { rm -f /etc/aerieos/hosting-fw.nft; die "nft could not apply the firewall, so this box takes in what it did before"; }
             if have systemctl; then
                 cat > /etc/systemd/system/builderbot-hosting-fw.service <<UNIT
 [Unit]
@@ -3077,7 +3172,7 @@ After=network-pre.target
 Before=docker.service
 [Service]
 Type=oneshot
-ExecStart=$(command -v nft) -f /etc/builderbot/hosting-fw.nft
+ExecStart=$(command -v nft) -f /etc/aerieos/hosting-fw.nft
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
@@ -3089,7 +3184,7 @@ UNIT
         remove)
             have systemctl && { systemctl disable --now builderbot-hosting-fw >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-hosting-fw.service; systemctl daemon-reload >/dev/null 2>&1 || true; }
             have nft && nft delete table inet builderbot_hosting >/dev/null 2>&1 || true
-            rm -f /etc/builderbot/hosting-fw.nft
+            rm -f /etc/aerieos/hosting-fw.nft
             say "firewall off: this box takes in what its other rules allow" ;;
     esac
 }
@@ -3365,6 +3460,10 @@ BBSANDBOX
 install -d -m 0755 /usr/local/sbin
 install -m 0750 "$BBSANDBOX_TMP" /usr/local/sbin/bb-sandbox
 rm -f "$BBSANDBOX_TMP"
+# ...and under AerieOS's own name (R204): aerie-sandbox runs it, with the
+# same arguments. The file stays where the units and the agent look for it.
+printf '#!/bin/sh\n# AerieOS'"'"'s tool for this machine, under its own name: bb-sandbox, as installed.\nexec /usr/local/sbin/bb-sandbox "$@"\n' > /usr/local/sbin/aerie-sandbox
+chmod 0750 /usr/local/sbin/aerie-sandbox
 # Root's, and nobody else's: 0750 root:root. Anyone the operator has given
 # sudo reaches it as `sudo bb-sandbox`, which is how it is meant to be run;
 # it refuses to run as anyone but root anyway. The docker account cannot read
@@ -3445,9 +3544,9 @@ fi
 # so nothing else has to be published or kept in step, and it runs under
 # systemd as root ONLY so that it can drop to ${USER_NAME} for every job it
 # runs, and so that phase 5's system jobs (mounts, network) have somewhere to
-# run. The credential it ends up holding (/etc/builderbot/node.json, 0600)
+# run. The credential it ends up holding (/etc/aerieos/node.json, 0600)
 # opens that node's own row and nothing else.
-AGENT=/usr/local/sbin/builderbot-agent
+AGENT=/usr/local/sbin/aerieos-agent
 # THE SESSIONS ARE NOT THIS UNIT'S TO KILL. systemd's default KillMode is
 # control-group: a stop takes every process in the cgroup with it, and the
 # agent's cgroup holds the terminals it opens, the tmux servers under them and
@@ -3496,6 +3595,9 @@ if [ -n "$CONTROLLER" ]; then
         rm -f "${AGENT}.new"; exit 1
     fi
     chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
+    svc_stop aerieos-agent
+    # ...and under the name it had before (R204): never two agents on one
+    # node.json, each handing the controller the other's replaced token.
     svc_stop builderbot-agent
     "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" --user "$USER_NAME" \
         ${SESSION_NAME:+--session-user "$SESSION_NAME"} ${REACH:+--reach "$REACH"} \
@@ -3509,13 +3611,14 @@ if [ -n "$CONTROLLER" ]; then
     if [ -n "$WG_ADDR" ]; then
         python3 - "$WG_ADDR" <<'PY'
 import json, sys
-p = "/etc/builderbot/node.json"
+p = "/etc/aerieos/node.json"
 d = json.load(open(p))
 d["tunnel"] = {"kind": "wireguard", "iface": "bb", "addr": sys.argv[1]}
 json.dump(d, open(p, "w"), indent=2)
 PY
     fi
-    svc_install builderbot-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    svc_install aerieos-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    names_old_service
 # Public port 22 shut only now, with the node enrolled and the door's client
 # up: a run that closed it first and then could not enroll left the person
 # coming back in through the KVM (11 Oct). The loopback (cloudflared's
@@ -3534,8 +3637,8 @@ if [ -n "$DOOR" ] && [ "$DOOR_CLOSE22" = 1 ] && [ -n "$door_up" ]; then
     printf '   a connection already open on it, this one included, stays up; a new one comes through the door\n'
     # shellcheck disable=SC2046
     command -v nft >/dev/null 2>&1 || pkg $(pkg_names nft) >/dev/null 2>&1 || true
-    install -d -m 0755 /etc/builderbot
-    cat > /etc/builderbot/door-22.nft <<'NFT'
+    install -d -m 0755 /etc/aerieos
+    cat > /etc/aerieos/door-22.nft <<'NFT'
 # Written by AerieOS's provision-linux.sh: port 22 from the loopback and the tailnet only.
 table inet builderbot_door
 delete table inet builderbot_door
@@ -3549,7 +3652,7 @@ table inet builderbot_door {
     }
 }
 NFT
-    if nft -f /etc/builderbot/door-22.nft 2>/dev/null; then
+    if nft -f /etc/aerieos/door-22.nft 2>/dev/null; then
         if [ "$INIT" = systemd ]; then
             cat > /etc/systemd/system/builderbot-door-22.service <<UNIT
 [Unit]
@@ -3557,7 +3660,7 @@ Description=AerieOS: port 22 reachable through the door only
 After=network-pre.target
 [Service]
 Type=oneshot
-ExecStart=$(command -v nft) -f /etc/builderbot/door-22.nft
+ExecStart=$(command -v nft) -f /etc/aerieos/door-22.nft
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
@@ -3568,7 +3671,7 @@ UNIT
         warn "nft could not apply the port 22 rule, so port 22 stays as it was"
     fi
 fi
-elif [ -f /etc/builderbot/node.json ]; then
+elif [ -f /etc/aerieos/node.json ]; then
     # Enrolled on an earlier run. A machine that lost the agent itself keeps its
     # identity and takes it back here, as an AerieOS root from before /usr/local
     # lasted did at every boot (B669). The agent does NOT keep itself current
@@ -3594,7 +3697,7 @@ elif [ -f /etc/builderbot/node.json ]; then
     done
     say "agent: already enrolled; checking the controller for a newer agent"
     ctl=""; tok=""
-    read -r ctl tok < <(python3 -c 'import json; d = json.load(open("/etc/builderbot/node.json")); print(d.get("controller", ""), d.get("token", ""))' 2>/dev/null || true)
+    read -r ctl tok < <(python3 -c 'import json; d = json.load(open("/etc/aerieos/node.json")); print(d.get("controller", ""), d.get("token", ""))' 2>/dev/null || true)
     if [ -n "$ctl" ] && [ -n "$tok" ]; then
         hdr="$(mktemp)"
         if curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
@@ -3610,7 +3713,7 @@ elif [ -f /etc/builderbot/node.json ]; then
                 rm -f "${AGENT}.new"
             else
                 chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
-                svc_restart builderbot-agent 2>/dev/null || true
+                svc_restart aerieos-agent 2>/dev/null || true
                 say "agent: updated ${have:7:12} -> ${got:7:12} and restarted"
             fi
         else
@@ -3619,7 +3722,7 @@ elif [ -f /etc/builderbot/node.json ]; then
         fi
         rm -f "$hdr"
     else
-        warn "/etc/builderbot/node.json carries no controller or token; re-enroll with a fresh token to update"
+        warn "/etc/aerieos/node.json carries no controller or token; re-enroll with a fresh token to update"
     fi
     # The session account is part of the enrollment record, and a node
     # enrolled before there was one carries none, so a re-run that made
@@ -3629,7 +3732,7 @@ elif [ -f /etc/builderbot/node.json ]; then
     # NEW node row, and every project bound to the old one would lose it.
     if [ -n "$(python3 - "${SESSION_NAME:-}" <<'PY'
 import json, sys
-p = "/etc/builderbot/node.json"
+p = "/etc/aerieos/node.json"
 d = json.load(open(p))
 want = sys.argv[1]
 if d.get("session_user", "") != want:
@@ -3639,9 +3742,18 @@ if d.get("session_user", "") != want:
 PY
     )" ]; then
         say "agent: sessions now run as ${SESSION_NAME:-nobody}; restarting the agent"
-        svc_restart builderbot-agent 2>/dev/null || true
+        svc_restart aerieos-agent 2>/dev/null || true
     fi
-    svc_active builderbot-agent || svc_install builderbot-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    # A node still running under the name before (R204), met by a re-run
+    # with no token: the same agent, the same record, under the new service.
+    # The old one is stopped first; where the controller could not be asked
+    # for the agent just now, the one installed is what the new name runs.
+    if [ -e /usr/local/sbin/builderbot-agent ] && ! grep -q 'exec /usr/local/sbin/aerieos-agent' /usr/local/sbin/builderbot-agent 2>/dev/null; then
+        svc_stop builderbot-agent
+        [ -s "$AGENT" ] || cp -p /usr/local/sbin/builderbot-agent "$AGENT"
+    fi
+    svc_active aerieos-agent || svc_install aerieos-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
+    names_old_service
 fi
 
 # --- the features asked for (R91) -------------------------------------------
@@ -3665,7 +3777,7 @@ done
 # filters alone. Re-applied at boot by a unit, and rewritten here on every
 # run, so a controller that moved is one re-run away.
 ctl_url="$CONTROLLER"
-[ -n "$ctl_url" ] || ctl_url="$(python3 -c 'import json; print(json.load(open("/etc/builderbot/node.json")).get("controller", ""))' 2>/dev/null || true)"
+[ -n "$ctl_url" ] || ctl_url="$(python3 -c 'import json; print(json.load(open("/etc/aerieos/node.json")).get("controller", ""))' 2>/dev/null || true)"
 if [ -n "$SESSION_NAME" ] && [ -n "$ctl_url" ]; then
     say "session port: 7684 (the screen relay: terminals and VMs' screens) open to the controller only"
     ctl_host="${ctl_url#*://}"; ctl_host="${ctl_host%%/*}"; ctl_host="${ctl_host%%:*}"
@@ -3691,8 +3803,8 @@ if [ -n "$SESSION_NAME" ] && [ -n "$ctl_url" ]; then
         # shellcheck disable=SC2046
         command -v nft >/dev/null 2>&1 || pkg $(pkg_names nft) >/dev/null 2>&1 || true
         case "$ctl_ip" in *:*) fam=ip6 ;; *) fam=ip ;; esac
-        install -d -m 0755 /etc/builderbot
-        cat > /etc/builderbot/session-ports.nft <<EOF
+        install -d -m 0755 /etc/aerieos
+        cat > /etc/aerieos/session-ports.nft <<EOF
 # Written by AerieOS's provision-linux.sh: the agent's screen relay, reachable from the
 # controller (${ctl_host}) and the loopback, and from nowhere else.
 table inet builderbot_session
@@ -3706,18 +3818,18 @@ table inet builderbot_session {
     }
 }
 EOF
-        if nft -f /etc/builderbot/session-ports.nft 2>/dev/null; then
+        if nft -f /etc/aerieos/session-ports.nft 2>/dev/null; then
             # ...and again at every boot, the way this init runs a one-shot:
             # a unit, an OpenRC local.d script, or a line in rc.local.
-            nft_cmd="$(command -v nft) -f /etc/builderbot/session-ports.nft"
+            nft_cmd="$(command -v nft) -f /etc/aerieos/session-ports.nft"
             case "$INIT" in
                 systemd)
-                    cat > /etc/systemd/system/builderbot-session-ports.service <<EOF
+                    cat > /etc/systemd/system/aerieos-session-ports.service <<EOF
 [Unit]
 Description=AerieOS: the session port open to the controller only
 After=network-pre.target
 Wants=network-pre.target
-Before=network.target builderbot-agent.service
+Before=network.target aerieos-agent.service
 
 [Service]
 Type=oneshot
@@ -3728,12 +3840,12 @@ ExecStart=${nft_cmd}
 WantedBy=multi-user.target
 EOF
                     systemctl daemon-reload
-                    systemctl enable builderbot-session-ports >/dev/null 2>&1 || true ;;
+                    systemctl enable aerieos-session-ports >/dev/null 2>&1 || true ;;
                 openrc)
                     install -d -m 0755 /etc/local.d
                     printf '#!/bin/sh\n# AerieOS: the session port open to the controller only\n%s\n' "$nft_cmd" \
-                        > /etc/local.d/builderbot-session-ports.start
-                    chmod 0755 /etc/local.d/builderbot-session-ports.start
+                        > /etc/local.d/aerieos-session-ports.start
+                    chmod 0755 /etc/local.d/aerieos-session-ports.start
                     rc-update add local default >/dev/null 2>&1 || true ;;
                 runit)
                     touch /etc/rc.local; chmod 0755 /etc/rc.local
@@ -3772,14 +3884,14 @@ EOF
 # this whole design turns on.
 /usr/local/sbin/bb-sandbox list || true
 
-if [ -f /etc/builderbot/node.json ]; then
+if [ -f /etc/aerieos/node.json ]; then
     cat <<EOF
 
-As a node: the agent is running ($(case "$INIT" in systemd) echo "systemctl status builderbot-agent" ;; openrc) echo "rc-service builderbot-agent status" ;; runit) echo "sv status builderbot-agent" ;; esac)) and the
+As a node: the agent is running ($(case "$INIT" in systemd) echo "systemctl status aerieos-agent" ;; openrc) echo "rc-service aerieos-agent status" ;; runit) echo "sv status aerieos-agent" ;; esac)) and the
 Nodes page should show this machine live within a minute. It dials out, so
 nothing was opened here for it. Jobs run as ${USER_NAME}.
 
-  sudo builderbot-agent status    what this node is, and does the controller answer
+  sudo aerieos-agent status    what this node is, and does the controller answer
 EOF
     if [ -n "$SESSION_NAME" ]; then
         cat <<EOF

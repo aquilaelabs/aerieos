@@ -220,14 +220,14 @@ names.
 AerieOS has a release key (`config/aerieos-release.pub` names its public
 half; the private half is the release build's secret and no controller's).
 The Enroll script carries the public half and the agent pins it as the
-node enrolls (`builderbot-agent release-key` shows it, and pins one on a
+node enrolls (`aerieos-agent release-key` shows it, and pins one on a
 node enrolled before, at its console). From then on the node takes an agent
 update only when the release build's signature over the update's digest
 comes with it (`scripts/agent/agent.sig`, made by `tools/sign-agent.py` in
 the release's builds and passed on by the controller, which checks nothing
 itself). A controller built from a branch ships an unsigned agent, which a
 pinned node refuses, saying so on the update's job; a machine its owner
-uses for such builds says `sudo builderbot-agent unsigned on` at its own
+uses for such builds says `sudo aerieos-agent unsigned on` at its own
 console. Both choices are a person's at the machine: they take root and a
 terminal, the running agent never writes over them, and nothing the
 controller sends in the channel changes them. A node's row says which it

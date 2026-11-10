@@ -17,8 +17,9 @@ import subprocess
 from typing import Callable
 
 from .base import log
+from .names import VAR
 
-HASH_FILE = "/var/lib/builderbot/console-hash"
+HASH_FILE = VAR + "/console-hash"
 OS_RELEASE = "/usr/lib/aerieos-os/release"
 OPEN_MARK = "/var/lib/aerieos-os/console-open"
 DOOR = "/usr/lib/aerieos-os/console-door"

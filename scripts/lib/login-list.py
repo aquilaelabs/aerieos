@@ -33,7 +33,8 @@ def _claims(jwt):
 # tokens.py): a seal there is a sign-in, its header saying whose, though the
 # home's own file is a link to a copy that is only open while the account
 # works here. Read as root, as this runs on a node.
-SEAL_DIR = "/var/lib/builderbot/tokens"
+# Under AerieOS's own name where the node has it (R204), else the one before.
+SEAL_DIR = ("/var/lib/aerieos" if os.path.isdir("/var/lib/aerieos") else "/var/lib/builderbot") + "/tokens"
 
 
 def sealed_of(home, agent):

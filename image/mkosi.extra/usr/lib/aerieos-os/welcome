@@ -21,7 +21,7 @@ mkdir -p "$(dirname "$OUT")"
     # The way in at this screen (R194): admin, once a console password is
     # set on the Nodes page; while the machine is first set up, with none
     # (console-door); otherwise, where to set one.
-    if [ -s "${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}" ]; then
+    if [ -s "${BB_CONSOLE_HASH:-$( [ -d /var/lib/aerieos ] && echo /var/lib/aerieos || echo /var/lib/builderbot )/console-hash}" ]; then
         printf '        Log in here as admin with the console password.\n'
     elif [ -e "${BB_CONSOLE_OPEN:-/var/lib/aerieos-os/console-open}" ]; then
         printf '        Until setup is finished, log in here as admin with no password.\n'

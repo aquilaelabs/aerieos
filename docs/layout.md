@@ -330,6 +330,7 @@ scripts/
     tokenwatch.py                who opens an account's coding-agent token on the node (R125): the files held at 600, a reader that is neither the account nor the agent said on the next hello
     tokens.py                    the coding agents' sign-ins sealed on the node (R126): sealed where a login wrote them, opened into a tmpfs for a person's terminal, wiped after the last session
     tokenseal.py                 the sealing both ends load: an account's key pair per node, the seal, and the wrap a seal's key travels in to the agent
+    names.py                     where a node keeps what is AerieOS's under its own name (R204): /etc/aerieos, /var/lib/aerieos and aerieos-agent where they are there, the names before where only those are, and the links and the command a starting agent adds so the new names answer before the Enroll script moves anything
     release.py                   whether an agent update is AerieOS's own release (R227): the Ed25519 release key a node pins at enrollment or at its console, the signature over the update's digest it then requires, and the console's word that unsigned builds are taken
     runners.py                   the CI runners: their slots and state, and Agent's runner verbs
     census.py                    the census and the sample every hello carries

@@ -8,21 +8,23 @@ import shutil
 import subprocess
 import sys
 import time
+from . import names
+from .names import ETC, VAR
 
 
 # Where the enrollment lands. Overridable for tests, which run a throwaway
 # agent against a throwaway controller and must not touch /etc.
-NODE_JSON = os.environ.get("BUILDERBOT_NODE_JSON", "/etc/builderbot/node.json")
-DEFAULT_STORES = {"data": "/var/lib/builderbot/data",
-                  "toolchains": "/var/lib/builderbot/toolchains",
-                  "cache": "/var/lib/builderbot/cache",
+NODE_JSON = os.environ.get("BUILDERBOT_NODE_JSON", ETC + "/node.json")
+DEFAULT_STORES = {"data": VAR + "/data",
+                  "toolchains": VAR + "/toolchains",
+                  "cache": VAR + "/cache",
                   # What this node keeps of a project's built artifacts, so
                   # an emulator or a container here starts from a local copy
                   # rather than pulling one over the link every time, which
                   # is free on a LAN and is not on a node in somebody's
                   # cloud. Per project underneath (artifact_dir), because a
                   # VM may be several projects' node.
-                  "artifacts": "/var/lib/builderbot/artifacts",
+                  "artifacts": VAR + "/artifacts",
                   # What a dev instance KEEPS: the databases, the uploads, the
                   # caches its containers write, under <appdata>/<project>/
                   # <instance>. A store like the other four (R17 step 2), so
@@ -30,7 +32,7 @@ DEFAULT_STORES = {"data": "/var/lib/builderbot/data",
                   # plane edits it there. It used to be BB_DEV_DATA_DIR on the
                   # CONTROLLER, which is a fact about a node kept on the wrong
                   # machine, and an optional /devdata mount to go with it.
-                  "appdata": "/var/lib/builderbot/appdata"}
+                  "appdata": VAR + "/appdata"}
 
 # The session half (roadmap #24): the screen relay's port, the one a
 # terminal (R133) and a VM's screen (R99) come in on, and the address it
@@ -74,10 +76,10 @@ STORE_DENY_UNDER = ("/bin/", "/boot/", "/dev/", "/etc/", "/lib/", "/lib32/",
 # its presence is what says this node was set up as a sandbox, and a
 # `system` job is refused without it. The netplan seams exist so the tests
 # can stand in for both without a root shell.
-SANDBOX_BIN = os.environ.get("BUILDERBOT_SANDBOX_BIN", "/usr/local/sbin/bb-sandbox")
+SANDBOX_BIN = os.environ.get("BUILDERBOT_SANDBOX_BIN", names.sandbox_bin())
 # Where the agent's own unit is kept through a restart it did not ask for
 # (B538): a systemd drop-in, and needrestart's configuration directory.
-UNIT_DROPIN = "/etc/systemd/system/builderbot-agent.service.d/builderbot.conf"
+UNIT_DROPIN = f"/etc/systemd/system/{names.unit()}.service.d/builderbot.conf"
 NEEDRESTART_DIR = "/etc/needrestart"
 # What the GPU display's unit last said (bb-sandbox gpu-display, R20): one
 # line, read into the census so the row says it.
@@ -102,7 +104,7 @@ SESSION_BIN = os.environ.get("BUILDERBOT_SESSION_BIN", "/usr/local/sbin/bb-sessi
 # which belongs to the job account. Reading them from the store let any job,
 # and so any session through aerie run, plant root code that landed on the
 # next hello (the review of 26 Sep).
-TOOLS_DIR = os.environ.get("BUILDERBOT_TOOLS_DIR", "/var/lib/builderbot/agent/tools")
+TOOLS_DIR = os.environ.get("BUILDERBOT_TOOLS_DIR", VAR + "/agent/tools")
 # The bundle a terminal runs where accounts are their own users (R125): a
 # root-owned copy on the node's own disk, unpacked from the checked tar, so
 # nothing outside a view can change what every account's terminal runs (the
@@ -228,7 +230,7 @@ DIAL_BACK_S = 180
 # The Actions runner as a per-node service (docs/nodes.md §14, phase 7):
 # where it lives, and, for the tests, a tarball to unpack instead of the
 # GitHub release download.
-RUNNER_DIR = os.environ.get("BUILDERBOT_RUNNER_DIR", "/var/lib/builderbot/runner")
+RUNNER_DIR = os.environ.get("BUILDERBOT_RUNNER_DIR", VAR + "/runner")
 # The machine's package manager, for a recipe's `system` packages. Seams for
 # the suite, which must not touch the box it runs on.
 APT_BIN = os.environ.get("BUILDERBOT_APT_BIN", "apt-get")
@@ -364,7 +366,7 @@ BREW_BIN = os.environ.get("BUILDERBOT_BREW_BIN", "brew")
 # controller's address: the agent keeps it true when that address moves.
 NFT_BIN = os.environ.get("BUILDERBOT_NFT_BIN", "nft")
 FIREWALL_CMD = os.environ.get("BUILDERBOT_FIREWALL_CMD", "firewall-cmd")
-SESSION_NFT = os.environ.get("BUILDERBOT_SESSION_NFT", "/etc/builderbot/session-ports.nft")
+SESSION_NFT = os.environ.get("BUILDERBOT_SESSION_NFT", ETC + "/session-ports.nft")
 FIREWALL_EVERY_S = 60
 NETWORKD_DIR = os.environ.get("BUILDERBOT_NETWORKD_DIR", "/etc/systemd/network")
 NETWORKCTL_BIN = os.environ.get("BUILDERBOT_NETWORKCTL_BIN", "networkctl")

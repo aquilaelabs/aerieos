@@ -68,10 +68,10 @@ class TheAgent(unittest.TestCase):
             f.write("BOOT_IMAGE=/vmlinuz aerieslot=a aerietoram=1\n")
         with mock.patch.dict(os.environ, {"BB_CMDLINE": cmd}):
             stick = self.am.render_snapraid(REC)
-        self.assertNotIn("content /var/lib/builderbot/snapraid.content", stick)
+        self.assertNotIn(f"content {self.am.CONTENT}", stick)
         self.assertIn("content /mnt/disks/d1/.snapraid.content\n", stick)
         self.assertNotIn("2-parity", conf)
-        self.assertIn("content /var/lib/builderbot/snapraid.content\n", conf)
+        self.assertIn(f"content {self.am.CONTENT}\n", conf)
         self.assertIn("content /mnt/disks/d1/.snapraid.content\n", conf)
         self.assertIn("data d2 /mnt/disks/d2/\n", conf)
         two = self.am.render_snapraid({**REC, "parity": REC["parity"] + [{"slot": 2, "id": "x", "uuid": "4", "fs": "xfs"}]})

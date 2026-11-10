@@ -151,6 +151,11 @@ def cmd_enroll(args):
 
 def cmd_run():
     harden()
+    # The new names made to answer where this machine has only the old ones
+    # (names.py): added, never moved, before anything here reads a path.
+    from . import names
+    from .base import own_path
+    names.ensure(own_path(), log)
     state = load_state()
     log(f"node {state.get('node_id')} → {state.get('controller')}, agent "
         f"{AGENT_VERSION} {own_digest()[:19]}…")
@@ -223,7 +228,7 @@ def cmd_release_key(args):
         return
     key = release.clean_key(args[0])
     if not key:
-        raise SystemExit("the release key is 64 hex characters, as the controller's About page and the release notes give it")
+        raise SystemExit("the release key is 64 hex characters, as config/aerieos-release.pub and the Enroll script carry it")
     state["release_key"] = key
     save_state(state, console=True)
     print(f"pinned {key[:16]}…: this node takes only agent updates signed by it")

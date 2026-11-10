@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
+from . import names
 from .base import (
     daemon_json_with_ip,
     ROOT_BUNDLE_DIR,
@@ -524,7 +525,7 @@ class ConfigPlaneMixin:
             return []
         did = []
         want = "[Service]\nKillMode=process\n"
-        if run(["systemctl", "show", "-p", "KillMode", "--value", "builderbot-agent"]) != "process":
+        if run(["systemctl", "show", "-p", "KillMode", "--value", names.unit()]) != "process":
             try:
                 os.makedirs(os.path.dirname(UNIT_DROPIN), exist_ok=True)
                 with open(UNIT_DROPIN, "w", encoding="utf-8") as f:
@@ -539,7 +540,7 @@ class ConfigPlaneMixin:
             conf = os.path.join(NEEDRESTART_DIR, "conf.d", "builderbot.conf")
             body = ("# Written by the AerieOS agent (B538): a restart of the agent after a\n"
                     "# library upgrade ended every Claude session on the node.\n"
-                    "$nrconf{override_rc}{qr(^builderbot-agent\\.service$)} = 0;\n")
+                    "$nrconf{override_rc}{qr(^(aerieos|builderbot)-agent\\.service$)} = 0;\n")
             try:
                 with open(conf, encoding="utf-8") as f:
                     same = f.read() == body

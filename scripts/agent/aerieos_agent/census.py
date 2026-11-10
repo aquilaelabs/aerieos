@@ -57,6 +57,7 @@ from .power import host_updates_now, ups_now
 from .extmounts import extmounts_now
 from .backups import backups_now
 from .vms import isos_now, vm_memory, vm_pool, vms_now, vms_other
+from .names import ETC
 
 
 def _sshd_listening():
@@ -218,7 +219,7 @@ def _docker_ip():
 # so IOMMU, Storage, Shares and UPS could not be installed from the page
 # (B641).
 FEATURES = ("vmhost", "firewall", "iommu", "storage", "shares", "ups", "gpuvm")
-FEATURES_DIR = "/etc/builderbot/features"
+FEATURES_DIR = ETC + "/features"
 
 
 def _gpuvm_now():
@@ -267,7 +268,7 @@ def features_now():
                    "kvm": kvm, **({"nokvm": nokvm} if nokvm else {}),
                    "virtiofs": bool(vmhw.virtiofsd()),
                    "libvirt": _run([virsh, "--version"], timeout=10) if virsh else ""},
-        "firewall": {"installed": os.path.exists("/etc/builderbot/hosting-fw.nft")},
+        "firewall": {"installed": os.path.exists(ETC + "/hosting-fw.nft")},
         # The IOMMU on the kernel's command line (R116 step 4): put there by
         # AerieOS (its marker), and on in the running kernel (its groups),
         # which a restart and the firmware's VT-d or AMD-Vi decide.

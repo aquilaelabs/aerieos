@@ -926,7 +926,7 @@ cmd_remove() {
     load_core
     [ "$(id -u)" -eq 0 ] || die "run this as root: sudo bash $0 --remove"
     what="the ${SERVICE} service, ${OPT} and ${RELEASES}, ${BB_BIN}, the sudo rule and the wall"
-    [ -f /etc/builderbot/node.json ] && [ -f "$ETC/own-node" ] && what="${what}, and this machine's node (provision-linux.sh --remove)"
+    { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; } && [ -f "$ETC/own-node" ] && what="${what}, and this machine's node (provision-linux.sh --remove)"
     if [ "$PURGE" = 1 ]; then
         # What --purge removes is the installer's own folders; a state the env
         # file moved elsewhere is named as staying, not as gone.
@@ -939,7 +939,7 @@ cmd_remove() {
         read -r -p "Go ahead? [y/N] " ans
         case "$ans" in y|Y|yes) ;; *) echo "nothing was changed"; exit 0 ;; esac
     fi
-    if [ -f /etc/builderbot/node.json ] && [ -f "$ETC/own-node" ]; then
+    if { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; } && [ -f "$ETC/own-node" ]; then
         say "this machine's node"
         bash "$OPT/nodes/provision-linux.sh" --remove --yes || warn "the node's own uninstall did not finish: sudo bb-sandbox uninstall"
     fi
@@ -997,7 +997,7 @@ own_node() {
     ip="$(lan_ip)" || true
     [ -n "$ip" ] || { warn "this machine has no address on a network, so it cannot be a node of itself: --install again once it has one"; return 1; }
     ctl="http://${ip}:${PORT}"
-    if [ -f /etc/builderbot/node.json ]; then
+    if { [ -f /etc/aerieos/node.json ] || [ -f /etc/builderbot/node.json ]; }; then
         if [ -f "$OWN_MARK" ]; then
             bash "$prov" --session-user "$SESSION_USER" --user "$JOBS_USER" --beside-controller "${dev[@]}" \
                 || warn "provisioning this machine's node again did not finish (above)"
@@ -1077,7 +1077,7 @@ boot_oneshot() {
 Description=${desc}
 After=network-pre.target
 Wants=network-pre.target
-Before=network.target ${SERVICE}.service builderbot-agent.service
+Before=network.target ${SERVICE}.service aerieos-agent.service builderbot-agent.service
 
 [Service]
 Type=oneshot

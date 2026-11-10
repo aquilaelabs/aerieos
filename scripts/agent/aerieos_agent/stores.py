@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+from . import names
 from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, _run, log
 
 
@@ -44,7 +45,7 @@ def store_path_ok(path, what="a store"):
         return f"{path!r} must be a plain absolute path, with no spaces or .."
     if p in STORE_DENY_EXACT:
         return (f"{p} is a system directory (or the root of the mounts): "
-                f"{what} is a directory of its own, like /var/lib/builderbot/x "
+                f"{what} is a directory of its own, like /var/lib/aerieos/x "
                 "or /mnt/<share>/<dir>")
     for bad in STORE_DENY_UNDER:
         if (p + "/").startswith(bad):
@@ -426,7 +427,7 @@ def load_state():
             return json.load(f)
     except OSError as e:
         raise SystemExit(f"{NODE_JSON} is missing; enroll this node first: "
-                         "builderbot-agent enroll --controller URL --token …") from e
+                         f"{names.command()} enroll --controller URL --token …") from e
     except ValueError as e:
         raise SystemExit(f"{NODE_JSON} is not JSON ({e}); enroll again") from e
 

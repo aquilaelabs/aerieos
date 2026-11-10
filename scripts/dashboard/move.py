@@ -1242,7 +1242,7 @@ def follow_line(nid):
     key = _key()
     if not d.get("restored_at") or not key:
         return ""
-    return f"builderbot-agent follow {node_url(nid, page_url() or d.get('to', ''))} {challenge(key, nid)}"
+    return f"aerieos-agent follow {node_url(nid, page_url() or d.get('to', ''))} {challenge(key, nid)}"
 
 
 def node_here(nid):

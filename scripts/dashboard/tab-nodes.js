@@ -1581,7 +1581,7 @@ function nodeConfSections(n){
     <div class="setrow col ctlrow">
       ${lbl("", role, STORE_ABOUT[role] || "")}
       <input data-k="store:${esc(role)}" list="ndStorePlaces" value="${esc(d.stores[role] || "")}" spellcheck="false"
-        autocomplete="off" placeholder="${esc(r?.path || "/var/lib/builderbot/" + role)}">
+        autocomplete="off" placeholder="${esc(r?.path || "/var/lib/aerieos/" + role)}">
       <div class="sub">${now ? "now " + esc(now) : "not reported"}</div>
     </div>`;
   }).join("");
@@ -2484,9 +2484,9 @@ ${state?.settings?.settings?.offer_unvetted?.value ? `
         <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner-macos' -o provision-macos.sh
 bash provision-macos.sh --controller ${esc(m.url)} --token ${esc(m.token)}</pre>` : ""}
         <div class="hint">Or the agent alone, where python3 exists:</div>
-        <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' ${esc(m.url)}/api/v1/agent/download -o /usr/local/sbin/builderbot-agent
-chmod 755 /usr/local/sbin/builderbot-agent
-builderbot-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
+        <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' ${esc(m.url)}/api/v1/agent/download -o /usr/local/sbin/aerieos-agent
+chmod 755 /usr/local/sbin/aerieos-agent
+aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
           m.user && m.user !== "bb" ? ` --user ${esc(m.user)}` : ""}</pre>
       </div>
       <div class="foot"><span class="sp"></span>

@@ -45,7 +45,7 @@ class Verify(unittest.TestCase):
         _, pub = pair()
         ok, said = release.may_install({"release_key": pub}, DIGEST, "")
         self.assertFalse(ok)
-        self.assertIn("sudo builderbot-agent unsigned on", said)
+        self.assertRegex(said, r"sudo (aerieos|builderbot)-agent unsigned on")
         ok, said = release.may_install({"release_key": pub, "unsigned_ok": True}, DIGEST, "")
         self.assertTrue(ok)
         self.assertIn("console allows unsigned", said)

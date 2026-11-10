@@ -14,7 +14,7 @@ back; the pools carry no such parity, so they are writable either way. A ZFS
 pool is imported without -f and never upgraded; one the old system did not export
 is refused with the reason, not forced.
 
-What the person picked is a record (/etc/builderbot/adopted.json); the
+What the person picked is a record (/etc/aerieos/adopted.json); the
 fstab lines are rendered from it under their own mark, the merged trees by
 mergerfs with the read-only disks marked so in the branch list, so a new
 file lands on a pool. Release unmounts all of it and forgets it, every disk
@@ -32,8 +32,9 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from typing import Callable
+from .names import ETC, VAR
 
-RECORD = "/etc/builderbot/adopted.json"
+RECORD = ETC + "/adopted.json"
 FSTAB = "/etc/fstab"
 MARK = "# builderbot-adopted"
 FS = ("xfs", "btrfs", "zfs")
@@ -367,9 +368,9 @@ def top_folders(root):
 # ran by digest, and each VM's definition, whether it starts with the
 # machine and its UEFI variables. Nothing in either file is changed, and
 # neither is ever run.
-APPS = "/var/lib/builderbot/adopted-apps.json"
-NVRAM_KEPT = "/var/lib/builderbot/adopted-nvram"
-TPM_KEPT = "/var/lib/builderbot/adopted-tpm"
+APPS = VAR + "/adopted-apps.json"
+NVRAM_KEPT = VAR + "/adopted-nvram"
+TPM_KEPT = VAR + "/adopted-tpm"
 SWTPM_DIR = "/var/lib/libvirt/swtpm"
 NVRAM_DIR = "/var/lib/libvirt/qemu/nvram"
 VM_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}")

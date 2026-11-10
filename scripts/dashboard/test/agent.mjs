@@ -657,7 +657,7 @@ print(json.dumps({'first': first, 'again': case('process'), 'guest': case('contr
       const r = JSON.parse(said);
       ok(JSON.stringify(r.first) === JSON.stringify([['unit', 'needrestart'], ['show', 'daemon-reload']])
          && r.dropin === '[Service]\nKillMode=process\n'
-         && r.conf.includes('$nrconf{override_rc}{qr(^builderbot-agent\\.service$)} = 0;'),
+         && r.conf.includes('$nrconf{override_rc}{qr(^(aerieos|builderbot)-agent\\.service$)} = 0;'),
          `a unit that would take the sessions on a stop gets KillMode=process in a drop-in, and needrestart is told to leave it alone (${said.slice(0, 120)})`);
       ok(r.again[0].length === 0 && JSON.stringify(r.again[1]) === '["show"]' && r.guest[0].length === 0,
          '...once: a unit that already stops only itself and a needrestart already told are left as they are, and a guest is never touched');
@@ -3968,9 +3968,9 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
   // would notice the line going away.
   const prov = readFileSync(`${REPO}/nodes/provision-linux.sh`, 'utf8');
   ok(/AGENT_KILLMODE='KillMode=process'/.test(prov)
-     && /svc_install builderbot-agent .*"\$AGENT_KILLMODE"/.test(prov),
+     && /svc_install aerieos-agent .*"\$AGENT_KILLMODE"/.test(prov),
      'the agent unit is installed with KillMode=process, so a stop does not take the sessions');
-  ok(!/svc_install\s+(?!builderbot-agent)\S+.*AGENT_KILLMODE/.test(prov),
+  ok(!/svc_install\s+(?!aerieos-agent)\S+.*AGENT_KILLMODE/.test(prov),
      '...and nothing else is: a runner that kept only its main process would orphan a CI job');
   // ...and the agent ends what IS its own, which the new KillMode makes its
   // responsibility: with control-group systemd killed the job children, and
