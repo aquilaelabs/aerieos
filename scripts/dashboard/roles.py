@@ -145,6 +145,9 @@ CAP_AREA = {
 }
 
 _ALL = {a: "write" for a in AREA_KEYS}
+# Names no custom role takes: what a plain account and a session are called.
+RESERVED = frozenset({"user", "session"})
+
 BUILTIN = {
     # Named for a person (R255 step 1): AerieOS's owner is not a
     # project's, and neither is the Owner of X role a project's owner holds.
@@ -382,6 +385,11 @@ def set_role(name, scope="projects", perms=None, note="", grants=None, nodes=Non
         return {"error": "a role's name is letters, digits, spaces and . _ -, up to 40"}
     if name in BUILTIN:
         return {"error": f"{name} is built in and not changed"}
+    # "user" is what every plain account and every session is called where a
+    # role is asked for, so a role made under that name would have been
+    # granted to all of them at once.
+    if name.lower() in RESERVED:
+        return {"error": f"{name} is what every account without a role is called, so no role takes that name"}
     r = _clean({"grants": grants} if grants is not None and perms is None else
                {"scope": scope, "perms": perms or {}, "nodes": nodes or [], "only": only or {}})
     r["note"] = str(note or "")[:200]

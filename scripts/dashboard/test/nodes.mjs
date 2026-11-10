@@ -645,13 +645,22 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
       headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 8192, mem_used_mb: 512, sessions },
                              running: [], wait: 0 }) });
+    // A session name is the node's own word (B762): it earns a token only
+    // for a space that works on this node and an account that may work on it.
     await beat([{ name: `${uid}~claude-alpha` }, { name: `${uid}~shell-3` }]);
+    const stray = await napi('/api/v1/agent/hello', {
+      census: CENSUS, version: shipped.version, digest: shipped.digest },
+      { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
+    ok((stray.session_tokens || []).length === 0,
+       `a node that names a session of a space it does not work on is handed no token for it (${JSON.stringify((stray.session_tokens || []).map(t => t.project))})`);
+    await napi('/api/prefs', { project: 'alpha', node: minted.id, nodes: [minted.id] });
+    await beat([{ name: `${uid}~claude-alpha` }, { name: 'u_0badc0de~claude-alpha' }, { name: `${uid}~shell-3` }]);
     const hello = await napi('/api/v1/agent/hello', {
       census: CENSUS, version: shipped.version, digest: shipped.digest },
       { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
     const toks = hello.session_tokens || [];
     ok(toks.length === 1 && toks[0].project === 'alpha' && toks[0].uid === uid,
-       `the heartbeat carries a fresh token for each Claude session on the node, and only those (${
+       `the heartbeat carries a fresh token for each Claude session of a space on the node, for an account that is one, and only those (${
          JSON.stringify(toks.map(t => t.project))})`);
     // Worth being a real credential rather than a shape: the whole point is
     // that the session can go on using it.
@@ -666,6 +675,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
       { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' });
     ok((none.session_tokens || []).length === 0,
        '...while a node running no Claude session is handed none');
+    await napi('/api/prefs', { project: 'alpha', node: '', nodes: [] });
   }
   // A heartbeat, in the shape the real one has: the sample flattens each
   // store to a bare free-space number while the census keeps the whole

@@ -2829,11 +2829,22 @@ def session_tokens_for(nid, sessions):
     Matched from the PROJECT towards the session name, never the other way:
     tmux rewrites `.` and `:` in a name, so `ep.silon` runs as
     `claude-ep_silon` and the project cannot be read back out of it.
+
+    A session name is the node's own word, so it earns a token only for a
+    space that works on THIS node, and for an account that may work on that
+    space (B762): a node that named another space's session, or another
+    person's, was handed their token, and with it that account's agent
+    sign-in. What the node is told is what a terminal opened there by that
+    person would have been given, never more.
     """
     want = {}
     for name in project_names(users.ALL):
+        pf = prefs.get(name) or {}
+        if nid not in ({pf.get("node") or ""} | set(pf.get("nodes") or [])) - {""}:
+            continue
         for n in agent_sessions(name):
             want[n] = name
+    names = account_names()
     out = []
     seen = set()
     for row in sessions if isinstance(sessions, list) else []:
@@ -2842,6 +2853,9 @@ def session_tokens_for(nid, sessions):
         project = want.get(base)
         if not uid or not project or (uid, project) in seen:
             continue
+        who = users.get(names.get(uid) or "") if names.get(uid) else None
+        if not who or not users.may_work(who, project):
+            continue
         seen.add((uid, project))
         out.append({"project": project, "uid": uid,
                     "token": users.mint_session(project, uid=uid)})
@@ -2849,7 +2863,7 @@ def session_tokens_for(nid, sessions):
         # in (R136), kept by the agent under that repository as this is.
         key = repos.project_of(project)
         for m in (repos.members(key) if key else []):
-            if m != project and (uid, m) not in seen:
+            if m != project and (uid, m) not in seen and users.may_work(who, m):
                 seen.add((uid, m))
                 out.append({"project": m, "uid": uid, "token": users.mint_session(m, uid=uid)})
     return out[:64]
@@ -5665,6 +5679,11 @@ def revisions(who=None, projects=None):
     if projects is not None:
         want = set(projects)
         names = [n for n in names if n in want]
+    # Only what the caller may see: every folder's name and its activity
+    # stamps went to any signed-in caller, a session and a role held to one
+    # space included.
+    if who is not None and who is not users.ALL:
+        names = [n for n in names if users.may_see(who, n)]
     # Read once for the whole request, and only when a notebook is open on
     # something: with no per-project work to do these are five files nobody
     # asked about.
@@ -11356,6 +11375,12 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         if not me or not users.uid_of(me):
             return self._json({"error": "not an account"}, 403)
+        # A person's, never their session's (B764): a session's token carries
+        # its person's id, and with it this page would have let a session
+        # send that person's notifications elsewhere, end their browser
+        # sign-ins and enroll a second factor on their account.
+        if me.get("session"):
+            return self._json({"error": "a profile is its person's, read and changed from their own sign-in, never by a session"}, 403)
         if req is None:
             return self._json(*profiletab.view(me))
         payload, status, renamed = profiletab.verb(me, field(req, "action"), req, origin=self._origin())
