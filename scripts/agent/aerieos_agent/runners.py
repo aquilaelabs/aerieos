@@ -67,6 +67,27 @@ def runner_dirs():
     return out
 
 
+def runner_busy(d, proc="/proc"):
+    """Whether the GitHub runner in `d` is running a job: a Runner.Worker of
+    its own, from bin/ or from the bin.VERSION/ it updated itself into
+    (B755: the check looked under bin/ alone, so a job of an updated
+    runner read as idle and the .env sync restarted the runner under it)."""
+    root = os.path.realpath(d).rstrip("/") + "/"
+    for pid in os.listdir(proc) if os.path.isdir(proc) else []:
+        if not pid.isdigit():
+            continue
+        try:
+            with open(os.path.join(proc, pid, "cmdline"), "rb") as f:
+                argv = f.read().split(b"\0")[:2]
+        except OSError:
+            continue
+        for a in argv:
+            a = a.decode(errors="replace")
+            if re.search(r"/Runner\.Worker(\.dll)?$", a) and os.path.realpath(a).startswith(root):
+                return True
+    return False
+
+
 def _runner_state(d, rec):
     """One runner as the census reports it: what it registered as and
     whether its listener is up, read from its own files."""
@@ -104,7 +125,7 @@ def _runner_state(d, rec):
             "name": str(rec.get("agentName") or rec.get("name") or "")[:80],
             "url": url, "forge": "gitea" if "address" in rec else "github",
             "unit": unit, "labels": labels[:16], "active": bool(pg),
-            "busy": bool(_run(["pgrep", "-f", os.path.join(d, "bin/Runner.Worker")]))}
+            "busy": runner_busy(d)}
 
 
 class RunnersMixin:
@@ -129,7 +150,7 @@ class RunnersMixin:
             have = ""
         if have == want:
             return
-        if _run(["pgrep", "-f", os.path.join(d, "bin/Runner.Worker")]):
+        if runner_busy(d):
             return                          # busy: next hello
         env = {}
         who = self.as_user(env, self.state.get("user") or "")
@@ -141,7 +162,10 @@ class RunnersMixin:
         if who:
             with contextlib.suppress(OSError):
                 os.chown(os.path.join(d, ".env"), who["user"], who["group"])
-        log("runner: its .env now carries the node's toolchain and the CI log directory; restarting the runner to read it")
+        # Which lines moved, so a restart says why (B755).
+        moved = sorted({ln.partition("=")[0] for ln in set(have.splitlines()) ^ set(want.splitlines()) if ln})
+        log(f"runner: its .env now carries the node's toolchain and the CI log directory ({', '.join(moved[:8]) or 'new'}); "
+            "restarting the runner, idle, to read it")
         if os.path.isfile(os.path.join(d, "svc.sh")) and has_systemd():
             quiet = type("Q", (), {"say": staticmethod(lambda t: None)})()
             self._sh(quiet, ["bash", "./svc.sh", "stop"], cwd=d)
