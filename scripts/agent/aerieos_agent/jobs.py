@@ -569,6 +569,12 @@ class Job(threading.Thread):
         # agent (docker_by_root), on the system's programs alone; on any
         # other node the mark means nothing and the job drops as ever.
         by_root = bool(spec.get("docker")) and self.agent.docker_by_root()
+        # ...and docker alone, held here and not only by what the controller
+        # queues: the mark turned any argv into root's on this machine, and
+        # a job's env could point PATH at another docker.
+        if by_root and (argv[:1] != ["docker"] or spec.get("bb")):
+            self.say("refused: a job run by the root agent here is docker itself, nothing else\n")
+            return "failed", 77
         if by_root:
             env = root_docker_env()
             env.update({"BUILDERBOT_NODE": self.agent.state.get("node_id", ""),
@@ -594,6 +600,8 @@ class Job(threading.Thread):
         if not os.path.isdir(cwd):
             cwd = "/tmp"
         for k, v in (spec.get("env") or {}).items():
+            if by_root and (str(k) == "PATH" or str(k).startswith("LD_")):
+                continue
             env[str(k)] = str(v)
         # Inputs: files from the project's dist/, fetched into the working
         # directory by name: an APK for the emulator to install.

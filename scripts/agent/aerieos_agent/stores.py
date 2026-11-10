@@ -438,4 +438,20 @@ def save_state(state):
     with open(tmp, "w") as f:
         os.fchmod(f.fileno(), 0o600)
         json.dump(state, f, indent=2)
+        # On the disk before its name points at it: a power cut after a new
+        # token was used could bring back the one before, which the
+        # controller had retired and reads as a stolen copy.
+        try:
+            f.flush()
+            os.fsync(f.fileno())
+        except OSError:
+            pass
     os.replace(tmp, NODE_JSON)
+    try:
+        fd = os.open(d, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
