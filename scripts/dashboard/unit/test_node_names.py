@@ -28,6 +28,28 @@ class Which(unittest.TestCase):
         self.assertEqual(names._home(new, old), new, "a link under the new name answers as the folder does")
 
 
+class Tool(unittest.TestCase):
+    def test_the_tool_is_one_file_and_the_new_name_runs_it(self):
+        # Met on the dev node, 10 Nov: the agent refreshes the file this
+        # answers, and answering aerie-sandbox left bb-sandbox, which every
+        # unit runs, to go stale.
+        self.assertEqual(names.sandbox_bin(), names.OLD_SANDBOX)
+        d = tempfile.mkdtemp()
+        was = (names.OLD_SANDBOX, names.NEW_SANDBOX, names.OLD_ETC, names.NEW_ETC, names.OLD_VAR, names.NEW_VAR, os.geteuid)
+        self.addCleanup(lambda: (setattr(names, "OLD_SANDBOX", was[0]), setattr(names, "NEW_SANDBOX", was[1]), setattr(names, "OLD_ETC", was[2]),
+                                 setattr(names, "NEW_ETC", was[3]), setattr(names, "OLD_VAR", was[4]), setattr(names, "NEW_VAR", was[5]),
+                                 setattr(os, "geteuid", was[6])))
+        names.OLD_SANDBOX, names.NEW_SANDBOX = f"{d}/bb-sandbox", f"{d}/aerie-sandbox"
+        names.OLD_ETC, names.NEW_ETC, names.OLD_VAR, names.NEW_VAR = f"{d}/e-old", f"{d}/e-new", f"{d}/v-old", f"{d}/v-new"
+        os.geteuid = lambda: 0
+        open(names.OLD_SANDBOX, "w").write("#!/bin/sh\n# the tool\n")
+        open(names.NEW_SANDBOX, "w").write("#!/usr/bin/env bash\n# a whole copy an agent wrote here\n" + "x" * 2000)
+        names.ensure("")
+        text = open(names.NEW_SANDBOX).read()
+        self.assertIn(f"exec {d}/bb-sandbox", text, "a copy becomes the forward again")
+        self.assertLess(len(text), 300)
+
+
 def move_fn():
     """names_move out of the provisioner, its folders pointed at a scratch one."""
     text = open(PROV).read()
