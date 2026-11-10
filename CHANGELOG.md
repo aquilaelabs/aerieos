@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Prepare to move names any node that dials in from outside the local network when the new home's address is a local one it cannot reach (133a1ba)
+
+### Changed
+
+- The move token given on the first page is not asked for again when the move lands, and where the old controller ran on the same machine the landing asks for the bundle alone (133a1ba)
+- The old system's containers and VMs are brought back from the machine's Containers page, and are found where they usually are when the stick was made without the old system's backup (133a1ba)
+- New container offers a ready app only when the Library's New container opened it on that app; apps are picked on the Library (133a1ba)
+
+### Fixed
+
+- Moving here's pool and folder picks and its After it lands step no longer squeeze long sentences into a grid, and each pick's button sits beside its field (133a1ba)
+- A move from a container install onto a machine no longer risks retiring one of its nodes and moving that node's spaces onto the new machine (133a1ba)
+
 ## 0.9.0-dev.5138: 2026-11-09
 
 ### Added
