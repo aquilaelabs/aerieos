@@ -82,15 +82,37 @@ class Signer(unittest.TestCase):
         had = open(sig).read() if os.path.exists(sig) else None
         self.addCleanup(lambda: open(sig, "w").write(had) if had is not None else (os.path.exists(sig) and os.unlink(sig)))
         k, pub = pair()
-        r = subprocess.run([sys.executable, tool], env=dict(os.environ, AERIEOS_RELEASE_KEY=k.private_bytes_raw().hex()),
+        # A key of the test's own, named as the committed file names the real one.
+        d = tempfile.mkdtemp()
+        mine = os.path.join(d, "release.pub")
+        open(mine, "w").write(f"# a test's key\naerieos-release-ed25519 {pub}\n")
+        env = dict(os.environ, AERIEOS_RELEASE_PUB=mine)
+        r = subprocess.run([sys.executable, tool], env=dict(env, AERIEOS_RELEASE_KEY=k.private_bytes_raw().hex()),
                            capture_output=True, text=True, timeout=60, check=False)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         got = json.load(open(sig))
         self.assertEqual(got["key"], pub)
         self.assertEqual(release.verify(pub, got["digest"], got["sig"]), "")
-        r = subprocess.run([sys.executable, tool], env={k2: v for k2, v in os.environ.items() if k2 != "AERIEOS_RELEASE_KEY"},
+        r = subprocess.run([sys.executable, tool, "--check"], env=env, capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        # A key that is not the one the file names signs nothing: nodes
+        # pinned to the named one would refuse what it signed.
+        os.unlink(sig)
+        other, _ = pair()
+        r = subprocess.run([sys.executable, tool], env=dict(env, AERIEOS_RELEASE_KEY=other.private_bytes_raw().hex()),
+                           capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 2)
+        self.assertFalse(os.path.exists(sig))
+        r = subprocess.run([sys.executable, tool], env={k2: v for k2, v in env.items() if k2 != "AERIEOS_RELEASE_KEY"},
                            capture_output=True, text=True, timeout=60, check=False)
         self.assertIn("ships unsigned", r.stdout)
+
+    def test_the_committed_key_is_one_a_node_can_pin(self):
+        sys.path.insert(0, os.path.join(HERE, ".."))
+        import enrollscript
+        key = enrollscript.release_key()
+        self.assertEqual(release.clean_key(key), key)
+        self.assertTrue(key, "the repository names AerieOS's release key")
 
 
 if __name__ == "__main__":

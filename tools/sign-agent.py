@@ -32,7 +32,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 AGENT = os.path.join(HERE, "..", "scripts", "agent")
 SIG = os.path.join(AGENT, "agent.sig")
-PUB = os.path.join(HERE, "..", "config", "aerieos-release.pub")
+# The committed public key; a test names another file.
+PUB = os.environ.get("AERIEOS_RELEASE_PUB") or os.path.join(HERE, "..", "config", "aerieos-release.pub")
 
 
 def _load(name):

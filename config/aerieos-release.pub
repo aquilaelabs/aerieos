@@ -2,5 +2,6 @@
 #   aerieos-release-ed25519 <64 hex characters>
 # made once by tools/sign-agent.py --keygen. A node pins it when it is enrolled
 # and then takes only agent updates the release build signed with its private
-# half (scripts/agent/aerieos_agent/release.py). While no line below names a
-# key, nothing is pinned and updates are taken as before.
+# half (scripts/agent/aerieos_agent/release.py). The private half is the
+# release build's secret (AERIEOS_RELEASE_KEY) and is in no repository.
+aerieos-release-ed25519 2eb9add8c065963469de797ff1d3e9679a19d904c93956487f5e2550d982e818
