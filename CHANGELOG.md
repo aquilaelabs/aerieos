@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A node enrolled at the public hostname of Reach from outside follows a move to a controller on the local network: it is told that hostname rather than the new home's local address, and Prepare to move no longer warns about it (6dd5554)
+
 ## 0.9.0-dev.5146: 2026-11-10
 
 ### Added
