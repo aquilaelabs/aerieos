@@ -366,9 +366,14 @@ container to a machine of its own, and back.
    shows the **move token** once (write it down) and from its next hello
    every node hears the new address and a challenge of its own, which it
    keeps. A node knocks there once the old controller goes quiet, so the new
-   address must be one each node reaches: a node that dials in from outside
-   the local network cannot reach an address of it, and the section names
-   any such node while the move is armed. The move stays armed until it lands or you press **Forget it**,
+   address must be one each node reaches. A node enrolled at the public
+   hostname of **Reach from outside** (the home tunnel, on the Network
+   page) is told that hostname instead and keeps it: the tunnel's settings
+   move with the state, so once the new home has landed and holds the
+   install key, the hostname reaches it there. Any other node that dials in
+   from outside the local network cannot reach a local address, and the
+   section names it while the move is armed: prepare the move with an
+   address it reaches, or enroll it again at the public hostname first. The move stays armed until it lands or you press **Forget it**,
    so a controller can be prepared days ahead, and the section says how
    many nodes have heard it.
 2. Install the new home (the image, an AerieOS stick or disk, or bare metal)
@@ -428,7 +433,8 @@ container to a machine of its own, and back.
    and TLS pin, and goes on; its containers kept running and its synced
    copies kept meanwhile. The new controller's Nodes page lists the nodes
    not yet here since the move, each with one line to run on it as root
-   (`builderbot-agent follow ADDRESS CHALLENGE`) for a node that outlived
+   (`builderbot-agent follow ADDRESS CHALLENGE`, the address its public
+   hostname for a node enrolled at one) for a node that outlived
    the old controller and so was never told: it knocks there at once, and
    nothing is enrolled again (the node keeps its id, its token, its
    containers and its synced copies). The list empties as each says hello.

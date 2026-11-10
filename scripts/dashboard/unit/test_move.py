@@ -242,6 +242,12 @@ class Move(unittest.TestCase):
         nh = move.not_yet_here()
         self.assertEqual([x["name"] for x in nh], ["alpha", "beta"])
         self.assertEqual(nh[0]["line"], f"builderbot-agent follow https://new.example/ {fn['expect']}")
+        move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
+        try:
+            self.assertTrue(move.not_yet_here()[1]["line"].startswith("builderbot-agent follow https://aerie.example.com "),
+                            "a node at the public hostname is followed there")
+        finally:
+            move.tunnel_host = lambda nid: ""
         move.node_here("n_1")
         move.node_here("n_9")
         self.assertEqual([x["id"] for x in move.not_yet_here()], ["n_2"], "a hello here takes a node off the list; a stranger is nobody's")
@@ -253,6 +259,16 @@ class Move(unittest.TestCase):
         fn2 = move.challenge(move.key_of(token), "n_2")
         self.assertEqual(move.for_node("n_2"), {"url": "https://new.example", "expect": fn2})
         self.assertEqual(move.answer_for("n_2"), "", "the old home answers no knock")
+        # A node enrolled at the home tunnel's public hostname is told that
+        # hostname, never the new home's local address (the operator, 10 Nov:
+        # a server elsewhere could not follow a move to a LAN address).
+        move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
+        try:
+            self.assertEqual(move.for_node("n_2")["url"], "https://aerie.example.com")
+            self.assertEqual(move.for_node("n_1")["url"], "https://new.example")
+            self.assertEqual(move.node_url("n_2", "http://192.168.1.15:7680"), "https://aerie.example.com")
+        finally:
+            move.tunnel_host = lambda nid: ""
         self.assertIn("moved already", move.prepare("user:ann", "https://x.example")["error"])
         self.assertIn("not withdrawn", move.forget("user:ann")["error"])
 

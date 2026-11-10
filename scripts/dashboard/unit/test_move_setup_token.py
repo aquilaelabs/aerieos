@@ -52,6 +52,13 @@ class FarNodes(unittest.TestCase):
         nodes = [("draconis", "15.204.9.32"), ("sandbox", "192.168.1.16"), ("odd", "")]
         self.assertEqual(move.far_nodes("http://192.168.1.15:7680", nodes), ["draconis"])
 
+    def test_a_node_at_the_home_tunnels_hostname_follows_there(self):
+        nodes = [("draconis", "15.204.9.32", "aerie.example.com"), ("vps2", "15.204.9.33", "")]
+        self.assertEqual(move.far_nodes("http://192.168.1.15:7680", nodes), ["vps2"], "one enrolled at the public hostname keeps it")
+        said = move.far_said(["vps2"], "http://192.168.1.15:7680")
+        self.assertIn("Reach from outside", said)
+        self.assertNotIn("the line the new home", said, "that line names the new home's local address too")
+
     def test_a_public_name_or_address_names_none(self):
         self.assertEqual(move.far_nodes("https://aerie.example.com", [("draconis", "15.204.9.32")]), [])
         self.assertEqual(move.far_nodes("https://15.204.9.40", [("draconis", "15.204.9.32")]), [])

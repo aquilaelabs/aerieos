@@ -777,7 +777,9 @@ def far_nodes(to, nodes):
     """The nodes that cannot follow a move to `to`: a new home named by an
     address of the local network, and a node that dials in from outside it
     (the operator, 10 Nov: a node on a server elsewhere stayed quiet after a
-    move to a LAN address). `nodes` is [(name, address)]; the names."""
+    move to a LAN address), unless it dials a public hostname, which it is
+    told to keep (node_url). `nodes` is [(name, address, hostname)]; the
+    names."""
     import ipaddress
     host = urllib.parse.urlsplit(str(to or "")).hostname or ""
     try:
@@ -787,7 +789,9 @@ def far_nodes(to, nodes):
     if not (here.is_private or here.is_loopback or here.is_link_local):
         return []
     out = []
-    for name, addr in nodes:
+    for name, addr, *host in nodes:
+        if host and host[0]:
+            continue
         try:
             a = ipaddress.ip_address(str(addr or "").split("%")[0])
         except ValueError:
@@ -798,9 +802,11 @@ def far_nodes(to, nodes):
 
 
 def far_said(far, to):
-    return (f"{', '.join(far)} {'dials' if len(far) == 1 else 'dial'} in from outside this network, so {to}, an address of the local network, "
-            f"cannot be reached from {'it' if len(far) == 1 else 'them'}: Forget this move and prepare it again with an address "
-            f"{'it reaches' if len(far) == 1 else 'they reach'}, or run the line the new home's Nodes page gives on {'it' if len(far) == 1 else 'each'} once it has landed")
+    one = len(far) == 1
+    return (f"{', '.join(far)} {'dials' if one else 'dial'} in from outside this network at no public hostname of this controller's, so {to}, "
+            f"an address of the local network, cannot be reached from {'it' if one else 'them'}: Forget this move and prepare it again with an "
+            f"address {'it reaches' if one else 'they reach'}, or set Reach from outside on the Network page and enroll {'it' if one else 'them'} "
+            f"again at that hostname with the Enroll script on {'its' if one else 'each'} row before you move")
 
 
 def pack_bundle():
@@ -927,6 +933,20 @@ def forget(principal):
     return {"ok": True}
 
 
+# The public hostname a node dials the controller at through the home tunnel
+# (nodes.tunnel_host), "" for one on the network: handed in by the server.
+tunnel_host = lambda nid: ""  # noqa: E731
+
+
+def node_url(nid, here):
+    """Where a node reaches the controller after a move: the public hostname
+    it was enrolled at, which the tunnel's settings carry to the new home,
+    else `here` (the operator, 10 Nov: a node on a server elsewhere could
+    never follow a move to a local address)."""
+    h = tunnel_host(nid)
+    return f"https://{h}" if h else here
+
+
 def for_node(nid):
     """What a node's hello carries while a move is armed, and what the old
     controller's "moved" answer carries after (R175: a node that never
@@ -948,7 +968,7 @@ def for_node(nid):
             if nid not in told and d.get("made_at"):
                 d["told"] = told + [str(nid)]
                 _save(d)
-    return {"url": d.get("moved_to") or d["to"], "expect": challenge(key, nid)}
+    return {"url": node_url(nid, d.get("moved_to") or d["to"]), "expect": challenge(key, nid)}
 
 
 def answer_for(nid):
@@ -1216,7 +1236,7 @@ def follow_line(nid):
     key = _key()
     if not d.get("restored_at") or not key:
         return ""
-    return f"builderbot-agent follow {page_url() or d.get('to', '')} {challenge(key, nid)}"
+    return f"builderbot-agent follow {node_url(nid, page_url() or d.get('to', ''))} {challenge(key, nid)}"
 
 
 def node_here(nid):

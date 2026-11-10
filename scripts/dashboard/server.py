@@ -5569,7 +5569,12 @@ backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.resto
                  host_fn=lambda: socket.gethostname())
 nodes.move_for_node = move.for_node
 nodes.move_here = move.node_here
-channel.moved_answer = lambda nid: {"answer": move.answer_for(nid), "url": _page_url(), "pin": tls._loaded or ""}
+# ...a node enrolled at the home tunnel's public hostname kept on it, with no
+# pin (the hostname's certificate is the tunnel's): the tunnel's settings
+# came with the bundle, so the hostname reaches this controller now.
+move.tunnel_host = lambda nid: nodes.tunnel_host(nodes.node(nid) or {})
+channel.moved_answer = lambda nid: ({"answer": move.answer_for(nid), "url": move.node_url(nid, ""), "pin": ""} if move.tunnel_host(nid)
+                                    else {"answer": move.answer_for(nid), "url": _page_url(), "pin": tls._loaded or ""})
 apps.configure(state=STATE, version=lambda: image_stamp().get("version") or "",
                setting=settings.get, write_json=write_json, audit=db.audit)
 apps.unvetted_ok = channel.unvetted_ok      # the Windows companion and the VS Code extension are dev features
@@ -13185,7 +13190,7 @@ class Handler(BaseHTTPRequestHandler):
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
         # An armed move to an address some node cannot reach, said while it stands.
         if out.get("prepared") and not out.get("moved"):
-            far = move.far_nodes(out.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr")) for n in nodes.node_list()
+            far = move.far_nodes(out.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr"), nodes.tunnel_host(n)) for n in nodes.node_list()
                                                      if n.get("kind") == "agent" and n.get("state") != "retired"])
             out["far"] = move.far_said(far, out.get("to", "")) if far else ""
         # Whether a move may land here (_move_land): a fresh controller's,
@@ -13222,7 +13227,7 @@ class Handler(BaseHTTPRequestHandler):
                              stores=[str(k) for k in stores if isinstance(k, str)] if isinstance(stores, list) else None)
             if r.get("ok"):
                 db.audit(self._principal(), "move-prepare", "", {"to": r.get("to", ""), "repos": req.get("repos") is True})
-                far = move.far_nodes(r.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr")) for n in nodes.node_list()
+                far = move.far_nodes(r.get("to", ""), [(n.get("name"), (n.get("agent") or {}).get("addr"), nodes.tunnel_host(n)) for n in nodes.node_list()
                                                        if n.get("kind") == "agent" and n.get("state") != "retired"])
                 if far:
                     r["said"] = [move.far_said(far, r["to"])]
