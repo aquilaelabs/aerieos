@@ -5,6 +5,7 @@
 ### Fixed
 
 - A node enrolled at the public hostname of Reach from outside follows a move to a controller on the local network: it is told that hostname rather than the new home's local address, and Prepare to move no longer warns about it (6dd5554)
+- A machine's first boot no longer fails to make the machine its own node when its dashboard answers the agent's download with an error in its first moments: the download is tried again (101fb59)
 
 ## 0.9.0-dev.5146: 2026-11-10
 
