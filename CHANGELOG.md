@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- A job pressed while another is running is queued behind it rather than refused, on the Library, the Installed page, a container's row, a node's system changes, Reboot and Shut down, and a new space's clone; the card or row says it is queued, and pressing the same thing again does not queue it twice. What still cannot happen during a job, such as renaming a container or disabling a node with sessions on it, is ghosted with the reason on its row (3d75e07)
+
 ### Fixed
 
 - A node that reached a move's new home and then came back to the old controller is taken back by itself, rather than refused every five minutes until it is enrolled again (5640b84)
