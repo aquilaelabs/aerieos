@@ -5275,6 +5275,11 @@ progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
 button.working::after,a.btn.working::after{content:"";display:inline-block;width:.8em;height:.8em;margin-left:6px;vertical-align:-.1em;
   border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after{animation:none;border-right-color:currentColor;opacity:.6} }
+/* ...and on a button that is an icon alone, the ring in place of the icon,
+   the button's size kept, rather than wrapped under it. */
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))>svg{visibility:hidden}
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta)))::after{position:absolute;left:50%;top:50%;margin:-.4em 0 0 -.4em}
+button.working:has(> svg):not(:has(> :not(svg, .dot, .meta))){position:relative}
 
 pre{margin:0;padding:9px 11px;font:var(--f-code);white-space:pre-wrap;
   word-break:break-word;max-height:300px;overflow:auto;color:color-mix(in srgb, var(--ink) 80%, var(--dim))}

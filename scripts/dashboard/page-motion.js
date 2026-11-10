@@ -519,6 +519,9 @@ const PRESS_TIE_MS = 1500;
 function pressTrackDown(e){
   const b = e.target.closest?.("button, a.btn");
   if (!b) return;
+  // A button that opens a panel (the bell, the doctor, the gear) has answered
+  // the press when the panel shows: what the panel then reads is its own.
+  if (b.hasAttribute("aria-haspopup")){ pressEl = null; return; }
   if (b.closest(".askdlg")){ if (pressEl) pressAt = performance.now(); return; }
   pressEl = b; pressAt = performance.now();
 }
