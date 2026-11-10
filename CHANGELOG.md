@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A node that reached a move's new home and then came back to the old controller is taken back by itself, rather than refused every five minutes until it is enrolled again (5640b84)
+
 ## 0.9.0-dev.5160: 2026-11-10
 
 ### Fixed
