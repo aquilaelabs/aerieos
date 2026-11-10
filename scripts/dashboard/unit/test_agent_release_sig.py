@@ -74,6 +74,55 @@ class Console(unittest.TestCase):
         self.assertEqual(stores.console_said(), {"release_key": pub})
 
 
+class Enrolling(unittest.TestCase):
+    def test_the_key_is_pinned_though_the_census_writes_the_record_midway(self):
+        # Met on the dev node, 10 Nov: the census a node takes while it
+        # enrolls saved the record (its check for the system's updates), on
+        # a machine whose record held no key yet, and the key the enrollment
+        # was pinning went with the file's own word for it.
+        from aerieos_agent import cli, power
+        d = tempfile.mkdtemp()
+        was = (stores.NODE_JSON, cli.Controller, cli.census, cli.make_store, cli.store_path_ok)
+        self.addCleanup(lambda: (setattr(stores, "NODE_JSON", was[0]), setattr(cli, "Controller", was[1]), setattr(cli, "census", was[2]),
+                                 setattr(cli, "make_store", was[3]), setattr(cli, "store_path_ok", was[4])))
+        stores.NODE_JSON = os.path.join(d, "node.json")
+        json.dump({"node_id": "n_1", "token": "bbn_old", "stores": {}}, open(stores.NODE_JSON, "w"))
+
+        class Ctl:
+            CA = "ca"
+
+            def __init__(self, url, token, pin):
+                self.url, self.host, self.scheme = url, "h", "http"
+
+            def call(self, verb, body, timeout=30):
+                return 200, {"node_id": "n_1", "token": "bbn_x", "name": "box", "capabilities": []}
+
+        def census(state):
+            stores.save_state(state)            # as a census that writes midway did
+            return {}
+        cli.Controller, cli.census, cli.make_store, cli.store_path_ok = Ctl, census, lambda p: {}, lambda p: ""
+        _, pub = pair()
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", pub])
+        self.assertEqual(json.load(open(stores.NODE_JSON)).get("release_key"), pub)
+        # ...and the check for updates no longer writes a record that is not a node's yet.
+        saved = []
+        w = (power.save_state, power.shutil.which, power.os.geteuid, power.os_release, power._out)
+        self.addCleanup(lambda: (setattr(power, "save_state", w[0]), setattr(power.shutil, "which", w[1]), setattr(power.os, "geteuid", w[2]),
+                                 setattr(power, "os_release", w[3]), setattr(power, "_out", w[4])))
+        power.save_state = saved.append
+        power.shutil.which = lambda name: "/usr/bin/apt-get"
+        power.os.geteuid = lambda: 0
+        power.os_release = lambda: ""
+        power._out = lambda *a, **k: "0 upgraded, 0 newly installed"
+        power.host_updates_now({"stores": {}})
+        self.assertEqual(saved, [], "no id yet: nothing written")
+        power.host_updates_now({"node_id": "n_1"})
+        self.assertEqual(len(saved), 1)
+
+
 class Signer(unittest.TestCase):
     """tools/sign-agent.py signs this tree's agent, and what it writes passes."""
     def test_what_the_build_signs_is_what_a_node_checks(self):

@@ -112,11 +112,7 @@ def cmd_enroll(args):
     if opts["--release-key"] and not release.clean_key(opts["--release-key"]):
         raise SystemExit("--release-key takes the release key as 64 hex characters")
     key = release.clean_key(opts["--release-key"]) or release.pinned(was)
-    if key:
-        state["release_key"] = key
-        print(f"pinned AerieOS's release key {key[:16]}…: this node takes only agent updates signed by it")
-    if release.unsigned_ok(was):
-        state["unsigned_ok"] = True
+    unsigned = release.unsigned_ok(was)
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
     state["session_user"] = opts["--session-user"]
@@ -142,6 +138,15 @@ def cmd_enroll(args):
     state.update({"node_id": r["node_id"], "token": r["token"],
                   "name": r.get("name", ""), "capabilities": r.get("capabilities", []),
                   "enrolled": int(time.time()), "scheme": ctl.scheme})
+    # ...set here, at the save that is the console's, and not before:
+    # nothing between could then write the record without them.
+    state.pop("release_key", None)
+    state.pop("unsigned_ok", None)
+    if key:
+        state["release_key"] = key
+        print(f"pinned AerieOS's release key {key[:16]}…: this node takes only agent updates signed by it")
+    if unsigned:
+        state["unsigned_ok"] = True
     save_state(state, console=True)
     print(f"enrolled as node {r['node_id']} ({r.get('name')}); "
           f"capabilities: {', '.join(r.get('capabilities') or []) or 'none'}")

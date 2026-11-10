@@ -79,7 +79,13 @@ def host_updates_now(state):
     security = sum(1 for ln in sim.splitlines() if ln.startswith("Inst ") and re.search(r"[Ss]ecurity", ln))
     now = {"pending": pending, "security": security, "checked": int(time.time())}
     state["host_updates"] = now
-    save_state(state)
+    # Kept on the record of a node that is one. The census is taken while a
+    # node enrolls too, with a record still being put together and no id
+    # yet: saved then, it replaced the record the machine had with half of
+    # one before the controller had answered, and dropped the release key
+    # the enrollment was pinning (met on the dev node, 10 Nov).
+    if state.get("node_id"):
+        save_state(state)
     return {**now, "reboot": os.path.exists(REBOOT_FLAG)}
 
 
