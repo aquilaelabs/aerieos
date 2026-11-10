@@ -42,6 +42,20 @@ class TokenBack(unittest.TestCase):
         with mock.patch.object(agentmod, "save_state"), mock.patch.object(agentmod, "log"):
             self.assertFalse(a.token_back())
 
+    def test_the_newest_is_kept_ahead_of_the_one_gone_back_to(self):
+        # B759: a move's new home refused the newest (it had not issued it),
+        # the node went back a token and was taken back there; the old home,
+        # running again, holds the newest live and the one before retired.
+        a = bare("bbn_x", "bbn_w")
+        a.state["past_tokens"] = [["bbn_w", 2000000000], ["bbn_v", 1999999999]]
+        with mock.patch.object(agentmod, "save_state"), mock.patch.object(agentmod, "log"):
+            self.assertTrue(a.token_back())
+            self.assertEqual([p[0] for p in a.state["past_tokens"]], ["bbn_x", "bbn_w", "bbn_v"])
+            a.take_token("bbn_s1")
+            a.take_token("bbn_s2")
+        self.assertEqual([p[0] for p in a.state["past_tokens"]], ["bbn_s1", "bbn_x", "bbn_w", "bbn_v"],
+                         "the token gone back to keeps its place behind the newer one, offered after it")
+
     def test_a_write_that_fails_keeps_the_newest(self):
         a = bare("bbn_new", "bbn_old")
         with mock.patch.object(agentmod, "save_state", side_effect=OSError(30, "read-only")), mock.patch.object(agentmod, "log"):

@@ -206,7 +206,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         old = self.state.get("token") or ""
         past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
                 and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
-        past = ([[old, now]] if old else []) + past
+        # A token already among them (the one token_back went back to)
+        # keeps its place: the newer one it stood in for stays ahead of it.
+        past = ([[old, now]] if old and old not in [p[0] for p in past] else []) + past
         try:
             save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
         except OSError as e:
@@ -250,12 +252,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         prev, _ = getattr(self, "prev_token", None) or ("", 0)
         if not prev or prev == self.state.get("token"):
             return False
+        # The newest is kept among the past, ahead of the one gone back to:
+        # a controller that refused it may not be the one that issued it (a
+        # move's new home, B759), and the one that did takes this node back
+        # by it once it is here again.
+        newest = self.state.get("token") or ""
+        past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != newest]
+        past = ([[newest, int(time.time())]] if newest else []) + past
         try:
-            save_state(dict(self.state, token=prev))
+            save_state(dict(self.state, token=prev, past_tokens=past[:PAST_MOST]))
         except OSError as e:
             log(f"the token before was not kept, so the newest stays: {e}")
             return False
         log("the controller does not know this node's newest token; the one it handed out before is tried")
+        self.state["past_tokens"] = past[:PAST_MOST]
         self.state["token"] = prev
         self.ctl.token = prev
         self.prev_token = None

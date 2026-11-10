@@ -955,10 +955,11 @@ def recover_token(node_id, bearers, peer=""):
     back by an older one it still holds (the operator, 6 Nov: a controller
     restored from a backup re-adopts every node still there): the node's
     tokens of the last month offered newest first, the first this record
-    knows decides. One it holds live or pending is the node's own: a fresh
-    token answers, minted as a hello's rotation is. One it holds retired or
-    revoked ends the search with nothing, never the alarm a stolen copy
-    raises, since a node offering its own past is not a copy. The tokens
+    knows and has not retired decides. One live or pending is the node's own: a fresh
+    token answers, minted as a hello's rotation is. One it holds retired is
+    passed over, since a newer one may follow (B759); one revoked ends the
+    search with nothing, never the alarm a stolen copy raises, since a node
+    offering its own past is not a copy. The tokens
     themselves are offered, never their hashes, which the record keeps and a
     backup's reader would hold.
 
@@ -990,8 +991,13 @@ def recover_token(node_id, bearers, peer=""):
         if not rows:
             continue
         t = rows[0]
-        if t["node_id"] != node_id or t["revoked"] not in (0, TOKEN_PENDING):
+        if t["node_id"] != node_id or t["revoked"] not in (0, TOKEN_PENDING, TOKEN_RETIRED):
             return None
+        # A retired one is passed over: the node holds a newer one this
+        # record may know further down its list (B759: a token a move's new
+        # home handed out sat ahead of the one this record still held live).
+        if t["revoked"] == TOKEN_RETIRED:
+            continue
         if authenticate(b).get("error"):
             return None
         print(f"dashboard: node {node_id} came back by a token from before its newest (a restored record); a fresh one handed over", flush=True)

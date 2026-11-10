@@ -121,6 +121,15 @@ class Restored(unittest.TestCase):
         self.assertIn("node", nodes.authenticate(fresh), "the fresh token is the node's")
         self.assertIsNone(nodes.recover_token(self.nid, self.past), "the past it offered is retired by the fresh one")
 
+    def test_a_retired_token_ahead_of_the_live_one_is_passed_over(self):
+        # B759: the node offers a token this record retired before the one it
+        # still holds live (the newest it handed out, kept behind by a node
+        # that went back a token at a move's new home).
+        live = self.past[0]
+        retired = self.past[1]
+        fresh = nodes.recover_token(self.nid, ["bbn_" + "0" * 64, retired, live])
+        self.assertTrue(fresh and fresh.startswith("bbn_"), "the live one further down takes it back")
+
     def test_a_sweep_reaches_past_its_first_chunk_and_a_stranger_does_not_use_it_up(self):
         # B721: the agent offers its month 200 a call, back to back; the
         # second call was always refused, so a token past the newest 200
