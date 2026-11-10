@@ -449,7 +449,9 @@ guest_run() {
     say "the agent, from ${CONTROLLER}"
     local hdr want got
     hdr="$(mktemp)"
-    curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+    # Tried again on a transient answer: a stick's first boot asks its own
+    # dashboard the moment it answers at all, and once got a 500 (B747).
+    curl -fsSL --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${CONTROLLER%/}/api/v1/agent/download" -o "${agent}.new" \
         || { warn "could not download the agent from ${CONTROLLER}: is that the dashboard's address, and is the token unused?"
              rm -f "$hdr" "${agent}.new"; exit 1; }
@@ -3468,7 +3470,8 @@ if [ -n "$CONTROLLER" ]; then
     # shellcheck disable=SC2046
     pkg $(pkg_names pycrypto)
     hdr="$(mktemp)"
-    curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+    # Tried again on a transient answer (B747), as the own node's download is.
+    curl -fsSL --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
         || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
     # The digest the controller says it served, against what arrived. The
