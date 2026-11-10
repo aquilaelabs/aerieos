@@ -3,6 +3,7 @@ import contextlib
 import hashlib
 import hmac
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -85,6 +86,11 @@ def follow(state, url="", expect=""):
 PAST_KEEP_S = 30 * 86400
 PAST_MOST = 9000
 RECOVER_CHUNK = 200
+
+# What a call says when nobody is listening at the controller's port yet: a
+# restart under way (B760).
+RESTARTING = re.compile(r"ConnectionRefused|RemoteDisconnected|ConnectionReset|Connection refused")
+
 
 class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, ConsoleMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
             TokensMixin, ScanMixin):
@@ -705,6 +711,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
 
     def loop(self):
         delay = wdelay = 1
+        refused_since = 0.0     # when the controller began refusing connections (B760)
         # The hourly walk of the disks, on its own thread (storage.py).
         storage.start(lambda: self.state)
         # What is THIS process's to end, ended by it: a stop of the unit is
@@ -902,6 +909,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                                   timeout=wait + 15)
             if st in (200, 204):
                 wdelay = 1
+                refused_since = 0.0
             if st == 204:
                 continue
             if st == 200 and r.get("cancel"):
@@ -963,7 +971,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if st:
                 self.hello_again(f"the work poll failed ({st})")
             time.sleep(wdelay)
-            wdelay = min(wdelay * 2, 60)
+            # A controller that refuses the connection, or a proxy in front
+            # of it saying it is down, is a controller restarting (an update
+            # takes a minute): asked again every few seconds for its first
+            # ten minutes, so the node is back within seconds of it rather
+            # than up to a minute after and read as quiet meanwhile (B760).
+            # Anything else, and a controller gone longer, backs off to a
+            # minute as before.
+            down = (st == 0 and bool(RESTARTING.search(str(r.get("error") or "")))) or st in (502, 503, 530)
+            if down and not refused_since:
+                refused_since = time.monotonic()
+            elif not down:
+                refused_since = 0.0
+            soon = down and time.monotonic() - refused_since < 600
+            wdelay = min(wdelay * 2, 4 if soon else 60)
 
     def take(self, job):
         with self.lock:
