@@ -896,7 +896,8 @@ class AdoptMixin:
 
     def _hand_specs(self, job, specs, autostart):
         """The containers' settings, to the controller for their compose
-        files: one upload while the read runs. What the job says of it."""
+        files: one upload while the read runs. Said in the job's log when
+        taken; what the page says when not, else ""."""
         if not specs:
             return "Docker: no container's settings to hand over"
         fd, path = tempfile.mkstemp(prefix="bb-oldapps-", suffix=".json")
@@ -908,7 +909,8 @@ class AdoptMixin:
             with contextlib.suppress(OSError):
                 os.unlink(path)
         if st == 200 and not (r or {}).get("error"):
-            return f"Docker: each container's settings handed to the controller for its compose file ({len(specs)})"
+            job.say(f"Docker: each container's settings handed to the controller for its compose file ({len(specs)})\n")
+            return ""
         return f"Docker: the controller did not take the containers' settings ({(r or {}).get('error') or st}), so it has no compose files of them"
 
     def _apply_apps(self, job, action, cfg):
@@ -934,7 +936,9 @@ class AdoptMixin:
                         # Their settings go to the controller, which writes
                         # their compose files; kept nowhere here, since an
                         # env holds passwords.
-                        said.append(self._hand_specs(job, got["docker"].pop("specs", {}), got["docker"]["autostart"]))
+                        handed = self._hand_specs(job, got["docker"].pop("specs", {}), got["docker"]["autostart"])
+                        if handed:
+                            said.append(handed)
                     else:
                         doms = read_libvirt_root(d)
                         os.makedirs(NVRAM_KEPT, exist_ok=True)

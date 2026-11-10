@@ -446,11 +446,11 @@ function adoptAppsSection(n){
       btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${["stopped", "shut off", "crashed"].includes(s.state) ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
   return docSection("docker", "oldapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
-    `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
+    `<div class="field"><div class="actbar"><span class="grow">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}</span>${btn('data-adoptapp="read"', "Read again")}</div>
       ${adoptPlan === null ? skRows(2) : rows ? `<div class="adpick">${rows}</div>` : `<div class="hint">No container's settings were read: Read what ran again.</div>`}
       <div class="hint">Each is a compose file with the image, settings and paths it ran with, so it finds its files where they were. Import one with New container: Compose, Import a compose file${nets.length ? "; a container that joins a network needs that network made first" : ""}.</div>
-      <div class="actbar">${btn('data-adoptapp="read"', "Read again")}${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway || "")}"`, `Make the ${esc(k)} network`)).join("")}
-        ${btn(`data-adoptapp="zip"${nOk ? "" : " disabled"}`, "Download their compose files", "primary")}</div>
+      <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway || "")}"`, `Make the ${esc(k)} network`)).join("")}
+        ${btn(`data-adoptapp="zip"${nOk ? "" : " disabled"}`, "Download compose files", "primary")}</div>
       ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}
         <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === (apps.vms || []).filter(v => !other[v.name]).length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary") : ""}</div>` : ""}
     </div>`);
@@ -483,7 +483,7 @@ async function downloadOldCompose(b){
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     notify("saved old-system-compose.zip: import each with New container, Compose, Import a compose file");
   }catch(e){ notify("the compose files: " + failWords(e), true); }
-  finally{ unbusy(b, "Download their compose files"); }
+  finally{ unbusy(b, "Download compose files"); }
 }
 
 function wireAdoptApps(root){

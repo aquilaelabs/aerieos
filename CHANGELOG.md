@@ -12,7 +12,7 @@
 - The move token given on the first page is not asked for again when the move lands, and where the old controller ran on the same machine the landing asks for the bundle alone (133a1ba)
 - The old system's containers and VMs are brought back from the machine's Containers page, and are found where they usually are when the stick was made without the old system's backup (133a1ba)
 - New container offers a ready app only when the Library's New container opened it on that app; apps are picked on the Library (133a1ba)
-- The old system's containers come back as compose files: Download their compose files saves a zip of them, each with the image, settings, ports and paths it ran with and what it will not do as written said at its top, to import with New container; Make the network makes a network the old Docker kept for its own containers as a bridge of its own (16a8572)
+- The old system's containers come back as compose files: Download compose files saves a zip of them, each with the image, settings, ports and paths it ran with and what it will not do as written said at its top, to import with New container; Make the network makes a network the old Docker kept for its own containers as a bridge of its own (16a8572)
 
 ### Removed
 

@@ -838,7 +838,7 @@ await firstRun(false);
     ok(/1 started with the machine/.test(apps.text) && /plex br0 · starts with the machine/.test(apps.text) && /Import a compose file/.test(apps.text)
        && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
        && ['read', 'br0', 'zip', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make'),
-       `once read: each container's row, the network it joins and Download their compose files, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+       `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
     const picked = await page.evaluate(() => {

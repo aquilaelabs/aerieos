@@ -87,7 +87,7 @@ the bell, and a dead SSD is restored from last night's.
   are read read-only for what ran (from where the stick's plan says they
   are, or from their usual places under the merged folder when the stick
   was made with no plan). Its containers come back as compose files, one
-  each in a zip from Download their compose files: each with the image,
+  each in a zip from Download compose files: each with the image,
   settings, ports and paths it ran with, restarting with the machine where
   it started with it there, and what it will not do as written (a path the
   adopted disks do not hold, a network to make first) said at its top. Each
