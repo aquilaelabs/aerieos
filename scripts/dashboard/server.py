@@ -2563,6 +2563,19 @@ def ctr_target(name, instance):
         # log is read by the controller, as a node with no terminal's is.
         return {"where": "node", "id": nid, "name": nm, "term": False,
                 "no_shell": f"{nm} is the controller's own machine, which opens no shell in a container"}
+    # Its terminals still running the scripts from before this controller's
+    # update, which may not know what this one asks of them (B746): asked to
+    # check in now, it takes the new ones within a poll, waited for here
+    # rather than refusing with "try again in a minute".
+    if (not nodes.host_only(n) and n.get("state") == "online" and n.get("live") is not False and isinstance(se, dict)
+            and se.get("up") and se.get("bundle") and nodes.bundle_digest() and se["bundle"] != nodes.bundle_digest()):
+        _ask_hello(nid)
+        deadline = time.time() + 45
+        while time.time() < deadline:
+            time.sleep(0.5)
+            se = ((nodes.node(nid) or {}).get("reported") or {}).get("session")
+            if not isinstance(se, dict) or se.get("bundle") == nodes.bundle_digest():
+                break
     if nodes.host_only(n):
         why = f"{nm} hosts containers only and runs no terminal, so a shell in this one opens on a node that runs sessions"
     elif n.get("state") != "online" or n.get("live") is False:
@@ -2570,12 +2583,8 @@ def ctr_target(name, instance):
     elif not isinstance(se, dict) or not se.get("up"):
         why = f"{nm} runs no terminal server yet" + (f": {se['why']}" if isinstance(se, dict) and se.get("why") else "")
     elif se.get("bundle") and nodes.bundle_digest() and se["bundle"] != nodes.bundle_digest():
-        # Its terminals still run the scripts from before this controller's
-        # update, which may not know what this one asks of them (B746):
-        # asked to check in now, it takes the new ones in a minute or so.
-        _ask_hello(nid)
-        why = (f"{nm} has not taken this controller's update yet; its terminals move onto it at "
-               "its next check-in, asked for now, so try again in a minute")
+        why = (f"{nm} has not taken this controller's update within 45 seconds of being asked: "
+               "its agent may be busy restarting; its row on the Nodes page says when it is back")
     elif not se.get("ctr"):
         # The container terminal runs as the docker account; the session
         # ones as an account kept off docker, and it is set up after them.
@@ -3255,7 +3264,7 @@ def _end_agent(session):
     return {"ended": True}
 
 
-def end_session(session, node=""):
+def end_session(session, node="", wait=False):
     """End one session by its page name, wherever it runs: on a node through
     its agent's held poll, by node id when the caller knows it (one name can
     live here and there), else with this container's tmux. A name that is
@@ -3263,11 +3272,16 @@ def end_session(session, node=""):
     error, because the caller that wants a clean slate (Sign in ending the
     sign-in terminal first) asks for exactly that ordinary case. The
     Sessions card's kill (_session) and an administrator's End in a
-    project's settings (projsessions.py) are this one path."""
+    project's settings (projsessions.py) are this one path. With `wait`
+    (a Restart, whose new session would attach to the one going down), a
+    node's answers once the node says it has ended, `gone` saying whether
+    it did; this container's tmux ends it before answering anyway."""
     here = {s["name"] for s in tmux_sessions()}
     on_node = next((s for s in node_tmux_sessions() if s["name"] == session
                     and (not node or s["node_id"] == node)), None)
     if on_node and (node or session not in here):
+        if wait:
+            return nodes.session_kill_wait(on_node["node_id"], on_node["node_name"])
         return nodes.session_kill(on_node["node_id"], on_node["node_name"])
     if session not in here:
         return {"code": 0, "out": "", "err": "", "gone": True}
@@ -10024,9 +10038,6 @@ class Handler(BaseHTTPRequestHandler):
         stop (the review of 26 Sep)."""
         me = self._who() or {}
         uid = users.uid_of(me)
-        if signin.owner() not in ("", uid) and signin.state()["running"]:
-            return self._json({"error": "another account is signing in right now: "
-                                        "one sign-in at a time, so try again in a minute"}, 409)
         if field(req, "action") == "cancel":
             if me.get("session"):
                 return self._json({"error": "a session does not sign an account in or out"}, 403)
@@ -10042,9 +10053,10 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if me.get("session"):
             return self._json({"error": "a session does not sign an account in or out"}, 403)
-        if signin.owner() != users.uid_of(me):
+        uid = users.uid_of(me)
+        if not uid or not signin.running(uid):
             return self._json({"error": "no sign-in of yours is running"}, 403)
-        return self._json(*signin.take_code(field(req, "code")))
+        return self._json(*signin.take_code(field(req, "code"), uid))
 
     def _signout(self, req):
         """Sign this account out of a coding agent on one node
@@ -13175,7 +13187,7 @@ class Handler(BaseHTTPRequestHandler):
         # that is not a live session never becomes a `-t` argument: nothing
         # runs for it. By node id when the row said which, and by name alone
         # for a caller that only knows the name (a tab closing).
-        return self._result(end_session(session, str(req.get("node") or "")))
+        return self._result(end_session(session, str(req.get("node") or ""), wait=req.get("wait") is True))
 
     def _get_move(self):
         """GET /api/move (R90 step 12): a move armed here (and, asked with
@@ -13804,8 +13816,21 @@ class Handler(BaseHTTPRequestHandler):
                               req.get("custom", ""))
         if self._not_theirs(session):
             return None
-        return self._json(*macros.send(session, name, cid,
-                                       self._session_on_node(session, str(req.get("node") or ""))))
+        # A shell the page has just opened comes up as its tab connects, and
+        # on a node is known here only from the node's next heartbeat: with
+        # `wait` (seconds, at most a minute) this waits for it rather than
+        # the page sending again and again.
+        try:
+            wait = max(0.0, min(60.0, float(req.get("wait") or 0)))
+        except (TypeError, ValueError):
+            wait = 0.0
+        deadline = time.time() + wait
+        while True:
+            body, code = macros.send(session, name, cid,
+                                     self._session_on_node(session, str(req.get("node") or "")))
+            if code != 400 or not str(body.get("error") or "").startswith("no such session") or time.time() >= deadline:
+                return self._json(body, code)
+            time.sleep(1)
 
 
 class Server(ThreadingHTTPServer):

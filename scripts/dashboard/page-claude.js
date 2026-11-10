@@ -167,23 +167,19 @@ function claudeRestart(name, n, several, agent = "claude", slot = 1){
 }
 
 // The restart itself, once the model and effort are picked and the person
-// said yes: end the session, wait until the controller no longer lists it,
-// then start the same conversation. Started while the old one was still
-// going down, the new tab attached to the dying session and showed it end,
-// and a second press was what got a session (the operator, 12 Oct).
+// said yes: end the session, the server answering once the node says it has
+// ended, then start the same conversation. Started while the old one was
+// still going down, the new tab attached to the dying session and showed it
+// end, and a second press was what got a session (the operator, 12 Oct).
 async function restartNow(name, r){
   const n = r.restart, id = r.agent || "claude", slot = r.slot || 1;
   const where = n.name ? ` on ${n.name}` : "";
-  const j = await endSession(myAgentSession(id, name, slot), n.id).catch(e => ({error: String(e)}));
+  const j = await endSession(myAgentSession(id, name, slot), n.id, true).catch(e => ({error: failWords(e)}));
   if (j.error) return j.error;
   dropAgentTab(id, name, n.several && n.id ? n.id : "", slot);
-  const live = () => id === "claude" ? claudeLiveOn(name, {id: n.id}, slot) : agentLiveOn(id, name, {id: n.id}, slot);
-  for (let i = 0; i < 40 && live(); i++){
-    await new Promise(res => setTimeout(res, 500));
-    await refresh();
-  }
-  if (live())
-    return `your session${where} is still going down; press Restart again in a moment`;
+  if (j.gone === false)
+    return `${n.name || "the node"} has not said your session ended within half a minute: its agent may be away; Restart again once its row says it is back`;
+  await refresh();
   return "";
 }
 

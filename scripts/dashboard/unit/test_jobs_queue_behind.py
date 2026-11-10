@@ -35,5 +35,32 @@ class SystemQueue(Gate):
         self.assertEqual(nodes.job_next(self.n, 0)["id"], "t1")
 
 
+class SigninPasses(Gate):
+    def test_a_sign_in_is_handed_out_past_a_full_slot_and_holds_none(self):
+        nodes._exec("UPDATE nodes SET concurrency = 1 WHERE id = ?", (self.n,))
+        self.job("b1", "build", state="running")
+        self.job("l1", "claude-login", spec='{"uid": "u_1", "timeout": 900}')
+        self.job("b2", "build")
+        self.assertEqual(nodes.job_next(self.n, 0)["id"], "l1", "a person's sign-in does not wait for a build")
+        nodes._exec("UPDATE jobs SET state = 'succeeded' WHERE id = 'b1'")
+        self.assertEqual(nodes.job_next(self.n, 0)["id"], "b2", "...and a build does not wait for a sign-in left open")
+
+
+class SessionGone(Gate):
+    def test_a_kill_is_gone_once_a_heartbeat_after_it_was_taken_lacks_it(self):
+        name = "u_1~claude-web"
+        nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", ('{"sessions": [{"name": "%s"}]}' % name, self.n))
+        nodes._kill_taken.pop((self.n, name), None)
+        self.assertFalse(nodes.session_gone(self.n, name), "not before the agent has taken the kill")
+        nodes._kill_taken[(self.n, name)] = 100.0
+        nodes._sessions_at[self.n] = 50.0
+        nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", ('{"sessions": []}', self.n))
+        self.assertFalse(nodes.session_gone(self.n, name), "nor on a heartbeat from before it")
+        nodes._sessions_at[self.n] = 150.0
+        self.assertTrue(nodes.session_gone(self.n, name), "...and gone on one after it that lacks it")
+        nodes._exec("UPDATE nodes SET reported = ? WHERE id = ?", ('{"sessions": [{"name": "%s"}]}' % name, self.n))
+        self.assertFalse(nodes.session_gone(self.n, name), "still listed after it, still there")
+
+
 if __name__ == "__main__":
     unittest.main()

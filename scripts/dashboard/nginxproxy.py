@@ -769,19 +769,44 @@ def _cf_txt(token, name, value, delete=False):
 
 
 def _challenge_served(addr, host, token, value, wait=120):
-    """Whether the node's nginx answers the HTTP-01 token at its address,
-    polled while the rebuild lands; a node whose address is unknown or
-    unreachable from here is given the wait and then trusted."""
-    if not addr:
-        time.sleep(min(wait, 30))
-        return True
+    """Whether the node's nginx answers the HTTP-01 token, polled while the
+    rebuild lands: at the node's address with the name as its Host, or,
+    where the address is not known here, at the name itself, which is what
+    Let's Encrypt asks. True, or False when neither answered in `wait`."""
+    url = f"http://{addr}/.well-known/acme-challenge/{token}" if addr else f"http://{host}/.well-known/acme-challenge/{token}"
     end = time.time() + wait
     while time.time() < end:
         try:
-            req = urllib.request.Request(f"http://{addr}/.well-known/acme-challenge/{token}", headers={"Host": host})
+            req = urllib.request.Request(url, headers={"Host": host})
             with urllib.request.urlopen(req, timeout=5) as r:
                 if r.read().decode(errors="replace").strip() == value:
                     return True
+        except (urllib.error.URLError, OSError, ValueError):
+            pass
+        time.sleep(3)
+    return False
+
+
+# Where the DNS-01 record is looked for before Let's Encrypt is asked to: a
+# public resolver's DNS over HTTPS, since the standard library resolves no
+# TXT record. The zone is Cloudflare's already (the record was written there).
+DOH = "https://cloudflare-dns.com/dns-query"
+urlopen = urllib.request.urlopen     # the seam a test replaces
+
+
+def _txt_seen(name, value, wait=120):
+    """Whether the TXT record `name` carries `value` where a resolver reads
+    it, polled until it does or `wait` runs out: Let's Encrypt asked before
+    it has spread fails the order. True, or False."""
+    end = time.time() + wait
+    q = urllib.parse.urlencode({"name": name, "type": "TXT"})
+    while time.time() < end:
+        try:
+            req = urllib.request.Request(f"{DOH}?{q}", headers={"Accept": "application/dns-json"})
+            with urlopen(req, timeout=5) as r:
+                got = json.loads(r.read().decode(errors="replace") or "{}")
+            if any(str(a.get("data") or "").strip('"') == value for a in got.get("Answer") or []):
+                return True
         except (urllib.error.URLError, OSError, ValueError):
             pass
         time.sleep(3)
@@ -838,14 +863,17 @@ def _acme_run(nid, host, method, email, containers, devactions, devapp):
             if r.get("error"):
                 raise acme.AcmeError(f"nginx could not be rebuilt with the challenge: {r['error']}")
             if not _challenge_served(addr, name, tok, value):
-                raise acme.AcmeError(f"this node's nginx did not answer the challenge at {addr or 'its address'}: "
+                raise acme.AcmeError(f"this node's nginx did not answer the challenge at {addr or name} within two minutes: "
                                      "is port 80 open there, and does the name reach this node?")
         else:
             _acme_note(nid, host, state="writing the DNS record")
             err = _cf_txt(token, f"_acme-challenge.{name}", value)
             if err:
                 raise acme.AcmeError(f"Cloudflare refused the record: {err}")
-            time.sleep(15)
+            _acme_note(nid, host, state="waiting for the DNS record to be seen")
+            if not _txt_seen(f"_acme-challenge.{name}", value):
+                raise acme.AcmeError(f"the record _acme-challenge.{name} was written but not seen by a resolver within "
+                                     "two minutes: is the name's zone the one the Cloudflare token reaches?")
 
     def cleanup(kind, name, tok, value):
         if kind == "http-01":

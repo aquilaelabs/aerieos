@@ -452,10 +452,14 @@ ${code}`], { encoding: 'utf8' });
     // the flow was started for and to nobody else, and only they type into it.
     ok((await as(other, '/api/status')).signin?.running === true && (await as(owner, '/api/status')).signin?.running === false,
        'a running sign-in is shown to the account it was started for, and to nobody else');
+    // ...and another account signs in at the same time, a flow of its own,
+    // which neither replaces the first nor takes its code.
+    const before = await as(owner, '/api/login-code', { code: 'abc#def' });
     const butt = await as(owner, '/api/signin', { node: box.id });
-    const code = await as(owner, '/api/login-code', { code: 'abc#def' });
-    ok(butt.status === 409 && /another account is signing in/.test(butt.error || '') && code.status === 403,
-       `...and another account neither replaces it nor types a code into it (${butt.error})`);
+    ok(before.status === 403 && butt.status === 200 && butt.job && butt.job !== theirs.job
+       && (await as(other, '/api/status')).signin?.running === true,
+       `...and another account signs in at the same time with a flow of its own, the first one still running (${butt.error || butt.job})`);
+    await as(owner, '/api/signin', { action: 'cancel' });
     await as(other, '/api/signin', { action: 'cancel' });
     // Signing out: that account's, on that node. Not while its own session
     // is open there; then a job on the node, and nobody else's sign-in moves.

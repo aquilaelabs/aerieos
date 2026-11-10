@@ -140,8 +140,8 @@ async function killSession(name, node = ""){
 
 // End a session, no questions asked. killSession is this with the dialog in
 // front of it.
-async function endSession(name, node = ""){
-  const r = await postJSON("/api/session", {action:"kill", session:name, node});
+async function endSession(name, node = "", wait = false){
+  const r = await postJSON("/api/session", {action:"kill", session:name, node, ...(wait ? {wait: true} : {})});
   return r.json();
 }
 

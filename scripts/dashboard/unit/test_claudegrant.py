@@ -150,12 +150,38 @@ class WhichNode(unittest.TestCase):
 
             def state(self):
                 return {"running": True, "url": "https://claude.com/x", "node": "n1"}
-        was, signin._flow = signin._flow, Flow()
-        self.addCleanup(setattr, signin, "_flow", was)
+        was = dict(signin._flows)
+        signin._flows.clear()
+        signin._flows["u_aaaaaaaa"] = Flow()
+        self.addCleanup(lambda: (signin._flows.clear(), signin._flows.update(was)))
         self.assertTrue(signin.state("u_aaaaaaaa")["running"])
         self.assertEqual(signin.state("u_bbbbbbbb"), {"running": False})
         self.assertEqual(signin.state(""), {"running": False})
-        self.assertTrue(signin.state()["running"])
+
+    def test_two_accounts_sign_in_at_once_each_its_own(self):
+        class Flow:
+            def __init__(self, uid):
+                self.uid, self.codes, self.stopped = uid, [], False
+
+            def state(self):
+                return {"running": not self.stopped}
+
+            def submit(self, code):
+                self.codes.append(code)
+                return {"ok": True}
+
+            def cancel(self):
+                self.stopped = True
+        was = dict(signin._flows)
+        signin._flows.clear()
+        a, b = Flow("u_aaaaaaaa"), Flow("u_bbbbbbbb")
+        signin._flows.update({"u_aaaaaaaa": a, "u_bbbbbbbb": b})
+        self.addCleanup(lambda: (signin._flows.clear(), signin._flows.update(was)))
+        signin.take_code("abc#def", "u_bbbbbbbb")
+        self.assertEqual((a.codes, b.codes), ([], ["abc#def"]), "a code goes to its own account's flow")
+        signin.cancel("u_aaaaaaaa")
+        self.assertTrue(a.stopped and not b.stopped, "...and a cancel stops only its own")
+        self.assertTrue(signin.running("u_bbbbbbbb") and not signin.running("u_aaaaaaaa"))
 
 
 if __name__ == "__main__":

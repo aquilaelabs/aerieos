@@ -35,23 +35,16 @@ function nbTestsView({$, nb, project}){
       unbusy(btn, "Open the run's output");
       return notify("no shell tab opened; open one and run aerie tests log -f", true);
     }
-    // Sent, and sent again while the shell is still coming up. The server
-    // asks tmux itself whether the session is there, so this does not wait
-    // on the page's own list of sessions, which arrives with the status
-    // poll every fifteen seconds and, for a shell on a node, only after the
-    // node's next heartbeat: waiting on that said "the shell did not come
-    // up" over a shell that was up.
+    // Sent once: the server waits for the shell to come up (`wait`), asking
+    // tmux, or the node, itself, rather than the page's own list of
+    // sessions, which arrives with the status poll and, for a shell on a
+    // node, only after the node's next heartbeat.
     const session = sessionOf(t.arg);
     let said = "";
-    for (let i = 0; i < 24; i++){
-      try{
-        const r = await postJSON("/api/send", {session, macro: "tests-log"});
-        const j = await r.json();
-        said = j.error || "";
-        if (!said || !/no such session/.test(said)) break;
-      }catch(e){ said = "could not send: " + e; break; }
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    try{
+      const j = await (await postJSON("/api/send", {session, macro: "tests-log", wait: 48})).json();
+      said = j.error || "";
+    }catch(e){ said = "could not send: " + failWords(e); }
     if (said) notify(said, true);
     unbusy(btn, "Open the run's output");
   }

@@ -73,7 +73,10 @@ FLOWS = {
 URL_WAIT = 10
 
 _lock = threading.Lock()
-_flow = None
+# The flow running for each account, {uid: flow}: each is a job on its own
+# node, so two people signing in at once is two jobs, and an account's new
+# sign-in replaces only its own.
+_flows = {}
 
 # What verb() and take_code() need from the server, set by server.py: the
 # node registry a flow runs on, and a session token minted for the account
@@ -164,12 +167,11 @@ class NodeFlow:
 
 
 def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
-    """Begin a flow on a node. Same contract as start(): it replaces whatever
-    was running and waits a moment for the URL, so the button that is already
-    waiting gets the link in its own answer."""
-    global _flow
+    """Begin a flow on a node for account `uid`: it replaces that account's
+    own, if one was running, and waits a moment for the URL, so the button
+    that is already waiting gets the link in its own answer."""
     with _lock:
-        old = _flow
+        old = _flows.get(str(uid))
     if old:
         old.cancel()
     # The token is what lets the flow REPORT what it signed in as: minted
@@ -184,7 +186,7 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
         return r
     f = NodeFlow(nodes, node_id, r["job"], name, uid=uid, agent=a.id)
     with _lock:
-        _flow = f
+        _flows[str(uid)] = f
     t0 = time.time()
     while time.time() - t0 < URL_WAIT and not f.state()["url"] \
             and f.state()["running"]:
@@ -194,40 +196,35 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
 
 
 
-def submit(code):
+def submit(code, uid):
     with _lock:
-        f = _flow
-    return f.submit(code) if f else {"error": "no sign-in is running"}
+        f = _flows.get(str(uid))
+    return f.submit(code) if f else {"error": "no sign-in of yours is running"}
 
 
-def cancel():
-    """Stop the running flow and forget it. Forgotten at once, not when the
-    node reports the job stopped: a node that has gone quiet never does, and
-    a flow nobody can finish must not hold the next sign-in back."""
-    global _flow
+def cancel(uid):
+    """Stop this account's flow and forget it. Forgotten at once, not when
+    the node reports the job stopped: a node that has gone quiet never does,
+    and a flow nobody can finish must not hold the next sign-in back."""
     with _lock:
-        f, _flow = _flow, None
+        f = _flows.pop(str(uid), None)
     if f:
         f.cancel()
     return {"ok": True}
 
 
-def state(uid=None):
-    """The running flow as its row draws it. With `uid`, only that account's
-    own: the link a flow prints signs somebody in, so it is shown to the
-    person it was started for and nobody else."""
+def state(uid):
+    """This account's flow as its row draws it: the link a flow prints signs
+    somebody in, so it is shown to the person it was started for and nobody
+    else."""
     with _lock:
-        f = _flow
-    if not f or (uid is not None and getattr(f, "uid", "") != str(uid or "")):
-        return {"running": False}
-    return f.state()
+        f = _flows.get(str(uid or ""))
+    return f.state() if f else {"running": False}
 
 
-def owner():
-    """The account the running flow was started for, or "" when none is."""
-    with _lock:
-        f = _flow
-    return getattr(f, "uid", "") if f else ""
+def running(uid):
+    """Whether this account has a flow going."""
+    return bool(state(uid).get("running"))
 
 
 # ---- the row's verbs, one call each from the dashboard -------------------------
@@ -254,7 +251,7 @@ def verb(action, node_id, uid, agent="claude"):
     stop the one that is running, once server.py has said this person may
     and that the node is theirs to see. (payload, status)."""
     if action == "cancel":
-        return cancel() | {"signin": state(uid)}, 200
+        return cancel(uid) | {"signin": state(uid)}, 200
     n = nodes.node(node_id) if nodes is not None and node_id else None
     why = cannot(n, agent)
     if why:
@@ -281,7 +278,7 @@ def sign_out(node_id, uid, agent="claude"):
     return {"ok": True, "job": r["job"], "on": n["name"]}, 200
 
 
-def take_code(code):
+def take_code(code, uid):
     """Hand the code from the browser to the sign-in flow.
 
     Transport, not judgment. The only property this end owes the pty is
@@ -306,6 +303,6 @@ def take_code(code):
     if len(code) > 2048:
         return {"error": "that is far too long to be a code; "
                          "copy just the code"}, 400
-    r = submit(code)
-    r = r | {"signin": state(owner())}
+    r = submit(code, uid)
+    r = r | {"signin": state(uid)}
     return r, (400 if r.get("error") else 200)

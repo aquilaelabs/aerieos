@@ -18,6 +18,7 @@ stick's prepared configuration asked its first start to hold).
 import json
 import threading
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -87,11 +88,16 @@ def boot():
         why.append("the last shutdown was not clean")
     with _lock:
         _marker("clean-shutdown").unlink(missing_ok=True)
+        # Unwritten, the next start could not tell a shutdown that was not
+        # clean: said, on the record and in the log, rather than let go.
+        unwritten = ""
         try:
             _marker("booted").touch()
-        except OSError:
-            pass
+        except OSError as e:
+            unwritten = f"the boot marker could not be written ({e}), so the next start cannot tell whether this one ended cleanly"
+            print(f"dashboard: held: {unwritten}", file=sys.stderr, flush=True)
         d = _load()
+        d["unwritten"] = unwritten
         if why:
             d.update(held=True, why=why, since=int(time.time()))
         else:
@@ -107,8 +113,10 @@ def shutdown_clean():
     with _lock:
         try:
             _marker("clean-shutdown").touch()
-        except OSError:
-            pass
+        except OSError as e:
+            # The next start will read this shutdown as not clean, and hold.
+            print(f"dashboard: held: the clean-shutdown marker could not be written ({e}): "
+                  "the next start will take this shutdown for one that was not clean", file=sys.stderr, flush=True)
 
 
 def is_held():
@@ -129,7 +137,7 @@ def status():
         return {"held": False, "why": [], "since": 0, "armed": False}
     d = _load()
     return {"held": bool(d.get("held")), "why": list(d.get("why") or []), "since": int(d.get("since") or 0),
-            "armed": _marker("hold-next").exists()}
+            "armed": _marker("hold-next").exists(), "unwritten": str(d.get("unwritten") or "")}
 
 
 def start(principal=""):

@@ -2231,20 +2231,19 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
      `the server lets a running container of the instance through, to its node's terminal server (${good.status} ${good.error.slice(0, 60)})`);
   // A node whose terminals still run the scripts from before this
   // controller's update (B746): its bb-tty would not know the argument, so
-  // the proxy says so, and asks it to check in, rather than relaying.
+  // the server asks it to check in and waits for the new ones, then relays.
   {
     const extra = `${DIR}/sandboxdata/census-extra.json`;
     writeFileSync(extra, JSON.stringify({ session: { bundle: 'from-before-the-update' } }));
-    let old = null;
-    for (const t0 = Date.now(); Date.now() - t0 < 20000; await sleep(500)){
-      old = await term(`ctr:ep.silon:main:${offered[0].ctr}`);
-      if (old.status === 403) break;
-    }
+    // The stub says hello when the file changes: its census carries the old
+    // bundle within a poll, and the new one again once the file goes.
+    await sleep(4000);
+    const asked = term(`ctr:ep.silon:main:${offered[0].ctr}`);
+    await sleep(2500);
     rmSync(extra, { force: true });
-    ok(old?.status === 403 && /has not taken this controller's update yet/.test(old.error),
-       `a node still on the scripts from before an update is said plainly, not relayed (${old?.status} ${(old?.error || '').slice(0, 70)})`);
-    for (const t0 = Date.now(); Date.now() - t0 < 20000; await sleep(500))
-      if ((await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 400) break;
+    const got = await asked;
+    ok(got.status === 400 && /a websocket is asked for here/.test(got.error),
+       `a node still on the scripts from before an update is waited for while it takes the new ones, then let through (${got.status} ${(got.error || '').slice(0, 70)})`);
   }
   // ...and a node whose container terminal is not up yet says so.
   {

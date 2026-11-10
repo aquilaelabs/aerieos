@@ -5352,6 +5352,7 @@ def heartbeat(nid, sample, addr, running=0):
     # like everything a node says; absent when the agent did not send it.
     if isinstance(s.get("sessions"), list):
         rep["sessions"] = _session_rows(s["sessions"])
+        _sessions_at[nid] = time.time()
     # The sessions a controller outage held (R251), for the bell's "stopped
     # by the update" once this answers again; whitelisted, and a heartbeat
     # without it keeps what was there.
@@ -6032,8 +6033,15 @@ def job_running(node_id):
     slot check uses. Not the agent's own number: that rides a request as a
     snapshot, and a poll held with a stale one made the next job wait out
     the whole window after the last one ended."""
-    return _rows("SELECT COUNT(*) AS n FROM jobs WHERE node = ? AND state IN "
-                 "('assigned', 'running')", (node_id,))[0]["n"]
+    return sum(1 for r in _rows("SELECT type FROM jobs WHERE node = ? AND state IN "
+                                "('assigned', 'running')", (node_id,)) if r["type"] not in SIGNIN_JOBS)
+
+
+# A coding agent's sign-in and sign-out: a person reading a link and pasting a
+# code, the machine idle meanwhile. Neither waits for the node's slot nor
+# holds it, so a sign-in is not held behind a build, nor a build behind a
+# sign-in left open for its quarter of an hour.
+SIGNIN_JOBS = frozenset(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j)
 
 
 # Nodes whose census a refusal has just called into question. Set by the
@@ -6270,6 +6278,36 @@ def session_kill(node_id, name):
 # at once rather than at the next heartbeat; forgotten after a minute, by
 # which time the node has either dropped it or it is genuinely back.
 _ended = {}
+# ...when the agent's poll took that kill, and when each node's heartbeat
+# last listed its sessions: a heartbeat after the kill was taken that no
+# longer lists it says it has ended (session_gone).
+_kill_taken = {}
+_sessions_at = {}
+
+
+def session_gone(node_id, name):
+    """True once the node has said the session it was told to end is gone:
+    a heartbeat after its agent took the kill, without it."""
+    taken = _kill_taken.get((node_id, str(name)[:120]))
+    if not taken or _sessions_at.get(node_id, 0) <= taken:
+        return False
+    rows = ((node(node_id) or {}).get("reported") or {}).get("sessions") or []
+    return not any(isinstance(r, dict) and r.get("name") == name for r in rows)
+
+
+def session_kill_wait(node_id, name, timeout=25):
+    """session_kill, answered once the node says the session has ended (a
+    Restart's new one would otherwise attach to the one going down), or
+    with gone False when it has not said so within `timeout`."""
+    r = session_kill(node_id, name)
+    if r.get("error"):
+        return r
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if session_gone(node_id, name):
+            return {"ok": True, "gone": True}
+        time.sleep(0.25)
+    return {"ok": True, "gone": False}
 
 
 # tmux commands for a node's sessions (keys, a console's line, a macro),
@@ -6478,10 +6516,15 @@ def job_next(node_id, wait, runner="node", alive=None):
                 upd = _update_gate(node_id) if runner == "node" and not (n.get("config") or {}).get("lockdown") else None
                 # ...and while a store move runs, nothing else is handed out
                 # either: what the node runs reads and writes the stores.
+                # A sign-in is handed out past a full slot (SIGNIN_JOBS),
+                # but not past either of these.
+                stopped = False
                 if upd is None and runner == "node" and (storage_moving(node_id) or {}).get("state") == "moving":
                     free = lane = False
+                    stopped = True
                 if upd is not None:
                     free = lane = False
+                    stopped = True
                     if upd:
                         _exec("UPDATE jobs SET state = 'assigned', node = ?, started = ? WHERE id = ?",
                               (node_id, int(time.time()), upd["id"]))
@@ -6497,7 +6540,7 @@ def job_next(node_id, wait, runner="node", alive=None):
                         return upd | {"state": "assigned", "node": node_id, "spec": spec}
                 for j in (_rows("SELECT * FROM jobs WHERE state = 'queued' AND "
                                 "(node = ? OR node = '') ORDER BY queued, id",
-                                (node_id,)) if (free or lane) else ()):
+                                (node_id,)) if not stopped else ()):
                     j = _job_out(j)
                     # Queued, but its plan is still being prepared
                     # (devactions._submit): not this poll's.
@@ -6505,7 +6548,7 @@ def job_next(node_id, wait, runner="node", alive=None):
                         continue
                     if runner_of(j["type"], n["kind"]) != runner or not fits(j, n):
                         continue
-                    if not free and not _light(j):
+                    if not free and not (lane and _light(j)) and j["type"] not in SIGNIN_JOBS:
                         continue
                     # One pressed while another it would collide with
                     # runs waits its turn here (job_waits).
@@ -6534,6 +6577,8 @@ def job_next(node_id, wait, runner="node", alive=None):
                 # them, and the held poll is how it hears at once.
                 kills = _kills.pop(node_id, None)
                 if kills:
+                    for k in kills:
+                        _kill_taken[(node_id, k)] = time.time()
                     # The names as every agent reads them, and beside them how
                     # long ago each was asked, in seconds: an age, not a time,
                     # so the node's clock need not agree with this one's.
