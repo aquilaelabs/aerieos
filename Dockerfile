@@ -291,6 +291,9 @@ COPY config/toolchains.json /opt/aerieos/config/toolchains.json
 COPY config/release-keys/ /opt/aerieos/config/release-keys/
 # ...and the vetted catalog maintainers' key its signed index is checked against (R169).
 COPY config/catalog.pub /opt/aerieos/config/catalog.pub
+# ...and AerieOS's own release key, public half, which the Enroll script hands
+# a node to pin (R227): without it here no script carried one.
+COPY config/aerieos-release.pub /opt/aerieos/config/aerieos-release.pub
 # The operating systems a VM is made from (R91), read by vms.py the same way.
 COPY config/vm-images.json /opt/aerieos/config/vm-images.json
 # What a sandbox VM is made from, one per hypervisor, which the Nodes tab

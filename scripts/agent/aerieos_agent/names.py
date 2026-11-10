@@ -75,3 +75,10 @@ def ensure(own_path="", say=lambda msg: None):
             say(f"{os.path.basename(NEW_CMD)} now runs the agent here, as {os.path.basename(OLD_CMD)} does")
     except OSError as e:
         say(f"{NEW_CMD} could not be written ({e}); {os.path.basename(OLD_CMD)} is the command as before")
+    try:
+        if os.path.exists(OLD_SANDBOX) and not os.path.lexists(NEW_SANDBOX):
+            with open(NEW_SANDBOX, "w") as f:
+                f.write(f"#!/bin/sh\n# AerieOS's tool for this machine, under its own name: bb-sandbox, as installed.\nexec {OLD_SANDBOX} \"$@\"\n")
+            os.chmod(NEW_SANDBOX, 0o750)
+    except OSError:
+        pass
