@@ -55,7 +55,18 @@ def public_key():
 
 
 def main(argv):
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    except ImportError:
+        # Said, with a way that installs nothing on this machine: a NAS's own
+        # Python has no pip worth using, and a traceback named neither.
+        print("this needs Python's cryptography library, which this machine's Python does not have. Either\n"
+              "  python3 -m pip install cryptography\n"
+              "or, installing nothing here, from the repository's folder:\n"
+              "  docker run --rm -v \"$PWD\":/src -w /src python:3.12-slim \\\n"
+              "    sh -c 'pip install -q cryptography && python3 tools/sign-agent.py " + " ".join(argv) + "'",
+              file=sys.stderr)
+        return 3
     release = _load("release")
     if argv[:1] == ["--keygen"]:
         key = Ed25519PrivateKey.generate()
