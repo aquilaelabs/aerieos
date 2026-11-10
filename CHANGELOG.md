@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0-dev.5170: 2026-11-10
+## Unreleased
 
 ### Changed
 
@@ -19,6 +19,7 @@
 - A node no longer restarts its CI runner in the middle of a job when the runner has updated itself, which canceled the run (d047877)
 - The Analysis page shows its findings once they arrive, rather than loading until something else on the page moved, and its filters redraw it (273b47b)
 - On a phone the Files page's filter shares a line with New folder and Upload rather than spanning the page above them (ea6e923)
+- After a controller update its nodes are back within seconds, rather than showing quiet for a minute or two while their agents waited to ask again (ed35650)
 
 ## 0.9.0-dev.5146: 2026-11-10
 
