@@ -1968,6 +1968,14 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       // (B84).
       rmSync(`${DIR}/pre/a1/a2/art`, { recursive: true, force: true });
       mkdirSync(`${DIR}/pre/a1/a2/art`, { recursive: true });
+      // ...and the store it goes back to, for the same reason the other way
+      // (B754): the first move off the node's default store copied what that
+      // held into agentartifacts, and the move above left it there (nothing
+      // is ever deleted from a store moved off), so on a node whose default
+      // store had files (the CI runner's) the move back was refused as a
+      // copy into a folder of files, and every apply after it with it.
+      rmSync(`${DIR}/agentartifacts`, { recursive: true, force: true });
+      mkdirSync(`${DIR}/agentartifacts`, { recursive: true });
       await api('/api/v1/nodes', { action: 'config', id: minted.id,
         config: { mounts: [], stores: { artifacts: `${DIR}/agentartifacts` }, network: { mode: 'dhcp' } } });
       const un = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
