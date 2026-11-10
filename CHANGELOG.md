@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Only one controller can run on a configuration folder at a time: a second one started on the same /config stops with the reason, rather than writing over the first (e303494)
+- A backup and a move's bundle copy the configuration at one moment, rather than file by file while it is being written; the copies kept before an upgrade no longer carry the install key (e303494)
+
+### Fixed
+
+- Installs and space clones that were queued behind another job when the controller restarted are picked up again, or named on the Spaces page as not started, rather than dropped without a word (e303494)
+
+### Security
+
+- A node is handed a session's credential only for a space that works on that node and a person who may work on that space. Before, a node that merely named another space's session was handed its credential, so one node taken over reached every space (e9502c6)
+- An accounts file that cannot be read no longer opens the make-the-first-account page to whoever reaches the dashboard: nobody signs in until it is mended or put back from a backup, and nothing is written over it. State files are now synced to disk as they are written, so a power cut does not leave one cut short (e303494)
+- A coding agent's session can no longer change its person's Profile: where their notifications go, their browser sign-ins, their second factor (e9502c6)
+- A CI runner registered to a public repository says on its row that a pull request from anybody can run on that node, and which setting on the git host to change (61a3651)
+- A container's compose file is checked for more ways of reaching the host before it is built: the host's other namespaces, another container's volumes, a volume bound to a host folder under another name, a build that uses the host's network or ssh agent, and a folder that is a link to the system (35f094d)
+
 ## 0.9.0-dev.5173: 2026-11-10
 
 ### Changed
