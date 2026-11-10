@@ -1426,6 +1426,16 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
     ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
     ok(home.status !== 403, `...and does reach its own space's (${home.status})`);
+    // A session's token carries its person's id, and the Profile page is
+    // that person's alone (B764): no read of it, no notification sent
+    // elsewhere, no browser sign-in of theirs ended.
+    {
+      const read = await fetch(URL.replace(/\/$/, '') + '/api/profile', { headers: sessAuth });
+      const reach = await act(sessAuth, '/api/profile', { action: 'reach-set', kind: 'webhook', url: 'https://elsewhere.example/hook' });
+      const out = await act(sessAuth, '/api/profile', { action: 'signin-out', id: 'any' });
+      ok(read.status === 403 && reach.status === 403 && out.status === 403 && /never by a session/.test(reach.error || ''),
+         `a session's token is refused the Profile page of the person it runs for (${read.status} ${reach.status} ${out.status}: ${reach.error || ''})`);
+    }
     // B173-B175: what acts on a project by name asks the right as well as
     // the name. A plain account given alpha cannot lock it, move the shared
     // pins, read how its remote authenticates, or move its version; the
