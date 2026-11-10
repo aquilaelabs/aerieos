@@ -595,9 +595,14 @@ def job_view(project, instance):
     on the row until the next job on the instance replaces it."""
     if queue is None:
         return None
-    for j in queue.jobs_for(project=project, type="compose", n=40):
-        if (j.get("spec") or {}).get("instance", MAIN) != instance:
-            continue
+    mine = [j for j in queue.jobs_for(project=project, type="compose", n=40)
+            if (j.get("spec") or {}).get("instance", MAIN) == instance]
+    # Several pressed in turn (nodes.job_waits): the one at work, else the
+    # oldest queued, which goes first; the rest wait behind it.
+    active = [j for j in mine if j["state"] in queue.JOB_ACTIVE]
+    if active:
+        mine = [next((j for j in active if j["state"] in ("assigned", "running")), active[-1])]
+    for j in mine:
         running = j["state"] in queue.JOB_ACTIVE
         if not running and j["state"] == "succeeded":
             return None

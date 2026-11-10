@@ -76,17 +76,16 @@ def acting_as(principal):
 
 # One action per INSTANCE at a time. Two clicks on one row are two compose
 # calls on one project; two rows are two jobs, and the queue orders those.
-BUSY = {"error": "something is already running on this instance: one at a time"}
 
 
 def _active_job(project, instance):
-    """The compose job queued or running for this instance, if any."""
+    """The compose job this instance is on, if any: the one at work, else the
+    oldest of those queued behind each other, which goes first."""
     if devapp.queue is None:
         return None
-    for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50):
-        if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance:
-            return j
-    return None
+    mine = [j for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50)
+            if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance]
+    return next((j for j in mine if j.get("state") in ("assigned", "running")), mine[-1] if mine else None)
 
 
 def sync_work_tree(project, instance):
@@ -788,13 +787,16 @@ def _submit(project, instance, action, extra=None, check=None):
     with its plan, or fails it with the refusal, where the row and the Jobs
     tab show the words. Before this a Rebuild answered only after parsing
     the compose on the node, up to 30s, and a phone dropped the request as
-    a NetworkError with no reason (B260). A second press meanwhile meets
-    BUSY, since the held job is active.
+    a NetworkError with no reason (B260). A press while another of the
+    instance's jobs runs is queued behind it (nodes.job_waits), and one of
+    the same action still waiting its turn is that job, not a second.
     """
     if devapp.queue is None:
         return {"error": "no job queue is configured here"}
-    if _active_job(project, instance):
-        return dict(BUSY)
+    for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50):
+        sp = j.get("spec") or {}
+        if sp.get("instance", devapp.MAIN) == instance and j.get("state") == "queued" and sp.get("action") == action:
+            return {"ok": True, "job": j["id"], "already": True}
     nid = devapp._instance_node(project, instance)
     if action == "rebuild" and shipped(project, instance):
         return _ship_submit(project, instance, nid)
@@ -894,14 +896,17 @@ def route_set(project, instance, mode, port=None):
 
 
 def abort_job(project, instance):
-    """Stop this instance's job, if it has one. True if there was one."""
-    j = _active_job(project, instance)
-    if j is None:
+    """Stop this instance's jobs, the one running and any queued behind it.
+    True if there was one."""
+    jobs = [j for j in devapp.queue.jobs_for(project=project, type="compose", active=True, n=50)
+            if (j.get("spec") or {}).get("instance", devapp.MAIN) == instance] if devapp.queue else []
+    if not jobs:
         return False
-    if devapp.runner is not None:
-        devapp.runner.cancel(_by.get(), j["id"])
-    else:
-        devapp.queue.job_cancel(_by.get(), j["id"])
+    for j in jobs:
+        if devapp.runner is not None:
+            devapp.runner.cancel(_by.get(), j["id"])
+        else:
+            devapp.queue.job_cancel(_by.get(), j["id"])
     devapp._bump()
     return True
 

@@ -549,10 +549,10 @@ await firstRun(false);
   await page.route('**/api/v1/jobs?id=j_x', async r => { inFlight = false; return r.fulfill({ json: { id: 'j_x', state: 'succeeded' } }); });
   await page.route('**/api/v1/nodes', async r => {
     const b = r.request().postDataJSON?.() || {};
-    // As the server answers: one system job at a time on a node, a second
-    // refused while the first runs (B670), until the job read says it ended.
+    // Each sent only once the last has ended, so one that fails stops the
+    // rest: a second sent while the first runs is counted here.
     if (r.request().method() === 'POST' && /^storage-/.test(b.action || '')){
-      if (inFlight) { refused++; return r.fulfill({ status: 400, json: { error: 'a system job is already in flight on this node; one at a time' } }); }
+      if (inFlight) { refused++; return r.fulfill({ status: 400, json: { error: 'sent before the last ended' } }); }
       sent.push(b); inFlight = true; return r.fulfill({ json: { ok: true, job: 'j_x' } });
     }
     return r.fallback();
@@ -564,7 +564,7 @@ await firstRun(false);
   await page.waitForFunction(() => !setupDisks.making, null, { timeout: 20000 });
   await page.unroute('**/api/v1/nodes');
   await page.unroute('**/api/v1/jobs?id=j_x');
-  ok(refused === 0, `Make it sends its pools one at a time, so neither is refused for the other (${refused} refused) (B670)`);
+  ok(refused === 0, `Make it sends its pools one at a time, each once the last has ended (${refused} sent early)`);
   const ask = page.dialogs.slice(asked).join(' ');
   ok(/WD-B/.test(ask) && /WD-C/.test(ask) && /WD-D/.test(ask) && /S-N/.test(ask) && !/SG-E/.test(ask) && !/STICK1/.test(ask) && /erased/.test(ask),
      `Make it names every disk it erases by serial first, and none it keeps (${ask.slice(0, 160)})`);

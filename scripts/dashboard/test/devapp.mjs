@@ -1638,19 +1638,20 @@ out['free_now'] = a.up('alpha', 'main')
 print(json.dumps(out))
 `], { encoding: 'utf8' });
 const SL = JSON.parse(slot.trim().split('\n').pop());
-ok(SL.first_up.ok && SL.first_up.job === 'j_1' && SL.queued.length === 2
-   && SL.queued[1].join() === 'j_1,up,main,n_sandbox,operator',
+ok(SL.first_up.ok && SL.first_up.job === 'j_1' && SL.queued.length === 4
+   && SL.queued[3].join() === 'j_1,up,main,n_sandbox,operator',
    'an up is a compose job on the queue, placed on the node the instance is bound to');
-ok([SL.second_up, SL.rebuild_during_up, SL.down_during_up]
-     .every(r => /one at a time/.test(r.error || '')),
-   '...and every other verb on that instance is refused while it is queued or running, not only a build');
-ok(SL.other_instance.ok && SL.queued[0].join() === 'j_2,up,staging,n_sandbox,operator',
-   '...while another instance of the same space queues behind it: one at a time is per instance');
+ok(SL.second_up.ok && SL.second_up.already && SL.second_up.job === 'j_1',
+   `...a second press of the same verb while it waits is that job, not another (${JSON.stringify(SL.second_up)})`);
+ok([SL.rebuild_during_up, SL.down_during_up].every(r => r.ok && /^j_/.test(r.job || '')),
+   `...and another verb on that instance is queued behind it, never refused (${JSON.stringify([SL.rebuild_during_up, SL.down_during_up])})`);
+ok(SL.other_instance.ok && SL.queued[0].join() === 'j_4,up,staging,n_sandbox,operator',
+   '...as another instance of the same space queues: nodes.job_waits holds each behind its own instance\'s');
 ok(SL.view && SL.view.running && SL.view.step === 'queued' && SL.view.action === 'up'
    && SL.view.node === 'n_sandbox',
    'the row reads its job from the queue: running, on the step "queued", with the node');
-ok(SL.free_now.ok && SL.free_now.job === 'j_3',
-   '...and the instance is free again when its job has ended, however it ended');
+ok(SL.free_now.ok && SL.free_now.job === 'j_5',
+   '...and an up pressed once its first has ended is a job of its own again');
 
 // Abort during the stopping step. It reached nothing: the phase held no
 // process to signal, and nothing read the flag again until after `up`, so the

@@ -1728,7 +1728,8 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const ap = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'storage' });
     ok(ap.ok && /^j_/.test(ap.job), `apply storage queues a system job (${ap.job || ap.error})`);
     const twice = await api('/api/v1/nodes', { action: 'apply', id: minted.id, what: 'network' });
-    ok(/one at a time/.test(twice.error || ''), '...and a second apply waits for it');
+    ok(twice.ok && /^j_/.test(twice.job || ''), `...and a second apply is queued behind it (${twice.error || twice.job})`);
+    if (twice.job) await api('/api/v1/jobs', { action: 'cancel', id: twice.job });
     const fin = await until(async () => {
       const r = await api(`/api/v1/jobs?id=${ap.job}`);
       return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;

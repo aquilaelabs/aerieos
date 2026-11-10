@@ -80,6 +80,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     plat = str(tc.get("platform") or "")
     job = tc.get("job") or {}
     busy_on = job.get("current") if job.get("running") and job.get("action") != "check" else ""
+    # What is queued behind it (a press while it ran): each such card says so.
+    waiting = {str(x) for w in job.get("waiting") or [] if w.get("action") != "check" for x in w.get("names") or []}
     for r in agent_rows or []:
         out.append({"kind": "agent", "tier": "official", "name": r["name"], "label": r.get("label") or r["name"], "agent": r.get("agent", ""),
                     "about": _agent_about(r.get("for") or r.get("label") or ""), "platforms": [],
@@ -102,6 +104,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "platforms": [], "terms": [], "installed": here, "unknown": False, "version": ver.split("-")[0] if m["name"] != "nvidia-driver" else ver,
                     "latest": (m.get("newer") or "").split("-")[0], "update": bool(m.get("newer")), "updatable": True,
                     "running": busy_on == m["name"], "doing": job.get("action") or "" if busy_on == m["name"] else "",
+                    "queued": m["name"] in waiting and busy_on != m["name"],
                     "size": "", "wrong_platform": "", "pinned": [], "pack": None, "machine": m,
                     "verb": "" if not m.get("managed") else "update" if m.get("newer") else ("" if here else "install")})
     packs_here = set()
@@ -118,6 +121,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "installed": bool(i.get("installed")), "unknown": bool(i.get("unknown")), "version": i.get("version") or "",
                     "latest": i.get("latest") or "", "update": i.get("state") == "update", "updatable": bool(i.get("updatable")),
                     "running": busy_on == i["name"], "doing": job.get("action") or "" if busy_on == i["name"] else "",
+                    "queued": i["name"] in waiting and busy_on != i["name"],
                     "size": i.get("size") or "", "wrong_platform": i.get("wrong_platform") or "", "pinned": i.get("pinned_by") or i.get("pinned") or [],
                     # The open row's lines, as the Toolchains page draws them (step 2).
                     "tool": i.get("tool") or "", "system": i.get("system"), "needs": i.get("needs") or [], "needed_by": i.get("needed_by") or [],

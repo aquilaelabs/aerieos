@@ -171,11 +171,14 @@ def check_instance(project, instance):
 
 def check(node=None):
     """Every instance's registry images (on one node, or all), now. The
-    answers, keyed by container name."""
-    with _lock:
-        if _checking["on"]:
-            return {"error": "a check is already running"}
-        _checking["on"] = True
+    answers, keyed by container name. One asked for while another runs
+    waits for it and then runs, since it may be about another node."""
+    while True:
+        with _lock:
+            if not _checking["on"]:
+                _checking["on"] = True
+                break
+        time.sleep(0.5)
     out = {}
     try:
         for project, insts in devapp._load().items():

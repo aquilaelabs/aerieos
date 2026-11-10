@@ -58,17 +58,28 @@ def _runner_line(check):
     return out
 
 
-def refresh():
-    """Run aerie doctor and cache the parsed result. False if one is mid-run:
-    two at once would double every network probe for the same answer, so
-    the ask is kept and that run goes again when it ends. Dropped, a node
-    that dialed in while the first run after a restart was out left that
-    run's "not dialing in" on the card for the half hour (19 Oct)."""
+def refresh(wait=False):
+    """Run aerie doctor and cache the parsed result. One asked for mid-run is
+    not run beside it (two at once would double every network probe for the
+    same answer): the run goes again when it ends, and with `wait` (a press)
+    this waits for that and answers with it; without, it returns False. Dropped, a node that dialed in while the first run
+    after a restart was out left that run's "not dialing in" on the card for
+    the half hour (19 Oct)."""
     with _lock:
-        if _verdict.get("busy"):
+        busy = bool(_verdict.get("busy"))
+        if busy:
             _verdict["again"] = True
-            return False
-        _verdict["busy"] = True
+        else:
+            _verdict["busy"] = True
+    if busy and not wait:
+        return False
+    if busy:
+        while True:
+            time.sleep(0.5)
+            with _lock:
+                if not _verdict.get("busy"):
+                    return True
+    with _lock:
         _verdict["running"] = True
     again = True
     try:

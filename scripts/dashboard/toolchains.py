@@ -464,6 +464,8 @@ def payload():
         busy = _tc_job["running"]
         job = {k: (list(v) if isinstance(v, list) else v)
                for k, v in _tc_job.items()}
+        # What was pressed behind it, each started in turn (start_job).
+        job["waiting"] = [{"action": a, "names": list(ns)} for a, ns in _tc_next]
     # Nothing is probed while a job runs. The toolchain being installed has a
     # directory that is filling up, and every probe here reads a non-empty
     # directory as a finished install: a half-written NDK reported itself
@@ -620,16 +622,6 @@ def job_rev():
     return (f"{j['running']}:{j['action']}:{j['current']}:{len(j['done'])}"
             f":{len(j['failed'])}"
             f":{_tc_checked}:{_tc_sizing[0]}:{store}")
-
-
-def job_is_automatic():
-    """Whether the job in the way is the daily check rather than a person's.
-
-    The refusal an operator sees depends on it, and being told "an install is
-    already running" when nobody started an install wastes an evening.
-    """
-    with _tc_lock:
-        return bool(_tc_job.get("auto"))
 
 
 # The recipes `aerie toolchains update` knows, as the agent's tc_verbs has them.
@@ -996,7 +988,7 @@ def attention(project_nodes):
         if n.get("kind") != "agent" or not n.get("live"):
             continue
         running = set()
-        for j in nodes.jobs_for(node_id=n["id"], type="toolchain", active=True, n=1):
+        for j in nodes.jobs_for(node_id=n["id"], type="toolchain", active=True, n=20):
             running |= {str(x) for x in ((j.get("spec") or {}).get("names") or [])}
         rows, _ = last_check(n["id"])
         tools = [{"name": name, "label": labels[name], "from": r["installed"], "to": r["latest"]}
@@ -1374,7 +1366,8 @@ def payload_for_node(nid):
             i["reopen"] = sum(1 for c in started if 0 < c < at)
     job = None
     if nodes:
-        for j in nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=1):
+        cur, behind = current_of(nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=50))
+        for j in [cur] if cur else []:
             names = [DRIVER if str(x).startswith(DRIVER + ":") else str(x)
                      for x in (j.get("spec") or {}).get("names", [])]
             # How far through the batch it is, from the name the agent says
@@ -1389,7 +1382,11 @@ def payload_for_node(nid):
                    "passed": names[:at] if at >= 0 else [],
                    "current": cur,
                    "log": nodes.job_tail(j["id"], 1200).splitlines()[-16:], "done": [],
-                   "failed": [], "aborting": bool(j.get("cancel")), "node": nid, "id": j["id"]}
+                   "failed": [], "aborting": bool(j.get("cancel")), "node": nid, "id": j["id"],
+                   # The jobs pressed behind it, each started in turn.
+                   "waiting": [{"action": (w.get("spec") or {}).get("action", ""),
+                                "names": [str(x) for x in (w.get("spec") or {}).get("names", [])], "id": w["id"]}
+                               for w in behind]}
             break
         if job is None:
             # The last FINISHED one, so the tab can clear what it selected.
@@ -1866,8 +1863,16 @@ def _need_kb(name):
 STORE_JOBS = ("toolchain", "image")
 
 
-def _store_job_on(node_id):
-    return any(nodes.jobs_for(node_id=node_id, type=t, active=True, n=1) for t in STORE_JOBS)
+def _store_jobs_at_work(node_id, skip=""):
+    """The toolchain and image jobs a node has been handed and not finished:
+    one queued behind them waits its turn (job_next asks store_gate), so it
+    is not counted, and neither is `skip`, the job asking."""
+    return [j for t in STORE_JOBS for j in nodes.jobs_for(node_id=node_id, type=t, active=True, n=8)
+            if j.get("state", "running") in ("assigned", "running") and j.get("id") != skip]
+
+
+def _store_job_on(node_id, skip=""):
+    return bool(_store_jobs_at_work(node_id, skip))
 
 
 def store_areas(names, action="install", where=""):
@@ -1903,16 +1908,19 @@ def _job_areas(j, where):
     return store_areas(sp.get("names") or [], sp.get("action") or "install", where)
 
 
-def store_busy(nid, names=None, action="install"):
+def store_busy(nid, names=None, action="install", skip=""):
     """Why this node's toolchain store cannot take this job now, or "".
 
     On the node itself, one toolchain or image job at a time: its tab shows
     one job. Across machines that share the store, a job waits only for one
     writing the same directory (store_areas): each keeps its toolchains in
     its own, so that is the Android system images under <store>/shared.
-    `names` None is any write to the store (an image job: the Android SDK)."""
+    `names` None is any write to the store (an image job: the Android SDK).
+    Only jobs at work count: a press while one runs queues behind it rather
+    than being refused (store_gate holds it until its turn), and `skip` is
+    the queued job asking."""
     n = nodes.node(nid)
-    if _store_job_on(nid):
+    if _store_job_on(nid, skip):
         return f"a toolchain or image job is already running on {n['name']}. One at a time on a node."
     mine = (store_areas(names, action, _dir_of(n)) if names is not None
             else _image_areas(_dir_of(n)))
@@ -1920,7 +1928,9 @@ def store_busy(nid, names=None, action="install"):
         return ""
     for other in store_sharers(nid):
         for t in STORE_JOBS:
-            for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=4):
+            for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=8):
+                if j.get("state", "running") not in ("assigned", "running"):
+                    continue
                 both = sorted(a for _, a in mine & _job_areas(j, _dir_of(other)))
                 if both:
                     return (f"{other['name']} is installing {', '.join(both)} into the toolchain store "
@@ -1938,6 +1948,31 @@ def store_busy(nid, names=None, action="install"):
             return (f"this container is installing {', '.join(both)} into the toolchain store "
                     f"it shares with {n['name']}; this waits for it")
     return ""
+
+
+def current_of(active):
+    """The job a node is on among these (jobs_for's, newest first): the one
+    at work, else the oldest queued, which goes first; and the rest, oldest
+    first. (job or None, [waiting])."""
+    jobs = list(reversed(active))
+    cur = next((j for j in jobs if j.get("state", "running") in ("assigned", "running")), jobs[0] if jobs else None)
+    return cur, [j for j in jobs if j is not cur]
+
+
+def store_gate(job, nid):
+    """Whether a queued toolchain or image job waits on this node (nodes.job_next):
+    a press while another writes the store queues, and the job is handed
+    over once nothing it would collide with is at work."""
+    sp = job.get("spec") or {}
+    if job.get("type") == "image":
+        return bool(store_busy(nid, None, skip=job.get("id", "")))
+    names = None if sp.get("action") == "clean" else list(sp.get("names") or [])
+    return bool(store_busy(nid, names, sp.get("action") or "install", skip=job.get("id", "")))
+
+
+def queued_behind(r, why):
+    """A job's answer, saying what it waits for when it waits."""
+    return r | {"waits": why} if why and r.get("ok") else r
 
 
 TOOLKIT = "nvidia-container-toolkit"
@@ -2107,13 +2142,16 @@ def node_job(principal, nid, action, names, driver=""):
                              f"and this needs about {human_kb(int(need_kb * 1.2))}: "
                              "point the store somewhere bigger first"}
     busy = store_busy(nid, names + [x for x in (drv, ctk) if x], action)
-    if busy:
-        return {"error": busy}
+    # The same press while it waits its turn is that job, not a second.
+    every = names + [x for x in (drv, ctk) if x]
+    for j in nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=20):
+        sp = j.get("spec") or {}
+        if j["state"] == "queued" and sp.get("action") == action and sorted(sp.get("names") or []) == sorted(every):
+            return {"ok": True, "job": j["id"], "already": True}
     # Two architectures on one store used to be refused here, because a flat
     # store could not hold both. It is scoped by platform now: each machine
     # installs under <store>/<os>-<arch> (roadmap R19), so a Mac and a Linux
     # box sharing a share is the design, not a mistake.
-    every = names + [x for x in (drv, ctk) if x]
     # Two limits (the operator, 12 Oct): each toolchain's step gets an hour,
     # which the agent enforces and then moves on; the job as a whole gets
     # an hour per toolchain, which is what the controller holds it to. One
@@ -2124,7 +2162,7 @@ def node_job(principal, nid, action, names, driver=""):
                        "timeout": TC_STEP_S * max(1, len(every)) + 600})
     if r.get("ok") and added:
         r["added"] = added
-    return r
+    return queued_behind(r, busy)
 
 
 # The unmet set each node was last sent a system-packages job for, so one
@@ -2172,39 +2210,78 @@ def auto_sysdeps(nid):
     return r
 
 
+# What a person pressed for this container's own store while it was busy,
+# each started once it is free (_tc_waiter): (action, names).
+_tc_next = []
+_tc_waiting = {"thread": None}
+
+
+def _tc_clash(names, action):
+    """The other half of the shared-store rule: a node unpacking into the
+    store this container is about to write is the same collision, seen
+    from the other side. True when one is."""
+    if not nodes:
+        return False
+    try:
+        me = nodes.node(nodes.LOCAL)
+        mine = store_areas(list(names), action, _dir_of(me))
+        for other in store_sharers(nodes.LOCAL):
+            for t in STORE_JOBS:
+                for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=8):
+                    if j.get("state") in ("assigned", "running") and mine & _job_areas(j, _dir_of(other)):
+                        return True
+    except sqlite3.Error as e:
+        print(f"dashboard: toolchains: store sharers unread, going ahead: {e}",
+              file=sys.stderr, flush=True)
+    return False
+
+
+def _tc_waiter():
+    """Start what was pressed while the store was busy, in turn, as it frees."""
+    while True:
+        time.sleep(3)
+        with _tc_lock:
+            if not _tc_next:
+                _tc_waiting["thread"] = None
+                return
+            if _tc_job["running"] or _tc_clash(_tc_next[0][1], _tc_next[0][0]):
+                continue
+            action, names = _tc_next.pop(0)
+            _tc_begin(action, names, False)
+        threading.Thread(target=_tc_worker, daemon=True).start()
+
+
 def start_job(action, names, auto=False):
-    """Queue a toolchain job, unless one is already going. False if it is."""
+    """Start a toolchain job on this container's own store, or queue it
+    behind the one running (a person's press is never refused for another
+    job). The automatic version check steps aside instead: False then."""
     with _tc_lock:
-        if _tc_job["running"]:
-            return False
-        # The other half of the shared-store rule: a node unpacking into the
-        # store this container is about to write is the same collision, seen
-        # from the other side.
-        if nodes:
-            try:
-                me = nodes.node(nodes.LOCAL)
-                mine = store_areas(list(names), action, _dir_of(me))
-                for other in store_sharers(nodes.LOCAL):
-                    for t in STORE_JOBS:
-                        for j in nodes.jobs_for(node_id=other["id"], type=t, active=True, n=4):
-                            if mine & _job_areas(j, _dir_of(other)):
-                                return False
-            except sqlite3.Error as e:
-                print(f"dashboard: toolchains: store sharers unread, going ahead: {e}",
-                      file=sys.stderr, flush=True)
-        if action == "install":
-            here = {p["name"] for p in TOOLCHAINS if _tc_path(p["probe"])}
-            names, _added = with_requires(list(names), here)
-        _tc_job.update(running=True, queue=list(names), action=action,
-                        current="", log=[], done=[], failed=[], auto=auto,
-                        aborting=False,
-                        # Fixed in phase 1 (toolchains install here) and a
-                        # seam on purpose: phase 6 makes this a job placed on
-                        # any node's toolchain store, and this call site is
-                        # where the node picker's answer lands.
-                        node="local")
+        if _tc_job["running"] or _tc_next or _tc_clash(names, action):
+            if auto:
+                return False
+            _tc_next.append((action, list(names)))
+            if _tc_waiting["thread"] is None:
+                _tc_waiting["thread"] = threading.Thread(target=_tc_waiter, daemon=True)
+                _tc_waiting["thread"].start()
+            return True
+        _tc_begin(action, names, auto)
     threading.Thread(target=_tc_worker, daemon=True).start()
     return True
+
+
+def _tc_begin(action, names, auto):
+    """The job record set for a start; under _tc_lock."""
+    if action == "install":
+        here = {p["name"] for p in TOOLCHAINS if _tc_path(p["probe"])}
+        names, _added = with_requires(list(names), here)
+    _tc_job.update(running=True, queue=list(names), action=action,
+                    current="", log=[], done=[], failed=[], auto=auto,
+                    aborting=False,
+                    # Fixed in phase 1 (toolchains install here) and a
+                    # seam on purpose: phase 6 makes this a job placed on
+                    # any node's toolchain store, and this call site is
+                    # where the node picker's answer lands.
+                    node="local")
 
 
 # A version check on the way up, and once a day after that.
@@ -2331,11 +2408,10 @@ def verb(action, req, principal):
             want = [d for d in (req.get("names") or []) if d in offered]
             if not want:
                 return {"error": "nothing on this store is waiting to be taken off"}, 400
-            if (why := store_busy(nid, None)):
-                return {"error": why}, 409
+            why = store_busy(nid, None)
             r = nodes.job_add(principal, {"node": nid}, "toolchain", {"action": "clean", "names": want,
                                                                      "timeout": 3600})
-            return (r, 400) if r.get("error") else ({"ok": True, "job": r.get("job"), "queued": want}, 200)
+            return (r, 400) if r.get("error") else (queued_behind({"ok": True, "job": r.get("job"), "queued": want}, why), 200)
         if action not in ("install", "remove", "sysdeps", "check"):
             return {"error": "a node takes install, remove, sysdeps or check"}, 400
         node = nodes.node(nid)
@@ -2395,10 +2471,5 @@ def verb(action, req, principal):
         names = [p["name"] for p in TOOLCHAINS]
     if not names:
         return {"error": "nothing selected"}, 400
-    if not start_job(action, names):
-        # Which one, because the automatic version check holds the queue
-        # too and being told "an install is already running" when nobody
-        # started an install is the kind of answer that wastes an evening.
-        return {"error": "a version check is running; try again in a moment"
-                if job_is_automatic() else "an install is already running"}, 409
+    start_job(action, names)
     return {"ok": True, "queued": names}, 200

@@ -2076,8 +2076,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
        `...and the same toolchain installs on both at once, each into its own directory (${second.job || second.error})`);
     if (second.job) await napi('/api/v1/jobs', { action: 'cancel', id: second.job });
     const again = await napi('/api/toolchains', { action: 'install', names: ['node'], node: minted.id });
-    ok(/already running on .*One at a time on a node/.test(again.error || ''),
-       `...and one node still runs one toolchain job at a time (${(again.error || 'no error').slice(0, 80)})`);
+    ok(again.job && !again.error,
+       `...and a second toolchain job on one node is queued behind the first, never refused (${again.job || again.error})`);
+    if (again.job) await napi('/api/v1/jobs', { action: 'cancel', id: again.job });
     for (let i = 0; i < 60 && /queued|assigned|running/.test((await napi(`/api/v1/jobs?id=${second.job}`))?.state || ''); i++)
       await new Promise(r => setTimeout(r, 250));
     const look = await napi('/api/toolchains', { action: 'check', node: other.id });
@@ -2213,8 +2214,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     ok(/not an image this server offered/.test(mixed.error || ''),
        `...and a list with one id the tab never offered is refused whole (${mixed.error})`);
     const clash = await napi('/api/toolchains', { action: 'install', names: ['zig'], node: minted.id });
-    ok(/image job is already running/.test(clash.error || ''),
-       `...and a toolchain install waits for it on the same store (${clash.error})`);
+    ok(clash.job && !clash.error,
+       `...and a toolchain install on the same store is queued behind it (${clash.job || clash.error})`);
+    if (clash.job) await napi('/api/v1/jobs', { action: 'cancel', id: clash.job });
     if (add.job) await napi('/api/v1/jobs', { action: 'cancel', id: add.job });
     // What reaches a command line is a string this server handed out: an add
     // names one the picker offered, a removal one THIS node reported.
@@ -3301,7 +3303,8 @@ ok(page.errors.length === 0,
     const rj = await napi(`/api/v1/jobs?id=${rb.job}`);
     ok(rj.spec?.apply === 'reboot' && rj.node === plain.id, 'the job asks the agent for the reboot');
     const twice = await napi('/api/v1/nodes', { action: 'poweroff', id: plain.id });
-    ok(/one at a time/.test(twice.error || ''), '...and a shutdown pressed meanwhile waits for it');
+    ok(twice.ok && /^j_/.test(twice.job || ''), `...and a shutdown pressed meanwhile is queued behind it (${twice.error || twice.job})`);
+    if (twice.job) await napi('/api/v1/jobs', { action: 'cancel', id: twice.job });
     // The tab shows one node at a time, the picker's; laptop is picked
     // for the row, and the controller's own after it.
     await page.evaluate(() => openNodesTab());
@@ -3347,14 +3350,14 @@ ok(page.errors.length === 0,
     const line = await page.$eval(`.ndrow[data-node="${shed.id}"] .ndgpu`, e => e.textContent.replace(/\s+/g, ' ').trim());
     ok(/RTX 3070 Ti/.test(line) && /renders in software/.test(line),
        `the row's Health names the card and says the emulator is on software (${line.slice(0, 90)})`);
-    // A change being applied on the machine holds Reboot and Shut down, on
-    // the row and, as before, on the server (the operator, 30 Sep).
+    // A change being applied on the machine: Reboot and Shut down stay live
+    // and say one pressed now waits for it (job_waits holds it on the server).
     const held = await page.$eval(`.ndrow[data-node="${shed.id}"]`, r => ({
       dead: ['reboot', 'poweroff'].map(w => r.querySelector(`[data-nd="${w}"]`)?.disabled),
       // Said on the action's own row, under its name (the operator, 18 Oct).
       why: r.querySelector('[data-nd="reboot"]')?.closest('.ndact')?.querySelector('.sub')?.textContent || '' }));
-    ok(held.dead.every(Boolean) && /They wait: a change to this node \(gpu\)/.test(held.why),
-       `while a change is applying on the node, Reboot and Shut down are ghosted and say why (${held.why})`);
+    ok(held.dead.every(d => !d) && /A change to this node \(gpu\) is running here: one pressed now waits for it to end/.test(held.why),
+       `while a change is applying on the node, Reboot and Shut down say a press waits for it (${held.why})`);
     await napi('/api/v1/jobs', { action: 'cancel', id: g.job });
     // ...and the tab read again, so the canceled set-up is not what the
     // section below is drawn from.
@@ -3513,11 +3516,12 @@ ok(page.errors.length === 0,
     const mj = mixed.job ? await napi(`/api/v1/jobs?id=${mixed.job}`) : {};
     ok(mixed.ok && mj.type === 'toolchain' && (mj.spec?.names || []).at(-1) === 'nvidia-driver' && mj.spec.names.includes('zig'),
        `the driver is ticked into the same job as the store's toolchains, after them (${mixed.error || (mj.spec?.names || []).join(', ')})`);
-    // ...and an install running holds Reboot and Shut down on the server,
-    // as the row does.
+    // ...and a reboot pressed while an install runs is queued behind it,
+    // saying so, as the row does.
     const rbw = await napi('/api/v1/nodes', { action: 'reboot', id: shed.id });
-    ok(/a toolchain install or removal is running on shed2/.test(rbw.error || ''),
-       `a reboot waits for a toolchain install on the node (${rbw.error})`);
+    ok(rbw.ok && /a toolchain install or removal is running on shed2/.test(rbw.waits || ''),
+       `a reboot waits for a toolchain install on the node (${rbw.error || rbw.waits})`);
+    if (rbw.job) await napi('/api/v1/jobs', { action: 'cancel', id: rbw.job });
     await cancel(mixed);
     const bogus = await napi('/api/toolchains', { action: 'install', names: ['nvidia-driver'], driver: 'nvidia-driver-999', node: shed.id });
     ok(/not a driver apt offers/.test(bogus.error || ''), `a branch apt does not offer there is refused (${bogus.error})`);
@@ -3688,7 +3692,8 @@ ok(page.errors.length === 0,
      && JSON.stringify(j.spec.config) === JSON.stringify({ stores: true, configured: false, doors: true }),
      `the job asks the agent for the uninstall, carrying the rings ticked and only a true tick (${JSON.stringify(j.spec?.config)})`);
   const again = await napi('/api/v1/nodes', { action: 'uninstall', id: shed.id });
-  ok(/one at a time/.test(again.error || ''), '...and a second press waits for the first');
+  ok(again.ok && /^j_/.test(again.job || ''), `...and a second press is queued behind the first (${again.error || again.job})`);
+  if (again.job) await napi('/api/v1/jobs', { action: 'cancel', id: again.job });
   // The fake agent takes the job and reports it done, the way the real one does.
   const work = await fetch(base + '/api/v1/agent/work', { method: 'POST',
     headers: { Authorization: 'Bearer ' + shed.token, 'Content-Type': 'application/json' },
@@ -3899,7 +3904,7 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1"), "ok": r.
   ok(!claudeIn(await napi('/api/status')),
      '...and Claude Code leaves the bell row while the update is queued');
   const again = await napi('/api/agents', { action: 'install', node: en.id, agent: 'claude' });
-  ok(/already queued/.test(again.error || ''), '...and a second press is refused while one is queued');
+  ok(again.ok && again.already && /^j_/.test(again.job || ''), `...and a second press while one is queued is that job, not another (${JSON.stringify(again)})`);
   // The fake agent takes the job and finishes it the way the real one does,
   // naming what it installed on its last line. The row and the bell read
   // the new version from that line at once: the census only rides hello,

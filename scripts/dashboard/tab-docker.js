@@ -1346,9 +1346,13 @@ async function openEditContainer(name){
   // AerieOS's own (System) is managed: for reading, whatever its state
   // (the operator, 11 Oct).
   const managed = row?.owner === "System";
-  $("cName").disabled = !down || managed;
+  // ...nor while a job runs on it: its name is the job's compose project.
+  const jb = dockerJob(), jobOn = !!(jb?.running && jb.project === name && jb.instance === "main");
+  $("cName").disabled = !down || managed || jobOn;
   $("cNameHint").textContent = managed
     ? "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page)."
+    : jobOn && down
+    ? "A job is running on it: its name can change once that has ended."
     : down
     ? "Change the name while it is down: its volumes and data directory follow it on the node, then Build it again."
     : "It is running, so this is for reading: Down it to change its name, compose file or env.";
@@ -1896,7 +1900,7 @@ function dmRowsHtml(ins, job, blind){
         ${open}
         ${dmConfigureBtn(d)}
         ${!mayDocker() ? "" : `${d.running ? "" : `<button type="button" class="primary" data-dm="up" ${
-          busy || (d.missing_env || []).length ? "disabled" : ""}
+          (d.missing_env || []).length ? "disabled" : ""}
           title="${(d.missing_env || []).length
             ? "the env is missing " + esc(d.missing_env.join(", "))
             : !d.built_rev
@@ -1904,17 +1908,17 @@ function dmRowsHtml(ins, job, blind){
               : "Start it: docker compose up -d"}">Up</button>`}
         ${shellAt ? `<button type="button" data-dmshell="${esc(shellAt[0].name)}"${shellWhy ? " disabled" : ""}
           title="a shell inside ${esc(shellAt[0].service || shellAt[0].name)}, in the dock">Shell</button>` : ""}
-        ${(d.images_behind || []).length && !busy ? `<button type="button" data-dm="update"
+        ${(d.images_behind || []).length ? `<button type="button" data-dm="update"
           title="pull the newer images and start it again: docker compose pull, then up -d">Update</button>` : ""}
-        ${d.nginx_to && !busy ? `<button type="button" data-dm="nginx-update"
+        ${d.nginx_to ? `<button type="button" data-dm="nginx-update"
           title="pin nginx-${esc(d.nginx_to)}'s digest on the nginx page's record and rebuild with it">Update</button>` : ""}
         `}
         ${busy ? abortBtn('data-dm="abort"', job.aborting, "stop this build; what is already built is kept") : ""}
         ${managed || !mayDocker() ? "" : `<button type="button" data-dm="rebuild" ${
           // A button that refuses is not information: a rebuild when nothing
           // moved is a cached build and a restart, behind a confirm that
-          // says so.
-          busy ? "disabled" : ""}
+          // says so; one pressed while a job runs queues behind it.
+          ""}
           title="${!d.built_rev
             ? "build the first image, then bring it up"
             : d.changed
@@ -1923,7 +1927,7 @@ function dmRowsHtml(ins, job, blind){
                 ? "run it again: the last attempt did not finish"
                 : "the last build is current; this builds it again anyway"}">${
           d.built_rev ? "Rebuild" : "Build"}</button>`}
-        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists || busy ? "disabled" : ""}
+        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists ? "disabled" : ""}
           title="Stop it and remove its containers: docker compose down">Down</button>`}
         ${
         // Open, Shell, the build and Down are what a row is for; the rest

@@ -147,12 +147,22 @@ function byProjectGroup(list){
 // nowhere else, so it cannot drift from the poll.
 function projectJobHtml(){
   const pJob = state?.project_job || null;
-  return pJob?.running
+  // One pressed while another ran is queued behind it, named under it; one
+  // that failed with another starting after it is kept until dismissed.
+  const after = (pJob?.waiting || []).length ? ` · then ${esc(pJob.waiting.join(", "))}` : "";
+  const earlier = (pJob?.earlier || []).map(e => `<div class="row jobfail">
+         <div class="grow">
+           <div class="name">${esc(e.name)}</div>
+           <div class="sub bad">${esc(e.error)}</div>
+         </div>
+         ${pJob?.running ? "" : `<span class="acts"><button data-jobok>Dismiss</button></span>`}
+       </div>`).join("");
+  return earlier + (pJob?.running
     ? `<div class="row job">
          <div class="grow">
            <div class="name">${esc(pJob.name)}</div>
            <div class="sub">${esc(pJob.step || pJob.kind)}<span class="dots"></span>${
-             pJob.for > 4 ? ` · ${pJob.for}s` : ""}</div>
+             pJob.for > 4 ? ` · ${pJob.for}s` : ""}${after}</div>
          </div>
          <span class="acts">${abortBtn('id="bJobStop"', pJob.aborting,
              "stop it: a half-cloned directory is removed, a remote already set stays")}</span>
@@ -168,7 +178,7 @@ function projectJobHtml(){
          </div>
          <span class="acts"><button id="bJobOk">Dismiss</button></span>
        </div>`
-    : "";
+    : "");
 }
 
 // A draw of the projects draws the Projects page where it is on show, and
@@ -185,17 +195,13 @@ function pJobWire(){
   const stop = $("bJobStop"), okd = $("bJobOk");
   if (stop) stop.onclick = () => pJobAct("abort");
   if (okd)  okd.onclick  = () => pJobAct("dismiss");
+  document.querySelectorAll("[data-jobok]").forEach(b => { b.onclick = () => pJobAct("dismiss"); });
   // page-toolchains.js owns the timer; starting it here too means the Projects
   // card animates whether or not a page of toolchains has ever been opened.
   if (stop && !tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
-  // While a job runs the two things that would start another are dead, the
-  // same rule the toolchain buttons follow: the server answers 409 anyway,
-  // and a button that earns an error is worse than one that waits.
-  const busy = !!state?.project_job?.running;
-  const nb = $("bNewProjTab"); if (nb) nb.disabled = busy;
-  // ...and never re-enabled past the grant (R137 step 4): the busy pass
-  // undid the row's disabled for an account without git-auth.
-  document.querySelectorAll(".pgrid [data-l]").forEach(b => setDisabled(b, busy || state?.can?.["git-auth"] === false));
+  // A press while a job runs queues behind it, so nothing is held for it;
+  // a row's link stays dead without the grant (R137 step 4).
+  document.querySelectorAll(".pgrid [data-l]").forEach(b => setDisabled(b, state?.can?.["git-auth"] === false));
 }
 
 // ---- a project's job: the clone or the first push -----------------------

@@ -170,8 +170,10 @@ def update(principal, node_id, agent_id):
         return {"error": f"{n['name']} is not dialing in; nothing reaches it right now"}
     if not ((n.get("reported") or {}).get("session") or {}).get("up"):
         return {"error": f"{n['name']} runs no session account, so there is nowhere for {a.product} to go"}
-    if updating(node_id, a.id):
-        return {"error": f"a {a.product} job is already queued on {n['name']}"}
+    # The same press while it is queued or running is that job (no second
+    # one); another of this agent's waits behind it (nodes.job_waits).
+    if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=a.update_job, active=True) if ((j.get("spec") or {}).get("action") or "update") == "update"), "")):
+        return {"ok": True, "job": same, "already": True}
     _pressed[(a.id, node_id)] = time.time()
     try:
         ended = _end_sessions(node_id, a)
@@ -194,8 +196,10 @@ def remove(principal, node_id, agent_id):
         return {"error": f"only an agent node runs {a.product}"}
     if not installed(n, a.id):
         return {"error": f"{a.product} is not installed on {n['name']}"}
-    if updating(node_id, a.id):
-        return {"error": f"a {a.product} job is already queued on {n['name']}"}
+    # The same press while it is queued or running is that job (no second
+    # one); another of this agent's waits behind it (nodes.job_waits).
+    if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=a.update_job, active=True) if ((j.get("spec") or {}).get("action") or "update") == "remove"), "")):
+        return {"ok": True, "job": same, "already": True}
     ended = _end_sessions(node_id, a)
     r = nodes.job_add(principal, {"node": node_id}, a.update_job, {"timeout": 300, "action": "remove", "ended": ended})
     if r.get("ok") and audit:

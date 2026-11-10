@@ -323,7 +323,7 @@ function renderInstalledInto(i){
   const unmet = Object.entries(inst.sysdeps?.unmet || {});
   const notes = unmet.length ? `<div class="field"><div class="notice warn instsys">System packages ${esc(inst.name || "this node")} lacks for what its store holds (${esc(inst.sysdeps.family || "")}): ${
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${inst.sandbox && may.install
-        ? `<button type="button" data-instsysdeps${inst.job?.running ? " disabled" : ""} title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
+        ? `<button type="button" data-instsysdeps title="install these on ${esc(inst.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : "";
   const head = pageHead({facts: [
     ["Installed", String(rows.filter(r => r.installed).length)],

@@ -1143,13 +1143,12 @@ _job = {"running": False, "kind": "", "name": "", "step": "", "at": 0.0,
         "error": "", "note": "", "aborting": False}
 _lock = threading.Lock()
 _proc = None                  # the git process, so an abort can reach it
-_dest = None                  # the directory this job made, if it made one
 
 
 def job():
     """The job record for the status payload."""
     with _lock:
-        j = dict(_job)
+        j = dict(_job, waiting=[w[1] for w in _waiting], earlier=list(_earlier))
     j["for"] = int(time.time() - j["at"]) if j["at"] else 0
     return j
 
@@ -1184,6 +1183,7 @@ def dismiss():
         if _job["running"]:
             return {"error": "it is still running"}
         _job.update(error="", note="", kind="", name="", at=0.0)
+        _earlier.clear()
     return {"ok": True}
 
 
@@ -1211,15 +1211,39 @@ def _finish(error="", note=""):
                     aborting=False)
 
 
+# The space jobs pressed while one runs, each started once the one before
+# has ended: (kind, name, fn); and the failures of those that ended with
+# another starting behind them, kept until dismissed as the last one's is.
+_waiting = []
+_earlier = []
+
+
 def _start(kind, name, fn):
-    """Hand one job to a thread. The caller has already validated everything."""
+    """Hand one job to a thread, or queue it behind the one running (the
+    operator, 10 Nov: a press is never refused for another job). The caller
+    has already validated everything. True."""
     with _lock:
         if _job["running"]:
-            return False
+            _waiting.append((kind, name, fn))
+            return True
         _job.update(running=True, kind=kind, name=name, step="starting",
                     at=time.time(), error="", note="", aborting=False)
     threading.Thread(target=_wrap, args=(fn,), daemon=True).start()
     return True
+
+
+def _next():
+    """The next queued space job started, once the one before has ended."""
+    with _lock:
+        if _job["running"] or not _waiting:
+            return
+        if _job.get("error"):
+            _earlier.append({"name": _job.get("name", ""), "error": _job["error"]})
+            del _earlier[:-10]
+        kind, name, fn = _waiting.pop(0)
+        _job.update(running=True, kind=kind, name=name, step="starting",
+                    at=time.time(), error="", note="", aborting=False)
+    threading.Thread(target=_wrap, args=(fn,), daemon=True).start()
 
 
 def _wrap(fn):
@@ -1232,6 +1256,7 @@ def _wrap(fn):
     finally:
         _register(None)
     _finish(error, note)
+    _next()
 
 
 def _aborted():
@@ -1416,18 +1441,11 @@ def create(req, env=None):
                 body["note"] = f"{r['files']} files from {r['name']}; {body.get('note') or 'ready'}"
             return body, code
         return _init(dest, name, about, _field(req, "version"), env)
-    global _dest
-    _dest = dest
     cred_scheme = "http" if mode == "clone" and addr["scheme"] == "http" else "https"
     helper = (write_token(name, token, addr["host"], cred_scheme,
                           forges.cred_user(forge, addr["host"], token, cred_scheme), uid=str(req.get("_uid") or ""))
               if mode == "clone" and token else "")
-    if not _start("clone", name,
-                  lambda: _clone(dest, key_url or url, helper, want_push)):
-        shutil.rmtree(dest, ignore_errors=True)             # made a moment ago
-        forget_token(name)                                  # written a moment ago
-        _unmade(name)
-        return {"error": "another space job is already running"}, 409
+    _start("clone", name, lambda: _clone(dest, key_url or url, helper, want_push))
     if want_push:
         grant_push(name, addr["host"], repo_id, "token" if token else "key")
     return {"ok": True, "name": name, "started": True}, 200
@@ -1831,11 +1849,9 @@ def link(req):
         return {"error": "no deploy key was picked and no access token given; "
                          "a push has to authenticate somehow"}, 400
     forges.remember(host, forge["id"])
-    if not _start("link", name,
-                  lambda: _link(dest, name, forge, host, path, remote,
-                                bool(keyname), pat, helper=helper, token=token,
-                                scheme=addr["scheme"], user=user)):
-        return {"error": "another space job is already running"}, 409
+    _start("link", name, lambda: _link(dest, name, forge, host, path, remote,
+                                       bool(keyname), pat, helper=helper, token=token,
+                                       scheme=addr["scheme"], user=user))
     return {"ok": True, "name": name, "started": True}, 200
 
 

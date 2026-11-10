@@ -124,7 +124,7 @@ async function loadLibraryNow(){
   // One follow-up while a job writes a row, not a poll: the toolchains
   // revision moves when the job ends, and the row's "installing" until then.
   clearTimeout(libFollow); libFollow = null;
-  if ((lib.rows || []).some(r => r.running)) libFollow = setTimeout(loadLibrary, 3000);
+  if ((lib.rows || []).some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
   libRev++;
   drawPanes();
 }
@@ -150,6 +150,8 @@ function libPills(r){
 function libState(r){
   const w = (t, cls = "") => `<span class="state${cls ? " " + cls : ""}">${t}</span>`;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
+  // Pressed while another job ran: it goes when that one ends.
+  if (r.queued) return w("queued, after the job running now");
   // An app runs where Docker does (R170 step 7): said when this node has none.
   if (r.kind === "app") return lib && !lib.docker ? w("this node runs no Docker: New container picks another", "warn") : w("");
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("");
@@ -172,15 +174,16 @@ function libState(r){
 
 // The one verb a row takes, and Remove where it is installed (the
 // Toolchains page's Remove and the Agents page's, moved here).
-// Why the store's verbs are held on every card, or "": a job running on
-// the node (one at a time), a node not reporting, a store it cannot write.
+// Why the store's verbs are held on every card, or "": a node not reporting,
+// a store it cannot write. A job running there holds nothing: a press queues
+// behind it (toolchains.store_gate).
 // Set by the draw; the notice over the cards says the last two in full.
 let libHold = "";
 function libActs(r, may){
   const n = libNode, a = (act, words, cls = "", held = "") =>
     `<button type="button"${cls ? ` class="${cls}"` : ""} data-libact="${act}" data-libkind="${esc(r.kind)}" data-libname="${esc(r.name)}"${
       held ? ` disabled title="${esc(held)}"` : ""}>${esc(words)}</button>`;
-  if (r.running) return "";
+  if (r.running || r.queued) return "";
   if (r.kind === "companion") return r.download
     ? `<a class="btn primary" href="${esc(r.download.url)}" download title="${esc(r.download.file)} · sha256 ${esc((r.download.sha256 || "").slice(0, 12))}…">Download</a>`
     : `<button type="button" class="primary" disabled>Download</button>`;
@@ -409,11 +412,11 @@ function renderLibraryInto(i){
   d.setBar("");
   const acts = may.install
     ? `${busy ? abortBtn('data-libabort', job.aborting) : ""}
-       <button type="button" data-libcheck${busy || stale ? " disabled" : ""} title="ask each upstream what it has now">${
+       <button type="button" data-libcheck${stale ? " disabled" : ""} title="ask each upstream what it has now">${
          busy && job.action === "check" ? `${barSaid("Checking for updates", "Checking")}<span class="dots"></span>`
          : barSaid("Check for updates", "Check")}</button>${
         may.packs ? `<button type="button" class="primary" data-libadd>${barSaid("Add your own", "Add")}</button>` : ""}${
-        clean.length ? `<button type="button" class="danger" data-libclean${busy ? " disabled" : ""}>Remove</button>` : ""}` : "";
+        clean.length ? `<button type="button" class="danger" data-libclean>Remove</button>` : ""}` : "";
   if (lib.error){
     paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
     return;
@@ -451,9 +454,9 @@ function renderLibraryInto(i){
     pro ? `<div class="field"><div class="notice warn libro">${esc(lib.name || "This node")}'s toolchain store is read-only to it, so nothing installs here: what is in it is what it has. Make it writable on the machine to install.</div></div>` : ""}${
     unmet.length ? `<div class="field"><div class="notice warn libsys">System packages ${esc(lib.name || "this node")} lacks for what its store holds (${esc(lib.sysdeps.family || "")}): ${
       unmet.map(([r, ps]) => `${esc(r)}: ${esc(ps.join(" "))}`).join("; ")}. ${lib.sandbox && may.install
-        ? `<button type="button" data-libsysdeps${busy || stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
+        ? `<button type="button" data-libsysdeps${stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : ""}`;
-  libHold = busy ? "another toolchain job is running on this node" : stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
+  libHold = stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
   paint(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.

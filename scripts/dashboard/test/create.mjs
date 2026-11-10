@@ -1083,8 +1083,8 @@ ok(true, 'the Spaces card shows the job where its result will appear');
 ok(await page.$eval('.pjjob .row.job .sub', el => /clon|start/.test(el.textContent))
    && await page.$('.pjjob .row.job .dots') !== null,
    '...saying what it is doing, with an ellipsis rather than a parsed percentage');
-ok(await page.$eval('#bNewProjTab', b => b.disabled),
-   '...and New project is dead while it runs: one job at a time');
+ok(!await page.$eval('#bNewProjTab', b => b.disabled),
+   '...and New space stays live while it runs: a second is queued behind it');
 ok(existsSync(`${DIR}/ws/slowclone`),
    'the directory is claimed up front, so a second request cannot take the name');
 ok(await page.$$eval('.projtab .name',

@@ -222,15 +222,15 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
     const all = sel => [...document.querySelectorAll(sel)];
     const installs = all('.doc .librarytab [data-libact="install"][data-libkind="toolchain"]');
     const out = {
-      check: !!document.querySelector('.doc .librarytab [data-libcheck]')?.disabled,
+      check: !document.querySelector('.doc .librarytab [data-libcheck]')?.disabled,
       abort: all('.doc .librarytab [data-libabort]').length === 1 && !document.querySelector('.doc .librarytab [data-libabort]').disabled,
-      install: installs.length > 0 && installs.every(b => b.disabled),
+      install: installs.length > 0 && installs.every(b => !b.disabled),
     };
     lib.job = was; libRev++; drawPanes();
     return out;
   });
   ok(g.check && g.abort && g.install,
-     `while a job runs, Check for updates and every card's Install are dead and Abort is live (${
+     `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and Abort is there (${
        Object.entries(g).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all'})`);
   // A check the operator did not start still has to reach the page, and the
   // button says which job is in the way; the head keeps to the store (B31).
@@ -418,9 +418,7 @@ const post = async body => (await api('/api/toolchains', body)).status;
 ok(await post({ action: 'install', names: ['flutter; rm -rf /'] }) === 400,
    'a name that is not in the catalog is refused');
 ok(await post({ action: 'install', names: [] }) === 400, 'an empty selection is refused');
-// A second job is refused while one runs. The message names which one: the
-// version check that runs by itself once a day says so, rather than claiming
-// an install nobody started.
+// A second job pressed while one runs is queued behind it, never refused.
 const clash = await page.evaluate(async () => {
   const go = b => fetch('/api/toolchains', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -429,9 +427,9 @@ const clash = await page.evaluate(async () => {
   const j = await r.json().catch(() => ({}));
   return { status: r.status, error: j.error || '' };
 });
-ok(clash.status === 409 && /already running/.test(clash.error),
-   `...and a second job while one runs is refused (${clash.error})`);
-await waitLocal(t => t.job && !t.job.running);
+ok(clash.status === 200 && !clash.error,
+   `...and a second job while one runs is queued behind it (${clash.status} ${clash.error})`);
+await waitLocal(t => t.job && !t.job.running && !(t.job.waiting || []).length, 60000);
 ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown action is refused');
 
 // ---- what needs what --------------------------------------------------------

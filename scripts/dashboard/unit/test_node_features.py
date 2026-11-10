@@ -77,7 +77,8 @@ class Controller(unittest.TestCase):
         got = nodes.job_next(self.nid, 0)
         self.assertEqual((got or {}).get("spec", {}).get("apply"), "feature")
         self.assertEqual(got["spec"]["config"], {"id": "vmhost", "op": "install"})
-        self.assertIn("one at a time", nodes.node_feature("user:test", self.nid, "vmhost", "install").get("error", ""))
+        self.assertTrue(nodes.node_feature("user:test", self.nid, "vmhost", "install").get("job"), "a second press is queued")
+        self.assertIsNone(nodes.job_next(self.nid, 0), "...and waits behind the first")
 
     def test_no_kvm_is_refused_with_the_host_setting(self):
         self.census(vmhost={"kvm": False})
@@ -124,7 +125,8 @@ class Controller(unittest.TestCase):
             self.assertTrue(r.get("job"), r)
             got = nodes.job_next(self.nid, 0)
             self.assertEqual((got["spec"]["apply"], got["spec"]["config"]), ("controller-update", {"release": "v0.9.0"}))
-            self.assertIn("one at a time", nodes.node_controller_update("user:test", self.nid).get("error", ""))
+            self.assertTrue(nodes.node_controller_update("user:test", self.nid).get("job"), "a second press is queued")
+            self.assertIsNone(nodes.job_next(self.nid, 0), "...and waits behind the first")
 
 
 class Agent(unittest.TestCase):

@@ -889,6 +889,18 @@ function nodeHostRow(n){
        <div><button type="button" data-nd="host-only" ${n.live ? "" : "disabled"}>Make it hosting only</button></div>`;
 }
 
+// Why a node cannot be disabled or un-enrolled now, as nodes.node_in_use
+// says it: its accounts' sessions and the containers running there.
+function ndInUse(n){
+  const rep = n.reported || {};
+  const sessions = (rep.sessions || []).filter(s => /^u_[0-9a-f]{8}~/.test(String(s?.name || "")));
+  const ctrs = Object.keys(rep.published || {});
+  const bits = [];
+  if (sessions.length) bits.push(`end its ${sessions.length} session${sessions.length === 1 ? "" : "s"} on the Sessions card`);
+  if (ctrs.length) bits.push(`bring down its ${ctrs.length} container${ctrs.length === 1 ? "" : "s"} on the Containers page`);
+  return bits.join(" and ");
+}
+
 // Un-enroll (the operator, 11 Oct): the one way off. Where the machine can
 // be cleaned (its agent dialing in, provisioned by AerieOS) the dialog
 // says what always goes (the agent, the session isolation, the accounts)
@@ -1241,6 +1253,9 @@ function nodeAdvancedSection(n, stale, inflight){
   const installing = inflight("toolchain") ? "a toolchain install or removal"
     : inflight("image") ? "a system image install" : inflight("claude-update") ? "a Claude Code update"
     : applying ? `a change to this node (${applying.apply || "a system job"})` : "";
+  // What keeps it from being disabled or un-enrolled (nodes.node_in_use):
+  // the sessions and the containers running there, ended first.
+  const inUse = ndInUse(n);
   const paths = n.config?.paths || {};
   const text = Object.entries(paths).map(([k, v]) => `${k}:${v}`).join(", ");
   const c = nodeDraft(n);
@@ -1287,18 +1302,22 @@ function nodeAdvancedSection(n, stale, inflight){
     ${act("Clear cache", stale ? esc(staleWhy(n)) : "Drops every space's build cache here; the next build fetches again.",
         `<button type="button" data-nd="cache-clear" ${stale || inflight("cache-clear") ? "disabled" : ""}>${inflight("cache-clear") ? "Clearing…" : "Clear cache"}</button>`)}
     ${act(n.state === "disabled" ? "Enable" : "Disable",
-        n.state === "disabled" ? "Disabled: off every picker and handed no work or session. Enable offers it again." : "Keeps it enrolled and configured, but off every picker and handed no work or session until Enable.",
-        `<button type="button" data-nd="${n.state === "disabled" ? "enable" : "disable"}">${n.state === "disabled" ? "Enable" : "Disable"}</button>`)}
-    ${act("Un-enroll", n.live && n.reported?.sandbox
+        n.state === "disabled" ? "Disabled: off every picker and handed no work or session. Enable offers it again."
+        : inUse ? `<span class="warn">It is in use: ${esc(inUse)} first.</span>`
+        : "Keeps it enrolled and configured, but off every picker and handed no work or session until Enable.",
+        `<button type="button" data-nd="${n.state === "disabled" ? "enable" : "disable"}"${n.state !== "disabled" && inUse ? " disabled" : ""}>${n.state === "disabled" ? "Enable" : "Disable"}</button>`)}
+    ${act("Un-enroll", n.live && n.reported?.sandbox && inUse
+        ? `<span class="warn">It is in use: ${esc(inUse)} first.</span>`
+        : n.live && n.reported?.sandbox
         ? "Takes AerieOS off the machine (its agent, accounts, mounts, runners and files; Docker and the shares stay) and removes the node here."
         : `Removes the node here; AerieOS's pieces stay on the machine, since ${n.live ? "AerieOS did not provision it" : "its agent is not dialing in"}.`,
-        `<button type="button" class="danger" data-nd="unenroll" ${inflight("uninstall") ? "disabled" : ""}>${inflight("uninstall") ? "Un-enrolling…" : "Un-enroll"}</button>`)}
+        `<button type="button" class="danger" data-nd="unenroll" ${inflight("uninstall") || (n.live && n.reported?.sandbox && inUse) ? "disabled" : ""}>${inflight("uninstall") ? "Un-enrolling…" : "Un-enroll"}</button>`)}
     ${n.kind !== "agent" ? "" : act("Reboot or shut down",
         !n.live ? `<span class="bad">They need the agent dialing in, and it is away: power the machine from its console or its hypervisor.</span>`
-        : installing ? `<span class="bad">They wait: ${esc(installing)} is running here. Stop it first, or wait for it to finish.</span>`
+        : installing ? `<span class="warn">${esc(installing[0].toUpperCase() + installing.slice(1))} is running here: one pressed now waits for it to end.</span>`
         : "Reboot ends every session there and the machine comes back on its own; Shut down does not come back until somebody switches it on.",
         (n.id === state?.own_node && typeof holdNextBox === "function" ? holdNextBox() : "") + ["reboot", "poweroff"].map(w =>
-          `<button type="button" class="danger" data-nd="${w}" ${!n.live || inflight(w) || installing ? "disabled" : ""}>${
+          `<button type="button" class="danger" data-nd="${w}" ${!n.live || inflight(w) ? "disabled" : ""}>${
             inflight(w) ? (w === "reboot" ? "Rebooting…" : "Shutting down…")
                         : (w === "reboot" ? "Reboot" : "Shut down")}</button>`).join(""))}
     </div>`;

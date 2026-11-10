@@ -1,7 +1,7 @@
 // The toolchain store's state and verbs, shared by the Library (what the
 // catalog offers), the Installed page (what the node holds) and the pack
-// dialogs: the read of a node's store (/api/toolchains), the one job at a
-// time it runs (tcAct: install, remove, check, the system packages, abort),
+// dialogs: the read of a node's store (/api/toolchains), the jobs it
+// runs one at a time, queued behind each other (tcAct: install, remove, check, the system packages, abort),
 // the lines a toolchain's row says (its terms, system packages, what it
 // needs, how its download was checked), the machine's own rows (the NVIDIA
 // driver and the container toolkit) and the tool pack dialog (R77). Not a
@@ -577,14 +577,7 @@ function tcToolkitLine(m){
   }
 }
 async function tcAct(action, only){
-  // One at a time, and the server enforces it with a 409, so the buttons go
-  // dead rather than letting a click earn an error message. Installs are
-  // minutes long and share one sdkmanager lock; a queue that outlived them
-  // would have to survive a page reload to mean anything, and this does not.
-  // Abort is the one thing that may be asked of a running job; everything
-  // else has to wait for it.
-  if (action !== "abort" && toolchains?.job?.running)
-    return notify("a toolchain operation is already running", true);
+  // A press while a job runs is queued behind it, here and on a node alike.
   if (action === "abort"){
     if (!await askYes("Stop after the toolchain it is on? What has already installed stays."))
       return;
@@ -636,9 +629,9 @@ async function tcAct(action, only){
     // The job's own toast where there is one (R218 step 6): it follows the
     // job to its end, which is kept on the record.
     const on = tcNode !== "local" ? " on " + ((nodesList || []).find(n => n.id === tcNode)?.name || "the node") : "";
-    notifyJob(j.job, action === "check" ? "checking for updates" + on
+    notifyJob(j.job, (action === "check" ? "checking for updates" + on
       : action === "sysdeps" ? "installing the system packages" + on
-      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`);
+      : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`) + (j.waits ? ", once the job running there ends" : ""));
     loadToolchains();
   }catch(e){ notify("could not start: " + failWords(e), true); }
 }

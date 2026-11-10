@@ -204,8 +204,10 @@ def remove(principal, node_id):
         return {"error": "only an agent node runs Claude Code"}
     if not installed(n):
         return {"error": f"Claude Code is not installed on {n['name']}"}
-    if updating(node_id):
-        return {"error": f"a Claude Code job is already queued on {n['name']}"}
+    # The same press while it is queued or running is that job (no second
+    # one); another of this agent's waits behind it (nodes.job_waits).
+    if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=JOB, active=True) if ((j.get("spec") or {}).get("action") or "update") == "remove"), "")):
+        return {"ok": True, "job": same, "already": True}
     ended = []
     for s in node_sessions() if node_sessions else []:
         if s.get("node_id") == node_id and agents.of_session(tmux_base(s["name"]))[0] is agents.get("claude"):
@@ -232,8 +234,10 @@ def update(principal, node_id):
     se = (n.get("reported") or {}).get("session") or {}
     if not se.get("up"):
         return {"error": f"{n['name']} runs no session account, so there is no Claude Code there to update"}
-    if updating(node_id):
-        return {"error": f"an update is already queued on {n['name']}"}
+    # The same press while it is queued or running is that job (no second
+    # one); another of this agent's waits behind it (nodes.job_waits).
+    if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=JOB, active=True) if ((j.get("spec") or {}).get("action") or "update") == "update"), "")):
+        return {"ok": True, "job": same, "already": True}
     _pressed[node_id] = time.time()
     try:
         ended = []

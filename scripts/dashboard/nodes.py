@@ -2759,8 +2759,6 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False):
     # gets one too. Storage and network keep the stamp: node_apply.
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; system jobs go to an online node"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     ar = dict(runners_of(n).get(slot) or {})
     if not ar:
         return {"error": "no such runner on this node: add one on the CI runner page first"}
@@ -2897,8 +2895,6 @@ def node_funnel(principal, node_id, port, on=True):
         return {"error": f"{n['name']} has no tailscale; install and log it in on the node first"}
     if n["state"] != "online":
         return {"error": f"the node is {n['state']}; system jobs go to an online node"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     try:
         port = int(port)
     except (TypeError, ValueError):
@@ -3341,8 +3337,6 @@ def node_uninstall(principal, node_id, rings=None):
     if not (n.get("reported") or {}).get("sandbox"):
         return {"error": "only a node provisioned as an AerieOS sandbox can be uninstalled "
                          "from here: on the machine, sudo bb-sandbox uninstall"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     busy = node_in_use(n)
     if busy:
         return {"error": f"{n['name']} is in use: {busy} first"}
@@ -3403,8 +3397,6 @@ def node_feature(principal, node_id, fid, op):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     if op == "install" and fid == "vmhost" and (fe.get("vmhost") or {}).get("nokvm") == "kernel":
         return {"error": f"{n['name']}'s running kernel was built without KVM (openSUSE's minimal kernel-default-base "
                          "is one): install its full kernel (kernel-default), restart the machine, then VM host"}
@@ -3480,8 +3472,6 @@ def node_storage_snapshot(principal, node_id, req):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-snapshot", "config": cfg, "timeout": 900})
     if r.get("ok"):
         audit(principal, "storage-snapshot", node_id, {"job": r["job"], **cfg})
@@ -3666,8 +3656,6 @@ def node_storage_array(principal, node_id, req):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "storage-array", "config": cfg,
                  # A parity check reads every disk whole: two days for a large array.
@@ -3704,8 +3692,6 @@ def node_console(principal, node_id, password, clear=False):
         cfg["hash"] = h
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "console", "config": cfg, "timeout": 60})
     if r.get("ok"):
         audit(principal, "console-password", node_id, {"job": r["job"], "cleared": bool(clear)})
@@ -3808,8 +3794,6 @@ def node_storage_adopt(principal, node_id, req):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-adopt", "config": cfg, "timeout": 600})
     if r.get("ok"):
         audit(principal, "storage-adopt", node_id, {"job": r["job"], "adopt": action,
@@ -3888,8 +3872,6 @@ def node_storage_share(principal, node_id, req):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120 * max(1, len(cfg.get("shares") or []))})
     if r.get("ok"):
         audit(principal, "storage-share", node_id, {"job": r["job"], **({"share": "set-many", "names": [x["name"] for x in cfg["shares"]]} if action == "set-many" else cfg)})
@@ -4004,8 +3986,6 @@ def node_storage_pool(principal, node_id, req):
     held = {m.get("where", "").rsplit("/", 1)[-1] for m in ((rep.get("adopted") or {}).get("mounts") or [])}
     if action in ("create", "import") and (re.fullmatch(r"(user0?|disks?|disk[0-9]+|parity|array|other|remotes|addons|rootshare)", name) or name in held):
         return {"error": f"/mnt/{name} means something else on this machine (the array's folders, the other mounts', or adopted disks): pick another name"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     known = {d["name"]: d for d in rep.get("disks") or [] if isinstance(d, dict)}
     cfg = {"pool": action, "name": name}
     if action in ("create", "add"):
@@ -4210,8 +4190,6 @@ def node_storage_backup(principal, node_id, name):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-backup", "config": {"name": name}, "timeout": 86400})
     if r.get("ok"):
         audit(principal, "storage-backup", node_id, {"job": r["job"], "name": name})
@@ -4238,8 +4216,6 @@ def node_host_update(principal, node_id, reboot=False):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     cfg = {"reboot": reboot is True}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "host-update", "config": cfg, "timeout": 7200})
     if r.get("ok"):
@@ -4283,8 +4259,6 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
             return {"error": f"a spin-down is one of {', '.join(str(m) for m in SPINDOWN_MINUTES)} minutes, 0 for never"}
     if not host and not tz and spin is None:
         return {"error": "nothing to set"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     cfg = {k: v for k, v in (("hostname", host), ("timezone", tz)) if v}
     if spin is not None:
         cfg["spindown"] = spin
@@ -4321,8 +4295,6 @@ def node_os_kept(principal, node_id, verb, version):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "os-kept", "config": {"verb": verb, "version": version}, "timeout": 120})
     if r.get("ok"):
         audit(principal, "os-kept", node_id, {"job": r["job"], "verb": verb, "version": version})
@@ -4350,8 +4322,6 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
     src = str(from_dir or "").strip()
     if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
@@ -4452,8 +4422,6 @@ def node_projects_folder(principal, node_id, path="", release=False):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "projects-folder", "config": cfg, "timeout": 6 * 3600})
     if r.get("ok"):
         audit(principal, "projects-folder", node_id, {"job": r["job"], **({"path": cfg["path"]} if "path" in cfg else {"release": True})})
@@ -4497,8 +4465,6 @@ def node_system_pool(principal, node_id, path="", aside=False):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True}, "timeout": 6 * 3600})
     if r.get("ok"):
         audit(principal, "system-pool", node_id, {"job": r["job"], "path": path, "aside": aside is True})
@@ -4525,8 +4491,6 @@ def node_controller_update(principal, node_id, release=""):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     tag = str(release or "").strip()
     if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
         return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
@@ -4616,8 +4580,6 @@ def node_door(principal, node_id, on):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "door", "config": {"on": on is not False}, "timeout": 300})
     if r.get("ok"):
@@ -4650,8 +4612,6 @@ def node_gpu_display(principal, node_id):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "gpu", "config": {}, "timeout": 1800})
     if r.get("ok"):
@@ -4675,8 +4635,6 @@ def node_gpu_display_off(principal, node_id):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": "gpu-off", "config": {}, "timeout": 300})
     if r.get("ok"):
@@ -4731,28 +4689,30 @@ def node_power(principal, node_id, what):
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the "
                          f"machine: {verb} it from its console or its hypervisor"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     # ...nor under an install: a restart in the middle of apt, or of a
     # toolchain being unpacked, leaves it half on the machine (the operator,
-    # 30 Sep). The Library's Abort stops one first.
+    # 30 Sep), so it waits for one to end (job_waits), saying so.
     busy = [j["type"] for j in jobs_for(node_id=node_id, active=True, n=20)
             if j.get("type") in POWER_WAITS]
-    if busy:
-        return {"error": f"{POWER_WAITS[busy[0]]} is running on {n['name']}: {verb} it when that has "
-                         "finished, or stop it first"}
     r = job_add(principal, {"node": node_id}, "system",
                 {"apply": what, "config": {}, "timeout": 60})
+    if r.get("ok") and busy:
+        r["waits"] = f"{POWER_WAITS[busy[0]]} is running on {n['name']}: it {verb}s once that has finished"
     if r.get("ok"):
         audit(principal, "node-" + what, node_id, {"job": r["job"]})
     return r
 
 
-def system_job_for(node_id):
-    """The system job in flight for a node, if any: one at a time, because
-    two applies racing on one fstab is not a state anybody wants."""
-    for j in jobs_for(node_id=node_id, type="system", active=True, n=5):
-        return j
+def system_job_for(node_id, skip=""):
+    """The system job at work on a node, if any: one at a time, because two
+    applies racing on one fstab is not a state anybody wants. One pressed
+    meanwhile is queued, not refused, and job_next hands it over once this
+    has ended (B670: the first-run page sent each only when the last had
+    ended, and every other page refused the second press). A light one (a
+    quick root command) neither waits nor is waited for."""
+    for j in jobs_for(node_id=node_id, type="system", active=True, n=20):
+        if j["state"] in ("assigned", "running") and j["id"] != skip and not (j.get("spec") or {}).get("light"):
+            return j
     return None
 
 
@@ -4794,8 +4754,6 @@ def node_apply(principal, node_id, what):
     desired = (n.get("config") or {}).get("desired") or {}
     if not desired:
         return {"error": "nothing to apply; save a configuration first"}
-    if system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     cfg = apply_cfg(desired, what)
     # A storage apply that repoints a store copies what is in it first, and a
     # toolchain store is tens of gigabytes: fifteen minutes is the right ceiling
@@ -6033,8 +5991,6 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
         return {"error": f"the node is {n['state']}; a root command goes to an online node"}
     if node_locked(n):
         return {"error": node_locked(n)}
-    if not light and system_job_for(node_id):
-        return {"error": "a system job is already in flight on this node; one at a time"}
     spec = {"apply": "root", "timeout": int(timeout), **({"light": True} if light else {}),
             "config": {"argv": [str(a) for a in argv], "why": str(why)[:300],
                        # The person, for the log's first line; the audit row
@@ -6429,6 +6385,57 @@ def _fail_overdue(node_id):
                 _jstate_bump()
 
 
+# Whether a queued toolchain or image job waits for another writing the
+# store: toolchains.store_gate, handed in by the server.
+store_gate = None
+
+
+def _at_work(node_id, type=None, skip=""):
+    """The jobs handed to a node and not finished, of a type or any, but `skip`."""
+    return [x for x in jobs_for(node_id=node_id, type=type, active=True, n=50)
+            if x["state"] in ("assigned", "running") and x["id"] != skip]
+
+
+def job_waits(j, node_id):
+    """Whether a queued job waits for one already at work that it would
+    collide with. A press while such a job runs is queued behind it, never
+    refused (the operator, 10 Nov: every job queues unless there is a reason
+    it cannot), and handed over here once that one has ended:
+
+    - a toolchain or image job, for one writing the same part of the store,
+      on this node or another sharing it (toolchains.store_gate);
+    - a system job, for another system job on the node (two applies racing
+      on one fstab), a light one (a quick root command) neither waiting nor
+      waited for; a reboot or power-off, for an install there as well, since
+      a restart in the middle of one leaves it half on the machine; an
+      array's, for a SnapRAID run the census says is still going;
+    - a coding agent's install, update or removal, for another of the same
+      agent on the node;
+    - a container's compose job, for another on the same instance."""
+    t, sp = j.get("type") or "", j.get("spec") or {}
+    if t in ("toolchain", "image"):
+        return bool(store_gate and store_gate(j, node_id))
+    if t == "system":
+        if sp.get("light"):
+            return False
+        if sp.get("apply") in ("reboot", "poweroff") and any(x["type"] in POWER_WAITS for x in _at_work(node_id, skip=j["id"])):
+            return True
+        # SnapRAID's long runs (a sync, a scrub) go on after their job has
+        # ended, so an array job waits for the census to say none is going.
+        if sp.get("apply") == "storage-array":
+            arr = ((node(node_id) or {}).get("reported") or {}).get("array")
+            if isinstance(arr, dict) and arr.get("running"):
+                return True
+        return system_job_for(node_id, j["id"]) is not None
+    if t in POWER_WAITS:                                     # an agent's update job
+        return bool(_at_work(node_id, t, j["id"]))
+    if t == "compose":
+        inst = sp.get("instance") or ""
+        return any(x.get("project") == j.get("project") and ((x.get("spec") or {}).get("instance") or "") == inst
+                   for x in _at_work(node_id, "compose", j["id"]))
+    return False
+
+
 def job_next(node_id, wait, runner="node", alive=None):
     """The oldest queued job this node may take, for this runner, else wait
     up to `wait` seconds for one, or for a cancel request, which comes back
@@ -6499,6 +6506,10 @@ def job_next(node_id, wait, runner="node", alive=None):
                     if runner_of(j["type"], n["kind"]) != runner or not fits(j, n):
                         continue
                     if not free and not _light(j):
+                        continue
+                    # One pressed while another it would collide with
+                    # runs waits its turn here (job_waits).
+                    if job_waits(j, node_id):
                         continue
                     # An agent's job is `assigned` until its first log post
                     # says it started: the poll reply can be lost on the

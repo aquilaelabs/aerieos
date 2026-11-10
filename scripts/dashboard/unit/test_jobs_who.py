@@ -68,6 +68,9 @@ class Asker(unittest.TestCase):
                 seen.append(who)
                 return {"error": "stop here"}
 
+            def jobs_for(self, **k):
+                return []
+
         was = (devactions.devapp.queue, devactions._active_job, devactions.devapp._instance_node,
                devactions.shipped, devactions.devapp._read_rec)
         devactions.devapp.queue = Q()

@@ -107,7 +107,7 @@ function emuAddRows(d, why){
     <div class="tcs emaddrows">${mine.map(r => {
       const now = writing.has(r.id);
       return `<label class="tc emnew">
-        <input type="checkbox" value="${esc(r.id)}"${why || job.running || !mayToolchains(emuNode) ? " disabled" : ""}${
+        <input type="checkbox" value="${esc(r.id)}"${why || !mayToolchains(emuNode) ? " disabled" : ""}${
           emuTicked.has(r.id) || now ? " checked" : ""}>
         <span class="grow">
           <span class="nm">API ${esc(r.api)}</span>
@@ -175,7 +175,7 @@ function emuAddBar(d, held, job){
       ${job.running ? `<span class="state tcworking">${job.action === "remove" ? "Removing" : "Adding"} ${
         esc(job.current || job.image || "")}<span class="dots"></span></span>` : ""}
       ${held && !job.running ? `<span class="state bad">${esc(held)}</span>` : ""}
-      <button class="primary" data-emu="install"${held || job.running || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
+      <button class="primary" data-emu="install"${held || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
         emuTickedHere(d).length > 1 ? ` (${emuTickedHere(d).length})` : ""}</button>
       ${job.running ? abortBtn('data-emu="abort"', job.aborting) : ""}
     </div>`;
@@ -214,7 +214,6 @@ function renderEmulatorInto(i){
   const job = d.job || {};
   // Why nothing can be added or removed right now, said on the ghosted control.
   const held = d.wrong_platform ? `${d.name} is ${d.platform}, and the Android tools are packaged for ${d.wrong_platform}`
-    : job.running ? "another job is writing to this store"
     : stale ? staleWhy(pnode)
     : d.sdkmanager === false ? `${d.name} needs the Android command-line tools first` : "";
   // The node is the Build group's header's (R178).

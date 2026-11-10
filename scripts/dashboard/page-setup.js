@@ -336,18 +336,13 @@ function setupPlaceAuto(s){
   postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))
     .then(j => { if (j.error) notify(j.error, true); loadNodes().then(() => drawSetup()); });
 }
-// One machine's system jobs run one at a time, and a second asked for while the
-// first runs is refused (B670): each is sent when the last has ended, the button
-// saying how far along. The error to say, or "".
+// One machine's system jobs run one at a time, a second queued behind the
+// first: each is sent when the last has ended, so one that fails stops the ones
+// after it, the button saying how far along. The error to say, or "".
 async function setupInTurn(calls, btn, word){
   for (const [i, c] of calls.entries()){
     if (calls.length > 1) busy(btn, `${word} ${i + 1} of ${calls.length}`);
-    let j;
-    for (let tries = 0; tries < 200; tries++){
-      j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
-      if (!/already in flight/.test(j.error || "")) break;
-      await new Promise(r => setTimeout(r, 3000));
-    }
+    const j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
     if (j.error) return j.error;
     for (let tries = 0; j.job && tries < 900; tries++){
       const d = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`)).json().catch(() => ({}));

@@ -252,6 +252,21 @@ fair-share-per-pool or quota checks are one function swapped later rather than
 logic scraped out of four call sites. Until someone needs that, the function is
 ten lines.
 
+**A press is never refused because something else is running.** A job that
+would collide with one already at work is queued behind it and handed over
+once that one ends (`nodes.job_waits`): a toolchain or image job waits for one
+writing the same part of the store, here or on a node sharing it; a system job
+for another system job on the node, a reboot or shut-down for an install
+there too, and an array job for a SnapRAID run the census says is going; a
+coding agent's install, update or removal for another of the same agent; a
+container's compose job for another on the same instance. The same press
+while its job still waits is answered with that job rather than a second.
+The space jobs (a clone, a first push) and the controller's own toolchain
+installer, which are not jobs on the queue, keep a line of their own the same
+way. What is still refused is a change under something a person is using:
+a container renamed or moved while its job runs, a node disabled with
+sessions or containers on it, a space moved from under a session.
+
 **This is not a CI engine, and enterprise pressure will try to make it one.**
 No workflow DSL, no step graph, no matrix builds, no plugin marketplace. The
 Actions runner *service* exists precisely so that pipeline-shaped work goes to

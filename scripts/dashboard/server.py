@@ -1917,8 +1917,6 @@ def schedule_queue(s, argv, by):
         # own machine alone, as the page that made it may queue it by hand.
         if not nodes.own_machine(n):
             return {"error": f"{n['name']} is not the controller's own machine, where the table's jobs run"}
-        if nodes.system_job_for(nid):
-            return {"error": f"a system job is already running on {n['name']}; one at a time"}
         r = nodes.job_add(principal, {"node": nid}, "system",
                           {"apply": s["system"]["apply"], "config": dict(s["system"].get("config") or {}),
                            "timeout": schedules.system_timeout(s["system"])})
@@ -1926,8 +1924,6 @@ def schedule_queue(s, argv, by):
         if not (n.get("reported") or {}).get("sandbox"):
             return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so root there is its owner's: "
                              "run it as the jobs account, or on a sandbox node"}
-        if nodes.system_job_for(nid):
-            return {"error": f"a system job is already running on {n['name']}; one at a time"}
         spec = {"apply": "root", "timeout": t,
                 "config": {"argv": argv, "why": f"the schedule {s.get('name', '')}", "by": by, "timeout": t}}
         r = nodes.job_add(principal, {"node": nid}, "system", spec)
@@ -4456,6 +4452,9 @@ try:
     # rather than by one importing the other, which is the same seam every
     # other module pair uses.
     nodes.layout_of = toolchains.layout_for_node
+    # ...and a toolchain or image job pressed while another writes the
+    # store waits behind it rather than being refused.
+    nodes.store_gate = toolchains.store_gate
     # The accounts' SMB passwords and a share's names (R164 step 1).
     nodes.smb_users = users.smb_users
     nodes.smb_resolve = users.smb_resolve
@@ -8999,8 +8998,9 @@ class Handler(BaseHTTPRequestHandler):
         name = field(req, "project")
         if self._not_project(name):
             return
-        if not ciwatch.claim(name):
-            return self._json({"error": "a look at this space's CI is already running"}, 409)
+        # One already looking: this waits for it, then looks itself.
+        while not ciwatch.claim(name):
+            time.sleep(0.5)
         try:
             return self._json(ciwatch.look(name))
         finally:
@@ -12053,8 +12053,7 @@ class Handler(BaseHTTPRequestHandler):
         """
         if self._refused("controller"):
             return None
-        if not doctor.refresh():
-            return self._json({"error": "doctor is already running"}, 409)
+        doctor.refresh(wait=True)
         return self._json(doctor.payload())
 
     def _pin(self, req):
