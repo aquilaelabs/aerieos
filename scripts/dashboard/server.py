@@ -1857,12 +1857,15 @@ def _two_factor_due(who):
 
 
 def _token_rows():
-    """nodes.token_attention, each read with its account's name."""
+    """nodes.token_attention, a token's read named with its account's name;
+    a reused token and a node turned away name no account (B752: one of
+    those took the bell's whole list down with a KeyError)."""
     rows = nodes.token_attention()
-    if rows:
+    if any(r.get("account") for r in rows):
         names = {u["uid"]: u["name"] for u in users.all_users()}
         for r in rows:
-            r["who"] = names.get(r["account"], "")
+            if r.get("account"):
+                r["who"] = names.get(r["account"], "")
     return rows
 
 
