@@ -22,6 +22,7 @@
 
 - Moving here's pool and folder picks and its After it lands step no longer squeeze long sentences into a grid, and each pick's button sits beside its field (133a1ba)
 - A move from a container install onto a machine no longer risks retiring one of its nodes and moving that node's spaces onto the new machine (133a1ba)
+- The old system's VMs on this machine's page say each defined VM's name once with its buttons beside it, Define the VMs sits under the VMs it defines rather than under another's buttons, and whether one starts with the machine is a tick (f4e0613)
 
 ## 0.9.0-dev.5138: 2026-11-09
 
