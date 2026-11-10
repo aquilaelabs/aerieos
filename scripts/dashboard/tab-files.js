@@ -138,10 +138,14 @@ function renderFilesInto(i){
         <button type="button" data-fxact="download"${ticked.some(n => (fl.entries || []).find(e => e.name === n && e.kind === "dir")) ? " disabled title=\"a folder downloads one file at a time\"" : ""}>Download</button>
         <button type="button" class="danger" data-fxact="delete">Delete</button>
         <button type="button" data-fxact="none">Clear</button></div>`
-    : `<div class="actbar"><input type="search" id="flFilter" class="flfilter" placeholder="Filter" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
-        <span class="sp"></span><button type="button" data-fxact="mkdir">New folder</button>
+    // The filter beside the folder's actions, as the Library's search sits
+    // beside its buttons: a field of its own width, the actions their own
+    // bar at the right, one line on a phone where they fit (B757: the
+    // filter spanned a phone's whole width above its buttons).
+    : `<div class="flrow"><input type="search" id="flFilter" class="flfilter" placeholder="Filter" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
+        <div class="actbar"><button type="button" data-fxact="mkdir">New folder</button>
         <button type="button" class="primary" data-fxact="upload"${fl.serves ? "" : " disabled"}>Upload</button>
-        <input type="file" id="flPick" multiple hidden></div>`;
+        <input type="file" id="flPick" multiple hidden></div></div>`;
   const up = flUp ? `<div class="field"><div class="sub">Uploading ${esc(flUp.name)} (${flUp.i} of ${flUp.n}): ${flSize(flUp.done)} of ${flSize(flUp.size)}</div>
       <progress max="${flUp.size || 1}" value="${flUp.done}" aria-label="upload progress"></progress></div>` : "";
   const why = !fl.serves ? `<div class="field"><div class="notice warn">${esc(fl.name)}'s agent does not serve files yet: update it from the Nodes page.</div></div>`

@@ -2168,8 +2168,9 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .fxtbl .tline.on{background:color-mix(in srgb, var(--accent) 10%, transparent)}
 .fxpage.drop{outline:2px dashed var(--accent);outline-offset:4px}
 .fxselbar .said{font:var(--f-ui)}
-.filestab .actbar .flfilter{flex:0 1 14rem;min-width:7rem}
-@media(max-width:899px){ .filestab .actbar .flfilter{flex-basis:100%;max-width:none} }
+.filestab .flrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--field-gap)}
+.filestab .flrow>.flfilter{flex:1 1 9rem;min-width:7rem;max-width:28rem}
+.filestab .flrow>.actbar{margin-inline-start:auto;flex:0 0 auto}
 .fxview .box{width:min(960px, calc(100vw - 32px));max-width:none}
 .fxview .fxbody{max-height:70vh;overflow:auto;margin:8px 0}
 .fxview .fxbody img,.fxview .fxbody video{display:block;max-width:100%;max-height:68vh;margin:0 auto}
