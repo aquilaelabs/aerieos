@@ -3358,6 +3358,13 @@ ok(page.errors.length === 0,
       why: r.querySelector('[data-nd="reboot"]')?.closest('.ndact')?.querySelector('.sub')?.textContent || '' }));
     ok(held.dead.every(d => !d) && /A change to this node \(gpu\) is running here: one pressed now waits for it to end/.test(held.why),
        `while a change is applying on the node, Reboot and Shut down say a press waits for it (${held.why})`);
+    // A node with sessions or containers running: Disable and Un-enroll are
+    // ghosted, the row saying what to end first, as the server refuses them.
+    const inUse = await page.evaluate(() => ndInUse({ reported: {
+      sessions: [{ name: 'u_0123abcd~claude-web' }, { name: 'harness-own' }], published: { 'web-main': [80] } } }));
+    ok(inUse === 'end its 1 session on the Sessions card and bring down its 1 container on the Containers page'
+       && await page.evaluate(() => ndInUse({ reported: {} })) === '',
+       `a node in use says what to end before Disable and Un-enroll (${inUse})`);
     await napi('/api/v1/jobs', { action: 'cancel', id: g.job });
     // ...and the tab read again, so the canceled set-up is not what the
     // section below is drawn from.
