@@ -45,6 +45,9 @@ SESSION_GID=100
 SSH_KEY=""
 CONTROLLER=""
 TOKEN=""
+# AerieOS's release key, as the Enroll script carries it: pinned by the agent
+# at enrollment, after which the node takes only agent updates signed by it.
+RELEASE_KEY=""
 STORE_DATA=/var/lib/builderbot/data
 STORE_TOOLCHAINS=/var/lib/builderbot/toolchains
 STORE_CACHE=/var/lib/builderbot/cache
@@ -275,6 +278,7 @@ while [ $# -gt 0 ]; do
         --nfs)   NFS+=("$2"); shift 2 ;;
         --controller) CONTROLLER="$2"; shift 2 ;;
         --token) TOKEN="$2"; shift 2 ;;
+        --release-key) RELEASE_KEY="$2"; shift 2 ;;
         --wg-conf) WG_CONF="$2"; shift 2 ;;
         --reach) REACH="$2"; shift 2 ;;
         --door) DOOR="$2"; shift 2 ;;
@@ -471,6 +475,7 @@ guest_run() {
     systemctl --user stop "$GUEST_UNIT_NAME" 2>/dev/null || true
     BUILDERBOT_NODE_JSON="$node_json" python3 "$agent" enroll \
         --controller "$CONTROLLER" --token "$TOKEN" --user "$(id -un)" \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
         --store "data=$s_data" --store "toolchains=$toolchains" \
         --store "cache=$s_cache" --store "artifacts=$s_art" \
         --store "appdata=$s_app" \
@@ -3495,6 +3500,7 @@ if [ -n "$CONTROLLER" ]; then
     "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" --user "$USER_NAME" \
         ${SESSION_NAME:+--session-user "$SESSION_NAME"} ${REACH:+--reach "$REACH"} \
         ${DOOR:+--door "$DOOR"} ${DOOR_HOST:+--door-host "$DOOR_HOST"} \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
         --store "data=${STORE_DATA}" --store "toolchains=${STORE_TOOLCHAINS}" \
         --store "cache=${STORE_CACHE}" --store "artifacts=${STORE_ARTIFACTS}" \
         --store "appdata=${STORE_APPDATA}"

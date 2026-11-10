@@ -110,6 +110,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.census_asked = False         # a hello asked for again has its census on the way
         self.census_stale = False         # ...and was asked for once more meanwhile
         self.controller_digest = ""
+        self.controller_sig = ""          # the release's signature over that digest, where the build has one
         self.warned_caps = False
         # The session half (roadmap #24): whether its terminals are set up,
         # the bundle they run bb-tty from, and when the last start was tried.
@@ -402,6 +403,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             self.hello_said = True           # the first is said on the loop; the rest beside it
             self.poll = int(r.get("poll") or 25)
             self.controller_digest = (r.get("agent") or {}).get("digest") or ""
+            self.controller_sig = (r.get("agent") or {}).get("sig") or ""
             # Where toolchains land, from the controller's catalog. Kept on the
             # record so a job started before the next hello still has it, and
             # only replaced when the controller has one: none (a catalog that
@@ -1040,6 +1042,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if got == own_digest():
             job.say("already current\n")
             return "succeeded", 0
+        # AerieOS's own release, where this node pinned its key (release.py):
+        # the digest above is the controller's word, the signature is not.
+        # Read from the file, which the console writes, not this process's copy.
+        from . import release
+        try:
+            trust = load_state()
+        except SystemExit:
+            trust = self.state
+        ok, said = release.may_install(trust, got, spec.get("sig") or getattr(self, "controller_sig", ""))
+        if said:
+            job.say(said + "\n")
+        if not ok:
+            job.why = said
+            return "failed", 77
         me = own_path()
         tmp = me + ".new"
         with open(tmp, "wb") as f:

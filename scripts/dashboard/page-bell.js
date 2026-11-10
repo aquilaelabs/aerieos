@@ -343,8 +343,8 @@ function attRow(a){
   }
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
-      <div class="bt">${esc(a.node)}'s credential was used from a copy</div>
-      <div class="bsum">a token it had already replaced was presented again, so every token of ${esc(a.node)} is revoked: enroll it again from the Nodes page, and treat that machine's disk as copied</div>
+      <div class="bt">${esc(a.node)} looks like a restored or copied machine</div>
+      <div class="bsum">it presented a token it had already replaced, which a machine put back from a snapshot or a backup does, and so does a copy of its disk in somebody else's hands. Every token of ${esc(a.node)} is revoked either way. If you restored it, Enroll script on its row brings it back; if you did not, treat that machine's disk as copied</div>
       <div class="bfoot"><span>${esc(ago(a.at))}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;

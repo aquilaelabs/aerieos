@@ -1,0 +1,6 @@
+# AerieOS's release key, public half, as config/catalog.pub names the catalog's:
+#   aerieos-release-ed25519 <64 hex characters>
+# made once by tools/sign-agent.py --keygen. A node pins it when it is enrolled
+# and then takes only agent updates the release build signed with its private
+# half (scripts/agent/aerieos_agent/release.py). While no line below names a
+# key, nothing is pinned and updates are taken as before.

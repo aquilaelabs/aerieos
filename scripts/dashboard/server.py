@@ -1797,7 +1797,9 @@ def _att_words(a):
     if k == "node-refused":
         return (f"{node}'s agent is turned away", f"{a.get('why') or 'its credential'}: enroll it again from the Nodes page")
     if k == "token-reuse":
-        return (f"{node}'s credential was used from a copy", "every token of that node is revoked")
+        return (f"{node} looks like a restored or copied machine",
+                "it presented a token it had already replaced, so every token of it is revoked: "
+                "Enroll script on its row if you restored it, and treat its disk as copied if you did not")
     if k == "acme":
         return (f"{'no certificate' if a.get('bad') else 'a certificate'} for {a.get('host', '')} on {node}", a.get("why", ""))
     if k == "scan":

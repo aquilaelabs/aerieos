@@ -216,17 +216,34 @@ names.
 
 ## What a node takes on its controller's word
 
-A node does what its controller asks, and checks none of it. The agent runs
-as root; a root command an administrator approves is run as given; the
-agent's own update and the scripts root installs from are accepted on a
-digest the same controller names. So whoever holds the controller (a copy
-of its state with the install key, an administrator's sign-in) holds every
-node provisioned as a sandbox, and through the jobs account's Docker every
-node that runs containers. What bounds it today is on the controller's
-side: **Lock system changes** on a node's row has the controller refuse
-storage, network and root changes there, and every root command is on the
-record with who approved it. One thing is held by the node itself: on the
-controller's own machine the root agent runs docker for the controller and
-nothing else under that mark. Closing the rest takes a release key the
-nodes pin and the controller does not hold, and a jobs account whose Docker
-is not root's, neither of which is built.
+**Its agent's updates, once it has pinned the release key, it does not.**
+AerieOS has a release key (`config/aerieos-release.pub` names its public
+half; the private half is the release build's secret and no controller's).
+The Enroll script carries the public half and the agent pins it as the
+node enrolls (`builderbot-agent release-key` shows it, and pins one on a
+node enrolled before, at its console). From then on the node takes an agent
+update only when the release build's signature over the update's digest
+comes with it (`scripts/agent/agent.sig`, made by `tools/sign-agent.py` in
+the release's builds and passed on by the controller, which checks nothing
+itself). A controller built from a branch ships an unsigned agent, which a
+pinned node refuses, saying so on the update's job; a machine its owner
+uses for such builds says `sudo builderbot-agent unsigned on` at its own
+console. Both choices are a person's at the machine: they take root and a
+terminal, the running agent never writes over them, and nothing the
+controller sends in the channel changes them. A node's row says which it
+is under Updates. While the repository names no key, no node pins one and
+updates are taken as before.
+
+**The rest, it still does.** The agent runs as root; a root command an
+administrator approves is run as given (which, on a node provisioned as a
+sandbox, could also undo the pin); the scripts root installs from the
+bundle are accepted on a digest the controller names; and the jobs
+account's Docker is root's on a node that runs containers. So whoever
+holds the controller (a copy of its state with the install key, an
+administrator's sign-in) still holds those nodes: the signature closes the
+update as a way in, not the others. What bounds them is on the
+controller's side: **Lock system changes** on a node's row has the
+controller refuse storage, network and root changes there, and every root
+command is on the record with who approved it. One thing is held by the
+node itself: on the controller's own machine the root agent runs docker
+for the controller and nothing else under that mark.

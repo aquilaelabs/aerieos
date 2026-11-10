@@ -30,3 +30,6 @@ apps/android/.kotlin/
 
 # What a build produced, for the Artifacts tab and never for history.
 dist/
+
+# The agent's release signature: made by a release build (tools/sign-agent.py), in no commit.
+scripts/agent/agent.sig

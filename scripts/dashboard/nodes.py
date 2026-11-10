@@ -1039,7 +1039,7 @@ def _token_reused(t):
         _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), nid))
         _bump()
     print(f"dashboard: node {nid} presented a retired token after its grace; its tokens are revoked "
-          "(a copy of its credential is in use somewhere)", flush=True)
+          "(a machine restored from a snapshot or a backup, or a copy of its credential in use somewhere)", flush=True)
 
 
 def authenticate(bearer):
@@ -1912,6 +1912,10 @@ def _census(c):
     # the address it is on. Facts about the machine, drawn against the
     # operator's desired config on the row; never treated as the config.
     out["sandbox"] = bool(c.get("sandbox"))
+    # Whose agent updates it takes (the agent's release.py): the release key
+    # it pinned, shortened, and whether its console allows unsigned builds.
+    out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
+    out["unsigned_ok"] = c.get("unsigned_ok") is True
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
     for k in ("gpu_card", "gpu_display", "gpu_amd"):
@@ -3204,7 +3208,8 @@ def node_update_agent(principal, node_id):
     if (n.get("agent") or {}).get("digest") == ours["digest"]:
         return {"ok": True, "current": True, "version": ours["version"]}
     r = job_add(principal, {"node": node_id}, "self-update",
-                {"digest": ours["digest"], "version": ours["version"], "timeout": 300})
+                {"digest": ours["digest"], "version": ours["version"], "timeout": 300,
+                 **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {})})
     if r.get("ok"):
         audit(principal, "node-update-agent", node_id, {"to": ours["digest"]})
     return r
@@ -3215,6 +3220,22 @@ def agent_shipped():
     version only; the body is the download verb's."""
     f = agent_file()
     return {"digest": f["digest"], "version": f["version"]}
+
+
+def agent_sig(digest=None):
+    """The release's signature over the agent this controller ships, where
+    its build made one (scripts/agent/agent.sig, tools/sign-agent.py), or
+    "": a node that pinned the release key takes the update only with it
+    (the agent's release.py). Passed on as it is: this side holds no key
+    and checks nothing, since the node is the one that must not take this
+    controller's word."""
+    digest = digest or agent_file()["digest"]
+    try:
+        d = json.loads((AGENT_DIR / "agent.sig").read_text())
+    except (OSError, ValueError):
+        return ""
+    sig = str(d.get("sig") or "") if isinstance(d, dict) and d.get("digest") == digest else ""
+    return sig if re.fullmatch(r"[0-9a-f]{128}", sig) else ""
 
 
 # What a build command obviously needs, by the tool it invokes. Only the
@@ -5128,7 +5149,8 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
                                      "state": n["state"],
                                      "capabilities": n["capabilities"],
                                      "concurrency": n["concurrency"]},
-            "agent": {"digest": ours["digest"], "version": ours["version"]},
+            "agent": {"digest": ours["digest"], "version": ours["version"],
+                      **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {})},
             # Where every toolchain lands, from the catalog: the node has no
             # catalog of its own, and this is what stops it keeping a second
             # copy of the answer that drifts from ours.
@@ -7915,7 +7937,10 @@ def tab_view(rows, admin):
             if admin and tk and token_stale:
                 n["tokseal_stale"] = token_stale(n["id"], tk)
     import systems
-    return {"nodes": rows, "agent": agent_shipped() if admin else {},
+    # ...with the release key this build names and whether its agent is
+    # signed, for the row's Updates fact (the agent's release.py).
+    return {"nodes": rows, "agent": (agent_shipped() | {"release_key": enrollscript.release_key()[:16],
+                                                        "signed": bool(agent_sig())}) if admin else {},
             "default": node_for() if admin else "",
             # What Enroll node's System pulldown offers (R204).
             "systems": systems.offered() if admin else []}

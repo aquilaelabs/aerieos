@@ -195,6 +195,17 @@ jobs:
           echo "built $v"
           echo "v=$v" >> "$GITHUB_OUTPUT"
 
+      - name: Sign the agent with the release key
+        # A node that pinned AerieOS's release key takes an agent update only
+        # with this signature (scripts/agent/aerieos_agent/release.py). The
+        # key is this repository's secret and no controller's; with none set
+        # the step says so and the build ships unsigned, as a branch's does.
+        shell: bash
+        env:
+          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+        run: |
+          python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install --quiet --user cryptography
+          python3 tools/sign-agent.py
       - name: Build and push
         id: push
         uses: docker/build-push-action@v7
@@ -399,6 +410,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Sign the agent with the release key
+        # A node that pinned AerieOS's release key takes an agent update only
+        # with this signature (scripts/agent/aerieos_agent/release.py). The
+        # key is this repository's secret and no controller's; with none set
+        # the step says so and the build ships unsigned, as a branch's does.
+        shell: bash
+        env:
+          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+        run: |
+          python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install --quiet --user cryptography
+          python3 tools/sign-agent.py
       - name: Pack the tag's tree
         id: pack
         shell: bash
@@ -411,6 +433,12 @@ jobs:
           git archive --format=tar --prefix="builderbot-${ver}/" "$tag" > tree.tar
           mkdir -p stamp/"builderbot-${ver}" && git rev-parse "$tag^{commit}" > stamp/"builderbot-${ver}"/.release-rev
           tar -rf tree.tar -C stamp "builderbot-${ver}/.release-rev"
+          # ...and the agent's signature, which is made by this build and is
+          # in no commit: beside the agent's sources, where the controller reads it.
+          if [ -s scripts/agent/agent.sig ]; then
+            mkdir -p stamp/"builderbot-${ver}"/scripts/agent && cp scripts/agent/agent.sig stamp/"builderbot-${ver}"/scripts/agent/
+            tar -rf tree.tar -C stamp "builderbot-${ver}/scripts/agent/agent.sig"
+          fi
           gzip -n -9 < tree.tar > "$name"
           sha256sum "$name" > "$name.sha256"
           echo "name=$name" >> "$GITHUB_OUTPUT"
@@ -475,6 +503,9 @@ jobs:
   appliance:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.appliance) || github.event_name == 'schedule'
     uses: ./.github/workflows/os-image.yml
+    # The release key, for the agent the image carries (os-image.yml signs it).
+    secrets:
+      AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
 
   appliance-publish:
     needs: appliance

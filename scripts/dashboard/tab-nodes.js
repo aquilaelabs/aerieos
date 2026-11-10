@@ -1864,7 +1864,23 @@ function ndBar(live){
 }
 // Its facts in the facts voice, its id among them (R218 step 26): the id is
 // the one in its enroll script's name.
-const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Jobs run as", "Runs on", "Id"];
+const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Updates", "Jobs run as", "Runs on", "Id"];
+// Whose agent updates a node takes (R227 step 1, the agent's release.py):
+// only those AerieOS's release signed, once it has pinned the release key;
+// an unsigned build too where its own console said so; else this
+// controller's word, as every node did before.
+function ndUpdatesFact(n){
+  if (n.kind !== "agent" || !n.reported) return "";
+  const key = n.reported.release_key || "";
+  // Before AerieOS names a release key, no node can pin one: nothing to say.
+  if (!key) return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (Enroll script pins it)" : "";
+  // A pinned node meeting an unsigned build here will refuse its update.
+  if (!n.reported.unsigned_ok && nodesAgent && nodesAgent.signed === false && nodeStale(n))
+    return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;
+  return n.reported.unsigned_ok
+    ? `signed releases (key ${key.slice(0, 8)}…), and unsigned builds, allowed at its console`
+    : `signed releases only (key ${key.slice(0, 8)}…)`;
+}
 function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
 }
@@ -1970,7 +1986,9 @@ function ndRowHtml(n, lead = ""){
         </div>
         <div class="sub ndtest" hidden></div>` : "";
     const health = docSection("nodes", "health", ndTitle("health"),
-      n.kind === "agent" ? (n.live ? "live" : n.agent?.refused?.at
+      n.kind === "agent" ? (n.live ? "live" : n.agent?.token_reuse?.at
+        ? "turned away: it presented a token it had already replaced, as a machine restored from a snapshot does, or a copy of its disk; Enroll script brings it back if you restored it"
+        : n.agent?.refused?.at
         ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "quiet") : "", `
         ${nodeMeters(n) || `<div class="empty">nothing measured yet</div>`}
         ${nodeCharts(n)}
@@ -1997,7 +2015,7 @@ function ndRowHtml(n, lead = ""){
         ${
         // Its facts in the facts voice, its id among them (R218 step 26):
         // the id is the one in its enroll script's name.
-        ndFacts([where, census, seen, agentVer, n.kind === "agent" ? n.config?.user || "" : "",
+        ndFacts([where, census, seen, agentVer, ndUpdatesFact(n), n.kind === "agent" ? n.config?.user || "" : "",
                  // A VM AerieOS made on another node (R91 step 14).
                  n.config?.vm_of ? `${(nodesList || []).find(x => x.id === n.config.vm_of)?.name || n.config.vm_of}, as a VM` : "", n.id])}
         ${keepLine(n)}

@@ -42,7 +42,8 @@ def stores_kept(stores, given, had):
 
 def cmd_enroll(args):
     opts = {"--controller": "", "--token": "", "--user": "bb", "--pin": "",
-            "--session-user": "", "--reach": "", "--door": "", "--door-host": ""}
+            "--session-user": "", "--reach": "", "--door": "", "--door-host": "",
+            "--release-key": ""}
     stores = dict(DEFAULT_STORES)
     given = set()
     it = iter(args)
@@ -98,6 +99,24 @@ def cmd_enroll(args):
         if opts["--door"] not in ("cloudflared", "tailscale"):
             raise SystemExit("--door takes cloudflared or tailscale")
         state["door"] = {"kind": opts["--door"], "host": opts["--door-host"][:253]}
+    # AerieOS's release key, pinned here and now (release.py): the one the
+    # Enroll script carries, else the one this machine pinned before, with
+    # what its console said about unsigned builds. Never from a running
+    # controller's word.
+    from . import release
+    was = {}
+    try:
+        was = load_state()
+    except SystemExit:
+        was = {}
+    if opts["--release-key"] and not release.clean_key(opts["--release-key"]):
+        raise SystemExit("--release-key takes the release key as 64 hex characters")
+    key = release.clean_key(opts["--release-key"]) or release.pinned(was)
+    if key:
+        state["release_key"] = key
+        print(f"pinned AerieOS's release key {key[:16]}…: this node takes only agent updates signed by it")
+    if release.unsigned_ok(was):
+        state["unsigned_ok"] = True
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
     state["session_user"] = opts["--session-user"]
@@ -123,7 +142,7 @@ def cmd_enroll(args):
     state.update({"node_id": r["node_id"], "token": r["token"],
                   "name": r.get("name", ""), "capabilities": r.get("capabilities", []),
                   "enrolled": int(time.time()), "scheme": ctl.scheme})
-    save_state(state)
+    save_state(state, console=True)
     print(f"enrolled as node {r['node_id']} ({r.get('name')}); "
           f"capabilities: {', '.join(r.get('capabilities') or []) or 'none'}")
     print(f"  credential in {NODE_JSON} (0600); jobs run as {opts['--user']}"
@@ -175,10 +194,66 @@ def cmd_follow(args):
           "address has stayed quiet for three hellos, or now if its service is restarted")
 
 
+def _at_console(what):
+    """A choice about what this machine trusts is made by a person at it:
+    root, on a terminal. A job the controller sends has neither a terminal
+    nor a reason to ask."""
+    import os
+    if os.geteuid() != 0:
+        raise SystemExit(f"{what} is root's on this machine: run it with sudo")
+    if not sys.stdin.isatty():
+        raise SystemExit(f"{what} is said at this machine's own console or over ssh, by a person: "
+                         "it takes a terminal, which a job does not have")
+
+
+def cmd_release_key(args):
+    """release-key [HEX|none]: show, pin or drop AerieOS's release key here."""
+    from . import release
+    state = load_state()
+    if not args:
+        key = release.pinned(state)
+        print(f"release key: {key}" if key else "release key: none pinned; agent updates are taken on the controller's word")
+        print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if key else "not asked, with no key pinned"))
+        return
+    _at_console("pinning a release key")
+    if args[0] == "none":
+        state.pop("release_key", None)
+        save_state(state, console=True)
+        print("no release key pinned: agent updates are taken on the controller's word again")
+        return
+    key = release.clean_key(args[0])
+    if not key:
+        raise SystemExit("the release key is 64 hex characters, as the controller's About page and the release notes give it")
+    state["release_key"] = key
+    save_state(state, console=True)
+    print(f"pinned {key[:16]}…: this node takes only agent updates signed by it")
+
+
+def cmd_unsigned(args):
+    """unsigned on|off: whether this machine takes an agent no release signed."""
+    from . import release
+    if not args or args[0] not in ("on", "off"):
+        raise SystemExit("unsigned takes on or off")
+    _at_console("allowing unsigned builds")
+    state = load_state()
+    if args[0] == "on":
+        state["unsigned_ok"] = True
+    else:
+        state.pop("unsigned_ok", None)
+    save_state(state, console=True)
+    print(("this machine takes agent updates no release signed (a controller built from a branch)" if args[0] == "on"
+           else "this machine refuses agent updates the pinned release key did not sign"
+           + ("" if release.pinned(state) else "; none is pinned yet, so that applies once one is")))
+
+
 def main(argv):
     cmd = argv[0] if argv else ""
     if cmd == "enroll":
         cmd_enroll(argv[1:])
+    elif cmd == "release-key":
+        cmd_release_key(argv[1:])
+    elif cmd == "unsigned":
+        cmd_unsigned(argv[1:])
     elif cmd == "follow":
         cmd_follow(argv[1:])
     elif cmd == "run":

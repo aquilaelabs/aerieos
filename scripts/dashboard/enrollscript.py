@@ -35,6 +35,7 @@ cloudflared's config as one way to write it.
 Stdlib only; nodes.py hands in the provisioner's bytes.
 """
 import base64
+import os
 import ipaddress
 import re
 import time
@@ -53,6 +54,20 @@ DOORS = ("cloudflared", "tailscale")
 _DROP = re.compile(r"^\s*(DNS|PreUp|PostUp|PreDown|PostDown|SaveConfig|Table)\s*=", re.I)
 _NAME = re.compile(r"[^A-Za-z0-9._-]")
 
+
+
+RELEASE_PUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "aerieos-release.pub")
+
+
+def release_key():
+    """AerieOS's release key as this build names it (config/aerieos-release.pub,
+    one line of 64 hex characters), or "" while it names none."""
+    try:
+        with open(RELEASE_PUB, encoding="utf-8") as f:
+            key = next((ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")), "")
+    except OSError:
+        return ""
+    return key if re.fullmatch(r"[0-9a-f]{64}", key) else ""
 
 def controller_host(url):
     """The host part of the controller's URL, '' when it is not a URL."""
@@ -270,6 +285,10 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
         flags.append("--session-user none")
     if ans["reach"] == "public":
         flags.append("--reach public")
+    # AerieOS's release key, where this build names one: the node pins it as
+    # it enrolls and takes only agent updates the release signed after that.
+    if release_key():
+        flags.append(f"--release-key {release_key()}")
     if ans.get("door"):
         flags.append(f"--door {_q(ans['door'])}")
         if ans.get("door_host"):

@@ -29,7 +29,7 @@ from .base import (
     _probe_died,
     _run,
 )
-from .stores import _stores, noexec, store_dirs, tc_root
+from .stores import _stores, console_said, noexec, store_dirs, tc_root
 from .backends import _have, net_backend, pkg_backend
 from .toolchains import _toolchains, sdk_images, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
@@ -396,6 +396,10 @@ def census(state):
         # is mounted and from where, and the address this machine is on.
         # The row draws the operator's desired config against these.
         "sandbox": os.access(SANDBOX_BIN, os.X_OK),
+        # Whose agent updates this node takes (release.py): the release key
+        # it pinned, shortened, and whether its console allows unsigned ones.
+        "release_key": str(console_said().get("release_key") or "")[:16],
+        "unsigned_ok": console_said().get("unsigned_ok") is True,
         # ...and whether this agent may install the machine's own packages
         # here: the stamp AND root, which is what administers() asks. The
         # stamp alone said yes for an agent that could not, and the

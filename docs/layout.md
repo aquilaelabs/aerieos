@@ -330,6 +330,7 @@ scripts/
     tokenwatch.py                who opens an account's coding-agent token on the node (R125): the files held at 600, a reader that is neither the account nor the agent said on the next hello
     tokens.py                    the coding agents' sign-ins sealed on the node (R126): sealed where a login wrote them, opened into a tmpfs for a person's terminal, wiped after the last session
     tokenseal.py                 the sealing both ends load: an account's key pair per node, the seal, and the wrap a seal's key travels in to the agent
+    release.py                   whether an agent update is AerieOS's own release (R227): the Ed25519 release key a node pins at enrollment or at its console, the signature over the update's digest it then requires, and the console's word that unsigned builds are taken
     runners.py                   the CI runners: their slots and state, and Agent's runner verbs
     census.py                    the census and the sample every hello carries
     jobs.py                      Job: one piece of the controller's work, on its own thread
@@ -397,6 +398,7 @@ config/icon.png                  the icon the Unraid template shows
 config/toolchains.json           the toolchains the Library offers, and how to install each
 config/release-signers           the keys a release's SHA256SUMS.sig must verify against (R199), as ssh-keygen's allowed signers: what AerieOS's updater, the stick maker and the installer check a release by
 config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against
+config/aerieos-release.pub       AerieOS's release key, public half (R227): what the Enroll script hands a node to pin, and what tools/sign-agent.py holds a build's key to; no key named until one is made
 config/release-keys/README.md    where each publisher release key came from, and how one is refreshed (R137)
 config/release-keys/node.asc     the Node.js release team keys that sign each release SHASUMS256.txt
 config/release-keys/swift.asc    the Swift signing keys that sign each download
@@ -405,6 +407,7 @@ config/controller-packages.tsv   what the controller needs installed, per provis
 config/vm-images.json            the operating systems a VM is made from: each publisher's cloud image and its checksum file (R91)
 config/templates/                briefing.md, assembled per session by preamble.py; nothing is copied into a project
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
+tools/sign-agent.py              the agent's release signature (R227): --keygen makes the key pair once, a release build signs the agent's digest into scripts/agent/agent.sig with the key from its secret, --check holds a signature to the committed public key
 tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release

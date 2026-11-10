@@ -8,6 +8,9 @@ name: os image
 
 on:
   workflow_call:
+    secrets:
+      AERIEOS_RELEASE_KEY:
+        required: false
   push:
     branches-ignore: ["main"]
     paths:
@@ -64,6 +67,17 @@ jobs:
           # tree is unchanged (a release moves it by a commit).
           date -u -d 'yesterday 00:00' +%Y%m%dT%H%M%SZ > image/SNAPSHOT
           echo "snapshot: $(cat image/SNAPSHOT)"
+      - name: Sign the agent with the release key
+        # A node that pinned AerieOS's release key takes an agent update only
+        # with this signature (scripts/agent/aerieos_agent/release.py). The
+        # key is this repository's secret and no controller's; with none set
+        # the step says so and the build ships unsigned, as a branch's does.
+        shell: bash
+        env:
+          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+        run: |
+          python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install --quiet --user cryptography
+          python3 tools/sign-agent.py
       - name: Build the image
         shell: bash
         # For gh's trusted root, which build.sh bakes into the image.

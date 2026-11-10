@@ -431,7 +431,40 @@ def load_state():
         raise SystemExit(f"{NODE_JSON} is not JSON ({e}); enroll again") from e
 
 
-def save_state(state):
+# What this machine's console alone decides (release.py): the release key
+# pinned here and whether an unsigned agent is taken. A running agent holds
+# node.json in memory and writes it whole at every token it is handed, so
+# what the console wrote is read back from the file and kept, never the
+# agent's older copy of it.
+CONSOLE_KEYS = ("release_key", "unsigned_ok")
+
+
+def console_said():
+    """The console's keys as node.json has them now, {} when it has none."""
+    try:
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {k: cur[k] for k in CONSOLE_KEYS if isinstance(cur, dict) and k in cur}
+
+
+def save_state(state, console=False):
+    """node.json written whole. `console` is a person at the machine saying
+    what it trusts (enroll, release-key, unsigned): only then are the
+    console's keys taken from `state`; otherwise the file's own are kept."""
+    if not console:
+        try:
+            with open(NODE_JSON) as f:
+                cur = json.load(f)
+        except (OSError, ValueError):
+            cur = None
+        if isinstance(cur, dict):
+            for k in CONSOLE_KEYS:
+                if k in cur:
+                    state[k] = cur[k]
+                else:
+                    state.pop(k, None)
     d = os.path.dirname(NODE_JSON)
     os.makedirs(d, mode=0o700, exist_ok=True)
     tmp = NODE_JSON + ".tmp"
