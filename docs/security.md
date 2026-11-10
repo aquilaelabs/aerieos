@@ -230,7 +230,12 @@ pinned node refuses, saying so on the update's job; a machine its owner
 uses for such builds says `sudo aerieos-agent unsigned on` at its own
 console. Both choices are a person's at the machine: they take root and a
 terminal, the running agent never writes over them, and nothing the
-controller sends in the channel changes them. A node's row says which it
+controller sends in the channel changes them. A pinned node that meets an
+unsigned controller stays on the agent it has, and since a controller
+sends a node whose agent is behind nothing but that update, it takes no
+other job either until the controller runs a signed build or the node's
+console allows unsigned ones: closed, on purpose, and said on the update's
+job and on the node's row. A node's row says which it
 is under Updates. While the repository names no key, no node pins one and
 updates are taken as before.
 

@@ -8,6 +8,7 @@
 - A backup and a move's bundle copy the configuration at one moment, rather than file by file while it is being written; the copies kept before an upgrade no longer carry the install key (e303494)
 - With Run its container on auto, a session's build still runs at once, unless its compose file asks for more than its own folder (the host's files, privileges, the Docker socket): then you are asked once, with the list, and your Allow covers that file from then on (0c4735d)
 - A node locked out because a token it had replaced came back now says it may be a machine restored from a snapshot or a backup, and that Enroll script on its row brings it back (ac7e5dc)
+- A node keeps its files in /etc/aerieos and /var/lib/aerieos and runs the service aerieos-agent, under AerieOS's own name. A node from before changes over when its Enroll script is run on it: the folders are renamed with the old names left as links, and builderbot-agent still works as a command. Until then it runs as it did, and both names answer (c850175)
 
 ### Fixed
 
