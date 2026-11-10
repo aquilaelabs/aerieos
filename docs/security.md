@@ -190,3 +190,43 @@ What no step closes: root on the running controller, and a person's own
 agent acting as them on their own spaces, which is what it is for. The
 dials (Agents may) bound what it may do; the record (the audit, the
 notebook's history, the forge's log under their own token) says what it did.
+
+## What is held in one place
+
+**Who may reach a route.** Every route of the dashboard's API names what it
+asks of its caller in one table beside the routes (`ROUTE_GATES` in
+`server.py`), and the dispatcher holds it before the handler runs: the
+owner's alone, a person's own sign-in and never a session's token, or the
+handler's own check where it depends on what the request names (which
+space, which node, which action). A route with no line in the table is not
+served, and the auth suite fails on one, so a new route cannot be reached
+before somebody has said who may reach it. Most routes are still the
+handler's own; each one moved into the table is one fewer place to forget.
+
+**A request from another site.** A change, and a read of `/api/`, sent with
+the browser's cookie is taken from the dashboard's own page alone
+(`Sec-Fetch-Site`), since some reads do things and another origin of the
+same site is sent the cookie. The cookie is marked Secure where TLS ends
+here or at a proxy in front that says so.
+
+**What a node is told.** A node's word about the sessions it runs earns a
+session's token only for a space that works on that node and an account
+that may work on that space; it is handed nothing for a session it merely
+names.
+
+## What a node takes on its controller's word
+
+A node does what its controller asks, and checks none of it. The agent runs
+as root; a root command an administrator approves is run as given; the
+agent's own update and the scripts root installs from are accepted on a
+digest the same controller names. So whoever holds the controller (a copy
+of its state with the install key, an administrator's sign-in) holds every
+node provisioned as a sandbox, and through the jobs account's Docker every
+node that runs containers. What bounds it today is on the controller's
+side: **Lock system changes** on a node's row has the controller refuse
+storage, network and root changes there, and every root command is on the
+record with who approved it. One thing is held by the node itself: on the
+controller's own machine the root agent runs docker for the controller and
+nothing else under that mark. Closing the rest takes a release key the
+nodes pin and the controller does not hold, and a jobs account whose Docker
+is not root's, neither of which is built.

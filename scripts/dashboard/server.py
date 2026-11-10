@@ -6340,11 +6340,224 @@ POST_ROUTES = (
     ("prefix", "/api/signin", "_signin"),
 )
 
+# What each route asks of its caller, named beside the routes and held by the
+# dispatcher before the handler runs (R227): a route with no line here is not
+# served, and test/auth.mjs fails on one, so a new route cannot be reached
+# until somebody has said who may reach it. Past being signed in, which
+# _get and _post hold for every route:
+#   ("owner", words)   the owner's alone, never a session's
+#   ("person", words)  anybody's own sign-in, never a session's token
+#   "handler"          the handler holds its own, as it reads the request
+#                      (which space, which node, which action): the state of
+#                      most of them, and each one moved up here is one fewer
+#                      place to forget.
+# The words are what the refusal says, as the handler said it.
+ROUTE_GATES = {
+    "_agents": "handler",
+    "_apps": "handler",
+    "_archive": "handler",
+    "_artifacts": "handler",
+    "_backup": ("owner", "a backup now is the owner's"),
+    "_bb_relay": "handler",
+    "_bell": "handler",
+    "_brief": "handler",
+    "_bugs": "handler",
+    "_catalog_mirror_post": "handler",
+    "_changelog": ("person", "the changelog's arrangement is the operator's: a session writes entries with `aerie changelog add`, and corrects one with `edit`, `merge`, `split` or `rm`"),
+    "_chat": "handler",
+    "_checks_post": "handler",
+    "_ci_watch": "handler",
+    "_claude_login": "handler",
+    "_container": "handler",
+    "_create": "handler",
+    "_custom": "handler",
+    "_design": "handler",
+    "_devapp": "handler",
+    "_diag": "handler",
+    "_docker_ctl": "handler",
+    "_doctor": "handler",
+    "_emulator": "handler",
+    "_extmounts": "handler",
+    "_files": ("person", "a session has its space's tree already: this is a person's editor's"),
+    "_findings_log": "handler",
+    "_forge": "handler",
+    "_forge_access_post": ("person", "an account's: a session reads it with aerie forge whoami"),
+    "_get_agents": "handler",
+    "_get_apps": "handler",
+    "_get_artifact": "handler",
+    "_get_artifacts": "handler",
+    "_get_audit": "handler",
+    "_get_backup": "handler",
+    "_get_backup_file": ("owner", "a backup's download is the owner's"),
+    "_get_brief": "handler",
+    "_get_bugs": "handler",
+    "_get_catalog": "handler",
+    "_get_changelog": "handler",
+    "_get_ci_runs": "handler",
+    "_get_ci_watch": "handler",
+    "_get_claude_now": "handler",
+    "_get_codebase": "handler",
+    "_get_containers": "handler",
+    "_get_design": "handler",
+    "_get_docker": "handler",
+    "_get_emulator": "handler",
+    "_get_extmounts": "handler",
+    "_get_findings": "handler",
+    "_get_forge_access": "handler",
+    "_get_git": "handler",
+    "_get_global_rules": "handler",
+    "_get_help": "handler",
+    "_get_history": "handler",
+    "_get_home": "handler",
+    "_get_jobs": "handler",
+    "_get_library": "handler",
+    "_get_live": "handler",
+    "_get_logs_download": "handler",
+    "_get_memory": "handler",
+    "_get_meta": "handler",
+    "_get_move": "handler",
+    "_get_move_backup": ("owner", "the controller's backup is its owner's"),
+    "_get_move_bundle": ("owner", "the move bundle is its owner's"),
+    "_get_nasapps": "handler",
+    "_get_nginx": "handler",
+    "_get_node_busy": "handler",
+    "_get_node_files": "handler",
+    "_get_node_files_read": "handler",
+    "_get_nodes": "handler",
+    "_get_notices": "handler",
+    "_get_old_compose": "handler",
+    "_get_pack_icon": "handler",
+    "_get_pending": "handler",
+    "_get_phone": "handler",
+    "_get_phone_wait": "handler",
+    "_get_preamble": "handler",
+    "_get_project_job": "handler",
+    "_get_project_sessions": "handler",
+    "_get_pubkeys": "handler",
+    "_get_reset": "handler",
+    "_get_revs": "handler",
+    "_get_roles": "handler",
+    "_get_router": ("person", "a node's router is a person's"),
+    "_get_router_key": "handler",
+    "_get_rules": "handler",
+    "_get_scanners": ("person", "a node's scanners are a person's"),
+    "_get_schedules": "handler",
+    "_get_signing_backup": "handler",
+    "_get_snapshots": ("person", "a space's snapshots are the operator's"),
+    "_get_source": ("person", 'a session has the tree already'),
+    "_get_status": "handler",
+    "_get_storage": "handler",
+    "_get_storebackups": "handler",
+    "_get_tests": "handler",
+    "_get_tls": "handler",
+    "_get_todo": "handler",
+    "_get_toolchains": "handler",
+    "_get_trace": "handler",
+    "_get_transcript": "handler",
+    "_get_transcripts": "handler",
+    "_get_trash": "handler",
+    "_get_users": "handler",
+    "_get_version": "handler",
+    "_get_vms": "handler",
+    "_get_welcome": "handler",
+    "_get_wiki": "handler",
+    "_get_wiki_export": "handler",
+    "_git_act": "handler",
+    "_global_rules": "handler",
+    "_hook": "handler",
+    "_idle": "handler",
+    "_images": ("person", "checking for image updates is a person's"),
+    "_jobs": "handler",
+    "_keys": "handler",
+    "_layout": "handler",
+    "_library": "handler",
+    "_link": "handler",
+    "_lock": "handler",
+    "_login_code": ("person", 'a session does not sign an account in or out'),
+    "_logs": "handler",
+    "_members": ("person", "who joins a space is a person's decision"),
+    "_memory": "handler",
+    "_move": ("owner", "moving the controller is its owner's"),
+    "_nasapps": "handler",
+    "_nginx": ("person", "a node's proxy is a person's"),
+    "_node_files": "handler",
+    "_nodelog": "handler",
+    "_nodes": "handler",
+    "_notices": "handler",
+    "_paths": ("person", "the controller's storage is the operator's"),
+    "_pc": "handler",
+    "_pending": "handler",
+    "_phone": "handler",
+    "_pin": "handler",
+    "_post_signing_backup": "handler",
+    "_prefs_post": ("person", "a space's settings are the operator's: say what should change in your reply"),
+    "_presence": "handler",
+    "_profile": "handler",
+    "_project_auth": "handler",
+    "_project_color": ("person", "a session has no Spaces page: a space's color is a person's own"),
+    "_project_ftp": "handler",
+    "_project_group": ("person", "a session has no Spaces page: the groups are a person's own"),
+    "_project_job": "handler",
+    "_project_pin": ("person", "a session has no sidebar: the pins are a person's own"),
+    "_project_sessions": "handler",
+    "_rename": "handler",
+    "_reports": "handler",
+    "_repos": "handler",
+    "_reset": "handler",
+    "_roadmap": "handler",
+    "_roles": "handler",
+    "_router": ("person", "a node's router is a person's"),
+    "_rules": "handler",
+    "_say": "handler",
+    "_scanners": ("person", "a node's scanners are a person's"),
+    "_schedules": "handler",
+    "_send": "handler",
+    "_session": "handler",
+    "_settings_post": "handler",
+    "_signin": "handler",
+    "_signing": "handler",
+    "_signout": "handler",
+    "_snapshots": ("person", "a space's snapshots are the operator's"),
+    "_storage": "handler",
+    "_storebackups": "handler",
+    "_tests": "handler",
+    "_tls": "handler",
+    "_toolchains": "handler",
+    "_toolpacks": "handler",
+    "_transcripts": "handler",
+    "_trash": "handler",
+    "_trash_purge": "handler",
+    "_trash_restore": "handler",
+    "_tty_grant": "handler",
+    "_unlink": "handler",
+    "_users": "handler",
+    "_version": "handler",
+    "_vms": "handler",
+    "_wiki": "handler",
+}
+
+
+def route_gate(name, me):
+    """Why this caller may not reach the handler `name`, or "" (ROUTE_GATES)."""
+    g = ROUTE_GATES.get(name)
+    if g is None:
+        return "this route names no permission (ROUTE_GATES), so it is not served"
+    if g == "handler":
+        return ""
+    kind, words = g
+    me = me or {}
+    if me.get("session"):
+        return words
+    if kind == "owner" and (users.account_of(me) or {}).get("role") != "owner":
+        return words
+    return ""
+
 
 
 # The mark a Finish of the setup leaves under the state, never taken off: a
 # move lands only on a controller never finished (Handler._move_land), and
 # the setup_done setting alone could be turned back (B720).
+ACCOUNTS_UNREADABLE = "The accounts file in /config (users.json) is there and cannot be read, so nobody can sign in and no first account is offered over it. Put back a copy from /config/backups, or mend the file, then restart."
 SETUP_FINISHED = ".setup-finished"
 
 
@@ -6681,7 +6894,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Set-Cookie",
                          f"bb_session={make_token(users.get(name), self._mint_lid(users.get(name)))}; Path=/; "
                          f"Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Strict"
-                         + ("; Secure" if tls.over_tls(self.connection) else ""))
+                         + ("; Secure" if self._over_tls() else ""))
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -6739,7 +6952,7 @@ class Handler(BaseHTTPRequestHandler):
         second factor; then on to `nxt`, or a JSON answer for the passkey's
         fetch."""
         users.touch(u["name"])
-        sec = "; Secure" if tls.over_tls(self.connection) else ""
+        sec = "; Secure" if self._over_tls() else ""
         cookies = [f"bb_session={make_token(u, self._mint_lid(u))}; Path=/; Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Strict{sec}",
                    "bb_mfa=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"]
         if remember:
@@ -6911,6 +7124,16 @@ class Handler(BaseHTTPRequestHandler):
             return ""
         return f"a terminal opens from this dashboard's own page, not from {o}"
 
+    def _over_tls(self):
+        """Whether the browser reached this over TLS: ended here, or by a
+        proxy in front that says so (X-Forwarded-Proto: https), where the
+        cookie went out without Secure and so rode any plain request to the
+        same name. A client that sends the header itself over plain HTTP
+        only marks its own cookie Secure, which its browser then declines
+        to keep: nobody's sign-in but its own."""
+        return tls.over_tls(self.connection) or \
+            self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower() == "https"
+
     def _post_cross_site(self):
         """Why a POST signed in by the browser's cookie is refused as sent by
         a page of another origin, or "" (B721). SameSite=Strict keeps the
@@ -6928,6 +7151,19 @@ class Handler(BaseHTTPRequestHandler):
             return "a change is asked for from this dashboard's own page, not from another site's"
         if not site and self._ws_cross_origin():
             return f"a change is asked for from this dashboard's own page, not from {self.headers.get('Origin', '')}"
+        return ""
+
+    def _get_cross_site(self):
+        """The same for a read of /api/ (R227): some reads do things (a
+        bundle packed, a key marked backed up, a probe queued on a node),
+        and another origin of the same site, which the cookie is sent to,
+        could have a signed-in browser ask for one. A page of this origin
+        says same-origin, an address typed or a bookmark says none, and a
+        client with its own token is not a page."""
+        if self.headers.get("Authorization"):
+            return ""
+        if self.headers.get("Sec-Fetch-Site", "") in ("cross-site", "same-site"):
+            return "this is read by this dashboard's own page, not by another site's"
         return ""
 
     def _logout(self):
@@ -7712,7 +7948,7 @@ class Handler(BaseHTTPRequestHandler):
         if cookie:
             self.send_header("Set-Cookie", f"bb_session={cookie}; Path=/; "
                              f"Max-Age={SESSION_DAYS * 86400}; HttpOnly; SameSite=Strict"
-                             + ("; Secure" if tls.over_tls(self.connection) else ""))
+                             + ("; Secure" if self._over_tls() else ""))
         # A session token's renewal, when _who decided one was due: bb and
         # the hooks read this header and write the token where bb looks.
         fresh = getattr(self, "_renewed", "")
@@ -7915,11 +8151,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why, "off": True}, 403)
         # An exact route is the path without its query (B409): /api/audit?n=50
         # and /api/router?node=N are the exact routes' own reads.
+        if path.startswith("/api/") and (why := self._get_cross_site()):
+            return self._json({"error": why}, 403)
         for how, route, name in GET_ROUTES:
             if (path == route) if how == "exact" else self.path.startswith(route):
                 if (why := self._work_refused(route, (urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                                                      .get("project") or [""])[0])):
                     return self._json({"error": why}, 400)
+                if (why := route_gate(name, self._who())):
+                    return self._json({"error": why}, 403)
                 return getattr(self, name)()
         self._json({"error": "not found"}, 404)
 
@@ -9285,6 +9525,8 @@ class Handler(BaseHTTPRequestHandler):
             if (path == route) if how == "exact" else path.startswith(route):
                 if (why := self._work_refused(route, str(req.get("project") or ""))):
                     return self._json({"error": why}, 400)
+                if (why := route_gate(name, self._who())):
+                    return self._json({"error": why}, 403)
                 # What a write to the notebook or the settings means for the
                 # sessions is recorded before its reply goes, not after: the
                 # reply is what lets a session send its next prompt, and one
