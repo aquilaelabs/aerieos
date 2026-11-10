@@ -8,6 +8,8 @@
 - A machine's first boot no longer fails to make the machine its own node when its dashboard answers the agent's download with an error in its first moments: the download is tried again (101fb59)
 - The bell no longer loses its whole list while a node is being turned away or has shown a retired token (7e481f5)
 - A node no longer restarts its CI runner in the middle of a job when the runner has updated itself, which canceled the run (d047877)
+- The Analysis page shows its findings once they arrive, rather than loading until something else on the page moved, and its filters redraw it (273b47b)
+- On a phone the Files page's filter shares a line with New folder and Upload rather than spanning the page above them (ea6e923)
 
 ## 0.9.0-dev.5146: 2026-11-10
 
