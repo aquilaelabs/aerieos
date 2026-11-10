@@ -3480,6 +3480,29 @@ await page.waitForSelector('.dmtab .row[data-inst="radarr|main"]', { timeout: 20
   ok(/"3001:3000"/.test(onDisk), '...with the ports quoted, since YAML would read one as a number');
 }
 
+// Import a compose file (the operator, 10 Nov: the old system's containers
+// come as a zip of them): a file from the person's disk fills the Compose
+// pane and, with no name typed, the Name; a zip is refused with what to do.
+{
+  await page.evaluate(() => openNewContainer());
+  await page.waitForSelector('#cmodal:not([hidden])', { timeout: 10000 });
+  const text = 'services:\n  sonarr:\n    image: "lscr.io/linuxserver/sonarr"\n';
+  await page.setInputFiles('#cImportFile', { name: 'sonarr.yaml', mimeType: 'text/yaml', buffer: Buffer.from(text) });
+  await page.waitForFunction(() => document.getElementById('cName').value === 'sonarr', null, { timeout: 5000 }).catch(() => {});
+  const got = await page.evaluate(() => ({ name: document.getElementById('cName').value, yml: document.getElementById('cYml').value,
+    pane: !document.getElementById('cYmlField').hidden, err: !document.getElementById('cErrWrap').hidden,
+    beside: (() => { const b = document.getElementById('cImport').getBoundingClientRect(), h = document.querySelector('.cimport > .hint').getBoundingClientRect();
+                     return b.width > 0 && Math.abs(b.top - h.top) < 4; })() }));
+  await page.setInputFiles('#cImportFile', { name: 'old-system-compose.zip', mimeType: 'application/zip', buffer: Buffer.from('PK') });
+  await page.waitForFunction(() => !document.getElementById('cErrWrap').hidden, null, { timeout: 5000 }).catch(() => {});
+  const zip = await page.$eval('#cErr', e => e.closest('[hidden]') ? '' : e.textContent);
+  // Closed by its own button's handler: the toast of the container made
+  // above may still lie over the dialog's foot.
+  await page.$eval('#cCancel', b => b.click());
+  ok(got.name === 'sonarr' && got.yml === text && got.pane && !got.err && got.beside && /unzip it/.test(zip),
+     `Import a compose file fills the Compose pane and the name from its file, its button beside the pane's hint; a zip is refused (${JSON.stringify(got)}; ${zip})`);
+}
+
 ok(/written here/.test(await page.$eval(
      '.dmtab .row[data-inst="radarr|main"]', r => r.textContent))
    && await page.evaluate(() => {

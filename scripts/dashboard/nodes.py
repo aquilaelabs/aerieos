@@ -1745,7 +1745,9 @@ def _census(c):
                            "digests": {nm(k): re.sub(r"[^\w./:@-]", "", str(v or ""))[:200] for k, v in list((dk.get("digests") or {}).items())[:256]}},
                 "vms": [{"name": nm(v.get("name")), "autostart": v.get("autostart") is True, "nvram": v.get("nvram") is True}
                         for v in (ap.get("vms") or [])[:64] if isinstance(v, dict)],
-                "said": [aw(x, 300) for x in (ap.get("said") or [])[:16]]}
+                "said": [aw(x, 300) for x in (ap.get("said") or [])[:16]],
+                # ...and when it read them, so the page fetches the rows again.
+                "at": ap["at"] if isinstance(ap.get("at"), int) and not isinstance(ap.get("at"), bool) else 0}
     # The machine's time zone (R161 step 3), a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]

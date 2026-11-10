@@ -386,14 +386,15 @@ function adoptParts(n, {take = true} = {}){
 }
 
 // The containers and VMs the old system ran (R163 steps 10 and 11): read
-// from its Docker and libvirt image files once the disks are adopted, the
-// containers made again here as Containers page containers with the exact
-// image each ran, the VMs defined in this machine's libvirt, each started
-// with the machine where it was. The list of what would be made is the
+// from its Docker and libvirt image files once the disks are adopted. The
+// containers come back as compose files in a zip, each imported from New
+// container (the operator, 10 Nov: rather than made here on a press); the
+// VMs are defined in this machine's libvirt, each started with the machine
+// where it was. The containers' rows and their networks are the
 // controller's (adopt-apps plan), fetched once a read lands.
-let adoptPlan = null, adoptPlanFor = "";
-// What the person unticked, kept across redraws: "c:NAME" a container, "v:NAME"
-// a VM (the operator, 1 Nov: pick which to bring back, not all of them).
+let adoptPlan = null, adoptNets = {}, adoptPlanFor = "";
+// The VMs the person unticked, kept across redraws: "v:NAME" (the operator,
+// 1 Nov: pick which to bring back, not all of them).
 const adoptSkip = new Set();
 // Where the old system's Docker and VMs kept what ran: the stick's plan's
 // words when it was made with one, else their usual places on the adopted
@@ -420,22 +421,23 @@ function adoptAppsSection(n){
       `<div class="field"><div class="hint">Its Docker and VMs keep what ran in two image files on the adopted disks${from.guessed ? ", read from where they usually are" : ""} (${esc(from.docker?.image || "no Docker image")}; ${esc(from.vms?.image || "no VM image")}). Reading opens each read-only: nothing in them changes, and neither is run. A VM that was one of your nodes comes back as that node once it runs here.</div>
         <div class="actbar">${btn('data-adoptapp="read"', "Read what ran", "primary")}</div></div>`);
   }
-  const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r");
+  // A new read (its time) or other disks fetch the rows again.
+  const key = JSON.stringify(apps.docker?.digests || {}) + (had.writable ? "w" : "r") + (apps.at || "");
   if (adoptPlanFor !== key){ adoptPlanFor = key; adoptPlan = null; loadAdoptPlan(); }
-  // Each a tick, ticked unless the person took it off; what cannot be made
-  // is said and has none.
-  const pick = (key, label, said, on, warn = false) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}${on === null ? " disabled" : ""}>
-      <b>${esc(label)}</b> <span class="sub${warn ? " warn" : ""}">${esc(said)}</span></label>`;
-  const rows = (adoptPlan || []).map(a => pick(`c:${a.name}`, a.name,
-    `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}`,
-    a.ok ? !adoptSkip.has(`c:${a.name}`) : null, a.notes.length > 0)).join("");
+  // Each container a row: where it joins and what will not work as written.
+  const rows = (adoptPlan || []).map(a => `<div class="ndcap adrow"><b>${esc(a.name)}</b> <span class="sub${a.notes.length || !a.ok ? " warn" : ""}">${esc(
+    a.ok ? `${a.network}${a.autostart ? " · starts with the machine" : ""}${a.notes.length ? " · " + a.notes.join("; ") : ""}` : a.notes.join("; "))}</span></div>`).join("");
+  // Each VM a tick, ticked unless the person took it off.
+  const pick = (key, label, said, on) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}>
+      <b>${esc(label)}</b> <span class="sub">${esc(said)}</span></label>`;
   const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
   const vms = (apps.vms || []).map(v => { const here = other[v.name];
     return here ? `<div class="ndcap adrow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${here.state}${here.autostart ? " · starts with the machine" : ""}`)}</span></div>`
       : pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`)); }).join("");
-  const nC = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).length;
+  const nOk = (adoptPlan || []).filter(a => a.ok).length;
   const nV = (apps.vms || []).filter(v => !other[v.name] && !adoptSkip.has(`v:${v.name}`)).length;
-  const nets = Object.entries(from.networks || {});
+  // The networks a container joined: the read's, then a stick plan's.
+  const nets = Object.entries({...adoptNets, ...(from.networks || {})}).filter(([k]) => (adoptPlan || []).some(a => a.network === k));
   const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
     return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
@@ -445,10 +447,10 @@ function adoptAppsSection(n){
   return docSection("docker", "oldapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}
-      ${adoptPlan === null ? skRows(2) : `<div class="adpick">${rows}</div>`}
-      <div class="hint">Each is made with the exact image it ran and its paths as they were, so it finds its files where they were. A container or VM made new here goes where AerieOS keeps its own.</div>
-      <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway)}"`, `Make the ${esc(k)} network`)).join("")}
-        ${btn(`data-adoptapp="make"${nC ? "" : " disabled"}`, `Make and start ${nC === (adoptPlan || []).filter(a => a.ok).length ? "the containers" : nC ? `the ${nC} ticked` : "the ticked"}`, "primary")}</div>
+      ${adoptPlan === null ? skRows(2) : rows ? `<div class="adpick">${rows}</div>` : `<div class="hint">No container's settings were read: Read what ran again.</div>`}
+      <div class="hint">Each is a compose file with the image, settings and paths it ran with, so it finds its files where they were. Import one with New container: Compose, Import a compose file${nets.length ? "; a container that joins a network needs that network made first" : ""}.</div>
+      <div class="actbar">${btn('data-adoptapp="read"', "Read again")}${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway || "")}"`, `Make the ${esc(k)} network`)).join("")}
+        ${btn(`data-adoptapp="zip"${nOk ? "" : " disabled"}`, "Download their compose files", "primary")}</div>
       ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}
         <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === (apps.vms || []).filter(v => !other[v.name]).length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary") : ""}</div>` : ""}
     </div>`);
@@ -464,7 +466,24 @@ function adoptAppsPointer(n){
 async function loadAdoptPlan(){
   const j = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""})).json().catch(() => ({error: "no answer"}));
   adoptPlan = j.apps || [];
+  adoptNets = j.networks || {};
   nodesRev++; drawPanes();
+}
+
+// The zip of their compose files, saved where the browser saves: fetched
+// rather than navigated to, so a refusal is said on the page.
+async function downloadOldCompose(b){
+  busy(b, "Writing");
+  try{
+    const r = await fetch("/api/old-compose");
+    if (!r.ok){ const j = await r.json().catch(() => ({})); notify(j.error || `the compose files: ${r.status}`, true); return; }
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement("a"), {href: url, download: "old-system-compose.zip"});
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    notify("saved old-system-compose.zip: import each with New container, Compose, Import a compose file");
+  }catch(e){ notify("the compose files: " + failWords(e), true); }
+  finally{ unbusy(b, "Download their compose files"); }
 }
 
 function wireAdoptApps(root){
@@ -477,6 +496,7 @@ function wireAdoptApps(root){
   });
   root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.adoptapp, from = oldAppsFrom(n) || {};
+    if (act === "zip") return downloadOldCompose(b);
     if (act === "read"){
       busy(b, "Reading");
       const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms})).json().catch(() => ({error: "no answer"}));
@@ -489,18 +509,6 @@ function wireAdoptApps(root){
       busy(b, "Defining");
       const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names})).json().catch(() => ({error: "no answer"}));
       notify(j.error || "defining: its job says each VM's changes", !!j.error);
-    } else {
-      const names = (adoptPlan || []).filter(a => a.ok && !adoptSkip.has(`c:${a.name}`)).map(a => a.name);
-      busy(b, "Making");
-      const m = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "make", id: n.id, names})).json().catch(() => ({error: "no answer"}));
-      if (m.error){ notify(m.error, true); return; }
-      const go = (m.made || []).filter(x => x.autostart);
-      const asks = go.filter(x => x.risks.length).map(x => `${x.name}: ${x.risks.slice(0, 4).join("; ")}`);
-      if (go.length && (!asks.length || await askYes(`Start the ${go.length} that started with the machine there?\n\nWhat they ask for beyond their own folder, acknowledged by this press:\n${asks.join("\n")}`,
-          {title: "Start them?", verb: "Start"}))){
-        const s = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "start", id: n.id, rows: go.map(x => ({slug: x.slug, ack: x.ack}))})).json().catch(() => ({error: "no answer"}));
-        notify(s.error || `made ${(m.made || []).length}, starting ${(s.started || []).length}${(s.failed || []).length ? `; not ${s.failed.map(x => x.slug).join(", ")}` : ""}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => x.name).join(", ")}` : ""}: the Containers page shows each`, !!(s.error || (s.failed || []).length));
-      } else notify(`made ${(m.made || []).length}${(m.skipped || []).length ? `; skipped ${m.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}: start each from the Containers page`);
     }
     await loadNodes();
   }));

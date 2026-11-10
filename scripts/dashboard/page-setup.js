@@ -447,7 +447,7 @@ function setupWalkHtml(s){
   cards.push(setupCard(++i, "After it lands", false, false,
     `<p><b>Sign in</b> with an account the old controller had.</p>
      <p><b>Your nodes</b> follow by themselves once they can reach this address. Any that does not is listed on the Nodes page, with the one line to run on it${old ? "; a node that was a VM on the old system is off until its VM runs here" : ""}.</p>
-     ${old ? `<p><b>Containers and VMs</b>: this machine's Containers page reads what the old system ran and brings back what you tick, a VM that was one of your nodes with it. Home keeps this until it is done.</p>` : ""}
+     ${old ? `<p><b>Containers and VMs</b>: this machine's Containers page reads what the old system ran. Its containers come as a zip of compose files, each imported with New container; its VMs are defined there, a VM that was one of your nodes with them. Home keeps this until it is read.</p>` : ""}
      ${state?.held?.held ? `<p><b>Start</b>: nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be.</p>` : ""}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
   cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>

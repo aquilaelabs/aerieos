@@ -1235,6 +1235,10 @@ body.firstrun #panes{display:none}
    pushed to the right, a field with its button on a line of its own): the
    label over its field, the control and its verb on one line. */
 .setpicks{margin-top:10px}
+/* New container's import, beside the Compose pane's hint: never a button on a line of its own. */
+.cimport{flex-wrap:nowrap;align-items:flex-start}
+.cimport>.hint{margin:0;min-width:0}
+.cimport>button{flex:0 0 auto}
 .setpick{display:flex;flex-direction:column;gap:4px;min-width:0}
 .setpickline{display:flex;gap:8px;align-items:center;min-width:0}
 .setpickline>select,.setpickline>input{flex:1 1 auto;min-width:0;width:auto}
@@ -7031,13 +7035,17 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <option value="on-failure">on failure: only when it exits badly</option>
         <option value="no">no: never on its own</option>
       </select>
-      <div class="hint">Writes the Compose tab as you type; edit that directly for anything more.</div>
+      <div class="hint">Writes the Compose tab as you type; edit that directly, or import a compose file there, for anything more.</div>
     </div>
     <div class="field" id="cYmlField">
       <label for="cYml">docker-compose.yml</label>
       <textarea id="cYml" spellcheck="false"
                 placeholder="services:&#10;  app:&#10;    image: lscr.io/linuxserver/radarr:latest&#10;    restart: unless-stopped&#10;    environment:&#10;      - PUID=${PUID}&#10;      - PGID=${PGID}&#10;      - TZ=${TZ}&#10;    ports:&#10;      - &quot;7878:7878&quot;&#10;    volumes:&#10;      - ./config:/config"></textarea>
-      <div class="hint">Checked by compose before it is saved; relative bind sources are inside this container's data directory.</div>
+      <!-- A compose file from the person's disk (the operator, 10 Nov: the
+           old system's containers come as a zip of them, one each). -->
+      <div class="actbar cimport"><span class="grow hint">Checked by compose before it is saved; relative bind sources are inside this container's data directory.</span>
+        <button type="button" id="cImport">Import a compose file…</button></div>
+      <input id="cImportFile" type="file" hidden accept=".yml,.yaml,.json,.txt">
     </div>
     <div class="field" id="cEnvField" hidden>
       <label for="cEnv">.env</label>
@@ -8190,6 +8198,8 @@ for (const id of ["cImage", "cPorts", "cVols", "cEnvLines", "cRestart"])
   $(id).oninput = $(id).onchange = () => cFormWrote();
 $("cYml").oninput = () => { cYmlTouched = true; };
 $("cTabEnv").onclick = () => cSwitch("env");
+$("cImport").onclick = () => $("cImportFile").click();
+$("cImportFile").onchange = cImportPicked;
 $("cUnder").onchange = cUnderPicked;
 $("dnUnder").onchange = dnNodeSay;
 $("rnNode").onchange = () => {

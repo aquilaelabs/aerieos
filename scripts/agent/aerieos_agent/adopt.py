@@ -22,6 +22,7 @@ as it was.
 """
 import contextlib
 import glob
+import ipaddress
 import json
 import os
 import re
@@ -400,6 +401,7 @@ def read_docker_root(root, autostart_name=""):
                 if "@sha256:" in ref:
                     digests.setdefault(iid, ref)
     cdir = os.path.join(root, "containers")
+    found = []
     for cid in sorted(os.listdir(cdir)) if os.path.isdir(cdir) else []:
         try:
             with open(os.path.join(cdir, cid, "config.v2.json"), encoding="utf-8") as f:
@@ -409,9 +411,172 @@ def read_docker_root(root, autostart_name=""):
         name = str(c.get("Name") or "").lstrip("/")
         if not name:
             continue
+        found.append((cid, name, c))
         out["containers"][name] = {"image": str((c.get("Config") or {}).get("Image") or ""),
                                    "digest": digests.get(str(c.get("Image") or ""), "")}
+    # Each one's settings, for a compose file of it (the operator, 10 Nov:
+    # a zip of compose files to import rather than containers made here).
+    names = {cid: name for cid, name, _ in found}
+    out["specs"] = {}
+    for cid, name, c in found[:256]:
+        try:
+            with open(os.path.join(cdir, cid, "hostconfig.json"), encoding="utf-8") as f:
+                h = json.load(f)
+        except (OSError, ValueError):
+            h = {}
+        out["specs"][name] = container_spec(cid, c, h if isinstance(h, dict) else {},
+                                            image_config(root, str(c.get("Image") or "")), names)
+        out["specs"][name]["digest"] = out["containers"][name]["digest"]
     return out
+
+
+def on_lan(subnet, lan, run=subprocess.run):
+    """Whether a network's subnet is the LAN's: it holds an address of the
+    interface the machine reaches the LAN by. A LAN of no address read is
+    taken as the LAN's, as every such network was before."""
+    if not lan:
+        return True
+    try:
+        out = run(["ip", "-j", "-4", "addr", "show", "dev", lan], capture_output=True, text=True, timeout=10, check=False).stdout
+        addrs = [a.get("local") for x in json.loads(out or "[]") for a in x.get("addr_info") or [] if a.get("local")]
+        net = ipaddress.ip_network(subnet, strict=False)
+    except (OSError, ValueError, subprocess.SubprocessError, AttributeError, TypeError):
+        return True
+    if not addrs:
+        return True
+    return any(ipaddress.ip_address(a) in net for a in addrs)
+
+
+def image_config(root, image_id):
+    """The image's own settings (its env, command, labels, user), which a
+    container repeats without anyone having set them: {} when not found."""
+    hexid = image_id.partition(":")[2] if ":" in image_id else image_id
+    if not re.fullmatch(r"[0-9a-f]{64}", hexid):
+        return {}
+    for f in glob.glob(os.path.join(root, "image", "*", "imagedb", "content", "sha256", hexid)):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                got = json.load(fh).get("config") or {}
+            return got if isinstance(got, dict) else {}
+        except (OSError, ValueError, AttributeError):
+            continue
+    return {}
+
+
+def _strs(v, n=256, size=4096):
+    return [str(x)[:size] for x in v[:n]] if isinstance(v, list) else []
+
+
+def container_spec(cid, c, h, img, names):
+    """One container's settings as its compose file says them: what it was
+    given beyond its image's own, its ports, paths, networks and the rest of
+    how it was run. `names` maps a container's id to its name, for one that
+    shared another's network."""
+    cfg = c.get("Config") if isinstance(c.get("Config"), dict) else {}
+    s: dict = {"image": str(cfg.get("Image") or "")[:300]}
+    img_env = set(_strs(img.get("Env")))
+    env = [e for e in _strs(cfg.get("Env"), 400) if e not in img_env and "=" in e]
+    if env:
+        s["environment"] = env
+    for key, mine in (("command", "Cmd"), ("entrypoint", "Entrypoint")):
+        v = cfg.get(mine)
+        if isinstance(v, list) and v and v != img.get(mine):
+            s[key] = _strs(v, 64)
+    for key, mine in (("user", "User"), ("working_dir", "WorkingDir")):
+        if cfg.get(mine) and cfg.get(mine) != img.get(mine):
+            s[key] = str(cfg[mine])[:200]
+    # A hostname Docker made up is the container's id, cut short.
+    if cfg.get("Hostname") and not cid.startswith(str(cfg["Hostname"])):
+        s["hostname"] = str(cfg["Hostname"])[:200]
+    img_labels = img.get("Labels") if isinstance(img.get("Labels"), dict) else {}
+    labels = {str(k)[:200]: str(v)[:2000] for k, v in (cfg.get("Labels") or {}).items()
+              if isinstance(cfg.get("Labels"), dict) and img_labels.get(k) != v}
+    if labels:
+        s["labels"] = dict(list(labels.items())[:100])
+    for key, mine in (("tty", "Tty"), ("stdin_open", "OpenStdin")):
+        if cfg.get(mine) is True:
+            s[key] = True
+    vols = _strs(h.get("Binds"), 128, 1024)
+    for m in h.get("Mounts") or [] if isinstance(h.get("Mounts"), list) else []:
+        if isinstance(m, dict) and m.get("Type") in ("bind", "volume") and m.get("Source") and m.get("Target"):
+            vols.append(f"{m['Source']}:{m['Target']}{':ro' if m.get('ReadOnly') else ''}"[:1024])
+    if vols:
+        s["volumes"] = vols
+    if isinstance(h.get("Tmpfs"), dict) and h["Tmpfs"]:
+        s["tmpfs"] = [f"{k}:{v}" if v else str(k) for k, v in list(h["Tmpfs"].items())[:16]]
+    ports = []
+    for cport, binds in (h.get("PortBindings") or {}).items() if isinstance(h.get("PortBindings"), dict) else []:
+        num, _, proto = str(cport).partition("/")
+        for b in binds or [] if isinstance(binds, list) else []:
+            if not isinstance(b, dict):
+                continue
+            ip = str(b.get("HostIp") or "")
+            ports.append(f"{ip + ':' if ip and ip not in ('0.0.0.0', '::') else ''}{b.get('HostPort') or ''}{':' if b.get('HostPort') else ''}{num}"
+                         + (f"/{proto}" if proto and proto != "tcp" else ""))
+    if ports:
+        s["ports"] = sorted(set(ports))[:128]
+    mode = str(h.get("NetworkMode") or "bridge")
+    if mode.startswith("container:"):
+        other = mode.partition(":")[2]
+        mode = "container:" + names.get(other, next((n for i, n in names.items() if i.startswith(other)), other))
+    s["network_mode"] = "bridge" if mode == "default" else mode[:200]
+    nets = (c.get("NetworkSettings") or {}).get("Networks") if isinstance(c.get("NetworkSettings"), dict) else {}
+    for net, x in (nets or {}).items() if isinstance(nets, dict) else []:
+        if net in ("bridge", "host", "none") or not isinstance(x, dict):
+            continue
+        ipam = x.get("IPAMConfig") if isinstance(x.get("IPAMConfig"), dict) else {}
+        one = {}
+        if ipam.get("IPv4Address"):
+            one["ipv4_address"] = str(ipam["IPv4Address"])
+        if x.get("IPAddress") and x.get("IPPrefixLen"):
+            try:
+                one["subnet"] = str(ipaddress.ip_network(f"{x['IPAddress']}/{int(x['IPPrefixLen'])}", strict=False))
+            except ValueError:
+                pass
+        if x.get("Gateway"):
+            one["gateway"] = str(x["Gateway"])
+        s.setdefault("networks", {})[str(net)[:64]] = one
+    for key, mine in (("privileged", "Privileged"), ("init", "Init")):
+        if h.get(mine) is True:
+            s[key] = True
+    for key, mine in (("cap_add", "CapAdd"), ("cap_drop", "CapDrop"), ("extra_hosts", "ExtraHosts"), ("dns", "Dns"),
+                      ("security_opt", "SecurityOpt"), ("group_add", "GroupAdd")):
+        if _strs(h.get(mine), 64, 300):
+            s[key] = _strs(h.get(mine), 64, 300)
+    devs = [f"{d.get('PathOnHost')}:{d.get('PathInContainer') or d.get('PathOnHost')}"
+            + (f":{d['CgroupPermissions']}" if d.get("CgroupPermissions") and d["CgroupPermissions"] != "rwm" else "")
+            for d in (h.get("Devices") or [])[:64] if isinstance(d, dict) and d.get("PathOnHost")] if isinstance(h.get("Devices"), list) else []
+    if devs:
+        s["devices"] = devs
+    for r in h.get("DeviceRequests") or [] if isinstance(h.get("DeviceRequests"), list) else []:
+        if isinstance(r, dict) and any("gpu" in (cap or []) for cap in r.get("Capabilities") or []):
+            ids, count = r.get("DeviceIDs"), r.get("Count")
+            s["gpus"] = _strs(ids, 16, 64) if ids else count if isinstance(count, int) and count > 0 else "all"
+    if h.get("Runtime") and h["Runtime"] != "runc":
+        s["runtime"] = str(h["Runtime"])[:64]
+    rp = h.get("RestartPolicy") if isinstance(h.get("RestartPolicy"), dict) else {}
+    if rp.get("Name") and rp["Name"] != "no":
+        s["restart"] = str(rp["Name"]) + (f":{rp['MaximumRetryCount']}" if rp["Name"] == "on-failure" and rp.get("MaximumRetryCount") else "")
+    if isinstance(h.get("ShmSize"), int) and h["ShmSize"] and h["ShmSize"] != 64 * 1024 * 1024:
+        s["shm_size"] = h["ShmSize"]
+    if isinstance(h.get("Sysctls"), dict) and h["Sysctls"]:
+        s["sysctls"] = {str(k): str(v) for k, v in list(h["Sysctls"].items())[:32]}
+    lc = h.get("LogConfig") if isinstance(h.get("LogConfig"), dict) else {}
+    if lc.get("Config") or lc.get("Type") not in (None, "", "json-file"):
+        s["logging"] = {"driver": str(lc.get("Type") or "json-file"),
+                        **({"options": {str(k): str(v) for k, v in lc["Config"].items()}} if isinstance(lc.get("Config"), dict) and lc["Config"] else {})}
+    if isinstance(h.get("Memory"), int) and h["Memory"] > 0:
+        s["mem_limit"] = h["Memory"]
+    if isinstance(h.get("NanoCpus"), int) and h["NanoCpus"] > 0:
+        s["cpus"] = round(h["NanoCpus"] / 1e9, 3)
+    if h.get("CpusetCpus"):
+        s["cpuset"] = str(h["CpusetCpus"])[:64]
+    for key, mine in (("pid", "PidMode"), ("ipc", "IpcMode")):
+        if h.get(mine) and h[mine] not in ("private", "shareable", ""):
+            s[key] = str(h[mine])[:64]
+    if cfg.get("MacAddress"):
+        s["mac_address"] = str(cfg["MacAddress"])[:32]
+    return s
 
 
 def read_libvirt_root(root):
@@ -660,7 +825,9 @@ def apps_now():
     return {"docker": {"autostart": list(dk.get("autostart") or [])[:256],
                        "digests": {k: str(v.get("digest") or "")[:200] for k, v in list((dk.get("containers") or {}).items())[:256]}},
             "vms": [{"name": v["name"], "autostart": bool(v.get("autostart")), "nvram": bool(v.get("nvram"))} for v in d.get("vms") or []][:64],
-            "said": [str(x)[:300] for x in d.get("said") or []][:16]}
+            "said": [str(x)[:300] for x in d.get("said") or []][:16],
+            # ...and when, so the page fetches the containers' rows again.
+            "at": int(d.get("at") or 0)}
 
 
 def branches_mounted(branches):
@@ -727,6 +894,23 @@ class AdoptMixin:
             except OSError:
                 pass
 
+    def _hand_specs(self, job, specs, autostart):
+        """The containers' settings, to the controller for their compose
+        files: one upload while the read runs. What the job says of it."""
+        if not specs:
+            return "Docker: no container's settings to hand over"
+        fd, path = tempfile.mkstemp(prefix="bb-oldapps-", suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"specs": specs, "autostart": list(autostart)}, f)
+            st, r = self.ctl.upload(f"oldapps-put?job={job.job['id']}", path, timeout=120)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(path)
+        if st == 200 and not (r or {}).get("error"):
+            return f"Docker: each container's settings handed to the controller for its compose file ({len(specs)})"
+        return f"Docker: the controller did not take the containers' settings ({(r or {}).get('error') or st}), so it has no compose files of them"
+
     def _apply_apps(self, job, action, cfg):
         """read-apps, define-vms and docker-network (R163 steps 10, 11)."""
         say = job.say
@@ -747,6 +931,10 @@ class AdoptMixin:
                         got["docker"] = read_docker_root(d, str(spec.get("autostart_file") or ""))
                         n = len(got["docker"]["containers"])
                         said.append(f"Docker: {n} container{'' if n == 1 else 's'} ran, {len(got['docker']['autostart'])} started with the machine")
+                        # Their settings go to the controller, which writes
+                        # their compose files; kept nowhere here, since an
+                        # env holds passwords.
+                        said.append(self._hand_specs(job, got["docker"].pop("specs", {}), got["docker"]["autostart"]))
                     else:
                         doms = read_libvirt_root(d)
                         os.makedirs(NVRAM_KEPT, exist_ok=True)
@@ -773,6 +961,7 @@ class AdoptMixin:
                 finally:
                     self._unmount_image(job, d)
             got["said"] = said
+            got["at"] = int(time.time())
             path = _env("BB_ADOPT_APPS", APPS)
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path + ".new", "w", encoding="utf-8") as f:
@@ -801,6 +990,14 @@ class AdoptMixin:
                 return "succeeded", 0
             from .vms import lan_iface
             lan = lan_iface()
+            # A network that is not the LAN's (one the old system's Docker
+            # made of its own, for its containers to find each other) is
+            # made the same way here: a bridge of its own.
+            if not on_lan(subnet, lan):
+                rc = self._sh(job, ["docker", "network", "create", "--subnet", subnet, *(["--gateway", gw] if gw else []), name], timeout=60)
+                if rc == 0:
+                    say(f"the network {name}: {subnet}, a bridge of this machine's Docker as it was on the old system's\n")
+                return ("succeeded", 0) if rc == 0 else ("failed", rc)
             if not lan:
                 say("refused: this machine has no wired interface for a network of fixed addresses on the LAN\n")
                 return "failed", 65

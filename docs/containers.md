@@ -188,7 +188,9 @@ takes the **space** it belongs to (Send to Docker manager takes the same,
 with the space it is built from picked by default): a
 name, a compose file and an environment, which is the shape Portainer's stacks
 and Dockge use. Labels are not a fourth box, in compose they belong in the
-YAML. The compose file is checked by compose itself before it is saved, and
+YAML. **Import a compose file**, beside the Compose pane's hint, fills that
+pane from a file on your computer and the name from the file's, when none is
+typed. The compose file is checked by compose itself before it is saved, and
 kept in `/config/containers/<name>/` where no space scan can see it; its
 relative bind sources resolve against its own data directory under `/devdata`,
 which is a path the daemon has; this container too where the share is

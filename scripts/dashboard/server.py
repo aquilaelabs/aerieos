@@ -5489,6 +5489,7 @@ held.configure(state=STATE, bare_metal=lambda: BARE_METAL, write_json_fn=write_j
 import firstboot                                                 # noqa: E402
 import adoptapps                                                 # noqa: E402
 firstboot.configure(state=STATE, write_json_fn=write_json, users_mod=users, settings_mod=settings, hold_first_fn=held.arm_first)
+adoptapps.configure(state=STATE)
 if BARE_METAL:
     try:
         _fb = firstboot.apply()
@@ -6113,6 +6114,7 @@ GET_ROUTES = (
     ("prefix", "/api/library", "_get_library"),
     ("prefix", "/api/pack-icon", "_get_pack_icon"),
     ("exact", "/api/storebackups", "_get_storebackups"),
+    ("exact", "/api/old-compose", "_get_old_compose"),
     ("prefix", "/api/v1/nodes", "_get_nodes"),
     ("prefix", "/api/v1/jobs", "_get_jobs"),
     ("prefix", "/api/home", "_get_home"),
@@ -8404,6 +8406,23 @@ class Handler(BaseHTTPRequestHandler):
             v["move"] = {"arrived": move.restored(), "not_here": move.not_yet_here()}
         return self._json(v)
 
+    def _get_old_compose(self):
+        """GET /api/old-compose: the old system's containers as compose
+        files in a zip, one each, to import from New container
+        (adoptapps.export_zip). An administrator's, in a browser: their
+        environments hold passwords."""
+        me = self._who()
+        if (me or {}).get("session") or users.may(me, "admin"):
+            return self._json({"error": "an administrator downloads these, in a browser"}, 403)
+        own = nodes.node(_own_node_id() or "") if BARE_METAL and not NODES_OK else None
+        if not own:
+            return self._json({"error": "the old system's containers are read on the controller's own machine (a bare-metal install)"}, 404)
+        got = adoptapps.export_zip(firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {})
+        if not got:
+            return self._json({"error": "nothing is read yet: Read what ran, on the Containers page"}, 404)
+        db.audit(self._principal(), "old-compose", own["id"], {})
+        return self._attachment(*got, "application/zip")
+
     def _get_home(self):
         """GET /api/home: home.read, the overview's numbers (R218 step 5).
         The jobs are the ones this account sees on the Jobs page, scoped the
@@ -9502,29 +9521,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(r, 400 if r.get("error") else 200)
         if act == "hold-next":
             return self._json(held.arm_next(req.get("on") is not False))
-        # The containers another system ran, made again here (R163 step 10,
-        # adoptapps.py): what each would be, made, then started with what it
-        # asks for acknowledged by the press that showed it.
+        # The containers another system ran, as compose files to import
+        # (adoptapps.py): each one's row, and the networks they joined.
+        # The files themselves are GET /api/old-compose.
         if act == "adopt-apps":
             own = nodes.node(_own_node_id() or "") if BARE_METAL else None
             if not own:
-                return self._json({"error": "the containers are made on the controller's own machine (a bare-metal install)"}, 400)
-            cfg, adopted = firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {}
-            op = field(req, "op")
-            if op == "plan":
-                return self._json({"ok": True, "apps": adoptapps.plan(cfg, adopted)})
-            if op == "make":
-                names = [str(x) for x in (req.get("names") or []) if isinstance(x, str)][:128]
-                if not names:
-                    return self._json({"error": "name the containers to make"}, 400)
-                r = adoptapps.make(cfg, adopted, names, own["id"])
-                db.audit(self._principal(), "adopt-apps", own["id"], {"made": [m["slug"] for m in r["made"]], "skipped": len(r["skipped"])})
-                return self._json({"ok": True, **r})
-            if op == "start":
-                r = adoptapps.start(req.get("rows") if isinstance(req.get("rows"), list) else [])
-                db.audit(self._principal(), "adopt-apps-start", own["id"], {"started": r["started"]})
-                return self._json({"ok": True, **r})
-            return self._json({"error": "an adopt-apps op is plan, make or start"}, 400)
+                return self._json({"error": "the old system's containers are read on the controller's own machine (a bare-metal install)"}, 400)
+            if field(req, "op") != "plan":
+                return self._json({"error": "an adopt-apps op is plan: each container is imported from its compose file (GET /api/old-compose)"}, 400)
+            return self._json({"ok": True, **adoptapps.rows(firstboot.kept_config(), (own.get("reported") or {}).get("adopted") or {})})
         got = nodes.verb(self._principal(), req)
         # A node that left is a node the Doctor's cached verdict may still
         # name, for up to its half hour: the next run starts now, on its own
@@ -9811,7 +9817,7 @@ class Handler(BaseHTTPRequestHandler):
             if status != 200:
                 return self._json(got, status)
             return self._send_file(got)
-        if verb in ("artifact", "sync-put", "claude-put", "devimage-put", "devdata-put", "signing-put", "scan-put"):
+        if verb in ("artifact", "sync-put", "claude-put", "devimage-put", "devdata-put", "signing-put", "scan-put", "oldapps-put"):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
@@ -9828,6 +9834,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(*channel.signing_put(auth, q, self.rfile, length))
             if verb == "scan-put":
                 return self._json(*channel.scan_put(auth, q, self.rfile, length))
+            if verb == "oldapps-put":
+                return self._json(*channel.oldapps_put(auth, q, self.rfile, length))
             return self._json(*channel.artifact(auth, q, self.rfile, length))
         if verb in ("sync-file", "sync-tar", "claude-file", "devimage", "devdata"):
             got, status = {"sync-file": channel.sync_file, "sync-tar": channel.sync_tar,

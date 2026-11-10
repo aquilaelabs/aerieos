@@ -86,12 +86,20 @@ the bell, and a dead SSD is restored from last night's.
   merged folder as their security said, its Docker and libvirt image files
   are read read-only for what ran (from where the stick's plan says they
   are, or from their usual places under the merged folder when the stick
-  was made with no plan), and its containers are made again with the exact
-  image each ran and started with the machine where they were; its VMs are
-  defined on this machine's QEMU and firmware with their disks where they
-  are. All of it is on this machine's Containers page, under Containers and
-  VMs from the old system, and a VM that was one of the controller's nodes
-  comes back as that node once it runs. Everything is said before it
+  was made with no plan). Its containers come back as compose files, one
+  each in a zip from Download their compose files: each with the image,
+  settings, ports and paths it ran with, restarting with the machine where
+  it started with it there, and what it will not do as written (a path the
+  adopted disks do not hold, a network to make first) said at its top. Each
+  is imported with New container, Compose, Import a compose file; a network
+  of fixed addresses on the LAN is made once with Make the network, and one
+  the old Docker made for its containers alone is made as a bridge of its
+  own. Its VMs are defined on this machine's QEMU and firmware with their
+  disks where they are. All of it is on this machine's Containers page,
+  under Containers and VMs from the old system, and a VM that was one of
+  the controller's nodes comes back as that node once it runs. The
+  containers' settings are kept on the controller for an administrator
+  alone, since an environment holds passwords. Everything is said before it
   happens, and Release undoes the mounts.
 
 ## What AerieOS does not build

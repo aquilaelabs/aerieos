@@ -13,6 +13,7 @@ answers (payload, status), a file as {path or body, ctype, headers}.
 import base64
 import re
 
+import adoptapps
 import agents
 import claudegrant
 import db
@@ -241,6 +242,22 @@ def scan_put(auth, q, stream, length):
     if (no := _node_only(auth)):
         return no
     return scanners.take_report(auth["node"], q.get("scanner", [""])[0], stream, length, q.get("projects", [""])[0][:4000])
+
+
+def oldapps_put(auth, q, stream, length):
+    """The old system's containers' settings, from the read that found them
+    on the controller's own machine (adoptapps.py writes their compose
+    files): only that machine's running read-apps job, while it runs."""
+    if (no := _node_only(auth)):
+        return no
+    j = nodes.job(q.get("job", [""])[0], with_log=False)
+    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
+        return {"error": "not this node's running job"}, 403
+    spec = j.get("spec") or {}
+    if spec.get("apply") != "storage-adopt" or (spec.get("config") or {}).get("adopt") != "read-apps" \
+            or not nodes.own_machine(nodes.node(auth["node"]) or {}):
+        return {"error": "only the controller's own machine's read of the old system hands these over"}, 403
+    return adoptapps.take(stream, length)
 
 
 # ---- a synced node's Claude conversations (B613, claudesync.py) -----------------

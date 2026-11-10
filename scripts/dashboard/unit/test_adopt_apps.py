@@ -1,14 +1,18 @@
 """The containers and VMs another system ran, taken again here (R163 steps
-10 and 11): the compose each container becomes (adoptapps.compose_for:
-the exact image by digest, its network of fixed addresses, started with
-the machine where it was, its paths said where the adopted disks do not
-hold them or may not write them), and the agent's reading of the old
-Docker and libvirt folders and its rewrite of a VM for this machine."""
+10 and 11): each container's settings as the agent reads them from the old
+Docker folder (adopt.container_spec: only what its image does not say), the
+compose file each becomes (adoptapps.compose_of, and compose_for for a
+stick plan's template: its network of fixed addresses, restarting with the
+machine where it started with it, its paths said where the adopted disks do
+not hold them or may not write them), the zip of them to import (the
+operator, 10 Nov), and the agent's rewrite of a VM for this machine."""
 import json
 import os
 import sys
 import tempfile
 import unittest
+import zipfile
+import io
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import adoptapps  # noqa: E402
@@ -24,11 +28,11 @@ READ = {"autostart": ["Plex-Media-Server"], "digests": {"Plex-Media-Server": "pl
 
 
 class Compose(unittest.TestCase):
-    def test_the_exact_image_its_network_and_autostart(self):
+    def test_its_image_its_network_and_autostart(self):
         comp, notes, auto = adoptapps.compose_for(APP, READ, pools=["cache"], writable=True,
                                                   shares={"appdata": {"cache": "prefer"}})
         svc = comp["services"]["plex-media-server"]
-        self.assertEqual(svc["image"], READ["digests"]["Plex-Media-Server"])
+        self.assertEqual(svc["image"], "plexinc/pms-docker:latest", "as it named it: the digest is said at the top of its file")
         self.assertEqual(svc["restart"], "unless-stopped")
         self.assertTrue(auto)
         self.assertEqual(comp["networks"], {"br0": {"external": True}})
@@ -37,16 +41,90 @@ class Compose(unittest.TestCase):
         self.assertNotIn("x-fixed-network", svc)
         self.assertTrue(any("/mnt/disks/usb/x" in n for n in notes), notes)
 
-    def test_not_started_with_the_machine_and_no_digest_said(self):
-        comp, notes, auto = adoptapps.compose_for(APP, {"autostart": [], "digests": {}})
+    def test_not_started_with_the_machine(self):
+        comp, _notes, auto = adoptapps.compose_for(APP, {"autostart": [], "digests": {}})
         self.assertFalse(auto)
         self.assertEqual(comp["services"]["plex-media-server"]["restart"], "no")
-        self.assertTrue(any("no exact image" in n for n in notes))
 
     def test_a_writable_path_that_may_be_on_a_read_only_disk_is_said(self):
         _comp, notes, _auto = adoptapps.compose_for(APP, READ, writable=False, shares={"appdata": {"cache": "yes"}})
         self.assertTrue(any("/mnt/user/appdata/plex may be on a data disk" in n for n in notes), notes)
         self.assertFalse(any("/mnt/user/media" in n and "data disk" in n for n in notes), "a read-only path is fine")
+
+
+SPEC = {"image": "lscr.io/linuxserver/sonarr", "digest": "lscr.io/linuxserver/sonarr@sha256:" + "b" * 64,
+        "environment": ["PUID=99", "API_KEY=pa$$word"], "volumes": ["/mnt/user/appdata/sonarr:/config:rw"],
+        "ports": ["8989:8989", "1900:1900/udp"], "network_mode": "bridge", "labels": {"net.example.webui": "http://[IP]:[PORT:8989]"}}
+
+
+class FromTheRead(unittest.TestCase):
+    """A container's compose from the settings the read handed over."""
+    def test_its_settings_its_ports_and_restart(self):
+        comp, notes = adoptapps.compose_of("Sonarr", SPEC, {"Sonarr"})
+        svc = comp["services"]["sonarr"]
+        self.assertEqual(svc["image"], "lscr.io/linuxserver/sonarr")
+        self.assertEqual(svc["environment"], {"PUID": "99", "API_KEY": "pa$$word"})
+        self.assertEqual(svc["ports"], ["8989:8989", "1900:1900/udp"])
+        self.assertEqual(svc["restart"], "unless-stopped")
+        self.assertNotIn("networks", comp)
+        self.assertEqual(notes, [])
+        self.assertEqual(adoptapps.compose_of("Sonarr", SPEC)[0]["services"]["sonarr"]["restart"], "no")
+
+    def test_a_fixed_address_joins_its_network_made_outside_the_file(self):
+        spec = {**SPEC, "network_mode": "br0", "networks": {"br0": {"ipv4_address": "192.168.1.60", "subnet": "192.168.1.0/24", "gateway": "192.168.1.1"}}}
+        comp, notes = adoptapps.compose_of("Pi-hole", spec)
+        svc = comp["services"]["pi-hole"]
+        self.assertEqual(svc["networks"], {"br0": {"ipv4_address": "192.168.1.60"}})
+        self.assertEqual(comp["networks"], {"br0": {"external": True}})
+        self.assertTrue(any("br0" in n for n in notes))
+
+    def test_host_network_publishes_no_ports_and_a_gpu_is_reserved(self):
+        comp, _ = adoptapps.compose_of("Plex", {**SPEC, "network_mode": "host", "gpus": "all"})
+        svc = comp["services"]["plex"]
+        self.assertEqual(svc["network_mode"], "host")
+        self.assertNotIn("ports", svc)
+        self.assertEqual(svc["deploy"]["resources"]["reservations"]["devices"], [{"driver": "nvidia", "capabilities": ["gpu"], "count": "all"}])
+
+    def test_the_yaml_quotes_every_string_and_doubles_a_dollar(self):
+        comp, _ = adoptapps.compose_of("Sonarr", SPEC, {"Sonarr"})
+        text = adoptapps.file_of("Sonarr", comp, ["a note"], SPEC["digest"])
+        self.assertIn('      API_KEY: "pa$$$$word"', text, "compose reads $ as a variable: a literal one is $$")
+        self.assertIn('      - "8989:8989"', text, "a port quoted, never a YAML 1.1 number")
+        self.assertIn("services:\n  sonarr:\n    image: ", text)
+        self.assertIn(f"# It ran {SPEC['digest']}", text)
+        self.assertIn("# Note: a note.", text)
+        self.assertIn('    labels:\n      net.example.webui: "http://[IP]:[PORT:8989]"', text)
+        self.assertEqual(adoptapps.yaml_of({"x": {"on": True, "a b": [], "n": 3, "num": 3}}), 'x:\n  "on": true\n  "a b": []\n  "n": 3\n  num: 3\n')
+
+
+class Kept(unittest.TestCase):
+    """The read's upload, kept for the controller alone, and the zip of the
+    compose files written from it."""
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        adoptapps.configure(state=self.d)
+
+    def test_kept_private_and_written_as_a_zip_with_a_plans_app_beside(self):
+        body = json.dumps({"specs": {"Sonarr": SPEC, "../bad": SPEC}, "autostart": ["Sonarr"]}).encode()
+        got, st = adoptapps.take(io.BytesIO(body), len(body))
+        self.assertEqual((st, got["containers"]), (200, 1))
+        self.assertEqual(os.stat(os.path.join(self.d, adoptapps.FILE)).st_mode & 0o777, 0o600, "an environment holds passwords")
+        rows = adoptapps.rows({"apps": [APP]}, {"apps": {"docker": READ}, "writable": True})
+        self.assertEqual([(r["name"], r["file"], r["ok"]) for r in rows["apps"]],
+                         [("Sonarr", "sonarr.yaml", True), ("Plex-Media-Server", "plex-media-server.yaml", True)])
+        self.assertEqual(rows["networks"], {})
+        fname, data = adoptapps.export_zip({"apps": [APP]}, {"apps": {"docker": READ}, "writable": True})
+        z = zipfile.ZipFile(io.BytesIO(data))
+        self.assertEqual(fname, "old-system-compose.zip")
+        self.assertEqual(sorted(z.namelist()), ["old-system-compose/README.txt", "old-system-compose/plex-media-server.yaml",
+                                                "old-system-compose/sonarr.yaml"])
+        self.assertIn("restart: \"unless-stopped\"", z.read("old-system-compose/sonarr.yaml").decode())
+
+    def test_a_body_not_the_shape_is_refused_and_nothing_read_writes_no_zip(self):
+        for body in (b"[]", b"not json", json.dumps({"specs": []}).encode()):
+            self.assertNotEqual(adoptapps.take(io.BytesIO(body), len(body))[1], 200)
+        self.assertEqual(adoptapps.take(io.BytesIO(b""), 0)[1], 413)
+        self.assertIsNone(adoptapps.export_zip({}, {}))
 
 
 class Read(unittest.TestCase):
@@ -63,6 +141,45 @@ class Read(unittest.TestCase):
         got = adopt.read_docker_root(root, "autostart-list")
         self.assertEqual(got["autostart"], ["Plex-Media-Server", "Other"])
         self.assertEqual(got["containers"]["Plex-Media-Server"], {"image": "plexinc/pms-docker:latest", "digest": "plexinc/pms-docker@sha256:abc"})
+
+    def test_a_containers_settings_are_what_its_image_does_not_say(self):
+        root = tempfile.mkdtemp()
+        cid = "c" * 64
+        os.makedirs(f"{root}/containers/{cid}")
+        os.makedirs(f"{root}/image/overlay2/imagedb/content/sha256")
+        json.dump({"config": {"Env": ["PATH=/usr/bin", "HOME=/root"], "Cmd": ["/init"], "Labels": {"maintainer": "x"}}},
+                  open(f"{root}/image/overlay2/imagedb/content/sha256/{'1' * 64}", "w"))
+        json.dump({"Name": "/sonarr", "Image": "sha256:" + "1" * 64,
+                   "Config": {"Image": "lscr.io/linuxserver/sonarr", "Hostname": cid[:12], "Cmd": ["/init"],
+                              "Env": ["PATH=/usr/bin", "HOME=/root", "PUID=99", "TZ=Etc/UTC"],
+                              "Labels": {"maintainer": "x", "net.example.webui": "http://[IP]:[PORT:8989]"}},
+                   "NetworkSettings": {"Networks": {"br0": {"IPAMConfig": {"IPv4Address": "192.168.1.60"}, "IPAddress": "192.168.1.60",
+                                                            "IPPrefixLen": 24, "Gateway": "192.168.1.1"}}}},
+                  open(f"{root}/containers/{cid}/config.v2.json", "w"))
+        json.dump({"Binds": ["/mnt/user/appdata/sonarr:/config:rw"], "NetworkMode": "br0",
+                   "PortBindings": {"8989/tcp": [{"HostIp": "", "HostPort": "8989"}], "1900/udp": [{"HostIp": "", "HostPort": "1900"}]},
+                   "RestartPolicy": {"Name": "no"}, "ShmSize": 67108864, "Privileged": False,
+                   "LogConfig": {"Type": "json-file", "Config": {"max-size": "50m"}}, "IpcMode": "private"},
+                  open(f"{root}/containers/{cid}/hostconfig.json", "w"))
+        s = adopt.read_docker_root(root)["specs"]["sonarr"]
+        self.assertEqual(s["environment"], ["PUID=99", "TZ=Etc/UTC"], "the image's own env is not repeated")
+        self.assertEqual(s["labels"], {"net.example.webui": "http://[IP]:[PORT:8989]"})
+        self.assertNotIn("command", s)
+        self.assertNotIn("hostname", s, "a hostname Docker made up is not one")
+        self.assertEqual(s["ports"], ["1900:1900/udp", "8989:8989"])
+        self.assertEqual(s["volumes"], ["/mnt/user/appdata/sonarr:/config:rw"])
+        self.assertEqual(s["network_mode"], "br0")
+        self.assertEqual(s["networks"], {"br0": {"ipv4_address": "192.168.1.60", "subnet": "192.168.1.0/24", "gateway": "192.168.1.1"}})
+        self.assertEqual(s["logging"], {"driver": "json-file", "options": {"max-size": "50m"}})
+        for gone in ("restart", "shm_size", "ipc", "privileged"):
+            self.assertNotIn(gone, s, "a default is not said")
+
+    def test_a_network_on_the_lan_is_the_lans_and_another_is_a_bridge(self):
+        out = json.dumps([{"addr_info": [{"local": "192.168.1.15"}]}])
+        run = lambda *_a, **_k: type("R", (), {"stdout": out})()   # noqa: E731
+        self.assertTrue(adopt.on_lan("192.168.1.0/24", "eth0", run=run))
+        self.assertFalse(adopt.on_lan("172.18.0.0/16", "eth0", run=run))
+        self.assertTrue(adopt.on_lan("172.18.0.0/16", "", run=run), "no LAN read: as before")
 
     def test_a_libvirt_folder_says_each_vm_and_whether_it_started(self):
         root = tempfile.mkdtemp()

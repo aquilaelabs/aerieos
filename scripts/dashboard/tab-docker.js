@@ -111,14 +111,14 @@ function dmNodesKey(){
     .map(n => [n.id, n.name, n.kind, n.state].join(",")).join(";") + dmOldAppsKey();
 }
 // ...and, on the controller's own machine, what the old system's section
-// draws from: the disks, what was read, the VMs defined, the plan and the
-// picks, so a read landing or a tick redraws it.
+// draws from: the disks, what was read, the VMs defined, the containers'
+// rows and the VM picks, so a read landing or a tick redraws it.
 function dmOldAppsKey(){
   const own = ownMachine();
   if (!own || dockerNode !== own.id) return "";
   const ad = own.reported?.adopted || {};
   return "|" + JSON.stringify([(ad.mounts || []).length, ad.apps || null, own.reported?.vms_other || null, !!oldAppsFrom(own),
-                               adoptPlan === null ? null : adoptPlan.length, [...adoptSkip]]);
+                               adoptPlan === null ? null : adoptPlan, adoptNets, [...adoptSkip]]);
 }
 
 function openDocker(){
@@ -1581,6 +1581,26 @@ function openNewContainer(){
     "A name no other container has.";
   $("cmodal").hidden = false;
   cHold();
+}
+
+// A compose file from the person's disk (the operator, 10 Nov: the old
+// system's containers come as a zip of them): its text in the Compose pane,
+// and the name its file has when none is typed.
+async function cImportPicked(){
+  const inp = $("cImportFile"), f = inp.files?.[0];
+  inp.value = "";
+  if (!f) return;
+  const fail = m => { $("cErr").textContent = m; $("cErrWrap").hidden = false; };
+  if (/\.zip$/i.test(f.name)) return fail(`${f.name} is a zip: unzip it and import one of its files`);
+  if (f.size > 200000) return fail(`${f.name} is over 200 kB, more than a compose file holds`);
+  const text = await f.text().catch(() => null);
+  if (text === null) return fail(`${f.name} could not be read`);
+  $("cErrWrap").hidden = true;
+  $("cYml").value = text;
+  cYmlTouched = true;
+  const base = f.name.replace(/\.(ya?ml|json|txt)$/i, "");
+  if (!$("cName").disabled && !$("cName").value.trim() && !/^(docker-)?compose([.-]override)?$/i.test(base)) $("cName").value = base.slice(0, 60);
+  cSwitch("yml");
 }
 
 let cTab = "yml";                 // which pane the segment is showing

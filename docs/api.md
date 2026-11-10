@@ -60,6 +60,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/library` | prefix | `_get_library` | GET /api/library?node=ID (R170): everything an AerieOS installs or runs as one list for one node (library.rows): the toolchains and packs with what the node's store holds, the coding agents, the apps a NAS runs, the vett |  |
 | GET | `/api/pack-icon` | prefix | `_get_pack_icon` | GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an app's own icon, as the image its file is and nothing else: its type set here and never sniffed, and a policy that runs no script and sandboxes it, so an SVG  |  |
 | GET | `/api/storebackups` | exact | `_get_storebackups` | GET /api/storebackups (R162 step 5): the backups the controller's own machine copies, as recorded. |  |
+| GET | `/api/old-compose` | exact | `_get_old_compose` | GET /api/old-compose: the old system's containers as compose files in a zip, one each, to import from New container (adoptapps.export_zip). |  |
 | GET | `/api/v1/nodes` | prefix | `_get_nodes` | GET /api/v1/nodes: the Nodes page's read (nodes.tab_view), scoped to this account. |  |
 | GET | `/api/v1/jobs` | prefix | `_get_jobs` | GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this account may see unless it administers. |  |
 | GET | `/api/home` | prefix | `_get_home` | GET /api/home: home.read, the overview's numbers (R218 step 5). |  |

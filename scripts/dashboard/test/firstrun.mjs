@@ -807,7 +807,9 @@ await firstRun(false);
     });
     ok(pointer.there && pointer.button && !pointer.read, `the Nodes page says the old system's containers and VMs are on the Containers page (${JSON.stringify(pointer)})`);
     // ...and what the old system ran (R163 steps 10, 11): read first, then
-    // its containers to make and start and its VMs to define and run.
+    // its containers as compose files to download (the operator, 10 Nov:
+    // imported from New container, never made here on a press) and its VMs
+    // to define and run.
     const apps = await page.evaluate(() => {
       const n = ownMachine();
       openDockerOn(n.id);
@@ -823,15 +825,20 @@ await firstRun(false);
                                                    vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
                                                    said: ['Docker: 1 container ran, 1 started with the machine'] } } };
       nodesRev++; drawPanes();
+      // The rows as the controller answers them, laid over the fetch this
+      // draw made (it lands after this evaluate).
+      adoptPlan = [{ name: 'plex', file: 'plex.yaml', autostart: true, notes: [], network: 'br0', ok: true }];
+      nodesRev++; drawPanes();
       const sect = document.querySelector('.dmtab details[data-sect="docker:oldapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
     });
     ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
        `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
-    ok(/1 started with the machine/.test(apps.text) && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
-       && ['br0', 'make', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)),
-       `once read: the networks and Make and start, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+    ok(/1 started with the machine/.test(apps.text) && /plex br0 · starts with the machine/.test(apps.text) && /Import a compose file/.test(apps.text)
+       && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
+       && ['read', 'br0', 'zip', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make'),
+       `once read: each container's row, the network it joins and Download their compose files, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
     const picked = await page.evaluate(() => {
@@ -845,6 +852,14 @@ await firstRun(false);
     });
     ok(picked.was === true && picked.label === 'Define the ticked' && picked.dead,
        `a VM untaken is left out and Define waits for one ticked (${JSON.stringify(picked)})`);
+    // The zip waits for a read's settings, and the controller makes no
+    // container of them on a press any more.
+    const own0 = await page.evaluate(() => ownMachine()?.id);
+    const zipNone = await (await fetch(bm.base + '/api/old-compose', { headers: bmH })).json().catch(() => ({}));
+    const noMake = await bmApi('/api/v1/nodes', { action: 'adopt-apps', op: 'make', id: own0, names: ['plex'] });
+    const rowsNone = await bmApi('/api/v1/nodes', { action: 'adopt-apps', op: 'plan', id: own0 });
+    ok(/nothing is read yet/.test(zipNone.error || '') && /Import a compose file|compose file/.test(noMake.error || '') && Array.isArray(rowsNone.apps) && rowsNone.networks,
+       `the compose files wait for a read, and make is refused for import (${zipNone.error}; ${noMake.error}; ${JSON.stringify(rowsNone)})`);
     // The verb checks before any job: a filesystem it does not take, and a
     // Release with nothing adopted, each refused with why and no job made.
     const own = await page.evaluate(() => ownMachine()?.id);
