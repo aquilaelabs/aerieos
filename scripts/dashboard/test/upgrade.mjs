@@ -186,12 +186,14 @@ for (const ver of vers){
     const w = unpack(ver, 'newer');
     const newer = { state: policy.current + 1, by: '99.0.0' };
     writeFileSync(`${w}/config/state.json`, JSON.stringify(newer));
-    const listing = () => execFileSync('find', [`${w}/config`, '-printf', '%p %s %T@\n']).toString();
+    // But for the one-server lock, which is taken before the version is read
+    // and is no part of the state: an empty file, and the folder's own time.
+    const listing = () => execFileSync('find', [`${w}/config`, '-mindepth', '1', '!', '-name', '.server.lock', '-printf', '%p %s %T@\n']).toString();
     const before = listing();
     const c = await start(w);
     ok(c.code === 78 && /Downgrades are not supported/.test(c.log()) && /99\.0\.0/.test(c.log()),
        `${ver} stamped newer: this build refuses to start, saying a downgrade is not supported (${c.code}: ${c.log().trim().split('\n').pop()})`);
-    ok(listing() === before, `${ver} stamped newer: and writes nothing`);
+    ok(listing() === before, `${ver} stamped newer: and writes nothing of the state`);
     await stop(c);
   }
 }

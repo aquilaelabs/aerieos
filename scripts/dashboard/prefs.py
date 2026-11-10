@@ -27,7 +27,6 @@ respawned onto the same transcript.
 import contextlib
 import json
 import re
-import threading
 import os
 import sys
 from pathlib import Path
@@ -125,7 +124,10 @@ REPORT_MODES = ("auto", "deny")
 # "" is no color, which is the default and leaves nothing on the file.
 COLORS = ("red", "orange", "yellow", "green", "teal", "blue", "violet", "pink")
 
-_lock = threading.Lock()
+import statefile  # noqa: E402
+# Against the other processes that write the settings too (aerie's verbs),
+# not this one's threads alone.
+_lock = statefile.FileLock(lambda: FILE)
 
 
 def _register():

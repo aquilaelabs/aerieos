@@ -55,6 +55,9 @@ def configure(*, run, write_json, state, project_nodes=None, workspace=None):
     globals()["VERSIONS_FILE"] = Path(state) / "toolchain-versions.json"
     globals().update(zip(("_tc_versions", "_tc_checked", "_tc_remembered",
                           "_tc_local"), load_versions(), strict=True))
+    # What was pressed behind a running job and not yet started when the
+    # controller last stopped: taken up again, in order.
+    _tc_next_load()
 
 
 # The catalog lives beside the code rather than in it: config/toolchains.json,
@@ -2216,6 +2219,39 @@ _tc_next = []
 _tc_waiting = {"thread": None}
 
 
+def _tc_next_file():
+    return STATE / "toolchain-queue.json"
+
+
+def _tc_next_keep():
+    """The waiting presses on disk, so a restart does not drop them without
+    a word; under _tc_lock. The file goes when nothing waits."""
+    try:
+        if _tc_next:
+            write_json(_tc_next_file(), {"waiting": [{"action": a, "names": list(ns)} for a, ns in _tc_next]})
+        else:
+            _tc_next_file().unlink(missing_ok=True)
+    except (OSError, TypeError) as e:
+        print(f"dashboard: toolchains: the waiting installs were not kept: {e}", file=sys.stderr, flush=True)
+
+
+def _tc_next_load():
+    """Presses kept by a controller that stopped before starting them."""
+    try:
+        d = json.loads(_tc_next_file().read_text())
+    except (OSError, ValueError):
+        return
+    known = {p["name"] for p in TOOLCHAINS}
+    with _tc_lock:
+        for w in (d.get("waiting") or [])[:20] if isinstance(d, dict) else []:
+            names = [n for n in (w.get("names") or []) if n in known]
+            if w.get("action") in ("install", "remove", "check") and names:
+                _tc_next.append((w["action"], names))
+        if _tc_next and _tc_waiting["thread"] is None:
+            _tc_waiting["thread"] = threading.Thread(target=_tc_waiter, daemon=True)
+            _tc_waiting["thread"].start()
+
+
 def _tc_clash(names, action):
     """The other half of the shared-store rule: a node unpacking into the
     store this container is about to write is the same collision, seen
@@ -2247,6 +2283,7 @@ def _tc_waiter():
             if _tc_job["running"] or _tc_clash(_tc_next[0][1], _tc_next[0][0]):
                 continue
             action, names = _tc_next.pop(0)
+            _tc_next_keep()
             _tc_begin(action, names, False)
         threading.Thread(target=_tc_worker, daemon=True).start()
 
@@ -2260,6 +2297,7 @@ def start_job(action, names, auto=False):
             if auto:
                 return False
             _tc_next.append((action, list(names)))
+            _tc_next_keep()
             if _tc_waiting["thread"] is None:
                 _tc_waiting["thread"] = threading.Thread(target=_tc_waiter, daemon=True)
                 _tc_waiting["thread"].start()

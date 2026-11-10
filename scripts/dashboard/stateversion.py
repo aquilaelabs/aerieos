@@ -64,8 +64,13 @@ SUPPORTED_FROM = 19
 # runner-tokens is a Docker volume of its own, root-only by design and kept
 # across an update by Docker, which this copy (made as the dashboard's
 # account) could not read anyway (B109).
+# The install key, where an install with no secrets folder keeps it beside
+# the state: it unseals every secret the copy holds, so a copy that carried
+# it was the secrets in the clear for whoever read the copy. It is no
+# version's (an update never changes it), and a copy put back leaves what
+# is skipped where it is, so the key in place still opens what comes back.
 SKIP = {BACKUPS, "logs", "snapshots", "project-snapshots", "images", "gitrelay",
-        "gitview", "apps", "ci-logs", "runner-tokens", "state-held"}
+        "gitview", "apps", "ci-logs", "runner-tokens", "state-held", ".install-key"}
 SKIP_GLOBS = (".reset-*", "*.lock", "*.tmp")
 
 # Why this start migrates nothing, when the copy before it failed; written

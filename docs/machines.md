@@ -732,8 +732,25 @@ entrypoint and again in the dashboard:
   images in transit, the relay and Git view repositories, the apps fetched
   from a release, earlier copies and a Reset's moved-aside state) and keeps
   every record, the database, the signing keys, the git credentials and the
-  wikis. A migration that fails is said in the log and runs again at the
+  wikis. The install key, where an install with no secrets folder keeps it
+  under `/config`, is left out too: it opens every sealed secret the copy
+  holds, an update never changes it, and a copy put back leaves it where it
+  is. A migration that fails is said in the log and runs again at the
   next start; the controller starts either way.
+- **A state file that cannot be read**: every write of a state file is
+  synced to the disk before its name points at it, so a power cut does not
+  leave one cut short. One that is there and is not JSON all the same is
+  named in the log at start and a copy of it kept beside it
+  (`NAME.unreadable-TIME`), since its loader reads it as empty and the next
+  save would write that over it. The accounts file is held harder: while
+  `users.json` is there and cannot be read, nobody signs in, no first
+  account is offered, no move or saved configuration lands, and nothing is
+  written over it; mend it, or put back the copy under `/config/backups`,
+  and restart.
+- **Two servers on one `/config`**: the server holds a lock on
+  `/config/.server.lock` for its whole life, taken before the copy and the
+  migrations. A second one started on the same folder waits half a minute
+  for the first to go, then stops with the reason.
 - **An older state than this build migrates from**: the container stops,
   saying which release to start on it first.
 - **A newer state** (a rollback past an upgrade): the container stops, saying

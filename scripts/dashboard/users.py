@@ -44,7 +44,10 @@ write_json = None
 # identity override below. Injected, so users.py stays the module the
 # login path imports on its own.
 project_prefs = None
-_lock = threading.RLock()
+import statefile  # noqa: E402
+# Against the other processes that write the accounts too (aerie users), not
+# this one's threads alone.
+_lock = statefile.FileLock(lambda: _file())
 
 ROLES = ("owner", "admin", "user")
 # 600k is the OWASP floor for pbkdf2-sha256 at the time of writing. It costs
@@ -121,7 +124,39 @@ def load():
     return d
 
 
+def unreadable():
+    """Why the accounts file is there and cannot be read, or "" (B763).
+
+    `load` answers no accounts for a file that is missing, which is a fresh
+    install, and for one that is cut short or not JSON, which is not: read
+    as no accounts, the first-owner page opened to whoever reached the port,
+    and making that owner wrote over the accounts a person could still have
+    mended. So the two are told apart here, and everything that asks "is
+    there no account yet" asks this as well."""
+    f = _file()
+    try:
+        if not f.exists():
+            return ""
+        d = json.loads(f.read_text())
+    except (OSError, ValueError) as e:
+        return f"{f.name} cannot be read ({str(e)[:120]})"
+    if not isinstance(d, dict) or not isinstance(d.get("users"), dict):
+        return f"{f.name} is not an accounts file"
+    return ""
+
+
+def fresh():
+    """Whether nobody has made an account here yet: no accounts, and not an
+    accounts file that cannot be read."""
+    return not load()["users"] and not unreadable()
+
+
 def _save(d):
+    # Never over an accounts file that cannot be read (B763): what is in it
+    # is somebody's accounts, and this would be the empty view of them.
+    why = unreadable()
+    if why:
+        raise OSError(f"{why}: not written over; mend it or put back a copy from /config/backups first")
     # Private from the instant it is in place, where the helper can take a
     # mode (statefile's); the harness and aerie users hand in one that cannot.
     try:
@@ -161,12 +196,15 @@ def get(name):
 
 
 def uid_of(u):
-    """The minted id for a principal, or "" for one that is not a person.
+    """The minted id for a principal, or "" for the server's own contexts
+    (ALL), which are nobody: a background sweep has no tab strip, and every
+    per-account store treats "" as "do not store".
 
-    The server's own contexts (ALL) and a session's scoped token both reach
-    code that wants to remember something per account. Neither should: a
-    background sweep has no tab strip and a `aerie` invocation has no browser. So
-    they answer "" and every per-account store treats that as "do not store".
+    A session's token answers its PERSON's id (it is how a node fetches that
+    account's own sign-in and how a session's notes are kept as theirs), so
+    this is not the test for "a person is asking": a handler that is a
+    person's alone refuses `me.get("session")` as well, as the Profile page
+    does (B764: this said a session answered "", and one handler believed it).
     """
     uid = (u or {}).get("uid") or ""
     return "" if uid == "\u0000server" else str(uid)
@@ -935,6 +973,9 @@ def claim(name, password):
     if len(password or "") < 8:
         return {"error": "a password is at least 8 characters"}
     with _lock:
+        if unreadable():
+            return {"error": f"the accounts file is there and cannot be read ({unreadable()}): "
+                             "no first account is made over it"}
         d = load()
         if d["users"]:
             return {"error": "this container already has an account"}

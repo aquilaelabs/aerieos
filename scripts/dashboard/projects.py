@@ -1218,6 +1218,56 @@ _waiting = []
 _earlier = []
 
 
+def _waiting_file():
+    return STATE / "space-jobs-waiting.json"
+
+
+def _waiting_keep():
+    """Which jobs wait, on disk: a job waiting is a closure over what the
+    request carried (a token among it), which is not kept, so a controller
+    that restarts cannot start them; what it can do is say so and take back
+    what each had claimed (dropped_at_restart). Under _lock."""
+    try:
+        if _waiting:
+            write_json(_waiting_file(), {"waiting": [{"kind": k, "name": n} for k, n, _ in _waiting]})
+        else:
+            _waiting_file().unlink(missing_ok=True)
+    except (OSError, TypeError):
+        pass
+
+
+def dropped_at_restart():
+    """At start: the space jobs that were waiting behind another when the
+    controller last stopped. Each clone's claimed folder and record are
+    taken back, so the name is free, and the Spaces page says which were
+    not started, kept until dismissed as a failure is."""
+    try:
+        d = json.loads(_waiting_file().read_text())
+    except (OSError, ValueError):
+        return []
+    names = []
+    for w in (d.get("waiting") or [])[:20] if isinstance(d, dict) else []:
+        kind, name = str(w.get("kind") or ""), str(w.get("name") or "")
+        if not name:
+            continue
+        if kind == "clone":
+            dest = WORKSPACE / name
+            # Only a folder the clone never reached: claimed and still empty.
+            with contextlib.suppress(OSError):
+                if dest.is_dir() and not any(dest.iterdir()):
+                    dest.rmdir()
+                    with contextlib.suppress(Exception):       # tidying after a job that never ran
+                        forget_token(name)
+                    _unmade(name)
+        names.append(name)
+        _earlier.append({"name": name, "error": f"the controller restarted while this {'clone' if kind == 'clone' else 'job'} "
+                                                "waited behind another, so it was not started: press it again"})
+    with contextlib.suppress(OSError):
+        _waiting_file().unlink(missing_ok=True)
+    del _earlier[:-10]
+    return names
+
+
 def _start(kind, name, fn):
     """Hand one job to a thread, or queue it behind the one running (the
     operator, 10 Nov: a press is never refused for another job). The caller
@@ -1225,6 +1275,7 @@ def _start(kind, name, fn):
     with _lock:
         if _job["running"]:
             _waiting.append((kind, name, fn))
+            _waiting_keep()
             return True
         _job.update(running=True, kind=kind, name=name, step="starting",
                     at=time.time(), error="", note="", aborting=False)
@@ -1241,6 +1292,7 @@ def _next():
             _earlier.append({"name": _job.get("name", ""), "error": _job["error"]})
             del _earlier[:-10]
         kind, name, fn = _waiting.pop(0)
+        _waiting_keep()
         _job.update(running=True, kind=kind, name=name, step="starting",
                     at=time.time(), error="", note="", aborting=False)
     threading.Thread(target=_wrap, args=(fn,), daemon=True).start()

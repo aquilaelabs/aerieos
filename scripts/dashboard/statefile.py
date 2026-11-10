@@ -49,6 +49,113 @@ _locks = {}
 _guard = threading.Lock()
 
 
+# Held by every write of a state file for the moment it lands, and by
+# frozen() for as long as a copy of the state is being taken: a backup or a
+# move's bundle read the files one by one while the server went on writing
+# them, so it could hold an account without its secrets, or a link to a
+# token the copy of the other file had already dropped.
+_gate = threading.RLock()
+
+
+@contextlib.contextmanager
+def frozen():
+    """No state file of this process's lands while the block runs; writers
+    wait, and go on when it ends. For reading the state as one moment (a
+    bundle's walk of /config), so kept short: nothing slow that could wait
+    on a writer belongs inside. The CLI's own writes, another process's,
+    are not held."""
+    with _gate:
+        yield
+
+
+class FileLock:
+    """`with lock:` over `locked(path)`, for a module that held a threading
+    lock alone around a read, a change and a save of its file: the same
+    block now holds the file against every other process too (the CLI's
+    verbs, a relay's worker), which the threading lock never did. Reentrant
+    in one thread, as `locked` is. `path` is asked each time, since a
+    module is told where its file is after it is imported; with none yet,
+    the threads of this process are what it holds."""
+
+    def __init__(self, path):
+        self._path = path
+        self._here = threading.RLock()
+        self._held = threading.local()
+
+    def __enter__(self):
+        p = self._path()
+        cm = locked(p) if p else self._here
+        cm.__enter__()
+        stack = getattr(self._held, "stack", None)
+        if stack is None:
+            stack = self._held.stack = []
+        stack.append(cm)
+        return self
+
+    def __exit__(self, *exc):
+        return self._held.stack.pop().__exit__(*exc)
+
+
+def _sync(f):
+    """The file's bytes on the disk before it is renamed into place: without
+    it a power cut after the rename could leave the name pointing at a file
+    cut short, which every loader then read as empty and the next save wrote
+    over (B763). Never fatal: a filesystem that cannot sync keeps the rename."""
+    with contextlib.suppress(OSError, ValueError):
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def _sync_dir(path):
+    """...and the rename itself, by syncing the folder that holds the name."""
+    with contextlib.suppress(OSError):
+        fd = os.open(os.path.dirname(path) or ".", os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
+def unreadable(folder):
+    """The state files in `folder` that are there and cannot be read as JSON:
+    [(name, why)]. Asked at start, before any of them is loaded: a loader
+    reads one as empty, and a save after that writes the empty view over
+    what a person could still have mended."""
+    out = []
+    try:
+        names = sorted(os.listdir(_p(folder)))
+    except OSError:
+        return out
+    for name in names:
+        if not name.endswith(".json") or name.startswith("."):
+            continue
+        f = os.path.join(_p(folder), name)
+        if not os.path.isfile(f):
+            continue
+        try:
+            with open(f, encoding="utf-8") as fh:
+                json.load(fh)
+        except (OSError, ValueError) as e:
+            out.append((name, str(e)[:160]))
+    return out
+
+
+def set_aside(folder, name):
+    """A copy of an unreadable state file kept beside it, so what a save
+    writes over it afterwards is not the only copy: NAME.unreadable-STAMP.
+    The copy's name, or "" when it could not be made."""
+    import shutil
+    import time
+    src = os.path.join(_p(folder), name)
+    dst = f"{src}.unreadable-{time.strftime('%Y%m%d-%H%M%S')}"
+    try:
+        shutil.copy2(src, dst)
+        os.chmod(dst, 0o600)
+    except OSError:
+        return ""
+    return os.path.basename(dst)
+
+
 def write_json(path, obj, mode=0o644):
     """Atomically replace `path` with `obj` as JSON. `mode` is the file's
     from the moment it is in place: a file of password hashes was 0644
@@ -61,9 +168,12 @@ def write_json(path, obj, mode=0o644):
     try:
         with os.fdopen(fd, "w") as f:
             f.write(json.dumps(obj, indent=2) + "\n")
+            _sync(f)
         # mkstemp gives 600 and these were world-readable before.
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        with _gate:
+            os.replace(tmp, path)
+        _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
@@ -83,8 +193,11 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
     try:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(text)
+            _sync(f)
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        with _gate:
+            os.replace(tmp, path)
+        _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)

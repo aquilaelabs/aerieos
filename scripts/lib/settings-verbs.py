@@ -22,10 +22,10 @@ verb, here, proj = sys.argv[1], sys.argv[2], sys.argv[3]
 def set_field():
     sys.path.insert(0, here)
     import prefs, pending
-    def _w(path, obj):
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w") as f: json.dump(obj, f)
-        os.replace(tmp, path)
+    # The dashboard's own writer: a temporary of its own name, synced, and
+    # the file's lock shared with the running server (statefile.py).
+    import statefile
+    _w = statefile.write_json
     prefs.configure(state=os.environ["DASHBOARD_STATE"], write_json=_w)
     pending.configure(state=os.environ["DASHBOARD_STATE"], write_json=_w)
     field, value = os.environ["BB_SET_FIELD"], os.environ["BB_SET_VALUE"]
@@ -239,10 +239,10 @@ def set_node():
     running dashboard."""
     sys.path.insert(0, here)
     import prefs, dash
-    def _w(path, obj):
-        tmp = str(path) + ".tmp"
-        with open(tmp, "w") as f: json.dump(obj, f)
-        os.replace(tmp, path)
+    # The dashboard's own writer: a temporary of its own name, synced, and
+    # the file's lock shared with the running server (statefile.py).
+    import statefile
+    _w = statefile.write_json
     state = os.environ["DASHBOARD_STATE"]
     prefs.configure(state=state, write_json=_w)
     # The running dashboard's hooks, which a shell has none of: no container

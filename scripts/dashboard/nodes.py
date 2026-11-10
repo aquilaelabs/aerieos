@@ -923,6 +923,11 @@ def rotate_token(node_id):
           (node_id, TOKEN_RETIRED, now - RETIRED_KEEP_S))
     tid, bearer = _token_mint("node", node_id)
     _exec("UPDATE tokens SET revoked = ? WHERE id = ?", (TOKEN_PENDING, tid))
+    # In the database file before the node is told it: a token handed out
+    # and then lost with the log (a controller re-created on a mount that
+    # does not keep it, 3 Nov) is a node this side no longer knows.
+    with contextlib.suppress(sqlite3.Error):
+        db.fold()
     return bearer
 
 

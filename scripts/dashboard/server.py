@@ -63,6 +63,45 @@ SCREEN_PORT = 7684
 # challenge is precisely what made browsers pop their own dialog.
 SESSION_DAYS = 30
 STATE = Path(os.environ.get("DASHBOARD_STATE", "/config"))
+
+
+def _one_server(state, wait=30):
+    """This process is the only server on `state`, held for its whole life
+    by a lock on a file there, taken before the version gate, the copy made
+    before a migration and the migrations themselves: two servers started on
+    one /config (a second container pointed at the same folder, an update
+    whose old container had not gone) each ran those and then wrote the same
+    files. The one going down is given `wait` seconds. A folder that cannot
+    hold a lock (a filesystem with none) is served as before, said once.
+    The open file, kept by the caller; exits when another server has it."""
+    import fcntl
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        f = open(state / ".server.lock", "a+")                     # noqa: SIM115 (held for the process's life)
+    except OSError as e:
+        print(f"dashboard: no lock file in {state} ({e}); starting without the one-server lock", file=sys.stderr, flush=True)
+        return None
+    end = time.time() + wait
+    while True:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return f
+        except BlockingIOError:
+            if time.time() >= end:
+                print(f"dashboard: another AerieOS server is running on {state} and did not stop within {wait}s. "
+                      "Two on one configuration write over each other, so this one stops here: "
+                      "stop the other (a second container given the same folder?), then start this again.",
+                      file=sys.stderr, flush=True)
+                raise SystemExit(75) from None
+            time.sleep(0.5)
+        except OSError as e:
+            print(f"dashboard: {state} takes no lock ({e}); starting without the one-server lock", file=sys.stderr, flush=True)
+            return f
+
+
+# Only the server itself: a tool or a test that imports this file reads the
+# state beside a running server by design.
+_SERVER_LOCK = _one_server(STATE) if __name__ == "__main__" else None
 # Before anything below writes to it: a /config newer than this build, or
 # older than it migrates from, is refused here in one sentence, a fresh one
 # is stamped, and one about to migrate is copied first (stateversion.py).
@@ -6591,6 +6630,8 @@ class Handler(BaseHTTPRequestHandler):
         this box" is a question with an answer already, and a second copy of
         it is one more thing that can disagree.
         """
+        if users.unreadable():
+            return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This container already has an account.")
         try:
@@ -7792,6 +7833,9 @@ class Handler(BaseHTTPRequestHandler):
             # The other controller's door (R175): a proof under the move
             # key, never a credential of either side.
             return self._move_peer()
+        # An accounts file that cannot be read is not a fresh install (B763).
+        if users.unreadable() and path not in ("/favicon.ico", "/favicon.svg"):
+            return self._login_page(ACCOUNTS_UNREADABLE)
         if not users.all_users() and path not in ("/favicon.ico", "/favicon.svg"):
             return self._login_page(setup=True)
         if path == "/login":
@@ -13456,6 +13500,8 @@ class Handler(BaseHTTPRequestHandler):
         """POST /setup/restore: a found copy or an uploaded one with the
         backup password, before an owner exists, held to the version gate,
         restored, and the dashboard re-executed on the restored state."""
+        if users.unreadable():
+            return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account; a saved configuration lands only on a fresh install.")
         try:
@@ -13560,6 +13606,8 @@ class Handler(BaseHTTPRequestHandler):
         restored, and the dashboard re-executed on the restored state. Not on
         a stick (the operator, 1 Nov): there the machine's disks are set up
         first, under an account, and the move lands from Controller settings."""
+        if users.unreadable():
+            return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account; a move lands only on a fresh install.")
         if nodes.on_stick():
@@ -13933,11 +13981,27 @@ def main():
     # It is the first-run screen instead, and until somebody claims the
     # container that is the only page it serves. Nothing else is reachable
     # unauthenticated, which is the property the old refusal was protecting.
-    if not users.all_users():
+    # State files that are there and cannot be read (B763): each is read as
+    # empty by its loader and written over by the next save, so a copy of
+    # each is kept beside it first and the log names them.
+    for _name, _why in statefile.unreadable(STATE):
+        _kept = statefile.set_aside(STATE, _name)
+        print(f"dashboard: /config/{_name} cannot be read ({_why}); what it held reads as empty until it is mended"
+              + (f", and a copy is kept as {_kept}" if _kept else ""), file=sys.stderr, flush=True)
+    if users.unreadable():
+        print(f"dashboard: {users.unreadable()}: nobody can sign in and no first account is offered "
+              "until it is mended or put back from /config/backups", file=sys.stderr, flush=True)
+    elif not users.all_users():
         print("dashboard: no accounts yet; the first page served will ask "
               "you to make the owner. Do it now: until you do, whoever "
               "reaches this port can.", flush=True)
     layout.prune_claude_tabs()
+    # Space jobs that waited behind another when the controller last stopped
+    # were never started: said on the Spaces page, their claims taken back.
+    with contextlib.suppress(Exception):                    # noqa: BLE001 (tidying never holds the start)
+        _dropped = projects.dropped_at_restart()
+        if _dropped:
+            print(f"dashboard: not started before the restart, and to press again: {', '.join(_dropped)}", flush=True)
     # The JSON stores' numbered migrations past /config's stamp (R79), here,
     # once every module is configured: one needs project_list to answer,
     # which at import it could not (B496). The gate at the top took the copy.

@@ -712,14 +712,20 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
     # the server writes it all the while (its minute's fold among it), and
     # a copy read across a write is torn. The file and its log are left out
     # of the walk, the snapshot put in their place.
-    snap = _db_snapshot()
-    try:
-        counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE | (set(DB_FILES) if snap else set()))
-        if snap:
-            tar.add(str(snap), arcname=f"state/{DB_FILES[0]}", recursive=False)
-    finally:
-        if snap:
-            snap.unlink(missing_ok=True)
+    # ...and the files beside it at that same moment: no state file lands
+    # while the database is copied and the state is walked (statefile.frozen),
+    # so the bundle is not an account from before a change and its secrets
+    # from after it.
+    import statefile                                        # noqa: PLC0415
+    with statefile.frozen():
+        snap = _db_snapshot()
+        try:
+            counts["state"] = _tar_tree(tar, STATE, "state", leave=LEAVE | (set(DB_FILES) if snap else set()))
+            if snap:
+                tar.add(str(snap), arcname=f"state/{DB_FILES[0]}", recursive=False)
+        finally:
+            if snap:
+                snap.unlink(missing_ok=True)
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)) and (kind in stores if stores is not None else kind not in STORES_OFF):
             counts[kind] = _tar_tree(tar, path, f"stores/{kind}")
