@@ -257,13 +257,36 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // With the URL, because "Failed to load resource: 400" names neither what
   // asked nor what was asked for, and a console error nobody can locate is
   // one nobody fixes.
+  // The box's own networks changing under the browser (B753): a suite that
+  // brings a compose project up or down beside this one makes or takes a
+  // Docker network, and Chromium cuts what it has in flight with
+  // ERR_NETWORK_CHANGED. That is this machine, not the page: what it cut
+  // is not an error of the page's, and a page whose script or document it
+  // cut never ran that script, so it is loaded again, a few times at most.
+  let netChanged = 0, netReloads = 0;
+  page.on('requestfailed', r => {
+    if (!/ERR_NETWORK_CHANGED/.test(r.failure()?.errorText || '')) return;
+    netChanged = Date.now();
+    if (['document', 'script', 'stylesheet'].includes(r.resourceType()) && netReloads < 3){
+      netReloads++;
+      console.log(`[net] a network change on this box cut ${r.url().replace(/^https?:\/\/[^/]+/, '')}: loading the page again (${netReloads} of 3)`);
+      page.reload().catch(() => {});
+    }
+  });
+  const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text)
+    || (Date.now() - netChanged < 3000 && /Failed to fetch|NetworkError/.test(text));
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
-    if (url.includes('/term')) return;
+    if (url.includes('/term') || cutByNet(m.text())) return;
     page.errors.push(url ? `${m.text()} [${url.replace(/^https?:\/\/[^/]+/, '')}]` : m.text());
   });
-  page.on('pageerror', e => page.errors.push(String(e)));
+  // ...and a name the cut script would have defined, missed right after it.
+  page.on('pageerror', e => {
+    const t = String(e);
+    if (cutByNet(t) || (Date.now() - netChanged < 3000 && /ReferenceError: .* is not defined/.test(t))) return;
+    page.errors.push(t);
+  });
   page.on('dialog', d => { page.dialogs.push(d.message()); d.accept(); });
   // The page's own questions (page-ask.js, R121) are answered the way the
   // browser's were: their words recorded on page.dialogs, and the first
