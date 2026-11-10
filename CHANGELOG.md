@@ -6,6 +6,8 @@
 
 - Only one controller can run on a configuration folder at a time: a second one started on the same /config stops with the reason, rather than writing over the first (e303494)
 - A backup and a move's bundle copy the configuration at one moment, rather than file by file while it is being written; the copies kept before an upgrade no longer carry the install key (e303494)
+- With Run its container on auto, a session's build still runs at once, unless its compose file asks for more than its own folder (the host's files, privileges, the Docker socket): then you are asked once, with the list, and your Allow covers that file from then on (0c4735d)
+- A node locked out because a token it had replaced came back now says it may be a machine restored from a snapshot or a backup, and that Enroll script on its row brings it back (ac7e5dc)
 
 ### Fixed
 
@@ -18,6 +20,7 @@
 - A coding agent's session can no longer change its person's Profile: where their notifications go, their browser sign-ins, their second factor (e9502c6)
 - A CI runner registered to a public repository says on its row that a pull request from anybody can run on that node, and which setting on the git host to change (61a3651)
 - A container's compose file is checked for more ways of reaching the host before it is built: the host's other namespaces, another container's volumes, a volume bound to a host folder under another name, a build that uses the host's network or ssh agent, and a folder that is a link to the system (35f094d)
+- A node can pin AerieOS's release key and then takes only agent updates the release signed, whatever its controller sends. Nothing changes until a release names the key; a node's row says which it is under Updates (ac7e5dc)
 
 ## 0.9.0-dev.5173: 2026-11-10
 
