@@ -4128,9 +4128,40 @@ def risks(project, cfg):
             out.append(f"{name} is on the host's own network")
         if str(sv.get("userns_mode") or "") == "host":
             out.append(f"{name} shares the host's user namespace")
-        loose = [o for o in (sv.get("security_opt") or []) if isinstance(o, str) and "unconfined" in o]
+        # The other namespaces a service can ask for the host's own, and
+        # another container's, which is that container's reach under this
+        # one's name (R227: the gate read pid, network and userns alone).
+        for key, what in (("ipc", "inter-process memory"), ("uts", "hostname"), ("cgroup", "control groups")):
+            if str(sv.get(key) or "") == "host":
+                out.append(f"{name} shares the host's {what} namespace")
+        for key, what in (("network_mode", "network"), ("pid", "processes"), ("ipc", "inter-process memory")):
+            val = str(sv.get(key) or "")
+            if val.startswith(("container:", "service:")):
+                out.append(f"{name} joins the {what} of {val}: that container's reach, under this one's name")
+        if sv.get("volumes_from"):
+            out.append(f"{name} takes every volume of {', '.join(str(v) for v in sv['volumes_from'][:3])}: "
+                       "whatever that container mounts of the host, this one does")
+        if sv.get("device_cgroup_rules"):
+            out.append(f"{name} is allowed host devices by rule: {', '.join(str(r) for r in sv['device_cgroup_rules'][:3])}")
+        if sv.get("sysctls"):
+            keys = sv["sysctls"] if isinstance(sv["sysctls"], list) else list(sv["sysctls"])
+            out.append(f"{name} sets kernel parameters: {', '.join(str(k) for k in keys[:3])}")
+        # Every way of loosening a profile, not the word unconfined alone:
+        # labels switched off, a seccomp or AppArmor profile of the file's own.
+        loose = [o for o in (sv.get("security_opt") or []) if isinstance(o, str)
+                 and ("unconfined" in o or o.replace("=", ":").startswith(("label:disable", "seccomp:", "apparmor:", "systempaths")))
+                 and o.replace("=", ":") != "no-new-privileges:true"]
         if loose:
             out.append(f"{name} drops a security profile: {', '.join(loose)}")
+        # A build reaches the host too, before anything runs: the host's
+        # network, its ssh agent, a privileged build.
+        b = sv.get("build") if isinstance(sv.get("build"), dict) else {}
+        if str(b.get("network") or "") == "host":
+            out.append(f"{name} builds on the host's own network")
+        if b.get("ssh"):
+            out.append(f"{name}'s build is handed the node's ssh agent or keys")
+        if b.get("privileged") or b.get("entitlements"):
+            out.append(f"{name}'s build runs privileged")
         # A bind mount of what gives control of the node is a risk a person
         # acknowledges, whatever the row already shows about it: with the
         # project's Run its container dial on auto, a session writes the
@@ -4144,12 +4175,27 @@ def risks(project, cfg):
                 out.append(f"{name} mounts the docker socket: every container on the node, and root through it")
             elif _system_path(host) or _behind_wall(host, tree):
                 out.append(f"{name} mounts {host} of the host: the node's own system, not a share")
+            else:
+                # ...and a path in the tree that is a link out of it, where
+                # this side can see it: judged by where it leads, not by its
+                # name (a link named data pointing at / passed as the tree's own).
+                real = _resolved(host)
+                if real and real != os.path.normpath(host) and (_system_path(real) or _behind_wall(real, tree)):
+                    out.append(f"{name} mounts {host}, a link to {real} of the host: the node's own system, not a share")
         # What compose reads off the host as it starts or builds, not a bind
         # and so not above: an env file, a build's folders.
         for host in _read_sources(sv):
             if (_system_path(host) and not host.startswith(tree) and os.path.basename(host) != "instance.env") \
                     or _behind_wall(host, tree):
                 out.append(f"{name} reads {host} of the host into itself: the node's own system, not a share")
+    # A named volume whose driver options bind a host path is a bind by
+    # another name, and no service's volumes list shows where it leads.
+    for key, vol in sorted(((cfg.get("volumes") if isinstance(cfg, dict) else None) or {}).items()):
+        opts = vol.get("driver_opts") if isinstance(vol, dict) else None
+        dev = str((opts or {}).get("device") or "")
+        if dev.startswith("/") and "bind" in str((opts or {}).get("o") or "") + str((opts or {}).get("type") or ""):
+            if dev.endswith("/docker.sock") or _system_path(dev) or _behind_wall(dev, tree):
+                out.append(f"the volume {key} is {dev} of the host by another name: the node's own system, not a share")
     # A top-level secret or config from a file is a bind by another name.
     for kind in ("secrets", "configs"):
         for key, item in sorted(((cfg.get(kind) if isinstance(cfg, dict) else None) or {}).items()):
@@ -4157,6 +4203,16 @@ def risks(project, cfg):
             if host and (_system_path(host) or _behind_wall(host, tree)):
                 out.append(f"{key} ({kind[:-1]}) is read from {host} of the host: the node's own system, not a share")
     return out
+
+
+def _resolved(host):
+    """Where a host path really leads, where this side has it to look at
+    (the tree is here on the controller, and on its own machine so is the
+    rest): "" where it is not here to follow."""
+    try:
+        return os.path.realpath(host) if os.path.lexists(host) else ""
+    except OSError:
+        return ""
 
 
 def _bind_sources(sv):
