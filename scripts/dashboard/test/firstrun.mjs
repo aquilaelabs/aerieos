@@ -831,14 +831,15 @@ await firstRun(false);
       nodesRev++; drawPanes();
       const sect = document.querySelector('.dmtab details[data-sect="docker:oldapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
-               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm) };
+               acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm),
+               tick: sect?.querySelector('[data-adoptvmauto="Windows 11"]')?.checked === false };
     });
     ok(/not read yet/.test(apps.unread) && /Read what ran/.test(apps.unread) && /nothing in them changes/.test(apps.unread),
        `before a read, the old system's containers and VMs offer Read what ran, which changes nothing (${apps.unread.slice(0, 160)})`);
     ok(/1 started with the machine/.test(apps.text) && /plex br0 · starts with the machine/.test(apps.text) && /Import a compose file/.test(apps.text)
        && /Windows 11 shut off/.test(apps.text) && /Ubuntu not defined here yet/.test(apps.text)
-       && ['read', 'br0', 'zip', 'start', 'autostart-on', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make'),
-       `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and start with the machine, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.text.slice(0, 200)})`);
+       && ['read', 'br0', 'zip', 'start', 'define'].every(x => apps.acts.includes(x)) && !apps.acts.includes('make') && apps.tick,
+       `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and its Starts with the machine tick, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.tick}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
     const picked = await page.evaluate(() => {

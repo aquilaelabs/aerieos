@@ -431,19 +431,24 @@ function adoptAppsSection(n){
   const pick = (key, label, said, on) => `<label class="ndcap adrow"><input type="checkbox" data-adpick="${esc(key)}"${on ? " checked" : ""}>
       <b>${esc(label)}</b> <span class="sub">${esc(said)}</span></label>`;
   const other = Object.fromEntries((n.reported?.vms_other || []).map(v => [v.name, v]));
-  const vms = (apps.vms || []).map(v => { const here = other[v.name];
-    return here ? `<div class="ndcap adrow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${here.state}${here.autostart ? " · starts with the machine" : ""}`)}</span></div>`
-      : pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`)); }).join("");
+  // The VMs not defined here yet, each a tick, Define acting on them right
+  // under them (B750: it sat under the last defined VM's buttons, as if it
+  // were that VM's).
+  const toDefine = (apps.vms || []).filter(v => !other[v.name]);
+  const ticks = toDefine.map(v => pick(`v:${v.name}`, v.name, `not defined here yet${v.autostart ? " · started with the machine there" : ""}`, !adoptSkip.has(`v:${v.name}`))).join("");
   const nOk = (adoptPlan || []).filter(a => a.ok).length;
   const nV = (apps.vms || []).filter(v => !other[v.name] && !adoptSkip.has(`v:${v.name}`)).length;
   // The networks a container joined: the read's, then a stick plan's.
   const nets = Object.entries({...adoptNets, ...(from.networks || {})}).filter(([k]) => (adoptPlan || []).some(a => a.network === k));
-  const vmActs = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name];
-    return `<div class="actbar"><span class="grow">${esc(v.name)}</span>${s.state === "running"
+  // Each one defined here a row of its own: its name and state once with
+  // its buttons beside them, why Clone waits said on the row, and whether
+  // it starts with the machine a tick of its own under them (a yes or no).
+  const vmRows = (apps.vms || []).filter(v => other[v.name]).map(v => { const s = other[v.name], off = ["stopped", "shut off", "crashed"].includes(s.state);
+    return `<div class="vmrow"><div class="actbar"><span class="grow"><b>${esc(v.name)}</b> <span class="sub">${esc(`${s.state}${off ? "" : " · shut it down to clone it"}`)}</span></span><span class="vmacts">${s.state === "running"
       ? btn(`data-adoptvm="shutdown" data-vmname="${esc(v.name)}"`, "Shut down") : btn(`data-adoptvm="start" data-vmname="${esc(v.name)}"`, "Start")}${
-      btn(`data-adoptvm="${s.autostart ? "autostart-off" : "autostart-on"}" data-vmname="${esc(v.name)}"`, s.autostart ? "Don't start with the machine" : "Start with the machine")}${
       // Made AerieOS's own (R163 step 12): its disks copied, the original kept.
-      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${["stopped", "shut off", "crashed"].includes(s.state) ? "" : ' disabled title="shut it down to clone it"'}`, "Clone into a space…")}</div>`; }).join("");
+      btn(`data-vmclone="${esc(n.id)}" data-vmfrom="${esc(v.name)}"${off ? "" : " disabled"}`, "Clone into a space…")}</span></div>
+      <label class="ndcap"><input type="checkbox" data-adoptvmauto="${esc(v.name)}"${s.autostart ? " checked" : ""}> Starts with the machine</label></div>`; }).join("");
   return docSection("docker", "oldapps", "Containers and VMs from the old system",
     `${(adoptPlan || []).length} containers, ${(apps.vms || []).length} VMs`,
     `<div class="field"><div class="actbar"><span class="grow">${(apps.said || []).map(x => `<div class="sub">${esc(x)}</div>`).join("")}</span>${btn('data-adoptapp="read"', "Read again")}</div>
@@ -451,8 +456,9 @@ function adoptAppsSection(n){
       <div class="hint">Each is a compose file with the image, settings and paths it ran with, so it finds its files where they were. Import one with New container: Compose, Import a compose file${nets.length ? "; a container that joins a network needs that network made first" : ""}.</div>
       <div class="actbar">${nets.map(([k, v]) => btn(`data-adoptnet="${esc(k)}" data-subnet="${esc(v.subnet)}" data-gateway="${esc(v.gateway || "")}"`, `Make the ${esc(k)} network`)).join("")}
         ${btn(`data-adoptapp="zip"${nOk ? "" : " disabled"}`, "Download compose files", "primary")}</div>
-      ${(apps.vms || []).length ? `<div class="sub">The VMs</div><div class="adpick">${vms}</div>${vmActs}
-        <div class="actbar">${(apps.vms || []).some(v => !other[v.name]) ? btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === (apps.vms || []).filter(v => !other[v.name]).length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary") : ""}</div>` : ""}
+      ${(apps.vms || []).length ? `<div class="sub">The VMs</div>${toDefine.length ? `<div class="adpick">${ticks}</div>
+        <div class="actbar"><span class="grow hint">Each keeps its disks where they are, and one that started with the machine there does here.</span>${
+          btn(`data-adoptapp="define"${nV ? "" : " disabled"}`, nV === toDefine.length ? "Define the VMs" : nV ? `Define the ${nV} ticked` : "Define the ticked", "primary")}</div>` : ""}${vmRows}` : ""}
     </div>`);
 }
 
@@ -460,7 +466,7 @@ function adoptAppsSection(n){
 function adoptAppsPointer(n){
   if (!adoptAppsSection(n)) return "";
   return docSection("nodes", "adoptapps", "Containers and VMs from the old system", "on the Containers page",
-    `<div class="field"><div class="actbar"><span class="grow sub">Read what the old system ran and bring back what you tick, on this machine's Containers page.</span>
+    `<div class="field"><div class="actbar"><span class="grow sub">Read what the old system ran, download its containers' compose files and define its VMs, on this machine's Containers page.</span>
       <button type="button" data-oldapps>Containers page</button></div></div>`);
 }
 async function loadAdoptPlan(){
@@ -518,6 +524,15 @@ function wireAdoptApps(root){
     notify(j.error || `making the ${b.dataset.adoptnet} network`, !!j.error);
     await loadNodes();
   }));
+  root.querySelectorAll("[data-adoptvmauto]").forEach(c => c.onchange = async () => {
+    const name = c.dataset.adoptvmauto, on = c.checked;
+    c.disabled = true;
+    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name, op: on ? "autostart-on" : "autostart-off"})).json().catch(() => ({error: "no answer"}));
+    notify(j.error || `${name}: ${on ? "starts" : "does not start"} with the machine`, !!j.error);
+    if (j.error) c.checked = !on;
+    c.disabled = false;
+    await loadNodes();
+  });
   root.querySelectorAll("[data-adoptvm]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Asking");
     const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm})).json().catch(() => ({error: "no answer"}));

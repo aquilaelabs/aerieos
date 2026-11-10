@@ -1235,9 +1235,16 @@ body.firstrun #panes{display:none}
    pushed to the right, a field with its button on a line of its own): the
    label over its field, the control and its verb on one line. */
 .setpicks{margin-top:10px}
+/* An old system's VM defined here: its name and state keep a width of their own, and its buttons wrap under them together on a phone (B750). */
+.vmrow>.actbar>.grow{flex:1 1 14em;min-width:0}
+.vmrow .vmacts{display:flex;gap:8px;flex:0 0 auto;margin-left:auto}
+.vmrow{margin-top:8px}
+.vmrow>.ndcap{margin-top:4px}
 /* New container's import, beside the Compose pane's hint: never a button on a line of its own. */
 .cimport{flex-wrap:nowrap;align-items:flex-start}
-.cimport>.hint{margin:0;min-width:0}
+/* A hint beside a button in an action bar sits level with it, not a hint's
+   gap below the line above. */
+.actbar>.hint{margin:0;min-width:0}
 .cimport>button{flex:0 0 auto}
 .setpick{display:flex;flex-direction:column;gap:4px;min-width:0}
 .setpickline{display:flex;gap:8px;align-items:center;min-width:0}
