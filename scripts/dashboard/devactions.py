@@ -1376,7 +1376,7 @@ def _job_down(project, instance, run):
 
 
 @devapp._on_instance
-def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
+def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside="", approved=True):
     """Build, then bounce, or stop at the env gate. A job: a build is
     minutes, and the poll watches it through job_rev. The name and the
     worktree are this side's and are checked in front of the answer; the
@@ -1385,10 +1385,14 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
 
     `gate` is False for a build its project's setting has already answered
     for: a session's on auto, or a person's Allow on a session's question.
-    The confirmation of what a compose asks for is a person's own press of
-    Build; a session's build follows Agents may: Run its container like
-    every other (the operator, 26 Sep: auto does it, ask asks, deny
-    refuses)."""
+    The confirmation of what a compose asks for is a person's: their own
+    press of Build, or their Allow, which acknowledges the list as it
+    stands (`approved`, and AerieOS's own containers' deploys). A session's
+    build on auto carries no yes (`approved` False): it runs at once while
+    the file asks for nothing past its own folder that a person has not
+    acknowledged, and is put to a person when it does (request; the
+    operator, 10 Nov), so here it meets the check only when the file
+    changed between that look and this build."""
     if devapp.compose_file(project) is None:
         return {"error": "no compose file here"}
     clash = devapp.name_clash(project, instance)
@@ -1405,7 +1409,8 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside=""):
                    check=lambda: devapp.room_gate(project, instance) or devapp.gpu_gate(project, instance)
                    or _env_gate(project, instance)
                    or devapp._beside_gate(project, instance, beside if gate else "")
-                   or (devapp._risk_gate(project, instance, ack) if gate or devapp.on_own_machine(project, instance) else ""))
+                   or (devapp._risk_gate(project, instance, ack) if gate or not approved or devapp.on_own_machine(project, instance)
+                       else devapp.ack_risks(project, instance)))
 
 
 def run_compose_job(job, run):
@@ -1670,7 +1675,7 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
         r = test(project, instance, test_cmd,
                  [str(a) for a in (req.get("args") or [])][:32])
     elif action == "rebuild":
-        r = rebuild(project, instance, f(req, "ack"), gate=gate, beside=f(req, "beside"))
+        r = rebuild(project, instance, f(req, "ack"), gate=gate, beside=f(req, "beside"), approved=gate)
     elif action == "override":
         # The compose file laid over this one, or none: the next build
         # takes it, and what it adds meets the gates as the base file's does.
@@ -1782,6 +1787,17 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     # Auto is Ask there: what a session builds waits for a person (B743).
     if sess and dial == "auto" and devapp.on_own_machine(project, instance):
         dial = "ask"
+    # Auto runs at once unless the compose reaches the host (the operator,
+    # 10 Nov): a build whose file asks for more than its own folder, which
+    # no person has acknowledged, is put to a person with the list, and
+    # their Allow acknowledges it, so the same file is asked about once.
+    if sess and dial == "auto" and action == "rebuild":
+        reach = devapp.unacked_risks(project, instance)
+        if reach:
+            dial = "ask"
+            req = dict(req, why=("Its compose file asks for more than its own folder: " + "; ".join(reach[:4])
+                                 + (" …" if len(reach) > 4 else "") + ". "
+                                 + str(devapp.field(req, "why") or "")).strip()[:600])
     # An override on a container that exists is a person's under ask: a
     # session names one for a new container (new's override), which the
     # request carries to Allow.

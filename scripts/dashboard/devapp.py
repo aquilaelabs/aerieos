@@ -4573,12 +4573,40 @@ def _risk_gate(project, instance=MAIN, ack=""):
     # shown, once, and it holds until the compose asks for more. Taking the
     # risky lines out of the compose is the move the bare refusal suggested,
     # and it broke the container it was for (24 Sep, a PUID/PGID image that
-    # needs CHOWN and SETUID). A session's build never meets this: its
-    # project's Run its container setting is its answer (rebuild's `gate`).
+    # needs CHOWN and SETUID). A session's build on auto is put in front of
+    # a person with this list (devactions.request), whose Allow acknowledges
+    # it (ack_risks); it meets this only when the file changed after that.
     return ("this compose asks for more than its own directory: "
             + "; ".join(rs[:3]) + (" …" if len(rs) > 3 else "")
             + ". A person acknowledges that once by pressing Build or Rebuild on its row "
               "on the Containers page, where the list is shown")
+
+
+def unacked_risks(project, instance=MAIN):
+    """What this compose asks for beyond its own directory that no person
+    has acknowledged yet, or []: what a session's build on auto waits for a
+    person over (the operator, 10 Nov: auto runs at once unless the file
+    reaches the host)."""
+    rs = risks(project, _config(project, instance))
+    if not rs or _read_rec(project, instance).get("risks_ack") == risk_digest(rs):
+        return []
+    return rs
+
+
+def ack_risks(project, instance=MAIN):
+    """A person's yes to a build (Allow on a session's question, or
+    AerieOS's own container deployed from its page) is their yes to what its
+    compose asks for as it stands: kept as the row's own press keeps it, so
+    the same file is not asked about again. "" always: no gate."""
+    rs = risks(project, _config(project, instance))
+    if rs:
+        d = risk_digest(rs)
+        with _lock:
+            store = _load()
+            if _rec(store, project, instance).get("risks_ack") != d:
+                _rec(store, project, instance)["risks_ack"] = d
+                write_json(FILE, store)
+    return ""
 
 
 # ---- what a build ships beside the app (the operator, 17 Oct) -------------

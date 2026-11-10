@@ -4145,11 +4145,12 @@ ok(await page.$('#devSend'),
     }, inst);
     await dial('auto');
     // A compose asking for more than its own directory is confirmed by a
-    // person pressing Build; a session's build follows its project's Run its
-    // container setting instead, like every other container (the operator,
-    // 26 Sep, after a session on auto was stopped there): auto builds it,
-    // and at ask the person's Allow is the confirmation. A person's own
-    // rebuild without it is still refused, on its job.
+    // person: their own press of Build, or their Allow. A session's build
+    // on auto runs at once unless the file reaches the host (the operator,
+    // 10 Nov; before, auto built it unasked): then it is put to a person
+    // with the list, their Allow acknowledges it, and the same file is not
+    // asked about again. A person's own rebuild without the confirmation is
+    // still refused, on its job.
     writeFileSync(`${DIR}/dockerstate/riskynew.config`, JSON.stringify(
       { services: { app: { build: { context: '.' }, privileged: true } } }));
     const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
@@ -4161,12 +4162,22 @@ ok(await page.$('#devSend'),
       }
       return j || {};
     };
+    const allowIt = async id => {
+      await page.evaluate(async (id) => {
+        await fetch('/api/phone', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'allow', id }) });
+      }, id);
+      return (await fetch(URL.replace(/\/$/, '') + '/api/phone', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ action: 'outcome', id }) })).json();
+    };
     const rn = await asSession({ project: 'ep.silon', action: 'new', instance: 'riskynew' });
-    const rr = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew' });
-    const rj = await jobEnd(rr.job);
-    ok(rn.status === 200 && !rn.needs_ack && rr.status === 200 && rj.state === 'succeeded',
-       `on auto a session makes and builds a compose that asks for more than its own directory (${
-          rn.error || 'made'}; ${rj.state}: ${String(rj.error || '').slice(0, 80)})`);
+    const rr = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew', why: 'first build' });
+    const asked = rr.id ? (await (await fetch(URL.replace(/\/$/, '') + '/api/phone', { headers: H })).json()) : {};
+    const row = JSON.stringify(asked).match(/Its compose file asks for more than its own folder[^"]{0,120}/)?.[0] || '';
+    ok(rn.status === 200 && rr.status === 200 && rr.id && !rr.job && /runs privileged/.test(row) && /first build/.test(row),
+       `on auto a session's build of a compose that asks for more than its own directory is put to a person, with the list (${
+          rn.error || 'made'}; ${rr.error || rr.job || rr.id}: ${row.slice(0, 90)})`);
     const mine = await page.evaluate(async () => (await (await fetch('/api/devapp', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project: 'ep.silon', instance: 'riskynew', action: 'rebuild', ack: '' }) })).json()));
@@ -4174,6 +4185,13 @@ ok(await page.$('#devSend'),
     ok(mj.state === 'failed' && /Build or Rebuild on its row on the Containers page/.test(mj.error || ''),
        `...while a person's own rebuild without the confirmation is still refused, on its job (${mj.state}: ${
           String(mj.error || '').slice(0, 60)})`);
+    const ao = await allowIt(rr.id);
+    const aoj = await jobEnd(ao.out);
+    const again = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew' });
+    const againJ = await jobEnd(again.job);
+    ok(ao.state === 'done' && aoj.state === 'succeeded' && again.job && !again.id && againJ.state === 'succeeded',
+       `...their Allow builds it and acknowledges the list, so the same file builds at once on auto after that (${
+          ao.state}; ${aoj.state}; ${again.job ? againJ.state : 'asked again'}: ${String(againJ.error || '').slice(0, 60)})`);
     await dial('ask');
     const ra = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew',
                                  why: 'the privileged one again' });

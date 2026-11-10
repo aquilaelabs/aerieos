@@ -197,10 +197,11 @@ class BehindTheWall(unittest.TestCase):
 
 
 class ASessionsBuild(unittest.TestCase):
-    def run_it(self, dial, own):
+    def run_it(self, dial, own, reach=()):
         act, ask = mock.Mock(return_value=({"ok": True}, 200)), mock.Mock(return_value={"ok": True, "asked": True})
         with mock.patch.object(devactions, "act", act), mock.patch.object(devactions, "ask_rebuild", ask, create=True), \
                 mock.patch.object(devactions.devapp, "on_own_machine", lambda *a: own), \
+                mock.patch.object(devactions.devapp, "unacked_risks", lambda *a: list(reach)), \
                 mock.patch.object(devactions.devapp, "pname", lambda p, i: p), \
                 mock.patch.object(devactions.devapp, "field", lambda req, k: "", create=True), \
                 mock.patch.object(devactions, "say", lambda *a: None, create=True), \
@@ -214,6 +215,11 @@ class ASessionsBuild(unittest.TestCase):
 
     def test_auto_anywhere_else_is_auto(self):
         self.assertEqual(self.run_it("auto", False), (True, False))
+
+    def test_auto_waits_for_a_person_when_the_compose_reaches_the_host(self):
+        # The operator, 10 Nov: auto runs at once unless the file asks for
+        # more than its own folder that no person has acknowledged.
+        self.assertEqual(self.run_it("auto", False, reach=["app runs privileged: root on the host, in effect"]), (False, True))
 
 
 if __name__ == "__main__":
