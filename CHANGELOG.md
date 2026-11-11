@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Each signing key can have a spare, so a key that is lost or has to be replaced no longer cuts installs off: a release may name a second key for the catalog and for agent updates, an install reads a catalog signed by either, and a node takes an agent update signed by either. Upgrading: a node enrolled before a spare is named pins it when its Enroll script is run again, and its row says so under Updates until then (23c0207)
+
 ### Changed
 
 - The catalog is signed by a new key, which this release carries. Upgrading: an install on 0.9.0-dev.5221 or earlier keeps the catalog it last read and refuses newer ones (its Library says the index's signature does not match) until it is updated to this release; nothing installed is affected (2713dd2)
