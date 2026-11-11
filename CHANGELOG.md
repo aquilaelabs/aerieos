@@ -25,6 +25,7 @@
 - aerie changelog missing, and a release's own check for bugs owed a Fixed line, no longer run past three minutes and end with nothing said on a space with hundreds of fixed bugs (879e7c2)
 - The Enroll script's last lines say the machine's address again, where they printed 'my_ip: command not found' (874b4d1)
 - Home's updates due counts updates only: a failing disk, a hot one or a restart owed is no longer one (874b4d1)
+- The installer ISO installs on a blank machine, a VM included: it stopped at an (initramfs) prompt on any machine that did not already hold an AerieOS disk, and could not lay a disk out past that. The ISO of 0.9.0-dev.5173 and before cannot install; take one built after this (9dfe8e2)
 
 ### Security
 
