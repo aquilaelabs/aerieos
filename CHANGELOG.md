@@ -12,6 +12,7 @@
 - Moving a controller from or onto a machine of its own (an AerieOS stick or disk, or a bare-metal install) carries its secrets files and ssh keys, where you were told to copy them by hand as root. Anything in them that is not a plain secret is left out and named (202a994)
 - A file in the secrets folder is read as plain NAME=value lines and never run. Upgrading: a line there that is not a plain value (one with $( ), backticks, a $VARIABLE in double quotes, or a command of its own) is no longer honored and the controller's log names it: write the value out in full, in single quotes. A line that sets PATH or the like is left out too; it used to stop the controller starting (4789074)
 - A catalog entry written in a newer pack format than this AerieOS reads says so on its Library card (Needs AerieOS X or newer) and is not fetched; it used to be refused only when you pressed Install. The format now has a number that only grows, so a pack that works today keeps working (f44c779)
+- The Library says who stands behind each card as Built by Aerie, Verified or Vetted, where it said official or vetted: Built by Aerie is what AerieOS ships or its maintainers wrote, Verified a verified vendor's own pack, Vetted anybody's pack the maintainers reviewed (dee246b)
 
 ### Fixed
 
