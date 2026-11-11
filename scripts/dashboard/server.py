@@ -5444,7 +5444,7 @@ reports.node_name = lambda p: ((nodes.node(prefs.get(p)["node"]) or {}).get("nam
 reports.audit = db.audit
 diag.configure(image_stamp=image_stamp, uptime=uptime, doctor_payload=doctor.payload,
                settings=settings, nodes=nodes, db=db, log_dir=logs.log_dir,
-               plugins=plugins, users=users, reports=reports, state_dir=lambda: STATE)
+               plugins=plugins, users=users, reports=reports, state_dir=lambda: STATE, tunnel=tunnel)
 # A person's devices (R272): their tokens, and the door their apps sync a
 # project through as a node does (wssync), as far as the editor's door lets
 # that person (ftp.access_for).

@@ -37,6 +37,18 @@ for name, v in d.items():
         print("\n".join(f"  {x}" for x in v) or "  none recorded")
     elif name == "settings":
         print("\n".join(f"  {k} = {val}" for k, val in v.items()) or "  none")
+    elif name == "tunnel":
+        if not v.get("configured"):
+            print(f"  no token set{'' if v.get('installed') else '; cloudflared is not in this image'}")
+        else:
+            state = ("registered" if v.get("registered") else "running, not registered") if v.get("running") else "not running"
+            reach = {True: "its name reaches this controller", False: "its name does NOT reach this controller"}.get(v.get("reaches"), "its name not asked yet")
+            print(f"  {v.get('host') or 'no hostname set'}: {state}{', since ' + v['since'] if v.get('since') else ''}; {reach}")
+            for k in ("said", "error"):
+                if v.get(k):
+                    print(f"    {v[k]}")
+            for line in v.get("tail") or []:
+                print(f"    | {line}")
     elif name == "doctor":
         print(f"  ran {v.get('when')}")
         for c in v.get("checks") or []:

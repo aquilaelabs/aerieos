@@ -35,6 +35,7 @@ doctor_payload = None     # () -> the Doctor card's payload
 settings = None           # the settings module
 nodes = None              # the node registry
 db = None                 # the store
+tunnel = None             # tunnel.py: the home tunnel's process, or None
 plugins = None            # plugins.py: each account's Claude plugins
 reports = None            # reports.py: problems with AerieOS, from any project's session
 users = None              # the account store, for names
@@ -42,8 +43,8 @@ log_dir = None            # () -> Path of the controller's logs
 state_dir = None          # () -> Path of /config, for its state version
 IMAGE_LOG = Path(os.environ.get("BB_IMAGE_LOG") or f"{os.environ.get('DASHBOARD_STATE') or '/config'}/image-log.tsv")
 
-SECTIONS = ("controller", "images", "settings", "doctor", "nodes", "plugins", "jobs", "errors", "audit",
-            "reports")
+SECTIONS = ("controller", "images", "settings", "tunnel", "doctor", "nodes", "plugins", "jobs", "errors",
+            "audit", "reports")
 
 
 def configure(**deps):
@@ -128,7 +129,25 @@ def images(n=8):
 def settings_now():
     got = settings.payload() if hasattr(settings, "payload") else {}
     vals = (got or {}).get("settings") or {}
-    return {k: (v.get("value") if isinstance(v, dict) else v) for k, v in vals.items()}
+    # A secret is never shown, and one that is set says so: an empty line
+    # read as "no token" for a tunnel that had one, sealed.
+    return {k: ("(set, not shown)" if isinstance(v, dict) and v.get("set") else
+                v.get("value") if isinstance(v, dict) else v) for k, v in vals.items()}
+
+
+def tunnel_now():
+    """The home tunnel as the controller has it: whether cloudflared is here,
+    running and registered, whether its name reaches this controller, and its
+    last lines. Why a node dialing in from outside went quiet is read here."""
+    st = tunnel.status() if tunnel is not None else {}
+    reach = st.get("route") or {}
+    return {"installed": bool(st.get("installed")), "configured": bool(st.get("configured")),
+            "host": st.get("host") or "", "running": bool(st.get("running")),
+            "registered": bool(st.get("connected")),
+            "since": _ago(st["since"]) if st.get("since") else "",
+            "reaches": reach.get("ok"), "said": redact(reach.get("said") or ""),
+            "error": redact(st.get("error") or ""),
+            "tail": [redact(x) for x in st.get("tail") or []]}
 
 
 def doctor():
@@ -234,7 +253,7 @@ def reports_now(n=40):
             for r in reports.listing(n=n)]
 
 
-_BUILD = {"controller": controller, "images": images, "settings": settings_now,
+_BUILD = {"controller": controller, "images": images, "settings": settings_now, "tunnel": tunnel_now,
           "doctor": doctor, "nodes": nodes_now, "plugins": plugins_now, "jobs": jobs, "errors": errors,
           "audit": audit, "reports": reports_now}
 

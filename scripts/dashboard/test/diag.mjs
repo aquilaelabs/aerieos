@@ -38,6 +38,9 @@ const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:
   ok(r.status === 200 && ['controller', 'images', 'settings', 'doctor', 'nodes', 'jobs', 'errors', 'audit']
        .every(s => secs.includes(s)),
      `an administrator reads the whole report (${r.status}: ${secs.join(',')})`);
+  ok(typeof r.body.tunnel?.running === 'boolean' && typeof r.body.tunnel?.registered === 'boolean'
+     && Array.isArray(r.body.tunnel?.tail) && !('ids' in r.body.tunnel),
+     `...the home tunnel's state among it, with nothing of its token (${JSON.stringify(r.body.tunnel)})`);
   ok(typeof r.body.controller?.agent_shipped === 'string' && 'debug_mode' in (r.body.settings || {})
      && Array.isArray(r.body.doctor?.checks) && typeof r.body.jobs?.last_24h === 'object',
      '...with the build it ships, the switches, the doctor and the jobs in it');

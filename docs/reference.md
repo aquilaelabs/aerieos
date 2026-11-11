@@ -767,7 +767,9 @@ aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
                    anything else is refused, not run
 aerie diag [--json] [SECTION...]
                    the controller's diagnostics, read-only: its build and the
-                   images it ran, its switches, the doctor's every check, each
+                   images it ran, its switches, the home tunnel (running,
+                   registered, whether its name reaches here, its last lines),
+                   the doctor's every check, each
                    node's agent and session half, the Claude plugins each
                    account installed on each node, the last day's jobs and the
                    failures, error lines from its own logs and the audit
