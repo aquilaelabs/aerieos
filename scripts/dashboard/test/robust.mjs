@@ -65,6 +65,17 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
   const js = await get('/nb-history.js?v=' + (v1 ? v1[1] : ''));
   ok(js.status === 200 && /javascript/.test(js.type),
      `...which the server answers under that name (${js.status})`);
+  // Under its own version a script is this file as it is now and nothing
+  // else, so the browser keeps it without asking; under one the file has
+  // moved past, or none, it asks first as before.
+  ok(/immutable/.test(js.cache) && /max-age=31536000/.test(js.cache) && /private/.test(js.cache),
+     `...and says to keep for good, with no question on the next load (${js.cache})`);
+  const stale = await get('/nb-history.js?v=' + (v ? v[1] : ''));
+  ok(stale.status === 200 && /no-cache/.test(stale.cache) && !/immutable/.test(stale.cache),
+     `...while the version it has moved past is still asked about (${stale.cache})`);
+  const held = await get('/nb-history.js?v=' + (v1 ? v1[1] : ''), { 'If-None-Match': js.tag });
+  ok(held.status === 304 && /immutable/.test(held.cache), `...and an unchanged one comes back 304 (${held.status})`);
+  ok(!/immutable/.test(g1.cache) && /no-cache/.test(g1.cache), `the page itself is always asked about (${g1.cache})`);
 }
 
 const browser = await launch();

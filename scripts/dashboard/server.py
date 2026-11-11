@@ -3507,6 +3507,8 @@ def page_scripts():
 
 
 _sri = {}
+# What _static last sent of each file, by (file, compressed or not).
+_static_kept = {}
 
 
 def _integrity_of(name, version):
@@ -7890,36 +7892,67 @@ class Handler(BaseHTTPRequestHandler):
         of a few bytes and the new bytes arrive the moment the file changes.
         The tag is the file's own size and mtime, which is what changes when
         an image does, and costs one stat rather than a hash of 700KB.
+
+        A script the page names with its version (?v=, _versioned_page) is
+        another matter: that address is only ever this file as it is now, so
+        a browser that has it need not ask at all. Asked for under its own
+        version it is kept for good; under no version, or one the file has
+        moved past, it is asked about as before. Eighty-one scripts were
+        eighty-one questions on every load, each answered by reading and
+        compressing the file before looking at what the browser held.
         """
         try:
             st = (HERE / rel).stat()
-            raw = (HERE / rel).read_bytes()
         except OSError:
             return self._json({"error": "not found"}, 404)
-        tag = f'W/"{st.st_size:x}-{st.st_mtime_ns:x}"'
-        if rel == "index.html":
+        version = f"{st.st_size:x}-{st.st_mtime_ns:x}"
+        tag = f'W/"{version}"'
+        page = rel == "index.html"
+        asked = urllib.parse.parse_qs(self.path.partition("?")[2]).get("v", [""])[0]
+        cache = "private, max-age=31536000, immutable" if not page and asked == version else "no-cache"
+        raw = None
+        if page:
+            try:
+                raw = (HERE / rel).read_bytes()
+            except OSError:
+                return self._json({"error": "not found"}, 404)
             raw, tag = _versioned_page(raw, tag)
-            raw = (raw.replace(b"<title>AerieOS</title>", b"<title>" + PRODUCT.encode() + b"</title>", 1)
-                   .replace(b"<h1>AerieOS</h1>", b"<h1>" + PRODUCT.encode() + b"</h1>", 1))
-        body, zipped = self._gzip(raw)
         if self.headers.get("If-None-Match") == tag:
             self.send_response(304)
             self.send_header("ETag", tag)
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", cache)
             return self.end_headers()
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        if ctype.startswith("text/html"):
+        wants = "gzip" in self.headers.get("Accept-Encoding", "")
+        kept = _static_kept.get((rel, wants))
+        if kept and kept[0] == tag:
+            _, body, zipped, policy = kept
+        else:
+            if raw is None:
+                try:
+                    raw = (HERE / rel).read_bytes()
+                except OSError:
+                    return self._json({"error": "not found"}, 404)
+            if page:
+                raw = (raw.replace(b"<title>AerieOS</title>", b"<title>" + PRODUCT.encode() + b"</title>", 1)
+                       .replace(b"<h1>AerieOS</h1>", b"<h1>" + PRODUCT.encode() + b"</h1>", 1))
+            body, zipped = self._gzip(raw)
             # The page's policy (R158 step 4): its own scripts and styles,
             # the inline blocks it ships by their hash.
-            self.send_header("Content-Security-Policy", csp.header(raw))
+            policy = csp.header(raw) if ctype.startswith("text/html") else ""
+            # What was sent, kept while the file is as it was: one entry a
+            # file and a way of sending it, replaced when the file moves.
+            _static_kept[(rel, wants)] = (tag, body, zipped, policy)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        if policy:
+            self.send_header("Content-Security-Policy", policy)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Referrer-Policy", "same-origin")
         if zipped:
             self.send_header("Content-Encoding", "gzip")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("ETag", tag)
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", cache)
         self.end_headers()
         return self.wfile.write(body)
 
@@ -8140,8 +8173,16 @@ class Handler(BaseHTTPRequestHandler):
                 body = (HERE / "static" / name).read_bytes()
             except OSError:              # a checkout that predates the assets
                 return self._json({"error": "not found"}, 404)
+            # The .ico is several sizes of uncompressed bitmap, a third of a
+            # megabyte as it sits and a thirtieth of that compressed.
+            zipped = False
+            if name.endswith((".ico", ".svg")):
+                body, zipped = self._gzip(body)
             self.send_response(200)
             self.send_header("Content-Type", ctype)
+            if zipped:
+                self.send_header("Content-Encoding", "gzip")
+                self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(body)))
             # A day: the icon changes when the image does, and a stale tab
             # icon for a day is invisible next to re-fetching it every poll.
