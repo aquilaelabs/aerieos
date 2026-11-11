@@ -47,18 +47,18 @@ jobs:
           set -euo pipefail
           # The runner's first apt mirror is Azure's. When that name does not
           # resolve, apt gives up on every package rather than going on to
-          # the next mirror, and a release's image build failed on it twice
-          # (11 Nov): the mirror is left out then, and once more if apt
-          # fails with it in.
-          no_azure() { sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt 2>/dev/null || true; }
-          apt_tools() {
-            sudo apt-get update -qq -o Acquire::Retries=3 &&
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"
+          # the next mirror, after a quarter of an hour of trying, and a
+          # release's image build failed on it twice (11 Nov). The archive's
+          # own mirrors are the next lines of the list: Azure's is left out.
+          no_azure() {
+            if [ -f /etc/apt/apt-mirrors.txt ] && grep -v 'azure\.archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt | grep -q ubuntu; then
+              sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+            fi
           }
-          getent hosts azure.archive.ubuntu.com >/dev/null 2>&1 || no_azure
-          tools="squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils"
-          # shellcheck disable=SC2086  # a list of package names
-          apt_tools $tools || { echo "apt failed: once more without the runner's Azure mirror"; no_azure; apt_tools $tools; }
+          no_azure
+          sudo apt-get update -qq -o Acquire::Retries=3
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 \
+            squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.
           snap="$(tr -d '[:space:]' < image/SNAPSHOT)"
@@ -156,17 +156,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # As the build's own tools step: without the runner's Azure mirror
-          # when its name does not resolve, and once more if apt fails.
-          no_azure() { sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt 2>/dev/null || true; }
-          apt_tools() {
-            sudo apt-get update -qq -o Acquire::Retries=3 &&
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"
-          }
-          getent hosts azure.archive.ubuntu.com >/dev/null 2>&1 || no_azure
-          tools="qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk"
-          # shellcheck disable=SC2086  # a list of package names
-          apt_tools $tools || { echo "apt failed: once more without the runner's Azure mirror"; no_azure; apt_tools $tools; }
+          # As the build's own tools step: without the runner's Azure mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -v 'azure\.archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt | grep -q ubuntu; then
+            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get update -qq -o Acquire::Retries=3
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
           sudo chmod a+rw /dev/kvm 2>/dev/null || true
       - name: Boot the image and wait for the dashboard
         shell: bash
