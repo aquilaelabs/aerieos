@@ -3727,12 +3727,30 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    and the sessions' states go under them, each a line; the name and the
    repository pulldown give up their width first. */
 @media(max-width:600px){
-  .pane .bar.proj .phead>:is(.pfacts,.pstate,.pstates){order:2}
-  .pane .bar.proj .phead>.pfacts{flex:1 1 100%;max-width:none}
-  .pane .bar.proj .pname{flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-  .pane .bar.proj .phead select.prepos{flex:0 1 auto;max-width:9rem}
-  .pane .bar.proj .phead>.sp{order:1;flex:1 0 0;min-width:0}
-  .pane .bar.proj .phead>:is(button,.more){order:1;flex:0 0 auto}
+  /* A grid, not a wrapping row: a wrapping row breaks before anything in it
+     shrinks, so a longer name with its pulldown and Manage agent sent the
+     menu's button to a line of its own (the operator, 11 Nov). The buttons
+     keep their width; the name is as wide as its words while there is room;
+     the pulldown takes what is left, up to its own width and never under a
+     thumb's, and the name is cut before the pulldown goes under that. */
+  .pane .bar.proj .phead{display:grid;align-items:center;gap:10px 0;
+    grid-template-columns:[name] minmax(0,max-content) [repo] minmax(auto,1000fr) [sp] minmax(0,1fr) [agent] max-content [shell] max-content [more] max-content}
+  .pane .bar.proj .phead>*{grid-column:1 / -1}
+  .pane .bar.proj .phead>:is(.pname,.pfacts,.pstate,.pstates){min-width:0}
+  .pane .bar.proj .phead>.pfacts{max-width:none}
+  .pane .bar.proj .phead>.pname{grid-area:1 / name;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .pane .bar.proj .phead>select.prepos{grid-area:1 / repo;width:calc(100% - 10px);min-width:2.25rem;max-width:max-content;margin-inline-start:10px;justify-self:start}
+  .pane .bar.proj .phead>.sp{grid-area:1 / sp}
+  .pane .bar.proj .phead>button{grid-area:1 / agent;margin-inline-start:10px;white-space:nowrap}
+  .pane .bar.proj .phead>button[data-s]{grid-area:1 / shell}
+  .pane .bar.proj .phead>.more{grid-area:1 / more;margin-inline-start:10px}
+}
+/* ...and on the narrowest phones the buttons sit closer and carry less
+   padding, so the name keeps most of its letters beside them. */
+@media(max-width:380px){
+  .pane .bar.proj .phead>button{padding-inline:8px;margin-inline-start:6px}
+  .pane .bar.proj .phead>.more{margin-inline-start:6px}
+  .pane .bar.proj .phead>select.prepos{margin-inline-start:6px;width:calc(100% - 6px)}
 }
 /* The restart note as a band between the header and the view strip (the
    operator, 28 Oct): tinted, its x at the right. */

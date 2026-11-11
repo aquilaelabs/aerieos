@@ -190,6 +190,32 @@ const browser = await launch();
   const heights = await page.evaluate(() => { const h = e => e ? Math.round(e.getBoundingClientRect().height) : 0;
     return { sel: h(document.querySelector('.pane .bar.proj .phead>select[data-reposw]')), btn: h(document.querySelector('.pane .bar.proj .phead>button')) }; });
   ok(heights.sel && Math.abs(heights.sel - heights.btn) <= 1, `the pulldown is the height of the buttons beside it (${JSON.stringify(heights)})`);
+  // On a phone the name, the pulldown and the actions keep one row (the
+  // operator, 11 Nov: with a longer name and Manage agent the menu's button
+  // went to a line of its own, since a wrapping row breaks before anything
+  // in it gives up width): the name and the pulldown give up theirs.
+  const rows = [];
+  for (const w of [344, 360, 393, 412, 440]){
+    await page.setViewportSize({ width: w, height: 852 });
+    rows.push(await page.evaluate(w => {
+      const h = document.querySelector('.pane .bar.proj .phead');
+      const a = h.querySelector(':scope > button:not([data-s])');
+      const was = a?.textContent;
+      if (a) a.textContent = 'Manage agent';
+      const row = [...h.querySelectorAll(':scope > .pname, :scope > select.prepos, :scope > button, :scope > .more')].filter(e => e.offsetWidth);
+      const mid = row.map(e => { const r = e.getBoundingClientRect(); return Math.round(r.top + r.height / 2); });
+      const said = { w, n: row.length, oneRow: Math.max(...mid) - Math.min(...mid) <= 2,
+        inside: row.every(e => e.getBoundingClientRect().right <= innerWidth + 0.5) && document.documentElement.scrollWidth <= innerWidth,
+        apart: row.every((e, i) => !i || e.getBoundingClientRect().left >= row[i - 1].getBoundingClientRect().right + 4),
+        whole: row.every(e => e.tagName !== 'BUTTON' || e.scrollWidth <= e.clientWidth + 1),
+        pick: Math.round(h.querySelector(':scope > select.prepos').getBoundingClientRect().width) };
+      if (a) a.textContent = was;
+      return said;
+    }, w));
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  ok(rows.every(r => r.n >= 4 && r.oneRow && r.inside && r.apart && r.whole && r.pick >= 32),
+     `on a phone the name, the pulldown, Manage agent, Shell and the menu keep one row at every width, no button cut and the pulldown never under a thumb's width (${JSON.stringify(rows.filter(r => !(r.oneRow && r.inside && r.apart && r.whole && r.pick >= 32)).length ? rows : rows.map(r => r.w + ':' + r.pick))})`);
   await page.selectOption('.pane .bar.proj select[data-reposw]', 'shopweb');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && tabOf(panes[0])?.arg === 'shopweb', null, { timeout: 10000 }).catch(() => {});
   ok(await page.evaluate(() => tabOf(panes[0])?.arg === 'shopweb'), "picking another repository in the pulldown opens its notebook");
