@@ -45,20 +45,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The runner's first apt mirror is Azure's. When that name does not
-          # resolve, apt gives up on every package rather than going on to
-          # the next mirror, after a quarter of an hour of trying, and a
-          # release's image build failed on it twice (11 Nov). The archive's
-          # own mirrors are the next lines of the list: Azure's is left out.
-          no_azure() {
-            if [ -f /etc/apt/apt-mirrors.txt ] && grep -v 'azure\.archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt | grep -q ubuntu; then
-              sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-            fi
+          # The runner's own resolver failed for minutes at a time on 11 Nov
+          # ("Temporary failure resolving" one mirror, then the next, while
+          # the same names answered everywhere else), and a release's image
+          # build died here four times. Public resolvers stand in front of
+          # it for this job, and apt is tried three times before giving up.
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 127.0.0.53\noptions timeout:2 attempts:2\n' | sudo tee /etc/resolv.conf >/dev/null
+          apt_tools() {
+            local n
+            for n in 1 2 3; do
+              if sudo apt-get update -qq -o Acquire::Retries=3 &&
+                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"; then
+                return 0
+              fi
+              echo "apt failed (try ${n} of 3)"
+              sleep 20
+            done
+            return 1
           }
-          no_azure
-          sudo apt-get update -qq -o Acquire::Retries=3
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 \
-            squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils
+          apt_tools squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.
           snap="$(tr -d '[:space:]' < image/SNAPSHOT)"
@@ -156,12 +162,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # As the build's own tools step: without the runner's Azure mirror.
-          if [ -f /etc/apt/apt-mirrors.txt ] && grep -v 'azure\.archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt | grep -q ubuntu; then
-            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          fi
-          sudo apt-get update -qq -o Acquire::Retries=3
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
+          # As the build's own tools step: public resolvers in front of the
+          # runner's own, and apt tried three times.
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 127.0.0.53\noptions timeout:2 attempts:2\n' | sudo tee /etc/resolv.conf >/dev/null
+          apt_tools() {
+            local n
+            for n in 1 2 3; do
+              if sudo apt-get update -qq -o Acquire::Retries=3 &&
+                 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Acquire::Retries=3 "$@"; then
+                return 0
+              fi
+              echo "apt failed (try ${n} of 3)"
+              sleep 20
+            done
+            return 1
+          }
+          apt_tools qemu-system-x86 ovmf mtools grub-common jq e2fsprogs fdisk
           sudo chmod a+rw /dev/kvm 2>/dev/null || true
       - name: Boot the image and wait for the dashboard
         shell: bash
