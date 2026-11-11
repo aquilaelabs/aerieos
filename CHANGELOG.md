@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5221: 2026-11-11
 
 ### Changed
 
@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- Updating OpenCode works again: it failed with 'installed, but no opencode to run' since OpenCode's installer moved where it puts the program. Takes effect once a node's agent has updated (b726ef1)
+- Updating OpenCode works again: it failed with 'installed, but no opencode to run' since OpenCode's installer moved where it puts the program. Takes effect once a node's agent has updated (fb6049b)
 - An agent's update, sign-in and sign-out jobs say what they are on the Jobs page and in aerie jobs, where OpenCode's (and in aerie jobs every agent's) read 'exec' (fb6049b)
 
 ## 0.9.0-dev.5214: 2026-11-11
