@@ -69,6 +69,22 @@ export const steps = {
     for (const c of cards) console.log('-', c.slice(0, 500));
     console.log(page.url());
   },
+  // A backup taken from the controller signed in to: what its bundle would
+  // carry, then the bundle itself, its token and file kept in run/ as a
+  // move's are.
+  async backup({ page, BASE }){
+    await page.goto(BASE); await sleep(4000);
+    const pieces = await page.evaluate(async () => (await (await fetch('/api/move?pieces=1')).json()).pieces || []);
+    for (const p of pieces) console.log('piece:', p.label, '|', p.on ? 'carried' : 'not carried', '|', p.size, 'bytes |', (p.about || '').slice(0, 160));
+    const r = await page.evaluate(async () => (await fetch('/api/move', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'backup', carry_key: false, repos: false, stores: [] }) })).json());
+    if (!r.ok) throw new Error('no backup: ' + (r.error || JSON.stringify(r)));
+    writeFileSync(new URL('run/move-token.txt', import.meta.url), r.token + '\n', { mode: 0o600 });
+    console.log('bundle', r.bundle, r.size, 'bytes; counts', JSON.stringify(r.counts));
+    const got = await page.request.get(BASE + '/api/move-backup?name=' + encodeURIComponent(r.bundle));
+    writeFileSync(new URL('run/moved.aeriemove', import.meta.url), await got.body());
+    console.log('downloaded', (await got.body()).length, 'bytes');
+  },
   // Sign in as an account the moved controller had: signin NAME PASSWORD.
   async signin({ page, BASE, shot, args }){
     await page.goto(BASE + '/login'); await sleep(1500);
