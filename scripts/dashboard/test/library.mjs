@@ -300,8 +300,8 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
 // draw no Configure of their own.
 {
   const RT = '.doc .librarytab .lcard[data-lrow="service:model-router"]';
-  ok(await page.$(RT) !== null && await page.$eval(RT, c => /official/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.disabled === true),
-     'the model router is a Services card, official, its Install dead while nothing is behind it');
+  ok(await page.$(RT) !== null && await page.$eval(RT, c => /built by aerie/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.disabled === true),
+     'the model router is a Services card, built by Aerie, its Install dead while nothing is behind it');
   await toEntry('service:model-router');
   ok(await page.$eval(ENTRY('service:model-router'), c => !c.querySelector('.lcform') && !c.querySelector('[data-signin]') && /Installed page/.test(c.querySelector('.ldetail').textContent)),
      '...and its page is the entry alone, pointing at the Installed page for what is set per node');
