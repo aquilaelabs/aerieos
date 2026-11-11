@@ -179,6 +179,34 @@ class NodeAgent(unittest.TestCase):
         self.assertIn("stub installed 0.163.0", log)
         self.assertIn("Codex CLI 0.163.0 is what a session here runs now", log)
 
+    def test_opencode_is_found_where_its_installer_puts_it(self):
+        # B772: OpenCode's own script installs into ~/.opencode/bin whatever
+        # it is told, so the update ran and then found no program at
+        # ~/.local/bin. The stub does what the script does; the row names
+        # that place, asks the script not to write the shell's files, and a
+        # removal takes the old place away too.
+        row = self.mod.AGENT_INSTALLS["opencode-update"]
+        self.assertEqual(row["bin"], ".opencode/bin/opencode")
+        self.assertIn("--no-modify-path", row["script"])
+        stub = os.path.join(self.tmp.name, "opencode-installer.sh")
+        with open(stub, "w") as f:
+            f.write('mkdir -p "$HOME/.opencode/bin"\n'
+                    'printf "#!/bin/sh\\necho ${VERSION:-0.0.0}\\n" > "$HOME/.opencode/bin/opencode"\n'
+                    'chmod +x "$HOME/.opencode/bin/opencode"\necho "stub installed opencode $VERSION"\n')
+        os.makedirs(os.path.join(self.home, ".local", "bin"))
+        old = os.path.join(self.home, ".local", "bin", "opencode")
+        with open(old, "w") as f:
+            f.write("#!/bin/sh\necho 1.0.0\n")
+        os.chmod(old, 0o755)
+        with mock.patch.dict(os.environ, {"BUILDERBOT_OPEN_INSTALLER": stub}):
+            got, log = self.run_job({"to": "1.19.5"}, type_="opencode-update")
+            self.assertEqual(got, ("succeeded", 0), log)
+            self.assertIn("OpenCode 1.19.5 is what a session here runs now", log)
+            got, log = self.run_job({"action": "remove"}, type_="opencode-update")
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".opencode", "bin", "opencode")))
+        self.assertFalse(os.path.exists(old))
+
     def test_a_job_the_table_does_not_name_is_refused(self):
         got, log = self.run_job({}, type_="exec")
         self.assertEqual(got, ("failed", 78))

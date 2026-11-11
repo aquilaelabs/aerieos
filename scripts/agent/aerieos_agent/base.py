@@ -152,12 +152,16 @@ AGENT_INSTALLS = {
                     "pin": ("BB_PIN", "{v}"), "env": {"GROK_BIN_DIR": "{home}/.local/bin"},
                     "bin": ".local/bin/grok"},
     # OpenCode (R144 step 2), the open agent any model runs through: its
-    # install script takes the version as VERSION and the folder as
-    # OPENCODE_INSTALL_DIR (read off the script on 28 Oct).
+    # install script takes the version as VERSION and puts the program in
+    # ~/.opencode/bin, whatever it is told (read off the script on 11 Nov:
+    # it took OPENCODE_INSTALL_DIR on 28 Oct and no longer does, so an
+    # update installed and then found nothing at ~/.local/bin). Asked not to
+    # write the account's shell files: a session runs the pinned copy. The
+    # old place is still taken away with it on a removal.
     "opencode-update": {"id": "open", "command": "opencode", "product": "OpenCode", "reported": "opencode",
-                        "script": "curl -fsSL https://opencode.ai/install | bash",
-                        "pin": ("VERSION", "{v}"), "env": {"OPENCODE_INSTALL_DIR": "{home}/.local/bin"},
-                        "bin": ".local/bin/opencode"},
+                        "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
+                        "pin": ("VERSION", "{v}"), "env": {},
+                        "bin": ".opencode/bin/opencode", "also": (".local/bin/opencode",)},
 }
 # Claude Code's row in the same shape, for the claude-update job: kept out of
 # AGENT_INSTALLS, which the census and the session PATH read for the agents
