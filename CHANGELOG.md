@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- aerie diag has a tunnel section: whether the home tunnel is running and registered, whether its name reaches this controller, and its last lines; a secret that is set says so in the settings section, where it printed as empty (03d106d)
+
 ### Changed
 
 - Only one controller can run on a configuration folder at a time: a second one started on the same /config stops with the reason, rather than writing over the first (e303494)
@@ -9,10 +13,18 @@
 - With Run its container on auto, a session's build still runs at once, unless its compose file asks for more than its own folder (the host's files, privileges, the Docker socket): then you are asked once, with the list, and your Allow covers that file from then on (0c4735d)
 - A node locked out because a token it had replaced came back now says it may be a machine restored from a snapshot or a backup, and that Enroll script on its row brings it back (ac7e5dc)
 - A node keeps its files in /etc/aerieos and /var/lib/aerieos and runs the service aerieos-agent, under AerieOS's own name. A node from before changes over when its Enroll script is run on it: the folders are renamed with the old names left as links, and builderbot-agent still works as a command. Until then it runs as it did, and both names answer (c850175)
+- A page already loaded once in a browser opens without asking the controller about each of its scripts again: a repeat load was 82 requests and is one (8add20a)
+- An open page no longer reads the whole status every two seconds while a coding session is working: the turning mark in a working session's title is no longer taken for a change (b53ac75)
+- A coding session's tool calls no longer wait about two seconds in every twenty while their gate asked the controller for its whole status, and every aerie command starts about 50 ms sooner (873e79e)
+- A command that acts on a space's tree right after an edit there (aerie git push after a commit, aerie version) no longer waits up to half a minute for the node's own change to come back to it. Takes effect on a node once its agent has updated (fe36377)
+- The Jobs page and Home read a short form of each job rather than the script or configuration it carried: a hundred jobs were over a megabyte, read again whenever any job moved (89a91dd)
 
 ### Fixed
 
 - Installs and space clones that were queued behind another job when the controller restarted are picked up again, or named on the Spaces page as not started, rather than dropped without a word (e303494)
+- aerie changelog missing, and a release's own check for bugs owed a Fixed line, no longer run past three minutes and end with nothing said on a space with hundreds of fixed bugs (879e7c2)
+- The Enroll script's last lines say the machine's address again, where they printed 'my_ip: command not found' (874b4d1)
+- Home's updates due counts updates only: a failing disk, a hot one or a restart owed is no longer one (874b4d1)
 
 ### Security
 
