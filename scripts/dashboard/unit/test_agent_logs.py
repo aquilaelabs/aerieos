@@ -90,6 +90,9 @@ class Dropped(unittest.TestCase):
             j.say(f"{i:02d}" * 10)
         seqs = [c["seq"] for c in j.pending]
         self.assertIn("dropped here", j.pending[0]["chunk"])
+        # The count of what is held, kept as lines come and go, is what the
+        # lines add up to (it was summed again on every line).
+        self.assertEqual(j.held, sum(len(c["chunk"]) for c in j.pending))
         self.assertEqual(seqs, sorted(seqs), "the notice's seq comes before the chunks that were kept")
         self.assertEqual(len(set(seqs)), len(seqs))
 

@@ -1,4 +1,5 @@
 """A job: one piece of work the controller sent, run on its own thread."""
+import collections
 import contextlib
 import json
 import os
@@ -81,7 +82,11 @@ class Job(threading.Thread):
     def __init__(self, agent, job):
         super().__init__(daemon=True, name=job["id"])
         self.agent, self.job = agent, job
-        self.pending, self.seq = [], 0
+        # The lines not yet sent, oldest first, and how many bytes they are:
+        # counted as they come and go. Summed again on every line, a job that
+        # printed faster than it could send took seconds a line, with the
+        # lock held against the heartbeat (20,000 unsent lines: 7.6 s).
+        self.pending, self.seq, self.held = collections.deque(), 0, 0
         self.lock = threading.Lock()
         # A cancel is a fact about the job on the controller's row, and it
         # reaches here two ways: named in a work reply, or as `cancel: true`
@@ -129,19 +134,21 @@ class Job(threading.Thread):
             for i in range(0, len(text), 32 * 1024):
                 self.seq += 1
                 self.pending.append({"seq": self.seq, "chunk": text[i:i + 32 * 1024]})
-            held = sum(len(c["chunk"]) for c in self.pending)
-            if held > self.PENDING_CAP:
+            self.held += len(text)
+            if self.held > self.PENDING_CAP:
                 dropped, at = 0, None
-                while self.pending and held > self.PENDING_CAP // 2:
-                    gone = self.pending.pop(0)
+                while self.pending and self.held > self.PENDING_CAP // 2:
+                    gone = self.pending.popleft()
                     at = gone["seq"] if at is None else at
                     dropped += len(gone["chunk"])
-                    held -= len(gone["chunk"])
+                    self.held -= len(gone["chunk"])
                 # At the seq of the first chunk that went, which the
                 # controller orders by: with a new one it read as after the
                 # chunks that were kept, not where the gap is.
-                self.pending.insert(0, {"seq": at, "chunk": f"[{dropped} bytes of output dropped here: "
-                                        "the controller was unreachable and this job kept talking]\n"})
+                note = (f"[{dropped} bytes of output dropped here: "
+                        "the controller was unreachable and this job kept talking]\n")
+                self.pending.appendleft({"seq": at, "chunk": note})
+                self.held += len(note)
 
     BATCH = 40 * 1024      # under the controller's 64KB body cap, with headroom
     # How long a job's end may be refused by a controller that is answering
@@ -167,7 +174,8 @@ class Job(threading.Thread):
                     more = len(json.dumps(self.pending[0]["chunk"]))
                     if batch and size + more > self.BATCH:
                         break
-                    batch.append(self.pending.pop(0))
+                    batch.append(self.pending.popleft())
+                    self.held -= len(batch[-1]["chunk"])
                     size += more
             if not batch:
                 with self.lock:
@@ -194,12 +202,14 @@ class Job(threading.Thread):
             if st in (400, 401, 403, 404, 413):
                 with self.lock:
                     left = len(self.pending)
-                    self.pending = []
+                    self.pending.clear()
+                    self.held = 0
                 log(f"{self.job['id']}: log refused ({st}); dropping {len(batch) + left} chunk(s)")
                 return True
             if st != 200:
                 with self.lock:
-                    self.pending = batch + self.pending
+                    self.pending.extendleft(reversed(batch))
+                    self.held += sum(len(c["chunk"]) for c in batch)
                 self.refused = st
                 return False
             self._answered(r)

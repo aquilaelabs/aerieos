@@ -388,6 +388,32 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(self.at("n2", "src/new.py")), "new\n")
         self.assertFalse(os.path.exists(self.at("n2", "src/b.py")))
 
+    def test_a_nodes_own_save_leaves_it_at_the_controllers_revision(self):
+        # What a verb that acts on the tree waits for (lib/syncwait.py down):
+        # this copy at the controller's revision. A node's own change is at
+        # it as it lands, with no pull and no wait for the next ask.
+        self.turn()
+        n1 = self.n["n1"]
+        pulls = []
+        real = n1.pull
+        n1.pull = lambda p, top: (pulls.append(p.name), real(p, top))[1]
+        write(self.at("n1", "a.txt"), "two\n")
+        write(self.at("n1", "src/new.py"), "new\n")
+        self.turn("n1")
+        self.assertEqual(n1.status()["alpha"]["rev"], ctl_sync.rev_of("alpha"))
+        self.assertNotIn("alpha", pulls)
+        # ...and one that crossed another's change reads that change on the
+        # same tick, where it would have stayed a revision behind.
+        write(self.at("n1", "a.txt"), "three\n")
+        n1.step()                                # seen, held still for a tick
+        write(f"{self.ws}/alpha/other.txt", "from the controller\n")
+        ctl_sync.changed("alpha")
+        Nodes.hints.clear()                      # the hint is not what this is about
+        n1.step()
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "three\n")
+        self.assertEqual(read(self.at("n1", "other.txt")), "from the controller\n")
+        self.assertEqual(n1.status()["alpha"]["rev"], ctl_sync.rev_of("alpha"))
+
     def test_a_write_on_the_controller_reaches_both_nodes(self):
         self.turn()
         write(f"{self.ws}/alpha/a.txt", "from vs code\n")

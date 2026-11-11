@@ -905,4 +905,16 @@ class WorkspaceSync:
         else:
             p.files[rel] = [sha, *e]
         p.error = ""
+        # The revision the controller is at now that it has this change. One
+        # past ours means this change and nothing else, so this copy is at
+        # it too; further means something else landed between, read on this
+        # same tick. Left for the next ask (half a minute apart), a verb that
+        # acts on the tree waited that long for this node's own change to
+        # come back to it: aerie git push after a commit, up to 28 seconds.
+        rev = r.get("rev")
+        if isinstance(rev, int) and not isinstance(rev, bool):
+            if rev == p.rev + 1:
+                p.rev = rev
+            elif rev > p.rev:
+                p.hinted = True
         return True
