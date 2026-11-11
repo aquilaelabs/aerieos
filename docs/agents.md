@@ -164,11 +164,14 @@ controller hands to the node with every install, update and removal:
 | `fresh` | The folder a named version is read from, with `{v}` (Claude Code's `versions` folder), or empty. |
 
 A release carries each recipe, so an install with no network works as
-before. Where the catalog's signed index pins an agent's pack whose `rev`
-is higher than the release's, the controller fetches that pack at the
-pinned commit, checks its archive's sha256 and the recipe's shape, and
-hands the node the catalog's recipe instead: the job's first line then
-says `by the catalog's recipe (rev N)`. So when a vendor changes its
+before. The catalog's signed index says each agent's recipe `rev` beside
+its pin (`install_rev`). Where that is higher than the release's, the
+controller fetches the pack at the pinned commit, checks its archive's
+sha256 and the recipe's shape, and hands the node the catalog's recipe
+instead: the job's first line then says `by the catalog's recipe (rev N)`.
+It is read once per commit, behind the Library as the page opens, so a
+press on Update does not wait for it; where nothing is newer, which is
+nearly always, nothing is fetched at all. So when a vendor changes its
 installer, the answer is a catalog commit and a maintainer's signature,
 and no install waits for a release. A catalog that does not answer, a
 pack that is refused, or one no newer than the release leaves the

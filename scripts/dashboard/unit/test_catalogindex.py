@@ -73,6 +73,21 @@ class Index(unittest.TestCase):
         self.assertIsNone(r5["index"])
         self.assertEqual(len(catalogindex.index("https://catalog.example/", opener=down)["index"]["packs"]), 1)
 
+    def test_the_index_as_last_read_is_answered_without_asking(self):
+        # What a press on Update reads: never the network.
+        self.assertIsNone(catalogindex.known("https://catalog.example/"))
+        data, sig = self.signed([ENTRY])
+        catalogindex.fetch("https://catalog.example/", opener=lambda u: data if u.endswith("index.json") else sig.encode())
+        asked = []
+        real = catalogindex.urllib.request.urlopen
+        catalogindex.urllib.request.urlopen = lambda *a, **k: asked.append(a) or (_ for _ in ()).throw(OSError("asked"))
+        self.addCleanup(setattr, catalogindex.urllib.request, "urlopen", real)
+        self.assertEqual([p["name"] for p in catalogindex.known("https://catalog.example/")["packs"]], ["ghidra"])
+        catalogindex._cache.update(at=0.0, index=None, error="")
+        self.assertEqual([p["name"] for p in catalogindex.known("https://catalog.example/")["packs"]], ["ghidra"], "from the copy kept under the state")
+        self.assertIsNone(catalogindex.known("https://other.example/"))
+        self.assertEqual(asked, [])
+
     def test_without_a_shipped_key_nothing_is_trusted(self):
         catalogindex.PUB_FILE = os.path.join(self.d, "none.pub")
         data, sig = self.signed([ENTRY])
@@ -118,6 +133,17 @@ class Kinds(unittest.TestCase):
 
 
 class Shipped(unittest.TestCase):
+    def test_a_coding_agent_s_entry_says_its_recipe_s_rev(self):
+        # R169 step 13: an install fetches an agent's pack only when the
+        # index says its install recipe is newer than the release's.
+        packs = [dict(ENTRY, name="open", tier="official", path="packs/agents/open", install_rev=3),
+                 dict(ENTRY, name="grok", tier="official", path="packs/agents/grok", install_rev="3"),
+                 dict(ENTRY, name="codex", tier="official", path="packs/agents/codex", install_rev=True),
+                 ENTRY]
+        idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": packs}).encode())
+        self.assertEqual(why, "")
+        self.assertEqual([p.get("install_rev") for p in idx["packs"]], [3, None, None, None])
+
     def test_the_image_carries_the_key_the_index_is_checked_against(self):
         # Left out, every released install said it ships no catalog key and
         # trusted no index (B451); a bare-metal install lays out by the same lines.

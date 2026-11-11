@@ -4864,8 +4864,10 @@ def _catalog_pin(url, commit, sha256, path=""):
 def _catalog_official(name):
     """The signed index's official pack entry of this name, withdrawn ones
     left out, or None: where a shipped coding agent's install recipe is
-    read when the catalog's is newer than this release's (R169 step 13)."""
-    return next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
+    read when the catalog's is newer than this release's (R169 step 13).
+    From the index as last read, never asked for now: a press on Update
+    reads this, and the Library's own read keeps the index fresh."""
+    return next((e for e in (catalogindex.known(settings.get("catalog_url") or None) or {}).get("packs") or []
                  if e["name"] == name and e.get("tier") == "official" and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
 
 
@@ -12585,6 +12587,10 @@ class Handler(BaseHTTPRequestHandler):
         may_install = not users.may(who, "toolchains-write")
         may_apps = not users.may(who, "docker-write")
         cat = catalogindex.index(settings.get("catalog_url") or None) if may_install or may_apps else {}
+        # A newer install recipe the catalog pins for a coding agent is read
+        # now, behind the page, so a press on Update finds it (R169 step 13).
+        if may_install and not NODES_OK:
+            agentcode.warm()
         # An app's row opens on its compose file (step 2), so it rides along.
         napps = [{**a, "compose": nasapps._all().get(a["id"], {}).get("compose", "")} for a in nasapps.catalog()] if may_apps else []
         # ...and an agent's on what this person added to it there (the Installed page's Yours).

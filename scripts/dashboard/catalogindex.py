@@ -94,6 +94,12 @@ def parse(index_bytes):
                     "tier": "official" if p.get("tier") == "official" else "vetted", "withdrawn": p.get("withdrawn") is True,
                     "about": str(p.get("about") or "")[:400],
                     "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]})
+        # A shipped coding agent's entry says its install recipe's rev (R169
+        # step 13), so an install fetches the pack only when that is higher
+        # than the recipe its release carries.
+        rev = p.get("install_rev")
+        if isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999:
+            out[-1]["install_rev"] = rev
     return {"generated": str(d.get("generated") or "")[:40], "packs": out}, ""
 
 
@@ -183,6 +189,17 @@ def index(url=None, fresh=False, opener=None):
     with _lock:
         _cache["missed"] = {"base": base, "at": time.time(), "error": r["error"]} if r.get("error") else {}
     return {"index": r.get("index"), "error": r.get("error", "")}
+
+
+def known(url=None):
+    """The index as last read from this address (or the imported mirror's),
+    never asked for now: what a press reads, which must not wait for the
+    network. None when there is none yet."""
+    base = (url or DEFAULT_URL).rstrip("/") + "/"
+    with _lock:
+        if _cache["index"] and _cache["index"].get("url", base) == base:
+            return _cache["index"]
+    return _fallback(base)
 
 
 def withdrawn(installed_names):

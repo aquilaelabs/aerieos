@@ -39,6 +39,7 @@ catalog_entry = None       # server: the signed index's official entry of this n
 fetch_pack = None          # toolpacks.fetch
 _recipes = {}              # {(agent id, commit): (the catalog's recipe there or None, when read, why not)}
 RECIPE_MISS_S = 300        # a pack that could not be fetched is asked again after this long
+_warming = threading.Event()   # a read-ahead of the catalog's recipes is running
 
 
 def configure(*, nodes_module, node_sessions, tmux_base, audit=None, claude=None, catalog_entry=None, fetch_pack=None):
@@ -47,20 +48,32 @@ def configure(*, nodes_module, node_sessions, tmux_base, audit=None, claude=None
                      catalog_entry=catalog_entry, fetch_pack=fetch_pack)
 
 
+def _ahead(a):
+    """The catalog's entry for this agent when the signed index says its
+    recipe is newer than the table's (the entry's install_rev), else None.
+    Nothing is fetched to know: the index as last read says it."""
+    entry = catalog_entry(a.id) if a and a.install and catalog_entry and fetch_pack else None
+    return entry if entry and int(entry.get("install_rev") or 0) > a.install["rev"] else None
+
+
 def recipe(agent_id):
     """(recipe, "catalog" or "release"): how this agent is installed, as
     the node is handed it with every install, update and removal (R169 step
     13). The agent table's own, which shipped with this release, unless the
-    catalog's signed index pins this agent's pack at a commit whose recipe
-    has a higher rev: then the catalog's, fetched at that commit with its
-    archive's sha256 checked and the manifest held to its shape, as any
-    pack's is. A catalog that does not answer, a pack that is refused or
-    one no newer than the table leaves the table's. Read once per commit
-    and kept while the controller runs."""
+    catalog's signed index pins this agent's pack with a higher rev: then
+    the catalog's, fetched at that commit with its archive's sha256 checked
+    and the manifest held to its shape, as any pack's is. A pack that is
+    refused, or one no newer than the table after all, leaves the table's.
+
+    The network is asked only when the index names a newer recipe not read
+    yet, once per commit (warm reads it ahead, behind the Library): a press
+    on Update otherwise waits for nothing, which matters, since the node's
+    sessions are ended right after and a slow press ended none (the node
+    had stopped counting as live)."""
     a = agents.get(agent_id)
     own = a.install if a else None
-    entry = catalog_entry(a.id) if a and catalog_entry else None
-    if not entry or not fetch_pack:
+    entry = _ahead(a)
+    if not entry:
         return own, "release"
     key = (a.id, entry["commit"])
     with _lock:
@@ -72,9 +85,31 @@ def recipe(agent_id):
         with _lock:
             _recipes[key] = had
     theirs = had[0]
-    if theirs and (not own or theirs["rev"] > own["rev"]):
+    if theirs and theirs["rev"] > own["rev"]:
         return theirs, "catalog"
     return own, "release"
+
+
+def warm():
+    """Read, in a thread of its own, each newer recipe the index names
+    that has not been read yet. Called from the Library's read: by the time
+    a person presses Update the recipe is here. Nothing starts when there
+    is nothing newer, which is nearly always."""
+    with _lock:
+        todo = [a.id for a in agents.TABLE if (e := _ahead(a)) and (a.id, e["commit"]) not in _recipes]
+        if not todo or _warming.is_set():
+            return
+        _warming.set()
+
+    def work():
+        try:
+            for aid in todo:
+                recipe(aid)
+        except Exception as e:                                      # noqa: BLE001 (a thread must not die loudly)
+            print(f"dashboard: coding agent recipes: {e}", flush=True)
+        finally:
+            _warming.clear()
+    threading.Thread(target=work, name="agent-recipes", daemon=True).start()
 
 
 def recipe_spec(agent_id):

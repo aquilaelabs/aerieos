@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -121,16 +122,19 @@ class Controller(unittest.TestCase):
         self.assertEqual(ns.added, [("codex-update", {"timeout": 900, "to": "0.163.0", "ended": [],
                                                       "recipe": agents.get("codex").install, "recipe_from": "release"})])
 
-    def catalog(self, recipe, error=""):
-        """A catalog whose signed index pins codex's pack at one commit, and
+    def catalog(self, recipe, error="", says=None):
+        """A catalog whose signed index pins codex's pack at one commit and
+        says its recipe's rev (`says`, the recipe's own unless given), and
         whose pack there carries `recipe`; the fetches are counted."""
         was = (agentcode.catalog_entry, agentcode.fetch_pack, dict(agentcode._recipes))
         self.addCleanup(lambda: (setattr(agentcode, "catalog_entry", was[0]), setattr(agentcode, "fetch_pack", was[1]),
                                  agentcode._recipes.clear(), agentcode._recipes.update(was[2])))
         agentcode._recipes.clear()
         asked = []
+        rev = says if says is not None else (recipe or {}).get("rev")
         agentcode.catalog_entry = lambda name: {"name": name, "url": "https://example.test/catalog", "commit": "c" * 40,
-                                                "sha256": "5" * 64, "path": "packs/agents/" + name} if name == "codex" else None
+                                                "sha256": "5" * 64, "path": "packs/agents/" + name,
+                                                **({"install_rev": rev} if rev else {})} if name == "codex" else None
 
         def fetch(url, commit, shipped, sha256, path):
             asked.append((url, commit, sha256, path))
@@ -179,7 +183,7 @@ class Controller(unittest.TestCase):
         git("init", "-q")
         git("add", "-A")
         git("commit", "-qm", "pack")
-        entry = {"name": "open", "url": "file://" + tmp, "commit": git("rev-parse", "HEAD").decode().strip(), "path": "packs/agents/open",
+        entry = {"name": "open", "url": "file://" + tmp, "commit": git("rev-parse", "HEAD").decode().strip(), "path": "packs/agents/open", "install_rev": 7,
                  "sha256": hashlib.sha256(git("archive", "--format=tar", "HEAD", "packs/agents/open")).hexdigest()}
         was = (agentcode.catalog_entry, agentcode.fetch_pack, dict(agentcode._recipes))
         self.addCleanup(lambda: (setattr(agentcode, "catalog_entry", was[0]), setattr(agentcode, "fetch_pack", was[1]),
@@ -195,15 +199,40 @@ class Controller(unittest.TestCase):
             self.assertEqual(agentcode.recipe("open"), (agents.get("open").install, "release"))
 
     def test_a_catalog_no_newer_than_the_release_changes_nothing(self):
-        # A catalog left behind never undoes what a release fixed.
-        self.catalog(agents.get("codex").install | {"script": "curl -fsSL https://old.example/install.sh | sh"})
+        # A catalog left behind never undoes what a release fixed, and is
+        # not even fetched: the index says its rev, so a press waits for
+        # nothing (a press that waited ended no session: the node had
+        # stopped counting as live by the time it looked).
+        asked = self.catalog(agents.get("codex").install | {"script": "curl -fsSL https://old.example/install.sh | sh"})
+        self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
+        agentcode.warm()
+        self.assertEqual(asked, [])
+        # An index from before it said a rev is the same: nothing newer is known.
+        asked = self.catalog(agents.get("codex").install | {"rev": 9}, says=0)
+        self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
+        self.assertEqual(asked, [])
+        # ...and an index that says more than its pack holds changes nothing.
+        self.catalog(agents.get("codex").install, says=5)
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
 
     def test_a_pack_that_cannot_be_read_leaves_the_table_s(self):
-        asked = self.catalog(None, error="its archive's sha256 differs, so it is refused")
+        asked = self.catalog(None, error="its archive's sha256 differs, so it is refused", says=2)
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
         self.assertEqual(len(asked), 1)          # asked again only after RECIPE_MISS_S
+
+    def test_the_library_s_read_fetches_a_newer_recipe_ahead_of_the_press(self):
+        theirs = agents.get("codex").install | {"rev": 2, "bin": ".codex/bin/codex"}
+        asked = self.catalog(theirs)
+        agentcode.warm()
+        for _ in range(200):
+            if not agentcode._warming.is_set() and asked:
+                break
+            time.sleep(0.01)
+        self.assertEqual(len(asked), 1)
+        self.assertEqual(agentcode.recipe("codex"), (theirs, "catalog"))
+        agentcode.warm()
+        self.assertEqual(len(asked), 1, "read once per commit")
 
     def test_a_recipe_is_held_to_its_shape(self):
         for a in agents.TABLE:

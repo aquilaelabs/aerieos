@@ -123,6 +123,11 @@ def catalog_index(root):
         tar = subprocess.run(["git", "-C", root, "archive", "--format=tar", head, folder], capture_output=True, check=True).stdout
         new.append({"name": name, "url": url, "commit": head, "path": folder, "sha256": hashlib.sha256(tar).hexdigest(),
                     "tier": "official", "withdrawn": False, "about": m["about"] or m["label"], "platforms": m["platforms"]})
+        # A coding agent's entry says its install recipe's rev, so an
+        # install fetches the pack only when that is higher than its own.
+        rev = ((m.get("agent") or {}).get("install") or {}).get("rev")
+        if rev:
+            new[-1]["install_rev"] = rev
     idx = {"version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": new + kept}
     with open(idx_path, "w", encoding="utf-8") as f:
         json.dump(idx, f, indent=1)
