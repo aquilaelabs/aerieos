@@ -156,10 +156,15 @@ def set_aside(folder, name):
     return os.path.basename(dst)
 
 
-def write_json(path, obj, mode=0o644):
+def write_json(path, obj, mode=0o644, sync=True):
     """Atomically replace `path` with `obj` as JSON. `mode` is the file's
     from the moment it is in place: a file of password hashes was 0644
-    for the instant between the rename and the chmod that followed it."""
+    for the instant between the rename and the chmod that followed it.
+    `sync=False` is for a store that is only notes of the moment (which
+    session is editing which file, what a session last saw): still replaced
+    whole, never half-written, but not waited onto the disk, which is tens
+    of milliseconds a write and was paid on every edit a session made. A
+    power cut can cost such a store its last minutes and nothing else."""
     path = _p(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
@@ -168,12 +173,14 @@ def write_json(path, obj, mode=0o644):
     try:
         with os.fdopen(fd, "w") as f:
             f.write(json.dumps(obj, indent=2) + "\n")
-            _sync(f)
+            if sync:
+                _sync(f)
         # mkstemp gives 600 and these were world-readable before.
         os.chmod(tmp, mode)
         with _gate:
             os.replace(tmp, path)
-        _sync_dir(path)
+        if sync:
+            _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)

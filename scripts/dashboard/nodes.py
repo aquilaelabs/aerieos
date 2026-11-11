@@ -1403,6 +1403,16 @@ def agent_window(version):
 # three of them were the slowest intervals in the suite. Nothing else sets it.
 POLL_S = int(os.environ.get("BB_NODE_POLL") or 25)
 _wake = threading.Condition(_lock)
+
+
+def _snooze(seconds):
+    """Wait for the queue to move (a job taken, a result in), `seconds` at
+    most. Whoever waits on a node's answer looks again the moment it lands:
+    asleep for a fixed quarter second between looks, every docker read and
+    every command sent to a node took an eighth of a second longer than the
+    node did, on average."""
+    with _wake:
+        _wake.wait(seconds)
 # The last hour of samples per node, for its charts (R218 step 9, docs/
 # nodes.md §9), and of each running container's on an agent node, sampled
 # once a minute by the agent: memory only, and lost on restart, which is the
@@ -5877,7 +5887,7 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
                 job_forget(r["job"])
             return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
                     "out": exec_out(j.get("log") or ""), "job": r["job"], "state": j["state"]}
-        time.sleep(0.25)
+        _snooze(0.25)
     # Taken back, not left in the queue: a probe nobody is waiting for any
     # more would otherwise run whenever the node's slot freed: an `adb
     # install` an hour after the operator read it as failed.
@@ -6025,7 +6035,7 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
                 return {"ok": True, "sent": False, "typed": True, "text": text, "job": r["job"]}
             last = [x for x in (j.get("log") or "").splitlines() if x.strip()]
             return {"error": last[-1] if last else f"the send failed on {n['name']} (exit {code})"}
-        time.sleep(0.25)
+        _snooze(0.25)
     job_cancel("dashboard", r["job"])
     return {"error": f"the agent on {n['name']} took the send but did not report back within {timeout}s"}
 
@@ -6065,7 +6075,7 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
         if j and j["state"] in JOB_END:
             return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
                     "out": j.get("log") or "", "job": r["job"], "state": j["state"]}
-        time.sleep(0.25)
+        _snooze(0.25)
     why = _no_answer(r["job"], node_id, timeout)
     job_cancel(principal, r["job"])
     return {"error": why}
@@ -7473,7 +7483,7 @@ def agent_test(principal, n):
                      {"on": j["state"] == "succeeded"})
             return {"on": j["state"] == "succeeded",
                     "why": out or f"{j['state']} (exit {j['exit_code']})"}
-        time.sleep(0.3)
+        _snooze(0.3)
     return {"on": False, "why": "the agent took the job but did not "
                                 "report back within 15s"}
 

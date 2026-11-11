@@ -3925,10 +3925,14 @@ def session_seen_note(project, uid, node, who=None, begin=False):
             stale = [label for k, label in START_ONLY if k in started and started.get(k) != start_now.get(k)]
             # Said once for each change, not on every prompt after it.
             new_stale = stale and rec.get("stale_said") != start_now
-            d[key] = {"build": build or was_build, "revs": revs_now or was_revs,
-                      "diag": max(top, was_diag), "start": started,
-                      "stale_said": start_now if new_stale else rec.get("stale_said")}
-            write_json(STATE / SESSION_SEEN, d)
+            now = {"build": build or was_build, "revs": revs_now or was_revs,
+                   "diag": max(top, was_diag), "start": started,
+                   "stale_said": start_now if new_stale else rec.get("stale_said")}
+            # Written when something moved, which on most prompts nothing
+            # has, and as a note of the moment (not waited onto the disk).
+            if now != rec:
+                d[key] = now
+                write_json(STATE / SESSION_SEEN, d, sync=False)
         if begin:
             return ""
         said = []
@@ -4079,7 +4083,9 @@ chat.configure(state=STATE, write_json=write_json)
 # the server touches it only for a session on a node, whose hook posts the
 # note here because the node has no /config to write (roadmap #24).
 import overlap                                                   # noqa: E402
-overlap.configure(state=STATE, workspace=WORKSPACE, write_json=write_json)
+# Notes of the moment, written on every edit a session makes: not waited
+# onto the disk (statefile.write_json's sync).
+overlap.configure(state=STATE, workspace=WORKSPACE, write_json=lambda p, d: write_json(p, d, sync=False))
 import plugins                                                   # noqa: E402
 plugins.configure(state=STATE, write_json=write_json)
 
@@ -5708,6 +5714,15 @@ def _cached(path, fn):
 
 
 def revisions(who=None, projects=None):
+    """Every token a view watches, with each node's row read once for all of
+    them (nodes.held): the nodes token, the VMs' and the live sessions' each
+    read every node's record, three reads of the census on a poll every
+    page makes every second or two."""
+    with nodes.held():
+        return _revisions(who, projects)
+
+
+def _revisions(who=None, projects=None):
     """Every token a view watches, cheap enough to ask for every second or two.
 
     `projects` is what the page actually has open: the notebooks, which are
