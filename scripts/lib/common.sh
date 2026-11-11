@@ -32,16 +32,23 @@ BOOT_READY_FILE="${BOOT_READY_FILE:-/run/builderbot-ready}"
 # always a controller. Read here rather than only in the entrypoint because
 # bb, bb-tty and the account helpers below all have a node answer that
 # differs, and all three run on a node out of the bundle.
+# Matched in the shell, in either case, with no process started: this is
+# asked dozens of times in one aerie call.
 bb_role() {
-    case "$(printf '%s' "${BUILDERBOT_ROLE:-controller}" | tr '[:upper:]' '[:lower:]')" in
-        node|worker|agent) printf 'node' ;;
-        *)                 printf 'controller' ;;
+    case "${BUILDERBOT_ROLE:-controller}" in
+        [Nn][Oo][Dd][Ee]|[Ww][Oo][Rr][Kk][Ee][Rr]|[Aa][Gg][Ee][Nn][Tt]) printf 'node' ;;
+        *) printf 'controller' ;;
     esac
 }
 
 # on_node: true on a node. The four account helpers, bb's notebook verbs
 # and bb-tty all branch on it, so it is one word rather than a case each.
-on_node() { [ "$(bb_role)" = node ]; }
+on_node() {
+    case "${BUILDERBOT_ROLE:-controller}" in
+        [Nn][Oo][Dd][Ee]|[Ww][Oo][Rr][Kk][Ee][Rr]|[Aa][Gg][Ee][Nn][Tt]) return 0 ;;
+    esac
+    return 1
+}
 
 log()  { printf '[builderbot] %s\n'      "$*"; }
 warn() { printf '[builderbot] WARN: %s\n' "$*" >&2; }

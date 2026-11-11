@@ -8,18 +8,23 @@ set -euo pipefail
 # image (both live in /opt/aerieos/scripts), and it means a dry-run from a
 # checkout uses that checkout's library instead of silently mixing new
 # commands with the installed image's older helpers.
+# Where this script is, found once: each of the thirty places that asked ran
+# readlink and dirname for itself, five of them before any verb was read,
+# which was half of what every aerie call cost before it began.
+BB_SCRIPTS="$(readlink -f "$0")"
+BB_SCRIPTS="${BB_SCRIPTS%/*}"
 # shellcheck source=lib/common.sh
-. "$(dirname "$(readlink -f "$0")")/lib/common.sh"
+. "$BB_SCRIPTS/lib/common.sh"
 # The toolchain manager (`aerie toolchains` and everything the Library and the Installed page drive) is a
 # third of this script's length and none of its subject, so it lives next door.
 # shellcheck source=lib/sdk.sh
-. "$(dirname "$(readlink -f "$0")")/lib/sdk.sh"
+. "$BB_SCRIPTS/lib/sdk.sh"
 # shellcheck source=lib/preflight.sh
-. "$(dirname "$(readlink -f "$0")")/lib/preflight.sh"
+. "$BB_SCRIPTS/lib/preflight.sh"
 # The API client the network verbs share (lib/bbapi.py) and the programs
 # behind them (lib/*-verbs.py, lib/report.py and the rest), run by path so
 # a checkout's bb runs with the checkout's library.
-BB_LIB="$(dirname "$(readlink -f "$0")")/lib"
+BB_LIB="$BB_SCRIPTS/lib"
 export BB_LIB
 
 # The reference's entries for one verb: each line that starts `bb VERB `,
@@ -893,7 +898,7 @@ cmd_projects() {
         local name="" folder="$2"
         [ "${3:-}" = --name ] && name="${4:-}"
         BB_ADOPT_DIR="$folder" BB_ADOPT_NAME="$name" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            WORKSPACE="$WORKSPACE" python3 "$BB_LIB/projects-adopt.py" "$(dirname "$(readlink -f "$0")")/dashboard"
+            WORKSPACE="$WORKSPACE" python3 "$BB_LIB/projects-adopt.py" "$BB_SCRIPTS/dashboard"
         return
     fi
     echo "== projects (${WORKSPACE}) =="
@@ -2516,7 +2521,7 @@ cmd_roadmap() {
     # roadmap.py, still: the file is where the roadmap has always been implemented
     # and renaming it would move code the running image serves by absolute
     # path. The command is what the operator reads, and that is `aerie roadmap`.
-    py="$(dirname "$(readlink -f "$0")")/dashboard/roadmap.py"
+    py="$BB_SCRIPTS/dashboard/roadmap.py"
     [ -f "$py" ] || die "roadmap.py is missing from this image"
     local proj="${BB_ROADMAP_PROJECT:-}"
     if [ -z "$proj" ]; then
@@ -2533,7 +2538,7 @@ cmd_history() {
     # "when did anything here mention the picker?", which is a question about
     # the notebook and not about a tab of it.
     local dir
-    dir="$(dirname "$(readlink -f "$0")")/dashboard"
+    dir="$BB_SCRIPTS/dashboard"
     local proj="${BB_ROADMAP_PROJECT:-}"
     if [ -z "$proj" ]; then
         proj="$(project_here)" \
@@ -2616,7 +2621,7 @@ cmd_preamble() {
     # draws the same string: one assembly, so the tab cannot drift from what
     # a session actually gets.
     local dir py
-    dir="$(dirname "$(readlink -f "$0")")/dashboard"
+    dir="$BB_SCRIPTS/dashboard"
     py="$dir/preamble.py"
     [ -f "$py" ] || die "preamble.py is missing from this image"
     local proj="${BB_PROJECT:-}"
@@ -2703,7 +2708,7 @@ cmd_rules() {
     # module by design, so the hand-back hook blocked on the one machine
     # sessions actually run on.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/rules.py"
+    py="$BB_SCRIPTS/dashboard/rules.py"
     [ -f "$py" ] || die "rules.py is missing from this image"
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
         python3 "$BB_LIB/rules-verbs.py" "$py" "$proj" "$@"
@@ -2790,7 +2795,7 @@ cmd_tests() {
     # run` the one verb that cannot work on a node, which is the one machine
     # a suite actually runs on.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/testreg.py"
+    py="$BB_SCRIPTS/dashboard/testreg.py"
     # The checkout is the working tree's top, not the working directory:
     # from scripts/dashboard every verb looked for scripts/dashboard/scripts/
     # and said there was no harness (B778).
@@ -2950,7 +2955,7 @@ cmd_tests() {
         # the tree here): beside the installed bb there are none, so a
         # session's aerie tests lab died saying the checkout had no lab suites.
         local tdir="${BB_REPO:-$PWD}/scripts/dashboard/test"
-        [ -d "$tdir" ] || tdir="$(dirname "$(readlink -f "$0")")/dashboard/test"
+        [ -d "$tdir" ] || tdir="$BB_SCRIPTS/dashboard/test"
         local -a labs=()
         local f
         for f in "$tdir"/lab-*.mjs; do [ -e "$f" ] && labs+=("$(basename "$f" .mjs)"); done
@@ -3127,7 +3132,7 @@ cmd_bug() {
     # callers that are not in one, like bb-tty), the module loaded from the
     # file beside this script so the checkout's copy is the one under test.
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/bugs.py"
+    py="$BB_SCRIPTS/dashboard/bugs.py"
     [ -f "$py" ] || die "bugs.py is missing from this image"
     local proj="${BB_BUG_PROJECT:-}"
     if [ -z "$proj" ]; then
@@ -3524,7 +3529,7 @@ EOT
 
 cmd_findings_history() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/findings.py"
+    py="$BB_SCRIPTS/dashboard/findings.py"
     [ -f "$py" ] || die "findings.py is missing from this image"
     proj="${BB_FINDINGS_PROJECT:-}"
     if [ -z "$proj" ]; then
@@ -3651,7 +3656,7 @@ cmd_token() {
     local home py
     home="$(user_home "${BB_ACCOUNT_UID:-}")"
     [ -n "$home" ] || die "no home for account ${BB_ACCOUNT_UID:-(none)} on this machine"
-    py="$(dirname "$(readlink -f "$0")")/lib/bbapi.py"
+    py="$BB_SCRIPTS/lib/bbapi.py"
     [ -f "$py" ] || die "bbapi.py is missing beside aerie"
     HOME="$home" python3 "$BB_LIB/token-verbs.py" keep
 }
@@ -3752,7 +3757,7 @@ bb_controller_stamp() {
 # emulator, `aerie build` is a build (cmd_run). That is the point of being here.
 # One list, lib/relay-verbs, read here and by the server: a verb added to
 # one side only was either refused on arrival or never sent.
-BB_RELAY_VERBS=" $(tr -s '[:space:]' ' ' < "$(dirname "$(readlink -f "$0")")/lib/relay-verbs") "
+BB_RELAY_VERBS=" $(tr -s '[:space:]' ' ' < "$BB_SCRIPTS/lib/relay-verbs") "
 
 # bb_project: the project a verb acts on: BB_PROJECT, which is the session's
 # own or what `aerie -p NAME` named, else the working directory's when it is
@@ -3946,7 +3951,7 @@ cmd_settings() {
         [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one first, or aerie -p NAME settings node NODE"
         [ -n "${2:-}" ] || die "aerie settings node NODE: which node? aerie nodes lists them"
         BB_SET_VALUE="$2" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            python3 "$BB_LIB/settings-verbs.py" node "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+            python3 "$BB_LIB/settings-verbs.py" node "$BB_SCRIPTS/dashboard" "$proj"
         return
     fi
     if [ "${1:-}" = set ]; then
@@ -3955,7 +3960,7 @@ cmd_settings() {
         case "$field" in build|test|outputs) ;; *) die "aerie settings set build|test|outputs VALUE" ;; esac
         [ $# -ge 1 ] || die "aerie settings set $field VALUE: the command to run, or for outputs the globs, comma-separated"
         BB_SET_FIELD="$field" BB_SET_VALUE="$*" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-            python3 "$BB_LIB/settings-verbs.py" set "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+            python3 "$BB_LIB/settings-verbs.py" set "$BB_SCRIPTS/dashboard" "$proj"
         return
     fi
     # The tree this is being asked from, when the caller is standing in the
@@ -3966,7 +3971,7 @@ cmd_settings() {
     [ -n "$here_root" ] && [ "$(basename "$here_root")" = "$proj" ] || here_root=""
     BB_SETTINGS_JSON="$json" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
         BB_WORKSPACE="${WORKSPACE:-/workspace}" BB_PROJECT_ROOT="$here_root" \
-        python3 "$BB_LIB/settings-verbs.py" show "$(dirname "$(readlink -f "$0")")/dashboard" "$proj"
+        python3 "$BB_LIB/settings-verbs.py" show "$BB_SCRIPTS/dashboard" "$proj"
 }
 
 # aerie work: who else is changing this project, and where you overlap.
@@ -3981,7 +3986,7 @@ cmd_settings() {
 # to walk into, not a place to declare anything.
 cmd_work() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/overlap.py"
+    py="$BB_SCRIPTS/dashboard/overlap.py"
     [ -f "$py" ] || die "overlap.py is missing from this image"
     proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
     python3 "$BB_LIB/work-verbs.py" "$py" "$proj" "${DASHBOARD_STATE:-/config}" "${WORKSPACE:-/workspace}"
@@ -3989,7 +3994,7 @@ cmd_work() {
 
 cmd_users() {
     local py sub="${1:-list}"
-    py="$(dirname "$(readlink -f "$0")")/dashboard/users.py"
+    py="$BB_SCRIPTS/dashboard/users.py"
     [ -f "$py" ] || die "users.py is missing from this image"
     shift || true
     case "$sub" in
@@ -4042,7 +4047,7 @@ cmd_users() {
 
 cmd_nodes() {
     local py
-    py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    py="$BB_SCRIPTS/dashboard/nodes.py"
     [ -f "$py" ] || die "nodes.py is missing from this image"
     case "${1:-}" in
         "") DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nodes-verbs.py" list "$py" ;;
@@ -4219,7 +4224,7 @@ cmd_build_or_test() {
 cmd_ci_labels() {
     local write=0
     [ "${1:-}" = "--write" ] && write=1
-    local py; py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    local py; py="$BB_SCRIPTS/dashboard/nodes.py"
     local -a labels=()
     local l
     while IFS= read -r l; do [ -n "$l" ] && labels+=("$l"); done < <(
@@ -4449,7 +4454,7 @@ cmd_lint() {
             tmpd="$(mktemp -d)"
             while IFS= read -r f; do
                 [ -n "$f" ] && shells+=("$f")
-            done < <(python3 "${BB_LIB_DIR:-$(dirname "$(readlink -f "$0")")/lib}/embedded.py" \
+            done < <(python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" \
                              shell "$tmpd" "${shells[@]}" 2>/dev/null)
         fi
         if [ "${#shells[@]}" -eq 0 ]; then
@@ -4504,7 +4509,7 @@ cmd_lint() {
             pyd="$(mktemp -d)"
             while IFS= read -r f; do
                 [ -n "$f" ] && embedded+=("$f")
-            done < <(python3 "${BB_LIB_DIR:-$(dirname "$(readlink -f "$0")")/lib}/embedded.py" \
+            done < <(python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" \
                              python "$pyd" "${others[@]}" 2>/dev/null)
         fi
         local -a conf=()
@@ -4626,7 +4631,7 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
             local nid; nid="$(project_node)"
             if [ -n "$nid" ]; then
                 DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/lint-checks.py" runner \
-                    "$(dirname "$(readlink -f "$0")")/dashboard/nodes.py" "$nid" 2>/dev/null
+                    "$BB_SCRIPTS/dashboard/nodes.py" "$nid" 2>/dev/null
             fi
             # A hosted job on a moving label (ubuntu-latest) builds on whatever
             # GitHub points it at that day (R116): a note in any project, a
@@ -4891,7 +4896,7 @@ is not running; see aerie logs."
             # to use the dashboard.
             nohup env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u BB_AGENT "${envs[@]}" \
                 python3 -u "$dir/server.py" 2>&1 \
-                | "$(dirname "$(readlink -f "$0")")/lib/log-split.sh" \
+                | "$BB_SCRIPTS/lib/log-split.sh" \
                     "$(bb_log_dir)/dashboard.log" dashboard &
             sleep 1
             [ -n "$(dashboard_pid)" ] || die "the new dashboard did not stay up; see $(bb_log_dir)/dashboard.log"
@@ -5946,7 +5951,7 @@ PY
     # here rather than leaving somebody to find it when a button refuses.
     if ! on_node; then
         DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" node \
-            "$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+            "$BB_SCRIPTS/dashboard/nodes.py"
     fi
     # The daemon the dashboard's dev instances are built and run on: the
     # sandbox VM a node record names. This used to report only a mounted socket,
@@ -5957,7 +5962,7 @@ PY
     # its own poll, so doctor cannot drift into disagreeing with the tab about
     # whether the thing is up.
     local docker_line dst dmsg lib note
-    lib="$(dirname "$(readlink -f "$0")")/lib/docker-probe.py"
+    lib="$BB_SCRIPTS/lib/docker-probe.py"
     # `|| true`: a probe that dies is a skip line, not the end of the
     # doctor. Under set -e a failing substitution here ended the function
     # after the session line, and every check below it went unprinted.
@@ -5971,7 +5976,7 @@ PY
         docker_line="skip docker daemon: the controller checks it; its Doctor (the dot in the dashboard's header) says"
     else
         docker_line="$(python3 "$lib" \
-            "$(dirname "$(readlink -f "$0")")/dashboard/devapp.py" 2>/dev/null || true)"
+            "$BB_SCRIPTS/dashboard/devapp.py" 2>/dev/null || true)"
     fi
     [ -n "$docker_line" ] || docker_line="none"
     while read -r dst dmsg; do
@@ -6202,7 +6207,7 @@ cmd_version() {
         case " $* " in *" -h "*|*" --help "*) ;; *) cmd_version_edit "$@"; return $? ;; esac ;;
     esac
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/version.py"
+    py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
     proj="${BB_VERSION_PROJECT:-}"
     if [ -z "$proj" ]; then
@@ -6242,7 +6247,7 @@ cmd_version() {
 # the shape stays uniform; reading is just the file.
 cmd_changelog() {
     local py proj
-    py="$(dirname "$(readlink -f "$0")")/dashboard/version.py"
+    py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
     proj="${BB_VERSION_PROJECT:-}"
     if [ -z "$proj" ]; then

@@ -28,13 +28,15 @@ class FakeConn:
         self.fail = fail or {}
         self.sock = None
         self.closed = False
+        self.asked = []
 
     def connect(self):
         if "connect" in self.fail:
             raise self.fail["connect"]
         self.sock = object()
 
-    def request(self, *_a, **_k):
+    def request(self, *a, **_k):
+        self.asked.append(a)
         if "request" in self.fail:
             raise self.fail["request"]
 
@@ -53,17 +55,36 @@ class FakeConn:
 
 class Answers(unittest.TestCase):
     def ask(self, conn):
-        was = gate.bbapi._conn
-        gate.bbapi._conn = lambda timeout: (conn, "")
+        was = gate.api()._conn
+        gate.api()._conn = lambda timeout: (conn, "")
         try:
             return gate.controller_answers("p")
         finally:
-            gate.bbapi._conn = was
+            gate.api()._conn = was
 
     def test_a_refusal_is_an_answer(self):
         c = FakeConn()
         self.assertTrue(self.ask(c))
         self.assertTrue(c.closed)
+
+    def test_it_asks_the_small_read_and_not_the_status(self):
+        # That it answers is the whole question: the status read is seconds
+        # of the controller's work, and was asked every twenty seconds by
+        # every session, with a tool call waiting on it.
+        c = FakeConn()
+        self.ask(c)
+        self.assertEqual(c.asked[0][:2], ("GET", "/api/meta"), c.asked)
+
+    def test_the_client_is_loaded_only_to_ask(self):
+        import subprocess
+        import sys
+        code = ("import importlib.util, importlib.machinery, sys; "
+                "l = importlib.machinery.SourceFileLoader('g', sys.argv[1]); "
+                "m = importlib.util.module_from_spec(importlib.util.spec_from_loader('g', l)); l.exec_module(m); "
+                "print('http.client' in sys.modules, 'bbapi' in sys.modules)")
+        out = subprocess.run([sys.executable, "-c", code, os.path.join(HERE, "..", "bb-gate")],
+                             capture_output=True, text=True, check=True).stdout.split()
+        self.assertEqual(out, ["False", "False"])
 
     def test_a_slow_answer_is_a_busy_controller_not_a_down_one(self):
         c = FakeConn(fail={"response": socket.timeout("timed out")})

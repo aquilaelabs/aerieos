@@ -36,7 +36,7 @@ SDK_TOOLCHAINS="android node jdk playwright flutter dotnet swift go rust zig"
 # The catalog, at the one place it sits relative to this file in both the
 # image and a checkout.
 sdk_meta_file() {
-    printf '%s' "$(dirname "$(readlink -f "$0")")/../config/toolchains.json"
+    printf '%s' "${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/../config/toolchains.json"
 }
 
 sdk_checkable() {
@@ -256,7 +256,7 @@ sdk_status() {
 # listing: a node that has never dialed in has told us nothing, and inventing
 # an inventory for it would be worse than showing this container's.
 sdk_status_node() {
-    local py; py="$(dirname "$(readlink -f "$0")")/dashboard/nodes.py"
+    local py; py="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/dashboard/nodes.py"
     [ -f "$py" ] || return 1
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 - "$py" "$1" <<'NODESTAT'
 import importlib.util, os, sys
@@ -1102,7 +1102,7 @@ sdk_install_cleanup() {
 # directory, a vendor installer that wants its own arguments, a tool already in
 # the image pointed at a new directory, and sdkmanager, which resolves its own
 # package ids. A table that could express all five would be a language.
-SDK_META="$(dirname "$(readlink -f "$0")")/lib/sdkmeta.py"
+SDK_META="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/lib/sdkmeta.py"
 sdk_meta() { python3 "$SDK_META" "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
