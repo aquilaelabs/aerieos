@@ -3,7 +3,9 @@
 # build-image.yml for a release's tag, a manual run and the weekly rebuild,
 # which publishes what it built; and run on its own when a branch push
 # touches the image, which publishes nothing, so a fix to the image is proved
-# on a push rather than a tag (the operator, 30 Oct).
+# on a push rather than a tag (the operator, 30 Oct). A branch's build can
+# be asked for by hand as well, and publishes nothing either: a run GitHub
+# left queued is answered by another, without a change to the image.
 name: os image
 
 on:
@@ -11,6 +13,7 @@ on:
     secrets:
       AERIEOS_RELEASE_KEY:
         required: false
+  workflow_dispatch:
   push:
     branches-ignore: ["main"]
     paths:
