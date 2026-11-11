@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- This release names a spare for the catalog's key and for the release key. Upgrading: a node pins the spare when its Enroll script is run on it again; until then its row says no spare key is pinned, and it goes on taking updates signed by the first key (ff87870)
+
 ## 0.9.0-dev.5230: 2026-11-11
 
 ### Added
