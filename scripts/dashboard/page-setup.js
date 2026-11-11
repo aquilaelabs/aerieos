@@ -201,16 +201,27 @@ function setupDisksSig(dk){
 
 // Text a person has typed, put back when the page has had to be drawn again:
 // a disk plugged in mid-sentence moves the page, and is no reason to lose it.
+// A file picked is put back as the file itself: a file field's value cannot
+// be set, and trying threw, which left the page half wired, so Land it here
+// did nothing once the page had redrawn under a picked bundle (B776).
 function setupKeepTyped(el){
-  const had = [...el.querySelectorAll("input[id]:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea[id]")]
+  const had = [...el.querySelectorAll("input[id]:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]), textarea[id]")]
     .filter(i => i.value).map(i => ({id: i.id, value: i.value, focus: i === document.activeElement, at: i.selectionStart}));
-  return () => had.forEach(h => {
-    const now = el.querySelector("#" + CSS.escape(h.id));
-    if (!now || now.value) return;
-    now.value = h.value;
-    now.dispatchEvent(new Event("input", {bubbles: true}));
-    if (h.focus){ now.focus(); try{ now.setSelectionRange(h.at, h.at); }catch(e){ /* a type with no caret */ } }
-  });
+  const files = [...el.querySelectorAll("input[type=file][id]")].filter(i => i.files?.length).map(i => ({id: i.id, files: i.files}));
+  return () => {
+    had.forEach(h => {
+      const now = el.querySelector("#" + CSS.escape(h.id));
+      if (!now || now.value) return;
+      now.value = h.value;
+      now.dispatchEvent(new Event("input", {bubbles: true}));
+      if (h.focus){ now.focus(); try{ now.setSelectionRange(h.at, h.at); }catch(e){ /* a type with no caret */ } }
+    });
+    files.forEach(h => {
+      const now = el.querySelector("#" + CSS.escape(h.id));
+      if (!now || now.files?.length) return;
+      try{ now.files = h.files; now.dispatchEvent(new Event("change", {bubbles: true})); }catch(e){ /* picked again by hand */ }
+    });
+  };
 }
 
 function wireSetup(el, s){

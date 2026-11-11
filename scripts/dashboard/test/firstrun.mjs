@@ -477,6 +477,16 @@ await firstRun(false);
       setupLand = { fresh: true, owner: true, stick: true, held: '', token_kept: true }; setupSig = ''; drawSetup();
       out.keptNoTok = !step('Land the controller')?.querySelector('#landTok') && !!step('Land the controller')?.querySelector('#landFile')
         && /the one you gave on the first page/.test(words('Land the controller'));
+      // A bundle picked stays picked when the page draws again (B776: the
+      // redraw set the file field's value, which a file field refuses, so
+      // the file was gone and Land said to pick it first).
+      { const f = step('Land the controller')?.querySelector('#landFile'), dt = new DataTransfer();
+        dt.items.add(new File(['x'], 'moved.aeriemove'));
+        f.files = dt.files;
+        let threw = '';
+        try { setupSig = ''; drawSetup(); } catch (e){ threw = String(e); }
+        const now = step('Land the controller')?.querySelector('#landFile');
+        out.fileKept = { threw, redrawn: now !== f, name: now?.files?.[0]?.name || '' }; }
       // The two picks: each label over its field, the field and its verb on one line.
       { const sp = step('Where the spaces and containers go'), sel = sp?.querySelector('#stickPool'), go = sp?.querySelector('[data-stickpool]'), lbl = sp?.querySelector('label[for="stickPool"]');
         const r = e => e?.getBoundingClientRect();
@@ -555,6 +565,8 @@ await firstRun(false);
     ok(/Let it go in the step above before you shut down/.test(walk.backFolder) && /bash \/mnt\/user\/development\/projects\/\.aerieos-give-back\.sh/.test(walk.backFolder),
        `...and with one named, the way back says to give it back first and how from the old system (B665) (${walk.backFolder.slice(0, 240)})`);
     ok(walk.oldNoFrom && walk.keptNoTok, `...the land form asks for the bundle alone where the old controller ran here, and not the token given on the first page (${JSON.stringify([walk.oldNoFrom, walk.keptNoTok])})`);
+    ok(walk.fileKept && !walk.fileKept.threw && walk.fileKept.redrawn && walk.fileKept.name === 'moved.aeriemove',
+       `...and a bundle picked there is still picked after the page draws again (${JSON.stringify(walk.fileKept)})`);
     ok(walk.pickLine, '...the system pool is a label over its field, and the field and its button share a line');
     ok(walk.placed === 'done' && walk.landLive && walk.landFields, `...and once they have a place the land form is live on the page (${JSON.stringify([walk.placed, walk.landLive, walk.landFields])})`);
     ok(/lands only on a fresh controller/.test(walk.notFresh), `...a controller that is not fresh says so in place of the form (${walk.notFresh.slice(0, 120)})`);
