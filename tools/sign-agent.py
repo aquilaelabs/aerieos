@@ -47,12 +47,18 @@ def digest():
     return "sha256:" + hashlib.sha256(_load("bundle").build(AGENT)).hexdigest()
 
 
-def public_key():
+def public_keys():
+    """The keys the committed file names: the one the builds sign with, then
+    its spare (R232). A node pins both, so a build signed by either is taken."""
     try:
         with open(PUB, encoding="utf-8") as f:
-            return next((ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")), "")
+            return [ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")][:2]
     except OSError:
-        return ""
+        return []
+
+
+def public_key():
+    return (public_keys() or [""])[0]
 
 
 def main(argv):
@@ -73,7 +79,8 @@ def main(argv):
         key = Ed25519PrivateKey.generate()
         print("private (the build's secret AERIEOS_RELEASE_KEY; keep it nowhere else):")
         print("  " + key.private_bytes_raw().hex())
-        print("public (one line added to config/aerieos-release.pub, committed):")
+        print("public (one line added to config/aerieos-release.pub, committed: the first line is the key")
+        print("the builds sign with, a second is its spare, whose private half is kept apart from the build's):")
         print("  aerieos-release-ed25519 " + key.public_key().public_bytes_raw().hex())
         return 0
     if argv[:1] == ["--check"]:
@@ -83,9 +90,15 @@ def main(argv):
         except (OSError, ValueError) as e:
             print(f"no usable {os.path.relpath(SIG)}: {e}")
             return 1
-        why = "it is for another agent than this tree builds" if got.get("digest") != digest() \
-            else release.verify(public_key(), got.get("digest"), got.get("sig"))
-        print(f"{os.path.relpath(SIG)}: " + (why or f"signed by {public_key()[:16]}… for {digest()[:19]}…"))
+        why, by = "it is for another agent than this tree builds", ""
+        if got.get("digest") == digest():
+            # Under either key the file names: the builds' own, or its spare.
+            for k in public_keys() or [""]:
+                why = release.verify(k, got.get("digest"), got.get("sig"))
+                if not why:
+                    by = k
+                    break
+        print(f"{os.path.relpath(SIG)}: " + (why or f"signed by {by[:16]}… for {digest()[:19]}…"))
         return 1 if why else 0
     seed = os.environ.get("AERIEOS_RELEASE_KEY", "").strip().lower()
     if not seed:
@@ -97,16 +110,17 @@ def main(argv):
         print("AERIEOS_RELEASE_KEY is not a release key: 64 hex characters, as --keygen prints", file=sys.stderr)
         return 2
     pub = key.public_key().public_bytes_raw().hex()
-    if public_key() and public_key() != pub:
-        print(f"AERIEOS_RELEASE_KEY is not the key config/aerieos-release.pub names ({public_key()[:16]}…): "
-              "nodes pinned to that one would refuse this build, so nothing is signed", file=sys.stderr)
+    if public_keys() and pub not in public_keys():
+        print("AERIEOS_RELEASE_KEY is not a key config/aerieos-release.pub names ("
+              + ", ".join(k[:16] + "…" for k in public_keys()) + "): nodes pinned to those would refuse this build, "
+              "so nothing is signed", file=sys.stderr)
         return 2
     d = digest()
     out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": pub}
     with open(SIG, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
-    print(f"signed the agent {d[:19]}… with the release key {pub[:16]}…")
+    print(f"signed the agent {d[:19]}… with the " + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
     return 0
 
 

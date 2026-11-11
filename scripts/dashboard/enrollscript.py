@@ -59,15 +59,23 @@ _NAME = re.compile(r"[^A-Za-z0-9._-]")
 RELEASE_PUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "aerieos-release.pub")
 
 
-def release_key():
-    """AerieOS's release key as this build names it (config/aerieos-release.pub,
-    one line of 64 hex characters), or "" while it names none."""
+def release_keys():
+    """AerieOS's release keys as this build names them (config/aerieos-release.pub:
+    a line of 64 hex characters for the key the builds sign with, and a
+    second for its spare, R232), the first one first; [] while it names none."""
     try:
         with open(RELEASE_PUB, encoding="utf-8") as f:
-            key = next((ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")), "")
+            keys = [ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")]
     except OSError:
-        return ""
-    return key if re.fullmatch(r"[0-9a-f]{64}", key) else ""
+        return []
+    keys = list(dict.fromkeys(keys))
+    return keys if keys and len(keys) <= 2 and all(re.fullmatch(r"[0-9a-f]{64}", k) for k in keys) else []
+
+
+def release_key():
+    """The key the builds sign with, or "" while the build names none."""
+    return (release_keys() or [""])[0]
+
 
 def controller_host(url):
     """The host part of the controller's URL, '' when it is not a URL."""
@@ -287,8 +295,10 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
         flags.append("--reach public")
     # AerieOS's release key, where this build names one: the node pins it as
     # it enrolls and takes only agent updates the release signed after that.
-    if release_key():
-        flags.append(f"--release-key {release_key()}")
+    # ...with its spare after a comma, so the key the builds sign with can
+    # be replaced by the spare and this node still take its updates (R232).
+    if release_keys():
+        flags.append("--release-key " + ",".join(release_keys()))
     if ans.get("door"):
         flags.append(f"--door {_q(ans['door'])}")
         if ans.get("door_host"):

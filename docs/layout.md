@@ -399,8 +399,8 @@ config/skel/                     home directory skeleton
 config/icon.png                  the icon the Unraid template shows
 config/toolchains.json           the toolchains the Library offers, and how to install each
 config/release-signers           the keys a release's SHA256SUMS.sig must verify against (R199), as ssh-keygen's allowed signers: what AerieOS's updater, the stick maker and the installer check a release by
-config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against
-config/aerieos-release.pub       AerieOS's release key, public half (R227): what the Enroll script hands a node to pin, and what tools/sign-agent.py holds a build's key to; no key named until one is made
+config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against, with its spare on a second line (R232)
+config/aerieos-release.pub       AerieOS's release key, public half (R227): what the Enroll script hands a node to pin, and what tools/sign-agent.py holds a build's key to; no key named until one is made; a second line names its spare (R232)
 config/release-keys/README.md    where each publisher release key came from, and how one is refreshed (R137)
 config/release-keys/node.asc     the Node.js release team keys that sign each release SHASUMS256.txt
 config/release-keys/swift.asc    the Swift signing keys that sign each download

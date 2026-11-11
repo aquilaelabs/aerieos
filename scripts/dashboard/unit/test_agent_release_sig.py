@@ -50,6 +50,39 @@ class Verify(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("console allows unsigned", said)
 
+    def test_an_update_signed_by_the_spare_is_taken_as_one_signed_by_the_key(self):
+        # R232: the key the builds sign with is lost or replaced, the spare
+        # signs in its place, and no node is cut off.
+        k, pub = pair()
+        s, spare = pair()
+        other, _ = pair()
+        state = {"release_key": pub, "release_spare": spare}
+        self.assertEqual(release.keys(state), [pub, spare])
+        for signer, words in ((k, "signed by the release key"), (s, "signed by the spare release key")):
+            ok, said = release.may_install(state, DIGEST, signer.sign(release.MESSAGE + DIGEST.encode()).hex())
+            self.assertTrue(ok, said)
+            self.assertIn(words, said)
+        # A third key's is refused, naming both that are pinned.
+        ok, said = release.may_install(state, DIGEST, other.sign(release.MESSAGE + DIGEST.encode()).hex())
+        self.assertFalse(ok)
+        self.assertIn(pub[:16], said)
+        self.assertIn(f"or its spare ({spare[:16]}", said)
+        # A node that pinned no spare takes nothing the spare signed.
+        ok, _said = release.may_install({"release_key": pub}, DIGEST, s.sign(release.MESSAGE + DIGEST.encode()).hex())
+        self.assertFalse(ok)
+        # ...and a spare alone still pins the node: nothing unsigned gets in.
+        self.assertFalse(release.may_install({"release_spare": spare}, DIGEST, "")[0])
+
+    def test_a_key_and_its_spare_are_read_as_one_word(self):
+        _, a = pair()
+        _, b = pair()
+        _, c = pair()
+        self.assertEqual(release.clean_keys(a), [a])
+        self.assertEqual(release.clean_keys(f"{a},{b}"), [a, b])
+        self.assertEqual(release.clean_keys(f"{a},{a}"), [a])
+        for bad in ("", "nope", f"{a},nope", f"{a},{b},{c}"):
+            self.assertEqual(release.clean_keys(bad), [], bad)
+
     def test_a_node_that_pinned_nothing_updates_as_before(self):
         self.assertEqual(release.may_install({}, DIGEST, ""), (True, ""))
         self.assertEqual(release.may_install({"release_key": "not a key"}, DIGEST, ""), (True, ""))
@@ -71,6 +104,14 @@ class Console(unittest.TestCase):
         stores.save_state({"node_id": "n_1", "token": "bbn_new", "release_key": pub}, console=True)   # unsigned off, at the console
         stores.save_state(dict(running, token="bbn_3", unsigned_ok=True))                             # a stale copy cannot put it back
         self.assertNotIn("unsigned_ok", json.load(open(stores.NODE_JSON)))
+        self.assertEqual(stores.console_said(), {"release_key": pub})
+        # The spare is the console's too: the agent's own save keeps it, and cannot add one.
+        _, spare = pair()
+        stores.save_state({"node_id": "n_1", "token": "bbn_3", "release_key": pub, "release_spare": spare}, console=True)
+        stores.save_state(dict(running, token="bbn_4"))
+        self.assertEqual(stores.console_said(), {"release_key": pub, "release_spare": spare})
+        stores.save_state({"node_id": "n_1", "token": "bbn_4", "release_key": pub}, console=True)
+        stores.save_state(dict(running, token="bbn_5", release_spare=spare))
         self.assertEqual(stores.console_said(), {"release_key": pub})
 
 
@@ -107,6 +148,23 @@ class Enrolling(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", pub])
         self.assertEqual(json.load(open(stores.NODE_JSON)).get("release_key"), pub)
+        # The Enroll script carries the spare after a comma (R232): both are
+        # pinned, and a script that names the key alone drops the spare.
+        _, spare = pair()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", f"{pub},{spare}"])
+        got = json.load(open(stores.NODE_JSON))
+        self.assertEqual((got.get("release_key"), got.get("release_spare")), (pub, spare))
+        self.assertIn("and its spare", out.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t"])
+        got = json.load(open(stores.NODE_JSON))
+        self.assertEqual((got.get("release_key"), got.get("release_spare")), (pub, spare), "an enrollment naming none keeps what was pinned")
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", pub])
+        self.assertNotIn("release_spare", json.load(open(stores.NODE_JSON)))
+        with self.assertRaises(SystemExit):
+            cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", f"{pub},nope"])
         # ...and the check for updates no longer writes a record that is not a node's yet.
         saved = []
         w = (power.save_state, power.shutil.which, power.os.geteuid, power.os_release, power._out)
@@ -155,6 +213,31 @@ class Signer(unittest.TestCase):
         r = subprocess.run([sys.executable, tool], env={k2: v for k2, v in env.items() if k2 != "AERIEOS_RELEASE_KEY"},
                            capture_output=True, text=True, timeout=60, check=False)
         self.assertIn("ships unsigned", r.stdout)
+        # Named on the file's second line, that other key is the spare
+        # (R232): a build may sign with it, and the check passes under it.
+        open(mine, "a").write(f"aerieos-release-ed25519 {other.public_key().public_bytes_raw().hex()}\n")
+        r = subprocess.run([sys.executable, tool], env=dict(env, AERIEOS_RELEASE_KEY=other.private_bytes_raw().hex()),
+                           capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("with the spare release key", r.stdout)
+        r = subprocess.run([sys.executable, tool, "--check"], env=env, capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_the_enroll_script_carries_the_key_and_its_spare(self):
+        sys.path.insert(0, os.path.join(HERE, ".."))
+        import enrollscript
+        _, a = pair()
+        _, b = pair()
+        _, c = pair()
+        d = tempfile.mkdtemp()
+        was = enrollscript.RELEASE_PUB
+        self.addCleanup(setattr, enrollscript, "RELEASE_PUB", was)
+        enrollscript.RELEASE_PUB = os.path.join(d, "release.pub")
+        for lines, want in (([a], [a]), ([a, b], [a, b]), ([a, a], [a]), ([a, b, c], []), ([a, "nope"], []), ([], [])):
+            open(enrollscript.RELEASE_PUB, "w").write("# the keys\n" + "".join(f"aerieos-release-ed25519 {k}\n" for k in lines))
+            self.assertEqual(enrollscript.release_keys(), want, lines)
+            self.assertEqual(enrollscript.release_key(), (want or [""])[0])
+            self.assertEqual(release.clean_keys(",".join(want)), want)
 
     def test_the_committed_key_is_one_a_node_can_pin(self):
         sys.path.insert(0, os.path.join(HERE, ".."))

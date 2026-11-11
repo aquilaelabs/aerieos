@@ -1916,6 +1916,7 @@ def _census(c):
     # Whose agent updates it takes (the agent's release.py): the release key
     # it pinned, shortened, and whether its console allows unsigned builds.
     out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
+    out["release_spare"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_spare") or ""))[:16]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
@@ -8003,6 +8004,7 @@ def tab_view(rows, admin):
     # ...with the release key this build names and whether its agent is
     # signed, for the row's Updates fact (the agent's release.py).
     return {"nodes": rows, "agent": (agent_shipped() | {"release_key": enrollscript.release_key()[:16],
+                                                        "release_spare": (enrollscript.release_keys()[1:] or [""])[0][:16],
                                                         "signed": bool(agent_sig())}) if admin else {},
             "default": node_for() if admin else "",
             # What Enroll node's System pulldown offers (R204).

@@ -87,6 +87,25 @@ ok(local && local.kind === 'local' && local.state === 'online'
    'local is this container, with a real census');
 ok(!local.capabilities.includes('docker-host'),
    '...and no docker-host capability: the local node is not a sandbox');
+// A node's Updates line names the release key it pinned and its spare (R232),
+// and says when this build names a spare the node has not pinned yet.
+{
+  const said = await page.evaluate(() => {
+    const was = nodesAgent;
+    const n = reported => ({ kind: 'agent', reported });
+    try {
+      nodesAgent = { release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16), signed: true };
+      const both = ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16) }));
+      const owed = ndUpdatesFact(n({ release_key: 'a'.repeat(16) }));
+      nodesAgent = { release_key: 'a'.repeat(16), release_spare: '', signed: true };
+      return [both, owed, ndUpdatesFact(n({ release_key: 'a'.repeat(16) }))];
+    } finally { nodesAgent = was; }
+  });
+  ok(said[0] === 'signed releases only (key aaaaaaaa…, spare bbbbbbbb…)'
+     && said[1] === 'signed releases only (key aaaaaaaa…); no spare key pinned (Enroll script pins it)'
+     && said[2] === 'signed releases only (key aaaaaaaa…)',
+     `a node's Updates line names its release key and its spare, and says when the spare is still to pin (${JSON.stringify(said)})`);
+}
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
    'no capability toggles anywhere: a node does everything for the spaces bound to it');
 // The docker host, enrolled by the harness with a token (roadmap #24:

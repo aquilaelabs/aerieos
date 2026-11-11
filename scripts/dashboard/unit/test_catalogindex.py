@@ -88,6 +88,23 @@ class Index(unittest.TestCase):
         self.assertIsNone(catalogindex.known("https://other.example/"))
         self.assertEqual(asked, [])
 
+    def test_an_index_signed_by_the_spare_is_read_as_one_signed_by_the_key(self):
+        # R232: the install ships the key and its spare; an index signed by
+        # either is read, and a third key's is still refused.
+        data, sig = self.signed([ENTRY])
+        spare = ed25519.Ed25519PrivateKey.generate()
+        spare_pub = spare.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        other = ed25519.Ed25519PrivateKey.generate()
+        open(catalogindex.PUB_FILE, "a").write("builderbot-catalog-ed25519 " + spare_pub.hex() + "\n")
+        self.assertEqual(catalogindex._pubkeys(), [self.pub, spare_pub])
+        self.assertEqual(catalogindex.verify(data, sig), "")
+        self.assertEqual(catalogindex.verify(data, "builderbot-catalog-ed25519-signature " + spare.sign(data).hex()), "")
+        self.assertIn("does not match", catalogindex.verify(data, "builderbot-catalog-ed25519-signature " + other.sign(data).hex()))
+        # A file of three keys, or one with a line that is not a key, is no key at all.
+        open(catalogindex.PUB_FILE, "a").write("builderbot-catalog-ed25519 " + spare_pub.hex() + "\n")
+        self.assertEqual(catalogindex._pubkeys(), [])
+        self.assertIn("ships no catalog key", catalogindex.verify(data, sig))
+
     def test_without_a_shipped_key_nothing_is_trusted(self):
         catalogindex.PUB_FILE = os.path.join(self.d, "none.pub")
         data, sig = self.signed([ENTRY])

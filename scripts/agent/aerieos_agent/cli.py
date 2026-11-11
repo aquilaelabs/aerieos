@@ -109,9 +109,9 @@ def cmd_enroll(args):
         was = load_state()
     except SystemExit:
         was = {}
-    if opts["--release-key"] and not release.clean_key(opts["--release-key"]):
-        raise SystemExit("--release-key takes the release key as 64 hex characters")
-    key = release.clean_key(opts["--release-key"]) or release.pinned(was)
+    if opts["--release-key"] and not release.clean_keys(opts["--release-key"]):
+        raise SystemExit("--release-key takes the release key as 64 hex characters, and its spare after a comma")
+    pins = release.clean_keys(opts["--release-key"]) or release.keys(was)
     unsigned = release.unsigned_ok(was)
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
@@ -141,10 +141,14 @@ def cmd_enroll(args):
     # ...set here, at the save that is the console's, and not before:
     # nothing between could then write the record without them.
     state.pop("release_key", None)
+    state.pop("release_spare", None)
     state.pop("unsigned_ok", None)
-    if key:
-        state["release_key"] = key
-        print(f"pinned AerieOS's release key {key[:16]}…: this node takes only agent updates signed by it")
+    if pins:
+        state["release_key"] = pins[0]
+        if len(pins) > 1:
+            state["release_spare"] = pins[1]
+        print(f"pinned AerieOS's release key {pins[0][:16]}…" + (f" and its spare {pins[1][:16]}…" if len(pins) > 1 else "")
+              + ": this node takes only agent updates signed by " + ("one of them" if len(pins) > 1 else "it"))
     if unsigned:
         state["unsigned_ok"] = True
     save_state(state, console=True)
@@ -217,26 +221,35 @@ def _at_console(what):
 
 
 def cmd_release_key(args):
-    """release-key [HEX|none]: show, pin or drop AerieOS's release key here."""
+    """release-key [HEX[,HEX]|none]: show, pin or drop AerieOS's release
+    key here, with its spare after a comma."""
     from . import release
     state = load_state()
     if not args:
-        key = release.pinned(state)
+        key, spare = release.pinned(state), release.spare(state)
         print(f"release key: {key}" if key else "release key: none pinned; agent updates are taken on the controller's word")
-        print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if key else "not asked, with no key pinned"))
+        if spare:
+            print(f"spare key:   {spare}")
+        print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if release.keys(state) else "not asked, with no key pinned"))
         return
     _at_console("pinning a release key")
     if args[0] == "none":
         state.pop("release_key", None)
+        state.pop("release_spare", None)
         save_state(state, console=True)
         print("no release key pinned: agent updates are taken on the controller's word again")
         return
-    key = release.clean_key(args[0])
-    if not key:
-        raise SystemExit("the release key is 64 hex characters, as config/aerieos-release.pub and the Enroll script carry it")
-    state["release_key"] = key
+    pins = release.clean_keys(",".join(args))
+    if not pins:
+        raise SystemExit("the release key is 64 hex characters, as config/aerieos-release.pub and the Enroll script carry it, "
+                         "and its spare after a comma")
+    state["release_key"] = pins[0]
+    state.pop("release_spare", None)
+    if len(pins) > 1:
+        state["release_spare"] = pins[1]
     save_state(state, console=True)
-    print(f"pinned {key[:16]}…: this node takes only agent updates signed by it")
+    print(f"pinned {pins[0][:16]}…" + (f" and its spare {pins[1][:16]}…" if len(pins) > 1 else "")
+          + ": this node takes only agent updates signed by " + ("one of them" if len(pins) > 1 else "it"))
 
 
 def cmd_unsigned(args):
@@ -253,7 +266,7 @@ def cmd_unsigned(args):
     save_state(state, console=True)
     print(("this machine takes agent updates no release signed (a controller built from a branch)" if args[0] == "on"
            else "this machine refuses agent updates the pinned release key did not sign"
-           + ("" if release.pinned(state) else "; none is pinned yet, so that applies once one is")))
+           + ("" if release.keys(state) else "; none is pinned yet, so that applies once one is")))
 
 
 def main(argv):

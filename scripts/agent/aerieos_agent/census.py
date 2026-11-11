@@ -400,6 +400,7 @@ def census(state):
         # Whose agent updates this node takes (release.py): the release key
         # it pinned, shortened, and whether its console allows unsigned ones.
         "release_key": str(console_said().get("release_key") or "")[:16],
+        "release_spare": str(console_said().get("release_spare") or "")[:16],
         "unsigned_ok": console_said().get("unsigned_ok") is True,
         # ...and whether this agent may install the machine's own packages
         # here: the stamp AND root, which is what administers() asks. The

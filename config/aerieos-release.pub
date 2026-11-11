@@ -4,4 +4,7 @@
 # and then takes only agent updates the release build signed with its private
 # half (scripts/agent/aerieos_agent/release.py). The private half is the
 # release build's secret (AERIEOS_RELEASE_KEY) and is in no repository.
+# A second line of the same form names its spare: a node pins both and takes
+# an update signed by either, so this key can be replaced with no node cut
+# off. The spare's private half is kept apart from the build's secret.
 aerieos-release-ed25519 2eb9add8c065963469de797ff1d3e9679a19d904c93956487f5e2550d982e818

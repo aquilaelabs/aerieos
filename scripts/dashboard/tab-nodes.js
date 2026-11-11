@@ -1877,9 +1877,14 @@ function ndUpdatesFact(n){
   // A pinned node meeting an unsigned build here will refuse its update.
   if (!n.reported.unsigned_ok && nodesAgent && nodesAgent.signed === false && nodeStale(n))
     return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;
-  return n.reported.unsigned_ok
-    ? `signed releases (key ${key.slice(0, 8)}…), and unsigned builds, allowed at its console`
-    : `signed releases only (key ${key.slice(0, 8)}…)`;
+  // The spare (R232): pinned with the key, or named by this build and not
+  // pinned there yet, which the Enroll script puts right.
+  const spare = n.reported.release_spare || "";
+  const keys = spare ? `key ${key.slice(0, 8)}…, spare ${spare.slice(0, 8)}…` : `key ${key.slice(0, 8)}…`;
+  const owed = !spare && nodesAgent?.release_spare ? "; no spare key pinned (Enroll script pins it)" : "";
+  return (n.reported.unsigned_ok
+    ? `signed releases (${keys}), and unsigned builds, allowed at its console`
+    : `signed releases only (${keys})`) + owed;
 }
 function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");

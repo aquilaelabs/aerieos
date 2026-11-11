@@ -31,25 +31,35 @@ def configure(**deps):
         globals()["STATE"] = str(deps["state"])
 
 
-def _pubkey(path=None):
-    """The maintainers' public key as the install ships it, or None (then
-    nothing is trusted and the catalog says so)."""
+def _pubkeys(path=None):
+    """The maintainers' public keys as the install ships them: the key the
+    index is signed with, and on a second line its spare (R232), whose
+    private half is kept apart so the first can be lost or replaced with no
+    install cut off. [] when the file is not that, and then nothing is
+    trusted and the catalog says so."""
     try:
         with open(path or os.path.normpath(PUB_FILE), encoding="utf-8") as f:
-            words = f.read().split()
-        if len(words) != 2 or words[0] != "builderbot-catalog-ed25519":
-            return None
-        return bytes.fromhex(words[1])
+            lines = [ln.split() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+        if not 1 <= len(lines) <= 2 or any(len(w) != 2 or w[0] != "builderbot-catalog-ed25519" for w in lines):
+            return []
+        keys = [bytes.fromhex(w[1]) for w in lines]
+        return keys if all(len(k) == 32 for k in keys) else []
     except (OSError, ValueError):
-        return None
+        return []
+
+
+def _pubkey(path=None):
+    """The key the index is signed with, or None."""
+    return (_pubkeys(path) or [None])[0]
 
 
 def verify(index_bytes, sig_text, pub=None):
-    """Whether the signature is the maintainers' over these bytes: "" or
-    why not. Needs the cryptography library; without it nothing is
-    trusted, which is said rather than skipped."""
-    key = pub if pub is not None else _pubkey()
-    if not key:
+    """Whether the signature is the maintainers' over these bytes, under
+    the key this install ships or its spare: "" or why not. Needs the
+    cryptography library; without it nothing is trusted, which is said
+    rather than skipped."""
+    keys = ([pub] if isinstance(pub, bytes) else list(pub)) if pub is not None else _pubkeys()
+    if not keys:
         return "this install ships no catalog key, so no index is trusted"
     words = str(sig_text or "").split()
     if len(words) != 2 or words[0] != "builderbot-catalog-ed25519-signature":
@@ -58,11 +68,13 @@ def verify(index_bytes, sig_text, pub=None):
         from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: PLC0415
     except ImportError:
         return "the cryptography library is missing, so the index's signature cannot be checked: nothing is trusted"
-    try:
-        ed25519.Ed25519PublicKey.from_public_bytes(key).verify(bytes.fromhex(words[1]), index_bytes)
-    except Exception:                                                  # noqa: BLE001 (any failure is one answer)
-        return "the index's signature does not match: it was changed on the way or signed by another key, and is refused"
-    return ""
+    for key in keys:
+        try:
+            ed25519.Ed25519PublicKey.from_public_bytes(key).verify(bytes.fromhex(words[1]), index_bytes)
+            return ""
+        except Exception:                                              # noqa: BLE001, PERF203 (any failure is one answer)
+            continue
+    return "the index's signature does not match: it was changed on the way or signed by another key, and is refused"
 
 
 def parse(index_bytes):

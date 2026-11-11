@@ -221,7 +221,9 @@ AerieOS has a release key (`config/aerieos-release.pub` names its public
 half; the private half is the release build's secret and no controller's).
 The Enroll script carries the public half and the agent pins it as the
 node enrolls (`aerieos-agent release-key` shows it, and pins one on a
-node enrolled before, at its console). From then on the node takes an agent
+node enrolled before, at its console). Where the file names a spare on a
+second line, the script carries both and the node pins both: an update
+signed by either is taken ([the signing keys](#the-signing-keys-and-replacing-one)). From then on the node takes an agent
 update only when the release build's signature over the update's digest
 comes with it (`scripts/agent/agent.sig`, made by `tools/sign-agent.py` in
 the release's builds and passed on by the controller, which checks nothing
@@ -252,3 +254,38 @@ controller refuse storage, network and root changes there, and every root
 command is on the record with who approved it. One thing is held by the
 node itself: on the controller's own machine the root agent runs docker
 for the controller and nothing else under that mark.
+
+## The signing keys, and replacing one
+
+Three things an install takes from outside are checked against a key it
+already holds, never one that arrives with the thing itself:
+
+| What is checked | The public half an install holds | Where the private half is |
+|---|---|---|
+| The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
+| A node's agent update | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY` |
+| An OS update's file list | `config/release-signers`, read from the running image | offline, on the release key holder's own machine |
+
+**What a changed key costs.** An install trusts only what a key it holds
+signed, so a new key cuts off whatever still holds the old one. For the
+catalog that is every install on an older release: it keeps the index it
+last read and takes no newer one until it is updated; what a release
+ships itself (the toolchains, the coding agents), what is installed and a
+pack added by its own address go on working. For the release key it is
+every node that pinned the old one: it takes no agent update, and so no
+other job, until a person pins the new key at that machine (its Enroll
+script again, or `aerieos-agent release-key` at its console). A key that
+is lost costs the same as one that is changed.
+
+**The spare.** So each of the first two files may name a second key, its
+spare: a pair made the same way, whose private half is kept apart from
+the first (never in the same secrets) and signs nothing while the first is
+in use. An install reads an index signed by either, and a node that pinned
+both takes an update signed by either. When the first key is lost or has
+to go, the spare signs in its place and nothing is cut off; the next
+release then names the spare as its first key and a new spare beside it.
+Two is the most either file names: every key held is one more that can
+sign. A node enrolled before a spare was named pins it the next time its
+Enroll script is run, and its row says so under Updates until then. The
+OS update's list was a list from the start.
+

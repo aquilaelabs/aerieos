@@ -437,7 +437,7 @@ def load_state():
 # node.json in memory and writes it whole at every token it is handed, so
 # what the console wrote is read back from the file and kept, never the
 # agent's older copy of it.
-CONSOLE_KEYS = ("release_key", "unsigned_ok")
+CONSOLE_KEYS = ("release_key", "release_spare", "unsigned_ok")
 
 
 def console_said():
