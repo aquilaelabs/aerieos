@@ -198,8 +198,13 @@ cmd_tests_preflight() {
     # still lets the suites run, so one gate says everything that is wrong.
     local unit="${BB_REPO:-$PWD}/scripts/dashboard/unit"
     if [ -d "$unit" ]; then
-        printf '== unit: python3 -m unittest (scripts/dashboard/unit)\n'
-        if python3 -m unittest discover -s "$unit" -t "$unit" -q 2>&1; then
+        # Across the cores, as aerie tests unit runs it (unitpar.py): one
+        # process a core, each module dealt by the seconds it last took. In
+        # one process the tier was minutes of a gate that is otherwise idle
+        # while it runs.
+        printf '== unit: scripts/dashboard/unit, across the cores\n'
+        if python3 "$BB_LIB/unitpar.py" "$unit" "${BB_REPO:-$PWD}/.bb-map/unit-times.tsv" \
+                "${BB_TEST_WORKERS:-$(nproc 2>/dev/null || echo 1)}" 2>&1; then
             printf '  PASS  unit (exit 0)\n'
         else
             printf '  FAIL  unit\n'; rc=1

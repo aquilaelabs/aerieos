@@ -16,3 +16,11 @@ unraid
 # screenshots stay out.
 !docs/*.md
 .DS_Store
+# What a working tree holds that no image is made of: build output, the code
+# map, other branches' checkouts and Python's caches. A build from a tree
+# sent them all to the builder (dist alone can be gigabytes).
+dist
+.bb-map
+.worktrees
+.ruff_cache
+**/__pycache__

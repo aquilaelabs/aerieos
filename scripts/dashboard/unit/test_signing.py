@@ -25,6 +25,19 @@ KT = os.path.join(signnode.STORE, "jdk", "bin", "keytool") if signnode.STORE els
 
 @unittest.skipUnless(KT, "no toolchain store with a jdk on this machine")
 class Signing(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # One keystore for the class, each test given its own copy of the
+        # bytes: keytool is a JVM start and an RSA key, and one a test made
+        # this module the unit tier's whole wall time.
+        made = Path(tempfile.mkdtemp())
+        cls.addClassCleanup(shutil.rmtree, made, True)
+        subprocess.run([KT, "-genkeypair", "-keystore", str(made / "k.p12"), "-storetype", "PKCS12",
+                        "-storepass", "s3cret-pass", "-alias", "upload", "-keyalg", "RSA",
+                        "-keysize", "2048", "-validity", "100", "-dname", "CN=Test"],
+                       check=True, capture_output=True)
+        cls.keystore = (made / "k.p12").read_bytes()
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, True)
@@ -33,11 +46,8 @@ class Signing(unittest.TestCase):
         # A key is kept only once its backups have a password (2 Oct).
         signing.set_backup_password("app", "", "a-backup-password")
         self.ks = self.tmp / "k.p12"
-        subprocess.run([KT, "-genkeypair", "-keystore", str(self.ks), "-storetype", "PKCS12",
-                        "-storepass", "s3cret-pass", "-alias", "upload", "-keyalg", "RSA",
-                        "-keysize", "2048", "-validity", "100", "-dname", "CN=Test"],
-                       check=True, capture_output=True)
-        self.b64 = base64.b64encode(self.ks.read_bytes()).decode()
+        self.ks.write_bytes(self.keystore)
+        self.b64 = base64.b64encode(self.keystore).decode()
 
     def test_a_key_is_kept_once_keytool_reads_it(self):
         r, st = signing.put("app", "sideload", self.b64, "s3cret-pass", by="sean")

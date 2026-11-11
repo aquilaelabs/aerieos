@@ -279,6 +279,9 @@ RUN --mount=type=secret,id=gh_token,required=false \
     chmod +x /usr/local/bin/cloudflared; \
     cloudflared --version
 
+# A plain COPY, with the chmod in the step below: the installer on a machine
+# of its own lays a release out from these lines, read as "COPY SRC DEST"
+# (install-controller.sh lay_out), and one with a flag in it is not read.
 COPY scripts/ /opt/aerieos/scripts/
 COPY config/skel/ /opt/aerieos/skel/
 COPY config/templates/ /opt/aerieos/templates/
