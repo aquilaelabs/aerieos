@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A coding agent no longer second-guesses the aerie commands AerieOS itself decides: a release, a push or a roadmap change that the space's Agents may allows is not refused or asked about again by the agent's own permission check, which could differ from one day to the next. Claude Code, Codex, Copilot and Grok are each told in their own way, and a pack's agent can say how in its manifest (agent.allow). A session picks this up when it starts, so restart running sessions after the update (d0297ee)
+
 ## 0.9.0-dev.5211: 2026-11-11
 
 ### Added
