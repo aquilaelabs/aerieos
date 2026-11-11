@@ -168,6 +168,9 @@ class Shipped(unittest.TestCase):
         with open(os.path.join(root, "Dockerfile"), encoding="utf-8") as f:
             self.assertIn("COPY config/catalog.pub /opt/aerieos/config/catalog.pub", f.read())
         self.assertIsNotNone(catalogindex._pubkey(os.path.join(root, "config", "catalog.pub")))
+        # ...with its spare on the second line (R232), a key of its own.
+        keys = catalogindex._pubkeys(os.path.join(root, "config", "catalog.pub"))
+        self.assertEqual(len(set(keys)), 2, "the repository names a spare for the catalog's key")
 
 
 if __name__ == "__main__":

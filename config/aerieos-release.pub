@@ -8,3 +8,4 @@
 # an update signed by either, so this key can be replaced with no node cut
 # off. The spare's private half is kept apart from the build's secret.
 aerieos-release-ed25519 2eb9add8c065963469de797ff1d3e9679a19d904c93956487f5e2550d982e818
+aerieos-release-ed25519 5999f8948f031093527e378e6504bf436e82932835aeabce12d6031634586ce8

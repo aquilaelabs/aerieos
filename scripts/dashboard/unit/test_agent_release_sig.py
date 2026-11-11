@@ -245,6 +245,10 @@ class Signer(unittest.TestCase):
         key = enrollscript.release_key()
         self.assertEqual(release.clean_key(key), key)
         self.assertTrue(key, "the repository names AerieOS's release key")
+        # ...and its spare beside it (R232), a key of its own a node can pin too.
+        keys = enrollscript.release_keys()
+        self.assertEqual(len(keys), 2, "the repository names a spare for the release key")
+        self.assertEqual(release.clean_keys(",".join(keys)), keys)
 
 
 if __name__ == "__main__":
