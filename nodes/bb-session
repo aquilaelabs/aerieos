@@ -1402,7 +1402,34 @@ def caller(c, account=""):
 
 PROJECT_DIR = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 AGENT_IDS = ("claude", "codex", "copilot", "grok", "open")
-BRANCH = re.compile(r"(?:claude|codex|copilot|grok|open)/[A-Za-z0-9][A-Za-z0-9._@-]{0,79}")
+PACK_AGENT = re.compile(r"[a-z][a-z0-9]{1,15}")
+BRANCH_TAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]{0,79}")
+
+
+def pack_agents(c):
+    """The coding agents vetted packs bring (R169 step 10): the rows of the
+    node's own bundle's config/toolpacks.json that carry an adapter, read
+    from the bundle root keeps (BUNDLE in /etc/bb-session.conf), never from
+    anything the caller names. Never a shipped agent's id."""
+    path = os.path.join(c.get("BUNDLE") or "/nonexistent", "config", "toolpacks.json")
+    try:
+        # As root, only a file nobody else can write says who an agent is.
+        if os.geteuid() == 0 and not _root_owned(path):
+            return ()
+        with open(path, encoding="utf-8") as f:
+            rows = json.load(f).get("toolchains") or []
+    except (OSError, ValueError, AttributeError):
+        return ()
+    return tuple(sorted(r["name"] for r in rows if isinstance(r, dict) and isinstance(r.get("agent"), dict)
+                        and PACK_AGENT.fullmatch(str(r.get("name") or "")) and r["name"] not in AGENT_IDS))
+
+
+def agent_branch(c, agent, branch):
+    """Whether `agent` is a coding agent here, shipped or a pack's, and
+    `branch` a branch of its own: AGENT/NAME."""
+    if agent not in AGENT_IDS and agent not in pack_agents(c):
+        return False
+    return branch.startswith(agent + "/") and bool(BRANCH_TAIL.fullmatch(branch[len(agent) + 1:]))
 
 
 def worktree(c, argv):
@@ -1424,8 +1451,7 @@ def worktree(c, argv):
     if len(argv) != 4:
         raise Refused("bb-session worktree PROJECT AGENT SLOT BRANCH")
     project, agent, slot, branch = argv
-    if not PROJECT_DIR.fullmatch(project) or agent not in AGENT_IDS or slot not in "123456789" or len(slot) != 1 \
-            or not BRANCH.fullmatch(branch) or not branch.startswith(agent + "/"):
+    if not PROJECT_DIR.fullmatch(project) or slot not in "123456789" or len(slot) != 1 or not agent_branch(c, agent, branch):
         raise Refused("bb-session worktree: not a space, an agent, a slot and a branch")
     ws = c["WORKSPACE"].rstrip("/")
     src = f"{ws}/{project}"
