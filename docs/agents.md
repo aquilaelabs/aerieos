@@ -160,6 +160,39 @@ Grok has no hook for its permission prompt alone, so its dot is never
 asking, and it does not pass a prompt hook's words on to the model, so a
 house rule named in a prompt is not said to it then.
 
+## What an agent need not ask about
+
+Every coding agent has a permission check of its own, and none of them knows
+a space's Agents may: Claude Code's rules and, in its auto mode, a
+classifier; Codex CLI's execpolicy; Copilot CLI's and Grok Build's allow
+lists. Left to itself each judges an `aerie` command by its own lights, so a
+release a space lets its sessions cut could run one day and be refused the
+next. AerieOS is what decides those commands: each is checked on the
+controller against the space's Agents may, its pushing rules and its git
+host's permit, or waits on the bell for a person's answer. So each session
+starts with its agent told, in the agent's own words, that these need no
+asking, and the answer is the controller's alone.
+
+Which commands: `aerie` (and `bb`) followed by `version`, `changelog`,
+`roadmap`, `bug`, `rules`, `design`, `wiki`, `memory`, `report`, `git`,
+`forge`, `devapp`, `container`, `vm`, `tool`, `sign`, `pc`, `root`, `phone`,
+`settings` or `tidy`. Never the whole command: `aerie run`, `build`, `test`,
+`emu` and `gpu run` run a command of the session's own, which the agent's
+check judges as it would the command typed bare.
+
+How each is told is its manifest's `allow` (the table in `agents.py` for the
+agents AerieOS ships, a pack's `agent.allow` for one a pack brings,
+[tool-packs.md](tool-packs.md)): Claude Code by rules in the settings file
+its session starts with, where a rule is decided before its classifier is
+asked; Grok Build and Copilot CLI by an option on their command line; Codex
+CLI by a rules file under the account's home, written at each start;
+OpenCode is started with every command allowed already. A session picks
+this up when it starts: one already running keeps the rules it began with
+until it is restarted. Claude Code's rule form is its documentation's and
+Codex CLI's was checked with its own `execpolicy check`; Grok Build's and
+Copilot CLI's are as their own help gives them and not yet walked in a
+session.
+
 ## In the dock, the bell and the turn limit
 
 A Codex, Copilot or Grok session's dot in the dock reads from its own hooks, since

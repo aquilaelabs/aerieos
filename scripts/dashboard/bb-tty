@@ -649,8 +649,16 @@ claude_scope() {
                --arg state "${DASHBOARD_STATE:-/config}" \
                --argjson hooks "$(python3 "$hooks/bb-agent-hook" --claude-settings "$proj" "${account:-owner}" "$hooks")" \
                --arg proj "$proj" --arg who "${account:-owner}" \
+               --argjson allow "$(python3 "$hooks/bb-agent-hook" --allow claude 2>/dev/null | jq -c '.settings // []' 2>/dev/null || echo '[]')" \
                --arg mem "$HOME/.claude/projects/$(tree_slug "$here")/memory" '
            {permissions: {
+              # The aerie verbs the controller decides (agents.OWN_VERBS):
+              # checked there against what the space lets its agents do, or
+              # waiting on an answer from a person, so the check Claude Code
+              # has of its own does not judge them a second time, differently
+              # from one day to the next. (No apostrophe in this block: it
+              # sits inside a quoted jq program.)
+              allow: $allow,
               # The memory of the project, which Claude Code keeps outside
               # its tree: a session asked the person to approve reading the
               # file it was about to update (Shebang-DevBoard, 6 Oct).
@@ -1137,6 +1145,24 @@ opencode_config() {
          instructions: (if $pref == "" then [] else [$pref] end),
          permission: {edit: "allow", bash: "allow", webfetch: "allow"}}' > "$f.new" ) 2>/dev/null \
         && mv -f "$f.new" "$f"
+}
+
+# agent_allow AGENT: tell another coding agent, the way its manifest says it
+# is told (agents.allow_plan), that the aerie verbs the controller decides
+# need no asking: options added to the command about to start, or its rules
+# file written under the account's home. An agent with no way of being told,
+# or a helper that fails, changes nothing: it asks as it did.
+agent_allow() {
+    local plan f t
+    plan="$(python3 "$(dirname "$(readlink -f "$0")")/bb-agent-hook" --allow "$1" 2>/dev/null)" || return 0
+    f="$(jq -r '.file.path // ""' <<<"$plan" 2>/dev/null)"
+    if [ -n "$f" ]; then
+        ( umask 077; mkdir -p "$HOME/${f%/*}" && jq -r '.file.text' <<<"$plan" > "$HOME/$f.new" && mv -f "$HOME/$f.new" "$HOME/$f" ) 2>/dev/null || true
+    fi
+    while IFS= read -r t; do
+        [ -n "$t" ] && cmd+=("$t")
+    done < <(jq -r '.args[]?' <<<"$plan" 2>/dev/null)
+    return 0
 }
 
 # agent_first_run AGENT DIR: another coding agent's "trust this folder?",
@@ -2032,6 +2058,13 @@ case "$target" in
                 echo "WARNING: could not write ${agent_product}'s hooks; this session is held by" >&2
                 echo "its view and bb's own checks alone, not by AerieOS's guards." >&2
             fi
+        fi
+        # What it need not ask about, in its own words (its manifest's
+        # allow): options on its command line, or a rules file under its
+        # home. Claude's ride in its settings file below.
+        [ "$agent" = claude ] || agent_allow "$agent"
+        if [ -n "$PACK_AGENT" ] || [ "$agent" != claude ]; then
+            :
         elif scope="$(claude_scope "$proj" "$dir")"; then
             cmd+=(--settings "$scope")
         else

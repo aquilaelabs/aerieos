@@ -1,6 +1,11 @@
 {
  "about": "Copilot CLI, run by sessions as copilot",
  "agent": {
+  "allow": {
+   "flag": "--allow-tool",
+   "how": "flag",
+   "rule": "shell({cmd}:*)"
+  },
   "briefing": "instructions-file",
   "command": "copilot",
   "guards": "hooks",

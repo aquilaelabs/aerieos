@@ -167,7 +167,20 @@ def _agent(a, errors):
         errors.append("agent.transcripts is a path under the account's home")
     if out["latest_url"] and not re.fullmatch(r"https://[A-Za-z0-9._~:/@+?=&%-]{3,300}", out["latest_url"]):
         errors.append("agent.latest_url is an https address")
+    _agent_allow(a, out, errors)
     return out
+
+
+def _agent_allow(a, out, errors):
+    """An agent's `allow` (R231): how it is told the aerie verbs the
+    controller decides need no asking, checked by agents.allow_checked and
+    kept only where it says a way."""
+    import agents                                               # noqa: PLC0415 (beside this file)
+    spec, why = agents.allow_checked(a.get("allow"))
+    if why:
+        errors.append(why)
+    elif spec:
+        out["allow"] = spec
 
 
 # A coding agent from a vetted pack (R169 step 8): an adapter of data, never
@@ -285,6 +298,7 @@ def _pack_agent(name, a, errors):
     if se and not (isinstance(se, str) and ENV_NAME.fullmatch(se)):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
+    _agent_allow(a, out, errors)
     tr = a.get("transcripts") if isinstance(a.get("transcripts"), dict) else {}
     td, tf = tr.get("dir", ""), tr.get("file", "")
     if td and not (isinstance(td, str) and REL.fullmatch(td)):

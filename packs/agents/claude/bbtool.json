@@ -1,6 +1,10 @@
 {
  "about": "Claude Code, run by sessions as claude",
  "agent": {
+  "allow": {
+   "how": "settings",
+   "rule": "Bash({cmd} *)"
+  },
   "briefing": "system-prompt-file",
   "command": "claude",
   "guards": "hooks",

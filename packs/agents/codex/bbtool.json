@@ -1,6 +1,11 @@
 {
  "about": "Codex CLI, run by sessions as codex",
  "agent": {
+  "allow": {
+   "file": ".codex/rules/aerieos.rules",
+   "how": "rules-file",
+   "rule": "prefix_rule(pattern={argv}, decision=\"allow\")"
+  },
   "briefing": "instructions-file",
   "command": "codex",
   "guards": "hooks",

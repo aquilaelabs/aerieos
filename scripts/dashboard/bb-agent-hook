@@ -7,6 +7,9 @@
     bb-agent-hook --pack-agent AGENT             a pack agent's adapter, as JSON
     bb-agent-hook --pack-hooks AGENT             its hooks file written in its shape
     bb-agent-hook --pack-launch AGENT            its launcher's lines, for bb-tty
+    bb-agent-hook --allow AGENT                  what its session's start does so it need
+                                                 not ask about the aerie verbs the controller
+                                                 decides (agents.allow_plan), as JSON
 
 Codex CLI and Copilot CLI each carry hooks of their own now (Codex's
 PreToolUse, UserPromptSubmit, Stop, PermissionRequest and PostCompact;
@@ -433,6 +436,12 @@ def main(argv):
         if not a:
             return 1
         print(json.dumps(a))
+        return 0
+    if argv[:1] == ["--allow"] and len(argv) == 2:
+        sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+        import agents                                           # noqa: PLC0415 (beside this file)
+        pack = None if agents.get(argv[1]) else pack_adapter(argv[1])
+        print(json.dumps(agents.allow_plan(argv[1], (pack or {}).get("allow"))))
         return 0
     if argv[:1] == ["--pack-hooks"] and len(argv) == 2:
         here = os.path.dirname(os.path.abspath(__file__))

@@ -21,6 +21,7 @@ node's bundle and the doctor can read it standalone. The page's copy is
 page-agents.js, held to this one by unit/test_agents.py; the node agent's
 prefixes (aerieos_agent/sessions.py AGENT_PREFIXES) by the same test.
 """
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -44,6 +45,7 @@ class Agent:
     tool: str = ""          # its row's name in the Library and on the Installed page, "" when it has none yet
     latest_url: str = ""    # where the newest release is asked (an npm registry `latest`, or a plain version)
     pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter (R169 step 9), None for the shipped
+    allow: dict = field(default=None, compare=False, hash=False)  # how it is told a command needs no asking (ALLOW_HOW), None for no way
 
     @property
     def arg(self):
@@ -79,19 +81,23 @@ TABLE = (
           provider="Anthropic", reported="claude", update_job="claude-update",
           login_job="claude-login", logout_job="claude-logout",
           briefing="system-prompt-file", guards="hooks", state="hooks",
-          transcripts=".claude/projects", live=True, tool="claude-code"),
+          transcripts=".claude/projects", live=True, tool="claude-code",
+          allow={"how": "settings", "rule": "Bash({cmd} *)"}),
     Agent(id="codex", name="ChatGPT", product="Codex CLI", command="codex",
           provider="OpenAI", reported="codex", update_job="codex-update",
           login_job="codex-login", logout_job="codex-logout",
           briefing="instructions-file", guards="hooks", state="hooks",
           transcripts=".codex/sessions", tool="codex-cli", live=True,
-          latest_url="https://registry.npmjs.org/@openai/codex/latest"),
+          latest_url="https://registry.npmjs.org/@openai/codex/latest",
+          allow={"how": "rules-file", "file": ".codex/rules/aerieos.rules",
+                 "rule": 'prefix_rule(pattern={argv}, decision="allow")'}),
     Agent(id="copilot", name="Copilot", product="Copilot CLI", command="copilot",
           provider="GitHub", reported="copilot", update_job="copilot-update",
           login_job="copilot-login", logout_job="copilot-logout",
           briefing="instructions-file", guards="hooks", state="hooks",
           transcripts=".copilot/session-state", tool="copilot-cli", live=True,
-          latest_url="https://registry.npmjs.org/@github/copilot/latest"),
+          latest_url="https://registry.npmjs.org/@github/copilot/latest",
+          allow={"how": "flag", "flag": "--allow-tool", "rule": "shell({cmd}:*)"}),
     # Grok Build (R95 step 21): xAI's coding agent, checked against its user
     # guide on 25 Oct (xai-org/grok-build, Apache-2.0). Its hooks are
     # Claude's events (PreToolUse, UserPromptSubmit, Stop), its sign-in a
@@ -101,7 +107,8 @@ TABLE = (
           login_job="grok-login", logout_job="grok-logout",
           briefing="system-prompt-file", guards="hooks", state="hooks",
           transcripts=".grok/sessions", tool="grok-build", live=True,
-          latest_url="https://x.ai/cli/stable"),
+          latest_url="https://x.ai/cli/stable",
+          allow={"how": "flag", "flag": "--allow", "rule": "Bash({cmd}:*)"}),
     # Any model (R144 step 2): OpenCode, the open agent, pointed at a node's
     # model router (router.py) rather than signed in to anybody: its keys
     # are the router's, handed to a session at its start with the models
@@ -119,6 +126,87 @@ TABLE = (
 )
 
 _BY_ID = {a.id: a for a in TABLE}
+
+# ---- what an agent need not ask about (R231) ----------------------------------
+# Every coding agent has a permission check of its own (Claude Code's rules
+# and its classifier, Codex's execpolicy, Copilot's and Grok's allow lists),
+# and none of them knows the space's Agents may. Left alone, each judges an
+# `aerie` command by itself: the same release that ran one day was refused
+# the next, with the space's dial on auto both times (the operator, 11 Nov).
+# AerieOS is what decides these verbs: each is checked on the controller
+# against the space's dials, its pushing rules and its git host's permit, or
+# waits for a person's answer on the bell. So an agent is told, in its own
+# words, that these need no asking, and the answer is the controller's alone.
+#
+# Only the verbs the controller decides. What runs a command of the
+# session's own (`aerie run`, `build`, `test`, `emu`, `gpu run`) is left to
+# the agent's check, as that command would be if it were typed bare.
+OWN_VERBS = ("version", "changelog", "roadmap", "bug", "rules", "design", "wiki", "memory", "report",
+             "git", "forge", "devapp", "container", "vm", "tool", "sign", "pc", "root", "phone",
+             "settings", "tidy")
+# The command by both of its names: bb forwards to aerie.
+OWN_NAMES = ("aerie", "bb")
+# How an agent takes the list, which its row here or its pack's manifest
+# says (agent.allow): a rule in the settings file its session starts with
+# (Claude Code), an option repeated on its command line (Grok, Copilot), a
+# rules file under its home (Codex), or no way at all.
+ALLOW_HOW = ("none", "settings", "flag", "rules-file")
+_ALLOW_FLAG = re.compile(r"--[a-z][a-z0-9-]{1,30}")
+_ALLOW_RULE = re.compile(r"[A-Za-z0-9_ ()\[\]{}=,:.*\"'-]{3,120}")
+_ALLOW_FILE = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._-]{1,60}){0,5}")
+
+
+def allow_checked(spec):
+    """(spec, why): an agent's `allow` as it is kept, or why it is refused.
+    A manifest's words reach a command line and a file under the account's
+    home, so each is held to a shape: the option's name, a rule that carries
+    {cmd} or {argv}, a file by its path under the home."""
+    if spec in (None, "", {}):
+        return None, ""
+    if not isinstance(spec, dict) or spec.get("how") not in ALLOW_HOW:
+        return None, f"agent.allow.how is one of {', '.join(ALLOW_HOW)}"
+    how = spec["how"]
+    if how == "none":
+        return None, ""
+    rule = spec.get("rule")
+    if not (isinstance(rule, str) and _ALLOW_RULE.fullmatch(rule) and ("{cmd}" in rule or "{argv}" in rule)):
+        return None, "agent.allow.rule is the agent's own rule for one command, with {cmd} (aerie version) or {argv} ([\"aerie\", \"version\"]) where the command goes"
+    out = {"how": how, "rule": rule}
+    if how == "flag":
+        if not (isinstance(spec.get("flag"), str) and _ALLOW_FLAG.fullmatch(spec["flag"])):
+            return None, "agent.allow.flag is the option that takes one rule, e.g. --allow"
+        out["flag"] = spec["flag"]
+    if how == "rules-file":
+        f = spec.get("file")
+        if not (isinstance(f, str) and _ALLOW_FILE.fullmatch(f) and ".." not in f):
+            return None, "agent.allow.file is the rules file's path under the account's home, e.g. .codex/rules/aerieos.rules"
+        out["file"] = f
+    return out, ""
+
+
+def allow_plan(agent_id, spec=None):
+    """What starting this agent's session does so it need not ask about the
+    verbs AerieOS decides: {"settings": [rule...], "args": [option, rule,
+    ...], "file": {"path", "text"} or None}. Empty for an agent with no way
+    of being told. `spec` is a pack agent's own, where the caller holds its
+    adapter (a node's bb-tty, which has no table of packs)."""
+    a = get(agent_id)
+    spec, _why = allow_checked(spec or (a.allow if a else None) or ((a.pack or {}).get("allow") if a else None))
+    plan = {"settings": [], "args": [], "file": None}
+    if not spec:
+        return plan
+    rules = []
+    for name in OWN_NAMES:
+        for verb in OWN_VERBS:
+            rules.append(spec["rule"].replace("{cmd}", f"{name} {verb}").replace("{argv}", json.dumps([name, verb])))
+    if spec["how"] == "settings":
+        plan["settings"] = rules
+    elif spec["how"] == "flag":
+        plan["args"] = [x for r in rules for x in (spec["flag"], r)]
+    elif spec["how"] == "rules-file":
+        head = "# Written by AerieOS at each session's start: the aerie verbs its controller decides need no asking here.\n"
+        plan["file"] = {"path": spec["file"], "text": head + "\n".join(rules) + "\n"}
+    return plan
 
 # The coding agents installed packs bring (R169 step 9): the server sets this
 # to toolpacks.offered_agents, [(name, label, adapter)]; a standalone reader
@@ -139,7 +227,7 @@ def _pack_rows():
                               provider=a.get("provider") or "", reported=name, update_job="", login_job="", logout_job="",
                               briefing="instructions-file" if (a.get("briefing") or {}).get("how") == "env-file" else "system-prompt-file",
                               guards="hooks", state="hooks", transcripts=(a.get("transcripts") or {}).get("dir") or "",
-                              live=True, tool=name, pack=a))
+                              live=True, tool=name, pack=a, allow=allow_checked(a.get("allow"))[0]))
         _packs.update(key=got, rows=tuple(rows))
     return _packs["rows"]
 

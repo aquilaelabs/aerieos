@@ -56,7 +56,9 @@ def agent_packs():
     for a in agents.TABLE:
         m = {"name": a.id, "label": a.name, "about": f"{a.product}, run by sessions as {a.command}", "tier": "official",
              "platforms": ["linux/*"], "terms": [],
-             "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS}}
+             # ...with how it is told a command needs no asking, where the
+             # table says a way (agents.allow_plan).
+             "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS} | ({"allow": a.allow} if a.allow else {})}
         out.append((os.path.join(PACKS, "agents", a.id, "bbtool.json"), m))
     return out
 

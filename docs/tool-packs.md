@@ -112,6 +112,7 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 | `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
 | `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
+| `allow` | How it is told that a command needs no asking: `how` is `settings` (a rule in the settings file its session starts with, as Claude Code reads), `flag` (the option `flag` repeated with one rule each, as Grok Build's `--allow` and Copilot CLI's `--allow-tool`), `rules-file` (a `file` under the account's home with one rule a line, as Codex CLI's execpolicy) or `none`. `rule` is the agent's own rule for one command, with `{cmd}` (`aerie version`) or `{argv}` (`["aerie", "version"]`) where the command goes. AerieOS fills it once for each `aerie` verb its controller decides ([agents.md](agents.md#what-an-agent-need-not-ask-about)). Left out, the agent asks by its own judgment. |
 
 `pre`, `prompt` and `stop` are required: an agent that cannot take the
 guards is refused, as the shipped ones would be. The pack's name is its

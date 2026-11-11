@@ -1,6 +1,11 @@
 {
  "about": "Grok Build, run by sessions as grok",
  "agent": {
+  "allow": {
+   "flag": "--allow",
+   "how": "flag",
+   "rule": "Bash({cmd}:*)"
+  },
   "briefing": "system-prompt-file",
   "command": "grok",
   "guards": "hooks",

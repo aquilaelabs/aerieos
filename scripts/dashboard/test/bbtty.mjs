@@ -633,6 +633,10 @@ sleep 60
       ok(/bb-agent-hook codex pre$/.test(cmdOf('PreToolUse')) && /bb-agent-hook codex prompt$/.test(cmdOf('UserPromptSubmit'))
          && /bb-agent-hook codex stop$/.test(cmdOf('Stop')) && /bb-agent-hook codex asking$/.test(cmdOf('PermissionRequest')),
          `...its guards are Codex's own hooks, written into the account's hooks.json (${Object.keys(hk.hooks || {}).join(', ')})`);
+      // ...and what it need not ask about is its own rules file (R231).
+      const cxRules = existsSync(join(HOMEDIR, '.codex', 'rules', 'aerieos.rules')) ? readFileSync(join(HOMEDIR, '.codex', 'rules', 'aerieos.rules'), 'utf8') : '';
+      ok(cxRules.includes('prefix_rule(pattern=["aerie", "version"], decision="allow")') && !/"run"|"build"/.test(cxRules),
+         `...the aerie verbs the controller decides are allowed in Codex's rules file (${cxRules.split('\n').length} lines)`);
       const cxRun = readFileSync(join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, 'codex-run.sh'), 'utf8');
       ok(/export BB_AGENT=codex/.test(cxRun) && /export BB_AGENT_WHO=/.test(cxRun),
          '...and the launcher names the agent and the account its hooks act for');
@@ -720,6 +724,9 @@ sleep 60
       const dirs = existsSync(`${cpArgv}.dirs`) ? readFileSync(`${cpArgv}.dirs`, 'utf8') : '';
       ok(alive(`copilot-${proj}`) && cp[0] === '--no-auto-update',
          `signed in, a Copilot session starts, its own updater off (${cp.slice(0, 1).join(' ')})`);
+      const cpa = cp.indexOf('shell(aerie version:*)');
+      ok(cpa > 0 && cp[cpa - 1] === '--allow-tool' && !cp.some(a => /shell\(aerie (run|build)\b/.test(a)),
+         `...told with its own option that the aerie verbs the controller decides need no asking (${cp.filter(a => a === '--allow-tool').length} rules)`);
       const rcp = respawn('copilot');
       ok(rcp.includes('--continue'), `...and a respawn continues Copilot's newest session (${rcp.slice(-3).join(' ')})`);
       const cph = existsSync(join(HOMEDIR, '.copilot', 'hooks', 'builderbot.json'))
@@ -757,6 +764,8 @@ sleep 60
         const gk = existsSync(gkArgv) ? readFileSync(gkArgv, 'utf8').split('\0') : [];
         const genv = existsSync(`${gkArgv}.env`) ? readFileSync(`${gkArgv}.env`, 'utf8') : '';
         const ri = gk.indexOf('--rules');
+        const gka = gk.indexOf('Bash(aerie version:*)');
+        ok(gka > 0 && gk[gka - 1] === '--allow', `Grok is told the same with its own option (${gk.filter(a => a === '--allow').length} rules)`);
         ok(alive(`grok-${proj}`) && ri >= 0 && /THE HOUSE RULES/.test(gk[ri + 1] || '') && genv === '0 1',
            `signed in, a Grok session starts with the briefing appended to its prompt, Claude's hooks and its own updater off (${genv})`);
         const rgk = respawn('grok');
@@ -807,6 +816,14 @@ sleep 60
     const scope = JSON.parse(readFileSync(
       join(HOMEDIR, '.cache', 'builderbot', 'u', other, 'project', proj, 'claude-scope.json'), 'utf8'));
     const deny = scope.permissions.deny.join(' ');
+    // What the controller decides, Claude Code's own check does not judge
+    // again (R231): the aerie verbs held by the space's dials or a person's
+    // answer are allowed in its settings, under both of the command's names,
+    // and nothing that runs a command of the session's own is.
+    const allow = scope.permissions.allow || [];
+    ok(allow.includes('Bash(aerie version *)') && allow.includes('Bash(bb roadmap *)') && allow.includes('Bash(aerie git *)')
+       && !allow.some(r => /aerie (run|build|test|emu|gpu)\b/.test(r)) && !allow.includes('Bash(aerie *)'),
+       `the settings allow the aerie verbs the controller decides, and no verb that runs a command (${allow.length} rules)`);
     ok(deny.includes(`Edit(${src}/**)`),
        '...with the space directory itself denied to it, being another tree');
     ok(!deny.includes(`Edit(${wt}/**)`),
