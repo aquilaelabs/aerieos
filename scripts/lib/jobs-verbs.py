@@ -10,6 +10,7 @@ Arguments: how many jobs to list, and a job's id for its log. BB_JOBS_AUTH
 is the auth header.
 """
 import os
+import re
 import sys
 import time
 
@@ -41,6 +42,7 @@ else:
 if not rows:
     print("no jobs yet; a compose action, an exec on a node or an agent update makes one")
     raise SystemExit(0)
+_AGENT_JOB = re.compile(r"^([a-z]+)-(login|logout|update)$")
 for j in rows:
     s = j.get("spec") or {}
     # Named per type, the same names the Jobs tab uses. Anything not named
@@ -62,6 +64,12 @@ for j in rows:
             # since a failed one is otherwise a mystery (B775).
             f'tell {s.get("session") or "?"}: "{" ".join(str(s.get("text") or "").split())[:60]}"'
             if j["type"] == "tell" else
+            # A coding agent's install, sign-in and sign-out, by the program's
+            # own name (opencode-update, codex-login): these read "exec" with
+            # no command, which said nothing about what had failed.
+            (lambda m: ("sign " + m.group(1) + (" in" if m.group(2) == "login" else " out")) if m.group(2) != "update"
+             else f'{"remove" if s.get("action") == "remove" else "update"} {m.group(1)}')(_AGENT_JOB.match(j["type"]))
+            if _AGENT_JOB.match(j["type"] or "") else
             "exec " + " ".join(s.get("argv") or [])[:60])
     state = j["state"] + (" (stopping)" if j.get("cancel") and j["state"] == "running" else "")
     if j["state"] == "running" and j.get("step"):

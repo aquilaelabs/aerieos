@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Updating OpenCode works again: it failed with 'installed, but no opencode to run' since OpenCode's installer moved where it puts the program. Takes effect once a node's agent has updated (b726ef1)
+
 ## 0.9.0-dev.5214: 2026-11-11
 
 ### Changed

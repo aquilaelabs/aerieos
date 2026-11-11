@@ -94,7 +94,9 @@ function jobTitle(j){
   // Each coding agent's sign-in, sign-out and install by its own name, every
   // agent's job named <id>-login, -logout and -update (B291).
   const ag = (j.type || "").match(/^([a-z]+)-(login|logout|update)$/);
-  const who = ag && AGENTS.find(a => a.id === ag[1]);
+  // By its id or by its program: OpenCode's jobs are named after the
+  // program (opencode-update) and its id is open, so its row read "exec".
+  const who = ag && AGENTS.find(a => a.id === ag[1] || a.command === ag[1]);
   if (who) return ag[2] === "login" ? `sign ${esc(who.name)} in` : ag[2] === "logout" ? `sign ${esc(who.name)} out`
     : `${s.action === "remove" ? "remove" : "update"} ${esc(who.product)}`;
   if (j.type === "sign") return `sign ${esc(s.file || "a build")}`;
