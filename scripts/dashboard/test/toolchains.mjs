@@ -789,6 +789,22 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     ok(served.src.includes(iconAt.slice(0, 12)) && served.w > 0 && served.type === 'image/svg+xml' && /sandbox/.test(served.csp)
        && /default-src 'none'/.test(served.csp) && served.sniff === 'nosniff' && !served.ran,
        `its card draws the icon from the pack's own address at its pin, served as an image with no script run (${JSON.stringify(served)})`);
+    // An entry written in a pack format this build has not met (R234): its
+    // card says which AerieOS takes it, in the muted voice, with nothing to
+    // press, and Add refuses it the same way without fetching it.
+    writeFileSync(`${DIR}/state/catalog-index.json`, JSON.stringify({ fetched_at: 0, formats: { 99: '9.9.0' }, packs: [
+      { name: 'later', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '', format: 99,
+        about: 'Written for an AerieOS not out yet.', platforms: ['linux/amd64'] }] }));
+    const LATER = `.doc.on .librarytab .lcard[data-lrow="pack:later"]`;
+    await page.evaluate(() => { loadToolchains(); loadLibrary(); });
+    await page.waitForSelector(LATER, { timeout: 20000 });
+    const later = await page.$eval(LATER, c => ({ state: c.querySelector('.state')?.textContent.trim() || '', cls: c.querySelector('.state')?.className || '',
+      acts: [...c.querySelectorAll('[data-libact]')].map(b => b.dataset.libact) }));
+    ok(later.state === 'Needs AerieOS 9.9.0 or newer' && !/warn|bad/.test(later.cls) && !later.acts.length,
+       `an entry in a format this AerieOS has not met says what it needs on its card, muted, with nothing to press (${JSON.stringify(later)})`);
+    const past = await api('/api/toolpacks', { action: 'add', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt) });
+    ok(/later needs AerieOS 9\.9\.0 or newer \(it is written in pack format 99, and this AerieOS reads up to \d+\)/.test(past.error || ''),
+       `...and adding it is refused in the same words, nothing fetched (${past.error || 'it was added'})`);
     await api('/api/settings', { set: { catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/' } });
     rmSync(`${DIR}/state/catalog-index.json`, { force: true });
   }
