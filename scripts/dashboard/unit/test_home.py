@@ -11,10 +11,12 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import home  # noqa: E402
+import nodes as real_nodes  # noqa: E402
 
 
 class Nodes:
     rows = []
+    job_row = staticmethod(real_nodes.job_row)
 
     @staticmethod
     def node_list():
@@ -84,6 +86,12 @@ class Home(unittest.TestCase):
         # B113: where today began, so the Jobs page lists what was counted.
         self.assertTrue(now - 86400 < got["jobs"]["today"] <= now)
         self.assertEqual(len(got["jobs"]["last"]), 10)
+        # A job that carried a script is a row here, not the script.
+        rows[0]["spec"] = {"title": "a walk", "argv": ["bash", "-c", "x" * 50000]}
+        got, _ = home.read(rows, {}, False)
+        mine = next(j for j in got["jobs"]["last"] if j["id"] == "j_0")
+        self.assertEqual(mine["spec"]["title"], "a walk")
+        self.assertLess(len(mine["spec"]["argv"][2]), 1000)
         self.assertIsNone(got["nodes"], "an account that does not count the machines is told nothing of them")
 
     def test_machines_and_their_containers(self):

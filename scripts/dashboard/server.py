@@ -8772,7 +8772,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_jobs(self):
         """GET /api/v1/jobs: nodes.jobs_view, narrowed to the projects this
-        account may see unless it administers."""
+        account may see unless it administers. A list's rows carry each
+        job's spec cut to what names it; ?id= answers one job whole."""
         if NODES_OK:
             return self._json({"error": "the node store did not open: "
                                         + NODES_OK}, 500)

@@ -7854,6 +7854,36 @@ def _job_mine(j, mine):
     return bool(job_owner) and job_owner(j) in mine
 
 
+# What a list's row keeps of a job's spec: enough to name the job (its
+# action, its names, the head of its command), not what it carried. A system
+# job's spec holds the node's whole configuration and an exec's a script of
+# tens of kilobytes; a hundred rows of those were over a megabyte, read again
+# each time any job moved. One job, asked for by its id, has its spec whole.
+ROW_TEXT, ROW_ITEMS, ROW_NESTED = 400, 40, 2000
+
+
+def _row_value(v):
+    if isinstance(v, str):
+        return v if len(v) <= ROW_TEXT else v[:ROW_TEXT] + "…"
+    if isinstance(v, list):
+        return [_row_value(x) for x in v[:ROW_ITEMS] if not isinstance(x, (dict, list))
+                or len(json.dumps(x, default=str)) <= ROW_NESTED]
+    if isinstance(v, dict):
+        return v if len(json.dumps(v, default=str)) <= ROW_NESTED else None
+    return v
+
+
+def job_row(j):
+    """A job as a list carries it: itself, with its spec cut to what names
+    it (a long text's head, a list's first items, nothing of a large nested
+    part)."""
+    spec = j.get("spec")
+    if not isinstance(spec, dict):
+        return j
+    cut = {k: w for k, v in spec.items() if (w := _row_value(v)) is not None or v is None}
+    return {**j, "spec": cut}
+
+
 def jobs_view(jid, q, mine, system=None, hidden=None):
     """The Jobs page's whole read surface, and a test's: one job with its log
     so far, or the recent ones narrowed by the query's node, project, type,
@@ -7910,6 +7940,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         active=q.get("active", [""])[0] == "1")
     if mine is not None or hidden is not None:
         rows = [shown(j) for j in rows if seen(j)][:n]
+    rows = [job_row(j) for j in rows]
     # The names of the nodes these rows run on, and for an account that
     # is not an administrator no other: the whole registry rode here
     # past the scoping the nodes listing keeps (the probe of 26 Sep).

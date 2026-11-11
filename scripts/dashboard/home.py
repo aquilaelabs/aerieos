@@ -106,7 +106,9 @@ def _jobs(rows, names):
             # Where today began, so the Jobs page's Failed today lists the
             # jobs this count counted, by this container's day (B113).
             "today": int(since),
-            "last": [{k: j.get(k) for k in keep} for j in last],
+            # A row's spec, not the job's whole one (nodes.job_row): ten jobs
+            # that each carried a script were a quarter of a megabyte here.
+            "last": [{k: j.get(k) for k in keep} for j in map(nodes.job_row, last)],
             "nodes": {k: v for k, v in (names or {}).items() if any(j.get("node") == k for j in last)}}
 
 
