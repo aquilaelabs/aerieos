@@ -22,6 +22,7 @@
 - The UPS feature installs on AerieOS's own image, which now carries what it needs (e51c4c0)
 - A move or a backup that carries the install key lands on an AerieOS stick: it was refused with 'Permission denied' at the key once the system pool had been placed, which Moving here does just before (3e4f7df)
 - On Moving here, a bundle you picked is still picked when you press Land it here; the page could drop it and ask for it again (7980d72)
+- A catalog pack kept in a folder of a larger repository installs on a node; the install ended at 'bad object' before any of the pack's own steps ran (2ea3823)
 
 ## 0.9.0-dev.5236: 2026-11-11
 
