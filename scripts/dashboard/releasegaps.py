@@ -28,6 +28,7 @@ Path-pure apart from git, which is asked through version._git.
 import os
 import re
 import subprocess
+import threading
 
 version = None
 bugs = None
@@ -62,6 +63,67 @@ def _yes(project, *args):
                               timeout=30, check=False, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"}).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+# What git said about history, kept for the length of one walk over the
+# tracker: a tracker holds hundreds of fixed bugs, and asking git about each
+# (does this commit resolve, is it ours, was it before the tag, which commits
+# name the bug) was several processes a bug, minutes in all on a tree that
+# answers slowly. One walk asks each question once and reads the answers.
+_walk = threading.local()
+
+
+class _together:
+    """One walk: while it is open, a read of history is asked once. `memo`
+    is a walk's own answers handed back in, for work it left for later."""
+    def __init__(self, memo=None):
+        self.memo = {} if memo is None else memo
+
+    def __enter__(self):
+        self.outer = getattr(_walk, "memo", None)
+        if self.outer is None:
+            _walk.memo = self.memo
+        return self
+
+    def __exit__(self, *exc):
+        if self.outer is None:
+            _walk.memo = None
+
+
+def _once(key, make):
+    memo = getattr(_walk, "memo", None)
+    if memo is None:
+        return make()
+    if key not in memo:
+        memo[key] = make()
+    return memo[key]
+
+
+def _history(project, ref):
+    """Every commit in `ref`'s history, by its first seven characters, or
+    None when git would not say."""
+    def make():
+        out = _git(project, "rev-list", ref)
+        if out is None:
+            return None
+        idx = {}
+        for full in out.split():
+            idx.setdefault(full[:7], []).append(full)
+        return idx
+    return _once(("history", project, ref), make)
+
+
+def _since(project, tag):
+    """The commits since `tag`, newest first, each (short hash, message)."""
+    def make():
+        out = _git(project, "log", "--format=%h%x00%B%x01", f"{tag}..HEAD") or ""
+        rows = []
+        for rec in out.split("\x01"):
+            h, _, msg = rec.strip("\n").partition("\x00")
+            if h:
+                rows.append((h, msg))
+        return rows
+    return _once(("since", project, tag), make)
 
 
 def tag_prefix(comp=""):
@@ -107,19 +169,22 @@ def _stamp_sha(stamp):
     return (m.group(1), bool(m.group(2))) if m else ("", False)
 
 
-def _resolves(project, sha):
-    return bool(sha) and _yes(project, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}")
-
-
 def _at_or_before(project, sha, tag):
-    return _yes(project, "merge-base", "--is-ancestor", sha, tag)
+    """Whether the commit `sha` (seven characters of it or more) is in
+    `tag`'s history."""
+    if not sha:
+        return False
+    idx = _history(project, tag)
+    if idx is None or len(sha) < 7:
+        return _yes(project, "merge-base", "--is-ancestor", sha, tag)
+    return any(full.startswith(sha) for full in idx.get(sha[:7], ()))
 
 
 def _ours(project, sha):
     """A stamp's commit that this branch's history holds: one a rewrite left
     on no branch still resolves, and is in no tag's history either, which read
     as after every release (B700)."""
-    return bool(sha) and _resolves(project, sha) and _at_or_before(project, sha, "HEAD")
+    return bool(sha) and _at_or_before(project, sha, "HEAD")
 
 
 def _closed_after(project, bug, tag, tag_time):
@@ -129,7 +194,8 @@ def _closed_after(project, bug, tag, tag_time):
             return True
         # Closed with the fix not yet committed, on the release's own commit:
         # the fix landed after it.
-        tagged = _git(project, "rev-parse", "--short=7", f"{tag}^{{commit}}") or ""
+        tagged = _once(("short", project, tag),
+                       lambda: _git(project, "rev-parse", "--short=7", f"{tag}^{{commit}}") or "")
         return dirty and tagged and (sha.startswith(tagged) or tagged.startswith(sha))
     return int(bug.get("closed_at") or 0) > tag_time
 
@@ -137,9 +203,8 @@ def _closed_after(project, bug, tag, tag_time):
 def fix_commits(project, bug, tag):
     """The commits since `tag` that fixed `bug`: the ones whose message names
     it, and the one it was closed on when that came after the tag."""
-    word = _label(bug)
-    out = _git(project, "log", "--format=%h", "-E", f"--grep={re.escape(word)}([^0-9]|$)", f"{tag}..HEAD") or ""
-    shas = [s for s in out.split() if s]
+    names = re.compile(re.escape(_label(bug)) + r"([^0-9]|$)", re.M)
+    shas = [h for h, msg in _since(project, tag) if names.search(msg)]
     sha, dirty = _stamp_sha(bug.get("fixed_in"))
     if not dirty and _ours(project, sha) and not _at_or_before(project, sha, tag):
         short = _git(project, "rev-parse", "--short=7", sha) or sha[:7]
@@ -227,8 +292,10 @@ def answer_of(bug):
 
 def _named(where, shas):
     """Whether a changelog line names one of `shas`."""
-    text = changelog.read(where) or ""
-    named = {s for sec in changelog.sections(text) for e in sec["entries"] for s in e["shas"]}
+    def make():
+        text = changelog.read(where) or ""
+        return {s for sec in changelog.sections(text) for e in sec["entries"] for s in e["shas"]}
+    named = _once(("named", str(where)), make)
     return any(s.startswith(n) or n.startswith(s) for s in shas for n in named if len(n) >= 7)
 
 
@@ -237,6 +304,11 @@ def gaps(project, comp="", since=""):
     fixed since the last release (or the tag `since`) that it carried, or may
     have, with no Fixed line and no answer. {since: ""} for a tree with no
     release yet."""
+    with _together():
+        return _gaps(project, comp, since)
+
+
+def _gaps(project, comp, since):
     tag = since or last_release(project, comp)
     if not tag or bugs is None:
         return {"since": tag, "owed": []}
@@ -293,11 +365,12 @@ def stable_keep(project, comp=""):
     prev_time = int(_git(project, "log", "-1", "--format=%ct", prev) or 0)
     with bugs._lock:
         listed = list((bugs.load()["projects"].get(project) or []))
-    idx = []
-    for b in listed:
-        if b.get("status") != "fixed" or not _closed_after(project, b, prev, prev_time):
-            continue
-        idx.append((b, fix_commits(project, b, prev), answer_of(b)))
+    idx, memo = [], {}
+    with _together(memo):
+        for b in listed:
+            if b.get("status") != "fixed" or not _closed_after(project, b, prev, prev_time):
+                continue
+            idx.append((b, fix_commits(project, b, prev), answer_of(b)))
 
     def keep(e):
         if e.get("cat") != "Fixed":
@@ -307,5 +380,6 @@ def stable_keep(project, comp=""):
                or (ans and e["text"] in ans)]
         if not hit:
             return True
-        return any(carried(project, b, prev, shas)[0] != "no" for b, shas in hit)
+        with _together(memo):
+            return any(carried(project, b, prev, shas)[0] != "no" for b, shas in hit)
     return keep
