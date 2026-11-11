@@ -90,6 +90,17 @@ def _release_root(exe, src, home):
     return "" if os.path.realpath(root) in homes or root in ("/", "/usr", "/usr/local") else root
 
 
+def steady(title):
+    """A session's title with the frame of its working mark taken out: an
+    agent at work turns a mark at the head of its title several times a
+    second, and which frame a look caught is not a change to send. The
+    waiting mark is left, so working and waiting still differ."""
+    title = str(title or "")
+    if len(title) > 1 and title[1] == " " and title[0] != "✳" and ord(title[0]) > 127 and not title[0].isalnum():
+        return "~" + title[1:]
+    return title
+
+
 class SessionWatch:
     """The node's sessions reported the moment one changes (a session
     starting, ending, a Claude pane turning from waiting to working), so
@@ -116,7 +127,7 @@ class SessionWatch:
         if not self.agent.session_up:
             return
         rows = self.agent.sessions_now() or []
-        key = sorted((r.get("name", ""), r.get("title", "")) for r in rows)
+        key = sorted((r.get("name", ""), steady(r.get("title", ""))) for r in rows)
         if key == self.last:
             return
         if self.last is not None:

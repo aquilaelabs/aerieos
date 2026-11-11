@@ -5357,7 +5357,7 @@ def heartbeat(nid, sample, addr, running=0):
     # What another page draws from this row, as it stood before this sample:
     # if none of it moved, the sample's numbers are the only news, and only
     # the Nodes page, which shows them, is told (R218 step 10).
-    was = json.dumps([ag.get("addr"), *[rep.get(k) for k in HEARTBEAT_NEWS]], sort_keys=True)
+    was = _heartbeat_news(ag, rep)
     if addr:
         ag["addr"] = addr
     rep["sample"] = clean
@@ -5447,7 +5447,7 @@ def heartbeat(nid, sample, addr, running=0):
     # with a node picker re-read the node list and the status poll for each
     # node's every heartbeat (R218 step 10).
     _sample_rev[0] += 1
-    if json.dumps([ag.get("addr"), *[rep.get(k) for k in HEARTBEAT_NEWS]], sort_keys=True) != was:
+    if _heartbeat_news(ag, rep) != was:
         _bump()
     if n.get("live") is False:
         _revived(nid)
@@ -5455,6 +5455,28 @@ def heartbeat(nid, sample, addr, running=0):
         auto_update(nid)
     if moved:
         session_net_nudge()
+
+
+def _steady(title):
+    """A session's title with the frame of its working mark taken out. A
+    coding agent says it is working with a mark at the head of its title
+    that turns, several frames a second; which frame a sample caught is not
+    news. The waiting mark stays as it is, so working and waiting differ."""
+    if len(title) > 1 and title[1] == " " and title[0] != "✳" and ord(title[0]) > 127 and not title[0].isalnum():
+        return "~" + title[1:]
+    return title
+
+
+def _sessions_news(rows):
+    """A node's session rows as far as a page draws them: which sessions,
+    attached or not, where, and each one's title with its mark stilled."""
+    return [dict(r, title=_steady(str(r.get("title") or ""))) for r in rows or [] if isinstance(r, dict)]
+
+
+def _heartbeat_news(ag, rep):
+    """What another page draws from a node's row, as one string to compare."""
+    return json.dumps([ag.get("addr"), *[_sessions_news(rep.get(k)) if k == "sessions" else rep.get(k)
+                                         for k in HEARTBEAT_NEWS]], sort_keys=True)
 
 
 def _session_rows(rows):
@@ -5491,7 +5513,14 @@ def sessions_report(nid, rows):
     if not n:
         return {"error": "no such node"}
     rep = n.get("reported") or {}
-    rep["sessions"] = _session_rows(rows)
+    new = _session_rows(rows)
+    # Nothing a page draws moved (the same sessions, each working or waiting
+    # as before, on another frame of its mark): nothing is written and no
+    # page is told. Every frame was a write of the node's whole record and
+    # a status read by every open page, every two seconds a session worked.
+    if _sessions_news(new) == _sessions_news(rep.get("sessions")):
+        return {"ok": True, "sessions": len(new)}
+    rep["sessions"] = new
     _exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), nid))
     _bump()
     return {"ok": True, "sessions": len(rep["sessions"])}
