@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- A pack can bring a coding agent with a hook protocol of its own, described in its manifest: how its hooks file is laid out, where its payload keeps each thing and how each answer is written. The next such agent needs no update of AerieOS, and where its hooks file is also yours, its guards sit beside your own hooks (14b6057)
+
 ### Changed
 
 - Moving a controller from or onto a machine of its own (an AerieOS stick or disk, or a bare-metal install) carries its secrets files and ssh keys, where you were told to copy them by hand as root. Anything in them that is not a plain secret is left out and named (202a994)
