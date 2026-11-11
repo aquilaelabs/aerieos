@@ -1218,7 +1218,10 @@ def _add_folder(url, commit, path, by, shipped, sha256, tier):
         data = _load()
         rec = data["packs"].get(out["pack"]["name"])
         if rec:
-            rec.update({"url": url, "commit": commit, "path": path, "sha256": sha256 or "",
+            # The record names where the folder came from and the commit the
+            # catalog pins; the commit it is kept under in its repository
+            # here is its own, and is what a node fetches from the bundle.
+            rec.update({"url": url, "commit": commit, "path": path, "sha256": sha256 or "", "kept_at": rec.get("commit") or "",
                         "tier": tier if tier in ("vetted", "official") and sha256 else "url"})
             write_json(FILE, data)
             out["pack"] = rec
@@ -1260,6 +1263,22 @@ def remove(name, where=()):
     return {"ok": True}
 
 
+def _bundle_commit(rec):
+    """The commit a node fetches a pack at. One kept from a folder of a
+    repository (R170 step 6) is in its repository here under a commit of
+    its own, which is the one its bundle holds: the record's `kept_at`, or,
+    for a record from before it said so, that repository's head. Any other
+    pack's is the commit it is pinned to."""
+    if rec.get("hosted") and rec.get("path"):
+        if rec.get("kept_at"):
+            return rec["kept_at"]
+        if HOSTED and NAME.fullmatch(str(rec.get("name") or "")):
+            r = _git_here(rec["name"], "rev-parse", "-q", "--verify", "refs/heads/main")
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+    return rec["commit"]
+
+
 def recipe(rec):
     """A pack as one catalog row: the recipe machinery's own shape, its
     source the pack's repository cloned at the approved commit, then its
@@ -1268,7 +1287,7 @@ def recipe(rec):
     # A pack made here is fetched from the bundle beside the catalog on the
     # node (sdkmeta.packs_at makes the path whole there).
     url = f"bundle:toolpacks/{m['name']}.bundle" if rec.get("hosted") else rec["url"]
-    src = {"kind": "git", "url": url, "commit": rec["commit"], "fresh_only": True}
+    src = {"kind": "git", "url": url, "commit": _bundle_commit(rec), "fresh_only": True}
     if m["steps"]:
         src["then"] = [{"run": s} for s in m["steps"]]
     if m.get("verify"):

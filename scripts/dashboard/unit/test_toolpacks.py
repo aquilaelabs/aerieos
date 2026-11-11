@@ -164,6 +164,18 @@ class Repository(unittest.TestCase):
         row = toolpacks.recipes()[0]
         self.assertEqual((row["pack"]["path"], row["pack"]["here"], row["source"]["kind"]), ("packs/hexkit", True, "git"))
         self.assertTrue(row["source"]["url"].startswith("bundle:"), row["source"])
+        # What a node fetches is the commit the bundle holds, which is the
+        # folder's own here, never the repository's it came from: asked for
+        # that one, the bundle had no such object and no node could install
+        # a pack kept from a folder.
+        bundle = dict(toolpacks.hosted_files())["config/toolpacks/hexkit.bundle"]
+        heads = subprocess.run(["git", "bundle", "list-heads", str(bundle)], capture_output=True, text=True, check=True).stdout.split()
+        self.assertNotEqual(row["source"]["commit"], commit)
+        self.assertEqual(row["source"]["commit"], heads[0])
+        # A record from before it said where it is kept reads its repository's head.
+        rec = dict(r["pack"])
+        del rec["kept_at"]
+        self.assertEqual(toolpacks.recipe(rec)["source"]["commit"], heads[0])
 
     def test_what_is_kept_is_what_was_shown(self):
         shown = toolpacks.fetch(self.url)["commit"]
