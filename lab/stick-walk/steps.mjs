@@ -231,6 +231,25 @@ export const steps = {
     await Promise.all([page.waitForNavigation(), page.click('button[type=submit]')]);
     await sleep(6000); await shot('02-after-account'); console.log(page.url());
   },
+  // press HASH TEXT NAME: the page at HASH, the first visible button reading
+  // TEXT pressed, and the page photographed after.
+  async press({ page, BASE, tall, args }){
+    await page.goto(BASE + (args[0] || '')); await sleep(5000);
+    const b = page.locator('button:visible', { hasText: args[1] }).first();
+    await b.click(); await sleep(Number(args[3] || 5000));
+    await tall(args[2] || 'press', 1600);
+    console.log(page.url());
+    console.log((await page.evaluate(() => (document.querySelector('.modal:not([hidden])') || document.querySelector('.pane .doc.on') || document.body).innerText)).replace(/\n{2,}/g, '\n').slice(0, 1500));
+  },
+  // words HASH HEADING...: the text of each section of the page at HASH whose
+  // heading reads one of HEADING, as a person reads it.
+  async words({ page, BASE, args }){
+    await page.goto(BASE + (args[0] || '')); await sleep(9000);
+    const got = await page.evaluate(heads => [...document.querySelectorAll('.pane .doc.on details, .pane .doc.on section, .pane .doc.on .card')]
+      .filter(s => heads.some(h => (s.querySelector('summary, h2, h3, h4')?.innerText || '').trim().startsWith(h)))
+      .map(s => s.innerText.replace(/\n{2,}/g, '\n').slice(0, 3000)), args.slice(1));
+    console.log([...new Set(got)].join('\n=====\n'));
+  },
   async look({ page, BASE, tall, phone, args }){
     await page.goto(BASE + (args[0] || '')); await sleep(Number(args[2] || 6000));
     await tall(args[1] || 'look', Number(args[3] || 2200));

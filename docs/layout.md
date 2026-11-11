@@ -19,6 +19,7 @@ lab/.env.example                 the lab's one setting: the address other machin
 lab/stick-walk/.gitignore        what a walk leaves in its own folder
 lab/stick-walk/README.md         a first run walked on a real stick image in QEMU, blank disks and a reboot included
 lab/stick-walk/go.sh             the whole walk from a blank machine
+lab/stick-walk/iso.py            the installer ISO in a VM as a person installs it: boot, the console's keys and screen, the installed disk after
 lab/stick-walk/person.mjs        one browser step of it, its sign-in kept
 lab/stick-walk/rehearse.py       the move off another NAS rehearsed on the walked stick: the branch's agent handed in and run, its checks read back
 lab/stick-walk/rehearse-inside.py  that rehearsal, run as root on the stick: the old system's disks laid out, adopted, its VM defined and cloned, the array taken over and checked, every checksum compared
