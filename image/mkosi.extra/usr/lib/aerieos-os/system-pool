@@ -137,6 +137,20 @@ as_place() {
     chown --reference="$2" "$1" 2>/dev/null || true
     chmod --reference="$2" "$1" 2>/dev/null || true
 }
+# The pool's secrets folder shut as the folder it stands in for is: root's,
+# nothing for anybody else, and for the controller's account the one way
+# through to its own key folder where the folder it replaces had it (0710,
+# boot.sh secrets_enterable, which only a controller's start sets). Shut
+# outright here, a running controller was locked out of its key until its
+# next start, and a move landed in that time, right after Moving here placed
+# the pool, was refused at the install key it carried (B777).
+secrets_shut() {
+    local through=""
+    [ -d "$2" ] && [ "$(( 0$(stat -c %a "$2" 2>/dev/null || echo 0) & 010 ))" -ne 0 ] && through=1
+    [ -z "$through" ] || chgrp --reference="$2" "$1" 2>/dev/null || true
+    chmod go-rwx "$1"
+    [ -z "$through" ] || chmod g+x "$1"
+}
 # The hold let go before the projects get a real place.
 unhold() { held "$1" && umount "$1"; return 0; }
 # name=place, each a folder that writes all day; the projects only while no
@@ -218,7 +232,7 @@ apply() {
             continue
         fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
-            [ "$name" = secrets ] && chmod go-rwx "$src"
+            [ "$name" = secrets ] && secrets_shut "$src" "$place"
             [ -n "$(ls -A "$src" 2>/dev/null)" ] || as_place "$src" "$place"
             # Secrets a stick kept before they went to the pool (a pool named
             # by an earlier release) go there once, never hidden under an
@@ -449,7 +463,7 @@ set_pool() {
             cp -an "$place/." "$src/"
         fi
         unhold "$place"
-        [ "$name" = secrets ] && chmod go-rwx "$src"
+        [ "$name" = secrets ] && secrets_shut "$src" "$place"
         local tries=0
         while findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; do
             if [ "$tries" -ge 8 ] || ! umount "$place"; then

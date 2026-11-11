@@ -229,7 +229,26 @@ class TheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
             self.assertEqual(os.listdir(f"{d}/secrets"), [], "off the stick")
-            self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o077, 0, "nobody else's")
+            self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o067, 0, "nobody else's to read, list or write")
+
+    def test_the_controller_keeps_its_way_to_its_key_when_the_pool_is_placed(self):
+        # B777: a controller's start opens the secrets folder to its account
+        # for the key folder alone (0710). Placing the pool shut the pool's
+        # copy outright, so the running controller lost its key until its
+        # next start, and a move landing right after was refused at the key
+        # it carried.
+        for mode, want in ((0o710, 0o710), (0o700, 0o700)):
+            with tempfile.TemporaryDirectory() as d:
+                os.makedirs(f"{d}/secrets/install-key")
+                with open(f"{d}/secrets/install-key/key", "w") as f:
+                    f.write("k" * 64)
+                os.chmod(f"{d}/secrets", mode)
+                os.makedirs(f"{d}/pool")
+                with mock.patch.dict(os.environ, self.fakes(d)):
+                    r = self.tool(d, "set", f"{d}/pool")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o777, want, oct(mode))
+                self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
 
     def test_secrets_kept_on_the_stick_by_an_earlier_release_go_to_its_pool_once(self):
         # A pool named before the secrets went there: its folder for them is
