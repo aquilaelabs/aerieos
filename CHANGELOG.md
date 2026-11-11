@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A display adapter that is not an AMD card is no longer listed as an AMD GPU a container can be given: every adapter was, a VM's and an NVIDIA or Intel card among them (e51c4c0)
+- First run marks a disk SMART calls failing; no disk could be marked before (e51c4c0)
+- A machine just started no longer says it has no internet for up to ten minutes after its network comes up (e51c4c0)
+- The UPS feature installs on AerieOS's own image, which now carries what it needs (e51c4c0)
+
 ## 0.9.0-dev.5236: 2026-11-11
 
 ### Changed
