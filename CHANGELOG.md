@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Moving a controller from or onto a machine of its own (an AerieOS stick or disk, or a bare-metal install) carries its secrets files and ssh keys, where you were told to copy them by hand as root. Anything in them that is not a plain secret is left out and named (202a994)
+
 ### Fixed
 
 - A display adapter that is not an AMD card is no longer listed as an AMD GPU a container can be given: every adapter was, a VM's and an NVIDIA or Intel card among them (e51c4c0)
