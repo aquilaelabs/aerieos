@@ -47,6 +47,7 @@ scripts/
   supervisor.sh                  keeps the box alive; the graceful shutdown
   mint-runner-token              root-only token helper (one of the two sudo commands)
   deploy-key                     root-only deploy key helper: make, keep, forget, load (the other)
+  secrets-carry                  root-only carrier of the secrets folder across a move on a machine of its own: pack, land (a third sudo command there, B728)
   healthcheck.sh                 docker healthcheck
   aerie                          in-container helper CLI
   bb                             what an older agent calls in the bundle until it updates; no PATH carries it

@@ -529,6 +529,20 @@ publishes it, and only when every file `.release-files` names is on it; a
 failed image job never gets there, and the release stays a draft. A stable
 release is unchanged: a draft until its owner publishes it.
 
+**A move carries the secrets on a machine of its own, through root, as
+plain words (11 Nov 2026).** There the secrets folder is root's and the
+dashboard's account can neither read nor write it, so a move left its
+`*.env` files and `ssh/` keys to be copied by hand. The operator's line:
+the system should handle that, as long as a coding agent has no way to it.
+A root helper the controller's account alone may run packs the folder on
+the old home and places it on the new. Two things keep that from being a
+way to root. What it places is data: the controller's start reads those
+files as root, so a line lands only as a secret the start knows by name
+with a value that has no shell in it, written out again quoted, and a key
+is a plain file. And the account that may run it is the controller's, never
+a session's: a coding agent runs as another account, and a move is the
+owner's. The install key still travels by its own tick.
+
 ## A VM manager beside the Containers page
 
 **VMs are made the way containers are, by the node that runs them, from a

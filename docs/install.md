@@ -405,9 +405,16 @@ container to a machine of its own, and back.
    name the moved controller already has is that controller's account, and
    the landing says which. A bundle changed after it was made (its kind, where
    it came from, its versions) is refused before anything here changes. On a
-   machine of its own the secrets folder is root's, so a bundle carries none of
-   its `*.env` files or `ssh/`: the section says so, and they are copied to the
-   new home by hand, as root. **Download a backup**, beside Prepare to
+   machine of its own the secrets folder is root's, which the dashboard's
+   account can neither read nor write: AerieOS's root helper
+   (`scripts/secrets-carry`) packs its `*.env` files and `ssh/` keys into the
+   bundle there, and on a new home of that kind places them, saying what it
+   placed. What it places is held to plain words, since the controller's
+   start reads those files as root: a line is kept only as a secret the start
+   knows by name with a value that has no shell in it, and anything else is
+   left out and named, for you to copy by hand. A file already there of the
+   same name is kept beside the new one. The controller reads them at its
+   next start. **Download a backup**, beside Prepare to
    move, packs the same bundle under a token of its own without arming a
    move: no node hears of it and the controller it came from is never told
    when it lands. Neither the token nor the file expires, and the token is

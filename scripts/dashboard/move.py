@@ -45,6 +45,7 @@ import re
 import secrets
 import shutil
 import ssl
+import subprocess
 import tarfile
 import tempfile
 import threading
@@ -345,6 +346,44 @@ STORES_OFF = {"logs", "job-snapshots"}
 SECRETS_LEAVE = {"install-key"}
 
 
+# The secrets folder on a machine of its own is root's: the dashboard's
+# account can neither read it nor write into it, so a bundle carried none of
+# it and a landing left the copy to a person, as root (B728). The root
+# helper the account may run through sudo carries it instead
+# (scripts/secrets-carry: pack on the old home, land on the new, where each
+# *.env line is held to a secret's name and a value with no shell in it,
+# since the controller's start reads those files as root). A coding agent's
+# session runs as another account, which may not run it, and a move is the
+# owner's alone. A test names a stand-in with BB_SECRETS_CARRY.
+CARRY = os.environ.get("BB_SECRETS_CARRY") or str(Path(__file__).resolve().parent.parent / "secrets-carry")
+CARRY_MAX = 4 << 20
+# What the helper hands over and takes: a *.env file, or a plain file under ssh/.
+_CARRIED = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.env|ssh/[A-Za-z0-9][A-Za-z0-9._-]{0,99})")
+
+
+def _carry(verb, data=None, timeout=60):
+    """The root helper run with `verb`: (exit code, stdout bytes, stderr
+    text), (127, b"", why) where it cannot be run at all."""
+    stand_in = bool(os.environ.get("BB_SECRETS_CARRY"))
+    # Only on a machine of its own, as its account: the helper serves root's
+    # folder there and nowhere else, and a process that is root already (a
+    # test run as root) must never be the one to ask it.
+    if not stand_in and not (bare_metal() and os.geteuid() != 0 and os.path.isfile(CARRY)):
+        return 127, b"", "no root helper on this install"
+    argv = [CARRY, verb] if stand_in else ["sudo", "-n", CARRY, verb]
+    try:
+        r = subprocess.run(argv, input=data, capture_output=True, timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError) as e:
+        return 127, b"", str(e)[:200]
+    return r.returncode, r.stdout, r.stderr.decode("utf-8", "replace").strip()[:600]
+
+
+def _secrets_closed():
+    """Whether the secrets folder is there and closed to this account: the
+    case the root helper serves."""
+    return bool(SECRETS) and Path(SECRETS).is_dir() and not os.access(SECRETS, os.R_OK | os.X_OK)
+
+
 # How long a piece is measured for (B432: the workspace on a share took
 # minutes and the section never drew): past it the size is "at least".
 SIZE_BUDGET_S = 1.0
@@ -422,10 +461,21 @@ def pieces():
             out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
         else:
             # Root's alone on a machine of its own: the dashboard cannot
-            # list it, and a walk of it carried nothing without a word (B728).
-            out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
-                        "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
-                                 "and ssh/ to the new home by hand, as root"})
+            # list it, so AerieOS's root helper packs it (B728); where that
+            # cannot run either, the piece is off and says what to copy.
+            rc, said, _why = _carry("--can", timeout=15)
+            got = re.match(rb"(\d+) files, (\d+) bytes", said or b"")
+            if rc == 0 and got:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": int(got.group(2)), "over": False,
+                            "on": True, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here: AerieOS packs its *.env files and ssh/ as root ({int(got.group(1))} file(s))"})
+            elif rc == 3:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here and holds no *.env file or ssh key to carry"})
+            else:
+                out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                            "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
+                                     "and ssh/ to the new home by hand, as root"})
     out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where the Nodes page names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
     from concurrent.futures import ThreadPoolExecutor
@@ -702,6 +752,29 @@ def _db_snapshot():
         return None
 
 
+def _tar_carried(tar):
+    """Into `tar`, under secrets/, what the root helper packs of a secrets
+    folder this account cannot read: its count, 0 where the helper cannot
+    run or the folder holds nothing to carry."""
+    rc, data, _why = _carry("pack")
+    if rc != 0 or not data or len(data) > CARRY_MAX:
+        return 0
+    n = 0
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as src:
+            for m in src.getmembers():
+                name = m.name.removeprefix("./")
+                if not m.isfile() or not _CARRIED.fullmatch(name):
+                    continue
+                info = tarfile.TarInfo(f"secrets/{name}")
+                info.size, info.mtime, info.mode = m.size, m.mtime, 0o600
+                tar.addfile(info, src.extractfile(m))
+                n += 1
+    except (tarfile.TarError, OSError):
+        return n
+    return n
+
+
 def _pack_into(tar, repos=False, carry_key=False, stores=None):
     """Into `tar`, the tree a move or a backup carries: the state without
     its logs and job trees, the stores kept outside it (`stores` names the
@@ -734,7 +807,9 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
     # The install key's own folder under the secrets (lib/boot.sh
     # install_key_made) stays out: the key travels only as the entry below,
     # when ticked (B619).
-    if SECRETS and Path(SECRETS).is_dir():
+    if _secrets_closed():
+        counts["secrets"] = _tar_carried(tar)
+    elif SECRETS and Path(SECRETS).is_dir():
         counts["secrets"] = _tar_tree(tar, SECRETS, "secrets", leave=SECRETS_LEAVE)
     if carry_key:
         k = install_key() or b""
@@ -1368,6 +1443,27 @@ def _carry_share_people(aside, state_dir):
     return said
 
 
+def _land_carried(src):
+    """The bundle's secrets handed to the root helper to place: its own
+    lines, [] where it could not be run or took nothing."""
+    buf = io.BytesIO()
+    n = 0
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        for p in sorted(Path(src).rglob("*")):
+            rel = p.relative_to(src).as_posix()
+            if p.is_symlink() or not p.is_file() or not _CARRIED.fullmatch(rel):
+                continue
+            tar.add(str(p), arcname=rel, recursive=False)
+            n += 1
+    if not n or buf.tell() > CARRY_MAX:
+        return []
+    rc, out, _why = _carry("land", data=buf.getvalue())
+    lines = [ln.removeprefix("secrets-carry: ") for ln in out.decode("utf-8", "replace").splitlines() if ln.strip()]
+    if rc != 0:
+        return []
+    return [f"the old controller's secrets, placed as root: {'; '.join(lines)[:900]}"] if lines else []
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1472,10 +1568,16 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
             except (OSError, shutil.Error) as e:
                 # A secrets folder that is root's takes nothing the dashboard
-                # writes (and root never reads what the dashboard's account
-                # left for it): the rest lands, and this is said (B728).
-                said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
-                            "copy its *.env files and ssh/ there as root, then restart the controller")
+                # writes: the root helper places them, each *.env line held
+                # to a secret's name and a plain value, since root reads
+                # those files at the controller's start (B728). Where it
+                # cannot run, the rest lands and the copy is a person's.
+                placed = _land_carried(work / "secrets")
+                if placed:
+                    said += placed
+                else:
+                    said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
+                                "copy its *.env files and ssh/ there as root, then restart the controller")
         swapped = False
         # The landing marked while the state is half old and half new, so a
         # power loss midway leaves a word of it for the next start (B622):

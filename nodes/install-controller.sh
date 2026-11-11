@@ -527,12 +527,15 @@ EOF
     rm -f "$(dirname "$BB_BIN")/bb"   # the command's old name, on a machine that had it
 }
 
-# sudoers: the two root helpers the account may run, the image's rule.
+# sudoers: the root helpers the account may run: the image's two, and on a
+# machine of its own the one that carries the secrets folder across a move,
+# which is root's here and the account can neither read nor write.
 sudoers() {
     install -d -m 0750 "$(dirname "$SUDOERS")"
-    printf '%s\n' "# Written by AerieOS's install-controller.sh: the two root helpers, as in the image." \
+    printf '%s\n' "# Written by AerieOS's install-controller.sh: the image's two root helpers, and the secrets' carrier." \
         "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/mint-runner-token" \
-        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" > "$SUDOERS.new"
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/deploy-key" \
+        "${ACCOUNT} ALL=(root) NOPASSWD: /opt/aerieos/scripts/secrets-carry" > "$SUDOERS.new"
     chmod 0440 "$SUDOERS.new"
     if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$SUDOERS.new" >/dev/null 2>&1; then
         rm -f "$SUDOERS.new"; die "the sudo rule did not check out (visudo -c), so it was not put in place"
