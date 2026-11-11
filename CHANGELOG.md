@@ -6,6 +6,10 @@
 
 - This release names a spare for the catalog's key and for the release key. Upgrading: a node pins the spare when its Enroll script is run on it again; until then its row says no spare key is pinned, and it goes on taking updates signed by the first key (ff87870)
 
+### Fixed
+
+- On a phone a space's header keeps its buttons on the name's row: with a longer name, several repositories and Manage agent, the menu's button dropped to a line of its own (125d3e7)
+
 ## 0.9.0-dev.5230: 2026-11-11
 
 ### Added
