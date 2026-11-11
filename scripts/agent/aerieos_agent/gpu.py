@@ -32,14 +32,27 @@ def _gpu_card():
     return ""
 
 
+# AMD's PCI vendor id as lspci -nn prints it, [1002:DEVICE], on a
+# display-class device ([03xx]).
+_AMD_ID = re.compile(r"\[1002:[0-9a-f]{4}\]")
+_DISPLAY_CLASS = re.compile(r"\[03[0-9a-f]{2}\]")
+
+
 def _gpu_amd():
     """An AMD card or APU by its PCI id (R207 step 4): a display-class
     device of AMD's vendor id (0x1002), which the kernel's own amdgpu
-    drives, so a container is given its render devices from its row."""
-    for line in (_run(["lspci", "-nn"], timeout=10) if SYS_ROOT == "/sys" else "").splitlines():
-        low = line.lower()
-        if ("amd" in low or "ati" in low) and ("vga compatible" in low or "3d controller" in low or "display controller" in low):
+    drives, so a container is given its render devices from its row. By
+    the id, never by the name: 'ati' is in 'VGA compatible controller', so
+    a VM's emulated adapter, an Intel one and an NVIDIA card all read as
+    AMD's while the name was what was matched (B767)."""
+    listed = _run(["lspci", "-nn"], timeout=10) if SYS_ROOT == "/sys" else ""
+    for line in listed.splitlines():
+        if _AMD_ID.search(line.lower()) and _DISPLAY_CLASS.search(line.lower()):
             return line.split(": ", 1)[-1].strip()[:120]
+    # With lspci's answer in hand that is the answer. Without pciutils (a
+    # minimal Rocky) sysfs says the same, less the name.
+    if listed.strip():
+        return ""
     try:
         for dev in sorted(os.listdir(f"{SYS_ROOT}/bus/pci/devices")):
             base = f"{SYS_ROOT}/bus/pci/devices/{dev}"

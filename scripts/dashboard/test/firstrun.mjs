@@ -284,6 +284,27 @@ await firstRun(false);
   });
   ok(card.second === 'Your disks' && card.rows === 5 && card.held && /A ZFS raidz1 of 3 disks/.test(card.plan) && /one disk may fail/.test(card.plan) && card.fast,
      `the first run's second step is the disks: each but the stick a row, one holding data kept unless ticked, the plan in words and the SSD a fast pool (${JSON.stringify(card)})`);
+  // A disk SMART calls failing says so on its row (B771: the page read a
+  // field nothing sends, so no disk could ever be marked).
+  const failing = await page.evaluate(() => {
+    const disks = setupDisks.own?.disks?.disks || setupDisks.own?.disks || [];
+    const d = disks.find(x => x.name === 'sdb') || disks.find(x => !x.system);
+    if (!d) return { none: true };
+    const was = d.smart;
+    const pills = () => [...document.querySelectorAll('#setupPanel .setdisk')].filter(r => r.querySelector('.pill.bad')?.textContent === 'failing')
+      .map(r => r.querySelector('input')?.dataset.setdiskuse);
+    d.smart = { health: 'ok', temp_c: 31 };
+    drawSetup();
+    const well = pills();
+    d.smart = { health: 'failing', temp_c: 52 };
+    drawSetup();
+    const ill = pills();
+    d.smart = was;
+    drawSetup();
+    return { disk: d.name, well, ill };
+  });
+  ok(!failing.none && failing.well.length === 0 && failing.ill.length === 1 && failing.ill[0] === failing.disk,
+     `a disk SMART calls failing wears it on its row, and a healthy one does not (${JSON.stringify(failing)})`);
   // The disks a stick's plan adopts are the old system's (B637): each a
   // row with whose it is and no box, left out of the plan and of Make it;
   // when every disk is theirs the step points at This machine and makes

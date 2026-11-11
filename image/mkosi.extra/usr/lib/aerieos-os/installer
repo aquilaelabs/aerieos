@@ -108,10 +108,21 @@ ${on:-(nothing could be read from it)}
 Every partition on it is replaced. There is no undo." 20 76 --defaultno || pick=""
 done
 
+# Only what the first boot can turn on here is offered, and ticked only where
+# it will work (B768): the VM host needs this CPU's virtualization (no
+# /dev/kvm in a VM without it, and the first boot refused it in the journal
+# alone), and the hosting firewall is a hosting-only node's, refused on a
+# machine that runs sessions, which every machine installed from here does,
+# so it is not asked about.
 feats=""
-[ -n "$AUTO" ] || feats="$(whiptail --title "AerieOS" --checklist "Features turned on at the first boot (each can change later on This machine):" 16 72 4 \
-    vmhost "VM host: KVM through libvirt, for the VMs page" ON \
-    firewall "The hosting firewall: only what is published is reachable" ON \
+kvm=OFF vmwhat="VM host: KVM through libvirt, for the VMs page"
+if [ -e /dev/kvm ] || grep -qE '^flags[[:space:]]*:.*[[:space:]](vmx|svm)([[:space:]]|$)' /proc/cpuinfo 2>/dev/null; then
+    kvm=ON
+else
+    vmwhat="VM host: this CPU shows no virtualization, so VMs cannot run here"
+fi
+[ -n "$AUTO" ] || feats="$(whiptail --title "AerieOS" --checklist "Features turned on at the first boot (each can change later on This machine):" 16 76 3 \
+    vmhost "$vmwhat" "$kvm" \
     iommu "IOMMU on the kernel's command line, for PCI and USB passthrough" OFF 3>&1 1>&2 2>&3)" || bye "Nothing installed."
 
 [ -n "$AUTO" ] || clear

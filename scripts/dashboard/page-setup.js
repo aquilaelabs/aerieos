@@ -196,7 +196,7 @@ async function setupShutDown(b){
 }
 
 function setupDisksSig(dk){
-  return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.ok]));
+  return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.health]));
 }
 
 // Text a person has typed, put back when the page has had to be drawn again:
@@ -592,7 +592,7 @@ function setupDisksCard(num){
   const plan = setupDiskPlan(free.filter(use), setupDisks);
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
       ${facts(d)}
-      ${d.smart && d.smart.ok === false ? `<span class="pill bad">failing</span>` : ""}
+      ${d.smart?.health === "failing" ? `<span class="pill bad">failing</span>` : ""}
       ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(d.holds || "data")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
   const says = p => !p ? "" : `<div class="setplan"><p><b>${p.kind === "array" ? "An array" : p.layout === "single" ? "One pool" : `A ZFS ${esc(p.layout)}`}</b> of ${p.disks.length} disk${p.disks.length === 1 ? "" : "s"}${
       p.parity?.length ? `, ${p.parity.length} for parity` : ""}: <b>${esc(setupGB(p.usable_mb))}</b> to use, ${p.may_fail ? `any ${p.may_fail === 1 ? "one disk" : `${p.may_fail} disks`} may fail` : "no disk may fail"}.</p>

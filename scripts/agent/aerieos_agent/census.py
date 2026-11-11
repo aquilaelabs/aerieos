@@ -163,9 +163,14 @@ def _store_ro(state):
 
 
 # The internet, asked at most every ten minutes: a machine with none spent
-# a timeout on it at every check-in otherwise.
-_NET = {"at": 0.0, "ok": None}
+# a timeout on it at every check-in otherwise. A "no" is asked again after a
+# minute while the agent is young: its first look is at boot, before the
+# network (and a LAN bridge) is up, and that answer stood for ten minutes on
+# a machine that had it (B770).
+_NET = {"at": 0.0, "ok": None, "first": 0.0}
 NET_EVERY = 600
+NET_NO_EVERY = 60
+NET_YOUNG_S = 900
 NET_HOSTS = ("github.com", "dl.google.com")
 
 
@@ -173,7 +178,10 @@ def _internet():
     """True when this machine reaches the internet, False when it does not."""
     import socket
     import time
-    if _NET["ok"] is not None and time.time() - _NET["at"] < NET_EVERY:
+    now = time.time()
+    _NET["first"] = _NET["first"] or now
+    keep = NET_EVERY if _NET["ok"] or now - _NET["first"] > NET_YOUNG_S else NET_NO_EVERY
+    if _NET["ok"] is not None and now - _NET["at"] < keep:
         return _NET["ok"]
     ok = False
     for host in NET_HOSTS:
