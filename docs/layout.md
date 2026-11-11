@@ -37,7 +37,7 @@ image/                           AerieOS, the appliance image the installed edit
   mkosi.extra/                   what is laid into the tree: the initramfs script that mounts /var and /etc's overlay, fstab, the slot tool, the apt stub, the first-boot unit, the boot's own settings and the stick's network file, the data partition grown to its disk, the screen's login during a first setup, the installer and its unit, nouveau kept off an NVIDIA card (etc/modprobe.d)
   partitions.sh                  the disk's fixed partition UUIDs, sizes and labels, one place for build.sh, the initramfs, fstab and GRUB
   grub.cfg                       GRUB's menu on the ESP: the two slots, bb_slot from grubenv naming the one to boot
-  iso-grub.cfg                   the ISO's menu (R160 step 2): the same root booted live, with the installer or without
+  iso-grub.cfg                   the ISO's menu: the same root run live from the medium, and where a new machine starts; it offers no installer
   lay-disk                       one disk laid out as AerieOS: the partitions, GRUB for both firmwares, slot A and the data partition; build.sh runs it on a loop device, the installer on a person's disk
   ovf.xml                        the OVA's descriptor (the VM disk for VMware and VirtualBox, R160 step 3), its marks filled by build.sh
   build.sh                       the build: mkosi, the squashfs, the disk on a loop device with GRUB for UEFI and BIOS, the stamps

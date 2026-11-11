@@ -332,8 +332,16 @@ class Workflow(unittest.TestCase):
         self.assertIn("grub-mkrescue -o", b)
         self.assertIn("live/filesystem.squashfs", b)
         g = read(IMG, "iso-grub.cfg")
-        self.assertIn("boot=live components bbinstaller=1", g)
+        self.assertIn("boot=live components", g)
         self.assertIn("/live/vmlinuz", g)
+        # The ISO is what a running machine updates from and not an installer
+        # (the operator, 11 Nov): its menu starts nothing by itself and no
+        # entry of it starts the console installer, which stays in the image
+        # for the build's check (bbinstaller=1 on the kernel's line).
+        self.assertNotIn("bbinstaller", "".join(ln for ln in g.splitlines(True) if not ln.lstrip().startswith("#")))
+        self.assertIn("set timeout=-1", g)
+        self.assertIn("nothing is installed, nothing is kept", g)
+        self.assertIn("Not an installer", read(ROOT, "docs", "release-notes", "downloads.md"))
         conf = read(IMG, "mkosi.conf")
         for p in ("live-boot", "live-boot-initramfs-tools", "whiptail"):
             self.assertIn(p, conf, p)

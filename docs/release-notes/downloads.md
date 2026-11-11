@@ -3,7 +3,7 @@
 | File | What it is for |
 |---|---|
 | `aerieos-os-@VER@.stick.raw.xz` | AerieOS for a USB stick: the USB edition, written with AerieOS USB Maker below, or any tool that writes a raw image. |
-| `aerieos-os-@VER@.iso` | AerieOS installed on a machine's own disk, from a USB stick or a VM's virtual drive. |
+| `aerieos-os-@VER@.iso` | What a machine already running AerieOS updates from: its Updates section fetches it by itself, or takes it from a folder where the machine is offline. Not an installer: a new machine is set up from the USB edition above. |
 | `aerieos-usb-maker-@VER@.exe` | AerieOS USB Maker for Windows: picks the release and the stick, and writes it. |
 | `aerieos-controller-@VER@.tar.gz` | The controller for a bare-metal install on Linux, which the install script fetches by itself; nothing to download by hand. The container edition is the image `ghcr.io/@REPO@`. |
 | `aerieos-app-@VER@.apk` | The Android app: your AerieOS on your phone, its spaces, approvals and notifications. |

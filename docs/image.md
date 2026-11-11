@@ -376,34 +376,41 @@ starts nothing and opens a root shell at the screen: whoever is at the
 keyboard can already take the disks out, so it opens nothing they do not
 have, and it is never the default.
 
-## Installing it on a machine
+## Setting up a new machine
 
-`aerieos-os-VERSION.iso` boots the same root live (UEFI or BIOS) with
-the installer on the console: it lists the machine's disks (the medium it
-booted from left out), asks which one to lay out and says that everything
-on it is lost, asks which features to turn on at the first boot (VM host
-and the hosting firewall on, the IOMMU off), then lays the disk out with
-the very script that made the image (`image/lay-disk`, carried in the
-image at `/usr/lib/aerieos-os/lay-disk`), the data partition grown to
-the disk, and asks for a restart. Nothing else is asked: the first boot
-makes the machine its own node with those features, and the dashboard's
-first page, at `http://ITS-ADDRESS:7680` on the LAN, makes the owner and
-names the machine. The ISO's second entry boots the live system without
-installing, for a look or a rescue.
+A new machine is set up from the USB edition: the stick's image, written
+with the USB maker or `tools/aerieos-stick.py`, booted on the machine, and
+the dashboard's first page at `http://ITS-ADDRESS:7680` on the LAN, which
+makes the owner, names the machine and sets up its disks as a pool or an
+array ([On a stick](#on-a-stick-run-from-memory), [The stick maker](#the-stick-maker)).
 
-With `aerie_install_to=/dev/DISK` added to the installer entry's kernel line
-(the boot menu's `e`), the install asks nothing: that disk is laid out with
-no feature turned on, each step is said on the kernel's console, and the
-machine turns itself off at the end. It is for a machine nobody sits at,
-and it is how the build checks its own ISO: the menu never carries the
-word, so nothing is laid out that a person did not name.
+`aerieos-os-VERSION.iso` is not an installer. It is the file a machine
+already running AerieOS updates from ([Updating](#updating)): the same root,
+kernel and initrd under `live/`. Booted by itself (UEFI or BIOS) its menu
+starts nothing on its own; its one entry runs AerieOS from the medium with
+nothing installed and nothing kept, for a look or a rescue, and the other
+says where a new machine starts. An installer on the machine's own screen,
+which puts this system on a disk and sets up the machine's disks there, is
+being built; until it is, no release offers one.
+
+The console installer that the ISO used to open is still in the image, for
+the build's check and for what replaces it: with `bbinstaller=1` on the
+kernel's line it lists the machine's disks (the medium left out), asks which
+to lay out and which features to turn on, and lays the disk out with the
+script that made the image (`image/lay-disk`). With
+`aerie_install_to=/dev/DISK` beside it the install asks nothing: that disk
+is laid out with no feature turned on, each step is said on the kernel's
+console, and the machine turns itself off at the end. That is how the build
+checks that its ISO lays out a blank disk that then boots; no menu carries
+either word.
 
 ## In a VM
 
-A VM installs from the ISO as a machine does: give it a disk of 16 GB or
-more, boot the ISO and pick that disk. It boots into the bare-metal
-controller with the machine as its own node, as a stick or an installed
-disk does. The build also converts the raw disk, never laid out again, into
+A VM runs the USB edition as a machine does: the stick's image
+(`aerieos-os-VERSION.stick.raw.xz`, unpacked) as its first disk, and at
+least one more virtual disk for a pool, since the stick keeps the
+configuration and the containers' data goes on a pool. The build also
+converts the raw disk, never laid out again, into
 `aerieos-os-VERSION.qcow2` and `aerieos-os-VERSION.ova` (a
 stream-optimized VMDK with its OVF descriptor, `image/ovf.xml`, and a
 manifest), which the boot test runs and the CI run keeps as its artifact;

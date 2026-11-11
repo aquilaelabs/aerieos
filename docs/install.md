@@ -11,7 +11,7 @@ AerieOS comes in four editions, one controller in four shapes. This
 checklist is **Aerie Workshop**, the container edition, on any host with
 Docker. The **bare-metal install** puts the same controller on a Linux machine
 of its own, which is also its own node ([Bare metal](#bare-metal)). **AerieOS**
-is that install as an appliance, from an ISO or a VM image, and the
+is that install as an appliance, and the
 **USB edition** runs it from a stick ([image.md](image.md)); those two are
 new in 0.9 and experimental. A controller moves between any of them
 ([Moving a controller](#moving-a-controller)).
@@ -337,9 +337,10 @@ puts it back on them. `--remove --purge` takes all but the spaces.
 installed edition from the appliance image instead: Debian pinned to a
 snapshot with the controller staged in, a read-only root in two slots so an
 update is a whole image and a bad one falls back, and the machine its own
-node at its first boot. Each release carries it as an installer ISO, for a machine or a VM, and a
-USB stick's image; [image.md](image.md) says
-what it is, how each is installed and how it is built.
+node at its first boot. Each release carries it as a USB stick's image, which is how a new
+machine is set up today, and as an ISO that a machine already running it updates from (the ISO
+is not an installer: one on the machine's own screen is being built); [image.md](image.md) says
+what it is, how the stick is written and how it is built.
 
 ## Building locally instead of pulling
 

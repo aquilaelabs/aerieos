@@ -67,14 +67,14 @@ its own node: the dashboard, the builds, the sessions and the storage on one
 machine. `nodes/install-controller.sh --install` on the machine; updates
 come from the dashboard.
 
-**AerieOS, as its own OS.** The install above as an appliance: a read-only
-root in two slots, an update that falls back by itself when the new one does
-not come up, the disks as pools, an array and shares. Boot the ISO and pick a
-disk.
-
-**AerieOS on a USB stick.** The OS loaded into memory at boot, its
-configuration kept on the stick, the machine's disks its storage. Written
-with the USB maker from the releases page, on Windows, a Mac or Linux.
+**AerieOS on a USB stick.** AerieOS as its own OS: an appliance with a
+read-only root in two slots, an update that falls back by itself when the
+new one does not come up, the disks as pools, an array and shares. The OS is
+loaded into memory at boot, its configuration kept on the stick, the
+machine's disks its storage. Written with the USB maker from the releases
+page, on Windows, a Mac or Linux. An installer that puts the same system on
+a machine's own disk, on the machine's screen, is being built and is not
+offered yet.
 
 AerieOS has no stable release yet: every edition is a dev build. The OS and
 the stick are the newest and the least walked, so try them on a machine or a
@@ -270,11 +270,12 @@ makes the machine its own node; updates come from the page after that
 ### AerieOS and the USB edition (experimental)
 
 Each release carries the appliance image as two files:
-`aerieos-os-VERSION.iso` to install on a machine or a VM, and
-`aerieos-os-VERSION.stick.raw.xz` for a stick. Boot the ISO and pick a
-disk (a VM wants two processors and 4 GB), or write a stick, with the USB
-maker's window from the releases page or the tool here (there is no stable
-release yet, so the dev channel is where the builds are):
+`aerieos-os-VERSION.stick.raw.xz`, the USB edition, and
+`aerieos-os-VERSION.iso`, which a machine already running AerieOS updates
+from and which is not an installer. Write a stick with the USB maker's
+window from the releases page or the tool here (there is no stable release
+yet, so the dev channel is where the builds are); a VM takes the same image
+as its disk, with two processors and 4 GB:
 
 ```bash
 sudo python3 tools/aerieos-stick.py list
