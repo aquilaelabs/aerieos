@@ -517,6 +517,18 @@ upgrade suite starts this tree on every supported one, so a change that
 loses an account or a notebook entry on upgrade fails a test, not an
 install; `bb version release` refuses a version that has none.
 
+**A dev build's release is published by its own build, once it is whole
+(11 Nov 2026).** Every release starts as a draft so its owner can read it
+before anybody else sees it, and the dashboard's Publish refuses one still
+short of a file. The git host's own page checks nothing, though, and two dev
+builds were published from it minutes after their tags, while their images
+were still building; one image build then failed, and that release stayed
+out without its stick image and ISO. A dev build has no notes anyone waits
+to read, so the press bought nothing and cost that. The tag's last job now
+publishes it, and only when every file `.release-files` names is on it; a
+failed image job never gets there, and the release stays a draft. A stable
+release is unchanged: a draft until its owner publishes it.
+
 ## A VM manager beside the Containers page
 
 **VMs are made the way containers are, by the node that runs them, from a

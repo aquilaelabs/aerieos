@@ -890,7 +890,7 @@ def channel_of(project, dev=False, stable=False):
     f = _branch_facts(project) if not (dev or stable) else None
     if f and f["branch"] and f["branch"] != f["base"]:
         dev = True
-    return dev, ("a dev pre-release: the dev channel takes it and Latest stays where it is" if dev
+    return dev, ("a dev pre-release: its build publishes it once every file is on it (about fifty minutes; a draft until then), the dev channel takes it and Latest stays where it is" if dev
                  else "a stable release: it becomes Latest, and every install on the stable channel is offered it")
 
 

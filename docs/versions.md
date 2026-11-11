@@ -72,6 +72,15 @@ image tags people follow are not. A tag pushes the image under its exact
 version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
 and for a stable release `:latest` and `:0.9` too.
 
+AerieOS's own dev builds are published by their build, not by a press: the
+last job of the tag's build checks that every file `.release-files` names is
+on the release and publishes it then, a pre-release and never the latest
+(`tools/release-attach.sh --publish-when-whole`). A build whose image job
+fails never reaches that step, so its release stays a draft; so does one
+still short of a file after a quarter of an hour, with the file named in
+the run. A stable release is not published this way: its owner reads it
+first, as above.
+
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating
 AerieOS to one fetches the draft's files with that token and takes the

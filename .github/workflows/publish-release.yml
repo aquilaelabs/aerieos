@@ -2,7 +2,9 @@ name: publish release
 
 # A release is made a draft (build-image.yml) and published by its owner
 # once its notes are read (the operator, 1 Nov: aerie version publish, or the
-# Artifacts view's Publish). Publishing it is what moves the image tags
+# Artifacts view's Publish); a dev build's is published by its own build
+# once every file is on it (the operator, 11 Nov), which starts this by
+# name. Publishing it is what moves the image tags
 # people follow onto the version the tag built: :dev for every release, and
 # :latest and :MAJOR.MINOR for a stable one. A release published by a
 # person's token starts this; one published by a workflow's own token would

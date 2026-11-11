@@ -9,20 +9,31 @@
 # id, an asset of the same name replaced. Every job that attaches a file
 # calls this, so they cannot disagree about which release is the tag's.
 #
-#   tools/release-attach.sh TAG [--notes FILE] [--title TITLE] [FILE...]
+#   tools/release-attach.sh TAG [--notes FILE] [--title TITLE] [--publish-when-whole LIST] [FILE...]
 #
 # Needs GH_TOKEN (what gh reads) and GITHUB_REPOSITORY. Prints the release's
 # id, then each file as it lands. --notes and --title are used only when the
 # release is made here; a release that exists keeps its own.
+#
+# --publish-when-whole LIST is the last job's (the operator, 11 Nov): a dev
+# build's release goes out by itself, and only once every file LIST names
+# (.release-files, @VER@ the version, * a pattern) is on it. Two dev builds
+# were published by hand from the git host's own page minutes after their
+# tags, which checks nothing, and one of them never got its image. Whole,
+# the draft is published and the line says so; a file still missing after
+# RELEASE_WAIT_S (the signed app is attached by a controller, on its own
+# clock) is named, the release stays a draft and this exits 3. A release
+# that is not a dev build is never published here: its owner reads it first.
 set -euo pipefail
 
 tag="${1:?tag}"; shift
-notes="" title="$tag"
+notes="" title="$tag" whole=""
 files=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --notes) notes="$2"; shift 2 ;;
         --title) title="$2"; shift 2 ;;
+        --publish-when-whole) whole="$2"; shift 2 ;;
         *) files+=("$1"); shift ;;
     esac
 done
@@ -87,3 +98,41 @@ for f in "${files[@]}"; do
         "https://uploads.github.com/repos/$repo/releases/$id/assets?name=$name" --input "$f" >/dev/null
     echo "  $name"
 done
+
+[ -n "$whole" ] || exit 0
+case "$tag" in
+    v*-dev.*) ;;
+    *) echo "release $id is not a dev build's: it stays a draft for its owner to read and publish"; exit 0 ;;
+esac
+[ -f "$whole" ] || { echo "release-attach: no list of the release's files at $whole" >&2; exit 2; }
+ver="${tag#v}"
+mapfile -t want < <(sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*#/d' -e '/^$/d' -e "s|@VER@|$ver|g" "$whole")
+[ "${#want[@]}" -gt 0 ] || { echo "release-attach: $whole names no file" >&2; exit 2; }
+missing=()
+end=$(( $(date +%s) + ${RELEASE_WAIT_S:-900} ))
+while :; do
+    mapfile -t have < <(gh api "repos/$repo/releases/$id/assets?per_page=100" --paginate --jq '.[].name')
+    missing=()
+    for w in "${want[@]}"; do
+        found=""
+        for h in "${have[@]}"; do
+            # shellcheck disable=SC2053  # the list's names are patterns
+            [[ "$h" == $w ]] && { found=1; break; }
+        done
+        [ -n "$found" ] || missing+=("$w")
+    done
+    [ "${#missing[@]}" -eq 0 ] && break
+    [ "$(date +%s)" -lt "$end" ] || break
+    sleep "${RELEASE_POLL_S:-30}"
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+    echo "release $id is not whole: ${missing[*]} still missing, so it stays a draft" >&2
+    exit 3
+fi
+if [ "$(gh api "repos/$repo/releases/$id" --jq '.draft')" != "true" ]; then
+    echo "release $id was published already, whole now (${#want[@]} files)"
+    exit 0
+fi
+# The tag goes with it: GitHub drops a draft's tag patched without one.
+gh api --method PATCH "repos/$repo/releases/$id" -F draft=false -F prerelease=true -f make_latest=false -f tag_name="$tag" >/dev/null
+echo "release $id published: whole (${#want[@]} files)"

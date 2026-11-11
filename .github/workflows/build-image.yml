@@ -515,10 +515,15 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+      # To start publish-release.yml for a dev build this job publishes.
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
-          sparse-checkout: tools
+          sparse-checkout: |
+            tools
+            .release-files
+          sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@v4
         with:
           name: aerieos-os
@@ -550,3 +555,23 @@ jobs:
           bash tools/release-attach.sh "$tag" out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
             out/aerieos-os-*.stick.raw.xz out/aerieos-os-*.stick.raw.xz.sha256 \
             "${iso%.iso}.attestation.jsonl"
+      # A dev build's release goes out by itself, here, as the last thing its
+      # build does, and only once every file .release-files names is on it
+      # (the operator, 11 Nov): two were published by hand from the git
+      # host's page minutes after their tags, and one never got its image.
+      # The image job failing skips this job, so that release stays a draft.
+      # A release that is not a dev build stays a draft for its owner to read.
+      - name: A dev build's release goes out once it is whole
+        if: contains(github.ref_name, '-dev.')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          bash tools/release-attach.sh "$tag" --publish-when-whole .release-files | tee whole.log
+          # A release this job's own token publishes starts no workflow
+          # (GitHub's rule), so what follows a publication, the image tags
+          # people follow moved onto this build, is started by name.
+          if grep -q " published: whole" whole.log; then
+            gh workflow run publish-release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" -f tag="$tag"
+          fi

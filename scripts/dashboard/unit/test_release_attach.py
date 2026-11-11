@@ -38,7 +38,10 @@ p=sys.argv[1]; rows=json.load(open(p)); rows.append({"id": 777, "tag_name": "$3"
 EOF
     ;;
   "api repos/"*"/assets?per_page=100")
-    echo "" ;;
+    # Its files by name, where the test wrote some (--publish-when-whole asks).
+    case "$*" in *".[].name"*) [ -f "$GH_ASSETS" ] && cat "$GH_ASSETS" ;; *) echo "" ;; esac ;;
+  "api repos/"*"/releases/"[0-9]*)
+    case "$*" in *".draft"*) cat "$GH_DRAFT" 2>/dev/null || echo true ;; esac ;;
   "api --method")
     ;;
 esac
@@ -56,14 +59,64 @@ class ReleaseAttach(unittest.TestCase):
         self.releases = os.path.join(self.d, "releases.json")
         self.log = os.path.join(self.d, "gh.log")
         self.env = dict(os.environ, PATH=self.d + os.pathsep + os.environ["PATH"], GITHUB_REPOSITORY="x/y",
-                        GH_TOKEN="t", GH_RELEASES=self.releases, GH_LOG=self.log, GH_TAG="v1.2.3-dev.9")
+                        GH_TOKEN="t", GH_RELEASES=self.releases, GH_LOG=self.log, GH_TAG="v1.2.3-dev.9",
+                        GH_ASSETS=os.path.join(self.d, "assets.txt"), GH_DRAFT=os.path.join(self.d, "draft.txt"),
+                        RELEASE_WAIT_S="0", RELEASE_POLL_S="0")
+        self.list = os.path.join(self.d, ".release-files")
+        with open(self.list, "w", encoding="utf-8") as f:
+            f.write("# what every release carries\naerieos-controller-@VER@.tar.gz\naerieos-os-@VER@.iso\naerieos-app-@VER@.apk\n\n")
         self.f = os.path.join(self.d, "aerieos-os-1.2.3-dev.9.iso")
         with open(self.f, "wb") as f:
             f.write(b"iso")
 
-    def run_tool(self, *a):
-        return subprocess.run(["bash", TOOL, "v1.2.3-dev.9", *a], env=self.env, capture_output=True, text=True,
+    def run_tool(self, *a, tag="v1.2.3-dev.9"):
+        return subprocess.run(["bash", TOOL, tag, *a], env=dict(self.env, GH_TAG=tag), capture_output=True, text=True,
                               timeout=60, check=False)
+
+    def has(self, *names):
+        with open(self.env["GH_ASSETS"], "w", encoding="utf-8") as f:
+            f.write("".join(n + "\n" for n in names))
+
+    def test_a_dev_build_s_release_is_published_once_every_file_is_on_it(self):
+        # The operator, 11 Nov: two dev builds were published from the git
+        # host's page minutes after their tags, and one never got its image.
+        with open(self.releases, "w", encoding="utf-8") as f:
+            json.dump([{"id": 777, "tag_name": "v1.2.3-dev.9", "draft": True}], f)
+        whole = ("aerieos-controller-1.2.3-dev.9.tar.gz", "aerieos-os-1.2.3-dev.9.iso", "aerieos-app-1.2.3-dev.9.apk")
+        # Short of the image: named, left a draft, and the job fails.
+        self.has(whole[0], whole[2], "something-else.txt")
+        r = self.run_tool("--publish-when-whole", self.list)
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertIn("not whole: aerieos-os-1.2.3-dev.9.iso still missing, so it stays a draft", r.stderr)
+        self.assertFalse([c for c in self.calls() if "PATCH" in c], "nothing is published short of a file")
+        # Whole: published, a pre-release and never the latest, its tag sent with it.
+        os.unlink(self.log)
+        self.has(*whole)
+        r = self.run_tool("--publish-when-whole", self.list)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("release 777 published: whole (3 files)", r.stdout)
+        patch = [c for c in self.calls() if "--method PATCH" in c]
+        self.assertEqual(len(patch), 1)
+        for word in ("releases/777", "draft=false", "prerelease=true", "make_latest=false", "tag_name=v1.2.3-dev.9"):
+            self.assertIn(word, patch[0])
+        # One a person published already is left as it is, and said so.
+        os.unlink(self.log)
+        with open(self.env["GH_DRAFT"], "w", encoding="utf-8") as f:
+            f.write("false\n")
+        r = self.run_tool("--publish-when-whole", self.list)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("was published already, whole now", r.stdout)
+        self.assertFalse([c for c in self.calls() if "PATCH" in c])
+
+    def test_a_release_that_is_not_a_dev_build_s_stays_a_draft(self):
+        for tag in ("v1.2.3", "v1.2.3-rc.1"):
+            with open(self.releases, "w", encoding="utf-8") as f:
+                json.dump([{"id": 778, "tag_name": tag, "draft": True}], f)
+            self.has("aerieos-controller-1.2.3.tar.gz", "aerieos-os-1.2.3.iso", "aerieos-app-1.2.3.apk")
+            r = self.run_tool("--publish-when-whole", self.list, tag=tag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("stays a draft for its owner to read and publish", r.stdout)
+        self.assertFalse([c for c in self.calls() if "PATCH" in c], "a stable release and a candidate are a person's to publish")
 
     def calls(self):
         with open(self.log, encoding="utf-8") as f:
