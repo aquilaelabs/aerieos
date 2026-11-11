@@ -4029,6 +4029,7 @@ import library                                                   # noqa: E402
 
 catalogindex.configure(state=STATE, write_json=write_json)
 import catalogrows                                               # noqa: E402
+import packformat                                                # noqa: E402
 catalogrows.configure(state=STATE, write_json=write_json)
 toolpacks.configure(state=STATE, write_json=write_json,
                     unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
@@ -4908,7 +4909,7 @@ def _pack_from_catalog(entry, by, may_root=False):
         return {"error": f"{entry['name']} {past}"}
     shipped = {r["name"] for r in toolchains.load_toolchains()}
     return toolpacks.add(entry["url"], entry["commit"], by, shipped, sha256=entry["sha256"],
-                         tier="official" if entry.get("tier") == "official" else "vetted", path=entry.get("path", ""), may_root=may_root)
+                         tier=packformat.tier_of(entry.get("tier")), path=entry.get("path", ""), may_root=may_root)
 
 
 phone.pack_runner = lambda project, entry, by: _pack_from_catalog(entry, f"session:{project} (allowed by {by})", may_root=True)

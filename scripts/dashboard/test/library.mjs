@@ -42,7 +42,7 @@ ok(await page.evaluate(async () => {
 }), 'with no tool pack the Tool packs group is not drawn, and its chip still opens it empty');
 const shape = await page.evaluate(() => lib.rows.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, typeof r.installed, typeof r.verb]));
 ok(shape.length > 0 && shape.every(([k, t, l, a, i, v]) => ['agent', 'toolchain', 'pack', 'service', 'app', 'companion'].includes(k)
-   && ['official', 'vetted', 'sideloaded'].includes(t) && l === 'string' && a === 'string' && i === 'boolean' && v === 'string'),
+   && ['official', 'verified', 'vetted', 'sideloaded'].includes(t) && l === 'string' && a === 'string' && i === 'boolean' && v === 'string'),
    `every row is one shape: kind, tier, label, about, installed, verb (${shape.length} rows)`);
 ok(await page.evaluate(() => lib.rows.some(r => r.kind === 'toolchain') && document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform).length),
    'the toolchain catalog is among the rows, and every row for this node is drawn');
@@ -52,8 +52,15 @@ ok(await page.evaluate(() => {
   return off.length > 0 && off.every(r => !document.querySelector(`.doc .librarytab .lcard[data-lrow="${r.kind}:${r.name}"]`))
     && new RegExp(`Not for this node\\s*${off.length}\\b`).test(head);
 }), 'a card not for this node is not drawn, and the head counts them (R170 step 9)');
-ok(await page.$$eval('.doc .librarytab .lcard .lcmeta .pill', ps => ps.some(p => /^(official|vetted|sideloaded)$/.test(p.textContent.trim()))),
-   'the tier reads on a card as a pill');
+// Who stands behind a card, in the words a person reads (the operator, 12
+// Nov): Built by Aerie for what AerieOS ships or wrote, never the stored
+// word official.
+const tierPills = await page.$$eval('.doc .librarytab .lcard', cs => cs.map(c => c.querySelector('.lcmeta .pill')?.textContent.trim() || ''));
+ok(tierPills.length > 0 && tierPills.every(t => /^(built by aerie|verified|vetted|sideloaded)$/.test(t)) && tierPills.includes('built by aerie'),
+   `the tier reads on every card as a pill, in a person's words (${[...new Set(tierPills)].join(', ')})`);
+ok(await page.evaluate(() => libTierWord('official') === 'Built by Aerie' && libTierWord('verified') === 'Verified'
+     && LIB_TIERS.map(([, l]) => l).join(', ') === 'Built by Aerie, Verified, Vetted, Sideloaded'),
+   'the tier chips are Built by Aerie, Verified, Vetted and Sideloaded');
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
   return !!head && /Installed/.test(head.textContent);

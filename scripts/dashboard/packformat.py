@@ -36,6 +36,26 @@ FORMATS = {
 }
 
 
+# Who stands behind a catalog entry, as the signed index says it (`tier`)
+# and as a person reads it (the operator, 12 Nov: Built by Aerie, Verified
+# and Vetted, in place of official and vetted, which did not say who made
+# what):
+#   official  one of AerieOS's own shipped rows, as a pack   Built by Aerie
+#   aerie     a pack AerieOS's maintainers wrote             Built by Aerie
+#   verified  a verified vendor's own pack, a shorter list   Verified
+#   vetted    anybody's pack the maintainers reviewed        Vetted
+# The words in a manifest and an index are stored ones and stay; a word this
+# build has not met is read as vetted, the least any signed entry is, which
+# is how a release from before `aerie` and `verified` reads them too.
+TIERS = ("official", "aerie", "verified", "vetted")
+TIER_WORDS = {"official": "Built by Aerie", "aerie": "Built by Aerie", "verified": "Verified", "vetted": "Vetted"}
+
+
+def tier_of(word):
+    """A signed entry's tier as this build keeps it."""
+    return word if word in TIERS else "vetted"
+
+
 def of(doc):
     """The format a manifest or an index entry says it needs: a whole
     number from 1, 1 when it says none, None when what it says is no number."""

@@ -255,7 +255,7 @@ def _all():
     person's own as sideloaded, one taken from the catalog at its tier."""
     out = {k: {**v, "tier": "official"} for k, v in APPS.items()}
     for k, v in _load().items():
-        out[k] = {**v, "tier": v["tier"] if v.get("pin") and v.get("tier") in ("official", "vetted") else "sideloaded"}
+        out[k] = {**v, "tier": v["tier"] if v.get("pin") and v.get("tier") in packformat.TIERS else "sideloaded"}
     return out
 
 
@@ -445,7 +445,7 @@ def add_catalog(entry, by="", fetch=None):
     apps = _load()
     apps[app] = {"name": str(meta.get("label") or app)[:60], "what": str(meta.get("about") or entry.get("about") or "")[:200], "port": port,
                  "media": seen["media"], "compose": compose, "secrets": [], "by": str(by or ""), "at": int(time.time()),
-                 "tier": "official" if entry.get("tier") == "official" else "vetted",
+                 "tier": packformat.tier_of(entry.get("tier")),
                  "pin": {k: entry[k] for k in ("url", "commit", "sha256")} | {"path": entry.get("path", "")}}
     _save(apps)
     return {"app": app, **seen}

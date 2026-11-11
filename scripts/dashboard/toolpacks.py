@@ -1173,7 +1173,7 @@ def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=Fa
         d = _load()
         rec = {"name": m["name"], "url": url, "commit": got["commit"], "manifest": m,
                "guidance": got["guidance"], "by": str(by or ""), "at": int(time.time()),
-               "tier": tier if tier in ("vetted", "official") and sha256 else "url", "sha256": sha256 or ""}
+               "tier": tier if tier in packformat.TIERS and sha256 else "url", "sha256": sha256 or ""}
         was = d["packs"].get(m["name"])
         if was and was.get("url") != url:
             return {"error": f"a pack called {m['name']} is already here from {was.get('url')}; remove it first"}
@@ -1222,7 +1222,7 @@ def _add_folder(url, commit, path, by, shipped, sha256, tier):
             # catalog pins; the commit it is kept under in its repository
             # here is its own, and is what a node fetches from the bundle.
             rec.update({"url": url, "commit": commit, "path": path, "sha256": sha256 or "", "kept_at": rec.get("commit") or "",
-                        "tier": tier if tier in ("vetted", "official") and sha256 else "url"})
+                        "tier": tier if tier in packformat.TIERS and sha256 else "url"})
             write_json(FILE, data)
             out["pack"] = rec
     return out
@@ -1329,7 +1329,7 @@ def offers_agent(rec):
     or None: only one the vetted catalog pinned, or an official one, since
     the adapter decides what runs in every session of it."""
     m = (rec or {}).get("manifest") or {}
-    return m.get("pack_agent") if m.get("pack_agent") and rec.get("tier") in ("vetted", "official") else None
+    return m.get("pack_agent") if m.get("pack_agent") and rec.get("tier") in packformat.TIERS else None
 
 
 _offered = {"stamp": None, "rows": ()}

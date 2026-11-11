@@ -33,7 +33,11 @@ const LIB_STANDS = {installed: r => r.installed, update: r => r.update};
 // The section a card sits in: its kind, or the group it names (R169 step 9: a
 // pack that brings a coding agent is a pack's card under Coding agents).
 function libGroup(r){ return r.group || r.kind; }
-const LIB_TIERS = [["official", "Official"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
+// Who stands behind a card (the operator, 12 Nov): what AerieOS ships or
+// its maintainers wrote, a verified vendor's own pack, anybody's pack the
+// maintainers reviewed, and what a person added themselves.
+const LIB_TIERS = [["official", "Built by Aerie"], ["verified", "Verified"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
+function libTierWord(t){ return (LIB_TIERS.find(([k]) => k === t) || [t, t])[1]; }
 
 function openLibrary(){
   openTab({kind: "library", arg: "__library", label: "Library"});
@@ -132,14 +136,14 @@ async function loadLibraryNow(){
 // What the search box matches: the name, what it is, its kind and its tier.
 function libMatch(r, q){
   if (!q) return true;
-  const hay = `${r.label} ${r.name} ${r.about} ${r.kind} ${r.tier} ${(r.platforms || []).join(" ")}`.toLowerCase();
+  const hay = `${r.label} ${r.name} ${r.about} ${r.kind} ${r.tier} ${libTierWord(r.tier)} ${(r.platforms || []).join(" ")}`.toLowerCase();
   return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
 
 // The pills a row wears: its tier (the three read on every row), what is
 // installed, and what an update would move it to, which alone is news.
 function libPills(r){
-  const tier = `<span class="pill${r.tier === "vetted" ? " ok" : ""}">${esc(r.tier)}</span>`;
+  const tier = `<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
   const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
   const upd = r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
   const dev = r.dev ? devMark() : "";

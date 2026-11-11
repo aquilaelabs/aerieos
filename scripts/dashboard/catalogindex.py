@@ -105,7 +105,7 @@ def parse(index_bytes):
         # What the entry is (R170 step 7, R172): a tool pack, a Docker app or a service.
         kind = p.get("kind") if p.get("kind") in ("app", "service") else "pack"
         out.append({"name": name, "url": str(p["url"])[:300], "commit": str(p["commit"]), "sha256": str(p["sha256"]), "path": path, "kind": kind,
-                    "tier": "official" if p.get("tier") == "official" else "vetted", "withdrawn": p.get("withdrawn") is True,
+                    "tier": packformat.tier_of(p.get("tier")), "withdrawn": p.get("withdrawn") is True,
                     "about": str(p.get("about") or "")[:400],
                     "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]})
         # A shipped coding agent's entry says its install recipe's rev (R169

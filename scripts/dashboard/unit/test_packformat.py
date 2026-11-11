@@ -80,6 +80,29 @@ class Number(unittest.TestCase):
         self.assertTrue(packformat.too_new(n, "0.10.0").startswith("needs AerieOS 0.10.0 or newer ("))
 
 
+class Tiers(unittest.TestCase):
+    """Who stands behind an entry (the operator, 12 Nov): Built by Aerie,
+    Verified and Vetted are what a person reads; the stored words stay."""
+
+    def test_the_index_s_words_are_kept_and_one_not_met_reads_as_vetted(self):
+        idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": [dict(ENTRY, name=f"p{i}", tier=t) for i, t in
+                                                                           enumerate(("official", "aerie", "verified", "vetted", "platinum", None))]}).encode())
+        self.assertEqual(why, "")
+        self.assertEqual([p["tier"] for p in idx["packs"]], ["official", "aerie", "verified", "vetted", "vetted", "vetted"])
+
+    def test_what_a_person_reads_for_each(self):
+        self.assertEqual([packformat.TIER_WORDS[t] for t in packformat.TIERS], ["Built by Aerie", "Built by Aerie", "Verified", "Vetted"])
+        rows = library.rows({"items": []}, [], [], {"packs": [dict(ENTRY, name=f"p{i}", tier=t) for i, t in enumerate(("aerie", "verified", "vetted"))]}, {})
+        self.assertEqual([(r["tier"], library.TIER_WORDS[r["tier"]]) for r in rows],
+                         [("official", "Built by Aerie"), ("verified", "Verified"), ("vetted", "Vetted")])
+
+    def test_a_pack_s_agent_is_offered_from_any_signed_tier_and_never_from_an_address(self):
+        m, errors = toolpacks.validate(json.loads((KEPT / "1" / "kite.json").read_text()))
+        self.assertEqual(errors, [])
+        for tier, offered in (("official", True), ("aerie", True), ("verified", True), ("vetted", True), ("url", False), ("here", False)):
+            self.assertEqual(bool(toolpacks.offers_agent({"manifest": m, "tier": tier})), offered, tier)
+
+
 class Index(unittest.TestCase):
     def index(self, *packs, **top):
         idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": list(packs), **top}).encode())

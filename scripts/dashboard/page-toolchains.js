@@ -352,7 +352,7 @@ function tpOpenCatalog(entry){
 // Update then keeps it at that pin with the index's sha256, its tier kept.
 async function tpOpen(name, pin){
   const pack = name ? (toolchains?.items || []).find(i => i.name === name)?.pack : null;
-  const vetted = pack && (pack.tier === "vetted" || pack.tier === "official");
+  const vetted = pack && ["official", "aerie", "verified", "vetted"].includes(pack.tier);
   if (vetted && !pin && !tpCatalog?.index) await loadCatalog(false);
   pin = pin || (vetted ? tpPinOf(name, pack) : null);
   tpEdit = name || "";

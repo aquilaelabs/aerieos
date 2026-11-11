@@ -61,7 +61,9 @@ fetched from, how it is verified, the system packages it needs), and under
 in, how it takes the briefing and AerieOS's guards, where its
 conversations are). Both carry `"tier": "official"`, which is what lets
 them stand in for install steps and verbs and take a shipped name; a pack
-you add is `url`, and a pack from the vetted catalog is `vetted`. An agent whose manifest cannot name how it takes the guards is
+you add is `url`, and a pack from the vetted catalog takes the tier its
+index entry says (the Library reads official and `aerie` as Built by Aerie).
+An agent whose manifest cannot name how it takes the guards is
 not a pack and is not listed. The files are written from the tables by
 `tools/packs-export.py --write` and `aerie lint` fails when they drift, so
 the format is one; the installer and the agents' adapters still read
@@ -267,8 +269,18 @@ a pack made here, so a node fetches the folder and nothing else.
 ### Installing from the catalog
 
 The Library's **Tool packs** cards are the index's packs not yet added,
-each with its tier (official, vetted, sideloaded for one added by address
-or made here), what it is and the platforms it works on; **Install** opens
+each with who stands behind it, what it is and the platforms it works on:
+
+| On the card | What it means | The index's word |
+|---|---|---|
+| **Built by Aerie** | AerieOS's own: a toolchain, agent or app it ships, or a pack its maintainers wrote for somebody else's tool. | `official` (a shipped row), `aerie` |
+| **Verified** | The vendor's own pack, from a vendor the maintainers have verified: a shorter list than Vetted. | `verified` |
+| **Vetted** | Anybody's pack, reviewed by the maintainers. | `vetted` |
+| **Sideloaded** | Added here by its address, or made here: no index pins it. | none |
+
+The words on the card are a person's; a manifest and the index keep their
+own, and an AerieOS from before `aerie` and `verified` reads both as
+vetted. **Install** opens
 the same dialog as Add your own on the commit the index pins, with the
 archive's sha256 checked on the way in: Look (on the card, or in the
 dialog) shows what it fetches and runs, and Add keeps exactly that. A pack
@@ -282,9 +294,9 @@ card says so and offers **Catalog update**, which opens the dialog on the
 new pin with what it changes marked verb by verb, as Edit does for a pack
 added by address; **Update** keeps it at that pin with the index's sha256
 checked, its tier kept. Edit on a pack kept from the catalog looks at the
-index's pin too, never at the repository's head. A pack is kept as vetted or
-official only at a commit and sha256 the signed index pins; anything else
-is a pack by address.
+index's pin too, never at the repository's head. A pack is kept at the
+index's tier only at a commit and sha256 the signed index pins; anything
+else is a pack by address, Sideloaded.
 
 ### Without the network
 

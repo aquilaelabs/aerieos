@@ -15,7 +15,12 @@ import re
 import packformat
 
 KINDS = ("toolchain", "agent", "pack", "service", "app", "companion")
-TIER_WORDS = {"official": "Official", "vetted": "Vetted", "url": "Sideloaded", "here": "Sideloaded", "sideloaded": "Sideloaded"}
+# Who stands behind a card, as a person reads it (the operator, 12 Nov):
+# AerieOS's own shipped rows and the packs its maintainers wrote are both
+# Built by Aerie, a verified vendor's own pack is Verified, anybody's pack
+# the maintainers reviewed is Vetted, and what a person added themselves is
+# Sideloaded. The row's `tier` is the first word of each.
+TIER_WORDS = {"official": "Built by Aerie", "verified": "Verified", "vetted": "Vetted", "url": "Sideloaded", "here": "Sideloaded", "sideloaded": "Sideloaded"}
 
 
 def _an(w):
@@ -64,7 +69,7 @@ def repo_of(catalog_url):
 
 
 def _tier(t):
-    return "official" if t in ("official", "") else "vetted" if t == "vetted" else "sideloaded"
+    return "official" if t in ("official", "aerie", "") else t if t in ("verified", "vetted") else "sideloaded"
 
 
 def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(), pack_values=None, pack_mine=None):
