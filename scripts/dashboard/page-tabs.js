@@ -667,7 +667,12 @@ function show(t){
   if (!openedNow.has(t.id)) TABKINDS[t.kind]?.open?.();
   // Only when it is a different project's: switching back to a notebook must
   // not reload it, or whatever is staged in it goes.
-  refreshSoon();      // a just-opened terminal's session appears in Sessions
+  // A just-opened terminal's session appears in Sessions: now, and twice
+  // more as it comes to exist. Any other page reads the status once, as it
+  // opens; it has no session to wait for, and the two reads after were the
+  // heaviest read there is, made three times for every press on the rail.
+  if (t.kind === "term") refreshSoon();
+  else refresh();
 }
 
 // The status poll is every fifteen seconds, which is the right cadence for

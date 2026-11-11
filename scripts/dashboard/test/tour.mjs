@@ -294,9 +294,28 @@ for (const p of [page, phone]){
   // install) lands on its group's first page, which is not it.
   const offered = await p.evaluate(ks => ks.filter(([k]) => k === 'notebook' || railAllows(k)), kinds);
   for (const [k, g] of offered){
+    const want = k === 'notebook' ? '' : g === k ? `#/${g}` : `#/${g}/${k}`;
     if (k === 'notebook') await p.evaluate(() => openNotebook('alpha', 'overview'));
-    else await p.evaluate(([g, k]) => { location.hash = g === k ? `#/${g}` : `#/${g}/${k}`; }, [g, k]);
-    await p.waitForFunction(k => tabOf(panes[0])?.kind === k && !tourLoading(), k, { timeout: 15000 }).catch(() => {});
+    else await p.evaluate(want => { location.hash = want; }, want);
+    // Until the page is up and drawn, or the address turned out not to be a
+    // page's: one a press opens for a thing by its id (a Library entry, an
+    // installed thing) has no page at its bare address, and one this install
+    // does not offer lands elsewhere, so the router puts the address of the
+    // page it kept back in the bar. Waiting for a page that was never coming
+    // was the budget three times over for each, most of this suite's minutes.
+    await p.evaluate(async ([k, want]) => {
+      const t0 = Date.now();
+      let elsewhere = 0;
+      for (;;){
+        if (tabOf(panes[0])?.kind === k && !tourLoading()) return;
+        if (want && !location.hash.startsWith(want)){
+          elsewhere = elsewhere || Date.now();
+          if (Date.now() - elsewhere > 1500) return;
+        } else elsewhere = 0;
+        if (Date.now() - t0 > 15000) return;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }, [k, want]);
     await p.waitForTimeout(600);
     const miss = await p.evaluate(k => (TOUR_STEPS[k] || []).map((s, j) => s.at && !s.sample && !tourTarget(s.at) ? j : -1).filter(j => j >= 0), k);
     for (const j of miss) if (!(UNSHOWN[k] || []).includes(j)) lost.push(`${k} step ${j + 1}`);
