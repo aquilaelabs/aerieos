@@ -1772,6 +1772,16 @@ case "$target" in
         # Installed on purpose, from the node's Agents page, never by the
         # provisioner (R145): without it there is nothing for a session to run.
         if ! command -v "${agent_cmd:-$agent}" >/dev/null 2>&1; then
+            # A pack's agent is its pack's program, and a pack is off for a
+            # space until that space's settings switch it on (R77): said as
+            # that, where it is why the program is not on this session's
+            # PATH, never as a node that does not hold it.
+            if [ -n "$PACK_AGENT" ]; then
+                case " ${BB_TOOLCHAINS_OFF:-} " in *" ${agent} "*)
+                    bad "${agent_name} is switched off for ${proj}: it comes from a tool pack, and a pack is off for a space until its settings switch it on." \
+                        "Open ${proj}'s settings, Toolchains, switch ${agent_name} on and save; then open this again." ;;
+                esac
+            fi
             bad "${agent_product} is not installed on ${BB_NODE:-this node}: the Library installs it there." \
                 "Open the Library, pick ${BB_NODE:-this node}, and press Install on" \
                 "${agent_name}; then open this again."

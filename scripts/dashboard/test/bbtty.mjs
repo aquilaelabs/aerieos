@@ -85,7 +85,7 @@ if len(parts) == 3 and len(parts[1].encode()) > SHARE:
 t = "\\n\\n".join(parts)
 print(json.dumps({"text": t, "bytes": len(t.encode()), "parts": [], "notes": notes,
                   "name": "Alpha-Shown", "id": "P7"}))' ;;
-  settings) [ "\${2:-}" = --json ] && printf '{"git_name":"Pat Tester","git_email":"pat@example.invalid","toolchains_off":[%s],"git_ready":%s}\\n' "$([ "\${BB_PROJECT:-}" = alpha ] && echo '"hexkit","flutter"')" "$([ "\${FAKE_GIT_READY:-1}" = 0 ] && echo false || echo true)" ;;
+  settings) [ "\${2:-}" = --json ] && printf '{"git_name":"Pat Tester","git_email":"pat@example.invalid","toolchains_off":[%s],"git_ready":%s}\\n' "$(if [ -n "\${FAKE_TC_OFF:-}" ]; then printf '"%s"' "\${FAKE_TC_OFF}"; elif [ "\${BB_PROJECT:-}" = alpha ]; then echo '"hexkit","flutter"'; fi)" "$([ "\${FAKE_GIT_READY:-1}" = 0 ] && echo false || echo true)" ;;
   # A brief staged with Build it, taken once, the way the controller hands
   # it over (brief.py): the file is the stage, and taking it clears it.
   brief) if [ "\${2:-}" = take ] && [ -n "\${FAKE_BRIEF:-}" ] && [ -f "$FAKE_BRIEF" ]; then
@@ -838,6 +838,25 @@ sleep 60
         const rgm = respawn('gemini');
         ok(rgm.includes('--continue'), `...a respawn goes on with its newest conversation (${rgm.filter(Boolean).slice(-2).join(' ')})`);
         tmuxKill(`gemini-${proj}`);
+        // Its pack off for the space (a pack is, until the space's settings
+        // switch it on): the program is in the store and off this session's
+        // PATH, and the refusal says that, never that the node lacks it.
+        {
+          const sdk = join(DIR, 'gemsdk');
+          mkdirSync(join(sdk, 'gemini', 'bin'), { recursive: true });
+          writeFileSync(join(sdk, 'gemini', 'bin', 'agy'), readFileSync(join(bin, 'agy')), { mode: 0o755 });
+          rmSync(join(bin, 'agy'));
+          const env = { BB_TOOLPACKS_JSON: packs, SDK_ROOT: sdk, PATH: `${bin}:${join(sdk, 'gemini', 'bin')}:${process.env.PATH}` };
+          const offSaid = shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, { ...env, FAKE_TC_OFF: 'gemini' });
+          ok(/Gemini is switched off for/.test(offSaid) && /settings, Toolchains/.test(offSaid) && !/not installed/.test(offSaid) && !alive(`gemini-${proj}`),
+             `a pack's agent whose pack is off for the space is refused in those words, never as not installed (${
+               (offSaid.trim().split('\n').find(l => /switched off|not installed/.test(l)) || offSaid.trim().split('\n').pop() || '').slice(0, 110)})`);
+          shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, env);
+          await sleep(400);
+          ok(alive(`gemini-${proj}`), '...and switched on, it starts from the store');
+          tmuxKill(`gemini-${proj}`);
+          rmSync(sdk, { recursive: true, force: true });
+        }
         rmSync(join(HOMEDIR, '.gemini'), { recursive: true, force: true });
         try { git(['worktree', 'remove', '--force', join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-gemini`)]); } catch { /* not made */ }
       }
