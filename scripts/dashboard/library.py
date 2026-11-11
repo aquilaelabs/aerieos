@@ -175,7 +175,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         # service is its own row (R172).
         if e.get("kind") == "app":
             if e["name"] not in app_ids:
-                out.append({"kind": "app", "tier": _tier(e.get("tier")), "name": e["name"], "label": e["name"], "about": e.get("about") or "",
+                out.append({"kind": "app", "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
                             "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12],
                             "update": False, "running": False, "compose": "", "blanks": [],
                             "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "install",
@@ -183,7 +183,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
             continue
         if e.get("kind") == "service":
             continue
-        out.append({"kind": "pack", **({"group": "agent"} if e.get("agent") is True else {}), "tier": _tier(e.get("tier")), "name": e["name"], "label": e["name"], "about": e.get("about") or "",
+        out.append({"kind": "pack", **({"group": "agent"} if e.get("agent") is True else {}), "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
                     "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12], "update": False,
                     "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add",
                     **_past(e, catalog_index)})

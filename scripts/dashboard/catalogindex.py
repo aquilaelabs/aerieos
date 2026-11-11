@@ -118,6 +118,10 @@ def parse(index_bytes):
         # its card with the agents before it is installed as after.
         if p.get("agent") is True:
             out[-1]["agent"] = True
+        # Its name as a person reads it, where the entry says: a card shows
+        # it before the pack is fetched, as it does once it is kept.
+        if isinstance(p.get("label"), str) and p["label"].strip():
+            out[-1]["label"] = p["label"].strip()[:60]
         # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
         # an install fetches the pack only when that is past its own row's.
         rev = p.get("shipped_rev")
