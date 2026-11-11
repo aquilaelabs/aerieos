@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The catalog is signed by a new key, which this release carries. Upgrading: an install on 0.9.0-dev.5221 or earlier keeps the catalog it last read and refuses newer ones (its Library says the index's signature does not match) until it is updated to this release; nothing installed is affected (2713dd2)
+
 ## 0.9.0-dev.5221: 2026-11-11
 
 ### Changed
