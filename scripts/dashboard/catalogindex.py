@@ -112,6 +112,10 @@ def parse(index_bytes):
         rev = p.get("install_rev")
         if isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999:
             out[-1]["install_rev"] = rev
+        # A pack that brings a coding agent says so, and the Library files
+        # its card with the agents before it is installed as after.
+        if p.get("agent") is True:
+            out[-1]["agent"] = True
     return {"generated": str(d.get("generated") or "")[:40], "packs": out}, ""
 
 

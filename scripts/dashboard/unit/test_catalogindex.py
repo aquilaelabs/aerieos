@@ -161,6 +161,13 @@ class Shipped(unittest.TestCase):
         self.assertEqual(why, "")
         self.assertEqual([p.get("install_rev") for p in idx["packs"]], [3, None, None, None])
 
+    def test_a_pack_that_brings_a_coding_agent_keeps_its_mark(self):
+        # The Library files its card with the agents before it is installed.
+        packs = [dict(ENTRY, name="gemini", agent=True), dict(ENTRY, name="otter", agent="yes"), ENTRY]
+        idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": packs}).encode())
+        self.assertEqual(why, "")
+        self.assertEqual([p.get("agent") for p in idx["packs"]], [True, None, None])
+
     def test_the_image_carries_the_key_the_index_is_checked_against(self):
         # Left out, every released install said it ships no catalog key and
         # trusted no index (B451); a bare-metal install lays out by the same lines.
