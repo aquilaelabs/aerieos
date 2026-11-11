@@ -18,6 +18,22 @@ prereqs() { echo "$PREREQ"; }
 case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
 # shellcheck source=/dev/null  # the initramfs's own library, with rootmnt set by init
 . /scripts/functions
+# Booted live from the installer's medium (boot=live, the ISO's two entries):
+# there is no AerieOS disk yet, so no data partition to wait for and nothing
+# to make last; what is written lives in live-boot's own overlay until the
+# machine restarts. Waiting for the partition here stopped every install on
+# a machine that did not already hold an AerieOS disk, at the (initramfs)
+# prompt. The root's fstab names the boot partition of an installed disk,
+# which is not here either: left in, the boot waited a minute and a half for
+# it and ended in emergency mode with the console locked.
+read -r cmdline < /proc/cmdline
+for w in $cmdline; do
+    case "$w" in
+        boot=live)
+            sed -i '/[[:space:]]\/boot\/efi[[:space:]]/d' "${rootmnt}/etc/fstab" 2>/dev/null || true
+            exit 0 ;;
+    esac
+done
 DATA=/dev/disk/by-partuuid/6a5c2f3e-0b7d-4b2a-9c1e-b0b1de5b0e0d
 i=0
 while [ ! -b "$DATA" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done

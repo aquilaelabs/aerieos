@@ -51,6 +51,36 @@ class Partitions(unittest.TestCase):
         script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
         self.assertIn(f"by-partuuid/{self.p['BB_PART_DATA']}", script)
 
+    def test_a_live_boot_waits_for_no_disk_of_ours(self):
+        # B766: the ISO boots the same initrd live, on a machine with no
+        # AerieOS disk yet. The script leaves before it looks for the data
+        # partition, and takes the installed disk's boot partition out of the
+        # live root's fstab; run here as sh, with the boot's own names stood in.
+        script = read(EXTRA, "etc", "initramfs-tools", "scripts", "init-bottom", "aerieos-os")
+        self.assertLess(script.index("boot=live)"), script.index('while [ ! -b "$DATA" ]'))
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "root", "etc"))
+            shutil.copy(os.path.join(EXTRA, "etc", "fstab"), os.path.join(d, "root", "etc", "fstab"))
+            os.makedirs(os.path.join(d, "scripts"))
+            with open(os.path.join(d, "scripts", "functions"), "w") as f:
+                f.write('panic() { echo "PANIC: $*"; exit 3; }\n')
+            for line, want in (("BOOT_IMAGE=/live/vmlinuz boot=live components bbinstaller=1 quiet", 0),
+                               ("BOOT_IMAGE=/aerieos/a/vmlinuz root=PARTUUID=x ro quiet", 3)):
+                with open(os.path.join(d, "cmdline"), "w") as f:
+                    f.write(line + "\n")
+                body = (script.replace(". /scripts/functions", f". {d}/scripts/functions")
+                        .replace("/proc/cmdline", f"{d}/cmdline")
+                        .replace("[ \"$i\" -lt 100 ]", "[ \"$i\" -lt 1 ]"))
+                r = subprocess.run(["sh", "-c", body], env={**os.environ, "rootmnt": os.path.join(d, "root")},
+                                   capture_output=True, text=True, timeout=30)
+                self.assertEqual(r.returncode, want, (line, r.stdout, r.stderr))
+                if want == 0:
+                    left = open(os.path.join(d, "root", "etc", "fstab")).read()
+                    self.assertNotIn("/boot/efi", left)
+                    self.assertNotIn("PANIC", r.stdout)
+                else:
+                    self.assertIn("the data partition", r.stdout)
+
     def test_the_projects_under_srv_are_kept_on_the_data_partition(self):
         # B437: the staged WORKSPACE is /srv/aerieos/projects, and the
         # root is a tmpfs overlay, so /srv is bound from /var.
@@ -99,7 +129,7 @@ class Packages(unittest.TestCase):
         lay = read(IMG, "lay-disk")
         tools = set(re.search(r"for t in ([^;]+); do command -v", lay).group(1).split())
         carried = {"sfdisk": "fdisk", "mkfs.vfat": "dosfstools", "mkfs.ext4": "e2fsprogs",
-                   "grub-install": "grub-common", "grub-editenv": "grub-common", "partprobe": "parted"}
+                   "grub-install": "grub2-common", "grub-editenv": "grub-common", "partprobe": "parted"}
         self.assertEqual(tools - set(carried), set(), "a tool lay-disk asks for that this test does not map to its package")
         self.assertEqual({carried[t] for t in tools} - self.packages(), set())
 
@@ -283,6 +313,19 @@ class Workflow(unittest.TestCase):
         unit = read(EXTRA, "usr", "lib", "systemd", "system", "aerieos-os-installer.service")
         self.assertIn("ConditionKernelCommandLine=bbinstaller=1", unit)
         self.assertIn("TTYPath=/dev/tty1", unit)
+
+    def test_the_installer_asks_nothing_only_where_the_line_names_the_disk(self):
+        # B766: the build installs its own ISO onto a blank disk and boots the
+        # result. The word is the kernel line's alone, never the menu's, and
+        # the disk named must still be one the installer would offer.
+        inst = read(EXTRA, "usr", "lib", "aerieos-os", "installer")
+        self.assertIn("aerie_install_to=/dev/*)", inst)
+        self.assertIn('disk_rows | cut -f1 | grep -qx "$AUTO"', inst)
+        self.assertNotIn("aerie_install_to", read(IMG, "iso-grub.cfg"))
+        flow = read(ROOT, ".github", "workflows", "os-image.yml")
+        self.assertIn("aerie_install_to=/dev/vda", flow)
+        self.assertIn('grep -aq "aerieos-installer: AerieOS .* is on /dev/vda"', flow)
+        self.assertIn("serial-iso-installed.log", flow)
 
     def test_the_iso_boots_the_same_root_live_with_the_installer(self):
         b = read(IMG, "build.sh")

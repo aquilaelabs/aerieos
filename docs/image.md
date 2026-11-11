@@ -391,6 +391,13 @@ first page, at `http://ITS-ADDRESS:7680` on the LAN, makes the owner and
 names the machine. The ISO's second entry boots the live system without
 installing, for a look or a rescue.
 
+With `aerie_install_to=/dev/DISK` added to the installer entry's kernel line
+(the boot menu's `e`), the install asks nothing: that disk is laid out with
+no feature turned on, each step is said on the kernel's console, and the
+machine turns itself off at the end. It is for a machine nobody sits at,
+and it is how the build checks its own ISO: the menu never carries the
+word, so nothing is laid out that a person did not name.
+
 ## In a VM
 
 A VM installs from the ISO as a machine does: give it a disk of 16 GB or
@@ -453,7 +460,8 @@ An updated slot's trial and Safe mode are under [Updating](#updating).
 
 CI builds the image on a hosted runner with a workflow of its own,
 `.github/workflows/os-image.yml`, which builds it and then boots the VM
-disk under QEMU until the dashboard answers (`appliance-boot`). The image
+disk under QEMU until the dashboard answers (`appliance-boot`), and the ISO
+installed onto a blank disk there, which is then booted to its dashboard. The image
 build calls it on every release tag, from the Actions page's *Run
 workflow* with its *appliance* box ticked, and weekly; a branch push that
 touches the image runs it alone and publishes nothing, so a fix to the

@@ -9,8 +9,27 @@
 set -euo pipefail
 LIVE="${BB_LIVE_MEDIUM:-/run/live/medium}"
 LIB=/usr/lib/aerieos-os
+# With no questions, where the kernel's command line names the disk
+# (aerie_install_to=/dev/vda, beside bbinstaller=1): for a machine nobody sits
+# at, and for the build's own check that this ISO installs (the image
+# workflow boots it so on a blank disk). Never chosen for a person: the menu
+# does not carry the word, and without it every screen below asks. Each
+# line it says goes to the kernel's console as well, which is where such a
+# machine is read; it turns the machine off at its end, having restarted
+# into the medium again otherwise.
+AUTO=""
+read -r cmdline < /proc/cmdline || cmdline=""
+for w in $cmdline; do
+    case "$w" in aerie_install_to=/dev/*) AUTO="${w#aerie_install_to=}" ;; esac
+done
+told() { echo "aerieos-installer: $1"; echo "aerieos-installer: $1" > /dev/console 2>/dev/null || true; }
 say() { whiptail --title "AerieOS" --msgbox "$1" 14 72; }
-bye() { whiptail --title "AerieOS" --msgbox "$1
+bye() {
+    if [ -n "$AUTO" ]; then
+        told "FAILED: $1"
+        sync; systemctl poweroff; sleep 600; exit 1
+    fi
+    whiptail --title "AerieOS" --msgbox "$1
 
 Press Enter to get a shell; the installer runs again with: installer" 14 72; exec bash; }
 export NEWT_COLORS='root=,black roottext=white,black window=white,black border=white,black title=green,black button=black,green actbutton=black,green listbox=white,black actlistbox=black,green checkbox=white,black actcheckbox=black,green'
@@ -57,13 +76,21 @@ for d in json.load(sys.stdin).get("blockdevices") or []:
 # AerieOS's logo over the welcome (R185), the one the console shows at
 # every boot.
 LOGO="$(cat "$LIB/logo" 2>/dev/null || true)"
-whiptail --title "AerieOS" --msgbox "$LOGO
+[ -n "$AUTO" ] || whiptail --title "AerieOS" --msgbox "$LOGO
 
 Welcome to AerieOS ${VER:-}.
 
 This installs it onto a disk of this machine: the whole disk is laid out again (two root slots for updates and a data partition grown to the disk), and everything on it is lost. The machine comes up as its own controller, reached on the LAN at http://ITS-ADDRESS:7680, where the first page makes the owner." 24 76
 
 pick=""
+if [ -n "$AUTO" ]; then
+    # The disk the line named, if it is one this installer would offer: not
+    # the medium, nothing of it mounted.
+    disk_rows | cut -f1 | grep -qx "$AUTO" \
+        || bye "$AUTO is not a disk to install onto here: $(disk_rows | cut -f1 | tr '\n' ' ')"
+    pick="$AUTO"
+    told "laying out $pick as AerieOS ${VER:-}"
+fi
 while [ -z "$pick" ]; do
     rows=()
     while IFS=$'\t' read -r name what; do
@@ -81,12 +108,13 @@ ${on:-(nothing could be read from it)}
 Every partition on it is replaced. There is no undo." 20 76 --defaultno || pick=""
 done
 
-feats="$(whiptail --title "AerieOS" --checklist "Features turned on at the first boot (each can change later on This machine):" 16 72 4 \
+feats=""
+[ -n "$AUTO" ] || feats="$(whiptail --title "AerieOS" --checklist "Features turned on at the first boot (each can change later on This machine):" 16 72 4 \
     vmhost "VM host: KVM through libvirt, for the VMs page" ON \
     firewall "The hosting firewall: only what is published is reachable" ON \
     iommu "IOMMU on the kernel's command line, for PCI and USB passthrough" OFF 3>&1 1>&2 2>&3)" || bye "Nothing installed."
 
-clear
+[ -n "$AUTO" ] || clear
 echo "== laying out $pick"
 if ! bash "$LIB/lay-disk" "$pick" "$SQ" "$LIVE/live/vmlinuz" "$LIVE/live/initrd" "$LIVE/live/release" "$LIB/grub.cfg" --grow; then
     bye "The disk was not laid out (above). Nothing is installed; $pick may be partly written."
@@ -104,8 +132,12 @@ if [ -b "$data" ] && mount "$data" "$mnt" 2>/dev/null; then
     umount "$mnt"
 fi
 rmdir "$mnt" 2>/dev/null || true
-[ -n "$wrote" ] || whiptail --title "AerieOS" --msgbox "The features chosen could not be written to $data, so none is on at the first boot: turn them on under This machine once the dashboard is up." 12 72
+[ -n "$wrote" ] || [ -n "$AUTO" ] || whiptail --title "AerieOS" --msgbox "The features chosen could not be written to $data, so none is on at the first boot: turn them on under This machine once the dashboard is up." 12 72
 sync
+if [ -n "$AUTO" ]; then
+    told "AerieOS ${VER:-} is on $pick"
+    systemctl poweroff; sleep 600; exit 0
+fi
 whiptail --title "AerieOS" --msgbox "AerieOS ${VER:-} is on $pick.
 
 Take the medium out and press Enter to restart. The machine comes up as its own controller; the first page, at http://ITS-ADDRESS:7680 on the LAN, makes the owner." 14 72

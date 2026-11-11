@@ -278,6 +278,69 @@ jobs:
           env_set kept.raw aerie_kept_next=kept-test
           boot kept.raw serial-kept.log "aeriekept=kept-test"
           echo "kept and stick booted ($ver)" | tee -a "$GITHUB_STEP_SUMMARY"
+      # The ISO installs (B766): started as a machine with one blank disk
+      # starts it, the installer told its disk on the kernel's line
+      # (aerie_install_to, which asks nothing), and the disk it laid out
+      # booted after to its dashboard. No build was checked this way before,
+      # and none could install: the live boot waited for a disk of ours, its
+      # fstab for a boot partition, and the image carried no grub-install.
+      - name: Install from the ISO onto a blank disk and boot it
+        shell: bash
+        run: |
+          set -euo pipefail
+          iso="$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
+          [ -f "$iso" ] || { echo "no ISO among the build's files:"; ls out; exit 1; }
+          kvm=""; [ -w /dev/kvm ] && kvm="-enable-kvm -cpu host"
+          # The medium's own kernel and initrd with the installer's line, the
+          # disk named and the console on the serial line; the ISO itself in
+          # the drive, where live-boot finds its root.
+          mkdir -p isomnt
+          sudo mount -o loop,ro "$iso" isomnt
+          cp isomnt/live/vmlinuz iso-vmlinuz
+          cp isomnt/live/initrd iso-initrd
+          sudo umount isomnt
+          truncate -s 24G installed.raw
+          # shellcheck disable=SC2086
+          timeout 2400 qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+            -drive file=installed.raw,format=raw,if=virtio \
+            -drive file="$iso",format=raw,media=cdrom,readonly=on \
+            -kernel iso-vmlinuz -initrd iso-initrd \
+            -append "boot=live components bbinstaller=1 aerie_install_to=/dev/vda console=ttyS0,115200" \
+            -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
+            -display none -serial file:serial-iso-install.log -no-reboot || true
+          tr -d '\r' < serial-iso-install.log | grep -a "aerieos-installer:" || true
+          if ! grep -aq "aerieos-installer: AerieOS .* is on /dev/vda" serial-iso-install.log; then
+            tr -d '\r' < serial-iso-install.log | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 150
+            echo "the ISO did not install onto a blank disk"
+            exit 1
+          fi
+          # ...and the disk it made, started by the firmware as its machine
+          # would start it, its console on the serial line.
+          at="installed.raw@@$(( $(sfdisk -J installed.raw | jq -r '.partitiontable.partitions[] | select(.name == "esp") | .start') * 512 ))"
+          mcopy -n -i "$at" ::/grub/grubenv grubenv
+          grub-editenv grubenv set aerie_args="console=ttyS0,115200 loglevel=6"
+          mcopy -o -i "$at" grubenv ::/grub/grubenv
+          # shellcheck disable=SC2086
+          qemu-system-x86_64 $kvm -m 6144 -smp 2 -machine q35 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive file=installed.raw,format=raw,if=virtio \
+            -netdev user,id=n0,hostfwd=tcp:127.0.0.1:7680-:7680 -device virtio-net-pci,netdev=n0 \
+            -display none -serial file:serial-iso-installed.log -daemonize -pidfile qemu.pid
+          for i in $(seq 1 120); do
+            code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' http://127.0.0.1:7680/ || true)"
+            case "$code" in
+              200|302|303)
+                kill "$(cat qemu.pid)" || true
+                echo "installed from the ISO: the dashboard answered $code after $((i * 5)) s" | tee -a "$GITHUB_STEP_SUMMARY"
+                exit 0 ;;
+            esac
+            if grep -aq "end Kernel panic" serial-iso-installed.log 2>/dev/null; then break; fi
+            sleep 5
+          done
+          kill "$(cat qemu.pid)" || true
+          tr -d '\r' < serial-iso-installed.log | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 200
+          echo "the disk the ISO laid out did not reach its dashboard"
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
