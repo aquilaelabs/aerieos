@@ -50,7 +50,8 @@ mkdir -p /mnt/user/appdata/Aerie-Workshop/secrets/ssh
 cp /path/to/git-key /mnt/user/appdata/Aerie-Workshop/secrets/ssh/id_ed25519
 
 # any publishing token a controller shell should use: any *.env file here
-# is loaded the same way. The install key is made here by the first start.
+# is loaded the same way, as NAME=value lines read as words and never run.
+# The install key is made here by the first start.
 cat > /mnt/user/appdata/Aerie-Workshop/secrets/aerie.env <<'EOF'
 NPM_TOKEN=npm_xxxxxxxxxxxxxxxx
 EOF

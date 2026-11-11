@@ -75,7 +75,7 @@ class Helper(unittest.TestCase):
         self.assertEqual(run("--can", self.new).returncode, 3)
 
     def test_a_landing_keeps_secrets_as_plain_words_and_leaves_the_rest_out(self):
-        body = (b"NPM_TOKEN=npm_abc123\n"
+        body = (b"NPM_TOKEN=npm_abc123   # a note after it\n"
                 b"export SIGNING_SECRET=\"a passphrase, with words\"\n"
                 b"INSTALL_KEY='abc def'\n"
                 b"PATH=/tmp/evil\n"                       # not a secret the start reads

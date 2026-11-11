@@ -187,6 +187,44 @@ as_account() {
     fi
 }
 
+# One *.env file of the secrets folder read as words, never run. This start
+# is root, and the file used to be sourced whole: a line that set PATH left
+# the controller in a restart loop ('chmod: command not found'), and any
+# command in one ran as root (B779). A line is NAME=value, with or without
+# export, the value bare, in single quotes, or in double quotes with nothing
+# in it that a shell would expand; it is exported as it stands. Anything else
+# is said and left out, and so is a name the start itself runs by.
+secrets_env_read() {
+    local f="$1" shown line name val n=0
+    shown="$(basename "$f")"
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+        line="${line%$'\r'}"
+        [[ "$line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+        if [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            name="${BASH_REMATCH[2]}"; val="${BASH_REMATCH[3]}"
+            case "$name" in
+                PATH|IFS|ENV|BASH_ENV|SHELLOPTS|BASHOPTS|PS4|HOME|USER|LOGNAME|SHELL|LD_*)
+                    warn "secrets: ${shown} line ${n} sets ${name}, which a secrets file does not set: left out"
+                    continue ;;
+            esac
+            if [[ "$val" =~ ^\'([^\']*)\'[[:space:]]*(#.*)?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            elif [[ "$val" =~ ^\"([^\"\$\`\\]*)\"[[:space:]]*(#.*)?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            elif [[ "$val" =~ ^([^][:space:]\$\`\\\"\'\;\&\|\<\>\(\)]*)([[:space:]]+#.*)?[[:space:]]*$ ]]; then
+                val="${BASH_REMATCH[1]}"
+            else
+                warn "secrets: ${shown} line ${n} (${name}) is not a plain value, so it was not read: a secrets file is read as words and never run; write the value out in full, in single quotes"
+                continue
+            fi
+            export "${name}=${val}"
+        else
+            warn "secrets: ${shown} line ${n} is not a NAME=value line, so it was not read: a secrets file is read as words and never run"
+        fi
+    done < "$f"
+}
+
 stash_secrets() {
     mkdir -p "$BB_RUN_DIR"
     chmod 700 "$BB_RUN_DIR"
@@ -195,11 +233,8 @@ stash_secrets() {
     if [ -d "$BB_SECRETS_DIR" ]; then
         local f
         for f in "$BB_SECRETS_DIR"/*.env; do
-            [ -e "$f" ] || continue
-            set -a
-            # shellcheck disable=SC1090
-            . "$f"
-            set +a
+            [ -f "$f" ] || continue
+            secrets_env_read "$f"
         done
     fi
 

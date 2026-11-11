@@ -541,7 +541,10 @@ files as root, so a line lands only as a secret the start knows by name
 with a value that has no shell in it, written out again quoted, and a key
 is a plain file. And the account that may run it is the controller's, never
 a session's: a coding agent runs as another account, and a move is the
-owner's. The install key still travels by its own tick.
+owner's. The install key still travels by its own tick. The controller's start reads
+those files by the same rule since: as `NAME=value` lines taken as words,
+where it used to run each file as a shell script, as root, so one line
+setting `PATH` stopped the controller starting.
 
 ## A VM manager beside the Containers page
 
