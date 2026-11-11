@@ -113,7 +113,7 @@ your sign-in, what you added to the agent and Remove.
   toolchains on that node. Each ends that agent's sessions on the node
   first, then runs the vendor's own installer as the session account
   (`claude.ai/install.sh`, `chatgpt.com/codex/install.sh`,
-  `gh.io/copilot-install`, `x.ai/cli/install.sh`), and where the node's agent is root copies the
+  `gh.io/copilot-install`, `x.ai/cli/install.sh`, `opencode.ai/install`), and where the node's agent is root copies the
   binary somewhere the account cannot write, so an update typed in a
   session changes nothing that runs. Nothing installs or updates by itself:
   Copilot's and Grok's own updaters are switched off in a session. Grok's
@@ -134,6 +134,47 @@ The Nodes page keeps one line per node saying which agents are installed
 there and which you are signed in to. A space's Start sends a person to
 that agent's own page on its node, at its sign-in, when they have no
 sign-in there.
+
+### Where an agent's install recipe comes from
+
+How each of the five is installed is a recipe in its pack's manifest
+(`packs/agents/NAME/bbtool.json`, the `agent.install` block), which the
+controller hands to the node with every install, update and removal:
+
+```json
+"install": {
+  "rev": 1,
+  "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
+  "pin": ["VERSION", "{v}"],
+  "env": {},
+  "bin": ".opencode/bin/opencode",
+  "also": [".local/bin/opencode"],
+  "fresh": ""
+}
+```
+
+| Key | What it says |
+|---|---|
+| `rev` | A whole number, one more with each change to the recipe. |
+| `script` | The vendor's installer over https handed to `sh` or `bash`, with plain arguments after `-s --` if it takes any. Nothing else a shell would run is accepted. |
+| `pin` | The variable a version is handed through and how it is written (`["VERSION", "v{v}"]`), or `null` for an installer that takes none. |
+| `env` | Up to eight of the installer's own variables, with `{home}` for the account's home. Never `PATH`, `HOME`, the account's name or an `LD_` name. |
+| `bin` | Where the installer leaves the program, under the account's home. |
+| `also` | Older places a removal clears, under the account's home. |
+| `fresh` | The folder a named version is read from, with `{v}` (Claude Code's `versions` folder), or empty. |
+
+A release carries each recipe, so an install with no network works as
+before. Where the catalog's signed index pins an agent's pack whose `rev`
+is higher than the release's, the controller fetches that pack at the
+pinned commit, checks its archive's sha256 and the recipe's shape, and
+hands the node the catalog's recipe instead: the job's first line then
+says `by the catalog's recipe (rev N)`. So when a vendor changes its
+installer, the answer is a catalog commit and a maintainer's signature,
+and no install waits for a release. A catalog that does not answer, a
+pack that is refused, or one no newer than the release leaves the
+release's recipe in place. The node holds what it is handed to the same
+shape and refuses anything else without running it; a node whose agent is
+older than 0.9.426 ignores the recipe and uses the one it shipped with.
 
 ## The guards
 

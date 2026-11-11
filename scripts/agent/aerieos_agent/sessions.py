@@ -23,6 +23,7 @@ from .base import (
     FIREWALL_EVERY_S,
     IDLE_UNIT,
     NFT_BIN,
+    recipe_checked,
     respawnable,
     SESSION,
     ROOT_BUNDLE_DIR,
@@ -741,20 +742,37 @@ class SessionsMixin:
 
     def agent_update(self, job, spec):
         """Install, update or remove one of the other coding agents for the
-        SESSION account (R95 step 2). Which agent and how is AGENT_INSTALLS's
-        row for this job's type, never anything the controller sent."""
+        SESSION account (R95 step 2). Which agent is AGENT_INSTALLS's row
+        for this job's type; how is the recipe the controller handed over
+        (R169 step 13), held to its shape, or the row's own when it sent
+        none."""
         how = AGENT_INSTALLS.get(job.job.get("type") or "")
         if not how:
             job.say("refused: no coding agent is installed by this job\n")
             return "failed", 78
-        return self.agent_install(job, spec, how)
+        how = self.agent_recipe(job, spec, how)
+        return self.agent_install(job, spec, how) if how else ("failed", 78)
+
+    def agent_recipe(self, job, spec, row):
+        """The agent's row with the install recipe the controller sent in
+        place of its own, the row alone when it sent none, or None with the
+        reason said when what it sent is not a recipe: nothing is run then,
+        rather than the older way run in silence."""
+        if spec.get("recipe") is None:
+            return row
+        recipe, why = recipe_checked(spec["recipe"])
+        if why:
+            job.say(f"refused: the install recipe the controller sent for {row['product']} is not one: {why}\n")
+            return None
+        return {**row, **recipe, "by": "catalog" if spec.get("recipe_from") == "catalog" else ""}
 
     def claude_update(self, job, spec):
         """Install the current Claude Code for the SESSION account, and pin it
         (claudecode.py on the controller). Queued by an administrator's press
         and by nothing else; the controller ended the Claude sessions here
         before queueing it, since the binary is swapped under nothing."""
-        return self.agent_install(job, spec, CLAUDE_INSTALL)
+        how = self.agent_recipe(job, spec, CLAUDE_INSTALL)
+        return self.agent_install(job, spec, how) if how else ("failed", 78)
 
     def agent_install(self, job, spec, how):
         """One coding agent installed, updated or removed for the SESSION
@@ -793,6 +811,12 @@ class SessionsMixin:
                     with contextlib.suppress(OSError):
                         shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
                         gone.append(path)
+            # ...the link an install made where the agent is not root...
+            link = os.path.join(home, ".local", "bin", cmd)
+            if os.path.islink(link) and os.readlink(link) == os.path.join(home, how["bin"]):
+                with contextlib.suppress(OSError):
+                    os.unlink(link)
+                    gone.append(link)
             # ...and a pinned release folder, with the links into it.
             rel = os.path.join(pin_dir, "release")
             if os.path.isdir(rel) and not os.path.islink(rel):
@@ -816,7 +840,8 @@ class SessionsMixin:
             env[how["pin"][0]] = how["pin"][1].format(v=want)
         stub = os.environ.get(f"BUILDERBOT_{how['id'].upper()}_INSTALLER")
         argv = ["bash", stub] if stub else ["bash", "-c", how["script"]]
-        job.say(f"installing {product} for {who_name}" + (f" ({want} is out)" if want else "") + "\n")
+        job.say(f"installing {product} for {who_name}" + (f" ({want} is out)" if want else "")
+                + (f", by the catalog's recipe (rev {how.get('rev')})" if how.get("by") == "catalog" else "") + "\n")
         try:
             job.proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                         cwd=home if os.path.isdir(home) else "/tmp", env=env,
@@ -879,6 +904,20 @@ class SessionsMixin:
             except OSError as e:
                 job.say(f"installed {ver} for {who_name}, but could not pin it: {e}\n")
         else:
+            # No pinned copy, so a session finds the account's own on its
+            # PATH: ~/.local/bin, where an installer that keeps its program
+            # elsewhere (OpenCode's ~/.opencode/bin) is given a link.
+            link = os.path.join(home, ".local", "bin", cmd)
+            # A file already there is left alone, unless the recipe names it
+            # as the program's older place: then it is the old copy, which
+            # would run in place of the new one.
+            old_place = os.path.join(".local", "bin", cmd) in how.get("also", ())
+            if os.path.abspath(exe) != link and (os.path.islink(link) or not os.path.exists(link) or old_place):
+                with contextlib.suppress(OSError):
+                    os.makedirs(os.path.dirname(link), exist_ok=True)
+                    if os.path.lexists(link):
+                        os.unlink(link)
+                    os.symlink(exe, link)
             job.say(f"installed {ver} for {who_name} (the agent is not root here, so the account's own copy is what runs)\n")
         # New terminals get the PATH with the pinned copy on it, tmux
         # sessions untouched (there are none).

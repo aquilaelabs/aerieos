@@ -58,7 +58,11 @@ def agent_packs():
              "platforms": ["linux/*"], "terms": [],
              # ...with how it is told a command needs no asking, where the
              # table says a way (agents.allow_plan).
-             "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS} | ({"allow": a.allow} if a.allow else {})}
+             "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS} | ({"allow": a.allow} if a.allow else {})
+                      # ...and how it is installed (R169 step 13): the recipe
+                      # the controller hands a node, which the catalog's copy
+                      # replaces when its rev is higher.
+                      | ({"install": a.install} if a.install else {})}
         out.append((os.path.join(PACKS, "agents", a.id, "bbtool.json"), m))
     return out
 

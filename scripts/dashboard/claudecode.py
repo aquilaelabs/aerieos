@@ -47,6 +47,7 @@ nodes = None               # nodes.py: node, node_list, job_add, jobs_for, sessi
 node_sessions = None       # server.node_tmux_sessions
 tmux_base = None           # server.tmux_base
 audit = None
+recipe_spec = None         # agentcode.recipe_spec: a job's words for how Claude Code is installed (R169 step 13)
 _lock = threading.Lock()
 _latest = {"version": "", "at": 0, "error": "", "checking": False}
 # {node id: when} for an update pressed and not yet queued: ending the
@@ -58,9 +59,9 @@ _latest = {"version": "", "at": 0, "error": "", "checking": False}
 _pressed = {}
 
 
-def configure(*, nodes_module, node_sessions, tmux_base, audit=None):
+def configure(*, nodes_module, node_sessions, tmux_base, audit=None, recipe_spec=None):
     globals().update(nodes=nodes_module, node_sessions=node_sessions,
-                     tmux_base=tmux_base, audit=audit)
+                     tmux_base=tmux_base, audit=audit, recipe_spec=recipe_spec)
 
 
 def check():
@@ -208,13 +209,14 @@ def remove(principal, node_id):
     # one); another of this agent's waits behind it (nodes.job_waits).
     if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=JOB, active=True) if ((j.get("spec") or {}).get("action") or "update") == "remove"), "")):
         return {"ok": True, "job": same, "already": True}
+    how = recipe_spec("claude") if recipe_spec else {}
     ended = []
     for s in node_sessions() if node_sessions else []:
         if s.get("node_id") == node_id and agents.of_session(tmux_base(s["name"]))[0] is agents.get("claude"):
             r = nodes.session_kill(node_id, s.get("node_name") or s["name"])
             if not r.get("error"):
                 ended.append(s["name"])
-    r = nodes.job_add(principal, {"node": node_id}, JOB, {"timeout": 300, "action": "remove", "ended": ended})
+    r = nodes.job_add(principal, {"node": node_id}, JOB, {"timeout": 300, "action": "remove", "ended": ended, **how})
     if r.get("ok") and audit:
         audit(principal, "node-claude-remove", node_id, {"ended": ended})
     return r
@@ -240,6 +242,7 @@ def update(principal, node_id):
         return {"ok": True, "job": same, "already": True}
     _pressed[node_id] = time.time()
     try:
+        how = recipe_spec("claude") if recipe_spec else {}
         ended = []
         for s in node_sessions() if node_sessions else []:
             if s.get("node_id") == node_id and agents.of_session(tmux_base(s["name"]))[0] is agents.get("claude"):
@@ -247,7 +250,7 @@ def update(principal, node_id):
                 if not r.get("error"):
                     ended.append(s["name"])
         r = nodes.job_add(principal, {"node": node_id}, JOB,
-                          {"timeout": 900, "to": latest()["version"], "ended": ended})
+                          {"timeout": 900, "to": latest()["version"], "ended": ended, **how})
     finally:
         _pressed.pop(node_id, None)
     if r.get("ok"):

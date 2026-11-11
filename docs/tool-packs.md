@@ -65,7 +65,10 @@ you add is `url`, and a pack from the vetted catalog is `vetted`. An agent whose
 not a pack and is not listed. The files are written from the tables by
 `tools/packs-export.py --write` and `aerie lint` fails when they drift, so
 the format is one; the installer and the agents' adapters still read
-their own tables. The same folders live in the catalog repository
+their own tables, with one exception: how a shipped coding agent is
+installed is its pack's `agent.install`, and the catalog's copy is the one
+used when it is newer than the release's
+([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)). The same folders live in the catalog repository
 (`packs/official/NAME`, `packs/agents/NAME`, written there by
 `tools/packs-export.py --catalog DIR`), and its index pins every one of
 them at tier official to the catalog's own commit (`--catalog DIR

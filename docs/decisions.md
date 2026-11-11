@@ -640,6 +640,23 @@ agent has no hook for is said in the project's settings rather than implied.
 Steps 12 to 14, a model router and an open agent for any model, wait for
 0.8.0 (the operator, 22 Oct).
 
+**How a shipped agent is installed is its pack's recipe, and the catalog's
+copy wins when it is newer (11 Nov 2026).** The recipes were a table inside
+the node agent, so when OpenCode's installer moved where it puts its program
+the fix was a release of the agent, and every install waited for it. The
+operator's point: with the agents published in the catalog, a recipe kept
+anywhere else is hard-wired. Each agent's manifest now carries
+`agent.install`, the controller hands it to the node with the job, and the
+catalog's signed index can pin a newer one, which every install then uses
+with no release. Two limits keep that from widening what a catalog can do.
+A recipe is one shape, the vendor's installer over https handed to a shell
+with plain arguments, and both the controller and the node refuse anything
+else, so the catalog can move an installer's address, its arguments, its
+variables and where the program lands, and nothing more. And the catalog's
+recipe is used only when its `rev` is higher than the release's, so a
+catalog left behind never undoes what a release fixed. The node keeps its
+own table for a controller that sends no recipe.
+
 ## The repository laid out by part
 
 **The tree is laid out by what each part is, before the platforms and the

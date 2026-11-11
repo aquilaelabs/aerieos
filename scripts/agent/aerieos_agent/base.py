@@ -122,8 +122,11 @@ CLAUDE_DIR = "/usr/local/lib/builderbot/claude"
 # under this one: AGENTS_DIR/codex/codex, AGENTS_DIR/copilot/copilot.
 AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/agents")
 # How each is installed, by the job the controller's agent table names for
-# it (scripts/dashboard/agents.py update_job): a table lookup, never a
-# command from the controller. Each vendor's own installer, run as the
+# it (scripts/dashboard/agents.py update_job). Which agent is a lookup
+# here; how is the recipe the controller hands over with the job (its
+# table's, or its signed catalog's where that is newer: R169 step 13), held
+# to one shape by recipe_checked below, and these rows' own for a
+# controller that sends none. Each vendor's own installer, run as the
 # session account into its home: `script` fetched fresh each time, the
 # version asked for in `pin` (formatted with the version), `env` formatted
 # with the home, and the binary it leaves at `bin` under the home. A test
@@ -172,6 +175,63 @@ CLAUDE_INSTALL = {"id": "claude", "command": "claude", "product": "Claude Code",
                   "script": "curl -fsSL https://claude.ai/install.sh | bash",
                   "pin": None, "env": {}, "bin": ".local/bin/claude", "pin_dir": CLAUDE_DIR,
                   "fresh": ".local/share/claude/versions/{v}", "also": (".local/share/claude",)}
+# The recipe the controller hands over with an install, an update or a
+# removal (its agent table's `install`, or its catalog's where that is
+# newer): what a row here says of the installer, in its place. The rows
+# above are what runs when a controller from before this sends none. Held to
+# the shape the controller holds a manifest's to (agents.py install_checked):
+# one installer over https piped to sh or bash with plain arguments, an
+# environment that names neither PATH nor the account, and paths of two or
+# more parts under the account's home.
+_RECIPE_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
+_RECIPE_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
+_RECIPE_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
+_RECIPE_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
+_RECIPE_ENV_KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "IFS", "ENV", "BASH_ENV")
+
+
+def _recipe_path(v, braces=""):
+    if not (isinstance(v, str) and _RECIPE_PATH.fullmatch(v)) or ".." in v.split("/"):
+        return False
+    rest = v.replace(braces, "") if braces else v
+    return "{" not in rest and "}" not in rest
+
+
+def _recipe_name(k):
+    return isinstance(k, str) and bool(_RECIPE_NAME.fullmatch(k)) and k not in _RECIPE_ENV_KEPT and not k.startswith("LD_")
+
+
+def recipe_checked(r):
+    """(recipe, why): an install recipe as agent_install reads it (script,
+    pin, env, bin, also, fresh, rev), or why what was sent is not one."""
+    if not isinstance(r, dict):
+        return None, "it is not an object"
+    script = r.get("script")
+    if not (isinstance(script, str) and len(script) <= 400 and _RECIPE_SCRIPT.fullmatch(script)):
+        return None, "its script is not one installer over https handed to a shell"
+    pin = r.get("pin")
+    if pin is not None and not (isinstance(pin, (list, tuple)) and len(pin) == 2 and _recipe_name(pin[0]) and isinstance(pin[1], str)
+                                and re.fullmatch(r"[A-Za-z0-9._-]{0,12}\{v\}[A-Za-z0-9._-]{0,12}", pin[1])):
+        return None, "its pin is not a variable and how a version is written"
+    env = r.get("env") or {}
+    if not (isinstance(env, dict) and len(env) <= 8 and all(
+            _recipe_name(k) and isinstance(v, str) and _RECIPE_VALUE.fullmatch(v) and ".." not in v
+            and "{" not in v.replace("{home}", "") and "}" not in v.replace("{home}", "") for k, v in env.items())):
+        return None, "its env names something an installer is not handed"
+    if not _recipe_path(r.get("bin")):
+        return None, "its bin is not a path under the account's home"
+    also = r.get("also") or []
+    if not (isinstance(also, (list, tuple)) and len(also) <= 6 and all(_recipe_path(x) for x in also)):
+        return None, "its also is not paths under the account's home"
+    fresh = r.get("fresh") or ""
+    if fresh and not (_recipe_path(fresh, "{v}") and "{v}" in fresh):
+        return None, "its fresh is not a versions folder under the account's home"
+    rev = r.get("rev")
+    return {"script": script, "pin": tuple(pin) if pin is not None else None, "env": dict(env), "bin": r["bin"],
+            "also": tuple(also), "fresh": fresh,
+            "rev": rev if isinstance(rev, int) and not isinstance(rev, bool) else 0}, ""
+
+
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
 SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/builderbot-session")
 # The wall the installer writes on a controller's own machine (docs/decisions.md),

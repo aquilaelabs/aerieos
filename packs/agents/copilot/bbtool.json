@@ -9,6 +9,20 @@
   "briefing": "instructions-file",
   "command": "copilot",
   "guards": "hooks",
+  "install": {
+   "also": [],
+   "bin": ".local/bin/copilot",
+   "env": {
+    "PREFIX": "{home}/.local"
+   },
+   "fresh": "",
+   "pin": [
+    "VERSION",
+    "v{v}"
+   ],
+   "rev": 1,
+   "script": "curl -fsSL https://gh.io/copilot-install | bash"
+  },
   "latest_url": "https://registry.npmjs.org/@github/copilot/latest",
   "login_job": "copilot-login",
   "logout_job": "copilot-logout",

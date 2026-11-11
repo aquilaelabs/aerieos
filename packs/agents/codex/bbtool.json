@@ -9,6 +9,20 @@
   "briefing": "instructions-file",
   "command": "codex",
   "guards": "hooks",
+  "install": {
+   "also": [],
+   "bin": ".local/bin/codex",
+   "env": {
+    "CODEX_INSTALL_DIR": "{home}/.local/bin"
+   },
+   "fresh": "",
+   "pin": [
+    "CODEX_RELEASE",
+    "{v}"
+   ],
+   "rev": 1,
+   "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+  },
   "latest_url": "https://registry.npmjs.org/@openai/codex/latest",
   "login_job": "codex-login",
   "logout_job": "codex-logout",

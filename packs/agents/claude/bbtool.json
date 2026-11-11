@@ -8,6 +8,17 @@
   "briefing": "system-prompt-file",
   "command": "claude",
   "guards": "hooks",
+  "install": {
+   "also": [
+    ".local/share/claude"
+   ],
+   "bin": ".local/bin/claude",
+   "env": {},
+   "fresh": ".local/share/claude/versions/{v}",
+   "pin": null,
+   "rev": 1,
+   "script": "curl -fsSL https://claude.ai/install.sh | bash"
+  },
   "latest_url": "",
   "login_job": "claude-login",
   "logout_job": "claude-logout",

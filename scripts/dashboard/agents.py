@@ -46,6 +46,7 @@ class Agent:
     latest_url: str = ""    # where the newest release is asked (an npm registry `latest`, or a plain version)
     pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter (R169 step 9), None for the shipped
     allow: dict = field(default=None, compare=False, hash=False)  # how it is told a command needs no asking (ALLOW_HOW), None for no way
+    install: dict = field(default=None, compare=False, hash=False)  # its install recipe (install_checked), None for one a pack installs
 
     @property
     def arg(self):
@@ -82,7 +83,12 @@ TABLE = (
           login_job="claude-login", logout_job="claude-logout",
           briefing="system-prompt-file", guards="hooks", state="hooks",
           transcripts=".claude/projects", live=True, tool="claude-code",
-          allow={"how": "settings", "rule": "Bash({cmd} *)"}),
+          allow={"how": "settings", "rule": "Bash({cmd} *)"},
+          # Its installer is handed no version: the one asked for is read
+          # from the versions folder it leaves (fresh).
+          install={"rev": 1, "script": "curl -fsSL https://claude.ai/install.sh | bash", "pin": None, "env": {},
+                   "bin": ".local/bin/claude", "also": [".local/share/claude"],
+                   "fresh": ".local/share/claude/versions/{v}"}),
     Agent(id="codex", name="ChatGPT", product="Codex CLI", command="codex",
           provider="OpenAI", reported="codex", update_job="codex-update",
           login_job="codex-login", logout_job="codex-logout",
@@ -90,14 +96,20 @@ TABLE = (
           transcripts=".codex/sessions", tool="codex-cli", live=True,
           latest_url="https://registry.npmjs.org/@openai/codex/latest",
           allow={"how": "rules-file", "file": ".codex/rules/aerieos.rules",
-                 "rule": 'prefix_rule(pattern={argv}, decision="allow")'}),
+                 "rule": 'prefix_rule(pattern={argv}, decision="allow")'},
+          install={"rev": 1, "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+                   "pin": ["CODEX_RELEASE", "{v}"], "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"},
+                   "bin": ".local/bin/codex", "also": [], "fresh": ""}),
     Agent(id="copilot", name="Copilot", product="Copilot CLI", command="copilot",
           provider="GitHub", reported="copilot", update_job="copilot-update",
           login_job="copilot-login", logout_job="copilot-logout",
           briefing="instructions-file", guards="hooks", state="hooks",
           transcripts=".copilot/session-state", tool="copilot-cli", live=True,
           latest_url="https://registry.npmjs.org/@github/copilot/latest",
-          allow={"how": "flag", "flag": "--allow-tool", "rule": "shell({cmd}:*)"}),
+          allow={"how": "flag", "flag": "--allow-tool", "rule": "shell({cmd}:*)"},
+          install={"rev": 1, "script": "curl -fsSL https://gh.io/copilot-install | bash",
+                   "pin": ["VERSION", "v{v}"], "env": {"PREFIX": "{home}/.local"},
+                   "bin": ".local/bin/copilot", "also": [], "fresh": ""}),
     # Grok Build (R95 step 21): xAI's coding agent, checked against its user
     # guide on 25 Oct (xai-org/grok-build, Apache-2.0). Its hooks are
     # Claude's events (PreToolUse, UserPromptSubmit, Stop), its sign-in a
@@ -108,7 +120,12 @@ TABLE = (
           briefing="system-prompt-file", guards="hooks", state="hooks",
           transcripts=".grok/sessions", tool="grok-build", live=True,
           latest_url="https://x.ai/cli/stable",
-          allow={"how": "flag", "flag": "--allow", "rule": "Bash({cmd}:*)"}),
+          allow={"how": "flag", "flag": "--allow", "rule": "Bash({cmd}:*)"},
+          # Its installer takes the version as its argument, not from its
+          # environment: handed over through BB_PIN, empty for the newest.
+          install={"rev": 1, "script": "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}",
+                   "pin": ["BB_PIN", "{v}"], "env": {"GROK_BIN_DIR": "{home}/.local/bin"},
+                   "bin": ".local/bin/grok", "also": [], "fresh": ""}),
     # Any model (R144 step 2): OpenCode, the open agent, pointed at a node's
     # model router (router.py) rather than signed in to anybody: its keys
     # are the router's, handed to a session at its start with the models
@@ -122,7 +139,13 @@ TABLE = (
           login_job="", logout_job="",
           briefing="instructions-file", guards="plugin", state="plugin",
           transcripts=".local/share/opencode", tool="opencode", live=True,
-          latest_url="https://registry.npmjs.org/opencode-ai/latest"),
+          latest_url="https://registry.npmjs.org/opencode-ai/latest",
+          # Its installer puts the program in ~/.opencode/bin whatever it is
+          # told (read off the script on 11 Nov), and is asked not to write
+          # the account's shell files; the old place goes with a removal.
+          install={"rev": 1, "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
+                   "pin": ["VERSION", "{v}"], "env": {},
+                   "bin": ".opencode/bin/opencode", "also": [".local/bin/opencode"], "fresh": ""}),
 )
 
 _BY_ID = {a.id: a for a in TABLE}
@@ -207,6 +230,80 @@ def allow_plan(agent_id, spec=None):
         head = "# Written by AerieOS at each session's start: the aerie verbs its controller decides need no asking here.\n"
         plan["file"] = {"path": spec["file"], "text": head + "\n".join(rules) + "\n"}
     return plan
+
+# ---- how an agent is installed (R169 step 13) ---------------------------------
+# A shipped agent's install recipe is its row's `install`, which its pack's
+# manifest in the catalog carries as agent.install: the vendor's installer
+# fetched over https and handed to a shell, the variable a version is pinned
+# through, the installer's environment, where the program lands under the
+# account's home, older places a removal clears, and (Claude Code) the folder
+# a named version is read from. The controller hands the recipe to the node
+# with each install, update and removal, the catalog's where the signed index
+# pins a pack whose `rev` is higher than this table's (agentcode.recipe), so
+# an installer that changes upstream is answered by a catalog commit and a
+# maintainer's signature, with no release of AerieOS. `rev` moves by one with
+# any change to a recipe here, or a catalog still holding the old one wins.
+#
+# Held to a shape, since its words reach a shell and a removal's paths: one
+# installer over https piped to sh or bash with plain arguments, nothing
+# else a shell would run.
+_INSTALL_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
+_INSTALL_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
+_INSTALL_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
+_INSTALL_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
+# What an installer's environment never sets: where programs and libraries
+# are found, and who the account is.
+_INSTALL_ENV_KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "IFS", "ENV", "BASH_ENV")
+
+
+def _install_path(v, braces=""):
+    """Whether `v` is a path of two or more parts under the account's home,
+    with no braces but `braces` ({v} for the versions folder)."""
+    if not (isinstance(v, str) and _INSTALL_PATH.fullmatch(v)) or ".." in v.split("/"):
+        return False
+    rest = v.replace(braces, "") if braces else v
+    return "{" not in rest and "}" not in rest
+
+
+def install_checked(spec):
+    """(spec, why): an agent's install recipe as it is kept, or why it is
+    refused. The node's agent holds the same shape to what it is handed
+    (aerieos_agent/base.py recipe_checked; unit/test_agentcode.py holds the two
+    to each other)."""
+    if spec in (None, "", {}):
+        return None, ""
+    if not isinstance(spec, dict):
+        return None, "agent.install is an object: rev, script, pin, env, bin, also, fresh"
+    rev = spec.get("rev")
+    if not (isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999):
+        return None, "agent.install.rev is a whole number from 1, one more with each change to the recipe"
+    script = spec.get("script")
+    if not (isinstance(script, str) and len(script) <= 400 and _INSTALL_SCRIPT.fullmatch(script)):
+        return None, "agent.install.script is the vendor's installer over https handed to a shell: curl -fsSL https://HOST/PATH | bash, with plain arguments after -s -- if it takes any"
+    pin = spec.get("pin")
+    if pin is not None:
+        if not (isinstance(pin, (list, tuple)) and len(pin) == 2 and all(isinstance(x, str) for x in pin)
+                and _INSTALL_NAME.fullmatch(pin[0]) and pin[0] not in _INSTALL_ENV_KEPT and not pin[0].startswith("LD_")
+                and re.fullmatch(r"[A-Za-z0-9._-]{0,12}\{v\}[A-Za-z0-9._-]{0,12}", pin[1])):
+            return None, "agent.install.pin is the variable a version is handed through and how it is written, e.g. [\"VERSION\", \"v{v}\"], or null"
+        pin = [pin[0], pin[1]]
+    env = spec.get("env") or {}
+    if not (isinstance(env, dict) and len(env) <= 8 and all(
+            isinstance(k, str) and _INSTALL_NAME.fullmatch(k) and k not in _INSTALL_ENV_KEPT and not k.startswith("LD_")
+            and isinstance(v, str) and _INSTALL_VALUE.fullmatch(v) and ".." not in v
+            and "{" not in v.replace("{home}", "") and "}" not in v.replace("{home}", "") for k, v in env.items())):
+        return None, "agent.install.env is the installer's own variables, each a plain value with {home} for the account's home"
+    if not _install_path(spec.get("bin")):
+        return None, "agent.install.bin is where the installer leaves the program, under the account's home, e.g. .local/bin/codex"
+    also = spec.get("also") or []
+    if not (isinstance(also, (list, tuple)) and len(also) <= 6 and all(_install_path(x) for x in also)):
+        return None, "agent.install.also is the older places a removal clears, each under the account's home"
+    fresh = spec.get("fresh") or ""
+    if fresh and not (_install_path(fresh, "{v}") and "{v}" in fresh):
+        return None, "agent.install.fresh is the folder a named version is read from, with {v} for the version"
+    return {"rev": rev, "script": script, "pin": pin, "env": dict(sorted(env.items())), "bin": spec["bin"],
+            "also": list(also), "fresh": fresh}, ""
+
 
 # The coding agents installed packs bring (R169 step 9): the server sets this
 # to toolpacks.offered_agents, [(name, label, adapter)]; a standalone reader

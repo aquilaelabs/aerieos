@@ -35,11 +35,53 @@ audit = None
 _lock = threading.Lock()
 _latest = {}               # {agent id: {version, at, error, checking}}
 _pressed = {}              # {(agent id, node id): when}, as claudecode's
+catalog_entry = None       # server: the signed index's official entry of this name, or None
+fetch_pack = None          # toolpacks.fetch
+_recipes = {}              # {(agent id, commit): (the catalog's recipe there or None, when read, why not)}
+RECIPE_MISS_S = 300        # a pack that could not be fetched is asked again after this long
 
 
-def configure(*, nodes_module, node_sessions, tmux_base, audit=None, claude=None):
+def configure(*, nodes_module, node_sessions, tmux_base, audit=None, claude=None, catalog_entry=None, fetch_pack=None):
     globals().update(nodes=nodes_module, node_sessions=node_sessions,
-                     tmux_base=tmux_base, audit=audit, claudecode=claude)
+                     tmux_base=tmux_base, audit=audit, claudecode=claude,
+                     catalog_entry=catalog_entry, fetch_pack=fetch_pack)
+
+
+def recipe(agent_id):
+    """(recipe, "catalog" or "release"): how this agent is installed, as
+    the node is handed it with every install, update and removal (R169 step
+    13). The agent table's own, which shipped with this release, unless the
+    catalog's signed index pins this agent's pack at a commit whose recipe
+    has a higher rev: then the catalog's, fetched at that commit with its
+    archive's sha256 checked and the manifest held to its shape, as any
+    pack's is. A catalog that does not answer, a pack that is refused or
+    one no newer than the table leaves the table's. Read once per commit
+    and kept while the controller runs."""
+    a = agents.get(agent_id)
+    own = a.install if a else None
+    entry = catalog_entry(a.id) if a and catalog_entry else None
+    if not entry or not fetch_pack:
+        return own, "release"
+    key = (a.id, entry["commit"])
+    with _lock:
+        had = _recipes.get(key)
+    if not had or (had[2] and time.time() - had[1] > RECIPE_MISS_S):
+        got = fetch_pack(entry["url"], entry["commit"], (), entry["sha256"], entry.get("path", ""))
+        theirs = None if got.get("error") else ((got.get("manifest") or {}).get("agent") or {}).get("install")
+        had = (theirs, time.time(), got.get("error") or "")
+        with _lock:
+            _recipes[key] = had
+    theirs = had[0]
+    if theirs and (not own or theirs["rev"] > own["rev"]):
+        return theirs, "catalog"
+    return own, "release"
+
+
+def recipe_spec(agent_id):
+    """A job's spec words for the recipe: {recipe, recipe_from}, or {} for
+    an agent with none (an agent from before this runs its own table)."""
+    r, where = recipe(agent_id)
+    return {"recipe": r, "recipe_from": where} if r else {}
 
 
 def tracked():
@@ -176,14 +218,18 @@ def update(principal, node_id, agent_id):
         return {"ok": True, "job": same, "already": True}
     _pressed[(a.id, node_id)] = time.time()
     try:
+        # Read before its sessions are ended: a catalog asked for the first
+        # time takes a moment, and nothing should be down while it does.
+        how = recipe_spec(a.id)
         ended = _end_sessions(node_id, a)
         r = nodes.job_add(principal, {"node": node_id}, a.update_job,
-                          {"timeout": 900, "to": latest(a.id)["version"], "ended": ended})
+                          {"timeout": 900, "to": latest(a.id)["version"], "ended": ended, **how})
     finally:
         _pressed.pop((a.id, node_id), None)
     if r.get("ok"):
         if audit:
-            audit(principal, f"node-{a.id}-update", node_id, {"to": latest(a.id)["version"], "ended": ended})
+            audit(principal, f"node-{a.id}-update", node_id, {"to": latest(a.id)["version"], "ended": ended,
+                                                             "recipe": how.get("recipe_from", "")})
         r = r | {"ended": ended}
     return r
 
@@ -200,8 +246,9 @@ def remove(principal, node_id, agent_id):
     # one); another of this agent's waits behind it (nodes.job_waits).
     if (same := next((j["id"] for j in nodes.jobs_for(node_id, n=20, type=a.update_job, active=True) if ((j.get("spec") or {}).get("action") or "update") == "remove"), "")):
         return {"ok": True, "job": same, "already": True}
+    how = recipe_spec(a.id)
     ended = _end_sessions(node_id, a)
-    r = nodes.job_add(principal, {"node": node_id}, a.update_job, {"timeout": 300, "action": "remove", "ended": ended})
+    r = nodes.job_add(principal, {"node": node_id}, a.update_job, {"timeout": 300, "action": "remove", "ended": ended, **how})
     if r.get("ok") and audit:
         audit(principal, f"node-{a.id}-remove", node_id, {"ended": ended})
     return r

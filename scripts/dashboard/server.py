@@ -4861,6 +4861,14 @@ def _catalog_pin(url, commit, sha256, path=""):
                  and e["sha256"] == sha256 and (e.get("path") or "") == (path or "")), None)
 
 
+def _catalog_official(name):
+    """The signed index's official pack entry of this name, withdrawn ones
+    left out, or None: where a shipped coding agent's install recipe is
+    read when the catalog's is newer than this release's (R169 step 13)."""
+    return next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
+                 if e["name"] == name and e.get("tier") == "official" and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
+
+
 def _pack_from_catalog(entry, by, may_root=False):
     """A pack from the vetted catalog kept at the commit the signed index
     pins, its sha256 checked (R169 step 5): what the Library's Install keeps,
@@ -5102,9 +5110,10 @@ version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=
 # out, and the one way it is updated, which is an administrator's press.
 if not NODES_OK:
     claudecode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
-                         tmux_base=tmux_base, audit=nodes.audit)
+                         tmux_base=tmux_base, audit=nodes.audit, recipe_spec=agentcode.recipe_spec)
     agentcode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
-                        tmux_base=tmux_base, audit=nodes.audit, claude=claudecode)
+                        tmux_base=tmux_base, audit=nodes.audit, claude=claudecode,
+                        catalog_entry=_catalog_official, fetch_pack=toolpacks.fetch)
 
 # Every account's sessions on a project, for its settings dialog, and an
 # administrator ending one (projsessions.py): the rows the Sessions card is

@@ -4,6 +4,20 @@
   "briefing": "instructions-file",
   "command": "opencode",
   "guards": "plugin",
+  "install": {
+   "also": [
+    ".local/bin/opencode"
+   ],
+   "bin": ".opencode/bin/opencode",
+   "env": {},
+   "fresh": "",
+   "pin": [
+    "VERSION",
+    "{v}"
+   ],
+   "rev": 1,
+   "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path"
+  },
   "latest_url": "https://registry.npmjs.org/opencode-ai/latest",
   "login_job": "",
   "logout_job": "",

@@ -168,6 +168,14 @@ def _agent(a, errors):
     if out["latest_url"] and not re.fullmatch(r"https://[A-Za-z0-9._~:/@+?=&%-]{3,300}", out["latest_url"]):
         errors.append("agent.latest_url is an https address")
     _agent_allow(a, out, errors)
+    # How it is installed (R169 step 13): a shipped agent's alone, since a
+    # pack agent is installed by its pack's own steps.
+    import agents                                               # noqa: PLC0415 (beside this file)
+    recipe, why = agents.install_checked(a.get("install"))
+    if why:
+        errors.append(why)
+    elif recipe:
+        out["install"] = recipe
     return out
 
 
