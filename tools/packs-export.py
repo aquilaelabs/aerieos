@@ -123,6 +123,10 @@ def catalog_index(root):
         tar = subprocess.run(["git", "-C", root, "archive", "--format=tar", head, folder], capture_output=True, check=True).stdout
         new.append({"name": name, "url": url, "commit": head, "path": folder, "sha256": hashlib.sha256(tar).hexdigest(),
                     "tier": "official", "withdrawn": False, "about": m["about"] or m["label"], "platforms": m["platforms"]})
+        # A deployed thing's entry says its kind, or an install's Library
+        # offers it a second time as a tool pack to add.
+        if m.get("service"):
+            new[-1]["kind"] = "service"
         # A coding agent's entry says its install recipe's rev, so an
         # install fetches the pack only when that is higher than its own.
         rev = ((m.get("agent") or {}).get("install") or {}).get("rev")
