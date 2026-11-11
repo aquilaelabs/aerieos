@@ -8,6 +8,8 @@
 - First run marks a disk SMART calls failing; no disk could be marked before (e51c4c0)
 - A machine just started no longer says it has no internet for up to ten minutes after its network comes up (e51c4c0)
 - The UPS feature installs on AerieOS's own image, which now carries what it needs (e51c4c0)
+- A move or a backup that carries the install key lands on an AerieOS stick: it was refused with 'Permission denied' at the key once the system pool had been placed, which Moving here does just before (3e4f7df)
+- On Moving here, a bundle you picked is still picked when you press Land it here; the page could drop it and ask for it again (7980d72)
 
 ## 0.9.0-dev.5236: 2026-11-11
 
