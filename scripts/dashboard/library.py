@@ -12,6 +12,8 @@ read's own endpoint, so nothing is installed two ways.
 """
 import re
 
+import packformat
+
 KINDS = ("toolchain", "agent", "pack", "service", "app", "companion")
 TIER_WORDS = {"official": "Official", "vetted": "Vetted", "url": "Sideloaded", "here": "Sideloaded", "sideloaded": "Sideloaded"}
 
@@ -110,7 +112,9 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     packs_here = set()
     # The index's pin of each pack it offers: one kept from it at another
     # commit is offered the new pin on its row (R169 step 4).
-    pins = {e["name"]: e for e in (catalog_index or {}).get("packs") or [] if e.get("kind", "pack") == "pack" and not e.get("withdrawn")}
+    # A pin written in a format past this build's is no update to offer.
+    pins = {e["name"]: e for e in (catalog_index or {}).get("packs") or []
+            if e.get("kind", "pack") == "pack" and not e.get("withdrawn") and not _too_new(e, catalog_index)}
     for i in tc.get("items") or []:
         pack = i.get("pack")
         if pack:
@@ -174,13 +178,15 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                 out.append({"kind": "app", "tier": _tier(e.get("tier")), "name": e["name"], "label": e["name"], "about": e.get("about") or "",
                             "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12],
                             "update": False, "running": False, "compose": "", "blanks": [],
-                            "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "install"})
+                            "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "install",
+                            **_past(e, catalog_index)})
             continue
         if e.get("kind") == "service":
             continue
         out.append({"kind": "pack", **({"group": "agent"} if e.get("agent") is True else {}), "tier": _tier(e.get("tier")), "name": e["name"], "label": e["name"], "about": e.get("about") or "",
                     "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12], "update": False,
-                    "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add"})
+                    "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add",
+                    **_past(e, catalog_index)})
     for c in (companions or {}).get("apps") or []:
         if not c.get("offered"):
             continue
@@ -197,6 +203,20 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if not r["wrong_platform"] and plat and r.get("platforms") and not _supports(r["platforms"], plat):
             r["wrong_platform"] = f"not for this node ({plat}): {', '.join(r['platforms'])}"
     return out
+
+
+def _too_new(e, index):
+    """Why this build does not take a catalog entry, or "": its format is
+    past the one this build reads (R234), named with the first AerieOS that
+    reads it where the index says."""
+    fmt = packformat.of(e) or 1
+    return packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
+
+
+def _past(e, index):
+    """A row's `too_new` for such an entry, with no verb to press."""
+    why = _too_new(e, index)
+    return {"too_new": why, "verb": ""} if why else {}
 
 
 def _repin(pack, e):

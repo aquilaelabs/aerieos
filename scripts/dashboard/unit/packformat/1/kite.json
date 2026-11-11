@@ -1,0 +1,75 @@
+{
+ "about": "A coding agent.",
+ "agent": {
+  "briefing": {
+   "flag": "--rules",
+   "how": "flag-text"
+  },
+  "command": "kite",
+  "env": {
+   "KITE_DISABLE_AUTOUPDATER": "1"
+  },
+  "first_prompt": {
+   "how": "after-dashdash"
+  },
+  "hooks": {
+   "events": {
+    "pre": "PreToolUse",
+    "prompt": "UserPromptSubmit",
+    "recall": "PostCompact",
+    "stop": "Stop"
+   },
+   "file": ".kite/hooks/builderbot.json",
+   "payload": "camel",
+   "shape": "grouped",
+   "tools": {
+    "shell": [
+     "run_command"
+    ]
+   }
+  },
+  "model_flag": "--model",
+  "models": [
+   "kite-1",
+   "kite-1-mini"
+  ],
+  "name": "Kite",
+  "product": "Kite CLI",
+  "provider": "Kite Labs",
+  "respawn": [
+   "-c"
+  ],
+  "signin": {
+   "env": "KITE_API_KEY",
+   "file": ".kite/auth.json",
+   "login": [
+    "kite",
+    "login"
+   ]
+  },
+  "transcripts": {
+   "dir": ".kite/sessions",
+   "file": "{session}/log.jsonl",
+   "session_key": "sessionId"
+  }
+ },
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ]
+ },
+ "label": "Kite",
+ "layout": {
+  "bin": [
+   "bin"
+  ],
+  "tool": "bin/kite"
+ },
+ "name": "kite",
+ "platforms": [
+  "linux/amd64"
+ ]
+}

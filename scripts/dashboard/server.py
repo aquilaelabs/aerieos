@@ -4875,6 +4875,10 @@ def _pack_from_catalog(entry, by, may_root=False):
     """A pack from the vetted catalog kept at the commit the signed index
     pins, its sha256 checked (R169 step 5): what the Library's Install keeps,
     for a session's ask allowed or its dial at auto."""
+    # One written in a format this build has not met is not fetched (R234).
+    past = catalogindex.too_new(entry, catalogindex.known(settings.get("catalog_url") or None))
+    if past:
+        return {"error": f"{entry['name']} {past}"}
     shipped = {r["name"] for r in toolchains.load_toolchains()}
     return toolpacks.add(entry["url"], entry["commit"], by, shipped, sha256=entry["sha256"],
                          tier="official" if entry.get("tier") == "official" else "vetted", path=entry.get("path", ""), may_root=may_root)

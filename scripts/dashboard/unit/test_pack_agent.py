@@ -235,7 +235,7 @@ class OnTheNode(unittest.TestCase):
 # person's kept), says where its payload keeps each thing, and writes each
 # answer. Its prompt event is raised before every call to its model, and
 # the briefing and what it need not ask about both go through its hooks.
-GEMINI = {"name": "gemini", "label": "Gemini", "about": "Google's Antigravity CLI.", "platforms": ["linux/amd64", "linux/arm64"],
+GEMINI = {"name": "gemini", "format": 2, "label": "Gemini", "about": "Google's Antigravity CLI.", "platforms": ["linux/amd64", "linux/arm64"],
           "install": {"steps": [["sh", "{dir}/install.sh"]]}, "layout": {"bin": ["bin"], "tool": "bin/agy"},
           "agent": {"name": "Gemini", "product": "Antigravity CLI", "provider": "Google", "command": "agy",
                     "briefing": {"how": "hook"},
@@ -498,7 +498,7 @@ class AProtocolNobodyHasMet(unittest.TestCase):
     one's are made up: its hooks two keys down in a settings file, its
     payload under ctx and call, its answers in words no agent here uses."""
 
-    OTTER = {"name": "otter", "label": "Otter", "about": "A coding agent.", "platforms": ["linux/amd64"],
+    OTTER = {"name": "otter", "format": 2, "label": "Otter", "about": "A coding agent.", "platforms": ["linux/amd64"],
              "install": {"steps": [["sh", "{dir}/install.sh"]]}, "layout": {"bin": ["bin"], "tool": "bin/otter"},
              "agent": {"name": "Otter", "product": "Otter CLI", "provider": "", "command": "otter", "briefing": {"how": "none"},
                        "hooks": {"file": ".otter/settings.json",

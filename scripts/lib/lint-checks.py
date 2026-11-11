@@ -273,6 +273,38 @@ def _state_floor():
     return int(m.group(1)) if m else 0
 
 
+def formats():
+    """Every manifest kept for a pack format (R234) that the newest release
+    tag carried is in the tree byte-for-byte: a manifest a release read is
+    what later builds must still read, so the proof is never rewritten to
+    fit a change. A new manifest, and a new format's folder, are free."""
+    import subprocess
+
+    def git(*a):
+        return subprocess.run(["git", *a], capture_output=True, check=False)
+    where = "scripts/dashboard/unit/packformat"
+    tags = git("tag", "-l", "v[0-9]*", "--sort=-v:refname").stdout.decode().split()
+    names = list(filter(None, git("ls-tree", "-r", "--name-only", tags[0], "--", where).stdout.decode().split("\n"))) if tags else []
+    if not names:
+        print("  [ok]   no release has carried a kept manifest yet")
+        sys.exit(0)
+    bad = []
+    for path in names:
+        try:
+            now = pathlib.Path(path).read_bytes()
+        except OSError:
+            bad.append(f"{path} was kept in {tags[0]} and is gone: a format a release read is read for good")
+            continue
+        if now != git("show", f"{tags[0]}:{path}").stdout:
+            bad.append(f"{path} was kept in {tags[0]} and has changed: a kept manifest is never edited; "
+                       "what a change needs goes in a new format's folder")
+    for b in bad:
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print(f"  [ok]   every one of the {len(names)} manifest(s) kept in {tags[0]} is unchanged")
+    sys.exit(1 if bad else 0)
+
+
 def shipped():
     """Every migration present at the newest release tag (v*) is in the tree
     byte-for-byte, but a state migration at or under the state floor, which no
@@ -437,4 +469,4 @@ def dupes():
 
 
 {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
- "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid, "changelog": changelog, "dupes": dupes}[verb]()
+ "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid, "changelog": changelog, "dupes": dupes}[verb]()

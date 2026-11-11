@@ -152,6 +152,9 @@ function libState(r){
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
   // Pressed while another job ran: it goes when that one ends.
   if (r.queued) return w("queued, after the job running now");
+  // One this AerieOS is too old for: said plainly, in the muted voice, since
+  // nothing is wrong with the card or the machine.
+  if (r.too_new) return w(esc(r.too_new.charAt(0).toUpperCase() + r.too_new.slice(1).replace(/ \(.*$/, "")));
   // An app runs where Docker does (R170 step 7): said when this node has none.
   if (r.kind === "app") return lib && !lib.docker ? w("this node runs no Docker: New container picks another", "warn") : w("");
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("");
@@ -184,6 +187,9 @@ function libActs(r, may){
     `<button type="button"${cls ? ` class="${cls}"` : ""} data-libact="${act}" data-libkind="${esc(r.kind)}" data-libname="${esc(r.name)}"${
       held ? ` disabled title="${esc(held)}"` : ""}>${esc(words)}</button>`;
   if (r.running || r.queued) return "";
+  // Written in a format this AerieOS has not met (R234): nothing to press,
+  // and the card's state says which AerieOS takes it.
+  if (r.too_new) return "";
   if (r.kind === "companion") return r.download
     ? `<a class="btn primary" href="${esc(r.download.url)}" download title="${esc(r.download.file)} · sha256 ${esc((r.download.sha256 || "").slice(0, 12))}…">Download</a>`
     : `<button type="button" class="primary" disabled>Download</button>`;
@@ -243,6 +249,7 @@ function libDetail(r){
     if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);
     if (r.wrong_platform) lines.push(`<span class="sub warn">${esc(r.wrong_platform)}</span>`);
+    if (r.too_new) lines.push(`<span class="sub">This one ${esc(r.too_new)}. Nothing is fetched or added until then.</span>`);
     if (r.pack && !r.pack.here || r.catalog){
       const seen = libSeen[key];
       lines.push(seen === "looking" ? `<span class="sub">Looking at the repository<span class="dots"></span></span>`

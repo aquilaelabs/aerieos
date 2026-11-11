@@ -23,6 +23,7 @@ _lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
 if os.path.isdir(_lib) and _lib not in sys.path:
     sys.path.insert(0, _lib)
 import markup  # noqa: E402
+import packformat  # noqa: E402
 
 FILE = None
 write_json = None
@@ -397,6 +398,10 @@ def add_catalog(entry, by="", fetch=None):
     never the page's. {app} or {error}."""
     if not entry or entry.get("kind") != "app":
         return {"error": "no app by that name in the catalog"}
+    # One written in a format this build has not met is not fetched (R234).
+    past = packformat.too_new(packformat.of(entry) or 1)
+    if past:
+        return {"error": f"{entry['name']} {past}"}
     got = fetch(entry["url"], entry["commit"], entry["sha256"], entry.get("path", ""), ("bbapp.json", "compose.yml"))
     if got.get("error"):
         return got
@@ -406,6 +411,10 @@ def add_catalog(entry, by="", fetch=None):
     except (ValueError, UnicodeDecodeError, KeyError):
         return {"error": f"{entry['name']}'s bbapp.json is not JSON"}
     app = entry["name"]
+    # The format the manifest itself says it needs, held as the entry's was.
+    fmt = packformat.of(meta)
+    if fmt is None or packformat.too_new(fmt):
+        return {"error": f"{app}'s bbapp.json says a format that is no number" if fmt is None else f"{app} {packformat.too_new(fmt)}"}
     if app in APPS:
         return {"error": f"{app} is a shipped app already"}
     seen = check(compose)

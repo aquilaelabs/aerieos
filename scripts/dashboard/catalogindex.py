@@ -13,6 +13,8 @@ import threading
 import time
 import urllib.request
 
+import packformat
+
 STATE = None
 mirror_index = None      # catalogmirror.index: the imported mirror's index, for when the catalog does not answer
 write_json = None
@@ -116,7 +118,28 @@ def parse(index_bytes):
         # its card with the agents before it is installed as after.
         if p.get("agent") is True:
             out[-1]["agent"] = True
-    return {"generated": str(d.get("generated") or "")[:40], "packs": out}, ""
+        # The format its manifest is written in (R234), which the entry
+        # repeats: one past this build's is listed and says so, and is not
+        # fetched. An entry whose format is no number is no entry.
+        fmt = packformat.of(p)
+        if fmt is None:
+            out.pop()
+            continue
+        if fmt > 1:
+            out[-1]["format"] = fmt
+    # The first AerieOS that reads each format, where the index says, for a
+    # card to name ({"3": "0.10.0"}).
+    since = {str(k): str(v)[:40] for k, v in (d.get("formats") or {}).items()
+             if re.fullmatch(r"[0-9]{1,4}", str(k)) and re.fullmatch(r"[0-9A-Za-z.+-]{1,40}", str(v))} if isinstance(d.get("formats"), dict) else {}
+    return {"generated": str(d.get("generated") or "")[:40], "packs": out, **({"formats": since} if since else {})}, ""
+
+
+def too_new(entry, index=None):
+    """Why this build does not take an entry, or "": its format is past
+    the one this build reads (packformat), named with the first AerieOS
+    that reads it where the index says."""
+    fmt = packformat.of(entry) or 1
+    return packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
 
 
 def _path():

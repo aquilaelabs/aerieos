@@ -165,7 +165,69 @@ in one can be a command line, a path or an address: the only command a
 hooks file runs is AerieOS's own, in `{command}`'s place.
 
 A manifest written with a named shape stays valid: the names are kept for
-good, and mean what they meant.
+good, and mean what they meant. Describing a protocol this way is pack
+format 2, so such a manifest says `"format": 2`.
+
+## The format, and what it promises
+
+Everything a catalog entry can be is written in one format: a tool pack's
+`bbtool.json`, a Docker app's `bbapp.json` and `compose.yml`, a coding
+agent's adapter. The format has a number, and the number keeps a promise to
+whoever writes a pack:
+
+- **The format only grows.** A manifest that is valid at one number is
+  valid at every later one, and means what it meant. Nothing already in the
+  catalog is rewritten because something was added beside it, and you never
+  have to follow AerieOS's releases to keep a pack working.
+- **A manifest says the number it needs** (`format`), and its entry in the
+  catalog's signed index repeats it. An AerieOS that reads that number takes
+  the pack; one too old for it lists the card with what it needs (Needs
+  AerieOS 0.10.0 or newer) and fetches nothing. It never guesses at a
+  format it has not met.
+- **Adding something to the catalog needs no release of AerieOS** as long
+  as it is written in a format installs already read: a tool, a Docker app,
+  a coding agent with words of its own are each a signed commit to the
+  catalog.
+
+| Format | What it added | First read by |
+|---|---|---|
+| 1 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | 0.9.0's first releases |
+| 2 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | 0.9.0 |
+
+### What stays AerieOS's own
+
+A manifest describes; it never brings code that AerieOS runs as itself. So
+a few things are words a manifest can only name, each with a meaning
+AerieOS carries. These are the format's primitives:
+
+| Primitive | The words |
+|---|---|
+| What a command's words may hold | `{dir}`, `{dist}`, `{project}`, `{args}` |
+| A node's package managers (`system`) | `apt`, `dnf`, `pacman`, `zypper`, `apk` |
+| A config field's kind | `secret`, `text`, `choice`, `list`, `switch`, `projects` |
+| A Docker app's blanks | `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}` |
+| How an agent takes the briefing | `flag-text`, `flag-file`, `env-file`, `hook`, `none` |
+| A named hooks file shape and payload | `grouped`, `flat`; `snake`, `camel` |
+| AerieOS's events an agent's own are named for | `pre`, `prompt`, `stop`, `recall`, `asking`, `start` |
+| What an agent is answered | `refuse`, `pass`, `say`, `approve` |
+| A template's placeholders | `{command}`, `{seconds}`, `{handler}`, `{reason}`, `{text}` |
+| When its prompt event is raised | `once`, `each-call` |
+| How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
+| How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
+| An official toolchain's source and its version resolver | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release` |
+| An official service's kind | `router` |
+
+A new primitive is a new format number, never a change to an old one: the
+words above mean what they mean for good. When something cannot be said
+with them, the answer is a new word in the next number, and every manifest
+already written stays as it is.
+
+How the promise is held: AerieOS keeps manifests of every format it has
+read (`scripts/dashboard/unit/packformat/`), each of which must pass its
+validators in every later build, and its lint refuses a change to one a
+release shipped. The catalog's own check holds every entry to each AerieOS
+release still supported, so an entry is signed only when the oldest install
+that reads its format takes it as the newest does.
 
 ## The vetted catalog
 
@@ -303,6 +365,7 @@ the scripts it runs:
 |---|---|
 | `name` | The pack's name, 2 to 40 of `a-z`, `0-9` and `-`. It is the toolchain's name and the word after `aerie tool`, and it cannot be a shipped toolchain's. |
 | `label`, `about` | What the Library and the Installed page show. |
+| `format` | The pack format the manifest needs, a whole number; left out, it is 1. Say the number of the newest thing you use ([The format, and what it promises](#the-format-and-what-it-promises)). |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
 | `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. This is where a pack downloads its binaries. |

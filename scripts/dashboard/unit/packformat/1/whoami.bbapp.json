@@ -1,0 +1,10 @@
+{
+ "about": "A tiny web server that answers with the hostname, the address and the headers of the request: the simplest container to prove a deploy with.",
+ "compose": "compose.yml",
+ "label": "whoami",
+ "license": {"label": "MIT (traefik/whoami)", "url": "https://github.com/traefik/whoami/blob/master/LICENSE"},
+ "media": false,
+ "name": "whoami",
+ "platforms": ["linux/amd64", "linux/arm64"],
+ "port": 8089
+}

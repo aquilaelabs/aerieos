@@ -4796,6 +4796,13 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         fi
     fi
 
+    # A manifest a release read is read for good (R234): the kept manifests
+    # of each pack format at the newest v* tag, byte-for-byte.
+    if [ -d scripts/dashboard/unit/packformat ] && grep -qF '"formats": formats' "$BB_LIB/lint-checks.py"; then
+        section "pack formats (the kept manifests unchanged since the newest release tag)"
+        python3 "$BB_LIB/lint-checks.py" formats || rc=1
+    fi
+
     # The instruction channels, each saying its own (R202): CLAUDE.md the
     # tree, the briefing the machine, the shipped rules the obligations, and
     # no history in what a session is handed.

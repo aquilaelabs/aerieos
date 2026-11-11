@@ -39,6 +39,8 @@ import threading
 import time
 from pathlib import Path
 
+import packformat
+
 FILE = None
 write_json = None
 _lock = threading.RLock()
@@ -474,6 +476,15 @@ def _pack_agent(name, a, errors):
     return out if len(errors) == bad else None
 
 
+def _agent_format(a):
+    """The pack format a cleaned adapter needs: 2 when it describes its own
+    protocol or uses what came with that (R234 step 3), else 1."""
+    h = a.get("hooks") or {}
+    two = h.get("document") or isinstance(h.get("payload"), dict) or h.get("answers") or h.get("prompt_fires") \
+        or "start" in (h.get("events") or {}) or (a.get("briefing") or {}).get("how") == "hook" or (a.get("allow") or {}).get("how") == "hook"
+    return 2 if two else 1
+
+
 def _config(c, errors, depth=0):
     """The config block checked: a list of fields, each {name, label, kind,
     help, required, env, choices (choice), fields (list)}; [] with the
@@ -534,6 +545,14 @@ def validate(m, shipped=()):
     errors = []
     if not isinstance(m, dict):
         return None, [f"{MANIFEST} is a JSON object"]
+    # The format it needs (R234), said before anything else is read: a
+    # manifest of a format this build has not met is not judged by rules
+    # written before it, so it is refused in one sentence, never a list.
+    fmt = packformat.of(m)
+    if fmt is None:
+        return None, ["format is the pack format the manifest needs, a whole number from 1 (left out, it is 1)"]
+    if fmt > packformat.FORMAT:
+        return None, [f"{str(m.get('name') or 'this pack')} {packformat.too_new(fmt)}"]
     tier = str(m.get("tier") or "url")
     if tier not in TIERS:
         errors.append(f"tier is one of {', '.join(TIERS)}")
@@ -547,7 +566,7 @@ def validate(m, shipped=()):
         errors.append(f"{name} is a toolchain AerieOS ships; a pack takes a name of its own")
     elif name in BB_TOOL_WORDS and not official:
         errors.append(f"{name} is one of aerie tool's own words; a pack takes a name of its own")
-    out: dict = {"name": name, "tier": tier,
+    out: dict = {"name": name, "tier": tier, "format": fmt,
            "label": str(m.get("label") or name)[:80],
            "about": str(m.get("about") or "")[:400]}
     if official and isinstance(m.get("shipped"), dict):
@@ -559,6 +578,12 @@ def validate(m, shipped=()):
             a = _pack_agent(name, m["agent"], errors)
             if a:
                 out["pack_agent"] = a
+                # What it uses says the format it needs, and the manifest
+                # says that number: an install that reads only an earlier
+                # one then knows the entry is past it without fetching it.
+                needs = _agent_format(a)
+                if needs > fmt:
+                    errors.append(f"what its agent says of its own hooks is pack format {needs}'s: the manifest says \"format\": {needs}")
         else:
             a = _agent(m["agent"], errors)
             if a:
