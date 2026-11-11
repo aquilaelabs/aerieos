@@ -16,6 +16,7 @@
   "linux/*"
  ],
  "shipped": {
+  "needs": "node_modules/.bin/playwright",
   "probe": "playwright",
   "requires": [
    "node"

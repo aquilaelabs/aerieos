@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fields import field  # noqa: E402
 from names import tmux_name  # noqa: E402
 import agents  # noqa: E402
+import catalogrows  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
@@ -91,6 +92,9 @@ def load_toolchains(packs=()):
         rows = doc["toolchains"]
     except (OSError, ValueError, KeyError, TypeError):
         return []
+    # A shipped row whose recipe the catalog holds newer is that one, in
+    # its place (R234 step 4), as the bundle the nodes install from has it.
+    rows = catalogrows.merged(rows)
     if isinstance(rows, list) and packs:
         names = {r.get("name") for r in rows if isinstance(r, dict)}
         rows = rows + [r for r in packs if isinstance(r, dict) and r.get("name") not in names]

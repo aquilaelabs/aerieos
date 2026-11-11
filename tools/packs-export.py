@@ -26,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
 import agents    # noqa: E402
+import catalogrows  # noqa: E402
 import toolpacks  # noqa: E402
 
 PACKS = os.path.join(ROOT, "packs")
@@ -37,13 +38,9 @@ def toolchain_packs():
         rows = json.load(f)["toolchains"]
     out = []
     for r in rows:
-        shipped = {k: r[k] for k in ("probe", "source", "system", "requires", "updatable", "tool") if k in r}
-        m = {"name": r["name"], "label": r["label"], "about": r.get("about", ""), "tier": "official",
-             "platforms": r.get("platforms") or ["linux/amd64"], "terms": r.get("terms") or [],
-             "layout": {k: v for k, v in (r.get("layout") or {}).items() if k in ("bin", "env", "tool")},
-             "shipped": shipped}
-        if (r.get("layout") or {}).get("reports"):
-            m["shipped"]["reports"] = r["layout"]["reports"]
+        # The row as its manifest, by the one writer the controller reads
+        # it back with (catalogrows.row_of) when the catalog's is newer.
+        m = catalogrows.manifest_of(r)
         # The folder is the name with its colon as a hyphen (android:emulator
         # under android-emulator), a folder name every system takes.
         out.append((os.path.join(PACKS, "official", r["name"].replace(":", "-"), "bbtool.json"), m))
@@ -132,7 +129,13 @@ def catalog_index(root):
         rev = ((m.get("agent") or {}).get("install") or {}).get("rev")
         if rev:
             new[-1]["install_rev"] = rev
-    idx = {"version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": new + kept}
+        # ...and a shipped toolchain's its recipe's, past the first (R234 step 4).
+        if (m.get("shipped") or {}).get("rev"):
+            new[-1]["shipped_rev"] = m["shipped"]["rev"]
+    # What the index says beside its entries (the first AerieOS that reads
+    # each pack format) is kept as it was.
+    idx = {**{k: v for k, v in idx.items() if k not in ("version", "generated", "packs")},
+           "version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": new + kept}
     with open(idx_path, "w", encoding="utf-8") as f:
         json.dump(idx, f, indent=1)
         f.write("\n")

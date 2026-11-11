@@ -53,6 +53,10 @@ _bundle = {}
 # the server: the bundle carries them as config/toolpacks.json beside the
 # shipped catalog, which is how a node installs a pack by name.
 packs_json = None
+# The shipped catalog as the nodes get it (catalogrows.text, R234 step 4):
+# config/toolchains.json with a row's newer recipe from the vetted catalog in
+# its place, "" when the file goes as it is.
+toolchains_json = None
 # ...and the packs made on the controller, each a git bundle carried as
 # config/toolpacks/NAME.bundle (toolpacks.hosted_files): [(arcname, path)].
 packs_files = None
@@ -345,7 +349,9 @@ def bundle():
     packs = packs_json() if packs_json else ""
     hosted = packs_files() if packs_files else []
     stamp.extend(int(p.stat().st_mtime_ns) for _, p in hosted)
-    key = hash((tuple(stamp), packs))
+    shipped = REPO / "config" / "toolchains.json"
+    newer = toolchains_json(shipped.read_text()) if toolchains_json and shipped.is_file() else ""
+    key = hash((tuple(stamp), packs, newer))
     if _bundle.get("key") != key:
         import io
         buf = io.BytesIO()
@@ -358,6 +364,12 @@ def bundle():
                     ti = tar.gettarinfo(str(f), arcname=str(f.relative_to(REPO)))
                     ti.uid = ti.gid = 0
                     ti.uname = ti.gname = ""
+                    if newer and f == shipped:
+                        # The catalog's newer rows in the shipped ones' places.
+                        data = newer.encode("utf-8")
+                        ti.size = len(data)
+                        tar.addfile(ti, io.BytesIO(data))
+                        continue
                     with open(f, "rb") as fh:
                         tar.addfile(ti, fh)
             if packs:

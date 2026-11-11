@@ -4028,6 +4028,8 @@ import catalogmirror                                             # noqa: E402
 import library                                                   # noqa: E402
 
 catalogindex.configure(state=STATE, write_json=write_json)
+import catalogrows                                               # noqa: E402
+catalogrows.configure(state=STATE, write_json=write_json)
 toolpacks.configure(state=STATE, write_json=write_json,
                     unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
 # The catalog's mirror (R169 step 6): its index when the catalog does not
@@ -4270,6 +4272,31 @@ import paths                                                     # noqa: E402
 paths.configure(state=STATE, workspace=WORKSPACE)
 workspace.configure(workspace=WORKSPACE, state=STATE)
 workspace.packs_json = toolpacks.catalog_json
+workspace.toolchains_json = catalogrows.text
+
+
+def _catalog_rows_refresh(index):
+    """Take a shipped toolchain's newer recipe from the vetted catalog (R234
+    step 4), off the request that read the index: each pack is a fetch, and
+    a page never waits on one. The table and the bundle carry what was
+    taken from the next read on."""
+    try:
+        shipped = json.loads(toolchains.TOOLCHAINS_FILE.read_text())["toolchains"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return
+    if not catalogrows.wanted(index, shipped) and not catalogrows.kept():
+        return
+
+    def run():
+        try:
+            said = catalogrows.refresh(index, toolpacks.fetch_folder, shipped, toolpacks.validate)
+        except Exception as e:                                         # noqa: BLE001 (a catalog's row is never worth a page)
+            print(f"[dashboard] catalog rows: {type(e).__name__}: {e}", flush=True)
+            return
+        for name, why in said:
+            print(f"[dashboard] catalog rows: {name}: " + (why or "the catalog's newer recipe is in use"), flush=True)
+        toolchains.refresh_packs()
+    threading.Thread(target=run, name="catalog-rows", daemon=True).start()
 # The coding agents installed packs bring, beside the table's (R169 step 9).
 agents.pack_source = toolpacks.offered_agents
 workspace.packs_files = toolpacks.hosted_files
@@ -12591,6 +12618,8 @@ class Handler(BaseHTTPRequestHandler):
         may_install = not users.may(who, "toolchains-write")
         may_apps = not users.may(who, "docker-write")
         cat = catalogindex.index(settings.get("catalog_url") or None) if may_install or may_apps else {}
+        if cat.get("index"):
+            _catalog_rows_refresh(cat["index"])
         # A newer install recipe the catalog pins for a coding agent is read
         # now, behind the page, so a press on Update finds it (R169 step 13).
         if may_install and not NODES_OK:

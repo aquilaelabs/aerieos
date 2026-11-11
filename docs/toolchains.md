@@ -148,6 +148,16 @@ aerie emu image add "system-images;android-35;google_apis;x86_64"
 aerie emu image remove "system-images;android-35;google_apis;x86_64"
 ```
 
+**A recipe can come from the catalog.** Each row of that file has a `rev`
+(1 when it says none), and each is also an official pack in the vetted
+catalog. When the catalog's signed index says a row's recipe is newer than
+this install's own, the controller fetches that pack at its pin, checks it
+and uses the row in the shipped one's place, in its own table and in what
+every node installs from: a download address or a package list that moved
+upstream is put right by a catalog commit, with no release of AerieOS. The
+row in the image is what runs with no network, at first boot and whenever
+the catalog's is no newer ([tool-packs.md](tool-packs.md#what-stays-aerieoss-own)).
+
 **The recipes are a file, not code.**
 [`config/toolchains.json`](../config/toolchains.json) holds everything the container
 needs in order to offer, fetch and install a toolchain: the URL, the branch, the

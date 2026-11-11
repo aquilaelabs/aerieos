@@ -214,13 +214,27 @@ AerieOS carries. These are the format's primitives:
 | When its prompt event is raised | `once`, `each-call` |
 | How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
 | How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
-| An official toolchain's source and its version resolver | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release` |
+| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `signature` |
 | An official service's kind | `router` |
 
 A new primitive is a new format number, never a change to an old one: the
 words above mean what they mean for good. When something cannot be said
 with them, the answer is a new word in the next number, and every manifest
 already written stays as it is.
+
+A toolchain AerieOS ships is a row of its own table and an official pack
+in the catalog, written from that row. Most of a row is other people's
+facts: where a release is downloaded, how its version is found, which
+system packages it needs. So a row has a `rev`, and its entry in the signed
+index repeats it: when the catalog's is higher than an install's own, the
+install fetches that pack at its pin, checks its sha256, holds the row to
+the primitives above and uses it in the shipped row's place, on the
+controller and in what every node installs from. A recipe that moved
+upstream is then a catalog commit and no release. The image's own row is
+what runs with no network and whenever the catalog's is no newer; a row
+that names a primitive an install does not carry is refused there and its
+shipped row stays. A toolchain nobody ships yet is not a row at all: it is
+a pack with its own install steps.
 
 How the promise is held: AerieOS keeps manifests of every format it has
 read (`scripts/dashboard/unit/packformat/`), each of which must pass its

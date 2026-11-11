@@ -118,6 +118,11 @@ def parse(index_bytes):
         # its card with the agents before it is installed as after.
         if p.get("agent") is True:
             out[-1]["agent"] = True
+        # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
+        # an install fetches the pack only when that is past its own row's.
+        rev = p.get("shipped_rev")
+        if isinstance(rev, int) and not isinstance(rev, bool) and 2 <= rev <= 9999:
+            out[-1]["shipped_rev"] = rev
         # The format its manifest is written in (R234), which the entry
         # repeats: one past this build's is listed and says so, and is not
         # fetched. An entry whose format is no number is no entry.

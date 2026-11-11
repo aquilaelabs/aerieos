@@ -183,6 +183,7 @@ scripts/
     packconfig.py                what each added pack is configured with per node (R172): the answers to its config block, secrets sealed, handed in the hello
     library.py                   the Library's one list (R170): the toolchains and packs with what a node's store holds, the coding agents, the apps, the catalog's offers and the companions as rows of one shape
     catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell
+    catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table and the nodes' bundle in the shipped row's place
     packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images
