@@ -19,6 +19,10 @@
 - A command that acts on a space's tree right after an edit there (aerie git push after a commit, aerie version) no longer waits up to half a minute for the node's own change to come back to it. Takes effect on a node once its agent has updated (fe36377)
 - The Jobs page and Home read a short form of each job rather than the script or configuration it carried: a hundred jobs were over a megabyte, read again whenever any job moved (89a91dd)
 
+### Removed
+
+- The ISO is no longer an installer: its boot menu offers no Install, and a new machine is set up from the USB edition (the stick's image also serves as a VM's disk). The ISO stays on each release as the file a running AerieOS machine updates from. An installer on the machine's own screen is being built. The ISOs up to 0.9.0-dev.5173 could not install on a blank machine in any case (f725a42)
+
 ### Fixed
 
 - Installs and space clones that were queued behind another job when the controller restarted are picked up again, or named on the Spaces page as not started, rather than dropped without a word (e303494)
