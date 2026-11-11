@@ -703,3 +703,19 @@ boot without a word, and a package the node needs is the image's to carry.
 Debian's own docker in place of Docker's repository, since a pinned snapshot
 has to hold everything the image is made of. [image.md](image.md) is the
 image whole.
+
+**The ISO is the file a machine updates from, not an installer, until the
+installer is on the machine's own screen (the operator, 11 Nov 2026).** A
+machine being set up has a monitor, and what it should show there is
+AerieOS's own setup: the disk the system goes on, then the machine's disks
+as a pool or an array, the way the first page already sets them up. The
+console installer the ISO opened asked for one disk in a text menu and left
+the rest to a browser on another device, and installed from a VM's drive it
+was found not to start at all on a blank machine. So the ISO keeps its place
+on each release, since every running AerieOS updates from it, and loses its
+Install entry; a new machine starts from the USB edition. The installer to
+come is AerieOS's setup page in a full-screen browser on the machine,
+rather than a separate installer program with its own partitioning screens,
+so storage is built once; the console installer stays in the image behind
+the kernel's command line, for a serial line and for the build's check that
+the ISO lays out a blank disk.
