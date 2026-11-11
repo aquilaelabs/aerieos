@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- How each coding agent is installed is now a recipe in its catalog pack, so when a vendor changes its installer (as OpenCode's did) the fix reaches every install through the catalog with no new release of AerieOS; an update's first line says when the catalog's recipe is the one used. Takes effect on a node once its agent has updated (24f3a37)
+
 ### Fixed
 
 - Updating OpenCode works again: it failed with 'installed, but no opencode to run' since OpenCode's installer moved where it puts the program. Takes effect once a node's agent has updated (b726ef1)
