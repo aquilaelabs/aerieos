@@ -5,11 +5,13 @@
 ### Added
 
 - A pack can bring a coding agent with a hook protocol of its own, described in its manifest: how its hooks file is laid out, where its payload keeps each thing and how each answer is written. The next such agent needs no update of AerieOS, and where its hooks file is also yours, its guards sit beside your own hooks (14b6057)
+- A built-in toolchain's recipe can be put right from the catalog: when the signed catalog holds a newer one (a download address or a package list that moved upstream), the controller and its nodes use it without waiting for a release of AerieOS (2f16bb0)
 
 ### Changed
 
 - Moving a controller from or onto a machine of its own (an AerieOS stick or disk, or a bare-metal install) carries its secrets files and ssh keys, where you were told to copy them by hand as root. Anything in them that is not a plain secret is left out and named (202a994)
 - A file in the secrets folder is read as plain NAME=value lines and never run. Upgrading: a line there that is not a plain value (one with $( ), backticks, a $VARIABLE in double quotes, or a command of its own) is no longer honored and the controller's log names it: write the value out in full, in single quotes. A line that sets PATH or the like is left out too; it used to stop the controller starting (4789074)
+- A catalog entry written in a newer pack format than this AerieOS reads says so on its Library card (Needs AerieOS X or newer) and is not fetched; it used to be refused only when you pressed Install. The format now has a number that only grows, so a pack that works today keeps working (f44c779)
 
 ### Fixed
 
