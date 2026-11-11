@@ -107,15 +107,15 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 |---|---|
 | `name`, `product`, `provider` | What the page calls it (Start, the dock, the Library card). |
 | `command` | The program a session runs, on `PATH` from the pack's own `layout.bin`. |
-| `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file) or `none`. |
-| `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary) and `asking` (its permission prompt). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. |
+| `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file), `hook` (handed to the model by its own hooks, at its `start` event and again on the first prompt after a restart changed it; its `hooks.answers` says how, below) or `none`. |
+| `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary), `asking` (its permission prompt) and `start` (a conversation's start, for a briefing handed over by `hook`). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. An agent whose hooks are neither shape says its own as data: [A protocol of its own](#a-protocol-of-its-own). |
 | `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
 | `first_prompt` | How a new space's brief is handed over: after `--`, after a `flag`, or not at all. |
 | `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
 | `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
-| `allow` | How it is told that a command needs no asking: `how` is `settings` (a rule in the settings file its session starts with, as Claude Code reads), `flag` (the option `flag` repeated with one rule each, as Grok Build's `--allow` and Copilot CLI's `--allow-tool`), `rules-file` (a `file` under the account's home with one rule a line, as Codex CLI's execpolicy) or `none`. `rule` is the agent's own rule for one command, with `{cmd}` (`aerie version`) or `{argv}` (`["aerie", "version"]`) where the command goes. AerieOS fills it once for each `aerie` verb its controller decides ([agents.md](agents.md#what-an-agent-need-not-ask-about)). Left out, the agent asks by its own judgment. |
+| `allow` | How it is told that a command needs no asking: `how` is `settings` (a rule in the settings file its session starts with, as Claude Code reads), `flag` (the option `flag` repeated with one rule each, as Grok Build's `--allow` and Copilot CLI's `--allow-tool`), `rules-file` (a `file` under the account's home with one rule a line, as Codex CLI's execpolicy), `hook` (its own hook's answer before a tool approves each such verb typed alone, with no `rule`, where an agent's rules are in a settings file that is the person's own; its `hooks.answers.pre` gives the `approve`) or `none`. `rule` is the agent's own rule for one command, with `{cmd}` (`aerie version`) or `{argv}` (`["aerie", "version"]`) where the command goes. AerieOS fills it once for each `aerie` verb its controller decides ([agents.md](agents.md#what-an-agent-need-not-ask-about)). Left out, the agent asks by its own judgment. |
 
 `pre`, `prompt` and `stop` are required: an agent that cannot take the
 guards is refused, as the shipped ones would be. The pack's name is its
@@ -124,6 +124,48 @@ digits and never a shipped agent's. An agent is offered only from a pack the
 vetted catalog pinned (or an official one): a pack added by its address
 installs its program but never offers its agent, since the adapter decides
 what runs in every session of it.
+
+### A protocol of its own
+
+`grouped`, `flat`, `snake` and `camel` are names for descriptions AerieOS
+keeps. An agent whose hooks file, payload or answers are none of them
+writes the description out, and nothing in AerieOS has to know the agent:
+the next one with words of its own is a manifest in the catalog and no
+release.
+
+```json
+"hooks": {
+  "file": ".otter/settings.json",
+  "document": {"under": ["agent", "hooks"], "keep": true, "with": {"schema": 3},
+               "handler": {"run": "{command}", "limit": "{seconds}"},
+               "entry": ["{handler}"],
+               "entries": {"pre": [{"matcher": "*", "hooks": ["{handler}"]}]}},
+  "payload": {"session": "ctx.id", "cwd": "ctx.dir", "tool": "call.tool", "input": "call.params",
+              "prompt": "message", "stop_active": "again",
+              "args": {"command": "script", "file": "target"}},
+  "answers": {"pre":    {"refuse": {"ok": false, "why": "{reason}"}, "pass": {"ok": true}},
+              "prompt": {"refuse": {"block": true, "message": "{reason}"}, "say": {"context": "{text}"}},
+              "stop":   {"refuse": {"again": true, "because": "{reason}"}}},
+  "events": {"pre": "before_tool", "prompt": "on_message", "stop": "on_done"},
+  "tools": {"shell": ["terminal"], "edit": ["patch_file"]}
+}
+```
+
+| Key | What it says |
+|---|---|
+| `document` | How its hooks file is laid out, in place of `shape`. `under` is the keys down to the object that maps an event to its hooks. `handler` is one hook, with `{command}` where AerieOS's call goes and `{seconds}` for the time it is given. `entry` is an event's value, with `{handler}` where the hook goes, and `entries` gives one of AerieOS's events (`pre`, `prompt`, ...) an entry of its own. `with` is keys the file carries at its top. `keep` is true where the file is not AerieOS's alone (the agent's settings, a hooks file a person's own hooks are in): everything else in it is kept and only what `under` names is replaced. |
+| `payload` | Where its hooks' payload keeps each thing, in place of a named shape: `session`, `tool` and `input` (the tool's arguments) at least, and `cwd`, `prompt`, `stop_active` (a stop a hook already refused), `transcript` and `call` (the number of the call to its model, 0 opening a turn) where it has them. Each is a dotted path, or up to four tried in order. `args` adds its own names for a command, a file and a search pattern inside the tool's arguments. |
+| `answers` | What it reads back, as JSON on stdout, for each event: `refuse` when a guard said no (`{reason}` is why), `pass` when the call goes on (`{}` when left out), `say` for words meant for the model (`{text}`: a rule's text, a note, the briefing) and, before a tool, `approve` for an `aerie` verb the controller decides. `pre`, `prompt` and `stop` each need a `refuse`: an agent that cannot be refused cannot take the guards. Without `answers` it is answered as its shape's agents are. |
+| `prompt_fires` | `each-call` for an agent whose `prompt` event is raised before every call to its model rather than once for each thing a person sends: the hooks of a prompt then run on the first call of a turn alone. |
+
+A template is JSON the agent reads, so what it may hold is narrow: keys
+that are names, numbers, true and false, and strings that are one
+placeholder, whole, or one plain word (`command`, `allow`, `*`). No string
+in one can be a command line, a path or an address: the only command a
+hooks file runs is AerieOS's own, in `{command}`'s place.
+
+A manifest written with a named shape stays valid: the names are kept for
+good, and mean what they meant.
 
 ## The vetted catalog
 

@@ -230,7 +230,10 @@ agents AerieOS ships, a pack's `agent.allow` for one a pack brings,
 its session starts with, where a rule is decided before its classifier is
 asked; Grok Build and Copilot CLI by an option on their command line; Codex
 CLI by a rules file under the account's home, written at each start;
-OpenCode is started with every command allowed already. A session picks
+OpenCode is started with every command allowed already; a pack's agent
+whose rules live in the person's own settings file by its hook's answer
+before a tool, which approves one of these verbs typed alone and nothing
+joined to it. A session picks
 this up when it starts: one already running keeps the rules it began with
 until it is restarted. Claude Code's rule form is its documentation's and
 Codex CLI's was checked with its own `execpolicy check`; Grok Build's and

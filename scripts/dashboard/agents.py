@@ -172,8 +172,10 @@ OWN_NAMES = ("aerie", "bb")
 # How an agent takes the list, which its row here or its pack's manifest
 # says (agent.allow): a rule in the settings file its session starts with
 # (Claude Code), an option repeated on its command line (Grok, Copilot), a
-# rules file under its home (Codex), or no way at all.
-ALLOW_HOW = ("none", "settings", "flag", "rules-file")
+# rules file under its home (Codex), its own hook's answer before a tool
+# (Antigravity CLI, whose rules are in the person's own settings file: R233),
+# or no way at all.
+ALLOW_HOW = ("none", "settings", "flag", "rules-file", "hook")
 _ALLOW_FLAG = re.compile(r"--[a-z][a-z0-9-]{1,30}")
 _ALLOW_RULE = re.compile(r"[A-Za-z0-9_ ()\[\]{}=,:.*\"'-]{3,120}")
 _ALLOW_FILE = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._-]{1,60}){0,5}")
@@ -191,6 +193,9 @@ def allow_checked(spec):
     how = spec["how"]
     if how == "none":
         return None, ""
+    if how == "hook":
+        # No rule of its own: bb-agent-hook answers for each verb (own_verb).
+        return {"how": "hook"}, ""
     rule = spec.get("rule")
     if not (isinstance(rule, str) and _ALLOW_RULE.fullmatch(rule) and ("{cmd}" in rule or "{argv}" in rule)):
         return None, "agent.allow.rule is the agent's own rule for one command, with {cmd} (aerie version) or {argv} ([\"aerie\", \"version\"]) where the command goes"
@@ -211,12 +216,13 @@ def allow_plan(agent_id, spec=None):
     """What starting this agent's session does so it need not ask about the
     verbs AerieOS decides: {"settings": [rule...], "args": [option, rule,
     ...], "file": {"path", "text"} or None}. Empty for an agent with no way
-    of being told. `spec` is a pack agent's own, where the caller holds its
+    of being told, and for one its hook answers for, which a start does
+    nothing toward. `spec` is a pack agent's own, where the caller holds its
     adapter (a node's bb-tty, which has no table of packs)."""
     a = get(agent_id)
     spec, _why = allow_checked(spec or (a.allow if a else None) or ((a.pack or {}).get("allow") if a else None))
     plan = {"settings": [], "args": [], "file": None}
-    if not spec:
+    if not spec or spec["how"] == "hook":
         return plan
     rules = []
     for name in OWN_NAMES:

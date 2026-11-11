@@ -784,6 +784,63 @@ sleep 60
         const away = shell(`u:${ownerUid}:grok:${proj}:r:${gsid}:b:${boot}`);
         ok(/not on this node/.test(away) && !alive(`grok-${proj}`), '...and a Grok conversation this node never ran opens nothing, saying so');
       }
+      // A pack's agent whose protocol is its manifest's own (R234 step 3;
+      // R233: Gemini, Google's Antigravity CLI, as the catalog's pack brings
+      // it): its hooks go into the account's one hooks file under AerieOS's
+      // own key, a person's kept; it has no option for the briefing, so its
+      // launcher names the briefing's file and its start hook puts it into
+      // the conversation.
+      {
+        const packs = join(DIR, 'gemini-packs.json');
+        // Its adapter as the bundle carries it: the catalog pack's manifest, held to its shape.
+        writeFileSync(packs, JSON.stringify({ toolchains: [{ name: 'gemini', label: 'Gemini', agent: JSON.parse(String.raw`{"name": "Gemini", "product": "Antigravity CLI", "provider": "Google", "command": "agy", "briefing": {"how": "hook"}, "hooks": {"file": ".gemini/config/hooks.json", "shape": "", "payload": {"call": ["invocationNum"], "cwd": ["cwd", "toolCall.args.Cwd"], "input": ["toolCall.args"], "prompt": ["lastUserInput"], "session": ["conversationId"], "tool": ["toolCall.name"], "transcript": ["transcriptPath"], "args": {"command": ["CommandLine"], "file": ["TargetFile"], "pattern": ["Query"]}}, "events": {"pre": "PreToolUse", "prompt": "PreInvocation", "start": "SessionStart", "stop": "Stop"}, "tools": {"edit": ["write_to_file", "replace_file_content", "multi_replace_file_content"], "grep": ["grep_search"], "shell": ["run_command"]}, "document": {"under": ["aerieos"], "with": {}, "keep": true, "handler": {"command": "{command}", "timeout": "{seconds}", "type": "command"}, "entry": ["{handler}"], "entries": {"pre": [{"hooks": ["{handler}"], "matcher": "*"}]}}, "answers": {"pre": {"approve": {"decision": "auto_approve"}, "pass": {"decision": "allow"}, "refuse": {"decision": "deny", "reason": "{reason}"}, "say": {"decision": "allow", "reason": "{text}"}}, "prompt": {"refuse": {"injectSteps": [{"errorMessage": {"userMessage": "{reason}"}}], "terminationBehavior": "terminate"}, "say": {"injectSteps": [{"systemMessage": {"systemMessage": "{text}"}}]}}, "start": {"say": {"injectSteps": [{"systemMessage": {"systemMessage": "{text}"}}]}}, "stop": {"pass": {"decision": "allow"}, "refuse": {"decision": "continue", "reason": "{reason}"}}}, "prompt_fires": "each-call"}, "env": {}, "respawn": ["--continue"], "login": ["agy"], "first_prompt": {"how": "flag", "flag": "-i"}, "signin": {"file": "", "env": ""}, "allow": {"how": "hook"}, "transcripts": {"dir": ".gemini/antigravity/brain", "file": "{session}/.system_generated/logs/transcript.jsonl", "session_key": "conversationId"}, "models": [], "model_flag": ""}`) }] }));
+        const gmArgv = join(bin, 'gemini-argv');
+        writeFileSync(join(bin, 'agy'), `#!/usr/bin/env bash
+printf '%s\\0' "$@" > "${gmArgv}"
+printf '%s' "\${BB_BRIEFING_FILE:-}" > "${gmArgv}.env"
+sleep 60
+`, { mode: 0o755 });
+        const gmHooks = join(HOMEDIR, '.gemini', 'config', 'hooks.json');
+        mkdirSync(dirname(gmHooks), { recursive: true });
+        writeFileSync(gmHooks, JSON.stringify({ mine: { Stop: [{ type: 'command', command: './bell.sh' }] } }));
+        tmuxKill(`gemini-${proj}`);
+        const gmSaid = shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, { BB_TOOLPACKS_JSON: packs });
+        await sleep(400);
+        const gm = existsSync(gmArgv) ? readFileSync(gmArgv, 'utf8').split('\0').filter(Boolean) : [];
+        const gmBrief = existsSync(`${gmArgv}.env`) ? readFileSync(`${gmArgv}.env`, 'utf8') : '';
+        ok(alive(`gemini-${proj}`) && gmBrief && existsSync(gmBrief) && /THE HOUSE RULES/.test(readFileSync(gmBrief, 'utf8')) && !gm.length,
+           `a pack's agent with no option for a briefing starts with none on its command line, its file named for its hooks (${
+             gmBrief ? gmBrief.split('/').slice(-2).join('/') : (gmSaid.trim().split('\n').pop() || 'no session').slice(0, 90)})`);
+        const gmh = existsSync(gmHooks) ? JSON.parse(readFileSync(gmHooks, 'utf8')) : {};
+        const mineOf = ev => gmh.aerieos?.[ev]?.[0] || {};
+        ok(gmh.mine?.Stop?.[0]?.command === './bell.sh' && mineOf('PreToolUse').matcher === '*'
+           && /bb-agent-hook gemini pre$/.test(mineOf('PreToolUse').hooks?.[0]?.command || '')
+           && /bb-agent-hook gemini prompt$/.test(mineOf('PreInvocation').command || '')
+           && /bb-agent-hook gemini stop$/.test(mineOf('Stop').command || '')
+           && /bb-agent-hook gemini start$/.test(mineOf('SessionStart').command || ''),
+           `...its guards under AerieOS's own name in the account's one hooks file, a person's own kept beside them (${
+             Object.keys(gmh).join(', ')}: ${Object.keys(gmh.aerieos || {}).join(', ')})`);
+        // The start hook as the agent would run it: the briefing comes
+        // back as a system message, once for a conversation.
+        const startHook = (mineOf('SessionStart').command || 'false').split(' ');
+        const hookSays = () => {
+          try {
+            return JSON.parse(execFileSync(startHook[0], startHook.slice(1), {
+              encoding: 'utf8', input: JSON.stringify({ conversationId: 'ec33ebf9-0cba-4100-8142-c61503f6c587' }),
+              env: { ...process.env, HOME: HOMEDIR, BB_TOOLPACKS_JSON: packs, BB_BRIEFING_FILE: gmBrief,
+                     BB_PROJECT: proj, BB_AGENT_WHO: ownerUid } }) || '{}');
+          } catch (e) { return { error: String(e.message).slice(0, 120) }; }
+        };
+        const handed = hookSays();
+        ok(/THE HOUSE RULES/.test(handed.injectSteps?.[0]?.systemMessage?.systemMessage || '') && !Object.keys(hookSays()).length,
+           `...and its start hook puts the briefing into the conversation as a system message, once (${
+             handed.error || `${(handed.injectSteps?.[0]?.systemMessage?.systemMessage || '').length} characters`})`);
+        const rgm = respawn('gemini');
+        ok(rgm.includes('--continue'), `...a respawn goes on with its newest conversation (${rgm.filter(Boolean).slice(-2).join(' ')})`);
+        tmuxKill(`gemini-${proj}`);
+        rmSync(join(HOMEDIR, '.gemini'), { recursive: true, force: true });
+        try { git(['worktree', 'remove', '--force', join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-gemini`)]); } catch { /* not made */ }
+      }
       tmuxKill(`codex-${proj}`); tmuxKill(`copilot-${proj}`); tmuxKill(`grok-${proj}`);
       // Their trees go, so what follows counts the two people's alone.
       for (const ag of ['codex', 'copilot', 'grok']){

@@ -200,12 +200,139 @@ def _agent_allow(a, out, errors):
 # Copilot), so bb-agent-hook holds it to the same guards with no code of its
 # own. Before a tool, a prompt and the stop are required: an agent that
 # cannot take the guards is not listed.
+#
+# An agent whose hooks are none of those says its own as data (R234 step 3),
+# so a protocol nobody has met is a manifest and no release of AerieOS:
+# hooks.document lays its hooks file out, hooks.payload is the paths its
+# payload keeps each thing at, hooks.answers the JSON it reads back for a
+# refusal, a pass, words for the model and an approval. The named shapes are
+# those descriptions under a name (bb-agent-hook DOCUMENTS, PAYLOADS) and
+# stay what they are: a manifest written with them is valid for good.
 PACK_AGENT = re.compile(r"^[a-z][a-z0-9]{1,15}$")
 PACK_AGENT_SHAPES = ("grouped", "flat")
 PACK_AGENT_PAYLOADS = ("snake", "camel")
-PACK_AGENT_EVENTS = ("pre", "prompt", "stop", "recall", "asking")
+# `start` is a conversation's start, for an agent handed the briefing by its
+# hooks (briefing.how hook); the rest are AerieOS's guards.
+PACK_AGENT_EVENTS = ("pre", "prompt", "stop", "recall", "asking", "start")
 PACK_AGENT_NEEDS = ("pre", "prompt", "stop")
-PACK_AGENT_BRIEFING = ("flag-text", "flag-file", "env-file", "none")
+PACK_AGENT_BRIEFING = ("flag-text", "flag-file", "env-file", "hook", "none")
+# When its prompt event is raised: once for each thing a person sends, or
+# before every call to its model, where the hooks of a prompt run on the
+# first of a turn alone.
+PACK_AGENT_PROMPT_FIRES = ("once", "each-call")
+# What a payload's paths may name, and a tool's arguments under `args`.
+PACK_AGENT_PATHS = ("session", "cwd", "tool", "input", "prompt", "stop_active", "transcript", "call")
+PACK_AGENT_ARGS = ("command", "file", "pattern")
+PACK_AGENT_ANSWERS = ("refuse", "pass", "say", "approve")
+DOTTED = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,40}(\.[A-Za-z_][A-Za-z0-9_]{0,40}){0,5}$")
+# A template is JSON an agent reads, so what it may hold is narrow: keys
+# that are names, numbers, true and false, and strings that are either one
+# placeholder, whole, or a single plain word (command, allow, deny, *). No
+# string in one can carry a command line, a path or an address: the one
+# command a hooks file runs is AerieOS's own, in {command}'s place.
+TEMPLATE_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,40}$")
+TEMPLATE_WORD = re.compile(r"^[A-Za-z0-9_.*-]{0,40}$")
+
+
+def _template(v, holes, what, errors, depth=0, count=None):
+    """A template held to its shape, or an error said once: `holes` are the
+    placeholders it may carry."""
+    count = count if count is not None else [0]
+    count[0] += 1
+    bad = None
+    if depth > 6 or count[0] > 60:
+        bad = "is deeper or larger than a hook's answer is"
+    elif isinstance(v, bool) or v is None:
+        bad = None if isinstance(v, bool) else "holds a null"
+    elif isinstance(v, int):
+        bad = None if -1 <= v <= 86400 else "holds a number no hook is given"
+    elif isinstance(v, str):
+        bad = None if v in holes or TEMPLATE_WORD.fullmatch(v) else \
+            f"holds {v[:30]!r}: a string is one of {', '.join(holes)}, whole, or one plain word"
+    elif isinstance(v, list):
+        if len(v) > 8:
+            bad = "holds a list of more than 8"
+        else:
+            return all([_template(x, holes, what, errors, depth + 1, count) for x in v])
+    elif isinstance(v, dict):
+        if not all(isinstance(k, str) and TEMPLATE_KEY.fullmatch(k) for k in v):
+            bad = "has a key that is not a name"
+        else:
+            return all([_template(x, holes, what, errors, depth + 1, count) for x in v.values()])
+    else:
+        bad = "holds something that is not JSON's"
+    if bad:
+        errors.append(f"{what} {bad}")
+    return not bad
+
+
+def _paths(v):
+    """One path or a short list of them, or None."""
+    if isinstance(v, str):
+        v = [v]
+    return list(v) if isinstance(v, list) and 1 <= len(v) <= 4 and all(isinstance(x, str) and DOTTED.fullmatch(x) for x in v) else None
+
+
+def _hooks_data(h, errors):
+    """What an adapter says of its own protocol, checked: (document,
+    payload, answers), each None where it names a shape or gives none."""
+    doc = h.get("document")
+    if doc is not None:
+        ok = isinstance(doc, dict) and set(doc) <= {"under", "with", "keep", "handler", "entry", "entries"}
+        under = doc.get("under") if ok else None
+        if not (ok and isinstance(under, list) and 1 <= len(under) <= 4 and all(isinstance(k, str) and TEMPLATE_KEY.fullmatch(k) for k in under)):
+            errors.append("agent.hooks.document is an object: under (the keys down to its events), handler, entry, and optionally with, keep and entries")
+            doc = None
+        else:
+            ok = _template(doc.get("handler"), ("{command}", "{seconds}"), "agent.hooks.document.handler", errors) and isinstance(doc.get("handler"), dict)
+            if ok and "{command}" not in json.dumps(doc["handler"]):
+                errors.append("agent.hooks.document.handler names no {command}: a hook that does not call AerieOS holds nothing")
+                ok = False
+            ok = _template(doc.get("entry", ["{handler}"]), ("{handler}",), "agent.hooks.document.entry", errors) and ok
+            entries = doc.get("entries") if doc.get("entries") is not None else {}
+            if not (isinstance(entries, dict) and all(k in PACK_AGENT_EVENTS for k in entries)):
+                errors.append(f"agent.hooks.document.entries gives one of AerieOS's events its own entry: {', '.join(PACK_AGENT_EVENTS)}")
+                ok = False
+            else:
+                ok = all([_template(v, ("{handler}",), f"agent.hooks.document.entries.{k}", errors) for k, v in entries.items()]) and ok
+            for k, v in [("entry", doc.get("entry", ["{handler}"])), *entries.items()] if ok else []:
+                if "{handler}" not in json.dumps(v):
+                    errors.append(f"agent.hooks.document.{k} names no {{handler}}: an event with no hook holds nothing")
+                    ok = False
+            ok = _template(doc.get("with", {}), (), "agent.hooks.document.with", errors) and isinstance(doc.get("with", {}), dict) and ok
+            doc = {"under": list(under), "with": dict(doc.get("with") or {}), "keep": doc.get("keep") is True,
+                   "handler": doc["handler"], "entry": doc.get("entry", ["{handler}"]), "entries": dict(entries)} if ok else None
+    pay = h.get("payload")
+    if isinstance(pay, dict):
+        args = pay.get("args") if pay.get("args") is not None else {}
+        ok = set(pay) <= {*PACK_AGENT_PATHS, "args"} and all(_paths(pay[k]) for k in pay if k != "args") \
+            and isinstance(args, dict) and set(args) <= set(PACK_AGENT_ARGS) and all(_paths(v) for v in args.values())
+        if not ok or not all(k in pay for k in ("session", "tool", "input")):
+            errors.append("agent.hooks.payload as paths names where the session, the tool and its input are (session, tool, input), and optionally "
+                          "cwd, prompt, stop_active, transcript, call and args (command, file, pattern): each a dotted path or up to 4 of them")
+            pay = None
+        else:
+            pay = {**{k: _paths(pay[k]) for k in pay if k != "args"}, "args": {k: _paths(v) for k, v in args.items()}}
+    else:
+        pay = None
+    ans = h.get("answers")
+    if ans is not None:
+        ok = isinstance(ans, dict) and all(k in PACK_AGENT_EVENTS and isinstance(v, dict) and set(v) <= set(PACK_AGENT_ANSWERS) for k, v in ans.items())
+        if not ok:
+            errors.append(f"agent.hooks.answers gives an event ({', '.join(PACK_AGENT_EVENTS)}) what it is answered: {', '.join(PACK_AGENT_ANSWERS)}")
+            ans = None
+        else:
+            holes = {"refuse": ("{reason}",), "pass": (), "say": ("{text}",), "approve": ()}
+            ok = all([_template(t, holes[kind], f"agent.hooks.answers.{ev}.{kind}", errors) and isinstance(t, dict)
+                      for ev, kinds in ans.items() for kind, t in kinds.items()])
+            if ok and not all((ans.get(ev) or {}).get("refuse") for ev in PACK_AGENT_NEEDS):
+                errors.append("agent.hooks.answers says how a refusal is written before a tool, on a prompt and at the stop (pre, prompt and stop each a refuse): "
+                              "an agent that cannot be refused cannot take AerieOS's guards")
+                ok = False
+            ans = {ev: dict(kinds) for ev, kinds in ans.items()} if ok else None
+    return doc, pay, ans
+
+
 PACK_AGENT_FIRST = ("after-dashdash", "flag", "none")
 SHIPPED_AGENTS = ("claude", "codex", "copilot", "grok", "open")
 FLAG = re.compile(r"^-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}$")
@@ -255,10 +382,13 @@ def _pack_agent(name, a, errors):
         h = {}
     if not (isinstance(h.get("file"), str) and REL.fullmatch(h["file"])):
         errors.append("agent.hooks.file is its hooks file's path under the account's home, e.g. .foo/hooks/builderbot.json")
-    if h.get("shape") not in PACK_AGENT_SHAPES:
-        errors.append(f"agent.hooks.shape is one of {', '.join(PACK_AGENT_SHAPES)}")
-    if h.get("payload") not in PACK_AGENT_PAYLOADS:
-        errors.append(f"agent.hooks.payload is one of {', '.join(PACK_AGENT_PAYLOADS)}")
+    document, paths, answers = _hooks_data(h, errors)
+    if h.get("document") is None and h.get("shape") not in PACK_AGENT_SHAPES:
+        errors.append(f"agent.hooks.shape is one of {', '.join(PACK_AGENT_SHAPES)}, or agent.hooks.document lays the file out")
+    elif h.get("document") is not None and h.get("shape") not in (None, ""):
+        errors.append("agent.hooks names a shape or lays its file out as document, not both")
+    if not isinstance(h.get("payload"), dict) and h.get("payload") not in PACK_AGENT_PAYLOADS:
+        errors.append(f"agent.hooks.payload is one of {', '.join(PACK_AGENT_PAYLOADS)}, or the paths its payload keeps each thing at")
     evs = h.get("events") if isinstance(h.get("events"), dict) else {}
     for k in evs:
         if k not in PACK_AGENT_EVENTS:
@@ -272,9 +402,23 @@ def _pack_agent(name, a, errors):
     for k, v in tools.items():
         if k not in ("shell", "edit", "grep") or not (isinstance(v, list) and len(v) <= 8 and all(isinstance(t, str) and TOOL_NAME.fullmatch(t) for t in v)):
             errors.append("agent.hooks.tools maps shell, edit and grep to the agent's own tool names")
-    out["hooks"] = {"file": str(h.get("file") or ""), "shape": h.get("shape"), "payload": h.get("payload"),
+    fires = h.get("prompt_fires", "once")
+    if fires not in PACK_AGENT_PROMPT_FIRES:
+        errors.append(f"agent.hooks.prompt_fires is one of {', '.join(PACK_AGENT_PROMPT_FIRES)}")
+    elif fires == "each-call" and not answers:
+        errors.append("agent.hooks.prompt_fires each-call is for an agent answered from hooks.answers")
+    # What only an answer can do is asked of an adapter that says the answer.
+    if how == "hook" and not any((answers or {}).get(ev, {}).get("say") for ev in ("start", "prompt")):
+        errors.append("agent.briefing.how hook needs hooks.answers to say how words reach the model at a start or on a prompt (a say)")
+    out["hooks"] = {"file": str(h.get("file") or ""), "shape": h.get("shape") or "", "payload": paths or h.get("payload"),
                     "events": {k: v for k, v in evs.items() if k in PACK_AGENT_EVENTS},
                     "tools": {k: list(v) for k, v in tools.items() if k in ("shell", "edit", "grep") and isinstance(v, list)}}
+    if document:
+        out["hooks"]["document"] = document
+    if answers:
+        out["hooks"]["answers"] = answers
+    if fires == "each-call":
+        out["hooks"]["prompt_fires"] = fires
     env = a.get("env") if a.get("env") is not None else {}
     if not (isinstance(env, dict) and len(env) <= 8 and all(ENV_NAME.fullmatch(str(k)) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
                                                           for k, v in env.items())):
@@ -307,6 +451,8 @@ def _pack_agent(name, a, errors):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
     _agent_allow(a, out, errors)
+    if (out.get("allow") or {}).get("how") == "hook" and not ((answers or {}).get("pre") or {}).get("approve"):
+        errors.append("agent.allow.how hook needs hooks.answers.pre to say how a tool is approved (an approve)")
     tr = a.get("transcripts") if isinstance(a.get("transcripts"), dict) else {}
     td, tf = tr.get("dir", ""), tr.get("file", "")
     if td and not (isinstance(td, str) and REL.fullmatch(td)):
