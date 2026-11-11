@@ -54,12 +54,13 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
     state.attention = [
       {kind: 'toolchain', tools: [{name: 'a'}, {name: 'b'}]},
       {kind: 'image', containers: [{name: 'c1'}, {name: 'c2'}, {name: 'c3'}]},
-      {kind: 'nginx'}, {kind: 'agent'}, {kind: 'relocate'}];
+      {kind: 'nginx'}, {kind: 'agent'}, {kind: 'relocate'}, {kind: 'disk'},
+      {kind: 'host', what: 'reboot'}, {kind: 'some-kind-added-later'}];
     const got = homeUpdates();
     state.attention = was;
     return got;
   });
-  ok(n === 7, `updates due is two toolchains, three containers, nginx and an agent, and no move (${n})`);
+  ok(n === 7, `updates due is two toolchains, three containers, nginx and an agent, and no move, failing disk or restart owed (${n})`);
 }
 
 // ---- a job that fails shows on Home by itself, through the jobs token ----------

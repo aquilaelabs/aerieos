@@ -3858,6 +3858,13 @@ EOF
     fi
 fi
 
+# This machine's own address for the closing lines, as the tool above finds
+# its own (that copy is the tool's, written into another file).
+my_ip() {
+    hostname -I 2>/dev/null | awk '{print $1}' | grep . \
+        || ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -1 \
+        || true
+}
 ip="$(my_ip || true)"
 if [ "${#WARNINGS[@]}" -gt 0 ]; then
     say "the pre-flight warned about ${#WARNINGS[@]} thing(s), still true:"

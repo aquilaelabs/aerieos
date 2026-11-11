@@ -76,7 +76,9 @@ def sh(cmd, timeout=120):
     s = socket.socket(socket.AF_UNIX)
     s.connect(ROOTSOCK)
     s.settimeout(1)
-    s.sendall(f"\n( {cmd} ) 2>&1; echo {mark} $?\n".encode())
+    # set +H first, on a line of its own: the shell at the other end is an
+    # interactive bash, where a bang in the command would be read as history.
+    s.sendall(f"\nset +H 2>/dev/null\n( {cmd} ) 2>&1; echo {mark} $?\n".encode())
     out, end = b"", time.time() + timeout
     while time.time() < end:
         try:

@@ -6204,8 +6204,17 @@ cmd_version() {
     [ -f "$py" ] || die "version.py is missing from this image"
     proj="${BB_VERSION_PROJECT:-}"
     if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
+        proj="$(project_here)" || {
+            # A checkout that is not under the workspace (a CI runner's, for a
+            # rehearsal's file names) still has a version to read: its own,
+            # from where it stands. Reading only; anything that moves a
+            # version is a space's.
+            local out; out="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+            case "${1:-}" in ""|--file|--semver|--code|--json) ;; *) out="" ;; esac
+            [ -n "$out" ] && [ -f "$out/VERSION" ] \
+                || die "not inside a space under ${WORKSPACE}; cd into one first"
+            WORKSPACE="$(dirname "$out")"; proj="$(basename "$out")"
+        }
     fi
     # Asked from one of the project's worktrees, the answer is that tree's:
     # its HEAD, its VERSION file, its ordinal (version.py root()). The relay

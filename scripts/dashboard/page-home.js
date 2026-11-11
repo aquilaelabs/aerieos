@@ -54,14 +54,19 @@ async function loadHome(light = false){
 }
 
 // The updates due across the install, each thing behind counted once: each
-// toolchain behind on a node, each container with a newer image, nginx
-// behind, an agent behind. A move (relocate) is not an update, nor a node
-// short of room (R110), nor a release's signing (R106) or its files (R190), and a CI run has
-// its own tile.
+// toolchain or coding agent behind on a node, each container with a newer
+// image, nginx behind, a node's agent behind, a machine's security updates,
+// a newer release of AerieOS itself. Named, not what is left once the rest
+// is taken out: every other row on the bell (a move, a failing disk, a node
+// short of room, a release's signing) is news of another kind, and a new
+// kind of row is not an update until it is listed here.
+const HOME_UPDATES = new Set(["toolchain", "agents", "image", "nginx", "agent", "release"]);
 function homeUpdates(){
   return (state?.attention || []).reduce((n, a) =>
-    a.kind === "relocate" || a.kind === "room" || a.kind === "release-sign" || a.kind === "release-files" || a.kind === "git-unlinked" || a.kind === "project-leftover" || a.kind === "acme" ? n : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
-      : a.kind === "image" ? (a.containers || []).length || 1 : 1), 0);
+    a.kind === "host" ? n + (a.what === "security" ? 1 : 0)
+      : !HOME_UPDATES.has(a.kind) ? n
+      : n + (a.kind === "toolchain" || a.kind === "agents" ? (a.tools || []).length || 1
+        : a.kind === "image" ? (a.containers || []).length || 1 : 1), 0);
 }
 
 // The tiles, each one a press into its page (the home rule: unlike a tab's
