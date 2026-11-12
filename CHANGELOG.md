@@ -2,13 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- A pack kept from the catalog has no Edit on its Library card. Edit is for a pack or an app you added yourself; a catalog pack's kept copy is reached from its Details page, on the line that says where it came from (82a452a)
+- A pack that brings a coding agent is listed with the coding agents on the Installed page, where it was listed among the tool packs, and its page says where it signs in (82a452a)
+
 ### Fixed
 
 - A session that cannot start on a node because part of its view could not be mounted says which part; it said only 'No such file or directory' (6ee24d7)
 - A session or a shell starts again on a node set up before AerieOS had its name, once that node's agent has restarted: none did where the node carries a CI runner's folder, ending at 'this node could not build its view' (55a9cd1)
 - A session's view leaves out the agent's own folder on a node set up since AerieOS had its name, or whose Enroll script was run again: it was left in view there, readable as far as its files' permissions allowed (other spaces' build caches and containers' data among them) (55a9cd1)
 - A pack installed from the catalog says where it came from on its page and its Library entry; it said 'Made here' (15b6a4f)
-- A command a house rule refuses is refused in a Codex, Copilot, Grok or OpenCode session too, and a check that fails at the end of a turn sends that agent back to work once: both held Claude Code's sessions only, and in the others the command ran and the turn ended (0b24dab)
+- A command a house rule refuses is refused in a Codex, Copilot, Grok or OpenCode session too, and a check that fails at the end of a turn sends that agent back to work once: both held Claude Code's sessions only, and in the others the command ran and the turn ended. Upgrading: a session of one of those agents started before the update keeps its old hooks; restart it to have it held (0b24dab)
 - A session on a node is not asked about the aerie commands AerieOS itself decides: the rules that say so reached only sessions on the controller's own machine (5a603f4)
 
 ## 0.9.0-dev.5269: 2026-11-12

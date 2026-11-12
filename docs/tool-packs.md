@@ -39,7 +39,7 @@ at the end, shows.
    **Toolchains**, and tick it. A pack starts off in every space, so
    adding one hands it to nobody by itself.
 
-To update a pack, open its row's **Edit**. For a repository's pack it looks
+To update a pack you added yourself, open its card's **Edit**. For a repository's pack it looks
 at the repository's head as it opens; for a pack made here it opens on its
 `bbtool.json`, to change in place, or takes an upload of a new version, and
 **Look** reads what you gave. Either way the form marks every command the
@@ -293,8 +293,12 @@ later index pins a newer commit of it (the same repository and folder), its
 card says so and offers **Catalog update**, which opens the dialog on the
 new pin with what it changes marked verb by verb, as Edit does for a pack
 added by address; **Update** keeps it at that pin with the index's sha256
-checked, its tier kept. Edit on a pack kept from the catalog looks at the
-index's pin too, never at the repository's head. A pack is kept at the
+checked, its tier kept. A pack kept from the catalog has no Edit on its
+card: its kept copy is reached from its Details page, where the line that
+says where it came from carries **Look for a newer pin, or remove it**,
+which looks at the index's pin too, never at the repository's head. A pack
+that brings a coding agent sits with the coding agents, on the Library and
+on the Installed page. A pack is kept at the
 index's tier only at a commit and sha256 the signed index pins; anything
 else is a pack by address, Sideloaded.
 
