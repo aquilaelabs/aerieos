@@ -143,9 +143,10 @@ await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(st
      `...and the controller keeps the three (${JSON.stringify({ label: api.label, note: api.note, kept: api.kept })})`);
   // The space card's picker is one pulldown of them, each by its label or
   // its first words, its agent and when; the picked one's note under it.
-  if (await page.$('[data-c="alpha"]')){
-    await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
-    await page.waitForSelector('.resumemenu #rmConvSel', { state: 'attached', timeout: 10000 }).catch(() => {});
+  // Where this fixture's chooser has a Resume band at all (a node Claude
+  // Code runs on); sessions.mjs holds the band's shape on a phone.
+  await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
+  if (await page.waitForSelector('.resumemenu #rmConvSel', { state: 'attached', timeout: 8000 }).then(() => true, () => false)){
     const pick = await page.evaluate(() => { const m = document.querySelector('.resumemenu'); const s = m?.querySelector('#rmConvSel');
       return { options: [...(s?.options || [])].map(o => o.textContent), presses: [...(m?.querySelectorAll('.rmconv button') || [])].map(b => b.textContent.trim()),
                all: m?.querySelector('[data-rmall]')?.textContent.trim() || '', rows: m?.querySelectorAll('.rmconv').length }; });

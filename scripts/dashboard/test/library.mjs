@@ -56,7 +56,7 @@ ok(await page.evaluate(() => {
 // Nov): Packaged by Aerie for what AerieOS ships or wrote, never the stored
 // word official.
 const tierPills = await page.$$eval('.doc .librarytab .lcard', cs => cs.map(c => c.querySelector('.lcmeta .pill')?.textContent.trim() || ''));
-ok(tierPills.length > 0 && tierPills.every(t => /^(built by aerie|verified|vetted|sideloaded)$/.test(t)) && tierPills.includes('built by aerie'),
+ok(tierPills.length > 0 && tierPills.every(t => /^(packaged by aerie|verified|vetted|sideloaded)$/.test(t)) && tierPills.includes('packaged by aerie'),
    `the tier reads on every card as a pill, in a person's words (${[...new Set(tierPills)].join(', ')})`);
 ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && libTierWord('verified') === 'Verified'
      && LIB_TIERS.map(([, l]) => l).join(', ') === 'Packaged by Aerie, Verified, Vetted, Sideloaded'),
@@ -69,7 +69,9 @@ ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && 
                   left: c.firstElementChild.getBoundingClientRect().right <= c.querySelector('.pill').getBoundingClientRect().left + 1 }; });
   ok(by && by.first === 'lcby' && by.text === 'Eclipse Adoptium' && by.pill === 'packaged by aerie' && by.left,
      `a card names its tool's maker to the left of the pill that says who packaged it (${JSON.stringify(by)})`);
-  const made = await page.evaluate(() => ({ none: (lib.rows || []).filter(r => r.tier !== 'sideloaded' && !r.maker && r.kind !== 'pack').map(r => `${r.kind}:${r.name}`),
+  // What this build ships, not what the live catalog offers: an entry it
+  // lists is the catalog's to name (its own check holds it to that).
+  const made = await page.evaluate(() => ({ none: (lib.rows || []).filter(r => r.tier !== 'sideloaded' && !r.maker && r.kind !== 'pack' && !r.catalog).map(r => `${r.kind}:${r.name}`),
     lint: makerLine((lib.rows || []).find(r => r.name === 'lint-tools') || {}).replace(/<[^>]+>/g, '') }));
   ok(!made.none.length && /^Put together by AerieOS from other people's work: shellcheck \(Vidar Holen\), .*ruff \(Astral\)/.test(made.lint),
      `every card AerieOS ships names a maker, and one of several makers' tools is AerieOS's with each credited in its Details (${made.none.join(', ') || 'all named'}; ${made.lint.slice(0, 90)})`);
@@ -313,8 +315,8 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
 // draw no Configure of their own.
 {
   const RT = '.doc .librarytab .lcard[data-lrow="service:model-router"]';
-  ok(await page.$(RT) !== null && await page.$eval(RT, c => /built by aerie/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.disabled === true),
-     'the model router is a Services card, built by Aerie, its Install dead while nothing is behind it');
+  ok(await page.$(RT) !== null && await page.$eval(RT, c => /packaged by aerie/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.disabled === true),
+     'the model router is a Services card, packaged by Aerie, its Install dead while nothing is behind it');
   await toEntry('service:model-router');
   ok(await page.$eval(ENTRY('service:model-router'), c => !c.querySelector('.lcform') && !c.querySelector('[data-signin]') && /Installed page/.test(c.querySelector('.ldetail').textContent)),
      '...and its page is the entry alone, pointing at the Installed page for what is set per node');

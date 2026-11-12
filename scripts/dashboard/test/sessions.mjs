@@ -529,6 +529,15 @@ await phone.waitForFunction(() => {
 }, null, { timeout: 20000 }).catch(async () => {
   console.log('[diag] chooser precondition never held:', JSON.stringify(await chooserReady()));
 });
+// One of them given a label and a note first (R236), for the pulldown to
+// name it by and say under it.
+const named = await phone.evaluate(async () => {
+  const r = ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || []).find(x => x.first && (x.agent || 'claude') === 'claude');
+  if (!r) return '';
+  for (const [action, text] of [['label', 'The phone walk'], ['note', 'left off at the dock']])
+    await postJSON('/api/transcripts', { project: 'alpha', id: r.id, action, text });
+  return r.id;
+});
 await pressAlpha();
 // The press can land on a row the poll is replacing under load, and then
 // opens nothing; a press that opened nothing is pressed again, and one
@@ -546,6 +555,17 @@ const chooser = await phone.$eval('.resumemenu', el => ({ shown: getComputedStyl
   resume: [...el.querySelectorAll('.rmconv button')].map(b => b.textContent.trim()), text: el.textContent.trim().slice(0, 120) }));
 ok(chooser.shown && chooser.start.join() === 'New' && chooser.picks >= 1 && chooser.resume.join() === 'Resume',
    `phone: Claude on a space with history shows New, and its conversations to resume in one pulldown with one press (${chooser.start.join(' | ')}; ${chooser.picks} to pick from; ${chooser.resume.join(' | ')}; ${chooser.text})`);
+// ...each said by its label, or its first words, its agent and when; the
+// picked one's note under it, and the way to all of them.
+if (named){
+  await phone.selectOption('.resumemenu #rmConvSel', named);
+  await phone.waitForFunction(() => /left off at the dock/.test(document.querySelector('.resumemenu .rmnote')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  const pick = await phone.evaluate(() => { const m = document.querySelector('.resumemenu'), s = m?.querySelector('#rmConvSel');
+    return { picked: s?.selectedOptions[0]?.textContent || '', note: m?.querySelector('.rmnote')?.textContent || '', cv: m?.querySelector('[data-cv]')?.dataset.cv || '',
+             all: m?.querySelector('[data-rmall]')?.textContent.trim() || '', wide: m ? m.scrollWidth > m.clientWidth + 1 : null }; });
+  ok(/^The phone walk · Claude · /.test(pick.picked) && /left off at the dock/.test(pick.note) && pick.cv === named && /^(All \d+ conversations|Your conversation here)$/.test(pick.all) && pick.wide === false,
+     `phone: a labeled conversation is picked by its label with its agent and when, its note under it, Resume pointed at it, and a link to all of them (${JSON.stringify(pick)})`);
+}
 // ...where it can be seen. The sidebar scrolls, the chooser is placed inside
 // the card, and pressing Claude on a project whose session has ended opens
 // this and NOTHING ELSE, so one drawn below the fold is a press with no

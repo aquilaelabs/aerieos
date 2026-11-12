@@ -1256,6 +1256,8 @@ def pin_rows(nid, rep):
                      f"plugin cannot fetch it into a store a session cannot write. "
                      + ("The store holds it." if held else "The store lacks it: tick it and Install."),
             "terms": terms.get(f"android:{kind}") or [],
+            # ...and by whoever its kind's row is by.
+            "maker": next((p.get("maker") or "" for p in TOOLCHAINS if p["probe"] == f"android:{kind}"), ""),
             "tool": "", "updatable": False, "wrong_platform": "",
             "installed": held, "unknown": False, "pinned_by": [proj for proj, _ in who],
             "path": "", "version": v if held else "", "size": "", "size_from": "",
