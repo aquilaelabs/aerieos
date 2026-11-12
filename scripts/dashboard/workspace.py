@@ -322,6 +322,11 @@ BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains
                 # ...and the other coding agents' one hook, which runs these
                 # (R95 step 6): their hooks files name it in this bundle.
                 "scripts/dashboard/bb-agent-hook",
+                # ...and the agents' table it reads the aerie verbs a session
+                # is not asked about from (bb-agent-hook --allow, and an
+                # agent approved by its hook): without it no session on a
+                # node was handed them.
+                "scripts/dashboard/agents.py",
                 # ...and what trusts Codex's for a launch (B284).
                 "scripts/dashboard/bb-codex-trust",
                 # The gate, which refuses every tool call while the
