@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A session that cannot start on a node because part of its view could not be mounted says which part; it said only 'No such file or directory' (6ee24d7)
+
 ## 0.9.0-dev.5269: 2026-11-12
 
 ### Added
