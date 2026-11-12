@@ -2570,28 +2570,23 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
   ok(odd.length === 0, `every text field wears the one skin (${odd.join(' | ') || 'all'})`);
 }
 
-// ---- one frame, three pieces ------------------------------------------
-// The tab strip, the panes and the bottom bar are drawn as one outline: the
-// strip owns the top corners and its own bottom edge, the panes carry the
-// sides with no top border, the bar owns the bottom corners. .col's 10px gap
-// pushed them apart into three boxes with the seams showing, which is what
-// this measures, and the pieces have to touch exactly.
+// ---- one frame ---------------------------------------------------------
+// At a desk the terminal's frame ends at its panes: the band that stood
+// under them held Commands alone, which is gone (the operator, 12 Nov), and
+// the terminal's keys float over it. A band drawn there again, or a gap
+// left where it was, is what this measures.
 {
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')]
     .find(x => /^Terminal$/.test(x.textContent.trim())); b && b.click(); });
-  // A terminal in the dock, so the foot bar under it is drawn (R218 step 4).
+  // A terminal in the dock, in front (R218 step 4).
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) dockShow(t.id); });
   await page.waitForTimeout(400);
-  const seams = await page.evaluate(() => {
-    const box = s => { const e = document.querySelector(s);
-      if (!e) return null; const r = e.getBoundingClientRect();
-      return r.height ? [r.top, r.bottom] : null; };
-    const parts = ['.panes', '.keys', '.mobar']
-      .map(s => [s, box(s)]).filter(p => p[1]);
-    return parts.slice(1).map((p, i) => p[1][0] - parts[i][1][1]);
-  });
-  ok(seams.length >= 1 && seams.every(g => Math.abs(g) < 0.6),
-     `the terminal frame is one outline, not three boxes (seams ${seams})`);
+  const foot = await page.evaluate(() => {
+    const bar = document.querySelector('.mobar'), panes = document.querySelector('.panes'), col = panes?.closest('.col');
+    return { band: !!bar && bar.getBoundingClientRect().height > 0,
+             gap: panes && col ? Math.round(col.getBoundingClientRect().bottom - panes.getBoundingClientRect().bottom) : null }; });
+  ok(!foot.band && foot.gap !== null && Math.abs(foot.gap) <= 1,
+     `a desk's terminal has no band under it: its frame ends at its panes (${JSON.stringify(foot)})`);
 }
 
 // ---- the logs, in the gear menu ---------------------------------------
