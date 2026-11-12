@@ -144,8 +144,7 @@ await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(st
   // The space card's picker is one pulldown of them, each by its label or
   // its first words, its agent and when; the picked one's note under it.
   if (await page.$('[data-c="alpha"]')){
-    await page.evaluate(() => { resumeFor = null; drawProjects(state.projects); openTab({ kind: 'projects', arg: '__projects' }); });
-    await page.evaluate(() => document.querySelector('[data-c="alpha"]').click());
+    await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
     await page.waitForSelector('.resumemenu #rmConvSel', { state: 'attached', timeout: 10000 }).catch(() => {});
     const pick = await page.evaluate(() => { const m = document.querySelector('.resumemenu'); const s = m?.querySelector('#rmConvSel');
       return { options: [...(s?.options || [])].map(o => o.textContent), presses: [...(m?.querySelectorAll('.rmconv button') || [])].map(b => b.textContent.trim()),
@@ -157,7 +156,7 @@ await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(st
     await page.waitForFunction(() => /left off at the token test/.test(document.querySelector('.resumemenu .rmnote')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     const picked = await page.evaluate(() => ({ note: document.querySelector('.resumemenu .rmnote')?.textContent || '', cv: document.querySelector('.resumemenu [data-cv]')?.dataset.cv || '' }));
     ok(/left off at the token test/.test(picked.note) && picked.cv === 'conv-two-2025', `picking one shows its note under it and points Resume at it (${JSON.stringify(picked)})`);
-    await page.evaluate(() => document.querySelector('.resumemenu [data-rmall]').click());
+    await page.evaluate(() => document.querySelector('.resumemenu [data-rmall]')?.click());
     await page.waitForSelector(`${SESS} .cvlogs .artrow`, { timeout: 10000 });
     ok(await page.evaluate(() => !document.querySelector('.resumemenu') && !!document.querySelector('.nb .nbview[data-view="sessions"]:not([hidden]) .cvlogs')),
        'All conversations opens the notebook\'s Sessions view and shuts the chooser');

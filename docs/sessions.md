@@ -25,8 +25,9 @@ Where they differ is how each takes those, in its own form:
   account's hooks file for it, every one running the same list. Codex's
   are trusted for each launch by the hashes Codex reports for them.
 - **The conversations**: each agent keeps its own transcripts, listed on a
-  space's Sessions view with the agent named, and Start agent's menu
-  offers each agent's last one to resume.
+  space's Sessions view with the agent named, where each can be given a
+  label and a note and be kept past its agent's own cleanup; Start agent's
+  menu offers them all in one pulldown to resume.
 - **The sign-in**: each agent's, per account and per node, on the Agents
   page (see [below](#the-agents-on-a-node-and-their-sign-in)).
 

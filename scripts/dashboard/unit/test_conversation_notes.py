@@ -152,6 +152,18 @@ class Notes(unittest.TestCase):
         self.assertEqual(transcripts.delete("ann", "web", "ann-2")[1], 200)
         self.assertIsNone(self.row("ann", "ann-2"))
 
+    def test_a_conversation_whose_file_stands_in_two_folders_is_one_row(self):
+        # A resume in a worktree copies the file into that tree's folder.
+        other = self.homes["ann"] / transcripts._slug(self.ws / ".worktrees" / "web" / "ann")
+        other.mkdir(parents=True)
+        newer = other / "ann-1.jsonl"
+        newer.write_text((self.folder("ann") / "ann-1.jsonl").read_text() + json.dumps({"type": "user", "message": {"role": "user", "content": "and on"}}) + "\n")
+        os.utime(newer, (self.old + 60, self.old + 60))
+        transcripts.annotate("ann", "web", "ann-1", label="Listed once")
+        got = [r for r in transcripts.mine("ann", ["web"]) if r["id"] == "ann-1"]
+        self.assertEqual(len(got), 1)
+        self.assertEqual((got[0]["label"], got[0]["at"]), ("Listed once", int(self.old + 60)), "the newest written is the one")
+
     def test_each_accounts_kept_copies_are_its_own(self):
         transcripts.annotate("ann", "web", "ann-1", kept=True)
         self.assertIsNone(transcripts._kept_find("bob", "web", "ann-1"))

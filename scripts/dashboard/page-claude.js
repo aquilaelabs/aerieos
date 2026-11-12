@@ -700,7 +700,9 @@ function placeResumeMenu(){
     if (rmConvs.project !== p.name || rmConvs.rows === null)
       return `<div class="rmstate">${rmConvs.error ? esc(rmConvs.error) : "Reading your conversations here…"}</div>`;
     const ok = new Set(here().map(a => a.id));
-    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude"));
+    // One with nothing said in it and no label is not one to go on with (an
+    // agent started and ended before a word): the Sessions view lists it.
+    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude") && (r.first || r.label));
     if (!rows.length) return `<div class="rmstate">None yet: a conversation started here is kept to go on with.</div>`;
     if (rmConv.project !== p.name || !rows.some(r => r.id === rmConv.id)) rmConv = {project: p.name, id: rows[0].id};
     const r = rows.find(x => x.id === rmConv.id);
@@ -708,8 +710,10 @@ function placeResumeMenu(){
     // Every slot of its agent taken: said in the press's place, not offered
     // and then refused on the press.
     const full = !live && !freeSlot(p.name, a.id);
-    const CUT = 40;
-    const says = x => x.label || x.first || "nothing said yet";
+    // Cut short enough that its agent and when still show in the closed
+    // pulldown; the whole of the picked one's first words is under it.
+    const CUT = 26;
+    const says = x => x.label || x.first;
     const opt = x => { const w = says(x); return `<option value="${esc(x.id)}"${x.id === r.id ? " selected" : ""}>${
       esc(w.length > CUT ? w.slice(0, CUT - 1).trimEnd() + "…" : w)} · ${esc(agentById(x.agent || "claude").name)} · ${esc(ago(x.at))}${x.kept ? " · kept" : ""}</option>`; };
     const under = r.note || (r.first && (r.label || r.first.length > CUT) ? r.first : "");

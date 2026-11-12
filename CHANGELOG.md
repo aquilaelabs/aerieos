@@ -6,10 +6,12 @@
 
 - Gemini, Google's Antigravity CLI, can be added as a coding agent from the Library: a pack in the vetted catalog brings it, handed the briefing and held by the same guards as the agents AerieOS ships. It signs in with a Google account in its own session's terminal (347605e)
 - Gemini is signed in from its page: open its row on the Installed page with the node picked and press Sign in, and the page shows Google's link and a field for the code, which works on a phone. Any coding agent a pack brings is signed in this way where its pack says how its sign-in goes; its sign-in is sealed on a node that seals sign-ins, and Sign out removes it (732cb3c)
+- A conversation can be given a label and a note, and be kept: Edit on its row of a space's Sessions view names it, notes it, and keeps a copy on the controller that outlives its agent's own cleanup; aerie transcripts label, note, keep and unkeep say the same from a session (d95ead2)
 
 ### Changed
 
 - A pack kept from the catalog has no Edit on its row of the Installed page either, as on its Library card (f46b202)
+- Start agent's menu offers your conversations on a space as one pulldown with one Resume, each named by its label or its first words, where it listed a row and a button for each; a link under it opens all of them in the Sessions view, which has a find field past five (d95ead2)
 
 ## 0.9.0-dev.5284: 2026-11-12
 

@@ -42,9 +42,12 @@ node it shows (a picker where the space works on several):
 - **Start.** A line for each agent installed on that node, the space's own
   first: **New** starts a conversation, or **Sign in** where you have no
   sign-in to it there, which opens that agent's own page on the node, at its sign-in.
-- **Resume.** Your conversations on the space, newest first, each with its
-  agent, when it was and its first words; one running in a session of yours
-  is marked so and not offered, since two sessions would write over it.
+- **Resume.** Your conversations on the space in one pulldown, newest
+  first, each named by the label you gave it, or by its first words, with
+  its agent and when it was; **Resume** beside it goes on with the one
+  picked, and its note shows under it. One running in a session of yours
+  says so and is not offered, since two sessions would write over it. A
+  link under them opens all of them in the space's Sessions view.
 
 While one of yours runs, the button reads **Manage agent**.
 

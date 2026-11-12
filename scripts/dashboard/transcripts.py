@@ -420,7 +420,15 @@ def mine(uid, projects):
             rows.append({"project": project, "id": sid, "at": int(st.st_mtime), "bytes": st.st_size,
                          "first": _first_prompt(f), "shared": sid in on, "agent": agent_of(f),
                          "label": mark.get("label", ""), "note": mark.get("note", ""), "kept": True, "gone": True})
-    rows.sort(key=lambda r: r["at"], reverse=True)
+    # One conversation is one row: its file can stand in two of the account's
+    # folders (a resume in another tree copies it there), and it was listed
+    # once for each. The newest written is the one.
+    one = {}
+    for r in rows:
+        k = (r["project"], r["agent"], r["id"])
+        if k not in one or r["at"] > one[k]["at"]:
+            one[k] = r
+    rows = sorted(one.values(), key=lambda r: r["at"], reverse=True)
     return rows[:MAX_LIST]
 
 
