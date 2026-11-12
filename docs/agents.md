@@ -4,8 +4,10 @@ A session on a space runs a coding agent in a terminal on a node: Claude
 (Anthropic's Claude Code), ChatGPT (OpenAI's Codex CLI), Copilot (GitHub's
 Copilot CLI), Grok (xAI's Grok Build) or Any model (OpenCode, through a
 node's model router), each used the same way and held to the same briefing
-and guards. This page says what each agent is to AerieOS, where it is
-installed and signed in to, and how each is wired.
+and guards. A pack from the vetted catalog can bring another: Gemini
+(Google's Antigravity CLI) is the first, [below](#an-agent-a-pack-brings-gemini).
+This page says what each agent is to AerieOS, where it is installed and
+signed in to, and how each is wired.
 
 ## One table of agents
 
@@ -279,6 +281,41 @@ Build's from `~/.grok/auth.json` (the email its token names, never the
 token). The
 controller keeps that per account, per node, per agent, and holds no
 credential of any of them.
+
+## An agent a pack brings: Gemini
+
+A coding agent need not ship with AerieOS. A pack in the vetted catalog
+can bring one, its adapter written in the pack's manifest
+([tool-packs.md](tool-packs.md)): its command, how its hooks file is laid
+out, where its payload keeps each thing and how each answer is written. So
+a new agent is a signed entry in the catalog, with no release of AerieOS.
+
+Gemini is Google's Antigravity CLI (`agy`), Built by Aerie. Its card is
+under Coding agents on the Library; **Install** shows what it fetches (the
+program from Google's storage, held to its sha512) and its terms, and
+keeps it; then install it on a node from the same card and tick it under
+a space's **Settings, Toolchains**. Start agent then offers Gemini there.
+It needs AerieOS 0.9.0-dev.5284 or later to be held as the others are.
+
+- **Signing in.** With a Google account, in its own session's terminal: the
+  first session shows Google's link, and the code Google gives is pasted
+  back there. The link runs over many rows of a terminal, so sign in at a
+  desk, where it can be copied whole. The sign-in is kept in your home on
+  that node (`~/.gemini/antigravity-cli/antigravity-oauth-token`) and a
+  later session there starts signed in.
+- **Its first run.** Once, it asks for a color scheme and shows Google's
+  terms with its data-use choice, and once a space it asks whether you trust
+  the folder. Each is yours to answer: AerieOS answers none of them.
+- **What holds it.** The briefing is handed over before its first call to
+  the model, and again when a restart changed it. Its hooks call the same
+  guards as every agent's: a command a house rule refuses is refused in the
+  rule's words, an edit outside the session's tree is walled, and an
+  `aerie` verb the controller decides is approved without its own prompt.
+- **In the dock.** Working and waiting, as the others. It has no event for
+  its own permission prompt, so the dock says working while it asks.
+- **Not yet.** Its sign-in is not on the Installed page, its conversations
+  are not listed under Your conversations, and Start offers no choice of
+  model for it: it runs its own default.
 
 ## Any model, through a router
 
