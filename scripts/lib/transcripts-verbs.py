@@ -11,7 +11,10 @@ account's conversations on its own project and on one its project reads
 (`bb -p NAME transcripts`), and nobody else's: the controller looks under
 the account's transcripts and nowhere else. `audit [DAYS]` is `aerie rules
 audit`: the same conversations counted against the rules that refuse
-commands (R200). BB_TRANSCRIPTS_AUTH is the
+commands (R200). `label ID WORDS`, `note ID WORDS`, `keep ID` and `unkeep
+ID` say something of one of the account's own (R236): the name and the note
+its person reads it by, and whether a copy of it is kept past its agent's
+own cleanup. BB_TRANSCRIPTS_AUTH is the
 auth header and BB_TRANSCRIPTS_PROJECT the project.
 """
 import os
@@ -53,7 +56,13 @@ if verb == "list":
     def line(row, who=""):
         when = time.strftime("%d %b %H:%M", time.localtime(int(row.get("at") or 0)))
         agent = names.get(row.get("agent") or "claude", row.get("agent") or "")
-        print(f"  {row['id']}  {agent:<9} {when}  {size(int(row.get('bytes') or 0)):>7}  {who}{row.get('first') or ''}")
+        # Under its label where its person gave it one, its first words
+        # otherwise; a kept one says so.
+        says = row.get("label") or row.get("first") or ""
+        kept = "kept  " if row.get("kept") else ""
+        print(f"  {row['id']}  {agent:<9} {when}  {size(int(row.get('bytes') or 0)):>7}  {kept}{who}{says}")
+        if row.get("note"):
+            print(f"      note: {' '.join(str(row['note']).split())}")
     if rows:
         print(f"your conversations on {proj}, every agent's, newest first:")
         for row in rows:
@@ -65,6 +74,25 @@ if verb == "list":
         for row in seen:
             line(row, f"({row.get('by') or '?'}) ")
     print("aerie transcripts show ID prints one: what was said, every command it ran and what it answered")
+    raise SystemExit(0)
+
+if verb in ("label", "note", "keep", "unkeep"):
+    words = verb in ("label", "note")
+    if len(argv) < 2 or (not words and len(argv) != 2):
+        fail(f"aerie transcripts {verb} ID" + (" WORDS (no words takes it off)" if words else ""))
+    body = {"project": proj, "id": argv[1], "action": verb}
+    if words:
+        body["text"] = " ".join(argv[2:])
+    r = bbapi.call("/api/transcripts", body, auth=auth)
+    if not isinstance(r, dict) or r.get("error"):
+        fail(r.get("error") if isinstance(r, dict) else "the controller did not answer")
+    if verb == "label":
+        print(f"{argv[1]} is labeled: {r.get('label')}" if r.get("label") else f"{argv[1]} has no label now: it is listed by its first words")
+    elif verb == "note":
+        print(f"noted on {argv[1]}" if r.get("note") else f"{argv[1]} has no note now")
+    else:
+        print(f"{argv[1]} is kept: a copy stays on the controller past its agent's own cleanup" if r.get("kept")
+              else f"{argv[1]} is no longer kept: it lasts as long as its agent keeps it")
     raise SystemExit(0)
 
 if verb == "audit":

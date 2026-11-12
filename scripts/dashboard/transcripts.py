@@ -13,10 +13,17 @@ as they were. Claude's private reasoning is not conversation and is left
 out. A notebook's Sessions view offers each to resume, read, download,
 delete, or make visible to every session on the project (shared(); the
 operator, 22 Oct); otherwise only the account's own.
+
+A person gives a conversation a label and a note (R236, the operator, 12
+Nov), kept here and not in the agent's file, and marks one Kept: a second
+name for its file where no agent's own cleanup looks, so it is still there
+to read and resume when the original has gone.
 """
+import contextlib
 import json
 import re
 import os
+import shutil
 import threading
 import time
 
@@ -50,11 +57,20 @@ _shared_lock = threading.Lock()
 BUSY_S = 120
 
 
+# What a person says of their own conversations (R236): {uid: {project:
+# {session id: {"label", "note", "kept", "at"}}}}, in the state directory
+# (a file absent is none said). A label is a line, a note a few.
+NOTES = None
+_notes_lock = threading.Lock()
+LABEL_MAX, NOTE_MAX = 60, 500
+
+
 def configure(*, workspace, root_for, state=None, write_json=None):
     globals().update(WORKSPACE=Path(workspace), WORKTREES=Path(workspace) / ".worktrees",
                      root_for=root_for)
     if state is not None:
-        globals().update(SHARED=Path(state) / "transcripts-shared.json", write_json=write_json)
+        globals().update(SHARED=Path(state) / "transcripts-shared.json", NOTES=Path(state) / "conversations.json",
+                         write_json=write_json)
 
 
 def _shared_all():
@@ -100,10 +116,122 @@ def set_shared(uid, project, sid, on):
     return {"ok": True, "shared": bool(on)}, 200
 
 
+def _notes_all():
+    try:
+        with open(NOTES) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def notes_of(uid, project):
+    """{session id: {label, note, kept}} for what this account said of its
+    conversations on the project."""
+    got = ((_notes_all().get(uid) or {}).get(project) or {}) if NOTES is not None else {}
+    return {sid: {"label": str(v.get("label") or ""), "note": str(v.get("note") or ""), "kept": v.get("kept") is True}
+            for sid, v in got.items() if isinstance(v, dict)}
+
+
+def _kept_dir(uid, project):
+    """Where this account's kept conversations on the project are: beside
+    its projects folder on the share, where no agent's own cleanup looks."""
+    return Path(root_for(uid)).parent / "kept" / project
+
+
+def _kept_find(uid, project, sid):
+    for agent in ("claude", *OTHER_AGENTS):
+        f = _kept_dir(uid, project) / agent / f"{sid}.jsonl"
+        if f.is_file():
+            return f
+    return None
+
+
+def _keep(f, dest):
+    """`dest` made a second name for the conversation's file `f`: a hard
+    link where the share allows one, which stays current as the agent writes
+    and outlives the first name's removal, and a copy where it does not."""
+    with contextlib.suppress(OSError):
+        if dest.samefile(f):
+            return
+    dest.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    tmp = dest.with_name(f".{dest.name}.new")
+    with contextlib.suppress(OSError):
+        tmp.unlink()
+    try:
+        os.link(f, tmp)
+    except OSError:
+        shutil.copy2(f, tmp)
+    os.replace(tmp, dest)
+
+
+def _kept_current(f, dest):
+    """A kept copy brought up to its original where the two are no longer
+    one file (the agent wrote a new one in its place) and the original is
+    the newer; never the other way, and never an error a listing would say."""
+    with contextlib.suppress(OSError):
+        if not dest.samefile(f) and f.stat().st_mtime > dest.stat().st_mtime:
+            _keep(f, dest)
+
+
+def annotate(uid, project, sid, label=None, note=None, kept=None):
+    """Say something of one of the account's own conversations: its label,
+    its note, or whether it is kept; what is None is left as it was.
+    (payload, status)."""
+    f = _find(uid, project, sid)
+    if f is None:
+        return {"error": "no such conversation of yours"}, 404
+    held = _kept_find(uid, project, sid)
+    if kept is False and held is not None and held == f:
+        return {"error": "the kept copy is the only one left of this conversation: Delete removes it"}, 409
+    with _notes_lock:
+        d = _notes_all()
+        rec = dict(((d.get(uid) or {}).get(project) or {}).get(sid) or {})
+        if label is not None:
+            rec["label"] = " ".join(str(label).split())[:LABEL_MAX]
+        if note is not None:
+            rec["note"] = re.sub(r"[\x00-\x09\x0b-\x1f\x7f]", " ", str(note)).strip()[:NOTE_MAX]
+        if kept is not None:
+            try:
+                if kept:
+                    _keep(f, _kept_dir(uid, project) / agent_of(f) / f"{sid}.jsonl")
+                elif held is not None:
+                    held.unlink()
+            except OSError as e:
+                return {"error": f"could not {'keep' if kept else 'let go of'} it: {e.strerror}"}, 500
+            rec["kept"] = bool(kept)
+        rec = {k: v for k, v in rec.items() if v and k in ("label", "note", "kept")}
+        mine_ = d.setdefault(uid, {}).setdefault(project, {})
+        if rec:
+            mine_[sid] = dict(rec, at=int(time.time()))
+        else:
+            mine_.pop(sid, None)
+        if not mine_:
+            d[uid].pop(project, None)
+        if not d[uid]:
+            d.pop(uid, None)
+        write_json(NOTES, d)
+    return {"ok": True, "label": rec.get("label", ""), "note": rec.get("note", ""), "kept": rec.get("kept") is True}, 200
+
+
+def _forget(uid, project, sid):
+    """What was said of a conversation, gone with it."""
+    with _notes_lock:
+        d = _notes_all()
+        if sid in ((d.get(uid) or {}).get(project) or {}):
+            d[uid][project].pop(sid, None)
+            if not d[uid][project]:
+                d[uid].pop(project, None)
+            if not d[uid]:
+                d.pop(uid, None)
+            write_json(NOTES, d)
+
+
 def delete(uid, project, sid):
-    """Remove one of the account's own conversations, and its visibility
-    with it. One still being written (a session going) is refused: its
-    session would write it again. (payload, status)."""
+    """Remove one of the account's own conversations, its kept copy, what
+    was said of it and its visibility with it. One still being written (a
+    session going) is refused: its session would write it again. (payload,
+    status)."""
     f = _find(uid, project, sid)
     if f is None:
         return {"error": "no such conversation of yours"}, 404
@@ -111,8 +239,13 @@ def delete(uid, project, sid):
         if time.time() - f.stat().st_mtime < BUSY_S:
             return {"error": "a session is still writing this conversation: end it first"}, 409
         os.unlink(f)
+        held = _kept_find(uid, project, sid)
+        if held is not None:
+            os.unlink(held)
     except OSError as e:
         return {"error": f"could not remove it: {e.strerror}"}, 500
+    if NOTES is not None:
+        _forget(uid, project, sid)
     with _shared_lock:
         d = _shared_all()
         if sid in (d.get(project) or {}):
@@ -138,8 +271,10 @@ def visible(uid, project, name_of=lambda u: u):
         except OSError:
             continue
         # ...each marked with its agent, as the account's own rows are (R95).
+        # ...and under the label its person gave it, where they gave one.
         rows.append({"project": project, "id": sid, "at": int(st.st_mtime), "bytes": st.st_size,
-                     "first": _first_prompt(f), "by": name_of(o), "agent": agent_of(f)})
+                     "first": _first_prompt(f), "by": name_of(o), "agent": agent_of(f),
+                     "label": (notes_of(o, project).get(sid) or {}).get("label", "")})
     rows.sort(key=lambda r: r["at"], reverse=True)
     return rows[:MAX_LIST]
 
@@ -250,6 +385,8 @@ def mine(uid, projects):
     rows = []
     for project in projects:
         on = shared(project) if SHARED is not None else {}
+        said = notes_of(uid, project)
+        seen = set()
         for f, agent in _files(uid, project):
             try:
                 st = f.stat()
@@ -257,12 +394,32 @@ def mine(uid, projects):
                 continue
             if st.st_size == 0:
                 continue
+            seen.add(f.stem)
+            mark = said.get(f.stem) or {}
+            if mark.get("kept"):
+                _kept_current(f, _kept_dir(uid, project) / agent / f"{f.stem}.jsonl")
             # Which coding agent's (R95): Claude Code's at the top of the
             # folder, another agent's in its own folder beside them. Only
             # ever this account's own, whichever agent it used.
             rows.append({"project": project, "id": f.stem, "at": int(st.st_mtime),
                          "bytes": st.st_size, "first": _first_prompt(f),
-                         "shared": f.stem in on, "agent": agent})
+                         "shared": f.stem in on, "agent": agent,
+                         "label": mark.get("label", ""), "note": mark.get("note", ""), "kept": mark.get("kept") is True})
+        # A kept conversation whose first name has gone (an agent's own
+        # cleanup, a tree removed): still here, from its kept copy.
+        for sid, mark in said.items():
+            if sid in seen or not mark.get("kept"):
+                continue
+            f = _kept_find(uid, project, sid)
+            try:
+                st = f.stat() if f is not None else None
+            except OSError:
+                st = None
+            if st is None or st.st_size == 0:
+                continue
+            rows.append({"project": project, "id": sid, "at": int(st.st_mtime), "bytes": st.st_size,
+                         "first": _first_prompt(f), "shared": sid in on, "agent": agent_of(f),
+                         "label": mark.get("label", ""), "note": mark.get("note", ""), "kept": True, "gone": True})
     rows.sort(key=lambda r: r["at"], reverse=True)
     return rows[:MAX_LIST]
 
@@ -275,7 +432,9 @@ def _find(uid, project, sid):
             f = sub / f"{sid}.jsonl"
             if f.is_file():
                 return f
-    return None
+    # ...or its kept copy, where the conversation itself has gone: read,
+    # downloaded and fetched for a resume from there (R236).
+    return _kept_find(uid, project, sid)
 
 
 def raw(uid, project, sid):

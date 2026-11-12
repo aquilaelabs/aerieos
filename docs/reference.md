@@ -618,6 +618,13 @@ aerie transcripts show ID [--tz ZONE] [--all]   one of them as text: what was sa
 aerie transcripts fetch ID [--into DIR]   the file itself into this machine's folder
                    for it: how a node holding its spaces as a synced copy
                    resumes a conversation it does not have (bb-tty runs it)
+aerie transcripts label ID WORDS   the name one of yours is listed and picked by,
+                   in place of its first words; no words takes it off.
+                   aerie transcripts note ID WORDS says more of it, shown
+                   where it is picked
+aerie transcripts keep ID   keep a copy of one of yours on the controller, where
+                   its agent's own cleanup does not reach, so it can still
+                   be read and resumed; unkeep ID lets the copy go
 aerie memory          your memories on this repository, kept for every coding agent:
                    the index, newest first (aerie -p REPO for another repository
                    of the space, which keeps them when it moves)

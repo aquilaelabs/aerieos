@@ -11847,25 +11847,34 @@ class Handler(BaseHTTPRequestHandler):
     def _transcripts(self, req):
         """POST /api/transcripts {project, id, action}: one of the signed-in
         person's own conversations deleted, or made visible to every session
-        on the project (share) or private again (unshare). A person's, from
-        the notebook's Sessions view: never a session's, which reads them."""
+        on the project (share) or private again (unshare): a person's, from
+        the notebook's Sessions view, never a session's, which reads them.
+        Or said something of (R236): label and note {text}, keep and unkeep,
+        which that person's own session may do too (aerie transcripts
+        label), since it changes nothing but what its person reads of their
+        own conversations."""
         me = self._who()
         uid = users.uid_of(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
-        if me.get("session"):
+        name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
+        said = act in ("label", "note", "keep", "unkeep")
+        if me.get("session") and not said:
             return self._json({"error": "a conversation is deleted or shared by its person, from the "
                                         "space's Sessions view, not by a session"}, 403)
-        name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
         if self._not_project(name):
             return
         if act == "delete":
             r, st = transcripts.delete(uid, name, sid)
         elif act in ("share", "unshare"):
             r, st = transcripts.set_shared(uid, name, sid, act == "share")
+        elif act in ("label", "note"):
+            r, st = transcripts.annotate(uid, name, sid, **{act: str(req.get("text") or "")})
+        elif said:
+            r, st = transcripts.annotate(uid, name, sid, kept=act == "keep")
         else:
-            return self._json({"error": "delete, share or unshare"}, 400)
-        if st == 200:
+            return self._json({"error": "delete, share, unshare, label, note, keep or unkeep"}, 400)
+        if st == 200 and act not in ("label", "note"):
             db.audit(me["name"], f"conversation-{act}", name, {"id": sid})
         return self._json(r, st)
 
