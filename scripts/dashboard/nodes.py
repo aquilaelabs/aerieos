@@ -7918,6 +7918,23 @@ def job_row(j):
     return {**j, "spec": cut}
 
 
+# What a job's spec carries for the node alone: the token a sign-in's flow
+# reports with (signin.verb mints one for the account), and anything named
+# as one is. A reader of the Jobs page or of /api/v1/jobs is handed the job
+# without it, an administrator too: the list said a session's token to every
+# reader of it for the half hour it was good (B796).
+_SPEC_NODES_OWN = re.compile(r"token|secret|passw|passphrase|credential", re.I)
+
+
+def job_read(j):
+    """A job as a person or a session reads it: its spec without what is
+    the node's alone to hold."""
+    spec = j.get("spec") if isinstance(j, dict) else None
+    if not isinstance(spec, dict) or not any(_SPEC_NODES_OWN.search(str(k)) for k in spec):
+        return j
+    return {**j, "spec": {k: v for k, v in spec.items() if not _SPEC_NODES_OWN.search(str(k))}}
+
+
 def jobs_view(jid, q, mine, system=None, hidden=None):
     """The Jobs page's whole read surface, and a test's: one job with its log
     so far, or the recent ones narrowed by the query's node, project, type,
@@ -7957,7 +7974,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         j = job(jid)
         if j and not seen(j):
             j = None
-        return (shown(j), 200) if j else ({"error": "no such job"}, 404)
+        return (shown(job_read(j)), 200) if j else ({"error": "no such job"}, 404)
     try:
         n = min(500, max(1, int(q.get("n", ["100"])[0])))
     except ValueError:
@@ -7974,7 +7991,7 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
         active=q.get("active", [""])[0] == "1")
     if mine is not None or hidden is not None:
         rows = [shown(j) for j in rows if seen(j)][:n]
-    rows = [job_row(j) for j in rows]
+    rows = [job_row(job_read(j)) for j in rows]
     # The names of the nodes these rows run on, and for an account that
     # is not an administrator no other: the whole registry rode here
     # past the scoping the nodes listing keeps (the probe of 26 Sep).

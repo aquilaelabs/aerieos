@@ -36,6 +36,16 @@ class JobRow(unittest.TestCase):
         self.assertEqual(len(j["spec"]["argv"][2]), 60000)
         self.assertIn("config", j["spec"])
 
+    def test_what_is_the_nodes_alone_is_not_read_with_the_job(self):
+        # B796: a sign-in job's spec carried the session token minted for
+        # its flow to every reader of the list.
+        j = {"id": "j_4", "type": "claude-login", "spec": {"uid": "u_1", "timeout": 900, "token": "bbs_secret", "agent": "claude"}}
+        self.assertEqual(nodes.job_read(j)["spec"], {"uid": "u_1", "timeout": 900, "agent": "claude"})
+        self.assertEqual(j["spec"]["token"], "bbs_secret", "the job itself, which the node is handed, is as it was")
+        plain = {"id": "j_5", "type": "exec", "spec": {"argv": ["true"]}}
+        self.assertIs(nodes.job_read(plain), plain)
+        self.assertEqual(nodes.job_read({"id": "j_6", "spec": None}), {"id": "j_6", "spec": None})
+
     def test_a_job_with_no_spec(self):
         self.assertEqual(nodes.job_row({"id": "j_3", "spec": None}), {"id": "j_3", "spec": None})
         self.assertEqual(nodes.job_row({"id": "j_4"}), {"id": "j_4"})
