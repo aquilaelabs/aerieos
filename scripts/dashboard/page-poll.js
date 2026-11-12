@@ -192,10 +192,6 @@ async function refresh(){
       if (p) nb.poll(p);
     }));
     drawCard(null, gateFindings);
-    drawCard("linux", drawLinux);
-    drawCard("commands", drawCommands);
-    drawCard("git", drawGit);
-    drawCard("custom", drawCustom);
     drawCard("doctor", drawDoctor);
     drawCard(null, watchSignin);
     // A scan re-ran on the host: drop the cache, and any notebook showing

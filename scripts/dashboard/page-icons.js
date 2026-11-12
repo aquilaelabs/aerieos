@@ -85,6 +85,16 @@ const SPARK = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M4 4l8 8"/><path d="M12 4l-8 8"/></svg>`;
 
 // A prompt, for a plain terminal: the chevron and the line you type on.
+// Side-view thumbtack: cap, body, needle. Filled when pinned, so the state
+// reads at a glance without a second icon to learn.
+const TACK = `<svg viewBox="0 0 16 16" aria-hidden="true">
+  <path d="M5 1.6h6"/>
+  <path d="M6.4 1.6v4.1c0 .9-.5 1.4-1.3 1.9-.7.5-1.2 1-1.2 1.6h8.2c0-.6-.5-1.1-1.2-1.6
+           -.8-.5-1.3-1-1.3-1.9V1.6"/>
+  <path d="M8 9.2v5.2"/></svg>`;
+const PENCIL = `<svg viewBox="0 0 16 16" aria-hidden="true">
+  <path d="M11.3 2.2 13.8 4.7 5.6 12.9 2.4 13.6 3.1 10.4z"/>
+  <path d="M9.9 3.6 12.4 6.1"/></svg>`;
 const TERM = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M3.2 4.6 6.6 8l-3.4 3.4"/><path d="M8.4 11.8h4.4"/></svg>`;
 

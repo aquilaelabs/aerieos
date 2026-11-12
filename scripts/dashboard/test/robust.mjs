@@ -263,12 +263,11 @@ await page.waitForTimeout(300);
 const partial = await page.evaluate(() => ({
   doctor: document.getElementById('doctor').textContent.trim(),
   projectsWaiting: !!document.querySelector('.pgrid .loading'),
-  commandsWaiting: !!document.querySelector('#commands .loading'),
   red: document.getElementById('dot').classList.contains('off'),
 }));
 ok(/not drawn/.test(partial.doctor) && /doctor draw boom/.test(partial.doctor),
    `a part whose draw threw says so in its own body (${JSON.stringify(partial.doctor.slice(0, 60))})`);
-ok(!partial.projectsWaiting && !partial.commandsWaiting && !partial.red,
+ok(!partial.projectsWaiting && !partial.red,
    `...and the parts after it still draw, under a light that stays on (${JSON.stringify(partial)})`);
 ok(page.errors.some(t => /doctor draw boom/.test(t)),
    '...while the error itself still reaches the console');

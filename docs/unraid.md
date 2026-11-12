@@ -283,13 +283,6 @@ the mouse. Agents' terminals keep tmux's mouse mode instead, so they do not.
 Right-click gives you the browser's menu only: tmux's would be drawn
 underneath it, and Alt+right-click still opens tmux's if you want it.
 
-**Commands**, under the terminal in the dock, opens four lists: the
-commands you pinned, your own (**+** takes a title and a list of command
-lines, and the button it makes types them into the terminal in order, kept
-in `/config` so they survive updates), **Linux** (disk, memory, processes,
-ports: live on any shell) and **git**, which grays out when the active
-shell's directory is not a git repository.
-
 The dock starts with one workspace terminal; every terminal, that one
 included, can be minimized. **Start agent** opens one session per space:
 resumable if a previous conversation exists, and **Shell** opens another

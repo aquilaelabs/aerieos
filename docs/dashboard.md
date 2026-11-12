@@ -5,7 +5,7 @@ pages down the left edge (a bar along the foot on a phone), a top bar, the
 page on show, and the dock at the foot of every page, which holds the
 terminals and the chat. This doc covers signing in, finding your way, what
 the page tells you (toasts, the bell, notifications, the doctor), its color
-schemes, the dock and its terminals, and the commands it types for you. Each
+schemes, and the dock and its terminals. Each
 group on the rail has a doc of its own: [projects.md](projects.md) and
 [notebook.md](notebook.md), [building.md](building.md) and
 [toolchains.md](toolchains.md), [containers.md](containers.md),
@@ -239,12 +239,8 @@ The page above stays whole: clicking into the terminal gives the dock the
 keyboard, a press on the page gives it back.
 
 **On a phone** the dock up is a sheet over the whole page, above the
-bottom bar, and opening a page puts it down. Under the terminal sit
-**Keys** and **Commands**. Keys is the
-phone's alone: a desktop has a keyboard, so it carries no on-screen one at
-all. One flyout at a time on a phone, because there is not the height for
-two, and a flyout that has done its job gets out of the way: sending a
-command closes it. The dock's line carries each session's dot, amber if it is waiting on you, blue while it works,
+bottom bar, and opening a page puts it down. Under the terminal sits its
+hot bar, below. The dock's line carries each session's dot, amber if it is waiting on you, blue while it works,
 as each space's card does.
 
 The dock starts with one terminal (**workspace**, a shell at `/workspace`),
@@ -353,8 +349,8 @@ slightly translucent until the pointer is on it; the **›** at its end folds
 it to that one handle and **‹** brings it back, a choice this browser
 keeps. On a **phone** it is the band at the terminal's foot, read as the
 dock's line of tabs is: its keys in a line that scrolls under a thumb, the
-ends faded with a round arrow where more lie past them, and Links and, on a
-shell's tab, **»** for Commands standing still at its right. A shell's line
+ends faded with a round arrow where more lie past them, and Links standing
+still at its right. A shell's line
 carries the rest of a keyboard's keys past the first few (the other
 arrows, Home and End, more Ctrl keys, and the symbols a touch keyboard
 hides).
@@ -395,73 +391,6 @@ split one inside tmux, only the active pane's contents are kept.
 and a session wearing its old name would be a new one pretending otherwise. Its
 tab is dropped at boot too, and the space's **Start agent** offers to resume
 the transcript, which is still on disk.
-
-## Commands run in the terminal
-
-They live under the terminal, at every width: **Commands** (and, on a
-phone, **Keys**) in the bar under it, opening a flyout over the terminal they
-act on. On a desktop it really is *over*: the flyout is
-an overlay and the terminal keeps its height, because a resize costs a terminal
-a refit and a reflow of everything on screen, which is a lot to charge for
-looking at a list. A phone pushes the terminal up for it instead, there being
-no screen to spare for covering one thing with another. Both slide. That is where they belong: a command list is
-about the shell in front of you, not about the box, which is what the pages
-are for. On
-a wide screen the buttons sit at the bar's left edge and the flyout is capped
-rather than stretched: a short list read across two thousand pixels is worse
-than one read in a column.
-
-Nothing about the graying-out below depends on where they live. It is computed
-from the *terminal in front*, which is why one markup serves a phone and a
-desktop alike.
-
-A command's button clears whatever is half-typed at the prompt, types the
-command into the terminal you are looking at and presses Enter, rather than
-reporting into a box of its own. The output is then somewhere you can scroll
-it, and one that follows behaves exactly as if you had typed it. A command
-only ever goes to the tab you are looking at, and only if that is a plain
-shell: with an agent's session in front (it would submit the command as a
-prompt), or no terminal at all, every command button is grayed out and
-its hover text says where to go: never quietly typed into some other terminal.
-
-The line is cleared with end-of-line then kill-line, which is readline editing
-rather than a signal: `Ctrl-C` would also interrupt whatever is running in that
-terminal, which is not something a button should be able to do.
-
-The flyout holds no `aerie` commands: each has a page that does it better
-(status on Home, the emulator on its page, the logs in Controller settings,
-an agent's sign-in on the Installed page). The Tests view sends `aerie tests log -f`
-into the space's shell from its own button.
-
-What is there, top to bottom: **pinned**, the commands whose **thumbtack**
-is pressed, in their lists' order; **your commands** (below); **Linux**, the
-general toolkit: `clear`, `cd ..`, `ls -lah`, disk usage here and per
-directory, memory, the biggest processes, listening ports, live on any shell
-tab; and **git**, its commands verbatim (`git status`, log, diff, branches,
-stashes, fetch, pull), ghosting against the directory the active shell is
-*in*: outside a git repository the whole list grays out, and the verdict
-follows a `cd` on the next status poll. There is no `gh`: a node carries
-none, and a push is `aerie git push`'s, under the space's policy. Pins live in
-`/config/pinned-commands.json`: one machine, one set, so a pin made at the
-desk is there on the phone.
-
-## Your own commands
-
-**Your commands**, the second section of the same flyout, starts empty with a **+**. It takes a title and a
-box of command lines, and the button it makes types those lines into the
-terminal you are looking at, in order, exactly as if you had typed them: one
-line or twenty. The pencil beside each one edits or deletes it.
-
-Long titles are cut with an ellipsis so the list keeps its shape; hovering shows
-the full title *and* the commands it will run, which is the thing you will want
-six months later. They live in `/config/custom-commands.json`, so they survive
-restarts and image updates and are the same on every device.
-
-This is the one place the dashboard sends text you wrote rather than a name from
-a fixed list, and it is still not a remote-execution API. The lines are stored
-by one authenticated request and typed by another into a tty that the same
-operator is already sitting at with a full shell. Nothing is executed in the
-dashboard's own process.
 
 ## How a view knows to re-read
 

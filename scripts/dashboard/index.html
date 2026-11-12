@@ -1457,8 +1457,6 @@ button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--lin
   .modal .danger:hover{background:color-mix(in srgb, var(--bad) 35%, var(--panel))}
   .nb .caution:hover{background:color-mix(in srgb, var(--warn) 30%, var(--panel))}
   button:disabled:hover,button[aria-disabled="true"]:hover{background:var(--btn);border-color:var(--line)}
-  .cmd button:hover{background:var(--btn-hi)}
-  .cmd .tack:hover{color:var(--ink)}
   button.eye:hover{color:var(--ink)}
   .dockline .dtab .dx:hover{background:rgba(255,255,255,.09);color:var(--ink)}
   .pane .bar .x:hover{background:rgba(255,255,255,.1);color:var(--ink)}
@@ -1699,22 +1697,6 @@ button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var
 /* A reason line can carry a token nothing breaks (a node's name, a digest
    from the agent-window sentence), and at phone width that token was the
    21px the Projects tab scrolled sideways by. */
-/* A command and its thumbtack are one control with two halves, so the tack
-   cannot be mistaken for a command of its own. */
-.cmd{display:inline-flex;align-items:stretch;border:var(--hair) solid var(--line);
-  border-radius:var(--r-control);overflow:hidden;background:var(--btn)}
-.cmd button{border:0;border-radius:0;background:transparent;min-height:28px}
-.cmd .tack{padding:4px 6px;color:color-mix(in srgb, var(--dim) 55%, var(--panel));border-left:var(--hair) solid var(--line);
-  display:inline-flex;align-items:center}
-.cmd .tack.on{color:var(--lit)}   /* on, so the second color, as every lit control */
-.cmd .tack svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;
-  stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
-.cmd .tack.on svg{fill:currentColor}
-@media(max-width:900px){ .cmd button{min-height:var(--tap)} }
-/* A custom command's title is the operator's own words and can be any length:
-   it wraps inside the button, since no tooltip holds the rest any more. */
-.cmd .run{max-width:190px;white-space:normal;overflow-wrap:anywhere;text-align:left;display:block}
-
 /* The dialogs: the command editor and the new-project form. Dialogs rather
    than cards of their own: each is a detour, and should hand the page back
    when it is done. */
@@ -1788,7 +1770,7 @@ dialog.modal::backdrop{background:transparent}
    hold into the ground under them at the edge with more past it, a mask and
    not a painted band; a dialog pins its title and buttons; a list draws a
    hairline at that edge. */
-.modal .box,.modal .sheetslot,.pane .doc,.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.mpanel,.abpage,.dsboardwrap{
+.modal .box,.modal .sheetslot,.pane .doc,.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap{
   scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 /* A dialog that scrolls keeps its title and its buttons where they are and
    its content passes under them, each with the hairline it always had: the
@@ -1814,9 +1796,9 @@ dialog.modal::backdrop{background:transparent}
 /* A list or a log that scrolls inside a page has no title or buttons of its
    own to pin: the edge with more past it is drawn as a hairline instead,
    where the next line is cut, and nothing is shaded. */
-:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.mpanel,.abpage,.dsboardwrap).scrolldown{box-shadow:inset 0 -1px 0 var(--line)}
-:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.mpanel,.abpage,.dsboardwrap).scrollup{box-shadow:inset 0 1px 0 var(--line)}
-:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.mpanel,.abpage,.dsboardwrap).scrollup.scrolldown{box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
+:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap).scrolldown{box-shadow:inset 0 -1px 0 var(--line)}
+:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap).scrollup{box-shadow:inset 0 1px 0 var(--line)}
+:is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap).scrollup.scrolldown{box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
 /* The memory book holds prose, not form fields: 520px wraps a description
    every other line. */
 .modal .box.wide{width:min(760px,100%)}
@@ -5834,111 +5816,40 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    one control under it. */
 .pane .slot.popped .empty-pane{text-align:center;line-height:2.2}
 
-/* Keys --------------------------------------------------------------- */
-.keys{flex:0 0 auto;background:var(--panel);border:var(--hair) solid var(--line);
-  border-top:0;border-radius:0 0 var(--r-surface) var(--r-surface);padding:6px;display:none;gap:5px;flex-wrap:wrap}
-.keys.show{display:flex}
-.keys button{font-family:var(--mono);min-width:40px;min-height:var(--tap);padding:6px 8px}
-.keys .gap{flex-basis:100%;height:0}
-/* On a phone each group of ten is five across and two down, every key one
-   width, rather than nine to a row and the tenth alone under them (the
-   operator, 17 Oct). */
-@media(max-width:900px){
-  .keys.show{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
-  .keys button{min-width:0;padding:6px 2px}
-  .keys .gap{grid-column:1 / -1;height:3px}
-}
-
-/* The terminal's own bottom bar --------------------------------------- */
-/* The command lists and Sessions hang off the terminal, at every width, in
-   its bottom bar: they are about the shell in front of you and not about
-   the box. Ghosting reads the ACTIVE PANE (wireMacros), not the parent
-   element.
-   One panel at a time (they share the same strip of space), but on a
-   desktop the keys row is not part of that trade, because there is room for
-   it and a panel at once. */
-.mpanel{display:none}
+/* The terminal's own bottom band ------------------------------------- */
+/* A phone's alone: the hot bar of the terminal in front, its keys in a line
+   that scrolls under a thumb and Links at its end. A desk's keys float over
+   the terminal, so there is no band there. (The Keys panel and the Commands
+   panel that opened from it are gone: the operator, 12 Nov.) */
 .mobar[hidden]{display:none}
-.mobar{display:flex;gap:6px;padding:6px;flex:0 0 auto;background:var(--panel);
+.mobar{display:none;gap:6px;padding:6px;flex:0 0 auto;background:var(--panel);position:relative;
   border:var(--hair) solid var(--line);border-top:0;border-radius:0 0 var(--r-surface) var(--r-surface)}
 .mobar button{min-height:var(--tap)}
-.mobar button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
-/* The terminal's keys in the band, a phone's alone (the hot bar): a line of
-   them that scrolls under a thumb, taking what Keys and Commands leave. */
-.mobar{position:relative}
 .mobar .mhot{display:none}
 .mobar .mlinks{right:6px}
-.keys,.panes{border-radius:0}   /* the bar below them owns the bottom corners */
-/* flex-shrink 1, unlike the strip and the bar: on a phone held sideways the
-   fixed chrome plus a flyout can be taller than the screen, and since the
-   body cannot scroll, whatever overflowed was simply gone: the bar included,
-   with no way to close what had opened. The flyout scrolls inside itself
-   instead, and the terminal keeps a strip of screen. */
-.mpanel.show{display:block;flex:0 1 auto;max-height:45vh;overflow:auto}
-.keys.show{flex:0 1 auto;overflow:auto;max-height:45vh}
-/* A flyout is its own surface, at both sizes: the tinted --flyout, an accent
-   edge where it meets the terminal, and a shadow cast up onto it, so where
-   it stops is plain on a phone as much as over a desktop's terminal. The bar
-   below keeps --panel: the flyout is what it opened, not part of it. */
-.mpanel.show,.keys.show{background:var(--flyout);border:var(--hair) solid var(--line);
-  border-top:2px solid var(--accent-mid);box-shadow:0 -6px 18px rgba(0,0,0,.35);
-  position:relative;z-index:1}
-/* Mid-slide a flyout is an overlay pinned above the bottom bar (bottom set
-   inline to the bar's height), so the terminal under it holds still until the
-   slide lands and the panel drops back into the flow. */
+.panes{border-radius:0}   /* the band below them owns the bottom corners */
 .col.term{position:relative}
-/* `over` is where a desktop flyout LIVES; `sliding` is where any flyout is
-   for the length of its tween. Same geometry, and sliding outranks it so that
-   an opening panel passes over the one it is replacing, on a phone the one
-   being replaced is in the flow and loses on its own, on a desktop both are
-   overlays and the z-index is the only thing deciding it. */
-.keys.sliding,.mpanel.sliding,.mpanel.over{position:absolute;left:0;right:0;
-  box-shadow:0 -6px 18px rgba(0,0,0,.35)}
-.mpanel.over{z-index:5}
-.keys.sliding,.mpanel.sliding{z-index:6}
-.mpanel .lab{font-size:10px;text-transform:uppercase;letter-spacing:.6px;
-  color:var(--dim);padding:8px 10px 0}
 @media(max-width:380px){
   .mobar{gap:4px;padding:5px}
   .mobar button{padding-inline:4px}
 }
-@media(min-width:901px){
-  /* A row of buttons at the bar's left edge, not a set of stretched thirds:
-     on an ultrawide each third is several hundred pixels of empty button.
-     The panel is capped for the same reason: a macro list is a short list,
-     and one read across two thousand pixels is worse than one read in a
-     column. */
-  .mobar #mLinks{display:none}  /* a desk's Links is on the bar over its terminal */
-  .mpanel{max-width:min(760px,100%)}
-}
 @media(max-width:900px){
   .pill.att{display:none}   /* one pane on a phone: nothing to say */
-  .mobar button{flex:1}     /* thumbs, and only three of them */
-  /* ...and they share the bar rather than each taking its text's width: on a
-     344px fold cover four of them did not fit and Chat was cut off at the
-     edge, inside a bar that clips. */
-  /* In equal parts: two buttons since Chat and Sessions went to the dock, and
-     halves hold Commands whole down to a 344px fold cover. Shared by what
-     each said (B460) was for four, which cut two of them in equal quarters,
-     and with two it left Keys and Commands uneven. */
-  .mobar button{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
-  .mobar button[hidden]{display:none}
+  .mobar{display:flex}
   .mobar[hidden]{display:none}
+  .mobar button[hidden]{display:none}
   /* The hot bar is the band (the operator, 12 Nov): the terminal's keys in a
-     line that scrolls, each a thumb wide, and Keys and Commands two small
-     presses at its end, their words left to their labels. */
-  /* ...and it reads as the dock's line of tabs at the terminal's head does
-     (the operator, 12 Nov): the same gap, a key the height of a tab, the
+     line that scrolls, and it reads as the dock's line of tabs at the
+     terminal's head does: the same gap, a key the height of a tab, the
      line's faded ends and its round arrows where more keys lie past an
      edge (.hscroll, which the line and a row of chips share), and Links
-     and Commands standing still to the right of the arrow. */
+     standing still to the right of the arrow. */
   .mobar:has(.mhot:not([hidden])){gap:4px;padding:4px 6px;align-items:center}
   .mobar .mhot:not([hidden]){display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
   .mobar .mhot::-webkit-scrollbar{display:none}
   .mobar .mhot button{flex:0 0 auto;min-height:calc(32px + 2 * var(--hair));min-width:calc(32px + 2 * var(--hair));padding:0 10px;
     border-radius:var(--r-control);font:var(--f-data);white-space:nowrap}
   .mobar .mhot:not([hidden]) ~ button{flex:0 0 auto;min-height:calc(32px + 2 * var(--hair));inline-size:calc(36px + 2 * var(--hair));padding:0}
-  .mobar .mhot:not([hidden]) ~ button .mw{display:none}
   .mobar{border:0;border-top:var(--hair) solid var(--line);border-radius:0}   /* its foot is the bottom bar's line */
   .panes{min-height:90px}
 }
@@ -5996,28 +5907,6 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 </head>
 <body class="booting">
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
-  <div class="box">
-    <h3 id="mTitle">New custom command</h3>
-    <div class="field">
-      <label for="mName">Title</label>
-      <input id="mName" maxlength="60" autocomplete="off" spellcheck="false"
-             placeholder="e.g. rebuild and test">
-    </div>
-    <div class="field">
-      <label for="mBody">Commands</label>
-      <textarea id="mBody" spellcheck="false" autocomplete="off"
-                placeholder="./gradlew clean&#10;./gradlew test"></textarea>
-      <div class="hint">One per line, typed into the terminal in order.</div>
-    </div>
-    <div class="foot">
-      <button id="mSave" class="primary">Save</button>
-      <button id="mCancel">Cancel</button>
-      <span class="sp"></span>
-      <button id="mDelete" class="danger" hidden>Delete</button>
-    </div>
-  </div>
-</div>
 <!-- Notebooks live here while no tab is showing them. One instance per
      project, cloned from the template below, which is what lets two
      projects' notebooks be open, and visible, at the same time. -->
@@ -7702,29 +7591,14 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="pane" id="pane0"><div class="loading" data-skel="page">loading…</div></div>
       <div class="pane hidden" id="pane1"></div>
     </div>
-    <!-- The lists live here rather than being moved here at a breakpoint:
-         the pinned commands, the operator's own, then Linux and git from the
-         server's tables (LINUX_MACROS / GIT_MACROS), the git ones ghosting
-         where the active shell is not in a repo. -->
-    <div class="mpanel" id="macpanel">
-      <div class="lab">pinned</div>
-      <div class="macros" id="commands"><div class="loading" data-skel="chips">loading…</div></div>
-      <div class="lab">your commands</div>
-      <div class="macros" id="custom"></div>
-      <div class="lab">linux</div>
-      <div class="macros" id="linux"><div class="loading" data-skel="chips">loading…</div></div>
-      <div class="lab">git</div>
-      <div class="macros" id="git"><div class="loading" data-skel="chips">loading…</div></div>
-    </div>
-    <!-- The band at a terminal's foot. On a phone it is the hot bar (the
-         operator, 12 Nov): the keys of the terminal in front in a line that
-         scrolls as the dock's line does, then Links and, on a shell's tab,
-         Commands, standing still at its end; at a desk the keys float over
-         the terminal (page-term.js) and the band is Commands alone. -->
+    <!-- The band at a terminal's foot, a phone's alone: its hot bar (the
+         operator, 12 Nov), the keys of the terminal in front in a line that
+         scrolls as the dock's line does, then Links standing still at its
+         end. At a desk the keys float over the terminal (page-term.js) and
+         there is no band. -->
     <div class="mobar" id="mobar">
       <span class="mhot hscroll" id="mHot" role="toolbar" aria-label="terminal keys" hidden></span>
       <button id="mLinks" class="ic" aria-expanded="false" aria-label="the links this terminal shows, to open or copy" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.7 9.3 9.3 6.7"/><path d="M7.5 4.9 9.2 3.2a2.6 2.6 0 0 1 3.6 3.6L11.1 8.5"/><path d="M8.5 11.1 6.8 12.8a2.6 2.6 0 0 1-3.6-3.6L4.9 7.5"/></svg></button>
-      <button id="mMacros" aria-label="commands to type into the shell">»<span class="mw"> Commands</span></button>
       <div class="xlinks mlinks" id="mLinksBox" hidden></div>
     </div>
   </div>
@@ -7778,7 +7652,6 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 <script src="page-lists.js"></script>
 <script src="page-gear.js"></script>
 <script src="page-doctor.js"></script>
-<script src="page-commands.js"></script>
 <script src="page-projsessions.js"></script>
 <script src="tab-findings.js"></script>
 <script src="tab-projects.js"></script>
@@ -7818,7 +7691,6 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 <script src="page-claude.js"></script>
 <script src="page-sessions.js"></script>
 <script src="page-bell.js"></script>
-<script src="page-macros.js"></script>
 <script src="page-layout.js"></script>
 <script src="page-poll.js"></script>
 <script src="page-setup.js"></script>
@@ -8093,7 +7965,6 @@ window.addEventListener("blur", () => {
 
 // Crossing the phone breakpoint (a rotation) draws again for the width.
 window.matchMedia("(max-width:900px)").addEventListener("change", () => render());
-$("mMacros").onclick   = () => mobPanel("macros");
 
 // ---- chat ------------------------------------------------------------
 //
@@ -8192,18 +8063,6 @@ $("bDoctor").onclick = async () => {
 };
 
 // ---- commands ---------------------------------------------------------
-// Every `aerie` command is listed, which is more than fits a panel, so the
-// list is cut off and the ones an operator actually uses are pinned above the
-// cut. Pins live on the server with the rest of the state: the phone and the
-// desktop are looking at one machine and should agree about it.
-// Its functions are page-commands.js.
-
-// ---- custom commands --------------------------------------------------
-// The operator's own lists, typed into the terminal like the bb ones. Kept in
-// their own card because they are theirs: the bb card is what the image can do
-// and changes with it, this one is what they added and does not.
-// Its functions are page-commands.js.
-
 // ---- icons: the row's gear, and its folded controls ---------------------
 // Its declarations are page-icons.js; nothing of it runs at load.
 
@@ -8404,9 +8263,6 @@ $("rnmodal").onclick = e => { if (e.target === $("rnmodal")) $("rnCancel").click
 // ---- creating a project -------------------------------------------------
 $("pCreate").onclick = createProject;
 
-// ---- saved and pinned commands ------------------------------------------
-// Its declarations are page-commands.js; nothing of it runs at load.
-
 // ---- icons: lock, link, spark, terminal and book ------------------------
 // Its declarations are page-icons.js; nothing of it runs at load.
 
@@ -8462,9 +8318,6 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && bellOpen) toggleBell(false);
 });
-
-// ---- macros -------------------------------------------------------------
-// Its declarations are page-macros.js; nothing of it runs at load.
 
 // ---- one draw of the page -----------------------------------------------
 // Its declarations are page-layout.js; nothing of it runs at load.
@@ -8661,20 +8514,6 @@ document.addEventListener("click", e => {
   }
 });
 
-$("mCancel").onclick = closeEditor;
-$("mSave").onclick = async () => {
-  if (await postCustom({action:"save", id: editing,
-                        title: $("mName").value, body: $("mBody").value}))
-    closeEditor();
-};
-$("mDelete").onclick = async () => {
-  if (!editing || !await askYes(`Delete "${$("mName").value}"?`, {danger: true})) return;
-  if (await postCustom({action:"delete", id: editing})) closeEditor();
-};
-// The backdrop and Escape both mean "never mind"; Enter in the title field
-// means "save", because a one-line field with a Save button below it does.
-$("modal").onclick = e => { if (e.target.id === "modal") closeEditor(); };
-$("mName").onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); $("mSave").click(); } };
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   // A dialog's Escape is modalKeys' (page-motion.js), which stops the event

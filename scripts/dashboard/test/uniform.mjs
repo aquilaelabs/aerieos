@@ -306,7 +306,7 @@ async function measure(kind){
       who[x] = who[x] || `${e.tagName.toLowerCase()}.${[...e.classList].join('.')}${
         e.id ? '#' + e.id : ''} in ${e.parentElement?.className || e.parentElement?.tagName}`;
     }
-    const ref = document.getElementById('mName');
+    const ref = document.getElementById('pName');
     const skin = el => { const c = getComputedStyle(el);
       return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor,
               c.fontFamily].join('|'); };
@@ -2364,7 +2364,7 @@ const DIALOGS = {
   about: () => openAbout(), newproject: () => openNewProject(), trash: () => openTrash(), out: () => askSignOut(),
   pending: () => openPending('alpha'), report: () => openReport('alpha'),
   phonelend: () => openPhoneLend('alpha'),
-  newcontainer: () => openNewContainer(), custom: () => editCustom(),
+  newcontainer: () => openNewContainer(),
   // A new project's first session: opened for a project with no brief, which
   // draws the same dialog with an empty text box.
   firstsession: () => openBrief('alpha', ''),

@@ -289,7 +289,7 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
     return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
   const pair = await page.evaluate(`(() => { const skin = ${skin};
     return [skin(document.querySelector('.fxtab .fxFind')),
-            skin(document.getElementById('mName'))]; })()`);
+            skin(document.getElementById('pName'))]; })()`);
   ok(pair[0] === pair[1],
      'the Analysis tab\'s filter field wears the same skin as every other field');
 }

@@ -181,12 +181,13 @@ ok(/devactions\.py:\d+  passed by name in configure  \| .*runner\.register\("com
 }
 
 // An arrow with an expression body is a function too (B224): `const
-// drawLinux = () => drawShellCard(...)` was in no answer at all, so a
-// refactor read it as nothing. Found, and seen passed by name.
-ok(/^scripts\/dashboard\/page-commands\.js:\d+  arrow$/m.test(map('find', 'drawLinux')),
+// isPhone = () => window.matchMedia(...)` was in no answer at all, so a
+// refactor read it as nothing. Found; and a function handed over by its
+// name is seen passed by name.
+ok(/^scripts\/dashboard\/page-tabs\.js:\d+  arrow$/m.test(map('find', 'isPhone')),
    'an expression-bodied arrow is a definition');
-ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("linux", drawLinux\)/.test(map('who-calls', 'drawLinux')),
-   '...and who-calls sees it handed to the card draw');
+ok(/page-poll\.js:\d+  passed by name in refresh  \| .*drawCard\("doctor", drawDoctor\)/.test(map('who-calls', 'drawDoctor')),
+   '...and who-calls sees a function handed to the card draw');
 
 // The page's mutable state (B223): every page-level `let`, where it is
 // assigned and from what. A binding fed from `state` is a copy of the poll

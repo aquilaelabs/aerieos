@@ -112,35 +112,16 @@ ok((await btn('shell-9').textContent()).trim() === 'Open', 'Minimize takes the t
 await row('shell-9').locator('[data-go]').click();
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'shell-9'));
 
-
-// ---- the git list ghosts against the shell's directory ----------------------
-// shell-9 lives in /tmp; alpha and ep.silon are repositories, and the dotted
-// name proves the cwd-to-project mapping survives tmux's rename. No gh: a
-// node carries none (the operator, 17 Oct), so the list is git's alone.
+// Two shells in repositories, for the sections below: alpha's, and one whose
+// dotted name tmux rewrites.
 tmuxNew('shell-alpha', `${DIR}/ws/alpha`);
 tmuxNew('shell-ep_silon', `${DIR}/ws/ep.silon`);
 await page.evaluate(() => refresh());
 await page.waitForFunction(() => state.sessions.some(s => s.name === 'shell-ep_silon'));
-const gitBtn = () => page.$eval('#git [data-m="git-status"]', b => ({ dis: b.disabled }));
-await row('shell-9').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-9');
-ok(!(await page.$eval('#linux [data-m]', b => b.disabled)), 'linux commands live on any shell');
-ok((await gitBtn()).dis, 'outside a repo the git commands ghost');
-ok(!(await page.$('#git [data-m^="gh-"]')), '...and there are no gh commands to ghost');
-await row('shell-alpha').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-alpha');
-ok(!(await gitBtn()).dis, 'in a repository the git commands are live');
-await row('shell-ep_silon').locator('[data-go]').click();
-await page.waitForFunction(() => sessionOf(tabOf(panes[active])?.arg || '') === 'shell-ep_silon');
-ok(!(await gitBtn()).dis, '...a dotted space name included');
-// Tidy the strip for the sections below: these two tabs were this block's.
-await page.evaluate(() => { for (const s of ['shell-alpha', 'shell-ep_silon']){
-  const t = tabs.find(x => sessionOf(x.arg) === s); if (t) hideTab(t.id); } });
 
 await row('claude-alpha').locator('[data-go]').click();
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'claude-alpha'));
 ok((await btn('claude-alpha').textContent()).trim() === 'End', 'a Claude session with its tab open has End, and no Minimize');
-ok(await page.$eval('#linux [data-m]', b => b.disabled), 'macros grayed on a Claude tab');
 const nd = page.dialogs.length;
 await btn('claude-alpha').click();
 await page.waitForFunction(() => !document.querySelector('[data-go="claude-alpha"]'), { timeout: 15000 });
@@ -193,7 +174,6 @@ await page.evaluate(() => openNotebook('alpha', 'analysis'));
 await page.waitForSelector('.pane .nb [data-view="analysis"]:not([hidden]) .rule',
                            { timeout: 20000 });
 ok(true, 'a notebook opens on its Analysis view when asked by name');
-ok(await page.$eval('#linux [data-m]', b => b.disabled), 'macros grayed on a notebook tab');
 ok(await page.$$eval('.pane .nb .rule .rid .pill', ps => ps.length > 0),
    '...with the findings for that space alone, worst level first');
 
@@ -291,11 +271,9 @@ await page.evaluate(() => railGo('sessions'));
 await page.evaluate(() => { if (!tabs.some(t => sessionOf(t.arg) === 'shell-9'))
   openTab({kind:"term", arg: argForSession('shell-9'), label:'shell-9'}); });
 await page.evaluate(() => focusTab(tabs.find(t => sessionOf(t.arg) === 'shell-9').id));
-ok(await page.$eval('#linux [data-m]', b => !b.disabled), 'macros live on a shell tab');
-// no tabs at all → grayed too
+// Every tab put away, then shell-9 alone, for what follows.
 await page.evaluate(() => { const keep = tabs.slice(); keep.forEach(t => dropTab(t.id)); });
-ok(await page.$eval('#linux [data-m]', b => b.disabled),
-   'macros grayed with no tab open');
+ok(await page.evaluate(() => !tabs.some(t => t.kind === 'term')), 'every terminal can be put away');
 await page.evaluate(() => openTab({kind:"term", arg: argForSession('shell-9'), label:'shell-9'}));
 await page.waitForFunction(() => tabs.some(t => sessionOf(t.arg) === 'shell-9'));
 
@@ -411,9 +389,8 @@ const mob = await phone.waitForFunction(() => {
 ok(mob.display === 'flex' && !mob.bKeys,
    `the phone bar carries the keys, and the strip has no ⌨ anywhere to hide (${JSON.stringify(mob)})`);
 // On a phone the band at the terminal's foot is the hot bar (the operator,
-// 12 Nov): the keys of the terminal in front in a line that scrolls, Keys
-// and Commands two small presses at its end, and nothing floating over
-// the terminal.
+// 12 Nov): the keys of the terminal in front in a line that scrolls, Links
+// standing still at its end, and nothing floating over the terminal.
 {
   const band = await phone.evaluate(() => { const h = document.getElementById('mHot'), bar = document.getElementById('mobar');
     const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
@@ -427,13 +404,13 @@ ok(mob.display === 'flex' && !mob.bKeys,
              faded: getComputedStyle(h).maskImage !== 'none' || getComputedStyle(h).webkitMaskImage !== 'none',
              after: ends.every(b => b.getBoundingClientRect().left >= h.getBoundingClientRect().right - 1),
              overlay: [...document.querySelectorAll('.slot.ownterm .xhot')].filter(x => getComputedStyle(x).display !== 'none').length }; });
-  ok(band.shown && band.keys.startsWith('Esc Tab ↑ ↓ ^C ^D PgUp PgDn ') && / \^Z /.test(band.keys) && / \| /.test(band.keys) && band.ends.join() === 'mLinks,mMacros' && band.chain
+  ok(band.shown && band.keys.startsWith('Esc Tab ↑ ↓ ^C ^D PgUp PgDn ') && / \^Z /.test(band.keys) && / \| /.test(band.keys) && band.ends.join() === 'mLinks' && band.chain
      && band.words.every(d => d === 'none') && band.labels.every(Boolean)
      && band.tall && band.inBar && band.overlay === 0 && (!band.scrolls || (band.arrow && band.faded)) && band.after,
-     `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture and Commands still at the arrow's right, and nothing floats over the terminal (${JSON.stringify(band)})`);
+     `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture still at the arrow's right, with no Commands press beside it, and nothing floats over the terminal (${JSON.stringify(band)})`);
 }
-ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
-   `...Links and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);
+ok((mob.widths || []).length === 1 && mob.whole && !(await phone.$('#mMacros')) && !(await phone.$('#macpanel')),
+   `...Links is the one press at its end, not cut, and there is no Commands panel (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
 // About control carries the word instead, and exactly one of the two, never
 // both: showing the label on a desktop as well stacked it under the version
@@ -444,46 +421,8 @@ ok(await phone.$eval('#bAbout .alab', el => getComputedStyle(el).display !== 'no
 ok(await page.$eval('#bAbout .alab', el => getComputedStyle(el).display === 'none')
    && await page.$eval('#bAbout #build', el => getComputedStyle(el).display !== 'none'),
    '...and a wide one shows the version, with no second label under it');
-// Measure the terminal before, mid-slide and after: it must hold still
-// through the slide (the panel is an overlay then) and shrink once at the end.
-//
-// Both heights are read in ONE evaluate, either side of a synchronous click,
-// and that is the whole point rather than a shortcut. The button's handler is
-// mobPanel -> render -> drawKeys -> slidePanel with nothing awaited, so when
-// .click() returns the panel is already absolute and its animation started.
-// No frame, no poll and no other animation can land between the two reads.
-// Sampling the baseline in an earlier round trip is what CI kept failing on,
-// four runs running, while an idle box passed: the panel assertion above it
-// passed in the same breath, so the panel was still absolute and cannot have
-// been what moved the terminal; the baseline was simply stale. The mover was
-// the phone's view switch, a 220ms slide that held overflow-x on <main> for
-// its duration (the switch went with R218 step 3). One task keeps anything from
-// landing BETWEEN the two reads and does nothing about a baseline taken while
-// that slide is still running; what had been holding THAT off was the round
-// trips of the assertion above, which is not a thing to depend on and stopped
-// being true the moment that assertion needed one fewer of them. So wait for
-// the page to stop moving, which is what the baseline actually wants.
-await phone.waitForFunction(
-  () => !document.getAnimations().some(a => a.playState === 'running'),
-  { timeout: 10000 });
-const mid = await phone.evaluate(() => {
-  const panes = document.getElementById('panes');
-  const before = panes.offsetHeight;
-  document.getElementById('mMacros').click();
-  const el = document.getElementById('macpanel');
-  return { before, after: panes.offsetHeight,
-    show: el.classList.contains('show'), anim: el.getAnimations().length > 0,
-    overlay: el.classList.contains('sliding') && getComputedStyle(el).position === 'absolute' };
-});
-ok(mid.show && mid.anim && mid.overlay, 'Commands opens its panel with a slide, as an overlay');
-ok(mid.after === mid.before,
-   `the terminal holds still while the panel slides (${mid.after} vs ${mid.before}px)`);
-const paneH0 = mid.before;
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-ok(await phone.$eval('#panes', el => el.offsetHeight) < paneH0, 'then the terminal snaps to make room');
-ok(await phone.$eval('#linux', el => el.parentElement.id === 'macpanel' && el.querySelectorAll('[data-m]').length > 0), 'the command lists live in the panel');
-// Commands wants a shell under it now, and the tab that was open got ended
-// above, so put one there, or this measures the guard instead of the swap.
+// Links wants a terminal under it, and the tab that was open got ended
+// above, so put a shell there.
 await phone.evaluate(() => {
   const shell = t => t.kind === 'term' && !t.arg.startsWith('claude:');
   if (!tabs.some(shell)) newShell();
@@ -499,9 +438,6 @@ const lk = await phone.evaluate(() => { const b = document.getElementById('mLink
 ok(lk.shown && /^Links on this terminal/.test(lk.text) && lk.over && lk.inside && lk.said === 'true', `phone: Links lists what the terminal shows over the band, or that it shows none (${JSON.stringify(lk)})`);
 await phone.click('#mLinks');
 ok(await phone.$eval('#mLinksBox', b => b.hidden), '...and the next press puts the list away');
-// Commands closes as it opened; the close is a slide: the class drops when the tween lands.
-if (await phone.$eval('#macpanel', el => el.classList.contains('show'))) await phone.click('#mMacros');
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('show'));
 // Claude on a project with a transcript opens the Resume/New chooser, which
 // must be visible on a phone (it once shared the hidden pin menu's class).
 // A Claude session runs on a NODE (R47), so the chooser is what the press
@@ -702,47 +638,11 @@ ok(await phone.evaluate(() => !document.getElementById('tabbar'))
    && await phone.$eval('#pane1 .dockline', el => getComputedStyle(el).display !== 'none'),
    "on a phone the terminals are the dock's line, as at a desk (R218 step 4)");
 
-// Commands, the phone's one flyout, needs a shell under it, so make sure
-// the pane is showing one.
-await phone.evaluate(() => {
-  const shell = t => t.kind === 'term' && !t.arg.startsWith('claude:');
-  if (!tabs.some(shell)) newShell();
-  dockPlace(tabs.find(shell));
-  render();
-});
-await phone.waitForFunction(() => document.querySelector('.col.term').getAnimations().length === 0);
-await phone.evaluate(() => { if (!showMacros) mobPanel('macros'); });
-await phone.waitForFunction(() => document.getElementById('macpanel').classList.contains('show') && !document.getElementById('macpanel').classList.contains('sliding'));
-ok(await phone.$eval('#macpanel', el => el.classList.contains('show')) && !(await phone.$('#keys')),
-   'Commands is the one flyout over a shell on a phone: its keys are on the hot bar, with no panel of their own');
-// A second tap mid-slide reverses from where the panel is, not from full height.
-const hFull = await phone.$eval('#macpanel', el => el.offsetHeight);   // landed, in the flow
-// The whole gesture inside one evaluate, and the wait measured against the
-// animation's OWN clock rather than a sleep. Three round trips around a 200ms
-// tween is a race: on a loaded box the close lands before the second tap, so
-// there is no mid-slide left to reverse from and the test fails for a reason
-// that is about the box. Waiting on currentTime is exactly the condition the
-// assertion cares about: that the panel really is part-way down.
-const from = await phone.evaluate(async () => {
-  const el = document.getElementById("macpanel");
-  document.getElementById("mMacros").click();          // closing (slides)
-  const a = el.getAnimations()[0];
-  if (a) await new Promise(res => {
-    const tick = () => (a.playState !== "running" || a.currentTime >= 90)
-      ? res() : requestAnimationFrame(tick);
-    tick();
-  });
-  document.getElementById("mMacros").click();          // reopen mid-slide
-  return parseFloat(el.getAnimations()[0]?.effect.getKeyframes()[0].height);
-});
-ok(from > 0 && from < hFull, `re-tap mid-slide resumes from the current height (${from} of ${hFull}px)`);
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-
 // Picking a session on the phone's Sessions page opens its terminal in the
 // dock, up over the page (R250 step 1). (The desktop half ended both
 // fixture sessions above, so make one to pick.)
 tmuxNew('shell-7');
-await phone.evaluate(() => { if (showMacros) mobPanel('macros'); railGo('sessions'); refresh(); });
+await phone.evaluate(() => { railGo('sessions'); refresh(); });
 await phone.waitForFunction(() => document.querySelector('.sesstbl [data-go="shell-7"]'), { timeout: 15000 });
 await phone.click('.sesstbl [data-go="shell-7"]');
 await phone.waitForFunction(() => sessionOf(tabOf(panes[1])?.arg || '') === 'shell-7' && dockUp, { timeout: 10000 }).catch(() => {});
@@ -754,7 +654,6 @@ ok(await phone.evaluate(() => sessionOf(tabOf(panes[1])?.arg || '') === 'shell-7
 await phone.evaluate(() => openNotebook('alpha'));
 await phone.waitForFunction(() => tabOf(panes[active])?.kind === 'notebook');
 ok(await phone.$eval('#mLinks', b => b.hidden && getComputedStyle(b).display === 'none') && await phone.$eval('#mHot', b => b.hidden), 'the keys and Links leave the bar over a document tab');
-ok(await phone.$eval('#mMacros', b => b.hidden), '...and so does Commands');
 ok(await phone.$$eval('#mobar > button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
    '...and what is left is not cut short');
 // A Claude tab is a terminal, but not one to type keys or macros into: they
@@ -764,10 +663,9 @@ await phone.evaluate(() => {
   if (t) { dockPlace(t); render(); }
 });
 ok(await phone.evaluate(() => !tabs.some(t => t.arg.startsWith('claude:')))
-   || (await phone.$eval('#mMacros', b => b.hidden)
-       && await phone.$eval('#mLinks', b => !b.hidden)
+   || (await phone.$eval('#mLinks', b => !b.hidden)
        && /^Esc ⇧Tab ↑ ↓ ⏎ \^C PgUp PgDn$/.test(await phone.$eval('#mHot', h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()).join(' ')))),
-   '...and over a Claude tab Commands leaves it, the line has a coding agent\'s keys, and Links stays');
+   '...and over a Claude tab the line has a coding agent\'s keys, and Links stays');
 
 // With many open, the dock's line holds them all, scrolling along, and the
 // one in front is marked; a − on one takes it off the line.
@@ -788,20 +686,6 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state
 ok(true, 'a phone reload comes back with a page and the dock\'s terminals');
 ok(phone.errors.length === 0, `phone: zero console errors${phone.errors.length ? ': ' + phone.errors.join(' | ') : ''}`);
 await closePage(phone);
-
-// A phone held sideways: a flyout must not push the bottom bar off the
-// screen; it gives way, and the terminal keeps a strip.
-const land = await newPage(browser, { viewport: { width: 844, height: 390 } });
-await land.goto(URL);
-await land.waitForFunction(() => state !== null, { timeout: 30000 });
-// A terminal in front first: Commands opens only over a shell, and since
-// R131 a fresh browser starts on the front tab as of the strip's last
-// change, which may be a document (B494).
-await land.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) focusTab(t.id); mobPanel('macros'); });
-await land.waitForFunction(() => document.getElementById('macpanel').classList.contains('show') && !document.getElementById('macpanel').classList.contains('sliding'));
-const fit = await land.evaluate(() => ({ bar: document.getElementById('mobar').getBoundingClientRect().bottom, panes: document.getElementById('panes').offsetHeight }));
-ok(fit.bar <= 390 && fit.panes >= 90, `landscape: the bar stays on screen with a flyout open (bar bottom ${Math.round(fit.bar)}px, terminal ${fit.panes}px)`);
-await closePage(land);
 
 // ---- a tab that outlived its container ---------------------------------
 // A browser left open across a restart still holds its Claude tabs, and a

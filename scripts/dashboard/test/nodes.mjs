@@ -1829,7 +1829,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   // (--f-field). Measured with the page on show: on a phone it once sat in a
   // hidden view, every control measured nothing, and this passed vacuously.
   const skin = await page.evaluate(sel => {
-    const ref = document.getElementById('mName');
+    const ref = document.getElementById('pName');
     const key = el => { const c = getComputedStyle(el);
       return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
     return [...document.querySelectorAll(sel + ' .ndconf input:not([type=checkbox]), ' + sel + ' .ndconf select')]
