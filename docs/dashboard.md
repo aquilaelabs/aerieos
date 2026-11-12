@@ -338,6 +338,18 @@ wheel would in an agent's tab. A press held on a word selects it, with a
 grip at each end to widen it and **Copy** beside it; a tap still brings up
 the keyboard.
 
+**The hot bar** sits over a terminal's top right corner: the keys a
+terminal is most reached for, a press each. On a coding agent's tab they
+are Esc, Shift+Tab, the up and down arrows, Enter and Ctrl+C; on a shell's,
+Esc, Tab, the arrows, Ctrl+C and Ctrl+D; every terminal has PgUp and PgDn.
+**Links** lists the links the terminal shows, on its screen and in the
+lines before it, each to open in a new tab or copy: a link that runs over
+several rows is read whole, which is how a sign-in link a program prints is
+opened on a phone. The **›** at its end folds the bar to that one handle
+and **‹** brings it back; the choice is this browser's, and on a phone it
+starts folded. A log's tab, and a session you may only read, have the page
+keys and Links alone.
+
 The launcher sets this on the session as it starts one, not only in the config
 file, because `~/.tmux.conf` lives on the persistent home and is yours.
 Because the setting is applied per session, a `set -g mouse on` in your own
