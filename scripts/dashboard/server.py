@@ -2461,6 +2461,10 @@ def session_target(project, claude=False, node="", uid=""):
     carry what to do about it. A SHELL still falls back here, which is what
     keeps the tree, the linters and git reachable while a node is away.
     """
+    # The space by the name it is shown under, in every sentence a person
+    # reads: after a move landed without its repositories a card named its
+    # space by its folder's name here and by its own everywhere else (B778).
+    said = roles.shown(project)
     with timing.timed("session_target:prefs"):
         pf = prefs.get(project) if project else None
     nid = (pf or {}).get("node") or ""
@@ -2493,17 +2497,17 @@ def session_target(project, claude=False, node="", uid=""):
         # Made hosting-only after the project named it: no session goes
         # there, whatever the settings still say.
         why = (f"{name} hosts containers only, so no session runs there: pick another node in "
-               f"{project}'s settings")
+               f"{said}'s settings")
     elif n.get("state") == "retired":
         # Un-enrolled (the operator, 5 Oct): the fact first, then what to do
         # about it, both on the row.
-        why = (f"{name} was removed from the Nodes page. Pick another node in {project}'s settings, "
+        why = (f"{name} was removed from the Nodes page. Pick another node in {said}'s settings, "
                "or enroll it again")
         passing = True          # its own sentence says the way on
     elif n.get("state") == "disabled":
-        why = f"{name} is disabled on the Nodes page: Enable it there, or pick another node in {project}'s settings"
+        why = f"{name} is disabled on the Nodes page: Enable it there, or pick another node in {said}'s settings"
     elif n.get("state") != "online":
-        why = f"{project}'s sessions run on {name}, which is {n.get('state') or 'not online'}"
+        why = f"{said}'s sessions run on {name}, which is {n.get('state') or 'not online'}"
     elif n.get("live") is False and _reconnecting(n):
         # The controller has just started and this node was here a moment
         # before: its agent dials in again on its own schedule (two minutes,
@@ -2518,22 +2522,22 @@ def session_target(project, claude=False, node="", uid=""):
         seen = int((n.get("agent") or {}).get("last_seen") or 0)
         ago = int(time.time() - seen) if seen else 0
         when = (f"{ago // 60} minutes ago" if ago >= 120 else f"{ago} seconds ago") if seen else "never"
-        why = (f"{project}'s sessions run on {name}, whose agent is not answering, last heard "
+        why = (f"{said}'s sessions run on {name}, whose agent is not answering, last heard "
                f"from {when}. If it is restarting, its sessions are back when it dials in")
         passing = True
     elif not isinstance(se, dict):
-        why = (f"{project}'s sessions run on {name}, which has not reported a "
+        why = (f"{said}'s sessions run on {name}, which has not reported a "
                "session half yet; give it a moment, or provision it with "
                "--session-user")
     elif not se.get("up"):
-        why = (f"{project}'s sessions run on {name}, which runs none yet"
+        why = (f"{said}'s sessions run on {name}, which runs none yet"
                + (f": {se['why']}" if se.get("why") else
                   "; provision it with --session-user"))
         _ask_hello(nid)
     elif (n.get("config") or {}).get("leaving") or ((n.get("config") or {}).get("workspace") or "sync") != "sync":
         # Off its synced copy, or on the way off it (R164): nothing to open a
         # session on, and its row on the Nodes tab is the way back.
-        why = (f"{project}'s sessions run on {name}, which "
+        why = (f"{said}'s sessions run on {name}, which "
                + ("is leaving its synced copy: what is left there is going up to the controller"
                   if (n.get("config") or {}).get("leaving") else "holds no spaces now")
                + ". Its row on the Nodes page moves it to a synced copy again,"
@@ -2565,7 +2569,7 @@ def session_target(project, claude=False, node="", uid=""):
         # Without the node's boot the page would stamp this container's into
         # the tab, and bb-tty there would refuse every reconnect as a stale
         # tab (bug #56): a loop, not a session. Dead button, plain reason.
-        why = (f"{project}'s sessions run on {name}, whose agent could not read that machine's "
+        why = (f"{said}'s sessions run on {name}, whose agent could not read that machine's "
                "boot, which a session's terminal there is checked against")
     else:
         return {"where": "node", "id": nid, "name": name, "host": nodes.route_host(nid),
