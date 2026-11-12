@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-dev.5269: 2026-11-12
 
 ### Added
 
