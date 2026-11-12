@@ -214,13 +214,15 @@ the compose to the rules above and **Add** offers it in New container. Make
 a container of it and open it.
 
 **A coding agent.** Add its pack the same way: **Look** reads the `agent`
-block and names anything in it that is not said right, and installing the
-pack on a node proves that its program arrives and that `install.verify`
-passes. A sideloaded pack's agent is not offered to sessions: an agent's
-adapter decides what runs in every session of it, so an agent is started
-only from an entry the signed index pins. The maintainers start it, sign in
-to it and walk its guards on a test install as part of vetting, and say in
-the pull request what they saw.
+block and names anything in it that is not said right. A pack you added
+yourself does not offer its agent by itself, since an agent's adapter
+decides what runs in every session of it and nobody has vetted yours: turn
+on **Offer coding agents from packs added here** in Controller settings,
+under Vetted catalog. The agent is then listed with the coding agents on
+this install, as Sideloaded: install it on a node, sign in to it from its
+page, start a session, and walk what the maintainers will walk (the
+briefing in its conversation, a refused command refused, a turn's working
+and waiting on the dock). Turn the setting off again when you are done.
 
 ## Run the catalog's check
 
@@ -249,6 +251,7 @@ AerieOS's own validators as every supported release carries them.
    | `sha256` | Of the archive at that commit: `git archive --format=tar COMMIT \| sha256sum`, or `git archive --format=tar COMMIT PATH \| sha256sum` with a `path`. |
    | `tier` | `vetted`. A maintainer sets `verified` for a vendor `verified-vendors.json` lists. |
    | `format` | The manifest's `format`, when it is more than 1. |
+   | `works_with` | The manifest's `works_with`, when it names any: an install on another release line does not list the entry. |
    | `kind` | `"app"` for a Docker app; left out for a pack. |
    | `agent`, `label` | `true` and the agent's name, for a pack that brings a coding agent. |
    | `withdrawn` | `false`. |
@@ -315,6 +318,10 @@ from whom it says. It is not a promise about the tool itself.
 - **What is there is never rewritten.** The framework only grows: a
   manifest valid today is valid on every later AerieOS, so no change to
   AerieOS or to the catalog will ask you to rewrite an entry.
+- **Say which AerieOS it works with only when you must.** A manifest with
+  no `works_with` works with every release line. One that names lines is
+  shown only on those, and on an install that upgrades past them a kept
+  copy is switched off until you pin a version that names the new line.
 - **A pack found wanting is withdrawn** (`withdrawn: true` in the next
   signed index): it is no longer offered, and every install that holds it
   says so on its bell.

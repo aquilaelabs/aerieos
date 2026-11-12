@@ -89,6 +89,12 @@ KEYS = {
     "tunnel_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
     # The vetted catalog's address (R169 step 2): where index.json and index.sig are read from.
     "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
+    # Whether a pack a person added themselves (sideloaded) may offer the
+    # coding agent it brings (the operator, 12 Nov): off, since an agent's
+    # adapter decides what runs in every session of it and nobody vetted
+    # this one; on for somebody trying an agent of their own before they
+    # submit it to the catalog.
+    "sideload_agents": {"default": False, "kind": "bool", "applied": "now"},
     "tunnel_token": {"default": "", "kind": "secret", "applied": "now"},
     "cf_api_token": {"default": "", "kind": "secret", "applied": "now"},
     # The dashboard's own connection (R158 step 2, tls.py): http, self (the

@@ -1352,9 +1352,25 @@ def unfit():
         m = (r or {}).get("manifest") or {}
         if line and not fits(m):
             out.append({"kind": "pack", "name": n, "key": f"pack:unfit:{n}:{line}",
-                        "said": f"the pack {n} says it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}: "
-                                "update it from the Library, or remove it"})
+                        "said": f"the pack {n} is switched off: it says it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}. "
+                                "It comes back by itself once a version that names this one is kept (its card on the Library offers it when there is one), or remove it"})
     return out
+
+
+def disabled(rec):
+    """Why a pack this install holds is switched off, or "": its manifest
+    does not name the running release line (the operator, 12 Nov: a pack
+    that does not fit this AerieOS is disabled until one that does is
+    kept, as it would not have been offered at all). Switched off is not
+    removed: it stays where it is installed, and is in no session's PATH,
+    view or verbs, and offers no agent, until an update that fits."""
+    m = (rec or {}).get("manifest") or {}
+    return "" if fits(m) else _unfit_said(m)
+
+
+def _unfit_said(m):
+    line = line_of(running_version())
+    return f"switched off: it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}"
 
 
 def _unfit_why(m):
@@ -1534,7 +1550,11 @@ def recipe(rec):
                     # says, and a page that called it made here (every pack
                     # of the catalog, each a folder of it) was wrong.
                     "here": bool(rec.get("hosted")) and str(rec.get("url") or "").startswith(HERE),
-                    "agent": bool(offers_agent(rec)),
+                    # It brings a coding agent: its card is filed with the
+                    # agents, switched off or not.
+                    "agent": brings_agent(rec),
+                    # Switched off for not fitting this AerieOS, and why.
+                    "disabled": disabled(rec),
                     # Whether it carries an icon of its own (R182).
                     "icon": bool(rec.get("icon"))}}
     # A coding agent it offers, for bb-tty and bb-agent-hook on the node,
@@ -1548,12 +1568,28 @@ def recipe(rec):
     return row
 
 
+# Whether a sideloaded pack may offer its agent here: the install's own
+# setting (Controller settings, Vetted catalog), which the server sets this
+# to; never, for a reader with no settings.
+sideload_agents = lambda: False    # noqa: E731
+
+
+def brings_agent(rec):
+    """Whether a pack's coding agent is one this install lists with its
+    agents: one the vetted catalog pinned or an official one, since the
+    adapter decides what runs in every session of it; or a sideloaded one
+    where the install's own setting offers those (somebody trying an agent
+    of theirs before submitting it)."""
+    m = (rec or {}).get("manifest") or {}
+    return bool(m.get("pack_agent")) and (rec.get("tier") in packformat.TIERS or bool(sideload_agents()))
+
+
 def offers_agent(rec):
     """The coding agent an installed pack offers (R169 step 9), its adapter,
-    or None: only one the vetted catalog pinned, or an official one, since
-    the adapter decides what runs in every session of it."""
+    or None: one this install lists (brings_agent), and never one switched
+    off for not fitting this AerieOS (disabled)."""
     m = (rec or {}).get("manifest") or {}
-    return m.get("pack_agent") if m.get("pack_agent") and rec.get("tier") in packformat.TIERS else None
+    return m.get("pack_agent") if brings_agent(rec) and fits(m) else None
 
 
 _offered = {"stamp": None, "rows": ()}
@@ -1565,7 +1601,8 @@ def offered_agents():
     every session name is asked of it."""
     try:
         st = FILE.stat() if FILE else None
-        stamp = (str(FILE), st.st_mtime_ns, st.st_size) if st else None
+        # ...and again when the install's setting for sideloaded agents turns.
+        stamp = (str(FILE), st.st_mtime_ns, st.st_size, bool(sideload_agents())) if st else None
     except OSError:
         stamp = None
     if stamp is None or stamp != _offered["stamp"]:

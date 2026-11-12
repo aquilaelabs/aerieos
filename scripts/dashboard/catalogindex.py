@@ -146,6 +146,13 @@ def parse(index_bytes):
         fw = packformat.framework_of(p)
         if fw is not None and fw[1]:
             out[-1]["framework"] = packformat.said(fw)
+        # The AerieOS release lines its manifest says it works with, where
+        # the entry repeats them: an install on another line does not list
+        # the entry at all (the operator, 12 Nov), which it could only learn
+        # after fetching the pack before.
+        ww = p.get("works_with")
+        if isinstance(ww, list) and 0 < len(ww) <= 12 and all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
+            out[-1]["works_with"] = list(ww)
     # The first AerieOS that reads each format, where the index says, for a
     # card to name ({"3": "0.10.0"}).
     since = {str(k): str(v)[:40] for k, v in (d.get("formats") or {}).items()

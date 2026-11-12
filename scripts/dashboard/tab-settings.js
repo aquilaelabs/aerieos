@@ -647,7 +647,9 @@ const SETTING_GROUPS = [
   {key: "catalog", title: "Vetted catalog", intro: catalogIntro, status: catalogStatus,
    heading: s => `${/aquilaelabs\/(aerieos|builderbot)-catalog\//.test(s?.settings?.catalog_url?.value || "") ? "the public catalog" : "another catalog"}${s?.catalog_mirror ? ", a mirror held" : ""}`,
    fields: [{key: "catalog_url", label: "Address", type: "text", placeholder: "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/",
-     hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"}]},
+     hint: "where the Library reads the catalog's index.json and index.sig, checked against the maintainers' key this install ships"},
+    {key: "sideload_agents", label: "Offer coding agents from packs added here", type: "bool",
+     hint: "A pack you added yourself may bring a coding agent. Off, its program installs and its agent is not offered: an agent's adapter decides what runs in every session of it, and nobody vetted this one. On, for trying an agent of your own before you submit it to the catalog."}]},
   {key: "apps", title: "Apps", off: "apps", intro: appsIntro, status: appsStatus,
    heading: s => `${["apps_android", ...(s?.settings?.offer_unvetted?.value ? ["apps_vscode", "apps_companion"] : [])]
      .filter(k => s?.settings?.[k]?.value).length} offered`,

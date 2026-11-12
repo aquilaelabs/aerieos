@@ -12,6 +12,7 @@ BB_ACCOUNT_UID which seat this session sits in.
 import contextlib
 import json
 import os
+import re
 import sys
 
 import dash
@@ -118,11 +119,20 @@ def show():
     # shipped ones switched off here, and every tool pack not switched on.
     # bb-tty takes them out of a session's PATH and its view of the store.
     try:
-        packs = list((json.load(open(os.path.join(state, "toolpacks.json"))).get("packs") or {}))
+        held = json.load(open(os.path.join(state, "toolpacks.json"))).get("packs") or {}
     except (OSError, ValueError, AttributeError):
-        packs = []
+        held = {}
+    packs = list(held)
+    # ...and a pack that does not fit this AerieOS, which is switched off
+    # for every space until one that does is kept (toolpacks.disabled says
+    # the same of it: its works_with does not name this build's line).
+    m = re.match(r"^v?(\d+)\.(\d+)", os.environ.get("BB_VERSION", "").strip())
+    line = f"{m.group(1)}.{m.group(2)}" if m else ""
+    unfit = {n for n, r in held.items() if line and isinstance(r, dict)
+             and ((r.get("manifest") or {}).get("works_with") or []) and line not in r["manifest"]["works_with"]}
     on = set(rec.get("packs_on") or [])
-    rec["toolchains_off"] = sorted(set(rec.get("tc_off") or []) | {p for p in packs if p not in on})
+    rec["toolchains_off"] = sorted(set(rec.get("tc_off") or []) | {p for p in packs if p not in on} | unfit)
+    rec["packs_disabled"] = sorted(unfit)
     # Whether a push can happen at all (B734): the rights the controller
     # granted (push-rights.json, the clone dialog's or Link to a git host),
     # and what the remote authenticates with: an ssh address carries its

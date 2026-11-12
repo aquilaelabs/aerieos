@@ -213,6 +213,8 @@ function tpSeen(seen, was, offer = true){
     ${Object.keys(m.system || {}).length ? `<div class="sub">System packages it installs first: ${Object.entries(m.system).map(([k, v]) => `${esc(k)} <code>${esc(v.join(" "))}</code>`).join("; ")}; a node of another package manager is not offered it.</div>` : ""}
     ${(m.touches?.hosts || []).length ? `<div class="sub">Its install fetches from ${m.touches.hosts.map(h => `<code>${esc(h)}</code>`).join(", ")}.</div>` : ""}
     ${(m.works_with || []).length ? `<div class="sub">It works with AerieOS ${esc(m.works_with.join(", "))}.</div>` : ""}
+    ${m.pack_agent ? `<div class="sub">It brings a coding agent, ${esc(m.pack_agent.name || m.name)} (<code>${esc(m.pack_agent.command || "")}</code>), handed the briefing and held by AerieOS's guards through its own hooks.${
+      tpForm?.catalog ? "" : " A pack added here offers its agent only where Controller settings, under Vetted catalog, says to offer coding agents from packs added here: nobody vetted this one."}</div>` : ""}
     ${m.touches?.root ? `<div class="hint warn">It needs root on the node to install: only an administrator adds it.</div>` : ""}
     ${(m.terms || []).length ? `<div class="sub">Under ${m.terms.map(t => t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.label)}</a>` : esc(t.label)).join(", ")}.</div>` : ""}
     ${seen.guidance ? `<div class="sub">Comes with guidance a session reads as <code>aerie help tool-${esc(m.name)}</code>.</div>` : ""}

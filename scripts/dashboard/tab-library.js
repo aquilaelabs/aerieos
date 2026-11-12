@@ -194,6 +194,10 @@ function libState(r){
     return st === "absent" ? w("") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
   }
+  // A pack kept here that does not fit this AerieOS is switched off until
+  // one that does is kept (the operator, 12 Nov): said in the warning
+  // voice, since it was working before the update.
+  if (r.pack?.disabled) return w(esc(r.pack.disabled) + (r.repin ? ": Catalog update keeps one that fits" : r.tier === "sideloaded" ? ": Edit keeps a version that names this one" : ""), "warn");
   if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
@@ -230,7 +234,9 @@ function libActs(r, may){
   // The container toolkit installed but unknown to Docker is put right by
   // installing it again, which its line on the Installed page says.
   const again = r.machine?.state === "unconfigured";
-  const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
+  // One switched off for not fitting this AerieOS is not installed anywhere
+  // new: its way back is the catalog's newer pin, below.
+  const verb = r.pack?.disabled ? "" : r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
     : r.installed ? "" : a("install", "Install", "primary", libHold);
   // Edit on what a person added themselves, as on an app: a pack kept from
   // the catalog is not theirs to edit (the operator, 12 Nov: no Edit on
@@ -281,6 +287,7 @@ function libDetail(r){
     if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);
     if (r.wrong_platform) lines.push(`<span class="sub warn">${esc(r.wrong_platform)}</span>`);
+    if (r.pack?.disabled) lines.push(`<span class="sub warn">It is ${esc(r.pack.disabled)}. No session uses it, and it offers no agent, until a version that names this AerieOS is kept; where it is installed it stays.</span>`);
     if (r.too_new) lines.push(`<span class="sub">This one ${esc(r.too_new)}. Nothing is fetched or added until then.</span>`);
     if (r.pack && !r.pack.here || r.catalog){
       const seen = libSeen[key];
@@ -463,8 +470,12 @@ function renderLibraryInto(i){
     return;
   }
   // A card not for this node is not drawn (R170 step 9): counted in the head.
-  const all = (lib.rows || []).filter(r => !r.wrong_platform);
-  const notHere = (lib.rows || []).length - all.length;
+  // Nor is a catalog entry this AerieOS does not take (the operator, 12 Nov:
+  // not shown at all, where its card said what it needed): written in a
+  // format past this build's, or for other release lines than this one.
+  const notBuild = (lib.rows || []).filter(r => r.too_new).length;
+  const all = (lib.rows || []).filter(r => !r.wrong_platform && !r.too_new);
+  const notHere = (lib.rows || []).length - all.length - notBuild;
   // The last update installed takes the Updates chip with it, the last
   // thing removed the Installed chip: back to All.
   if (LIB_STANDS[libKind] && !all.some(LIB_STANDS[libKind])) libKind = "";
@@ -485,6 +496,7 @@ function renderLibraryInto(i){
     ["Store", lib.store?.root ? `${lib.store.root}${free ? ", " + free : ""}` : ""],
     ["Versions checked", lib.store?.checked ? ago(lib.store.checked) : ""],
     ["Not for this node", notHere ? String(notHere) : ""],
+    ["Not for this AerieOS", notBuild ? `${notBuild} in the catalog` : ""],
     ["Remove takes", clean.length ? clean.map(c => `<code>${esc(c.dir)}</code> (${esc(c.what)})`).join(", ") : "", {html: true}],
   ]});
   // What the Toolchains page said over its rows (step 5): a node that has

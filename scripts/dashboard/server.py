@@ -4044,6 +4044,12 @@ catalogindex.mirror_index = catalogmirror.index
 toolpacks.mirror_bundle = catalogmirror.bundle
 # This build's version, for a pack's works_with (R169 step 6).
 toolpacks.running_version = lambda: image_stamp().get("version") or ""
+# ...and for a catalog entry that says the lines it works with: one for
+# another line is not listed.
+library.fits = toolpacks.fits
+# A sideloaded pack's coding agent is offered where this install says so.
+# (Asked for the first time before the settings are loaded, further down.)
+toolpacks.sideload_agents = lambda: bool("settings" in globals() and settings.get("sideload_agents"))
 toolchains.packs_rows = toolpacks.recipes
 toolchains.refresh_packs()
 # The Android system images on each node's store, behind the Emulator tab:
@@ -9775,6 +9781,10 @@ class Handler(BaseHTTPRequestHandler):
         # rather than at the next daily look (R272 step 3).
         if any(k.startswith("apps_") for k in want):
             apps.check_now()
+        # Sideloaded agents offered or no longer: the nodes' bundle carries
+        # each offered agent's adapter, so it is made again now.
+        if "sideload_agents" in want:
+            toolchains.refresh_packs()
         if any(k in ("tls_mode", "tls_host", "tls_email") for k in want):
             # The connection as set now (R158 step 2): the install's own
             # certificate made for the hostname and the addresses the page

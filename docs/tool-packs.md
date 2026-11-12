@@ -122,7 +122,11 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 `pre`, `prompt` and `stop` are required: an agent that cannot take the
 guards is refused, as the shipped ones would be. The pack's name is its
 sessions' name (`kite-myproject`), so it is 2 to 16 lowercase letters and
-digits and never a shipped agent's. An agent is offered only from a pack the
+digits and never a shipped agent's. To try an agent of your own before
+submitting it, turn on **Offer coding agents from packs added here** in
+Controller settings, under Vetted catalog: a pack you added yourself then
+offers its agent as a catalog pack's is offered, on this install alone.
+With that off, as it starts, an agent is offered only from a pack the
 vetted catalog pinned (or an official one): a pack added by its address
 installs its program but never offers its agent, since the adapter decides
 what runs in every session of it.
@@ -407,6 +411,24 @@ on the Installed page. A pack is kept at the
 index's tier only at a commit and sha256 the signed index pins; anything
 else is a pack by address, Sideloaded.
 
+### What is not for this AerieOS
+
+The Library shows what this install can take, and nothing else. A catalog
+entry written in a pack format past the one this AerieOS reads, or one
+whose `works_with` names other release lines than this one, is not listed;
+the page's head counts them (**Not for this AerieOS**), so a person knows a
+newer AerieOS would show more. A newer pin of a pack already kept is
+offered only when it fits.
+
+A pack kept here whose `works_with` stops naming the running line after an
+upgrade is **switched off**: it stays where it is installed, and until a
+version that fits is kept it is in no session's `PATH`, view or `aerie
+tool` verbs, in whichever space it was ticked, and a coding agent it brings
+is not offered. Its card and its Installed row say so, the bell says it
+once, and when the catalog pins a commit that names this line its card
+offers **Catalog update**, which switches it back on. Nothing is removed,
+and nothing has to be set again.
+
 ### Without the network
 
 A controller that cannot reach the catalog installs from a mirror of it.
@@ -509,7 +531,7 @@ the scripts it runs:
 | `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |
 | `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
 | `verbs` | The commands a session calls as `aerie tool NAME VERB`. |
-| `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and one held that stops fitting after an upgrade is a line on the bell saying to update or remove it (R169 step 6). |
+| `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and a catalog entry that repeats the list is not shown on such an install at all. One held that stops fitting after an upgrade is switched off until a version that names the new line is kept ([What is not for this AerieOS](#what-is-not-for-this-aerieos)). |
 | `touches` | What it touches: `hosts`, up to 16 host names its install fetches from, and `root`, true when it needs root on the node to install. Look shows both before it is added, and a pack that needs root is added by an administrator alone (R169 step 4). |
 | `config` | What it asks for on each node (R172): a list of fields, each `{name, label, kind, help, required, env, scope}`, the kind one of `secret`, `text`, `choice` (with `choices`), `list` (with `fields`, rows of them), `switch` or `projects`. The Installed page draws them as Configure on the pack's row for the node picked; the answers are kept on the controller, a secret sealed and never shown again, and handed to the node, where a field with `env` reaches the pack's verbs as that environment variable (a switch as `1` or empty, a list as JSON). `scope` is `node` (the default: one answer for everybody on that node, set by whoever may Configure there) or `person`: each person's own, set under **Yours** on the same row by anyone who works on that node's spaces, a secret sealed under their own key, written into their home on the node and read by their sessions' verbs over the node's answer. |
 | `guidance` | A Markdown file in the repository telling a session, whichever coding agent runs it, when and how to use the pack. It reads it with `aerie help tool-NAME`. |

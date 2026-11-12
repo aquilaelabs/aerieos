@@ -115,6 +115,9 @@ function instState(r){
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
   }
   if (r.kind === "agent" && !r.installed) return w("not installed: the Library installs it", "warn");
+  // Kept here and not fitting this AerieOS: switched off until one that
+  // does is kept, which its Library card offers when the catalog has one.
+  if (r.pack?.disabled) return w(esc(r.pack.disabled) + ": the Library offers a version that fits when there is one", "warn");
   // The version that is out is the row's pill ("2.1.314 is out"), so the
   // state says only that, as the Library's card does.
   if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");

@@ -149,7 +149,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     # The open row's lines, as the Toolchains page draws them (step 2).
                     "tool": i.get("tool") or "", "system": i.get("system"), "needs": i.get("needs") or [], "needed_by": i.get("needed_by") or [],
                     "needs_missing": i.get("needs_missing") or [], "path": i.get("path") or "", "verified": i.get("verified"), "reopen": i.get("reopen") or 0,
-                    "pack": {k: pack.get(k) for k in ("url", "commit", "path", "by", "at", "tier", "verbs", "here")} if pack else None,
+                    "pack": {k: pack.get(k) for k in ("url", "commit", "path", "by", "at", "tier", "verbs", "here", "disabled")} if pack else None,
                     # What it asks for per node, and what it has been given here (R172).
                     "config": i.get("config") or [], "values": pack_values.get(i["name"]) if i.get("config") else None,
                     "mine": pack_mine.get(i["name"]),
@@ -229,12 +229,24 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     return out
 
 
+# Whether a manifest's works_with names this build's release line: the
+# server sets it to toolpacks.fits; a standalone reader takes every entry.
+fits = lambda manifest: True    # noqa: E731
+
+
 def _too_new(e, index):
     """Why this build does not take a catalog entry, or "": its format is
     past the one this build reads (R234), named with the first AerieOS that
-    reads it where the index says."""
+    reads it where the index says; or it says the AerieOS release lines it
+    works with and this build's is not one of them. Such an entry is not
+    listed on the Library at all (the operator, 12 Nov): the page counts
+    them in its head, so a person knows another AerieOS would show more."""
     fmt = packformat.of(e) or 1
-    return packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
+    why = packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
+    if why:
+        return why
+    ww = e.get("works_with") or []
+    return f"works with AerieOS {', '.join(ww)}, and this is another" if ww and not fits({"works_with": ww}) else ""
 
 
 def _past(e, index):
