@@ -21,6 +21,18 @@
 ### Fixed
 
 - Sign in on Claude Code's row opened a link cut off at its first line, so Claude's page said only that the sign-in did not complete: a newer Claude Code prints the link wrapped and as a terminal hyperlink. The whole link is read now, for every agent's sign-in (54f906a)
+- A kept pack that brings no aerie verbs says nothing of verbs in its dialog; it said 'Verbs: .' (92ae1e4)
+- Check for updates on the Library reads the vetted catalog again, so a newer pin of a kept pack is offered at once; it showed up to an hour late (70aa16c)
+- The message bar under a session's terminal, for an account with no shell, names the agent the session is; under a Gemini or a ChatGPT session it said Claude (d416735)
+- A thing's page that came back after a reload without what it was for opens the Installed page; it read 'Installed is not installed on NODE now'. A Library entry's page does the same with the Library (f68f872)
+- A release deleted on the git host leaves the bell; its row stayed as a release missing its files and was asked after again and again (b0a8553)
+- A card's line about where a space's sessions run names the space as it is shown everywhere else; after a move it used the folder's name (a218047)
+- A session or a shell that ends before it starts shows why: the reason was pushed off the top of a terminal shorter than 24 rows, which left only the line saying it had ended. Upgrading: a node shows it once it has this build's bundle and session helper, which it takes by itself (f69d77b)
+
+### Security
+
+- A sign-in job's entry on the Jobs page and in /api/v1/jobs no longer carries the session token minted for its flow, which every reader of the list was handed for the half hour it was good. Upgrading: nothing to do; a token handed out before the update ran out within thirty minutes of its sign-in (ac4b721)
+- An account with two-factor sign-in is no longer let in over FTP on its password alone: it gives its password with its authenticator app's six-digit code right after it, as one word, and its password alone is refused with that sentence. Upgrading: an FTP client that kept such an account's password has to be given the code each time; an account whose only second factor is a passkey adds an authenticator app under Profile to use FTP (37a765d)
 
 ## 0.9.0-dev.5284: 2026-11-12
 
