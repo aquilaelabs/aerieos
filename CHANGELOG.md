@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Gemini, Google's Antigravity CLI, can be added as a coding agent from the Library: a pack in the vetted catalog brings it, handed the briefing and held by the same guards as the agents AerieOS ships. It signs in with a Google account in its own session's terminal (347605e)
+
 ## 0.9.0-dev.5284: 2026-11-12
 
 ### Changed
