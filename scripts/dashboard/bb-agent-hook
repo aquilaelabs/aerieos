@@ -335,6 +335,30 @@ def run(argv, payload, timeout):
         return 0, "", ""
 
 
+def refusal(code, out, err):
+    """Why a hook refused, or "". A guard says no in one of the two ways
+    Claude Code reads, since Claude Code runs each of them itself: exit 2
+    with the reason on stderr (bb-gate), or an answer on stdout with exit 0,
+    a tool denied (bb-rule-hook's permissionDecision) or a stop sent back to
+    work (bb-check-relay's decision block). Every other agent is told from
+    here, so both are read here."""
+    if code == 2:
+        return err.strip() or "refused by an AerieOS guard"
+    try:
+        d = json.loads(out)
+    except ValueError:
+        return ""
+    if not isinstance(d, dict):
+        return ""
+    h = d.get("hookSpecificOutput") if isinstance(d.get("hookSpecificOutput"), dict) else {}
+    for said in (h, d):
+        if said.get("permissionDecision") == "deny":
+            return str(said.get("permissionDecisionReason") or "").strip() or "refused by an AerieOS guard"
+    if d.get("decision") == "block":
+        return str(d.get("reason") or "").strip() or "refused by an AerieOS guard"
+    return ""
+
+
 # THE ONE LIST of AerieOS's hooks: for each event, the scripts a session
 # runs, in order, with their arguments, their timeout and the tools they are
 # for (none: every call). Claude Code's settings are written from it
@@ -599,9 +623,15 @@ def main(argv):
             out = _answer(pack_adapter(agent) or {}, event, "pass")
         print(json.dumps(out))
         return 0
+    sid = call.get("session_id") or ""
     if event == "stop":
         keep(agent, raw)
         settle(agent, raw)
+        # A stop a check sent back once is let go the next time: by the
+        # agent's own word where its payload has one, by the mark where it
+        # has none, so no agent is sent back for ever by a check that fails.
+        if mark_read(agent, sid, "stop") is not None:
+            call["stop_hook_active"] = True
     said = []
     why = wall((call.get("tool_input") or {}).get("file_path", ""), call.get("cwd") or "") \
         if event == "pre" and call.get("tool_name") == "Edit" else ""
@@ -613,15 +643,20 @@ def main(argv):
         return 2
     for cmd, timeout in plan(event, call, proj, who):
         code, out, err = run(cmd, call, timeout)
-        if out.strip():
+        reason = refusal(code, out, err)
+        if out.strip() and not reason:
             said.append(out.strip())
-        if code == 2:
-            reason = err.strip() or "refused by an AerieOS guard"
+        if reason:
             if proto == "copilot" and event == "pre":
                 print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": reason}))
                 return 0
+            if event == "stop" and not mark_write(agent, sid, "stop", "1"):
+                # No conversation to remember it by: let go, never looped.
+                return 0
             print(reason, file=sys.stderr)
             return 2
+    if event == "stop":
+        mark_drop(agent, sid, "stop")
     # What a hook had to say to the model (a rule's text, a note), passed on
     # where the agent reads a hook's output; Copilot's before a tool reads
     # only a decision, so nothing goes there.
@@ -797,11 +832,11 @@ def answered(agent, event, raw, call, proj, who):
     if not refused:
         for cmd, timeout in plan(event, call, proj, who):
             code, out, err = run(cmd, call, timeout)
+            refused = refusal(code, out, err)
+            if refused:
+                break
             if out.strip():
                 said.append(out.strip())
-            if code == 2:
-                refused = err.strip() or "refused by an AerieOS guard"
-                break
     if event == "prompt" and by_hook and not refused:
         # The briefing again, ahead of what the hooks said, when a restart
         # changed it or the conversation's start handed over none.

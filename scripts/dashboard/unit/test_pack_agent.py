@@ -275,18 +275,20 @@ class AnsweredInJson(unittest.TestCase):
         self.addCleanup(env.stop)
         self.h = load_hook()
         # A stand-in for every guard: it records its words, refuses rm -rf
-        # as the rule guard does, has a rule's text to say on a prompt, and
-        # refuses a stop once while a check is failing.
+        # as the rule guard does (a denial on stdout, as Claude Code reads
+        # it), has a rule's text to say on a prompt, and sends a stop back
+        # while a check is failing as the check does (a block on stdout).
         self.log = os.path.join(self.d, "log")
         stub = os.path.join(self.d, "hook")
         Path(stub).write_text("#!/usr/bin/env python3\nimport json, os, sys\nd = json.load(sys.stdin)\n"
                               f"open({self.log!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n"
                               "if sys.argv[1:2] == ['guard'] and 'rm -rf' in (d.get('tool_input') or {}).get('command', ''):\n"
-                              "    print('a rule refuses rm -rf here', file=sys.stderr); sys.exit(2)\n"
+                              "    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',\n"
+                              "                                             'permissionDecisionReason': 'a rule refuses rm -rf here'}}))\n"
                               "if sys.argv[1:2] == ['prompt']:\n"
                               "    print(json.dumps({'hookSpecificOutput': {'additionalContext': 'RULE TEXT'}}))\n"
                               f"if os.path.basename(sys.argv[0]) == 'bb-check-relay' and os.path.exists({self.d!r} + '/failing') and not d.get('stop_hook_active'):\n"
-                              "    print('the tests fail: fix them', file=sys.stderr); sys.exit(2)\n")
+                              "    print(json.dumps({'decision': 'block', 'reason': 'the tests fail: fix them'}))\n")
         os.chmod(stub, 0o755)
         hooks = os.path.join(self.d, "hooks")
         os.mkdir(hooks)
@@ -530,11 +532,12 @@ class AProtocolNobodyHasMet(unittest.TestCase):
         stub = os.path.join(self.d, "hook")
         Path(stub).write_text("#!/usr/bin/env python3\nimport json, os, sys\nd = json.load(sys.stdin)\n"
                               "if sys.argv[1:2] == ['guard'] and 'rm -rf' in (d.get('tool_input') or {}).get('command', ''):\n"
-                              "    print('a rule refuses rm -rf here', file=sys.stderr); sys.exit(2)\n"
+                              "    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',\n"
+                              "                                             'permissionDecisionReason': 'a rule refuses rm -rf here'}}))\n"
                               "if sys.argv[1:2] == ['prompt']:\n"
                               "    print(json.dumps({'hookSpecificOutput': {'additionalContext': 'RULE TEXT'}}))\n"
                               "if os.path.basename(sys.argv[0]) == 'bb-check-relay' and not d.get('stop_hook_active'):\n"
-                              "    print('the tests fail: fix them', file=sys.stderr); sys.exit(2)\n")
+                              "    print(json.dumps({'decision': 'block', 'reason': 'the tests fail: fix them'}))\n")
         os.chmod(stub, 0o755)
         hooks = os.path.join(self.d, "hooks")
         os.mkdir(hooks)
