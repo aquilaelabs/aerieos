@@ -445,9 +445,11 @@ ${code}`], { encoding: 'utf8' });
     ok(nonode.status === 400 && /which node/.test(nonode.error || ''), `a sign-in names its node (${nonode.error})`);
     const theirs = await as(other, '/api/signin', { node: box.id });
     const lj = theirs.job ? await napi(`/api/v1/jobs?id=${theirs.job}`) : {};
+    // (The token the flow reports with is the node's alone: a reader of the
+    // job is not handed it.)
     ok(theirs.status === 200 && lj.type === 'claude-login' && lj.node === box.id && lj.spec?.uid === uidOf('sharer')
-       && /^bbs_/.test(lj.spec?.token || ''),
-       `on its own space's node it starts one: a claude-login job there, for that account (${theirs.error || lj.type})`);
+       && !('token' in (lj.spec || {})),
+       `on its own space's node it starts one: a claude-login job there, for that account, its token not read with it (${theirs.error || lj.type})`);
     // The link a flow prints signs somebody in: it is shown to the person
     // the flow was started for and to nobody else, and only they type into it.
     ok((await as(other, '/api/status')).signin?.running === true && (await as(owner, '/api/status')).signin?.running === false,

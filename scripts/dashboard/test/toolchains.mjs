@@ -810,19 +810,28 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     ok(served.src.includes(iconAt.slice(0, 12)) && served.w > 0 && served.type === 'image/svg+xml' && /sandbox/.test(served.csp)
        && /default-src 'none'/.test(served.csp) && served.sniff === 'nosniff' && !served.ran,
        `its card draws the icon from the pack's own address at its pin, served as an image with no script run (${JSON.stringify(served)})`);
-    // An entry written in a pack format this build has not met (R234): its
-    // card says which AerieOS takes it, in the muted voice, with nothing to
-    // press, and Add refuses it the same way without fetching it.
+    // An entry this AerieOS does not take is not shown at all (the operator,
+    // 12 Nov): one written in a pack format this build has not met (R234),
+    // and one whose manifest names other release lines than this one. The
+    // page's head counts them, and Add refuses the first without fetching it.
     writeFileSync(`${DIR}/state/catalog-index.json`, JSON.stringify({ fetched_at: 0, formats: { 99: '9.9.0' }, packs: [
       { name: 'later', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '', format: 99,
-        about: 'Written for an AerieOS not out yet.', platforms: ['linux/amd64'] }] }));
-    const LATER = `.doc.on .librarytab .lcard[data-lrow="pack:later"]`;
+        about: 'Written for an AerieOS not out yet.', platforms: ['linux/amd64'] },
+      { name: 'otherline', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '', works_with: ['99.1'],
+        about: 'For another release line.', platforms: ['linux/amd64'] },
+      { name: 'forall', kind: 'pack', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt), tier: 'vetted', path: '',
+        about: 'Names no release line.', platforms: ['linux/amd64'] }] }));
     await page.evaluate(() => { loadToolchains(); loadLibrary(); });
-    await page.waitForSelector(LATER, { timeout: 20000 });
-    const later = await page.$eval(LATER, c => ({ state: c.querySelector('.state')?.textContent.trim() || '', cls: c.querySelector('.state')?.className || '',
-      acts: [...c.querySelectorAll('[data-libact]')].map(b => b.dataset.libact) }));
-    ok(later.state === 'Needs AerieOS 9.9.0 or newer' && !/warn|bad/.test(later.cls) && !later.acts.length,
-       `an entry in a format this AerieOS has not met says what it needs on its card, muted, with nothing to press (${JSON.stringify(later)})`);
+    await page.waitForSelector(`.doc.on .librarytab .lcard[data-lrow="pack:forall"]`, { timeout: 20000 });
+    const later = await page.evaluate(() => ({
+      cards: ['later', 'otherline', 'forall'].map(n => !!document.querySelector(`.doc.on .librarytab .lcard[data-lrow="pack:${n}"]`)),
+      rows: (lib.rows || []).filter(r => r.too_new).map(r => r.name).sort().join(),
+      head: [...document.querySelectorAll('.doc.on .librarytab .pghead dt, .doc.on .librarytab .facts dt')].map(d => `${d.textContent.trim()}=${d.nextElementSibling?.textContent.trim()}`)
+        .find(x => /^Not for this AerieOS/.test(x)) || '' }));
+    // (A build with no version, as the suite's is, judges no entry by its release lines: only the format counts here.)
+    const want = later.rows === 'later,otherline' ? [false, false, true] : [false, true, true];
+    ok(JSON.stringify(later.cards) === JSON.stringify(want) && /^Not for this AerieOS=\d+ in the catalog$/.test(later.head),
+       `an entry this AerieOS does not take is not drawn, and the head counts what is left out (${JSON.stringify(later)})`);
     const past = await api('/api/toolpacks', { action: 'add', url: `file://${repo}`, commit: iconAt, sha256: sha(iconAt) });
     ok(/later needs AerieOS 9\.9\.0 or newer \(it is written in pack format 99, and this AerieOS reads up to \d+\)/.test(past.error || ''),
        `...and adding it is refused in the same words, nothing fetched (${past.error || 'it was added'})`);
