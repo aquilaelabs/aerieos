@@ -8,12 +8,15 @@
 - Gemini is signed in from its page: open its row on the Installed page with the node picked and press Sign in, and the page shows Google's link and a field for the code, which works on a phone. Any coding agent a pack brings is signed in this way where its pack says how its sign-in goes; its sign-in is sealed on a node that seals sign-ins, and Sign out removes it (732cb3c)
 - A conversation can be given a label and a note, and be kept: Edit on its row of a space's Sessions view names it, notes it, and keeps a copy on the controller that outlives its agent's own cleanup; aerie transcripts label, note, keep and unkeep say the same from a session (d95ead2)
 - A terminal has a hot bar: Esc, Shift+Tab or Tab, the arrows, Enter, Ctrl+C and page up and down a press each, and Links, which lists the links the terminal shows to open or copy, so a sign-in link a program prints can be opened on a phone. At a desk it floats over the terminal's bottom right corner and folds to a handle; on a phone it is the band at the terminal's foot, a line of keys that scrolls as the dock's tabs do, in place of the Keys panel, whose keys are on the line (467cb8e)
+- A coding agent a pack brings can say where who is signed in is read (signin.flow.who: the keys to follow in the file its sign-in is kept in, or another file beside it) and sign out by taking keys out of its settings file where the program has no sign-out of its own (signin.flow.forget); both are catalog framework 2.2. The agents AerieOS ships are described this way too, in their official packs, so a pack's agent can do at its sign-in whatever a shipped one does (300436f)
+- Help has Submitting to the catalog: one guide from writing a tool pack, a coding agent or a Docker app to a merged entry in the vetted catalog, with a worked example of each, how to try it on your own install, how to run the catalog's check, and what the maintainers vet. The Library's Add your own links to it (6c97ba7)
 
 ### Changed
 
 - A pack kept from the catalog has no Edit on its row of the Installed page either, as on its Library card (f46b202)
 - Start agent's menu offers your conversations on a space as one pulldown with one Resume, each named by its label or its first words, where it listed a row and a button for each; a link under it opens all of them in the Sessions view, which has a find field past five (d95ead2)
 - A Library card names who its tool is by (Google, Eclipse Adoptium, Anthropic) to the left of its pill, and the pill reads Packaged by Aerie where it read Built by Aerie: the pill says who packaged a tool, never who made it. A toolchain that puts several makers' tools together is by AerieOS, with each credited on its Details page (b64cf66)
+- A sign-in job's log holds the link and the one-time code for every agent, each on a line of its own, and never the program's own screen, as a pack agent's did already; Claude's link is read from a terminal wide enough to hold it on one row. Upgrading: a node signs in this way from its next bundle, within ten minutes of the controller's update; a sign-in started before then is read as before (300436f)
 
 ### Fixed
 
