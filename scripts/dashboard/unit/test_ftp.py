@@ -134,6 +134,34 @@ class Ftp(unittest.TestCase):
             users._save(d)
         self.assertEqual(ftp.login("n1", "alpha", "ann", "password1", "a")["access"], "")
 
+    def test_an_account_with_two_factor_gives_its_code_after_its_password(self):
+        # B723: its password alone opened its files over FTP.
+        class Mfa:
+            used = []
+
+            @staticmethod
+            def enabled(uid):
+                return uid == "u_3"
+
+            @classmethod
+            def totp_check(cls, uid, code):
+                cls.used.append((uid, code))
+                return code == "123456"
+        saved = ftp.mfa
+        self.addCleanup(setattr, ftp, "mfa", saved)
+        ftp.mfa = Mfa
+        ftp.save("alpha", {"on": True, "access": {"u_3": "r", "u_2": "rw"}}, "boss")
+        got = ftp.login("n1", "alpha", "ann", "password1", "10.0.0.5")
+        self.assertEqual(got["access"], "")
+        self.assertIn("six-digit code right after it", got["why"])
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "password1000000", "10.0.0.5")["access"], "", "a code that is not the one")
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "password1123456", "10.0.0.5"), {"access": "r"})
+        self.assertEqual(ftp.login("n1", "alpha", "ann", "wrong123456", "10.0.0.5")["access"], "")
+        # An account with none signs in as before, whatever its password ends in.
+        self.assertEqual(ftp.login("n1", "alpha", "adm", "password1", "10.0.0.5"), {"access": "rw"})
+        self.assertEqual(ftp.login("n1", "alpha", "adm", "password1123456", "10.0.0.5")["access"], "")
+        self.assertNotIn(("u_2", "123456"), Mfa.used, "a code is asked of an account that has a second factor, and no other")
+
     def test_failed_logins_are_throttled_per_address(self):
         ftp.save("alpha", {"on": True, "access": {"u_3": "r"}}, "boss")
         for _ in range(ftp.FAIL_LIMIT):

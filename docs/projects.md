@@ -549,7 +549,11 @@ turns it on, picks the port, and gives each account that sees the space
 administrator's; signing in also needs File access on the account's roles
 on that space (R152), and gets the lesser of the two, so a role without it
 refuses even the space's owner. A session never may set it. Anybody else on the space
-is shown only that it is on, and where.
+is shown only that it is on, and where. An account with two-factor sign-in
+gives its password with its authenticator app's six-digit code right after
+it, as one word: its password alone is refused, with that sentence, and an
+account whose only second factor is a passkey adds an authenticator app
+under Profile to use FTP.
 
 The server is the space's primary node's: the **ftp** toolchain's
 `bb-ftpd` (pyftpdlib), one per space, which the agent starts from what

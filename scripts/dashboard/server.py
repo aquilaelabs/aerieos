@@ -5447,7 +5447,7 @@ ftp.configure(state=STATE, workspace=WORKSPACE, write_json=write_json, users=use
               audit=lambda who, act, target, params: db.audit(who, act, target, params),
               project_node=lambda p: prefs.get(p)["node"] or "",
               ask_hello=lambda nid: None if NODES_OK else nodes.ask_hello(nid),
-              node_info=lambda nid: None if NODES_OK else _ftp_node(nid))
+              node_info=lambda nid: None if NODES_OK else _ftp_node(nid), mfa=mfa)
 ftp.locked_out = projects.locked_out       # a lock makes the files read-only through every door (B263)
 nodes.ftp_for = ftp.for_node
 # The node's nginx container, for its log stream (R182): named only where the nginx tab put one.

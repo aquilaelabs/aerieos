@@ -26,6 +26,7 @@ audit = None
 project_node = None          # project -> its primary node id, "" for none
 ask_hello = None             # node id -> the agent is told now, not in ten minutes
 node_info = None             # node id -> {"name", "addr", "has_ftp": True|False|None}
+mfa = None                   # the second factors (mfa.py): enabled(uid), totp_check(uid, code)
 # A locked project's refusal for an account (projects.locked_out), set by
 # server.py: a lock makes every way into the files read-only (B263).
 locked_out = lambda name, uid: None  # noqa: E731
@@ -50,10 +51,10 @@ FAIL_WINDOW_S = 300
 FAIL_LIMIT = 10
 
 
-def configure(*, state, workspace, write_json, users, audit, project_node, ask_hello=None, node_info=None):
+def configure(*, state, workspace, write_json, users, audit, project_node, ask_hello=None, node_info=None, mfa=None):
     globals().update(FILE=Path(state) / "ftp.json", WORKSPACE=Path(workspace), write_json=write_json,
                      users=users, audit=audit, project_node=project_node, ask_hello=ask_hello,
-                     node_info=node_info)
+                     node_info=node_info, mfa=mfa)
     # A timer set before a restart, armed again (R196).
     for rec in _load().values():
         r = _clean(rec)
@@ -361,7 +362,21 @@ def login(node, project, name, password, addr):
     # Counted against the node the login came through as well as the
     # address it names (B721): the node writes that address, so a node
     # changing it on every try was never held.
-    u = users.authenticate(str(name or ""), str(password or ""), where=f"node:{node}")
+    password = str(password or "")
+    u = users.authenticate(str(name or ""), password, where=f"node:{node}")
+    # An account with two-factor sign-in types its password with its
+    # authenticator's six digits right after it, the one way an FTP client
+    # can carry a code: its password alone opened its files here, where it
+    # opens nothing anywhere else (B723).
+    if u and mfa is not None and mfa.enabled(u.get("uid", "")):
+        _failed(addr)
+        audit(u["name"], "ftp-login-refused", project, {"addr": addr, "why": "its password alone, and the account has two-factor sign-in"})
+        return {"access": "", "why": "This account has two-factor sign-in: give your password with your authenticator's "
+                                     "six-digit code right after it."}
+    if not u and mfa is not None and len(password) > 6 and password[-6:].isdigit():
+        cand = users.authenticate(str(name or ""), password[:-6], where=f"node:{node}")
+        if cand and mfa.enabled(cand.get("uid", "")) and mfa.totp_check(cand["uid"], password[-6:]):
+            u = cand
     if not u:
         _failed(addr)
         audit(f"ftp:{addr}", "ftp-login-failed", project, {"name": str(name or "")[:60]})
