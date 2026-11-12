@@ -1,11 +1,14 @@
 // The Files page (R224, the operator, 8 Nov): a machine's files under
 // Machines, beside Nodes, Storage and Installed, one node picked in the
-// group's header. What it reaches is the node's roots (its pools, its array,
-// its shares, the old system's disks it adopted, the spaces folder a stick
-// names) as a row of chips; a folder of one is a table, its rows opened
-// (a folder) or previewed (a file), ticked for Download, Rename, Move and
-// Delete, which puts them in the root's trash. Upload takes files picked or
-// dropped on the page, streamed to the node. Administrators only.
+// group's header. Laid out as a file explorer is (the operator, 12 Nov):
+// the places it reaches down the left (the node's roots: its pools, its
+// array, its shares, the old system's disks it adopted, the spaces folder a
+// stick names; each by its name and its kind in words, Trash last), and
+// beside them one bar (where you are as a breadcrumb, a filter, New folder
+// and Upload) over the folder's listing. A row is opened (a folder) or
+// previewed (a file), ticked for Download, Rename, Move and Delete, which
+// puts it in the place's trash. Upload takes files picked or dropped on
+// the page, streamed to the node. Administrators only.
 //
 // Chrome from docSurface(); the hard rules are uniform.mjs's. Loaded
 // before the page's own script, so everything here is a declaration.
@@ -68,8 +71,43 @@ function flGo(root, path){
   loadFiles();
 }
 
-const FL_COLS = [{label: "Name", w: "minmax(0,4fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "13.5rem"},
-                 {label: "Owner", w: "minmax(4rem,.8fr)"}, {act: true, w: "2.5rem"}];
+const FL_COLS = [{label: "Name", w: "minmax(0,1fr)"}, {label: "Size", w: "6rem", num: true}, {label: "Modified", w: "8.5rem"},
+                 {act: true, w: "2.5rem"}];
+// A place's trash folder, which its listing leaves out and Trash opens.
+const FL_TRASH = ".aerieos-trash";
+// The page's own pictures, in the stroke every icon here is drawn in.
+const FL_ICON = {
+  dir: `<svg class="fxic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 4h4.2l1.4 1.7h6.8v7H1.8z"/></svg>`,
+  file: `<svg class="fxic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.8h5.1l2.9 3v9.4H4z"/><path d="M9.1 1.8v3h2.9"/></svg>`,
+  link: `<svg class="fxic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4"/><path d="M6.6 4H12v5.4"/></svg>`,
+  place: `<svg class="fxic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.6" width="12" height="8.8" rx="1.4"/><path d="M2 8.9h12"/><path d="M11 10.7h.9"/></svg>`,
+  trash: `<svg class="fxic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 4.6h10.4"/><path d="M6.3 4.6V3h3.4v1.6"/><path d="M4.2 4.6l.6 8.6h6.4l.6-8.6"/></svg>`,
+};
+
+// A place as a person reads it: its name, and its kind in words (the
+// design's files rule: never a path alone; the path is its title).
+function flPlace(r){
+  const m = String(r.label || "").match(/^(.*?)\s*\(([^)]*)\)$/);
+  return {name: m ? m[1] : r.label || r.path, kind: m ? m[2] : {pool: "pool", array: "array", spaces: "spaces", share: "share", mount: "mount", adopted: "adopted"}[r.kind] || ""};
+}
+// When a file was changed, short: the day and the time this year, the day
+// and the year before it.
+function flWhen(sec){
+  const t = new Date(sec * 1000), now = new Date();
+  return fmtTime(t.getTime(), t.getFullYear() === now.getFullYear() ? {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}
+                                                                : {day: "numeric", month: "short", year: "numeric"});
+}
+const flInTrash = () => flPath === FL_TRASH || flPath.startsWith(FL_TRASH + "/");
+// A place's trash keeps each thing under a stamped name (the day and time
+// it was deleted, then its own name) beside a note of where it was: the
+// page shows the name it had and when it went, and never the notes.
+const FL_NOTE = ".aerieos-from", FL_STAMP = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-/;
+const flTrashTop = () => flPath === FL_TRASH;
+function flShown(name){ return flTrashTop() ? name.replace(FL_STAMP, "") : name; }
+function flDeleted(name){
+  const m = flTrashTop() && name.match(FL_STAMP);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000 : 0;
+}
 
 function flSize(n){
   return n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB`
@@ -80,29 +118,48 @@ function flCrumbs(){
   const root = (fl.roots || []).find(x => x.path === flRoot);
   const parts = flPath ? flPath.split("/") : [];
   const at = (i) => parts.slice(0, i + 1).join("/");
-  return `<nav class="fxcrumbs" aria-label="where in ${esc(root?.label || "the root")}">
-    <button type="button" class="namelink" data-fxgo="">${esc((root?.label || flRoot).replace(/ \([^)]*\)$/, ""))}</button>${
-      parts.map((p, i) => `<span class="dim" aria-hidden="true">/</span>${i === parts.length - 1
-        ? `<span class="fxhere" aria-current="page">${esc(p)}</span>`
-        : `<button type="button" class="namelink" data-fxgo="${esc(at(i))}">${esc(p)}</button>`}`).join("")}</nav>`;
+  const said = (p, i) => i === 0 && p === FL_TRASH ? "Trash" : p;
+  const here = root ? flPlace(root).name : flRoot;
+  return `<nav class="fxcrumbs" aria-label="where in ${esc(here)}">${parts.length
+    ? `<button type="button" class="namelink" data-fxgo="">${esc(here)}</button>` : `<span class="fxhere" aria-current="page">${esc(here)}</span>`}${
+      parts.map((p, i) => `<span class="fxsep" aria-hidden="true">›</span>${i === parts.length - 1
+        ? `<span class="fxhere" aria-current="page">${esc(said(p, i))}</span>`
+        : `<button type="button" class="namelink" data-fxgo="${esc(at(i))}">${esc(said(p, i))}</button>`}`).join("")}</nav>`;
 }
 
 function flRows(){
   const want = flFilter.trim().toLowerCase();
-  const rows = (fl.entries || []).filter(e => !want || e.name.toLowerCase().includes(want))
+  // A place's trash is reached from Trash, never listed among its folders.
+  const rows = (fl.entries || []).filter(e => !(flPath === "" && e.name === FL_TRASH) && !(flTrashTop() && e.name.endsWith(FL_NOTE))
+                                              && (!want || flShown(e.name).toLowerCase().includes(want)))
     .sort((a, b) => ((b.kind === "dir" || b.to_dir) - (a.kind === "dir" || a.to_dir)) || a.name.localeCompare(b.name, undefined, {numeric: true}));
   return rows;
 }
 
 function flLine(e){
   const dir = e.kind === "dir" || (e.kind === "link" && e.to_dir);
-  const icon = dir ? "📁" : e.kind === "link" ? "↪" : "";
   const tick = `<input type="checkbox" class="fxtick" data-fxtick="${esc(e.name)}" aria-label="select ${esc(e.name)}"${flSel.has(e.name) ? " checked" : ""}>`;
   const name = `<span class="fxname">${tick}<button type="button" class="namelink" data-fxopen="${esc(e.name)}" data-fxdir="${dir ? 1 : ""}">${
-    icon ? `<span aria-hidden="true">${icon}</span> ` : ""}${esc(e.name)}</button></span>${e.target ? `<div class="sub dim">to ${esc(e.target)}</div>` : ""}`;
-  return tblLine(FL_COLS, [name, dir ? "" : esc(flSize(e.size || 0)), esc(fmtTime(e.mtime * 1000)), esc(e.owner || ""),
+    FL_ICON[e.kind === "link" ? "link" : dir ? "dir" : "file"]}<span class="fxn">${esc(flShown(e.name))}</span></button></span>${
+    e.target ? `<div class="sub dim">to ${esc(e.target)}</div>` : ""}`;
+  const when = esc(flWhen(flDeleted(e.name) || e.mtime));
+  // On a phone a row is one line: its name, and at its right a file's size
+  // or a folder's day (.fxphone, which a desk does not draw).
+  return tblLine(FL_COLS, [name, dir ? `<span class="fxphone">${when}</span>` : esc(flSize(e.size || 0)), when,
     dir ? "" : `<a class="btn icon" href="/api/node-files/read?${flQuery({path: (flPath ? flPath + "/" : "") + e.name, dl: "1"})}" download="${esc(e.name)}"
-       title="Download ${esc(e.name)}" aria-label="Download ${esc(e.name)}">↓</a>`], "div", flSel.has(e.name) ? "on" : "", `data-fxrow="${esc(e.name)}"`);
+       title="Download ${esc(e.name)}" aria-label="Download ${esc(e.name)}">↓</a>`], "div", flSel.has(e.name) ? "on" : "",
+    `data-fxrow="${esc(e.name)}"${e.owner ? ` title="owned by ${esc(e.owner)}"` : ""}`);
+}
+
+// The places column: every root by its name and kind, the one on show
+// marked, and its trash last.
+function flPlaces(roots){
+  return `<nav class="fxplaces" aria-label="places on ${esc(fl.name || "this node")}"><div class="fxphead">Places</div>${roots.map(r => {
+    const p = flPlace(r), on = r.path === flRoot && !flInTrash();
+    return `<button type="button" class="fxplace${on ? " on" : ""}" data-fxroot="${esc(r.path)}" aria-pressed="${on}" title="${esc(r.path)}">${
+      FL_ICON.place}<span class="fxpname">${esc(p.name)}</span>${p.kind ? `<span class="fxpkind">${esc(p.kind)}</span>` : ""}</button>`; }).join("")}
+    <button type="button" class="fxplace fxtrash${flInTrash() ? " on" : ""}" data-fxgo="${FL_TRASH}" aria-pressed="${flInTrash()}"
+      title="what was deleted from ${esc(flPlace((roots.find(r => r.path === flRoot)) || {label: flRoot}).name)}">${FL_ICON.trash}<span class="fxpname">Trash</span></button></nav>`;
 }
 
 function renderFilesInto(i){
@@ -110,7 +167,10 @@ function renderFilesInto(i){
   if (!d) return;
   d.setBar("");    // the node is picked in the Machines group's header (R177)
   if (fl === null){
-    d.list.innerHTML = skTpl(pageHead({facts: [["Roots", GHOST], ["Here", GHOST]]}) + docSection("files", "list", "Files", "", skRows(6)));
+    // As it waits, the page it will be: the places, the bar and the rows.
+    d.list.innerHTML = skTpl(`<div class="fxpage"><div class="fxcols"><nav class="fxplaces"><div class="fxphead">Places</div>${
+      [GHOST, GHOST, GHOST].map(g => `<span class="fxplace">${FL_ICON.place}<span class="fxpname">${g}</span></span>`).join("")}</nav>
+      <div class="fxmain"><div class="fxbar"><nav class="fxcrumbs"><span class="fxhere">${GHOST}</span></nav></div>${skRows(6)}</div></div></div>`);
     if (!flSeq) loadFiles();
     return;
   }
@@ -127,36 +187,35 @@ function renderFilesInto(i){
     paint(d.list, `<div class="empty">${esc(fl.name || "This node")} has no pool, array or share to browse. Make one on the Storage page, and its files show here.</div>`);
     return;
   }
-  const chips = `<div class="field"><div class="chips" data-chips="data-fxroot">${roots.map(r => `<button type="button" class="chip${r.path === flRoot ? " on" : ""}"
-      data-fxroot="${esc(r.path)}" aria-pressed="${r.path === flRoot}" title="${esc(r.path)}">${esc(r.label)}</button>`).join("")}</div></div>`;
   const rows = fl.error ? [] : flRows();
-  const ticked = [...flSel];
-  const bar = ticked.length
-    ? `<div class="actbar fxselbar"><span class="said">${ticked.length} selected</span><span class="sp"></span>
-        ${ticked.length === 1 ? `<button type="button" data-fxact="rename">Rename</button>` : ""}
-        <button type="button" data-fxact="move">Move</button>
+  const ticked = [...flSel], trash = flInTrash();
+  // One bar over the listing: where you are at its left, and at its right
+  // the filter and the folder's two actions, or what the ticked rows take.
+  const right = ticked.length
+    ? `<div class="actbar fxselbar"><span class="said">${ticked.length} selected</span>
+        ${ticked.length === 1 && !trash ? `<button type="button" data-fxact="rename">Rename</button>` : ""}
+        <button type="button" data-fxact="move">${flTrashTop() ? "Put back" : "Move"}</button>
         <button type="button" data-fxact="download"${ticked.some(n => (fl.entries || []).find(e => e.name === n && e.kind === "dir")) ? " disabled title=\"a folder downloads one file at a time\"" : ""}>Download</button>
-        <button type="button" class="danger" data-fxact="delete">Delete</button>
+        ${trash ? "" : `<button type="button" class="danger" data-fxact="delete">Delete</button>`}
         <button type="button" data-fxact="none">Clear</button></div>`
-    // The filter beside the folder's actions, as the Library's search sits
-    // beside its buttons: a field of its own width, the actions their own
-    // bar at the right, one line on a phone where they fit (B757: the
-    // filter spanned a phone's whole width above its buttons).
-    : `<div class="flrow"><input type="search" id="flFilter" class="flfilter" placeholder="Filter" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
-        <div class="actbar"><button type="button" data-fxact="mkdir">New folder</button>
+    : `<input type="search" id="flFilter" class="flfilter" placeholder="Filter" aria-label="filter this folder" value="${esc(flFilter)}" spellcheck="false" autocomplete="off">
+        ${trash ? "" : `<div class="actbar"><button type="button" data-fxact="mkdir">New folder</button>
         <button type="button" class="primary" data-fxact="upload"${fl.serves ? "" : " disabled"}>Upload</button>
-        <input type="file" id="flPick" multiple hidden></div></div>`;
-  const up = flUp ? `<div class="field"><div class="sub">Uploading ${esc(flUp.name)} (${flUp.i} of ${flUp.n}): ${flSize(flUp.done)} of ${flSize(flUp.size)}</div>
+        <input type="file" id="flPick" multiple hidden></div>`}`;
+  const bar = `<div class="fxbar">${flCrumbs()}<div class="fxbarend">${right}</div></div>`;
+  const up = flUp ? `<div class="fxnote"><div class="sub">Uploading ${esc(flUp.name)} (${flUp.i} of ${flUp.n}): ${flSize(flUp.done)} of ${flSize(flUp.size)}</div>
       <progress max="${flUp.size || 1}" value="${flUp.done}" aria-label="upload progress"></progress></div>` : "";
   const why = !fl.serves ? `<div class="field"><div class="notice warn">${esc(fl.name)}'s agent does not serve files yet: update it from the Nodes page.</div></div>`
     : fl.live === false ? `<div class="field"><div class="notice warn">${esc(fl.name)}'s agent is not dialing in, so its files cannot be read now.</div></div>` : "";
-  const body = fl.error ? `<div class="field"><div class="notice bad">${esc(fl.error)}</div></div>`
-    : rows.length ? tblWrap(FL_COLS, rows.map(flLine).join(""), "fxtbl") + (fl.truncated ? `<div class="sub dim">The first ${(fl.entries || []).length} are shown: this folder holds more.</div>` : "")
-    : `<div class="empty">${flFilter ? "Nothing here matches the filter." : "This folder is empty."}</div>`;
-  const nd = (fl.entries || []).filter(e => e.kind === "dir").length, nf = (fl.entries || []).length - nd;
-  const head = pageHead({facts: [["Path", flRoot + (flPath ? "/" + flPath : "")],
-                                 ["Here", `${nd} folder${nd === 1 ? "" : "s"}, ${nf} file${nf === 1 ? "" : "s"}`]]});
-  paint(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}${head}${chips}${docSection("files", "list", "Files", "", `${flCrumbs()}${bar}${up}${body}`)}</div>`);
+  const shown = (fl.entries || []).filter(e => !(flPath === "" && e.name === FL_TRASH) && !(flTrashTop() && e.name.endsWith(FL_NOTE)));
+  const nd = shown.filter(e => e.kind === "dir").length, nf = shown.length - nd;
+  const count = `${nd} folder${nd === 1 ? "" : "s"}, ${nf} file${nf === 1 ? "" : "s"}`;
+  const body = fl.error ? `<div class="fxnote"><div class="notice bad">${esc(fl.error)}</div></div>`
+    : rows.length ? tblWrap(flTrashTop() ? FL_COLS.map(c => c.label === "Modified" ? {...c, label: "Deleted"} : c) : FL_COLS, rows.map(flLine).join(""), "fxtbl")
+    : `<div class="fxempty">${flFilter ? "Nothing here matches the filter." : trash ? "Nothing has been deleted from this place." : "This folder is empty."}</div>`;
+  const foot = fl.error ? "" : `<div class="fxfoot">${flTrashTop() ? "What was deleted from this place. Put back returns what is ticked to where it was. " : ""}${
+    count}${fl.truncated ? `; the first ${(fl.entries || []).length} are shown, and this folder holds more` : ""}</div>`;
+  paint(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}<div class="fxcols">${flPlaces(roots)}<div class="fxmain">${bar}${up}${body}${foot}</div></div></div>`);
   wireFiles(d.el);
   if (rows.length > 120) paginate(d.el.querySelector(".fxtbl"), ".tline", {key: `fx:${flNode}:${flRoot}:${flPath}`, noun: "items"});
 }
@@ -216,6 +275,22 @@ async function flAct(what, root){
     const name = await askText(`Rename ${was}`, {value: was, verb: "Rename", label: "New name"});
     if (!name || name.trim() === was) return;
     if (await flPost({action: "rename", path: flFull(was), dest: flFull(name.trim())})){ flSel.clear(); loadFiles(); }
+    return;
+  }
+  if (what === "move" && flTrashTop()){
+    // Back to where each was, which its note says; one whose note is gone
+    // is put at the place's top.
+    for (const n of ticked){
+      let was = "";
+      try{
+        const r = await fetch("/api/node-files/read?" + flQuery({path: flFull(n + FL_NOTE)}));
+        if (r.ok) was = String((await r.json()).from || "");
+      }catch(e){ was = ""; }
+      const dest = (was && !was.startsWith("..") ? was : flShown(n)).replace(/^\/+|\/+$/g, "");
+      if (!await flPost({action: "rename", path: flFull(n), dest})) break;
+      notify(`${flShown(n)} is back at ${dest}`);
+    }
+    flSel.clear(); loadFiles();
     return;
   }
   if (what === "move"){
@@ -285,7 +360,7 @@ async function flPreview(name){
     : kind === "audio" ? `<audio src="${esc(src)}" controls preload="metadata"></audio>`
     : kind === "pdf" ? `<iframe src="${esc(src)}" title="${esc(name)}"></iframe>`
     : `<pre class="fxtext">${skRows(4)}</pre>`;
-  m.innerHTML = `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, ${esc(fmtTime((e.mtime || 0) * 1000))}</div></div>
+  m.innerHTML = `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, changed ${esc(fmtTime((e.mtime || 0) * 1000))}${e.owner ? `, owned by ${esc(e.owner)}` : ""}</div></div>
     <div class="field fxbody">${body}</div>
     <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" class="primary" data-fxclose>Close</button></div></div>`;
   document.body.appendChild(m);

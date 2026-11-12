@@ -438,7 +438,9 @@ async function bring(kind){
 // ...and a row of chips (the chips rule, R216): a view's groups, one in
 // force, never a set of verbs. No fixture drew two groups before the
 // Library's kinds (R170), which is when the row first met this check.
-const NOT_A_BAR = ['nbtabs', 'nbgroups', 'nbsub', 'foot', 'pagemore', 'pseg', 'rlist', 'chips'];
+// ...nor the Files page's places (the operator, 12 Nov: a file explorer's
+// column of the node's roots): rows you open, as a list of rows is.
+const NOT_A_BAR = ['nbtabs', 'nbgroups', 'nbsub', 'foot', 'pagemore', 'pseg', 'rlist', 'chips', 'fxplaces'];
 
 async function language(){
   return page.evaluate(({ NOT_A_BAR }) => {
@@ -622,7 +624,7 @@ async function lineup(){
     };
     const ctls = [...box.querySelectorAll(CTL)]
       .filter(e => e.offsetHeight > 0 && e.getBoundingClientRect().width > 0
-                   && !e.closest('.slot, .dmlog, .pagemore, .rlist') && !folded(e) && shown(e))
+                   && !e.closest('.slot, .dmlog, .pagemore, .rlist, .fxplaces') && !folded(e) && shown(e))
       .map(e => ({ e, r: e.getBoundingClientRect() }))
       .sort((a, b) => a.r.top - b.r.top);
     // One line = boxes whose vertical spans overlap by more than half the

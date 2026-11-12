@@ -505,8 +505,12 @@ store holds, with the one press that installs them.
 **Files**, under Machines, is the files on one node's disks, the node
 picked in the Machines header; on a machine AerieOS is installed on, its
 own machine is one of them. It is an administrator's alone, and every
-change is written to the audit log. What it reaches is the node's
-**roots**, a chip each over the list: the spaces folder a stick names,
+change is written to the audit log. It is laid out as a file explorer is:
+the node's **places** down the left, and beside them one bar (where you
+are, a filter, **New folder** and **Upload**) over the folder's listing. On
+a phone the places are a line over the listing. What it reaches is the
+node's roots, each a place by its name and its kind in words: the spaces
+folder a stick names,
 its pools, its array, the disks it adopted from another system, its
 shares, and the disks and network shares it mounts (its Storage
 section's mounts and its other disks). The system's own folders (`/`, `/etc`, `/usr`, `/var` and the
@@ -515,9 +519,10 @@ with `..` or a link pointing elsewhere is refused by the node itself.
 Aerie Workshop's own container has no Files page of its own, since its
 files are the image's; its nodes have theirs.
 
-A folder is a table, folders first: its name, size, when it changed and
-whose it is. A folder's name opens it, the line of names over the list
-goes back up, and a file's name shows it over the page: a picture, a
+A folder is a list, folders first: its name, its size and when it changed
+(whose it is shows on its row's hint and in its preview). A folder's name
+opens it, the path in the bar goes back up, and a file's name shows it
+over the page: a picture, a
 video, a sound or a PDF as itself, anything else as its first 256 KB of
 text, with **Download** for the whole. A page or a script on a disk is
 shown as text and never runs. **Upload** sends the files you pick, or
@@ -525,8 +530,10 @@ drop on the page, to the folder on show, with its progress, asking first
 before it replaces one of the same name. **New folder** makes one. Tick
 rows for **Rename**, **Move** (to a folder of the same root),
 **Download** and **Delete**. A delete is never final: what is deleted goes
-to the root's `.aerieos-trash` folder, with a note of where it was, and
-stays there until somebody empties it. A file or folder made from here
+to its place's trash, with a note of where it was, and stays there until
+somebody empties it. **Trash**, the last of the places, opens it: tick what
+you want back and **Put back** moves it to the folder you name. A file or
+folder made from here
 takes the owner of the folder it is made in, so a share's people can
 still change what an administrator put there.
 

@@ -2152,17 +2152,80 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 /* The Files page (tab-files.js, R224): where in the root as a line of names,
    a row's tick beside its name, and a file shown over the page at the size
    the screen has for it. A drag of files over the page outlines it. */
-.fxcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:0 0 8px;font:var(--f-ui)}
+/* The Files page: a file explorer's layout (the operator, 12 Nov). Places
+   down the left, one bar over the listing, and the listing itself; no head
+   and no card around it, so the path is said once, in the bar. */
+.fxpage{padding:var(--card-gap) var(--row-x) 0}
+.fxcols{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:var(--card-gap);align-items:start}
+.fxplaces{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fxplaces .fxphead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);padding:6px 8px}
+.fxplace{display:flex;align-items:center;gap:8px;min-width:0;min-height:var(--ctl);padding:4px 8px;text-align:left;
+  border:var(--hair) solid transparent;border-radius:var(--r-control);background:transparent;color:var(--ink);font:var(--f-ui)}
+.fxplace .fxpname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fxplace .fxpkind{flex:0 0 auto;font:var(--f-note);color:var(--dim)}
+.fxplace.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
+.fxplace.fxtrash{margin-top:var(--card-gap)}
+/* A place is a row of a list, not a button that lights: its hover is the
+   list's quiet one, and the one on show keeps its tint under the pointer
+   (button.on:hover would fill it with the scheme's second color). */
+@media(hover:hover){
+  .fxplaces button.fxplace:hover{background:var(--btn);border-color:transparent}
+  .fxplaces button.fxplace.on:hover,html[data-mode="light"] .fxplaces button.fxplace.on:hover{background:color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
+}
+.fxic{width:16px;height:16px;flex:0 0 auto;display:block;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;color:var(--dim)}
+.fxplace.on .fxic{color:var(--ink)}
+.fxmain{min-width:0;border:var(--hair) solid var(--line);border-radius:var(--r-surface);background:var(--panel)}
+.fxbar{display:flex;align-items:center;gap:var(--field-gap);min-width:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line)}
+.fxbar .fxbarend{display:flex;align-items:center;gap:var(--field-gap);margin-inline-start:auto;min-width:0;flex:0 1 auto}
+.fxbar .flfilter{flex:0 1 14rem;min-width:6rem;width:14rem}
+.fxbar .actbar{flex:0 0 auto}
+.fxcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;flex:1 1 auto;font:var(--f-ui)}
 .fxcrumbs .fxhere{font-weight:600;overflow-wrap:anywhere}
+.fxcrumbs .fxsep{color:var(--dim)}
 .fxtbl .thead,.fxtbl .tline{padding-inline:var(--row-x)}
-.fxtbl .fxname{display:inline-flex;align-items:center;gap:8px;min-width:0}
-.fxtbl .fxname .namelink{overflow-wrap:anywhere}
+.fxtbl .tline{padding-block:2px;border-bottom:var(--hair) solid color-mix(in srgb, var(--line) 60%, transparent)}
+.fxtbl .tline:last-child{border-bottom:0}
+.fxtbl .fxname{display:flex;align-items:center;gap:8px;min-width:0}
+.fxtbl .fxname .namelink{display:inline-flex;align-items:center;gap:8px;min-width:0;text-align:left}
+.fxtbl .fxname .fxn{overflow-wrap:anywhere}
 .fxtbl .tline.on{background:color-mix(in srgb, var(--accent) 10%, transparent)}
-.fxpage.drop{outline:2px dashed var(--accent);outline-offset:4px}
+/* A listing's names are read down a long column: the plain weight, a folder's a little heavier. */
+.tbl.fxtbl .td.lead{font-weight:400}
+.tbl.fxtbl .td.lead [data-fxdir="1"]{font-weight:600}
+.fxtbl .fxphone{display:none}
+@media(hover:hover){ .fxtbl .tline:hover{background:color-mix(in srgb, var(--btn) 60%, transparent)} }
+.fxfoot{padding:var(--label-gap) var(--row-x) var(--row-y);font:var(--f-note);color:var(--dim);border-top:var(--hair) solid var(--line)}
+/* The listing's own notes and its empty word: inside the explorer's panel,
+   not bands of the page, which start at the page's one edge. */
+.fxmain>.fxempty{padding:calc(var(--row-y) * 2) var(--row-x);color:var(--dim);font:var(--f-note)}
+.fxmain>.fxnote{padding:var(--row-y) var(--row-x)}
+.fxpage.drop .fxmain{outline:2px dashed var(--accent);outline-offset:4px}
 .fxselbar .said{font:var(--f-ui)}
-.filestab .flrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--field-gap)}
-.filestab .flrow>.flfilter{flex:1 1 9rem;min-width:7rem;max-width:28rem}
-.filestab .flrow>.actbar{margin-inline-start:auto;flex:0 0 auto}
+/* On a phone, one column: the places a line that scrolls over the listing,
+   the bar's path on a line of its own over its filter and buttons, and a
+   row one line, its name and a file's size or a folder's day. */
+@media(max-width:900px){
+  .fxpage{padding:var(--row-y) 0 0}
+  .fxcols{grid-template-columns:minmax(0,1fr);gap:var(--row-y)}
+  .fxplaces{flex-direction:row;overflow-x:auto;scrollbar-width:none;gap:6px;padding-inline:var(--row-x)}
+  .fxplaces::-webkit-scrollbar{display:none}
+  .fxplaces .fxphead{display:none}
+  .fxplace{flex:0 0 auto;border-color:var(--line);min-height:var(--tap)}
+  .fxplace .fxpname{flex:0 0 auto;overflow:visible}
+  .fxplace.fxtrash{margin-top:0}
+  .fxmain{border-inline:0;border-radius:0}
+  .fxbar{flex-wrap:wrap}
+  .fxbar .fxcrumbs{flex:1 0 100%}
+  .fxbar .fxbarend{margin-inline-start:0;flex:1 1 100%}
+  .fxbar .flfilter{flex:1 1 6rem;width:auto}
+  .fxbar .fxbarend>.flfilter:only-child{flex:0 1 14rem}   /* in the trash, where nothing stands beside it: no control spans a phone */
+  .tbl.fxtbl .tline{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--row-x)}
+  .tbl.fxtbl .tline>.td[data-th="Modified"],.tbl.fxtbl .tline>.td.act{display:none}
+  .tbl.fxtbl .tline>.td[data-th]::before{content:none}
+  .tbl.fxtbl .tline>.td[data-th="Size"]{font:var(--f-note);color:var(--dim);white-space:nowrap}
+  .fxtbl .fxphone{display:inline}
+}
 .fxview .box{width:min(960px, calc(100vw - 32px));max-width:none}
 .fxview .fxbody{max-height:70vh;overflow:auto;margin:8px 0}
 .fxview .fxbody img,.fxview .fxbody video{display:block;max-width:100%;max-height:68vh;margin:0 auto}
