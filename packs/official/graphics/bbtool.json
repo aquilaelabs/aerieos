@@ -22,6 +22,7 @@
    "name": "libwebp"
   }
  ],
+ "framework": "2.1",
  "label": "Graphics tools (ImageMagick, resvg, oxipng, pngquant, cwebp)",
  "layout": {
   "bin": [

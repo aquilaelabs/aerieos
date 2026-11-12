@@ -10,6 +10,7 @@
    "name": "pyOpenSSL"
   }
  ],
+ "framework": "2.1",
  "label": "File access server (FTPS)",
  "layout": {
   "bin": [

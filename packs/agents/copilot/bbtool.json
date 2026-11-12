@@ -34,6 +34,7 @@
   "transcripts": ".copilot/session-state",
   "update_job": "copilot-update"
  },
+ "framework": "2.1",
  "label": "Copilot",
  "maker": "GitHub",
  "name": "copilot",

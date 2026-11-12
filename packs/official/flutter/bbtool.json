@@ -1,5 +1,6 @@
 {
  "about": "Flutter with its Dart SDK. Builds Android apps on Linux, and iOS too on a Mac with Xcode.",
+ "framework": "2.1",
  "label": "Flutter",
  "layout": {
   "bin": [

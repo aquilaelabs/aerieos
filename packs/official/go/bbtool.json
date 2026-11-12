@@ -1,5 +1,6 @@
 {
  "about": "Go, which cross-compiles to Windows, macOS, Linux and ARM with nothing else to install.",
+ "framework": "2.1",
  "label": "Go",
  "layout": {
   "bin": [

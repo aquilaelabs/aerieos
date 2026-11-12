@@ -538,6 +538,12 @@ def _signin_flow(f, out, errors):
             "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout)}
 
 
+def _agent_uses(a):
+    """What a cleaned adapter uses that a second number of the framework
+    brought, each (version, what it is)."""
+    return [((2, 1), "its agent's signin.flow")] if ((a or {}).get("signin") or {}).get("flow") else []
+
+
 def _agent_format(a):
     """The pack format a cleaned adapter needs: 2 when it describes its own
     protocol or uses what came with that (R234 step 3), else 1."""
@@ -682,6 +688,10 @@ def validate(m, shipped=()):
     if m.get("credits") is not None and (not isinstance(m["credits"], list) or len(packformat.credits_of(m)) != len(m["credits"])):
         errors.append(f"credits lists up to {packformat.CREDITS_MAX} of {{name, maker}}: each tool the pack carries and who it is by")
     out["maker"], out["credits"] = packformat.maker_of(m), packformat.credits_of(m)
+    # The framework's version it is written for (packformat): what it uses
+    # must be in the version it says. A coding agent's part is added to this
+    # once its adapter is read, below.
+    out["framework"] = packformat.said(packformat.framework_of(m) or (fmt, 0))
     # What it touches (R169 step 4): the hosts its install fetches from and
     # whether it needs root on the node, said on Look before it is added; a
     # pack that needs root is an administrator's to add.
@@ -790,6 +800,9 @@ def validate(m, shipped=()):
         errors.append("icon names a PNG, WebP or SVG file inside the pack")
         ic = ""
     out["icon"] = ic
+    # What it uses is in the framework version it says (R234 step 7): the
+    # number on a manifest is what an install has to know to do all of it.
+    errors.extend(packformat.needs(m, [*packformat.uses_of(m), *_agent_uses(out.get("pack_agent"))]))
     return (out if not errors else None), errors
 
 

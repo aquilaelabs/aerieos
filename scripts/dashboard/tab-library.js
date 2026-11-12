@@ -265,6 +265,9 @@ function libDetail(r){
   const key = `${r.kind}:${r.name}`;
   const lines = [];
   if (makerLine(r)) lines.push(makerLine(r));
+  // Written for a later framework than this AerieOS reads: taken, with what
+  // is newer left out, said so nobody wonders where a part of it is.
+  if (r.ahead) lines.push(`<span class="sub warn">It is ${esc(r.ahead)}.</span>`);
   if (r.platforms?.length) lines.push(`<span class="sub">Platforms: ${esc(r.platforms.join(", "))}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);

@@ -29,6 +29,8 @@ import re
 import threading
 import time
 
+import packformat
+
 FILE = None            # the state's catalog-toolchains.json
 write_json = None
 _lock = threading.RLock()
@@ -72,6 +74,7 @@ def manifest_of(row):
             # Who the tool is by, and each of them where it carries several
             # makers' (packformat.maker_of), where the row says.
             **{k: row[k] for k in ("maker", "credits") if row.get(k)},
+            **({"framework": packformat.least(row)} if packformat.least(row) else {}),
             "platforms": row.get("platforms") or ["linux/amd64"], "terms": row.get("terms") or [],
             "layout": {k: v for k, v in lay.items() if k in ("bin", "env", "tool")},
             "shipped": shipped}

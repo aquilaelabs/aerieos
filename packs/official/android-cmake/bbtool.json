@@ -1,5 +1,6 @@
 {
  "about": "The CMake the NDK's build system uses.",
+ "framework": "2.1",
  "label": "Android CMake",
  "layout": {
   "bin": [],

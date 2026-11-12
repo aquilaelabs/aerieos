@@ -210,10 +210,10 @@ terms, whether a folder is trusted) is the person's own to answer, in
 their first session. The code a person pastes is typed into the program
 and never written to the job's log.
 
-`flow` is an extra ([below](#the-format-and-what-it-promises)): it is read
-by the AerieOS releases after 0.9.0-dev.5284, and that one and those
-before it leave it out, so the agent signs in in its terminal there as it
-did.
+`flow` is framework 2.1's ([the framework's version](#the-frameworks-version)),
+so a manifest that describes one says `"framework": "2.1"`. An AerieOS from
+before it leaves the flow out, and the agent signs in in its terminal there
+as it did.
 
 ## The format, and what it promises
 
@@ -236,21 +236,40 @@ whoever writes a pack:
   a coding agent with words of its own are each a signed commit to the
   catalog.
 
-| Format | What it added | First read by |
-|---|---|---|
-| 1 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | 0.9.0's first releases |
-| 2 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | 0.9.0 |
+### The framework's version
 
-The number a manifest says is the one it needs: the least an install must
-read for the pack to do what it says. A few keys are extras, which an
-install that does not read them simply leaves out, the rest meaning what it
-meant: a pack that gains one is still taken by every install that took it
-before, so an extra does not move the number.
+The framework has a version of its own, apart from AerieOS's, and it moves
+whenever the framework changes. It is two numbers, written `X.Y`:
 
-| Extra | Without it | First read by |
-|---|---|---|
-| A coding agent's `signin.flow` | The agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
-| `maker` and `credits`, in a manifest and an index entry | The card names nobody as the tool's maker. | the releases after 0.9.0-dev.5284 |
+- **X is the format.** It moves when an AerieOS that does not read it could
+  not run the entry at all. Such an install lists the card with what it
+  needs and fetches nothing.
+- **Y moves when something is added** that an AerieOS from before it simply
+  leaves out, the rest meaning what it meant. An entry that uses it is still
+  taken by every install that took it before, minus the new part. Y never
+  goes back: after 2.1 comes 2.2, or 3.2 if X moves first.
+
+A manifest says both, in two keys:
+
+```json
+"format": 2,
+"framework": "2.1"
+```
+
+`format` is the least X an install must read to run the pack, a whole
+number (left out, it is 1). `framework` is the version the manifest is
+written for; left out, it is the format's first, `X.0`. What a manifest
+uses has to be in the version it says: a manifest that names a `maker`
+says `"framework": "2.1"` or later, and the check tells you so when it does
+not. So the number on a manifest is what an AerieOS has to know to do all
+of it, and a card written for a later version than an install reads says
+on its Details what that install leaves out.
+
+| Version | What it added | An AerieOS from before it | First read by |
+|---|---|---|---|
+| 1.0 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | | 0.9.0's first releases |
+| 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
+| 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 
@@ -350,8 +369,7 @@ out:
 Every entry in the vetted catalog names its maker; its check refuses one
 that does not. A sideloaded pack's card names none, whatever its manifest
 says: what nobody vetted does not get to say whose it is. Both keys are
-extras ([above](#the-format-and-what-it-promises)), read by the AerieOS
-releases after 0.9.0-dev.5284.
+framework 2.1's ([the framework's version](#the-frameworks-version)).
 
 The words on the card are a person's; a manifest and the index keep their
 own, and an AerieOS from before `aerie` and `verified` reads both as
@@ -470,7 +488,8 @@ the scripts it runs:
 |---|---|
 | `name` | The pack's name, 2 to 40 of `a-z`, `0-9` and `-`. It is the toolchain's name and the word after `aerie tool`, and it cannot be a shipped toolchain's. |
 | `label`, `about` | What the Library and the Installed page show. |
-| `format` | The pack format the manifest needs, a whole number; left out, it is 1. Say the number of the newest thing you use ([The format, and what it promises](#the-format-and-what-it-promises)). |
+| `format` | The pack format the manifest needs, a whole number; left out, it is 1. Say the number of the newest thing you use that an older AerieOS could not run ([The format, and what it promises](#the-format-and-what-it-promises)). |
+| `framework` | The framework's version the manifest is written for, as `"2.1"`: the newest thing it uses, whichever number brought it ([The framework's version](#the-frameworks-version)). |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
 | `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. This is where a pack downloads its binaries. |

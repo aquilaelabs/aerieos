@@ -1,5 +1,6 @@
 {
  "about": "Zig, and a C and C++ cross-compiler (zig cc) for Windows, macOS and Linux; it also links Rust for those.",
+ "framework": "2.1",
  "label": "Zig",
  "layout": {
   "bin": [

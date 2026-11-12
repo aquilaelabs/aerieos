@@ -18,6 +18,7 @@
    "name": "ONNX"
   }
  ],
+ "framework": "2.1",
  "label": "PyTorch with CUDA (python-ml, numpy, ONNX)",
  "layout": {
   "bin": [

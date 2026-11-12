@@ -1,5 +1,6 @@
 {
  "about": "Installs and switches Xcode versions on a Mac: run xcodes install --latest on the node, with an Apple ID the first time.",
+ "framework": "2.1",
  "label": "xcodes (Xcode installer)",
  "layout": {
   "bin": [

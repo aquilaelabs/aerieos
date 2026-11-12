@@ -1,5 +1,6 @@
 {
  "about": "Chromium, Firefox and WebKit with the module that drives them, for aerie capture shot and browser tests. Needs node.",
+ "framework": "2.1",
  "label": "Playwright browsers",
  "layout": {
   "bin": [

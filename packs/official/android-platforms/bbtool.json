@@ -1,5 +1,6 @@
 {
  "about": "The android.jar a build compiles against (compileSdk), at the newest level Google publishes. Update adds the next level beside it, so older projects keep building. Removing this removes every level.",
+ "framework": "2.1",
  "label": "Android SDK Platform (newest level)",
  "layout": {
   "bin": [],

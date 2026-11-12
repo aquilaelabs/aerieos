@@ -29,6 +29,7 @@
   "transcripts": ".local/share/opencode",
   "update_job": "opencode-update"
  },
+ "framework": "2.1",
  "label": "Any model",
  "maker": "Anomaly",
  "name": "open",

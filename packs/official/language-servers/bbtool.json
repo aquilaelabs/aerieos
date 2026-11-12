@@ -14,6 +14,7 @@
    "name": "TypeScript"
   }
  ],
+ "framework": "2.1",
  "label": "Language servers (Python, TypeScript)",
  "layout": {
   "bin": [

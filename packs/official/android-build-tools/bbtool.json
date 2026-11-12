@@ -1,5 +1,6 @@
 {
  "about": "aapt2, d8, zipalign and apksigner at the newest stable version. Update adds the next beside it.",
+ "framework": "2.1",
  "label": "Android SDK Build-Tools (newest)",
  "layout": {
   "bin": [],

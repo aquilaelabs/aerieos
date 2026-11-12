@@ -1,5 +1,6 @@
 {
  "about": "The Swift toolchain for Linux: shared logic, server-side Swift, and compiling packages. Not an iOS SDK.",
+ "framework": "2.1",
  "label": "Swift",
  "layout": {
   "bin": [

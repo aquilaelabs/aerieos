@@ -10,6 +10,7 @@
    "name": "Mermaid"
   }
  ],
+ "framework": "2.1",
  "label": "Diagram renderers (PlantUML, Mermaid)",
  "layout": {
   "bin": [

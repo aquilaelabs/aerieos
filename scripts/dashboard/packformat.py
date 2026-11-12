@@ -17,11 +17,24 @@ the format has a number. The promise the number keeps:
     primitive, written down in docs/tool-packs.md. A new primitive is a new
     number, never a change to an old one.
 
-The number a manifest says is the one it needs. A key an earlier build
-leaves out with the rest meaning what it meant (an extra: today a coding
-agent's signin.flow, without which the agent signs in in its terminal)
-does not move it, so a pack that gains one is still taken by every install
-that took it before; docs/tool-packs.md lists the extras and who reads them.
+The framework's version is two numbers (the operator, 12 Nov: a version of
+the catalog's own, moved whenever the framework changes), written X.Y:
+
+  - X is the format above: it moves when an install that does not read it
+    could not run the entry at all, and such an install hides the entry
+    with what it needs.
+  - Y moves when something is added that an install from before it simply
+    leaves out, the rest meaning what it meant (a sign-in's flow, without
+    which the agent signs in in its terminal; who a tool is by). An entry
+    that uses it is still taken by every install that took it before. Y
+    never goes back: 2.1 is followed by 2.2, or by 3.2 when X moves.
+
+A manifest says both: `format`, the least X an install must read to run it
+(a whole number, which is all a release from before the second number
+takes there), and `framework`, the version it is written for ("2.1"), in
+a key of its own beside it. What a manifest uses must be in the version it
+says (needs, below), so the number an author reads off a manifest is what
+an install has to know to do all of it.
 
 unit/test_packformat.py holds the kept manifests of every number
 (unit/packformat/N/) to this build, and `aerie lint` holds the ones a
@@ -33,6 +46,15 @@ this beside toolpacks.py from a checkout of any release.
 
 # The number this build reads, and every one before it.
 FORMAT = 2
+# ...and the framework's second number, which this build reads up to: what
+# was added since that an earlier build leaves out. It never resets.
+MINOR = 1
+VERSION = f"{FORMAT}.{MINOR}"
+# What each second number added, by the version that brought it.
+ADDED = {
+    (2, 1): "a coding agent's sign-in described as data (signin.flow), so the page runs it; who a tool is by (maker), "
+            "and each maker's tool where a pack carries several (credits)",
+}
 # What each number added, for the docs and for a person reading a refusal.
 FORMATS = {
     1: "tool packs (install steps, layout, verbs, config), Docker apps, and a coding agent whose hooks are one of the named shapes "
@@ -101,6 +123,77 @@ def of(doc):
     number from 1, 1 when it says none, None when what it says is no number."""
     v = doc.get("format", 1) if isinstance(doc, dict) else 1
     return v if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 9999 else None
+
+
+def framework_of(doc):
+    """The framework version a manifest or an index entry says it is written
+    for, (X, Y): from `framework` ("2.1"), or its format and nought where it
+    says none; None when what it says is no version."""
+    fmt = of(doc)
+    if fmt is None:
+        return None
+    v = doc.get("framework") if isinstance(doc, dict) else None
+    if v is None:
+        return (fmt, 0)
+    if not isinstance(v, str):
+        return None
+    x, dot, y = v.partition(".")
+    if not (dot and x.isdigit() and y.isdigit() and len(x) <= 4 and len(y) <= 4 and int(x) >= 1):
+        return None
+    return (int(x), int(y))
+
+
+def said(version):
+    """A version as it is written: 2.1."""
+    return f"{version[0]}.{version[1]}"
+
+
+def needs(doc, uses=()):
+    """What is wrong with the framework version a manifest says, as a list
+    of sentences, [] when nothing: a version that is none, one before its
+    own format, or one before something it uses. `uses` is what the caller
+    found in it, each (the version that brought it, what it is)."""
+    fw = framework_of(doc)
+    if fw is None:
+        return ['framework is the catalog framework\'s version the manifest is written for, as "2.1"']
+    if fw[0] < (of(doc) or 1):
+        return [f'framework {said(fw)} is before the format the manifest says it needs ({of(doc)}): its first number is that format or a later one']
+    # By the second number alone, which never resets: what 2.1 brought is in 3.1 and not in 3.0.
+    late = [(v, what) for v, what in uses if v[1] > fw[1]]
+    if late:
+        v = max(v for v, _ in late)
+        return [f'{", ".join(what for _, what in late)} {"is" if len(late) == 1 else "are"} catalog framework {said(v)}\'s: the manifest says "framework": "{said(v)}"']
+    return []
+
+
+def uses_of(doc):
+    """What a manifest's top level uses that a second number brought, each
+    (version, what it is): the keys any kind of entry can carry."""
+    out = []
+    if isinstance(doc, dict):
+        if doc.get("maker") is not None:
+            out.append(((2, 1), "maker"))
+        if doc.get("credits") is not None:
+            out.append(((2, 1), "credits"))
+    return out
+
+
+def least(doc, uses=()):
+    """The framework version a manifest written from a table says: the
+    least that holds what it uses, as "2.1", or "" where its format alone
+    says it (nothing a second number brought)."""
+    y = max((v[1] for v, _ in [*uses_of(doc), *uses]), default=0)
+    return f"{max(of(doc) or 1, max((v[0] for v, _ in [*uses_of(doc), *uses] if v[1] == y), default=1))}.{y}" if y else ""
+
+
+def ahead(doc):
+    """What this build leaves out of something written for a later version
+    of the framework than it reads, in a sentence, or "": a later second
+    number, which is what an entry it still takes can be ahead by."""
+    fw = framework_of(doc)
+    if fw is None or fw[1] <= MINOR:
+        return ""
+    return f"written for catalog framework {said(fw)}: this AerieOS reads {VERSION} and leaves out what was added after it"
 
 
 def too_new(fmt, since=""):

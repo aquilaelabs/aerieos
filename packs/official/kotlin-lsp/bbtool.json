@@ -1,5 +1,6 @@
 {
  "about": "JetBrains' Kotlin language server, so a session sees Kotlin errors as it edits. Carries its own Java.",
+ "framework": "2.1",
  "label": "Kotlin language server",
  "layout": {
   "bin": [

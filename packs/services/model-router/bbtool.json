@@ -78,6 +78,7 @@
    "name": "Ollama"
   }
  ],
+ "framework": "2.1",
  "label": "Model router",
  "maker": "AerieOS",
  "name": "model-router",

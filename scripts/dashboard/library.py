@@ -207,7 +207,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if e.get("kind") == "service":
             continue
         out.append({"kind": "pack", **({"group": "agent"} if e.get("agent") is True else {}), "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
-                    "maker": e.get("maker", ""),
+                    "maker": e.get("maker", ""), "framework": e.get("framework", ""),
                     "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12], "update": False,
                     "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add",
                     **_past(e, catalog_index)})
@@ -238,9 +238,13 @@ def _too_new(e, index):
 
 
 def _past(e, index):
-    """A row's `too_new` for such an entry, with no verb to press."""
+    """A row's `too_new` for such an entry, with no verb to press; and for
+    one this build takes though it is written for a later framework than it
+    reads, `ahead`: what it leaves out, said on the card's Details."""
     why = _too_new(e, index)
-    return {"too_new": why, "verb": ""} if why else {}
+    if why:
+        return {"too_new": why, "verb": ""}
+    return {"ahead": packformat.ahead(e)} if packformat.ahead(e) else {}
 
 
 def _repin(pack, e):

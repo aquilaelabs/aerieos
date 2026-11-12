@@ -10,6 +10,7 @@
    "name": "Python"
   }
  ],
+ "framework": "2.1",
  "label": "Python (uv)",
  "layout": {
   "bin": [

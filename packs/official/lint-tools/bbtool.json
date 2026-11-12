@@ -26,6 +26,7 @@
    "name": "fd"
   }
  ],
+ "framework": "2.1",
  "label": "Lint tools (shellcheck, hadolint, actionlint, ruff, yq, fd)",
  "layout": {
   "bin": [

@@ -30,6 +30,7 @@
   "transcripts": ".claude/projects",
   "update_job": "claude-update"
  },
+ "framework": "2.1",
  "label": "Claude",
  "maker": "Anthropic",
  "name": "claude",

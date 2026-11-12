@@ -1,5 +1,6 @@
 {
  "about": "adb and the other tools that talk to a phone or an emulator; the emulator and the Phone tab need it. Google ships it for x86_64 Linux only.",
+ "framework": "2.1",
  "label": "Android platform tools",
  "layout": {
   "bin": [

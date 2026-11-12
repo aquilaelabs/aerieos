@@ -1,5 +1,6 @@
 {
  "about": "What aerie tool office runs: LibreOffice without a window, to turn documents, decks and spreadsheets into PDFs. About 750 MB.",
+ "framework": "2.1",
  "label": "LibreOffice, headless",
  "layout": {
   "bin": [

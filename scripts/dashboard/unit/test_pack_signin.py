@@ -36,7 +36,7 @@ LIST = os.path.join(LIB, "login-list.py")
 KEPT = ".heron/cli/oauth-token"
 LINK = "https://accounts.heron.example/o/oauth2/auth?client_id=heron-cli&scope=" + "+".join(f"scope{i}" for i in range(40)) + "&state=abc123"
 
-HERON = {"name": "heron", "format": 2, "label": "Heron", "about": "A coding agent that signs in on a screen of its own.",
+HERON = {"name": "heron", "format": 2, "framework": "2.1", "label": "Heron", "about": "A coding agent that signs in on a screen of its own.",
          "platforms": ["linux/amd64"], "install": {"steps": [["sh", "{dir}/install.sh"]]}, "layout": {"bin": ["bin"], "tool": "bin/heron"},
          "agent": {"name": "Heron", "product": "Heron CLI", "provider": "Heron Labs", "command": "heron",
                    "briefing": {"how": "flag-file", "flag": "--rules"},

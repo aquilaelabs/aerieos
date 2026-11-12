@@ -1,5 +1,6 @@
 {
  "about": "rustup, cargo and the stable toolchain. Building for Windows also needs a linker: mingw, or zig with cargo-zigbuild.",
+ "framework": "2.1",
  "label": "Rust",
  "layout": {
   "bin": [

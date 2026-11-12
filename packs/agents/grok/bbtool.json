@@ -34,6 +34,7 @@
   "transcripts": ".grok/sessions",
   "update_job": "grok-update"
  },
+ "framework": "2.1",
  "label": "Grok",
  "maker": "xAI",
  "name": "grok",

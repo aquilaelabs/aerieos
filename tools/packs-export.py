@@ -55,7 +55,7 @@ def agent_packs():
         m = {"name": a.id, "label": a.name, "about": f"{a.product}, run by sessions as {a.command}", "tier": "official",
              # Who the agent is by: its provider, or its maker where it runs
              # any provider's model.
-             "maker": library.AGENT_MAKERS.get(a.id) or a.provider,
+             "maker": library.AGENT_MAKERS.get(a.id) or a.provider, "framework": "2.1",
              "platforms": ["linux/*"], "terms": [],
              # ...with how it is told a command needs no asking, where the
              # table says a way (agents.allow_plan).
@@ -127,6 +127,10 @@ def catalog_index(root):
         # Who the tool is by, for its card before the pack is fetched.
         if m.get("maker"):
             new[-1]["maker"] = m["maker"]
+        # ...and the framework's version it is written for, where that is
+        # past its format alone.
+        if m.get("framework"):
+            new[-1]["framework"] = m["framework"]
         # A deployed thing's entry says its kind, or an install's Library
         # offers it a second time as a tool pack to add.
         if m.get("service"):
@@ -139,6 +143,7 @@ def catalog_index(root):
         # ...and a shipped toolchain's its recipe's, past the first (R234 step 4).
         if (m.get("shipped") or {}).get("rev"):
             new[-1]["shipped_rev"] = m["shipped"]["rev"]
+    # (packformat.framework_of reads an entry's as it reads a manifest's.)
     # What the index says beside its entries (the first AerieOS that reads
     # each pack format) is kept as it was.
     idx = {**{k: v for k, v in idx.items() if k not in ("version", "generated", "packs")},

@@ -1,5 +1,6 @@
 {
  "about": "Native development kit, for C and C++ inside an Android app.",
+ "framework": "2.1",
  "label": "Android NDK",
  "layout": {
   "bin": [],

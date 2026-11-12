@@ -140,10 +140,16 @@ def parse(index_bytes):
             continue
         if fmt > 1:
             out[-1]["format"] = fmt
+        # ...and the framework's version it is written for, where it says
+        # one past its format alone (packformat.framework_of): what a card
+        # says of an entry this build takes and leaves part of out.
+        fw = packformat.framework_of(p)
+        if fw is not None and fw[1]:
+            out[-1]["framework"] = packformat.said(fw)
     # The first AerieOS that reads each format, where the index says, for a
     # card to name ({"3": "0.10.0"}).
     since = {str(k): str(v)[:40] for k, v in (d.get("formats") or {}).items()
-             if re.fullmatch(r"[0-9]{1,4}", str(k)) and re.fullmatch(r"[0-9A-Za-z.+-]{1,40}", str(v))} if isinstance(d.get("formats"), dict) else {}
+             if re.fullmatch(r"[0-9]{1,4}(?:\.[0-9]{1,4})?", str(k)) and re.fullmatch(r"[0-9A-Za-z.+-]{1,40}", str(v))} if isinstance(d.get("formats"), dict) else {}
     return {"generated": str(d.get("generated") or "")[:40], "packs": out, **({"formats": since} if since else {})}, ""
 
 

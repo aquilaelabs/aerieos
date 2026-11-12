@@ -38,6 +38,7 @@
   }
  },
  "format": 2,
+ "framework": "2.1",
  "install": {
   "steps": [
    [

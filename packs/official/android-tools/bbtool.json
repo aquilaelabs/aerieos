@@ -1,5 +1,6 @@
 {
  "about": "sdkmanager and avdmanager, through which every other Android toolchain installs. Sets this node's ANDROID_HOME.",
+ "framework": "2.1",
  "label": "Android command-line tools",
  "layout": {
   "bin": [

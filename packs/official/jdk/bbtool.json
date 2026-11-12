@@ -1,5 +1,6 @@
 {
  "about": "Java 21, which Gradle, sdkmanager and the emulator tools need. The first thing a node needs for Android work.",
+ "framework": "2.1",
  "label": "JDK 21 (Temurin)",
  "layout": {
   "bin": [

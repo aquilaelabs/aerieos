@@ -1,5 +1,6 @@
 {
  "about": "The Android emulator. Its system images, one per API level, are added on the Emulator tab. Google ships it for x86_64 Linux only.",
+ "framework": "2.1",
  "label": "Android emulator",
  "layout": {
   "bin": [

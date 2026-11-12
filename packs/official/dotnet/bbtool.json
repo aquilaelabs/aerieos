@@ -1,5 +1,6 @@
 {
  "about": "The .NET SDK plus the maui-android workload: Android apps from C#.",
+ "framework": "2.1",
  "label": ".NET + MAUI",
  "layout": {
   "bin": [

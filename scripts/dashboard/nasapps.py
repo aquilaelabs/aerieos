@@ -417,6 +417,10 @@ def add_catalog(entry, by="", fetch=None):
     fmt = packformat.of(meta)
     if fmt is None or packformat.too_new(fmt):
         return {"error": f"{app}'s bbapp.json says a format that is no number" if fmt is None else f"{app} {packformat.too_new(fmt)}"}
+    # ...and what it uses is in the framework version it says (R234 step 7).
+    late = packformat.needs(meta, packformat.uses_of(meta))
+    if late:
+        return {"error": f"{app}'s bbapp.json: {late[0]}"}
     if app in APPS:
         return {"error": f"{app} is a shipped app already"}
     seen = check(compose)

@@ -73,12 +73,12 @@ class Makers(unittest.TestCase):
 
     def test_a_manifest_and_an_index_entry_carry_them_and_a_wrong_one_is_said(self):
         m = json.loads((KEPT / "1" / "hexkit.json").read_text())
-        got, errors = toolpacks.validate({**m, "maker": "Example Labs", "credits": [{"name": "hexdump", "maker": "the util-linux project"}]})
+        got, errors = toolpacks.validate({**m, "framework": "2.1", "maker": "Example Labs", "credits": [{"name": "hexdump", "maker": "the util-linux project"}]})
         self.assertEqual((errors, got["maker"], got["credits"]), ([], "Example Labs", [{"name": "hexdump", "maker": "the util-linux project"}]))
         got, errors = toolpacks.validate(m)
         self.assertEqual((errors, got["maker"], got["credits"]), ([], "", []), "a manifest from before the key says nobody, and is as valid")
-        self.assertTrue(any("maker is who the tool is by" in e for e in toolpacks.validate({**m, "maker": "<b>x</b>"})[1]))
-        self.assertTrue(any("credits lists" in e for e in toolpacks.validate({**m, "credits": [{"maker": "no name"}]})[1]))
+        self.assertTrue(any("maker is who the tool is by" in e for e in toolpacks.validate({**m, "framework": "2.1", "maker": "<b>x</b>"})[1]))
+        self.assertTrue(any("credits lists" in e for e in toolpacks.validate({**m, "framework": "2.1", "credits": [{"maker": "no name"}]})[1]))
         idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": [{**ENTRY, "maker": "Eclipse Adoptium"}, {**ENTRY, "name": "plain"}]}).encode())
         self.assertEqual((why, idx["packs"][0]["maker"], "maker" in idx["packs"][1]), ("", "Eclipse Adoptium", False))
 
@@ -93,6 +93,55 @@ class Makers(unittest.TestCase):
         self.assertEqual([k for k, v in nasapps.APPS.items() if not packformat.maker_of(v)], [])
         import agents
         self.assertEqual([a.id for a in agents.TABLE if not (library.AGENT_MAKERS.get(a.id) or a.provider)], [])
+
+
+class Framework(unittest.TestCase):
+    """The framework's version is two numbers (the operator, 12 Nov): the
+    format, which an install must read to run an entry, and a second for
+    what was added that an earlier install leaves out; a manifest says the
+    version it is written for, and what it uses is in that version."""
+
+    def test_a_manifest_says_the_version_it_is_written_for_beside_its_format(self):
+        self.assertEqual(packformat.framework_of({"format": 2, "framework": "2.1"}), (2, 1))
+        self.assertEqual(packformat.framework_of({"format": 2}), (2, 0), "one that says none is its format's first")
+        self.assertEqual(packformat.framework_of({}), (1, 0))
+        self.assertEqual(packformat.framework_of({"framework": "2.1"}), (2, 1), "written for 2.1 and run by any install that reads format 1")
+        for bad in (2.1, 2, "2", "2.x", "v2.1", "", "0.1", ["2.1"]):
+            self.assertIsNone(packformat.framework_of({"framework": bad}), repr(bad))
+        self.assertEqual(packformat.VERSION, f"{packformat.FORMAT}.{packformat.MINOR}")
+        self.assertIn((packformat.FORMAT, packformat.MINOR), packformat.ADDED, "each second number says what it added")
+
+    def test_what_a_manifest_uses_is_in_the_version_it_says(self):
+        m = json.loads((KEPT / "1" / "hexkit.json").read_text())
+        _, errors = toolpacks.validate({**m, "maker": "Example Labs"})
+        self.assertEqual(errors, ['maker is catalog framework 2.1\'s: the manifest says "framework": "2.1"'])
+        self.assertEqual(toolpacks.validate({**m, "maker": "Example Labs", "framework": "2.1"})[1], [])
+        self.assertEqual(toolpacks.validate({**m, "maker": "Example Labs", "framework": "3.4"})[1], [], "a later version holds what an earlier one brought")
+        self.assertTrue(any("is before the format" in e for e in toolpacks.validate({**m, "format": 2, "framework": "1.0"})[1]))
+        self.assertTrue(any('as "2.1"' in e for e in toolpacks.validate({**m, "framework": 2.1})[1]))
+        heron = json.loads((KEPT / "2" / "heron.json").read_text())
+        self.assertEqual(toolpacks.validate(heron)[1], [])
+        del heron["framework"]
+        self.assertTrue(any("signin.flow is catalog framework 2.1's" in e for e in toolpacks.validate(heron)[1]))
+
+    def test_an_entry_written_for_a_later_second_number_is_taken_and_says_what_is_left_out(self):
+        idx, why = catalogindex.parse(json.dumps({"version": 1, "formats": {"2": "0.9.0", "2.1": "0.9.0-dev.5300", "x": "y"},
+                                                  "packs": [{**ENTRY, "format": 2, "framework": "2.7"}, {**ENTRY, "name": "plain"}]}).encode())
+        self.assertEqual(why, "")
+        self.assertEqual((idx["packs"][0]["framework"], "framework" in idx["packs"][1]), ("2.7", False))
+        self.assertEqual(idx["formats"], {"2": "0.9.0", "2.1": "0.9.0-dev.5300"}, "the index says the first AerieOS that reads each version")
+        self.assertEqual(catalogindex.too_new(idx["packs"][0], idx), "", "its format is one this build reads: it is taken")
+        self.assertIn("written for catalog framework 2.7", packformat.ahead(idx["packs"][0]))
+        self.assertEqual(packformat.ahead({"framework": packformat.VERSION}), "")
+
+    def test_a_manifest_written_from_a_table_says_the_least_version_that_holds_what_it_uses(self):
+        self.assertEqual(packformat.least({"maker": "Google"}), "2.1")
+        self.assertEqual(packformat.least({"name": "plain"}), "")
+        self.assertEqual(packformat.least({"format": 2}, [((2, 1), "signin.flow")]), "2.1")
+        root = Path(__file__).resolve().parents[3]
+        for f in sorted((root / "packs").glob("*/*/bbtool.json")):
+            m = json.loads(f.read_text())
+            self.assertEqual(m.get("framework"), "2.1", f"{f.parent.name} names its maker, which is framework 2.1's")
 
 
 class Number(unittest.TestCase):

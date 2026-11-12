@@ -34,6 +34,7 @@
   "transcripts": ".codex/sessions",
   "update_job": "codex-update"
  },
+ "framework": "2.1",
  "label": "ChatGPT",
  "maker": "OpenAI",
  "name": "codex",

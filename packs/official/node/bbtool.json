@@ -1,5 +1,6 @@
 {
  "about": "Node.js and npm, for a project built with npm and for anything that drives a browser with Playwright.",
+ "framework": "2.1",
  "label": "Node.js",
  "layout": {
   "bin": [
