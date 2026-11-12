@@ -329,7 +329,7 @@ function tpModalHtml(){
   const rm = p ? `<button type="button" class="danger" data-tprm="${esc(p.name)}">Remove</button>` : "";
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
     ${p ? `<div class="field"><div class="sub">${here ? "Made here" : `From <code>${esc(p.pack.url)}</code>`} at ${esc(p.pack.commit.slice(0, 12))}, added by ${
-          esc(p.pack.by || "an administrator")}${p.pack.at ? ` ${ago(p.pack.at)}` : ""}. Verbs: ${esc((p.pack.verbs || []).join(", "))}.</div></div>` : ""}
+          esc(p.pack.by || "an administrator")}${p.pack.at ? ` ${ago(p.pack.at)}` : ""}.${(p.pack.verbs || []).length ? ` Verbs: ${esc(p.pack.verbs.join(", "))}.` : ""}</div></div>` : ""}
     ${fresh && !f.catalog ? tpWhatHtml(f) : ""}
     ${fresh || here ? tpFromHtml(f, here) : ""}
     ${seen ? `<div class="field">${tpSeen(seen, p ? p.pack : null, offer)}</div>` : ""}
