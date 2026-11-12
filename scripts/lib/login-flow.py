@@ -17,6 +17,8 @@ held to plain words by toolpacks.py):
                person types the code on the provider's page
   kept         the file under the account's home whose arrival says the
                account is signed in, which ends the flow
+  refused      the words it shows when it does not take the code, so the
+               flow ends then, in its words, and not after a wait
   logout       its own sign-out command; left out, a sign-out removes `kept`
 
 What goes up the job's log is this driver's lines and never the program's
@@ -105,6 +107,21 @@ def code_in(text, after):
     return m.group(1) if m else ""
 
 
+# What is taken out of a screen's last words before they are said: control
+# characters (a field echoes with backspaces) and a spinner's glyphs.
+NOISE = re.compile(r"[\x00-\x1f\x7f\u2800-\u28ff]+")
+
+
+def last_words(text, code=""):
+    """What a screen said last, as a sentence a person can read: its
+    escapes, control characters and spinner out, and never the code that
+    was typed into it."""
+    words = re.sub(r"\s+", " ", NOISE.sub(" ", visible(text))).strip()
+    if code:
+        words = words.replace(code, "(the code)")
+    return words[-240:]
+
+
 def kept_now(path):
     try:
         return os.path.getsize(path) > 0
@@ -171,7 +188,9 @@ def sign_in(agent, a):
     started = time.time()
     todo = [[squash(x["when"]), x.get("send", ""), 0.0] for x in flow.get("answers") or []]
     prompt, after = squash(flow.get("prompt") or ""), flow.get("code_after") or ""
-    link = code = ""
+    refused = squash(flow.get("refused") or "")
+    link = code = typed_code = ""
+    refused_at = 0.0
     link_at = sent_at = 0.0
     asked = False
     watch = [master, 0]
@@ -202,9 +221,15 @@ def sign_in(agent, a):
                     if got:
                         with contextlib.suppress(OSError):
                             os.write(master, got.encode())
-                            time.sleep(0.4)
+                            # Its field's echo of the code is read and put
+                            # aside before Enter, so what the screen says
+                            # after it starts with the program's answer.
+                            until = time.time() + 0.5
+                            while time.time() < until:
+                                if select.select([master], [], [], 0.1)[0]:
+                                    raw = (raw + os.read(master, 65536).decode("utf-8", "replace"))[-KEEP_CHARS:]
                             os.write(master, b"\r")
-                        sent_at, since = now, ""
+                        sent_at, since, typed_code = time.time(), "", got
                         say(f"the code is with {name}; waiting for it to keep the sign-in")
             if kept_now(kept):
                 say(f"signed in to {name} on {os.environ.get('BB_NODE') or 'this machine'}")
@@ -244,7 +269,11 @@ def sign_in(agent, a):
                     say(f"signed in to {name} on {os.environ.get('BB_NODE') or 'this machine'}")
                     return 0
                 break
-            if sent_at and now - sent_at > KEEP_S:
+            # It said it did not take the code: ended a moment later, once
+            # it has said why.
+            if sent_at and refused and not refused_at and refused in fresh:
+                refused_at = now
+            if (refused_at and now - refused_at > 1.0) or (sent_at and now - sent_at > KEEP_S):
                 break
             if now - started > LIMIT_S:
                 say("the sign-in was not finished in time")
@@ -255,9 +284,9 @@ def sign_in(agent, a):
             os.close(master)
     # Why, in the program's own words: what its screen said last (after the
     # code, where one was typed).
-    words = re.sub(r"\s+", " ", visible(since if sent_at else raw)).strip()
+    words = last_words(since if sent_at else raw, typed_code)
     say(f"{name} did not keep a sign-in" + (" after the code" if sent_at else "")
-        + (f"; its screen last said: {words[-240:]}" if words else ""))
+        + (f"; its screen last said: {words}" if words else ""))
     return 1
 
 

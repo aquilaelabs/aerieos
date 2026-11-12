@@ -185,6 +185,7 @@ person the link and a field for the code, which is what a phone can use:
     "answers": [{"when": "Select login method", "send": ""}],
     "url": "https://auth.example.com/oauth/",
     "prompt": "paste the authorization code",
+    "refused": "Got an error",
     "kept": ".kite/oauth-token"
   }
 }
@@ -196,6 +197,7 @@ person the link and a field for the code, which is what a phone can use:
 | `url` | How the link it prints starts: `https`, its host, and as much of the path as never changes. The link is read whole however the program wraps it. |
 | `prompt` | The words it waits at for the code the provider's page hands back. The page draws a field, and what a person pastes there is typed into the program. |
 | `code_after` | In `prompt`'s place, for a flow where a person types a code on the provider's page: the words that code follows on its screen. The page shows the code, and nothing is typed back. |
+| `refused` | The words it shows when it does not take the code. The flow ends then and the page says why in the program's own words; without it, a code that was not taken is noticed after two minutes. |
 | `kept` | The file under the account's home its sign-in is kept in. Its arrival ends the flow, signed in; it is what says who is signed in on a node, it is sealed where a node seals sign-ins, and a sign-out removes it. |
 | `logout` | Its own sign-out command, where it has one (`["kite", "logout"]`); the kept file is removed after it. |
 

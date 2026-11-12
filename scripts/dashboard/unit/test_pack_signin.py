@@ -46,6 +46,7 @@ HERON = {"name": "heron", "format": 2, "label": "Heron", "about": "A coding agen
                               "flow": {"url": "https://accounts.heron.example/o/oauth2/",
                                        "answers": [{"when": "Select login method", "send": ""}],
                                        "prompt": "paste the authorization code",
+                                       "refused": "code was not accepted",
                                        "kept": KEPT}}}}
 
 # The program: raw keys, a menu, the link wrapped at 80 columns whatever the
@@ -87,12 +88,14 @@ while True:
         if k == b"\r":
             break
         code += k
-        out("*")
+        out(k.decode() + " \b")
     if code == b"good-code":
         keep()
         out("\x1b[2J\x1b[HWelcome! Choose your color scheme\r\n > dark\r\n   light\r\n")
         time.sleep(600)
-    out("\r\n\x1b[31mThat code was not accepted. Try again.\x1b[0m\r\n > ")
+    out("\r\n\u28ef Signing in...")
+    time.sleep(0.3)
+    out("\r\u28df \x1b[31mThat code was not accepted. Try again.\x1b[0m\r\n > ")
 ''' % {"link": LINK, "kept": KEPT}
 
 
@@ -116,6 +119,7 @@ class TheFlowAsData(unittest.TestCase):
     def test_a_flow_is_kept_as_what_the_driver_reads(self):
         flow = cleaned()["signin"]["flow"]
         self.assertEqual(flow, {"url": "https://accounts.heron.example/o/oauth2/", "prompt": "paste the authorization code", "code_after": "",
+                                "refused": "code was not accepted",
                                 "answers": [{"when": "Select login method", "send": ""}], "kept": KEPT, "logout": []})
 
     def test_a_manifest_with_a_flow_needs_no_newer_format_than_its_hooks_do(self):
@@ -188,6 +192,18 @@ class TheControllersRow(unittest.TestCase):
         n.log += "[aerieos] Paste code: the one that page gives you once you have signed in there\n"
         self.assertTrue(f.state()["waiting"])
         self.assertEqual(f.state()["agent"], "heron")
+
+    def test_a_flow_that_failed_says_why_in_the_programs_words_without_the_drivers_mark(self):
+        self.offer(HERON)
+
+        class Nodes:
+            def job(self, _id):
+                return {"state": "failed", "log": "[aerieos] open this link to sign in: " + LINK + "\n[aerieos] Paste code: the one\n"
+                                                  "[aerieos] Heron did not keep a sign-in after the code; its screen last said: That code was not accepted.\n"}
+
+        got = signin.NodeFlow(Nodes(), "n_1", "j_1", "node one", uid="u_0123abcd", agent="heron").state()
+        self.assertEqual((got["done"], got["ok"]), (True, False))
+        self.assertEqual(got["error"], "Heron did not keep a sign-in after the code; its screen last said: That code was not accepted.")
 
     def test_a_flow_that_shows_a_code_draws_the_code_and_no_field(self):
         self.offer(with_flow(prompt=None, code_after="enter the one-time code"))
@@ -265,6 +281,7 @@ class OnTheNode(unittest.TestCase):
 
     def test_the_link_goes_up_whole_the_code_comes_down_and_the_program_is_ended_once_signed_in(self):
         log, code = self.flow(("Paste code", "good-code"), env={"BB_TOKEN": "the-flows-own-token"})
+        self.assertNotRegex(log, r"g ?o ?o ?d ?- ?c ?o ?d ?e")
         self.assertEqual(code, 0, log)
         with open(os.path.join(self.home, "heron.token")) as f:
             self.assertEqual(f.read(), "", "what the flow reports with is not handed to the program signing in")
@@ -278,11 +295,22 @@ class OnTheNode(unittest.TestCase):
             self.assertGreaterEqual(int(f.read()), 1000, "a terminal wide enough that a link is one row")
 
     def test_a_code_the_program_does_not_take_fails_in_its_own_words(self):
-        log, code = self.flow(("Paste code", "bad-code"))
+        t0 = time.time()
+        log, code = self.flow(("Paste code", "bad-code"), env={"BB_FLOW_KEEP_S": "60"})
         self.assertEqual(code, 1, log)
+        self.assertLess(time.time() - t0, 20, "ended when the program said so, not after the wait for a sign-in to be kept")
         last = [ln for ln in log.splitlines() if ln.strip()][-1]
         self.assertIn("Heron did not keep a sign-in after the code", last)
         self.assertIn("That code was not accepted", last)
+        self.assertNotIn("bad-code", log, "its field echoes what is typed, and the echo is not the program's answer")
+        self.assertNotRegex(last, r"b ?a ?d ?- ?c ?o ?d ?e")
+        self.assertNotRegex(last, "[\x00-\x1f\u2800-\u28ff]", "no control characters and no spinner in what a person reads")
+
+    def test_with_no_words_for_a_refusal_it_is_noticed_after_the_wait(self):
+        self.write_packs(with_flow(refused=None))
+        log, code = self.flow(("Paste code", "bad-code"))
+        self.assertEqual(code, 1, log)
+        self.assertIn("That code was not accepted", [ln for ln in log.splitlines() if ln.strip()][-1])
         self.assertFalse(os.path.exists(os.path.join(self.home, KEPT)))
         self.assertTrue(self.gone())
 

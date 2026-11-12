@@ -494,7 +494,8 @@ def _signin_flow(f, out, errors):
     driver reads (scripts/lib/login-flow.py), or None: `url` is how the link
     it prints starts; `prompt` the words it waits at for the code the
     provider's page hands back, or `code_after` the words a one-time code
-    follows, for one typed on the provider's page; `answers` what it asks
+    follows, for one typed on the provider's page; `refused` the words it
+    shows when it does not take a code; `answers` what it asks
     before the link, each the words it shows and what is typed (Enter
     follows); `kept` the file under the account's home whose arrival says
     it is signed in, which is sealed where a node seals sign-ins and removed
@@ -509,7 +510,7 @@ def _signin_flow(f, out, errors):
     if not (isinstance(url, str) and FLOW_URL.fullmatch(url)):
         errors.append("agent.signin.flow.url is how the link it prints starts: https and its host, e.g. https://auth.example.com/")
     words = {}
-    for k in ("prompt", "code_after"):
+    for k in ("prompt", "code_after", "refused"):
         v = f.get(k, "")
         if v and not (isinstance(v, str) and FLOW_WORDS.fullmatch(v)):
             errors.append(f"agent.signin.flow.{k} is the plain words its screen shows there, 2 to 80 of them")
@@ -533,7 +534,7 @@ def _signin_flow(f, out, errors):
         logout = []
     if len(errors) != bad:
         return None
-    return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"],
+    return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"], "refused": words["refused"],
             "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout)}
 
 

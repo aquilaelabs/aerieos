@@ -29,6 +29,7 @@
     ],
     "kept": ".heron/cli/oauth-token",
     "prompt": "paste the authorization code",
+    "refused": "code was not accepted",
     "url": "https://accounts.heron.example/o/oauth2/"
    },
    "login": [

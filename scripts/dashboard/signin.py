@@ -180,7 +180,8 @@ class NodeFlow:
             for line in reversed(out.splitlines()):
                 line = line.strip()
                 if line and not line.startswith("http") and (not prompt or prompt not in line):
-                    why = line[-300:]
+                    # Without the mark a driver's or a check's line opens with.
+                    why = re.sub(r"^\[(?:aerieos|builderbot)\]\s*", "", line)[-300:]
                     break
             why = why or "the sign-in did not finish"
         return {"running": not done, "url": m.group(0) if m else "",
