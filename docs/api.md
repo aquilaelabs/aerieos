@@ -156,7 +156,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/idle` | prefix | `_idle` | The idle rule for every agent's sessions (idle.py): minutes, 0 for never. | refused: controller |
 | POST | `/api/paths` | prefix | `_paths` | Where the controller keeps one kind of what grows (paths.py), and what is there moved across. | refused: controller |
 | POST | `/api/snapshots` | prefix | `_snapshots` | POST /api/snapshots: take one now, or restore the whole tree as of a day or one file of it (snapshots.restore, which snapshots the tree first so it can be undone). | refused: settings |
-| POST | `/api/transcripts` | exact | `_transcripts` | POST /api/transcripts {project, id, action}: one of the signed-in person's own conversations deleted, or made visible to every session on the project (share) or private again (unshare). |  |
+| POST | `/api/transcripts` | exact | `_transcripts` | POST /api/transcripts {project, id, action}: one of the signed-in person's own conversations deleted, or made visible to every session on the project (share) or private again (unshare): a person's, from the notebook's Se |  |
 | POST | `/api/settings` | prefix | `_settings_post` | POST /api/settings. | refused: controller, refused: debug |
 | POST | `/api/checks` | exact | `_checks_post` | POST /api/checks {kind}: Check for updates, for one of the update checks under Controller settings (R176, checks.py). | refused: controller |
 | POST | `/api/catalog-mirror` | exact | `_catalog_mirror_post` | POST /api/catalog-mirror {action: import, archive} or {action: forget}: the vetted catalog's mirror under Controller settings (R169 step 6), its archive taken through /api/upload-archive. | refused: controller |
