@@ -35,6 +35,7 @@
      "logout"
     ],
     "prompt": "Paste code",
+    "refused": "Invalid code",
     "url": [
      "https://claude.com/",
      "https://console.anthropic.com/",

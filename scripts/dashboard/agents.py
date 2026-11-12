@@ -91,7 +91,7 @@ TABLE = (
           # record names, while the credential beside it is there.
           signin={"login": ["claude", "auth", "login"],
                   "flow": {"url": ["https://claude.com/", "https://console.anthropic.com/", "https://platform.claude.com/"],
-                           "prompt": "Paste code", "ends": "exit", "kept": ".claude/.credentials.json",
+                           "prompt": "Paste code", "refused": "Invalid code", "ends": "exit", "kept": ".claude/.credentials.json",
                            "logout": ["claude", "auth", "logout"],
                            "who": {"file": ".claude.json", "email": ["oauthAccount", "emailAddress"]}}},
           # Its installer is handed no version: the one asked for is read
