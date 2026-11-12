@@ -368,7 +368,7 @@ function dockDress(){
   if (dockH) el.style.setProperty("--dock-h", dockH + "px");
   else if (up){
     if (!dockAuto.h || dockAuto.vh !== innerHeight){
-      const under = [$("mobar"), $("keys")].reduce((n, x) => n + (x ? x.getBoundingClientRect().height : 0), 0);
+      const under = [$("mobar")].reduce((n, x) => n + (x ? x.getBoundingClientRect().height : 0), 0);
       dockAuto = {h: Math.round((el.getBoundingClientRect().height + under) / 2), vh: innerHeight};
     }
     if (el.style.getPropertyValue("--dock-h") !== dockAuto.h + "px") el.style.setProperty("--dock-h", dockAuto.h + "px");

@@ -25,15 +25,12 @@ const KEYS = [
 // breakpoint to be on the wrong side of.
 let showMacros = false;
 
-// One panel at a time on the phone: opening one closes the others.
+// The phone's one panel, Commands: a press opens it and the next shuts it.
+// (Keys was the other, until the hot bar's line took its keys: the
+// operator, 12 Nov.)
 function mobPanel(which){
-  const on = {keys: showKeys, macros: showMacros}[which];
-  // The two panels always take turns: they are the same strip of space. The
-  // keys row only joins that trade on a phone, where the three of them plus
-  // a terminal do not fit, on a desktop it stays where it was put.
-  if (which === "keys") showKeys = !on;
-  else if (isPhone()) showKeys = false;
-  showMacros = which === "macros" ? !on : false;
+  if (which !== "macros") return;
+  showMacros = !showMacros;
   render();
 }
 
@@ -124,73 +121,65 @@ function mobHotRec(){
   const t = tabOf(panes[active]);
   return t ? [...TERMS.values()].find(r => r.t.id === t.id && r.el.isConnected) || null : null;
 }
-// Links on the band, there while the terminal in front shows a link.
-function mobHotLinks(rec, has){
-  if (mobHotRec() !== rec) return;
-  const lb = $("mHot")?.querySelector("[data-hlinks]");
-  if (lb && lb.hidden !== !has){ lb.hidden = !has; chipsEdge($("mHot")); }
-  if (!has) mobLinksShut();
-}
 function mobLinksShut(){
-  const box = $("mLinks");
+  const box = $("mLinksBox");
   if (box && !box.hidden) box.hidden = true;
-  $("mHot")?.querySelector("[data-hlinks]")?.setAttribute("aria-expanded", "false");
+  $("mLinks")?.setAttribute("aria-expanded", "false");
+}
+// A phone's line carries a shell's other keys past the hot ones, where the
+// Keys panel was (the operator, 12 Nov: most of them were on the bar
+// already): the rest of the table, in its order.
+function mobMoreKeys(t){
+  if (!isShellTab(t) || !mayShell()) return [];
+  const have = new Set(termHotKeys(t).map(([k]) => k));
+  return KEYS.flat().filter(([k]) => !have.has(k));
 }
 
 function drawKeys(){
-  const el = $("keys");
   const t = tabOf(panes[active]);
   const term = isShellTab(t);
-  const on = showKeys && term;                   // pointless anywhere else
-  // Content first, then the slide: the slide measures the panel, and the
-  // first open used to measure it empty and land twelve pixels tall.
-  if (on && paint(el, KEYS.map(r =>
-      r.map(([k,l]) => `<button data-k="${esc(k)}">${esc(l)}</button>`).join("")
-    ).join('<span class="gap"></span>')))
-    el.querySelectorAll("[data-k]").forEach(b => b.onclick = () => sendKey(b.dataset.k));
-  // Content is otherwise kept while a close tweens shut: emptying it
-  // mid-slide would collapse an already-shrinking box to nothing.
-  // Not there at all where there is no shell to type into (B460): ghosted,
-  // Keys took a quarter of a phone's bar on every document tab and cut
-  // Sessions and Commands short beside it, to say a thing nobody needed.
-  const mk = $("mKeys");
-  mk.classList.toggle("on", on);
-  setHidden(mk, !term);
+  // Commands, on a shell's tab: not there at all where there is no shell to
+  // type into (B460).
   const mm = $("mMacros");
   mm.classList.toggle("on", showMacros);
   setHidden(mm, !term);
   // On a phone the band is the hot bar (the operator, 12 Nov): the keys of
-  // the terminal in front, whichever kind it is, with Keys and Commands at
-  // its end where it is a shell. A desk's keys float over the terminal.
+  // the terminal in front, whichever kind it is, in a line that scrolls (a
+  // shell's carrying the rest of the key table past its hot ones), then
+  // Links, and Commands where it is a shell. A desk's keys float over the
+  // terminal.
   const hot = $("mHot"), own = t?.kind === "term" && termOwn(t) && isPhone() ? t : null;
-  if (paint(hot, own ? termHotButtons(own) : "")){
+  if (paint(hot, own ? termHotButtons(own, mobMoreKeys(own)) : "")){
     hot.querySelectorAll("[data-hk]").forEach(b => b.onclick = () => { mobLinksShut(); sendKey(b.dataset.hk); });
-    const lb = hot.querySelector("[data-hlinks]");
-    if (lb) lb.onclick = () => {
-      const rec = mobHotRec(), box = $("mLinks");
-      if (!rec || !box.hidden) return mobLinksShut();
-      termLinksFill(rec, box, mobLinksShut);
-      box.hidden = false;
-      lb.setAttribute("aria-expanded", "true");
-    };
     // A press on the band leaves the keyboard where it is.
     hot.onpointerdown = e => { if (e.target.closest("button")) e.preventDefault(); };
   }
   setHidden(hot, !own);
+  // Links, always there beside the line: what the terminal in front shows,
+  // listed over the band, or that it shows none.
+  const ml = $("mLinks");
+  setHidden(ml, !own);
   if (!own) mobLinksShut();
-  else { const rec = mobHotRec(); if (rec) mobHotLinks(rec, termLinks(rec).length > 0); }
+  ml.onpointerdown = e => e.preventDefault();
+  ml.onclick = () => {
+    const rec = mobHotRec(), box = $("mLinksBox");
+    if (!rec || !box.hidden) return mobLinksShut();
+    termLinksFill(rec, box, mobLinksShut);
+    box.hidden = false;
+    ml.setAttribute("aria-expanded", "true");
+  };
   // Its ends, as the dock's line has them: faded, with the arrow, where
   // more keys lie past one (chipsEdge), measured once it is laid out.
   if (own) requestAnimationFrame(() => chipsEdge(hot));
   // Sessions is a page and Chat the dock's tab (R250): the foot bar keeps
-  // what is about the terminal in front, its keys, Keys and Commands, and
+  // what is about the terminal in front, its keys, Links and Commands, and
   // is not drawn with nothing in it.
-  setHidden($("mobar"), mk.hidden && mm.hidden && !own);
+  setHidden($("mobar"), mm.hidden && !own);
   // One panel at a time: whichever is opening slides, and any that is
   // closing in the same breath swaps out under it (see slidePanel).
   // Commands closes with the keys when the tab underneath is not a shell: a
   // flyout of things to type, over something that cannot be typed into.
-  const want = [[el, on], [$("macpanel"), showMacros && term]];
+  const want = [[$("macpanel"), showMacros && term]];
   const opener = want.find(([p, s]) => s && p.dataset.shown !== "1");
   const landed = opener ? slidePanel(opener[0], true) : null;
   for (const [p, s] of want) if (p !== opener?.[0]) slidePanel(p, s, landed);

@@ -45,7 +45,6 @@ let findings = null;
 // useful and also where they cost the most room: opening one over the
 // terminal before anybody asked meant arriving at a phone with half the
 // screen already spent. The ⌨ button is right there.
-let showKeys = false;
 let seq = 0;
 
 const $ = id => document.getElementById(id);

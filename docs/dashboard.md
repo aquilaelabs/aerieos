@@ -331,7 +331,7 @@ clipboard, and the wheel scrolls its output.
 and PgDn pages forward; copy mode ends by itself the moment you are back at
 the bottom, so there is nothing to remember (`Ctrl-b [` still works, and `q`
 still leaves). Inside a full-screen program the key is the program's. That is
-also what the PgUp/PgDn keys in the ⌨ Keys row do on a **phone**, where a
+also what the PgUp and PgDn keys of the hot bar do on a **phone**, where a
 finger dragged up or down scrolls the terminal too: back through a shell's
 history by the line (copy mode, left by itself at the bottom), and as the
 wheel would in an agent's tab. A press held on a word selects it, with a
@@ -341,19 +341,23 @@ the keyboard.
 **The hot bar** is the keys a terminal is most reached for, a press each.
 On a coding agent's tab they are Esc, Shift+Tab, the up and down arrows,
 Enter and Ctrl+C; on a shell's, Esc, Tab, the arrows, Ctrl+C and Ctrl+D;
-every terminal has PgUp and PgDn. **Links** joins them while the terminal
-shows a link, and lists the links on its screen and in the lines before
-it, each to open in a new tab or copy: a link that runs over several rows
-is read whole, which is how a sign-in link a program prints is opened on a
-phone. A log's tab, and a session you may only read, have the page keys,
-and Links while there is one, alone.
+every terminal has PgUp and PgDn. Beside them is **Links**, the press with
+a chain on it: it lists the links the terminal shows, on its screen and in
+the lines before it, each to open in a new tab or copy, or says it shows
+none. A link that runs over several rows is read whole, which is how a
+sign-in link a program prints is opened on a phone. A log's tab, and a
+session you may only read, have the page keys and Links alone.
 
 At a **desk** the bar floats over the terminal's bottom right corner,
 slightly translucent until the pointer is on it; the **›** at its end folds
 it to that one handle and **‹** brings it back, a choice this browser
-keeps. On a **phone** it is the band at the terminal's foot: its keys in a
-line that scrolls under a thumb, and on a shell's tab **⌨** and **»** at
-its end, which open the full Keys panel and Commands.
+keeps. On a **phone** it is the band at the terminal's foot, read as the
+dock's line of tabs is: its keys in a line that scrolls under a thumb, the
+ends faded with a round arrow where more lie past them, and Links and, on a
+shell's tab, **»** for Commands standing still at its right. A shell's line
+carries the rest of a keyboard's keys past the first few (the other
+arrows, Home and End, more Ctrl keys, and the symbols a touch keyboard
+hides).
 
 The launcher sets this on the session as it starts one, not only in the config
 file, because `~/.tmux.conf` lives on the persistent home and is yours.

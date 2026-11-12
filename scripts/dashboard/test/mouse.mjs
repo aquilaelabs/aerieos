@@ -62,7 +62,7 @@ ok(await page.$eval('#pane1 .slot.on.ownterm', el => {
 // A desktop has a keyboard, so it has no on-screen one: the bar hides the
 // one it keeps for phones.
 ok(!await page.$('#bKeys')
-   && await page.$eval('#mKeys', el => getComputedStyle(el).display === 'none'),
+   && !await page.$('#mKeys') && await page.$eval('#mLinks', el => getComputedStyle(el).display === 'none'),
    'no on-screen keys control on a desktop, from either place it used to be');
 
 // A poll that changes nothing rebuilds nothing: the same elements stay put

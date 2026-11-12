@@ -61,13 +61,13 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
   const HOT = '#pane1 .slot.ownterm .xhot';
   const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
     const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
-    return { keys: [...b.querySelectorAll('.xhotkeys button')].filter(x => !x.hidden).map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
+    return { keys: [...b.querySelectorAll('.xhotkeys button')].map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
              bottom: Math.round(h.bottom - r.bottom), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1 && r.top >= h.top,
              seen: +getComputedStyle(b).opacity,
              tall: [...b.querySelectorAll('button')].filter(x => !x.hidden).every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
   ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.bottom >= 0 && hot.bottom < 24 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall
      && hot.seen > 0.6 && hot.seen < 1,
-     `a shell's terminal wears its hot bar at its bottom right, slightly translucent: a shell's keys and a page back and on, and no Links while it shows no link (${JSON.stringify(hot)})`);
+     `a shell's terminal wears its hot bar at its bottom right, slightly translucent: a shell's keys and a page back and on (${JSON.stringify(hot)})`);
   await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);
   const up = tmuxFmt('shell-9', '#{pane_in_mode}');
   await page.click(`${HOT} [data-hk="down"]`); await sleep(300);
@@ -79,9 +79,10 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
     type("clear; printf 'soft https://example.test/soft/%s end\\n' \"$(printf 'a%.0s' $(seq 1 400))\"; echo \"https://example.test/hard/$(printf 'b%.0s' $(seq 1 400))\" | fold -w \"$(tput cols)\"; echo done-links\r"); });
   await page.waitForFunction(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); const b = rec?.term?.buffer?.active;
     for (let i = 0; b && i < b.length; i++) if (/^done-links/.test(b.getLine(i)?.translateToString(true) || '')) return true; return false; }, null, { timeout: 15000 }).catch(() => {});
-  // ...and Links is there once the terminal shows one (the operator, 12 Nov).
-  const offered = await page.waitForFunction(sel => !document.querySelector(sel + ' [data-hlinks]').hidden, HOT, { timeout: 8000 }).then(() => true, () => false);
-  ok(offered, 'Links joins the bar once the terminal shows a link');
+  // Links is there whether or not the terminal shows one (the operator, 12
+  // Nov), a press with the chain's picture.
+  ok(await page.$eval(`${HOT} [data-hlinks]`, b => !b.hidden && !!b.querySelector('svg') && b.offsetParent !== null && /links/.test(b.getAttribute('aria-label') || '')),
+     'Links is on the bar always, a press with the chain\'s picture');
   await page.click(`${HOT} [data-hlinks]`);
   const links = await page.evaluate(sel => { const l = document.querySelector(sel + ' .xlinks');
     return { shown: !l.hidden, hrefs: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...l.querySelectorAll('a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),
@@ -398,7 +399,7 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state && Array
 // layout landing between the two took the tab away again and the bar with it.
 const mob = await phone.waitForFunction(() => {
   if (!tabs.some(t => t.kind === 'term')) openTab({kind: 'term', arg: argForSession('shell-alpha'), label: 'shell-alpha'});
-  const k = document.getElementById('mKeys');
+  const k = document.getElementById('mLinks');
   const bw = [...document.querySelectorAll('#mobar > button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
   window.__seen = { tabs: tabs.map(t => t.kind), keys: !!k && !k.hidden && k.offsetParent !== null, widths: bw,
                     whole: [...document.querySelectorAll('#mobar > button')].every(b => b.scrollWidth <= b.clientWidth),
@@ -417,7 +418,8 @@ ok(mob.display === 'flex' && !mob.bKeys,
   const band = await phone.evaluate(() => { const h = document.getElementById('mHot'), bar = document.getElementById('mobar');
     const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
     return { keys: [...h.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent.trim()).join(' '), shown: !h.hidden && h.offsetParent !== null,
-             ends: ends.map(b => b.id), words: ends.map(b => getComputedStyle(b.querySelector('.mw')).display), labels: ends.map(b => b.getAttribute('aria-label') || ''),
+             ends: ends.map(b => b.id), words: ends.map(b => b.querySelector('.mw') ? getComputedStyle(b.querySelector('.mw')).display : 'none'), labels: ends.map(b => b.getAttribute('aria-label') || ''),
+             chain: !!document.querySelector('#mLinks svg'),
              tall: [...bar.querySelectorAll('button')].filter(b => b.offsetParent !== null).every(b => b.getBoundingClientRect().height >= 30 && b.getBoundingClientRect().width >= 30),
              inBar: ends.every(b => b.getBoundingClientRect().right <= innerWidth + 1), scrolls: h.scrollWidth > h.clientWidth,
              // ...as the dock's line reads: its end faded with the arrow where more keys lie past it, the two presses still, to the arrow's right.
@@ -425,9 +427,10 @@ ok(mob.display === 'flex' && !mob.bKeys,
              faded: getComputedStyle(h).maskImage !== 'none' || getComputedStyle(h).webkitMaskImage !== 'none',
              after: ends.every(b => b.getBoundingClientRect().left >= h.getBoundingClientRect().right - 1),
              overlay: [...document.querySelectorAll('.slot.ownterm .xhot')].filter(x => getComputedStyle(x).display !== 'none').length }; });
-  ok(band.shown && band.keys === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && band.ends.join() === 'mKeys,mMacros' && band.words.every(d => d === 'none') && band.labels.every(Boolean)
+  ok(band.shown && band.keys.startsWith('Esc Tab ↑ ↓ ^C ^D PgUp PgDn ') && / \^Z /.test(band.keys) && / \| /.test(band.keys) && band.ends.join() === 'mLinks,mMacros' && band.chain
+     && band.words.every(d => d === 'none') && band.labels.every(Boolean)
      && band.tall && band.inBar && band.overlay === 0 && (!band.scrolls || (band.arrow && band.faded)) && band.after,
-     `phone: the band at a shell's foot is its hot bar, a line of its keys that reads as the dock's line does (a faded end and its arrow where more lie past it), Keys and Commands still at the arrow's right, and nothing floats over the terminal (${JSON.stringify(band)})`);
+     `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture and Commands still at the arrow's right, and nothing floats over the terminal (${JSON.stringify(band)})`);
 }
 ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
    `...Keys and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);
@@ -487,12 +490,18 @@ await phone.evaluate(() => {
   dockPlace(tabs.find(shell));      // a shell in the dock, in front (R218 step 4); dockShow
   render();                         // would put it down if it already was
 });
-await phone.click('#mKeys');
-// the close is a slide now: the class drops when the tween lands
+// Links, always there (the operator, 12 Nov): its list opens over the band,
+// saying so where the terminal shows none, and the next press puts it away.
+await phone.click('#mLinks');
+const lk = await phone.evaluate(() => { const b = document.getElementById('mLinksBox'), bar = document.getElementById('mobar');
+  return { shown: !b.hidden, text: b.textContent.replace(/\s+/g, ' ').trim().slice(0, 80), over: b.getBoundingClientRect().bottom <= bar.getBoundingClientRect().top + 1,
+           inside: b.getBoundingClientRect().left >= 0 && b.getBoundingClientRect().right <= innerWidth + 1, said: document.getElementById('mLinks').getAttribute('aria-expanded') }; });
+ok(lk.shown && /^Links on this terminal/.test(lk.text) && lk.over && lk.inside && lk.said === 'true', `phone: Links lists what the terminal shows over the band, or that it shows none (${JSON.stringify(lk)})`);
+await phone.click('#mLinks');
+ok(await phone.$eval('#mLinksBox', b => b.hidden), '...and the next press puts the list away');
+// Commands closes as it opened; the close is a slide: the class drops when the tween lands.
+if (await phone.$eval('#macpanel', el => el.classList.contains('show'))) await phone.click('#mMacros');
 await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('show'));
-ok(await phone.$eval('#keys', el => el.classList.contains('show')), 'Keys closes Commands and opens the keys row: one panel at a time');
-await phone.click('#mKeys');
-await phone.waitForFunction(() => !document.getElementById('keys').classList.contains('show'));
 // Claude on a project with a transcript opens the Resume/New chooser, which
 // must be visible on a phone (it once shared the hidden pin menu's class).
 // A Claude session runs on a NODE (R47), so the chooser is what the press
@@ -753,7 +762,7 @@ ok(await phone.evaluate(() => sessionOf(tabOf(panes[1])?.arg || '') === 'shell-7
 // the room (B460).
 await phone.evaluate(() => openNotebook('alpha'));
 await phone.waitForFunction(() => tabOf(panes[active])?.kind === 'notebook');
-ok(await phone.$eval('#mKeys', b => b.hidden && getComputedStyle(b).display === 'none'), 'Keys leaves the bar over a document tab');
+ok(await phone.$eval('#mLinks', b => b.hidden && getComputedStyle(b).display === 'none') && await phone.$eval('#mHot', b => b.hidden), 'the keys and Links leave the bar over a document tab');
 ok(await phone.$eval('#mMacros', b => b.hidden), '...and so does Commands');
 ok(await phone.$$eval('#mobar > button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
    '...and what is left is not cut short');
@@ -764,9 +773,10 @@ await phone.evaluate(() => {
   if (t) { dockPlace(t); render(); }
 });
 ok(await phone.evaluate(() => !tabs.some(t => t.arg.startsWith('claude:')))
-   || (await phone.$eval('#mKeys', b => b.hidden)
-       && await phone.$eval('#mMacros', b => b.hidden)),
-   '...and both leave it over a Claude tab');
+   || (await phone.$eval('#mMacros', b => b.hidden)
+       && await phone.$eval('#mLinks', b => !b.hidden)
+       && /^Esc ⇧Tab ↑ ↓ ⏎ \^C PgUp PgDn$/.test(await phone.$eval('#mHot', h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()).join(' ')))),
+   '...and over a Claude tab Commands leaves it, the line has a coding agent\'s keys, and Links stays');
 
 // With many open, the dock's line holds them all, scrolling along, and the
 // one in front is marked; a − on one takes it off the line.
