@@ -280,7 +280,8 @@ function tpWhatHtml(f){
     <div class="pseg" role="group" aria-labelledby="tpWhatLabel">${[["pack", "A tool pack"], ["app", "An app"]]
       .map(([k, t]) => `<button type="button" data-tpwhat="${k}" class="${f.what === k ? "on" : ""}" aria-pressed="${f.what === k}">${t}</button>`).join("")}</div>
     <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the shipped ones, kept as sideloaded."
-      : "A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's Tool packs says how to write one."}</div></div>`;
+      : `A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's <a href="#/help/tool-packs">Tool packs</a> says how to write one.`}
+      One meant for everybody goes to the vetted catalog: <a href="#/help/submitting">Submitting to the catalog</a> says how.</div></div>`;
 }
 function tpFromHtml(f, here){
   const seg = here ? "" : `<div class="field"><label id="tpFromLabel">From</label>

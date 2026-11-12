@@ -46,6 +46,7 @@ dashboard's rail.
 - [toolchains.md](toolchains.md): the Build pages: Toolchains, the NVIDIA card, Android versions and the Emulator, and a Phone lent to a space
 - [agents.md](agents.md): the coding agents a session runs (Claude Code, Codex CLI, Copilot CLI, Grok Build, OpenCode): installing each on a node from the Library and signing in to it there
 - [tool-packs.md](tool-packs.md): toolchains you add yourself from a repository, the commands they give a session, and how to write one
+- [submitting.md](submitting.md): submitting a tool pack, a coding agent or a Docker app to the vetted catalog, from writing it to a merged entry
 - [containers.md](containers.md): the Containers page and nginx: dev instances, how one is reached, their networks and image updates
 - [vms.md](vms.md): the VMs page and `aerie vm`: VM host on a node, the OS catalog, Make VMs, the network, snapshots, a VM made a node
 - [nas.md](nas.md): the installed edition as a NAS, its design: Python the management plane and never the data path, the two storage profiles, and what AerieOS does not build
