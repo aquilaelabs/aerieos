@@ -278,13 +278,13 @@ m.apply([('letgo', '/nowhere')], os.getuid(), os.getgid())
 m._call = busy
 try:
     m.apply([('letgo', '/nowhere')], os.getuid(), os.getgid()); held = False
-except OSError:
-    held = True
+except m.Refused as e:
+    held = 'letgo /nowhere' in str(e)
 print(json.dumps({'file': os.path.isfile(target), 'mounts': len(calls), 'held': held}))
 `], { encoding: 'utf8' }).trim();
   const r = JSON.parse(said);
   ok(r.file && r.mounts === 2 && r.held,
-     `a file bound into a new home gets a file made to land on; a mount already gone is let go quietly and any other failure stops the view (${said})`);
+     `a file bound into a new home gets a file made to land on; a mount already gone is let go quietly and any other failure stops the view, naming its step (${said})`);
 }
 {
   // An empty TOOLCHAINS_STORE (a node with no toolchain store): no bundle bind
