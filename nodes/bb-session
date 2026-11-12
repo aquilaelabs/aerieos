@@ -1580,7 +1580,9 @@ def enter(c, a, command):
                     slot = net_attach(net, init, a["project"], dfd)
                     os.write(addr_w, f"{slot['addr']} {slot['host']}\n".encode())
                 except (OSError, Refused, subprocess.SubprocessError) as e:
-                    sys.stderr.write(f"{e}\nthe session did not start: this node could not give it a "
+                    # A line left empty above it: tmux scrolls the pane one
+                    # row to say it ended, and the first row is what goes.
+                    sys.stderr.write(f"\n{e}\nthe session did not start: this node could not give it a "
                                      "network of its own\n")
                     with contextlib.suppress(OSError):
                         os.write(addr_w, b"x\n")
@@ -1624,7 +1626,8 @@ def enter(c, a, command):
         _drop(name, uid, gid)
         env = _read_env(envfile, uid)
     except (OSError, Refused, subprocess.SubprocessError) as e:
-        sys.stderr.write(f"{e}\nthe session did not start: this node could not build its view\n")
+        # (An empty line first, as above: the reason is not the row tmux scrolls away.)
+        sys.stderr.write(f"\n{e}\nthe session did not start: this node could not build its view\n")
         sys.exit(70)
     env.update(pane)
     env["HOME"] = home

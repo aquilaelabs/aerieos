@@ -1503,7 +1503,19 @@ start() {
     # new-session is not. Not -A: on a session that is there it is
     # attach-session, which attached this terminal right here, before the
     # settings below were made, and with -d threw every other client off it.
-    tmux new-session -d -s "$s" -c "$dir" "${envs[@]}" "$@" 2>/dev/null || true
+    # ...and made the size of the terminal that is about to attach, where
+    # this runs on one, less the rows the status line takes: made at tmux's
+    # own 80 by 24 and attached from a shorter terminal, a pane that had
+    # already ended lost its top lines, which say why it ended, into its
+    # history, and the tab showed only that it had (B787).
+    local tsz=() trc tst
+    trc="$(stty size 2>/dev/null || true)"
+    if [[ "$trc" =~ ^([0-9]{1,3})\ ([0-9]{1,4})$ ]] && [ "${BASH_REMATCH[1]}" -ge 6 ] && [ "${BASH_REMATCH[2]}" -ge 20 ]; then
+        tst="$(tmux show-options -gqv status 2>/dev/null || true)"
+        case "$tst" in off) tst=0 ;; [2-5]) ;; *) tst=1 ;; esac
+        tsz=(-x "${BASH_REMATCH[2]}" -y "$((BASH_REMATCH[1] - tst))")
+    fi
+    tmux new-session -d ${tsz[@]+"${tsz[@]}"} -s "$s" -c "$dir" "${envs[@]}" "$@" 2>/dev/null || true
     tmux set-option -g exit-empty on 2>/dev/null || true
 
     # Mouse mode decides who owns a drag. Off, the browser makes an ordinary
