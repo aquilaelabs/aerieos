@@ -766,6 +766,27 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, next, { timeout: 20000 });
     const after = await page.evaluate(() => (toolchains.items || []).find(i => i.name === 'hexkit').pack.tier);
     ok(after === 'vetted', `...and Update keeps it at that pin, still vetted (${after})`);
+    // Kept from the catalog, its card has no Edit, which is for what a
+    // person added themselves: the source line of its Details page opens
+    // the same dialog, with its Remove.
+    {
+      const HEX = '.doc.on .librarytab .lcard[data-lrow="pack:hexkit"]';
+      await page.evaluate(() => loadLibrary());
+      await page.waitForFunction(() => (lib?.rows || []).find(r => r.kind === 'pack' && r.name === 'hexkit')?.tier === 'vetted'
+        && !document.querySelector('#tpmodal:not([hidden])'), null, { timeout: 20000 });
+      await page.waitForSelector(HEX, { timeout: 20000 });
+      ok(!await page.$(EDIT('hexkit')), 'a pack kept from the catalog has no Edit on its card');
+      await page.click(`${HEX} [data-libmore]`);
+      const KEPT = '.pane .doc.on [data-libact="edit"][data-libname="hexkit"]';
+      await page.waitForSelector(KEPT, { timeout: 20000 });
+      const words = await page.$eval(KEPT, b => b.textContent);
+      await page.click(KEPT);
+      await page.waitForSelector('#tpmodal:not([hidden]) [data-tprm="hexkit"]', { timeout: 15000 });
+      ok(/newer pin, or remove it/.test(words), `...its Details page's source line opens its dialog, Remove in it (${words})`);
+      await page.waitForFunction(() => !tpForm.busy, null, { timeout: 20000 });
+      await page.click('#tpmodal [data-tpcancel]');
+      await toLibrary();
+    }
     // Its own icon (R182): named in its manifest, read at the commit it is
     // kept at, drawn on its card as an image, and served as one alone: an SVG
     // that carries a script is still a picture, its address sandboxed.

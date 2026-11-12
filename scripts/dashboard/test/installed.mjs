@@ -84,6 +84,32 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
      'the Library\'s card for it offers Install now and draws no Configure of its own');
 }
 
+// ---- a pack that brings a coding agent sits with the agents ---------------
+{
+  await page.evaluate(() => openInstalledTab());
+  await page.waitForFunction(() => inst && !inst.nonode && Array.isArray(inst.rows)
+    && !!document.querySelector('.doc.on .installedtab details.sect[data-sect="installed:agent"]'), null, { timeout: 20000 });
+  // Drawn and read in one turn of the page: its next read of the node would
+  // take a row the fixture's node does not hold away again.
+  const got = await page.evaluate(() => {
+    agentsAdopt([{ id: 'kite', name: 'Kite', product: 'Kite CLI', command: 'kite', provider: 'Example' }]);
+    const row = { kind: 'pack', group: 'agent', tier: 'vetted', name: 'kite', label: 'Kite', about: 'A coding agent from a pack.', installed: true,
+                  version: '1.0', pack: { url: 'https://example.test/kite', commit: 'a'.repeat(40), tier: 'vetted' } };
+    inst.rows.push(row);
+    instRev++; drawPanes();
+    const at = sel => !!document.querySelector(`.doc.on .installedtab details.sect[data-sect="${sel}"] .irow[data-irow="pack:kite"]`);
+    const signin = THING_SECTS.pack.find(s => s[0] === 'signin')[2];
+    const out = { agents: at('installed:agent'), packs: at('installed:pack'),
+                  says: signin(row).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+                  plain: signin({ ...row, group: undefined }), away: signin({ ...row, installed: false }) };
+    inst.rows.pop(); agentsAdopt([]); instRev++; drawPanes();
+    return out;
+  });
+  ok(got.agents && !got.packs, 'a pack that brings a coding agent is a row under Coding agents, not under Tool packs');
+  ok(/Kite signs in with an Example account in its own terminal: start a Kite session/.test(got.says) && got.plain === '' && got.away === '',
+     `its page says where it signs in, which a plain pack's page and one not installed do not (${got.says.slice(0, 140)})`);
+}
+
 // ---- no node ---------------------------------------------------------------
 await page.evaluate(() => { openInstalledTab(); nodesList = []; instNode = ''; inst = null; loadInstalled(); });
 await page.waitForSelector('.doc .installedtab .instnone', { timeout: 20000 });

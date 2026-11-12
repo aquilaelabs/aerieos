@@ -212,7 +212,10 @@ function libActs(r, may){
   const again = r.machine?.state === "unconfigured";
   const verb = r.update ? a("install", "Update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
     : r.installed ? "" : a("install", "Install", "primary", libHold);
-  const edit = r.kind === "pack" && r.pack ? a("edit", "Edit") : "";
+  // Edit on what a person added themselves, as on an app: a pack kept from
+  // the catalog is not theirs to edit (the operator, 12 Nov: no Edit on
+  // Gemini's card), and its kept copy is reached from its Details page.
+  const edit = r.kind === "pack" && r.pack && r.tier === "sideloaded" ? a("edit", "Edit") : "";
   // The catalog pins a newer commit of a pack kept from it (R169 step 4):
   // the dialog on that pin, its changes marked, before anything is kept.
   const repin = r.repin && may.packs ? a("repin", "Catalog update") : "";
@@ -248,7 +251,8 @@ function libDetail(r){
     lines.push(tcTermsLine(r));
     if (r.size) lines.push(`<span class="sub">About ${esc(r.size)} on the store.</span>`);
     if (r.machine) lines.push(`<span class="sub">${r.name === TC_DRIVER ? "Built for the machine's kernel, installed as root, taking the card at the next restart." : "From NVIDIA's own package source, which installing adds and removing takes away."} Its state and Remove are on the Installed page.</span>`);
-    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.</span>`);
+    if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.${
+      r.tier !== "sideloaded" && lib?.may?.install && !r.running ? ` <button type="button" class="link" data-libact="edit" data-libkind="pack" data-libname="${esc(r.name)}">Look for a newer pin, or remove it</button>` : ""}</span>`);
     if (r.catalog) lines.push(`<span class="sub">From <code>${esc(r.catalog.url)}</code>${r.catalog.path ? ` (${esc(r.catalog.path)})` : ""} at ${esc((r.catalog.commit || "").slice(0, 12))}, its archive's sha256 checked on the way in. Install opens the Add tool pack dialog on that commit, and Add keeps exactly that.</span>`);
     if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Catalog update shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);

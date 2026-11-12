@@ -331,7 +331,9 @@ function renderInstalledInto(i){
     ["Store", inst.store?.root || ""],
   ]});
   const sects = INST_KINDS.map(([k, title]) => {
-    const here = rows.filter(r => r.kind === k);
+    // By its group, as the Library sorts it: a pack that brings a coding
+    // agent sits with the coding agents (the operator, 12 Nov).
+    const here = rows.filter(r => libGroup(r) === k);
     if (!here.length) return "";
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
     return docSection("installed", k, title, k === "agent" ? `${here.filter(r => r.installed).length} of ${here.length}` : String(here.length), body);

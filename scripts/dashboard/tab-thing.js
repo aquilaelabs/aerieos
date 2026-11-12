@@ -52,6 +52,13 @@ const THING_SECTS = {
   ],
   pack: [
     ["about", "What it is", r => instAboutLines(r)],
+    // A pack's coding agent signs in in its own session's terminal: said
+    // here, where every agent's sign-in is looked for.
+    ["signin", "Your sign-in", r => {
+      const a = r.group === "agent" ? agentById(r.name) : null;
+      return a && r.installed ? `<span class="sub">${esc(a.name)} signs in${a.provider ? ` with ${/^(?:[AEIOU]|x(?=[A-Z]))/.test(a.provider) ? "an" : "a"} ${esc(a.provider)} account` : ""} in its own terminal: start a ${esc(a.name)} session on a space on ${esc(inst?.name || "this node")} (Start agent on the space's card), open the link it shows, and paste the code it gives back into that terminal.</span>
+        <span class="sub">A sign-in is this node's alone: each node you work on is signed in from a session there.</span>` : "";
+    }],
     ["configure", "Configure", r => instConfigLines(r)],
   ],
   service: [
