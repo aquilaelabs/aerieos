@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log, root_docker_env
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -294,6 +294,21 @@ class Job(threading.Thread):
             elif self.job.get("type") in ("claude-logout", *AGENT_LOGOUTS):
                 state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(self.job.get("type"), ""))
                 self.agent._logins_at = 0
+            elif self.job.get("type") in ("agent-login", "agent-logout"):
+                # A pack's coding agent's (R233 step 6): one pair of jobs
+                # for all of them, the spec naming which, and only one this
+                # node's bundle carries with a sign-in its pack describes.
+                # The same pty and channel; `aerie login` drives its screens
+                # from the pack's words (scripts/lib/login-flow.py).
+                which = str(spec.get("agent") or "")
+                if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", which) or which in ("claude", *AGENT_LOGINS.values()):
+                    self.say("refused: a pack's agent's sign-in names the agent it is for\n")
+                    state, code = "failed", 64
+                elif self.job.get("type") == "agent-login":
+                    state, code = self.claude_login(spec, which, pack=True)
+                else:
+                    state, code = self.claude_logout(spec, which, pack=True)
+                self.agent._logins_at = 0
             elif self.job.get("type") == "claude-update":
                 state, code = self.agent.claude_update(self, spec)
             elif self.job.get("type") in AGENT_INSTALLS:
@@ -370,7 +385,7 @@ class Job(threading.Thread):
             time.sleep(delay)
             delay = min(delay * 2, 60)
 
-    def claude_login(self, spec, agent=""):
+    def claude_login(self, spec, agent="", pack=False):
         """`claude auth login` on this machine, under a pty, as the SESSION
         account (roadmap R47).
 
@@ -408,6 +423,9 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
+        if pack and agent not in pack_signins(into):
+            self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
+            return "failed", 64
         # The AerieOS account, so the bundle's own user_home resolves the
         # same per-account home bb-tty gives a session here. Resolved there
         # rather than here: one implementation of "where does this account
@@ -501,7 +519,7 @@ class Job(threading.Thread):
         code = self.proc.wait()
         return ("succeeded" if code == 0 else "failed"), code
 
-    def claude_logout(self, spec, agent=""):
+    def claude_logout(self, spec, agent="", pack=False):
         """`claude auth logout` on this machine for one AerieOS account,
         as its own user or the SESSION account, in that account's home here: the other
         half of claude_login. The login is this machine's, so this machine
@@ -530,6 +548,9 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
+        if pack and agent not in pack_signins(into):
+            self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
+            return "failed", 64
         # The session account's home, which is this process's own where the
         # agent is not root and as_user changed nothing.
         env.setdefault("HOME", os.path.expanduser("~"))

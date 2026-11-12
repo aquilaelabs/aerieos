@@ -4008,7 +4008,7 @@ def agent_auth(home=""):
     reported this account is signed in to it as, from the same record."""
     return {a.id: {"nodes": {nid: {"email": v["email"], "plan": v["plan"]}
                              for nid, v in claudegrant.nodes_of(home, a.id).items()}}
-            for a in agents.TABLE if a.id != "claude" and a.login_job}
+            for a in agents.rows() if a.id != "claude" and a.login_job}
 
 
 # ---- toolchains ------------------------------------------------------------
@@ -10060,7 +10060,7 @@ class Handler(BaseHTTPRequestHandler):
         # ...and the other coding agents' beside Claude's (R95 step 3): the
         # same report, said from the same check, kept in their own record.
         agent = str(req.get("agent") or "claude")
-        if agent != "claude" and not any(a.id == agent and a.login_job for a in agents.TABLE):
+        if agent != "claude" and not any(a.id == agent and a.login_job for a in agents.rows()):
             return self._json({"error": f"no coding agent called '{agent[:20]}' signs in"}, 400)
         signed_in = bool(req.get("signed_in", True))
         if not signed_in and claudegrant.on(home_for(uid), nid, agent):

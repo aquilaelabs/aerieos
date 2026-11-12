@@ -297,12 +297,19 @@ keeps it; then install it on a node from the same card and tick it under
 a space's **Settings, Toolchains**. Start agent then offers Gemini there.
 It needs AerieOS 0.9.0-dev.5284 or later to be held as the others are.
 
-- **Signing in.** With a Google account, in its own session's terminal: the
-  first session shows Google's link, and the code Google gives is pasted
-  back there. The link runs over many rows of a terminal, so sign in at a
-  desk, where it can be copied whole. The sign-in is kept in your home on
-  that node (`~/.gemini/antigravity-cli/antigravity-oauth-token`) and a
-  later session there starts signed in.
+- **Signing in.** With a Google account, from its page: open Gemini's row
+  on the Installed page with the node picked, and under **Your sign-in**
+  press **Sign in**. The page shows Google's link and a field; sign in to
+  Google there and paste the code it gives back. This works on a phone.
+  The other way is its own session's terminal, which a session that is
+  not signed in opens on: the link there runs over many rows, so use it at
+  a desk, where it can be copied whole. Either way the sign-in is kept in
+  your home on that node
+  (`~/.gemini/antigravity-cli/antigravity-oauth-token`), sealed there where
+  the node seals sign-ins, and a later session starts signed in. **Sign
+  out** on the same page removes it. Signing in from the page needs an
+  AerieOS release after 0.9.0-dev.5284; on that one the terminal is the
+  way.
 - **Its first run.** Once, it asks for a color scheme and shows Google's
   terms with its data-use choice, and once a space it asks whether you trust
   the folder. Each is yours to answer: AerieOS answers none of them.
@@ -313,9 +320,9 @@ It needs AerieOS 0.9.0-dev.5284 or later to be held as the others are.
   `aerie` verb the controller decides is approved without its own prompt.
 - **In the dock.** Working and waiting, as the others. It has no event for
   its own permission prompt, so the dock says working while it asks.
-- **Not yet.** Its sign-in is not on the Installed page, its conversations
-  are not listed under Your conversations, and Start offers no choice of
-  model for it: it runs its own default.
+- **Not yet.** Its conversations are not listed under Your conversations,
+  and Start offers no choice of model for it: it runs its own default. The
+  page names a signed-in Gemini as a Google account, not by its address.
 
 ## Any model, through a router
 

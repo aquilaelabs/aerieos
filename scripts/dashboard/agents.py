@@ -316,6 +316,9 @@ def install_checked(spec):
 # (bb-tty, the doctor) has none. Each is an ordinary row, live, installed and
 # updated as its pack is, so it has no update or sign-in job of its own.
 pack_source = lambda: ()    # noqa: E731
+# The node jobs that sign an account in to a pack's agent and out of it: one
+# pair for all of them, the job's spec naming which (the agent's jobs.py).
+PACK_LOGIN, PACK_LOGOUT = "agent-login", "agent-logout"
 _packs = {"key": None, "rows": ()}
 
 
@@ -326,8 +329,13 @@ def _pack_rows():
         for name, _label, a in got:
             if name in _BY_ID:
                 continue
+            signs_in = bool((a.get("signin") or {}).get("flow"))
             rows.append(Agent(id=name, name=a.get("name") or name, product=a.get("product") or name, command=a.get("command") or name,
-                              provider=a.get("provider") or "", reported=name, update_job="", login_job="", logout_job="",
+                              provider=a.get("provider") or "", reported=name, update_job="",
+                              # One that describes its sign-in's flow is signed in
+                              # from the page as a shipped one is (R233 step 6),
+                              # by one job for every pack's agent, told which.
+                              login_job=PACK_LOGIN if signs_in else "", logout_job=PACK_LOGOUT if signs_in else "",
                               briefing="instructions-file" if (a.get("briefing") or {}).get("how") == "env-file" else "system-prompt-file",
                               guards="hooks", state="hooks", transcripts=(a.get("transcripts") or {}).get("dir") or "",
                               live=True, tool=name, pack=a, allow=allow_checked(a.get("allow"))[0]))
@@ -348,6 +356,8 @@ def page_rows():
         evs = (a.pack.get("hooks") or {}).get("events") or {}
         lacks = [w for k, w in (("recall", "the house rules' recall after a summary"), ("asking", "the asking mark")) if k not in evs]
         out.append({"id": a.id, "name": a.name, "product": a.product, "command": a.command, "provider": a.provider, "live": True, "pack": True,
+                    # Signed in from the page where its pack says how; else in its session's terminal.
+                    "signin": bool(a.login_job),
                     "models": list(a.pack.get("models") or []),
                     "guards": "the same guards through its own hooks, from its pack's adapter" + (f", but for {' and '.join(lacks)}, which it names no hook for" if lacks else "")})
     return out

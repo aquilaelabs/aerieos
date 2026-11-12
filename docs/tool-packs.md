@@ -114,7 +114,7 @@ steps, its `layout.bin` on `PATH`), and a catalog update updates it.
 | `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
 | `first_prompt` | How a new space's brief is handed over: after `--`, after a `flag`, or not at all. |
-| `signin` | Where its sign-in is kept (a file under home, or a variable such as an API key), and the login command a terminal tab runs for it. |
+| `signin` | Where its sign-in is kept (`file`, under the account's home, or `env`, a variable such as an API key): with either, a session does not start until one is there. `login` is the command that starts its sign-in, and `flow` says how that sign-in goes, so the page can run it: [A sign-in from the page](#a-sign-in-from-the-page). |
 | `transcripts` | Where its conversations are kept, so `aerie transcripts` and the Sessions view read them, and which payload field carries a session's id. |
 | `models`, `model_flag` | What Start's model step offers, and the option a pick is handed over with. |
 | `allow` | How it is told that a command needs no asking: `how` is `settings` (a rule in the settings file its session starts with, as Claude Code reads), `flag` (the option `flag` repeated with one rule each, as Grok Build's `--allow` and Copilot CLI's `--allow-tool`), `rules-file` (a `file` under the account's home with one rule a line, as Codex CLI's execpolicy), `hook` (its own hook's answer before a tool approves each such verb typed alone, with no `rule`, where an agent's rules are in a settings file that is the person's own; its `hooks.answers.pre` gives the `approve`) or `none`. `rule` is the agent's own rule for one command, with `{cmd}` (`aerie version`) or `{argv}` (`["aerie", "version"]`) where the command goes. AerieOS fills it once for each `aerie` verb its controller decides ([agents.md](agents.md#what-an-agent-need-not-ask-about)). Left out, the agent asks by its own judgment. |
@@ -170,6 +170,49 @@ A manifest written with a named shape stays valid: the names are kept for
 good, and mean what they meant. Describing a protocol this way is pack
 format 2, so such a manifest says `"format": 2`.
 
+### A sign-in from the page
+
+An agent that signs in on a screen of its own (a menu, a link, a field for
+a code) can only be signed in at a keyboard, in its session's terminal,
+unless its pack says how the sign-in goes. With `signin.flow`, Sign in on
+the agent's page of the Installed page runs it on the node and shows a
+person the link and a field for the code, which is what a phone can use:
+
+```json
+"signin": {
+  "login": ["kite"],
+  "flow": {
+    "answers": [{"when": "Select login method", "send": ""}],
+    "url": "https://auth.example.com/oauth/",
+    "prompt": "paste the authorization code",
+    "kept": ".kite/oauth-token"
+  }
+}
+```
+
+| Key | What it says |
+|---|---|
+| `answers` | Up to four things its screen asks before the link: `when` is the plain words it shows, `send` the key or short word typed there (letters and digits, eight at most; empty for Enter alone). Enter follows each. |
+| `url` | How the link it prints starts: `https`, its host, and as much of the path as never changes. The link is read whole however the program wraps it. |
+| `prompt` | The words it waits at for the code the provider's page hands back. The page draws a field, and what a person pastes there is typed into the program. |
+| `code_after` | In `prompt`'s place, for a flow where a person types a code on the provider's page: the words that code follows on its screen. The page shows the code, and nothing is typed back. |
+| `kept` | The file under the account's home its sign-in is kept in. Its arrival ends the flow, signed in; it is what says who is signed in on a node, it is sealed where a node seals sign-ins, and a sign-out removes it. |
+| `logout` | Its own sign-out command, where it has one (`["kite", "logout"]`); the kept file is removed after it. |
+
+Nothing in a flow is a pattern or a command line: the words are plain ones,
+compared without their spaces or case, and the only program run is the
+agent's own. The program is started in an empty folder of the account's,
+on a terminal wide enough that a link stays on one row, and is ended once
+its sign-in is kept: whatever it asks after that (a color scheme, its
+terms, whether a folder is trusted) is the person's own to answer, in
+their first session. The code a person pastes is typed into the program
+and never written to the job's log.
+
+`flow` is an extra ([below](#the-format-and-what-it-promises)): it is read
+by the AerieOS releases after 0.9.0-dev.5284, and that one and those
+before it leave it out, so the agent signs in in its terminal there as it
+did.
+
 ## The format, and what it promises
 
 Everything a catalog entry can be is written in one format: a tool pack's
@@ -195,6 +238,16 @@ whoever writes a pack:
 |---|---|---|
 | 1 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | 0.9.0's first releases |
 | 2 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | 0.9.0 |
+
+The number a manifest says is the one it needs: the least an install must
+read for the pack to do what it says. A few keys are extras, which an
+install that does not read them simply leaves out, the rest meaning what it
+meant: a pack that gains one is still taken by every install that took it
+before, so an extra does not move the number.
+
+| Extra | Without it | First read by |
+|---|---|---|
+| A coding agent's `signin.flow` | The agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 

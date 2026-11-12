@@ -118,7 +118,10 @@ def others():
     ll = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ll)
     home = os.environ.get("HOME") or ""
-    for agent, read in (("codex", ll.codex_of), ("copilot", ll.copilot_of), ("grok", ll.grok_of)):
+    # ...and a pack's agent's, where its pack says how it signs in (R233
+    # step 6): the same sentence, from the file its sign-in is kept in.
+    packs = [(name, (lambda h, name=name, a=a: ll.pack_of(h, name, a))) for name, a in ll.pack_flows().items()]
+    for agent, read in (("codex", ll.codex_of), ("copilot", ll.copilot_of), ("grok", ll.grok_of), *packs):
         got = read(home) if home else None
         if got and got.get("error"):
             # Unread is not signed out (B236): nothing is said for it.

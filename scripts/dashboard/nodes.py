@@ -5604,6 +5604,9 @@ JOB_TYPES = ("exec", "self-update", "compose", "system", "toolchain", "cache-cle
              # is queued by an administrator's press and nothing else; the
              # agent's sessions on the node are ended first.
              *(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j),
+             # ...and a pack's agent's (R233 step 6): one pair for all of
+             # them, the spec naming which.
+             agents.PACK_LOGIN, agents.PACK_LOGOUT,
              *(a.update_job for a in agents.installable()),
              # A line typed into a Claude session on the node, Enter pressed
              # only once the pane echoes it (notify.py's rule, run where the
@@ -6101,7 +6104,7 @@ def job_running(node_id):
 # code, the machine idle meanwhile. Neither waits for the node's slot nor
 # holds it, so a sign-in is not held behind a build, nor a build behind a
 # sign-in left open for its quarter of an hour.
-SIGNIN_JOBS = frozenset(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j)
+SIGNIN_JOBS = frozenset(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j) | {agents.PACK_LOGIN, agents.PACK_LOGOUT}
 
 
 # Nodes whose census a refusal has just called into question. Set by the

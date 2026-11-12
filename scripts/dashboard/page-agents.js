@@ -42,7 +42,8 @@ function agentsAdopt(rows){
   for (let i = AGENTS.length - 1; i >= 0; i--)
     if (AGENTS[i].pack && !want.some(r => r.id === AGENTS[i].id)){ delete AGENT_MODELS[AGENTS[i].id]; delete AGENT_GUARDS[AGENTS[i].id]; AGENTS.splice(i, 1); }
   for (const r of want){
-    const row = {id: r.id, name: r.name, product: r.product, command: r.command, provider: r.provider || "", live: true, pack: true};
+    // `signin`: its pack says how it signs in, so the page signs it in (R233 step 6).
+    const row = {id: r.id, name: r.name, product: r.product, command: r.command, provider: r.provider || "", live: true, pack: true, signin: !!r.signin};
     const at = AGENTS.findIndex(a => a.id === r.id);
     if (at < 0) AGENTS.push(row); else AGENTS[at] = row;
     AGENT_MODELS[r.id] = {models: Array.isArray(r.models) ? r.models : [], efforts: []};

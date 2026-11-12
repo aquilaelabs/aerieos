@@ -527,7 +527,7 @@ def _logins(nid, rows):
         # ...and the other coding agents' (R95 step 3), on an agent recent
         # enough to say: a row without the key says nothing about them.
         if isinstance(r.get("agents"), dict):
-            for a in agents.TABLE:
+            for a in agents.rows():
                 if a.id == "claude" or not a.login_job:
                     continue
                 got = r["agents"].get(a.id) if isinstance(r["agents"].get(a.id), dict) else {}

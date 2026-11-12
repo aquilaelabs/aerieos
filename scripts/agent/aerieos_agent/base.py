@@ -328,6 +328,44 @@ def pack_agent_ids():
     return _pack_ids["ids"]
 
 
+_pack_kept = {"stamp": None, "rows": {}}
+
+
+def pack_signins(bundle=""):
+    """{agent: {"kept": file under the home, "provider": whose account}} for
+    the packs' coding agents whose pack describes a sign-in's flow (R233
+    step 6): the file each keeps its sign-in in, which is sealed and watched
+    as a shipped agent's is. From the root bundle's config/toolpacks.json
+    (or the bundle named, for a job that runs from one on the store), read
+    again only when the file changes; a path that is not a plain one under
+    the home is no row."""
+    path = os.path.join(bundle or os.path.join(ROOT_BUNDLE_DIR, "current"), "config", "toolpacks.json")
+    try:
+        st = os.stat(path)
+        stamp = (path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return {}
+    if stamp != _pack_kept["stamp"]:
+        got = {}
+        try:
+            with open(path, encoding="utf-8") as f:
+                rows = json.load(f).get("toolchains") or []
+            for r in rows if isinstance(rows, list) else []:
+                a = r.get("agent") if isinstance(r, dict) else None
+                name = str(r.get("name") or "") if isinstance(r, dict) else ""
+                flow = ((a.get("signin") or {}).get("flow") or {}) if isinstance(a, dict) and isinstance(a.get("signin"), dict) else {}
+                kept = flow.get("kept") if isinstance(flow, dict) else None
+                if not (re.fullmatch(r"[a-z][a-z0-9]{1,15}", name) and name not in AGENT_IDS and isinstance(kept, str)
+                        and re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", kept) and not kept.startswith("/")
+                        and not any(p in ("", ".", "..") for p in kept.split("/"))):
+                    continue
+                got[name] = {"kept": kept, "provider": str(a.get("provider") or "")[:60]}
+        except (OSError, ValueError, AttributeError, TypeError):
+            got = {}
+        _pack_kept.update(stamp=stamp, rows=got)
+    return dict(_pack_kept["rows"])
+
+
 def agent_prefixes():
     """Every coding agent's session prefix, the shipped and the packs'."""
     return AGENT_PREFIXES + tuple(f"{a}-" for a in pack_agent_ids())

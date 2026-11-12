@@ -102,9 +102,31 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
     const out = { agents: at('installed:agent'), packs: at('installed:pack'),
                   says: signin(row).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
                   plain: signin({ ...row, group: undefined }), away: signin({ ...row, installed: false }) };
+    // One whose pack says how it signs in is signed in here, as a shipped
+    // agent is (R233 step 6): the card by what the flow says of itself, a
+    // field for a code pasted back, the code itself for one typed on the
+    // provider's page.
+    agentsAdopt([{ id: 'kite', name: 'Kite', product: 'Kite CLI', command: 'kite', provider: 'Example', signin: true }]);
+    const text = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const was = state.signin;
+    out.here = signin(row);
+    state.signin = { node: instNode, agent: 'kite', running: true, url: 'https://accounts.example.test/o/auth?x=1', paste: true, waiting: true };
+    out.paste = signin(row);
+    state.signin = { node: instNode, agent: 'kite', running: true, url: 'https://accounts.example.test/device', paste: false, code: 'WXYZ-1234' };
+    out.device = signin(row);
+    state.signin = was;
+    out.here = { text: text(out.here), button: /data-si="in"/.test(out.here) };
+    out.paste = { text: text(out.paste), field: /id="authCode"/.test(out.paste) && !/id="authCode"[^>]* disabled/.test(out.paste), link: /href="https:\/\/accounts\.example\.test\/o\/auth\?x=1"/.test(out.paste) };
+    out.device = { text: text(out.device), field: /id="authCode"/.test(out.device), code: /class="sicode">WXYZ-1234</.test(out.device) };
     inst.rows.pop(); agentsAdopt([]); instRev++; drawPanes();
     return out;
   });
+  ok(got.here.button && /You are not signed in to Kite on \S+: sign in here, or in the terminal of a Kite session there/.test(got.here.text),
+     `a pack agent whose pack says how it signs in has Sign in on its page, and the page says its terminal is the other way (${got.here.text.slice(0, 120)})`);
+  ok(got.paste.field && got.paste.link && /sign in to Example, and paste the code it gives you/.test(got.paste.text),
+     `its flow that takes a code back draws the link and the field for the code (${got.paste.text.slice(0, 120)})`);
+  ok(got.device.code && !got.device.field && /enter this code there/.test(got.device.text),
+     `one that shows a code draws the code and no field (${got.device.text.slice(0, 120)})`);
   ok(got.agents && !got.packs, 'a pack that brings a coding agent is a row under Coding agents, not under Tool packs');
   ok(/Kite signs in with an Example account in its own terminal: start a Kite session/.test(got.says) && got.plain === '' && got.away === '',
      `its page says where it signs in, which a plain pack's page and one not installed do not (${got.says.slice(0, 140)})`);

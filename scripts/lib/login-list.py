@@ -128,6 +128,64 @@ def grok_of(home):
     return {"email": _jwt_email(d) or "an xAI account", "plan": ""}
 
 
+def packs_file():
+    """The tool packs this bundle carries, beside its catalog: where a pack
+    that brings a coding agent says how it signs in."""
+    return os.environ.get("BB_TOOLPACKS_JSON") or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "toolpacks.json")
+
+
+def pack_flows():
+    """{agent: its adapter} for the packs' coding agents that describe a
+    sign-in's flow (R233 step 6): the link, what its screens ask, and the
+    file under the home its sign-in is kept in. A shipped agent's name is
+    never a pack's, and a kept file that is not a plain path under the home
+    is no row."""
+    try:
+        with open(packs_file(), encoding="utf-8") as f:
+            rows = json.load(f).get("toolchains") or []
+    except (OSError, ValueError, AttributeError):
+        return {}
+    out = {}
+    for r in rows if isinstance(rows, list) else []:
+        a = r.get("agent") if isinstance(r, dict) else None
+        name = str(r.get("name") or "") if isinstance(r, dict) else ""
+        si = a.get("signin") if isinstance(a, dict) else None
+        flow = si.get("flow") if isinstance(si, dict) else None
+        if not (isinstance(flow, dict) and re.fullmatch(r"[a-z][a-z0-9]{1,15}", name)
+                and name not in ("claude", "codex", "copilot", "grok", "open")):
+            continue
+        kept, url = flow.get("kept"), flow.get("url")
+        if not (isinstance(kept, str) and re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", kept) and not kept.startswith("/")
+                and not any(p in ("", ".", "..") for p in kept.split("/")) and isinstance(url, str) and url.startswith("https://")):
+            continue
+        out[name] = a
+    return out
+
+
+def pack_of(home, agent, a):
+    """Who this account is signed in to a pack's agent as here, {email,
+    plan}, or None: the file its pack says the sign-in is kept in, the email
+    a token in it names where one does, else whose account it is."""
+    whose = f"{str(a.get('provider') or '').strip()[:60] or agent} account"
+    try:
+        with open(os.path.join(home, a["signin"]["flow"]["kept"]), "rb") as f:
+            data = f.read(1 << 20)
+    except FileNotFoundError:
+        # Sealed, its copy not open now (R126): still a sign-in.
+        got = sealed_of(home, agent)
+        return got if got and got["email"] else None
+    except OSError as e:
+        return {"error": f"{type(e).__name__}: {e}"[:200]}
+    if not data.strip():
+        return None
+    try:
+        email = _jwt_email(json.loads(data))
+    except (ValueError, TypeError, AttributeError):
+        email = ""
+    return {"email": (email or whose)[:120], "plan": ""}
+
+
 def _copilot_config(home):
     return os.path.join(home, ".copilot", "config.json")
 
@@ -254,6 +312,7 @@ def main():
         names = sorted(os.listdir(root))
     except OSError:
         names = []
+    packs = pack_flows()
     for name in names[:64]:
         if not re.fullmatch(r"u_[0-9a-f]{8}", name):
             continue
@@ -271,7 +330,8 @@ def main():
                 and not sealed_of(home, "claude"):
             email = ""
         agents = {k: v for k, v in (("codex", codex_of(home)), ("copilot", copilot_of(home)),
-                                    ("grok", grok_of(home))) if v}
+                                    ("grok", grok_of(home)),
+                                    *((name, pack_of(home, name, a)) for name, a in packs.items())) if v}
         out.append({"uid": name, "email": email, "plugins": plugins_of(home), "agents": agents, "mcp": mcp_of(home)})
     print(json.dumps(out))
 

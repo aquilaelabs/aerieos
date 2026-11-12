@@ -452,6 +452,10 @@ def _pack_agent(name, a, errors):
     if se and not (isinstance(se, str) and ENV_NAME.fullmatch(se)):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
+    if si.get("flow") is not None:
+        flow = _signin_flow(si["flow"], out, errors)
+        if flow:
+            out["signin"]["flow"] = flow
     _agent_allow(a, out, errors)
     if (out.get("allow") or {}).get("how") == "hook" and not ((answers or {}).get("pre") or {}).get("approve"):
         errors.append("agent.allow.how hook needs hooks.answers.pre to say how a tool is approved (an approve)")
@@ -474,6 +478,63 @@ def _pack_agent(name, a, errors):
         errors.append("agent.model_flag is the option a model is picked with, e.g. --model")
     out["model_flag"] = str(a.get("model_flag") or "") if models else ""
     return out if len(errors) == bad else None
+
+
+# A sign-in's flow as its pack describes it (R233 step 6), so the page signs
+# an account in to a pack's agent as it does to a shipped one: the words a
+# screen shows are plain ones, the link is named by how it starts, and what
+# is typed back is a key or a short word. No pattern comes from a manifest.
+FLOW_WORDS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,:;'()/&-]{1,79}$")
+FLOW_URL = re.compile(r"^https://[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){1,6}(?:/[A-Za-z0-9._~/-]{0,120})?$")
+FLOW_SEND = re.compile(r"^[A-Za-z0-9]{0,8}$")
+
+
+def _signin_flow(f, out, errors):
+    """A pack agent's sign-in flow checked and cut down to what the node's
+    driver reads (scripts/lib/login-flow.py), or None: `url` is how the link
+    it prints starts; `prompt` the words it waits at for the code the
+    provider's page hands back, or `code_after` the words a one-time code
+    follows, for one typed on the provider's page; `answers` what it asks
+    before the link, each the words it shows and what is typed (Enter
+    follows); `kept` the file under the account's home whose arrival says
+    it is signed in, which is sealed where a node seals sign-ins and removed
+    on a sign-out unless `logout` names its own command."""
+    if not isinstance(f, dict):
+        errors.append("agent.signin.flow is an object: url, prompt or code_after, answers, kept")
+        return None
+    bad = len(errors)
+    if not out.get("login"):
+        errors.append("agent.signin.flow is run by agent.signin.login, the command that starts its sign-in")
+    url = f.get("url")
+    if not (isinstance(url, str) and FLOW_URL.fullmatch(url)):
+        errors.append("agent.signin.flow.url is how the link it prints starts: https and its host, e.g. https://auth.example.com/")
+    words = {}
+    for k in ("prompt", "code_after"):
+        v = f.get(k, "")
+        if v and not (isinstance(v, str) and FLOW_WORDS.fullmatch(v)):
+            errors.append(f"agent.signin.flow.{k} is the plain words its screen shows there, 2 to 80 of them")
+            v = ""
+        words[k] = str(v or "")
+    if bool(words["prompt"]) == bool(words["code_after"]):
+        errors.append("agent.signin.flow names prompt (where a code is pasted back) or code_after (a code typed on the provider's page), one of them")
+    answers = f.get("answers") if f.get("answers") is not None else []
+    if not (isinstance(answers, list) and len(answers) <= 4 and all(
+            isinstance(a, dict) and isinstance(a.get("when"), str) and FLOW_WORDS.fullmatch(a["when"])
+            and isinstance(a.get("send", ""), str) and FLOW_SEND.fullmatch(a.get("send", "")) for a in answers)):
+        errors.append("agent.signin.flow.answers lists up to 4 of {when, send}: the words a screen shows and the key or short word typed there, Enter after it")
+        answers = []
+    kept = f.get("kept")
+    if not (isinstance(kept, str) and REL.fullmatch(kept)):
+        errors.append("agent.signin.flow.kept is the file its sign-in is kept in, under the account's home")
+    logout = f.get("logout") if f.get("logout") is not None else []
+    if not (isinstance(logout, list) and len(logout) <= 6 and all(isinstance(x, str) and ARG.fullmatch(x) for x in logout)) \
+            or (logout and logout[0] != out.get("command")):
+        errors.append("agent.signin.flow.logout runs the agent's own command, e.g. [\"foo\", \"logout\"]; left out, a sign-out removes the kept file")
+        logout = []
+    if len(errors) != bad:
+        return None
+    return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"],
+            "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout)}
 
 
 def _agent_format(a):

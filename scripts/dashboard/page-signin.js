@@ -66,8 +66,12 @@ function signinBlock(n, id = "claude"){
   const cannot = signinCannot(n, id);
   const key = id === "claude" ? n.id : `${n.id}:${id}`;
   const said = signinSaid[key] ? `<div class="sub bad">${esc(signinSaid[key])}</div>` : "";
+  // Which kind of flow it is, by what the flow says of itself (signin.py
+  // pastes): one that wants a code pasted back draws the field for it, one
+  // that shows a code draws the code to type on the provider's page.
+  const paste = lg.paste ?? id === "claude";
   let inner;
-  if (mine && lg.running && !me && id !== "claude"){
+  if (mine && lg.running && !me && !paste){
     // A device flow (Codex, Copilot): its link and its one-time code, which
     // the person enters on the provider's page; nothing is pasted back.
     inner = `
@@ -82,7 +86,7 @@ function signinBlock(n, id = "claude"){
   } else if (mine && lg.running && !me){
     inner = `
       <div class="sub">${lg.url
-        ? `<a href="${esc(lg.url)}" target="_blank" rel="noopener">Open the sign-in page ↗</a>, approve, and paste the code it gives you.`
+        ? `<a href="${esc(lg.url)}" target="_blank" rel="noopener">Open the sign-in page ↗</a>, ${id === "claude" ? "approve" : `sign in to ${esc(a.provider || a.name)}`}, and paste the code it gives you.`
         : `Starting the sign-in on ${esc(n.name)}<span class="dots"></span>`}</div>
       <div class="setrow col ctlrow">${lbl("authCode", "Code", "the code the sign-in page shows once you approve")}
         <input id="authCode" autocomplete="off" spellcheck="false" autocapitalize="none"
@@ -103,7 +107,11 @@ function signinBlock(n, id = "claude"){
   } else {
     const failed = mine && lg.done && !lg.ok;
     inner = `
-      <div class="actbar"><span class="state warn">You are not signed in to ${esc(a.name)} on ${esc(n.name)}: your ${esc(a.name)} sessions will not start here</span>
+      <div class="actbar"><span class="state warn">You are not signed in to ${esc(a.name)} on ${esc(n.name)}: ${a.pack
+        // A pack's agent starts not signed in and asks in its own terminal;
+        // here is the other way in, which a phone can use.
+        ? `sign in here, or in the terminal of a ${esc(a.name)} session there`
+        : `your ${esc(a.name)} sessions will not start here`}</span>
         <button type="button" class="primary" data-si="in"${cannot ? " disabled" : ""}>${failed ? "Try again" : "Sign in"}</button></div>
       ${cannot ? `<div class="hint warn">${esc(cannot)}.</div>`
         : failed ? `<div class="sub bad">${esc(lg.error || "the sign-in did not finish")}</div>` : ""}`;

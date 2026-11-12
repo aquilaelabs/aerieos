@@ -1,0 +1,59 @@
+{
+ "about": "A coding agent that signs in on a screen of its own.",
+ "agent": {
+  "briefing": {
+   "flag": "--rules",
+   "how": "flag-file"
+  },
+  "command": "heron",
+  "hooks": {
+   "events": {
+    "pre": "PreToolUse",
+    "prompt": "UserPromptSubmit",
+    "stop": "Stop"
+   },
+   "file": ".heron/hooks.json",
+   "payload": "camel",
+   "shape": "grouped"
+  },
+  "name": "Heron",
+  "product": "Heron CLI",
+  "provider": "Heron Labs",
+  "signin": {
+   "flow": {
+    "answers": [
+     {
+      "send": "",
+      "when": "Select login method"
+     }
+    ],
+    "kept": ".heron/cli/oauth-token",
+    "prompt": "paste the authorization code",
+    "url": "https://accounts.heron.example/o/oauth2/"
+   },
+   "login": [
+    "heron"
+   ]
+  }
+ },
+ "format": 2,
+ "install": {
+  "steps": [
+   [
+    "sh",
+    "{dir}/install.sh"
+   ]
+  ]
+ },
+ "label": "Heron",
+ "layout": {
+  "bin": [
+   "bin"
+  ],
+  "tool": "bin/heron"
+ },
+ "name": "heron",
+ "platforms": [
+  "linux/amd64"
+ ]
+}

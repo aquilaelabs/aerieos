@@ -971,14 +971,31 @@ cmd_login() {
     # Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct), Grok Build's
     # device code from its user guide (25 Oct).
     if { [ "${1:-}" = --flow ] || [ "${1:-}" = --out ]; } && [ "${2:-}" = --agent ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag="${3:-}"
+        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag="${3:-}" pack=""
         local pinned="${BB_AGENTS_PINNED:-/usr/local/lib/builderbot/agents}"
         case "$ag" in
             codex|copilot|grok) ;;
-            *) die "no coding agent called '${ag}' signs in here" ;;
+            # A coding agent a tool pack brings (R233 step 6), where its
+            # pack says how it signs in: its program is the pack's, on the
+            # PATH a job here is handed, and its screens are worked by
+            # login-flow.py from the pack's own words.
+            *) python3 "$BB_LIB/login-flow.py" has "$ag" 2>/dev/null \
+                   || die "no coding agent called '${ag}' signs in here"
+               pack=1 ;;
         esac
         [ -n "$uid" ] || die "a sign-in names the account it is for"
         HOME="$(user_home "$uid")" && export HOME
+        if [ -n "$pack" ]; then
+            if [ "$1" = --flow ]; then
+                # Its last line says why where it fails, in the program's
+                # own words: nothing is said after it.
+                python3 "$BB_LIB/login-flow.py" in "$ag" || exit 1
+            else
+                python3 "$BB_LIB/login-flow.py" out "$ag" || die "the sign-out did not complete"
+            fi
+            claude_login_check --loud "$ag" || true
+            return 0
+        fi
         PATH="$pinned/$ag:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
         command -v "$ag" >/dev/null 2>&1 \
             || die "$ag is not installed on this machine: Install on its card in the Library, with this node picked, puts one down"

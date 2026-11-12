@@ -33,7 +33,7 @@ import time
 
 from . import tokenseal
 from .accounts import UID_RE, user_of
-from .base import log, wipe
+from .base import log, pack_signins, wipe
 from .names import VAR
 
 SEAL_DIR = VAR + "/tokens"
@@ -43,6 +43,12 @@ EVERY_S = 10
 # ...and Grok Build's session (R95 step 21), a file of its own as Codex's is.
 FILES = (("claude", os.path.join(".claude", ".credentials.json")), ("codex", os.path.join(".codex", "auth.json")),
          ("grok", os.path.join(".grok", "auth.json")), ("copilot", os.path.join(".copilot", "config.json")))
+
+
+def files():
+    """Every sign-in sealed here: the shipped agents', then the file each
+    pack's agent keeps its own in, where its pack says (R233 step 6)."""
+    return FILES + tuple((agent, row["kept"]) for agent, row in sorted(pack_signins().items()))
 
 
 def _claims(jwt):
@@ -96,7 +102,21 @@ def about(agent, data, home):
                 n += 1
             u = (json.loads("\n".join(lines[n:])) or {}).get("lastLoggedInUser") or {}
             out["email"] = str(u.get("login") or "")[:120] if isinstance(u, dict) else ""
+        elif agent in pack_signins():
+            # A pack's agent's: the email a token in it names where one
+            # does, else whose account it is (login-list.py pack_of says it
+            # the same way).
+            out["email"] = (pack_who(data) or f"{pack_signins()[agent]['provider'] or agent} account")[:120]
     return out
+
+
+def pack_who(data):
+    """The email a pack agent's kept sign-in names, or "": read from a token
+    in it where it is JSON that carries one, never a credential."""
+    try:
+        return _jwt_email(json.loads(data))
+    except (ValueError, TypeError, AttributeError):
+        return ""
 
 
 def _shred(path):
@@ -157,7 +177,7 @@ class TokensMixin:
             for acct in sorted(os.listdir(SEAL_DIR))[:500]:
                 if not UID_RE.match(acct):
                     continue
-                for agent, _ in FILES:
+                for agent, _ in files():
                     with contextlib.suppress(OSError, tokenseal.Refused):
                         with open(os.path.join(SEAL_DIR, acct, agent + ".seal"), "rb") as f:
                             h = tokenseal.header(f.read(8192))
@@ -249,7 +269,7 @@ class TokensMixin:
             except (KeyError, OSError):
                 continue
             odir = os.path.join(OPEN_DIR, acct)
-            for agent, rel in FILES:
+            for agent, rel in files():
                 hf, of = os.path.join(home, rel), os.path.join(odir, agent + ".json")
                 with contextlib.suppress(OSError):
                     if os.path.isfile(hf) and not os.path.islink(hf) and os.path.getsize(hf) > 0:
@@ -284,7 +304,7 @@ class TokensMixin:
             if self._live(acct):
                 live[acct] = now
             elif now - live.setdefault(acct, now) > GRACE_S:
-                for agent, _ in FILES:
+                for agent, _ in files():
                     of = os.path.join(odir, agent + ".json")
                     with contextlib.suppress(OSError):
                         os.unlink(of)
@@ -310,7 +330,7 @@ class TokensMixin:
             with contextlib.suppress(KeyError, OSError):
                 pw = pwd.getpwnam(user_of(acct))
                 home = os.path.join(users_dir, acct)
-                for agent, rel in FILES:
+                for agent, rel in files():
                     of = os.path.join(OPEN_DIR, acct, agent + ".json")
                     if not os.path.isfile(of):
                         continue
@@ -342,7 +362,7 @@ class TokensMixin:
         home = os.path.join(pwd.getpwnam(self.session_account()).pw_dir, "users", acct)
         seen, live = self._tok_state()
         odir = None
-        for agent, rel in FILES:
+        for agent, rel in files():
             with contextlib.suppress(OSError, tokenseal.Refused):
                 with open(os.path.join(SEAL_DIR, acct, agent + ".seal"), "rb") as f:
                     blob = f.read()

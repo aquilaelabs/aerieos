@@ -101,6 +101,7 @@ scripts/
   lib/diag.py                    `aerie diag`
   lib/node-log.py                `aerie logs --node`
   lib/login-check.py             `aerie login --check`: who this account is signed in to each agent as on this machine, told to the controller
+  lib/login-flow.py              `aerie login --flow` and `--out` for a coding agent a tool pack brings: its sign-in's own screens worked from what its pack says of them, the link sent up and the code typed in
   lib/emu-job.py                 `aerie emu` as a job on the project's node
   lib/run-job.py                 `aerie run`: the snapshot, the job, the log back
   lib/build-or-test.py           the command, place and outputs `aerie build` and `aerie test` read from the settings

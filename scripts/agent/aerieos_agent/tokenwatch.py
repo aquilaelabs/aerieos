@@ -18,10 +18,22 @@ import struct
 import threading
 import time
 
-from .base import log
+from .base import log, pack_signins
 
 # The folder in an account's home, and the file in it that is the sign-in.
 TOKENS = {".claude": ".credentials.json", ".codex": "auth.json", ".copilot": "config.json", ".grok": "auth.json"}
+
+
+def watched():
+    """{folder under a home: the file in it that is a sign-in}: the shipped
+    agents', and the file each pack's agent keeps its own in, where its pack
+    says (R233 step 6)."""
+    out = dict(TOKENS)
+    for row in pack_signins().values():
+        folder, name = os.path.split(row["kept"])
+        if folder and name:
+            out.setdefault(folder, name)
+    return out
 
 FAN_CLOEXEC = 0x1
 FAN_CLASS_NOTIF = 0x0
@@ -75,6 +87,7 @@ class TokenWatch:
         self.fd = -1
         self.why = ""
         self.marked = set()
+        self.names = {}                   # a marked folder: the sign-in's file in it
         self.reads = []
         self.lock = threading.Lock()
         self.me = os.getpid()
@@ -104,7 +117,7 @@ class TokenWatch:
         """One account's home, its user `pw`: the token files 600 and its
         own, and their folders marked (a folder mark outlives the file being
         replaced, which every agent does when it refreshes a token)."""
-        for d, name in TOKENS.items():
+        for d, name in watched().items():
             folder = os.path.join(home, d)
             f = os.path.join(folder, name)
             with contextlib.suppress(OSError):
@@ -120,6 +133,7 @@ class TokenWatch:
             if self.libc.fanotify_mark(self.fd, FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD,
                                        AT_FDCWD, folder.encode()) == 0:
                 self.marked.add(key)
+                self.names[folder] = name
 
     def loop(self):
         while True:
@@ -143,7 +157,7 @@ class TokenWatch:
                     with contextlib.suppress(OSError):
                         os.close(efd)
                 folder, name = os.path.split(path)
-                if not st or TOKENS.get(os.path.basename(folder)) != name:
+                if not st or self.names.get(folder, TOKENS.get(os.path.basename(folder))) != name:
                     continue
                 got = judge(path, pid, st.st_uid, self.me)
                 if got:

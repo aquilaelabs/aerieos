@@ -62,6 +62,35 @@ FLOWS = {
              "code": re.compile(r"(?<![A-Z0-9-])([A-Z0-9]{4,}-[A-Z0-9]{4,})(?![A-Z0-9-])"),
              "prompt": None},
 }
+# A pack's agent's flow (R233 step 6) reads the same for every one of them:
+# its own screens are driven on the node by scripts/lib/login-flow.py from
+# what its pack says of them, and what comes up the log is that driver's
+# lines, the link on one, a one-time code on another, and the prompt's words
+# where the flow wants a code pasted back.
+PACK_FLOW = {"url": re.compile(r"(?<=\[aerieos\] open this link to sign in: )https://[^\s\x1b]+"),
+             "code": re.compile(r"\[aerieos\] then enter this code there: ([A-Za-z0-9-]{4,40})"),
+             "prompt": PROMPT}
+# The first agent build that runs a pack agent's sign-in job (0.9.429); an
+# older one in the window is asked to update first, in words.
+PACK_FLOW_BUILD = 429
+
+
+def flow_of(agent):
+    """How an agent's flow reads in its job's log, or None for one that
+    signs in nowhere the page can run."""
+    if agent in FLOWS:
+        return FLOWS[agent]
+    a = agents.get(agent)
+    return PACK_FLOW if a is not None and a.pack and a.login_job else None
+
+
+def pastes(agent):
+    """Whether the agent's flow wants a code pasted back (a field on the
+    card), as against showing one to type on the provider's page."""
+    if agent in FLOWS:
+        return bool(FLOWS[agent]["prompt"])
+    a = agents.get(agent)
+    return bool(a is not None and a.pack and (((a.pack.get("signin") or {}).get("flow") or {}).get("prompt")))
 
 
 # How long start_on_node() waits for the URL before answering. The flow takes
@@ -114,7 +143,7 @@ class NodeFlow:
         self._nodes, self.node, self.job = nodes, node_id, job_id
         self.node_name = name
         self.uid = str(uid or "")          # whose sign-in it is: theirs to type into
-        self.agent = agent if agent in FLOWS else "claude"
+        self.agent = agent if flow_of(agent) else "claude"
         self.sent = False
 
     def _log(self):
@@ -142,7 +171,7 @@ class NodeFlow:
     def state(self):
         j, out = self._log()
         done = (j.get("state") or "") in ("succeeded", "failed", "canceled")
-        flow = FLOWS[self.agent]
+        flow = flow_of(self.agent) or FLOWS["claude"]
         m = flow["url"].search(out)
         c = flow["code"].search(out) if flow["code"] else None
         prompt = flow["prompt"]
@@ -158,6 +187,10 @@ class NodeFlow:
                 # A device flow's code, shown for the person to type on the
                 # provider's page; "" for a flow that wants one pasted back.
                 "code": c.group(1) if c else "", "agent": self.agent,
+                # Whether this flow takes a code back: the card draws the
+                # field for one that does and the code to type for one that
+                # does not.
+                "paste": pastes(self.agent),
                 "waiting": bool(prompt and prompt in out) and not self.sent and not done,
                 "sent": self.sent and not done,
                 "done": done, "ok": j.get("state") == "succeeded",
@@ -243,7 +276,15 @@ def cannot(n, agent="claude"):
         return f"{n['name']} is not answering: sign in or out there when it is back"
     if not ((n.get("reported") or {}).get("session") or {}).get("up"):
         return f"{n['name']} runs no sessions, so there is nowhere for a {a.name} login to live there"
+    if a.pack and _build((n.get("agent") or {}).get("version")) < PACK_FLOW_BUILD:
+        return f"{n['name']}'s AerieOS agent is from before a sign-in to {a.name} could be run from here: update it from its row on the Nodes page, then sign in"
     return ""
+
+
+def _build(version):
+    """The BUILD of an agent's WINDOW.BUILD version, 0 when it says none."""
+    m = re.fullmatch(r"\d+\.\d+\.(\d+)", str(version or ""))
+    return int(m.group(1)) if m else 0
 
 
 def verb(action, node_id, uid, agent="claude"):

@@ -17,6 +17,12 @@ the format has a number. The promise the number keeps:
     primitive, written down in docs/tool-packs.md. A new primitive is a new
     number, never a change to an old one.
 
+The number a manifest says is the one it needs. A key an earlier build
+leaves out with the rest meaning what it meant (an extra: today a coding
+agent's signin.flow, without which the agent signs in in its terminal)
+does not move it, so a pack that gains one is still taken by every install
+that took it before; docs/tool-packs.md lists the extras and who reads them.
+
 unit/test_packformat.py holds the kept manifests of every number
 (unit/packformat/N/) to this build, and `aerie lint` holds the ones a
 release shipped unchanged, as it holds a shipped migration.
