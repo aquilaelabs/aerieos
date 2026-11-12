@@ -8,6 +8,7 @@
 - A session or a shell starts again on a node set up before AerieOS had its name, once that node's agent has restarted: none did where the node carries a CI runner's folder, ending at 'this node could not build its view' (55a9cd1)
 - A session's view leaves out the agent's own folder on a node set up since AerieOS had its name, or whose Enroll script was run again: it was left in view there, readable as far as its files' permissions allowed (other spaces' build caches and containers' data among them) (55a9cd1)
 - A pack installed from the catalog says where it came from on its page and its Library entry; it said 'Made here' (15b6a4f)
+- A command a house rule refuses is refused in a Codex, Copilot, Grok or OpenCode session too, and a check that fails at the end of a turn sends that agent back to work once: both held Claude Code's sessions only, and in the others the command ran and the turn ended (0b24dab)
 
 ## 0.9.0-dev.5269: 2026-11-12
 
