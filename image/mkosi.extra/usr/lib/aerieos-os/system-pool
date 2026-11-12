@@ -8,6 +8,11 @@
 # wait for /run/aerieos-os/system-pool-ready), as Unraid's Docker and VMs
 # wait for the array.
 #
+# The secrets folder (its *.env files, ssh/ and the install key) goes to the
+# pool too (the operator, 7 Nov): the stick alone, lost or taken, then opens
+# nothing the controller sealed. While a named pool is not mounted it is held
+# empty and read only, so no key is made on the stick in the key's place.
+#
 #   system-pool apply        at boot (aerieos-os-system-pool.service), and
 #                            again while the pool is not mounted yet: bind
 #                            each folder, then let the held services start
@@ -64,6 +69,23 @@ pool_owner() {
     if [ -n "$mark" ] && [ "$mark" = "$(install_id)" ]; then echo mine; else echo other; fi
 }
 mark_pool() { mkdir -p "$1/$SUB" && install_id > "$1/$SUB/$OWNER_MARK"; }
+# Where another install's folder goes when set aside: SUB.old, then
+# SUB.old-2, -3 and on, never over one set aside before.
+aside_name() {
+    local n=1 d="$1/$SUB.old"
+    while [ -e "$d" ] || [ -L "$d" ]; do n=$((n + 1)); d="$1/$SUB.old-$n"; done
+    printf '%s' "$d"
+}
+# The mounted filesystems holding another install's folder, said before a
+# pool is picked so the page can offer to set it aside.
+others() {
+    local t
+    while IFS= read -r t; do
+        case "$t" in /|/proc*|/sys*|/dev*|/run*|/boot*|/usr*|/etc*|/var*|/home*|/srv*|/tmp*) continue ;; esac
+        if [ -d "$t/$SUB" ] && [ "$(pool_owner "$t")" = other ]; then printf '"%s"\n' "${t//\"/}"; fi
+    done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
+    return 0
+}
 CONTROLLER="aerieos-controller"
 
 envget() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null | tr -d '"' | tail -1; }
@@ -75,7 +97,28 @@ bound() { findmnt -rn -o TARGET "$1" 2>/dev/null | grep -qx "$1"; }
 # or a folder on the disks is named, the projects folder is an empty
 # read-only mount of its own, held, so nothing can be written there.
 HELD="bb-projects-held"
-held() { findmnt -rn -o SOURCE "$1" 2>/dev/null | grep -qx "$HELD"; }
+HELD_SECRETS="bb-secrets-held"
+held() { findmnt -rn -o SOURCE "$1" 2>/dev/null | grep -qx -e "$HELD" -e "$HELD_SECRETS"; }
+secrets_place() { printf '%s' "${BB_SP_SECRETS:-/etc/aerieos-controller/secrets}"; }
+# The secrets held while the pool they live on is not mounted: an empty,
+# read-only folder with a mark the controller's boot reads (lib/boot.sh
+# secrets_held), so it makes no key and waits.
+hold_secrets() {
+    local place; place="$(secrets_place)"
+    mkdir -p "$place"
+    held "$place" && return 0
+    # Secrets the stick still holds (a pool named by an earlier release,
+    # not mounted yet to take them) are the controller's key: used, not hidden.
+    [ -n "$(ls -A "$place" 2>/dev/null)" ] && return 0
+    [ -n "${BB_SP_NO_MOUNT:-}" ] && return 0
+    if mount -t tmpfs -o size=64k,mode=0700 "$HELD_SECRETS" "$place" 2>/dev/null; then
+        : > "$place/.aerieos-held"
+        mount -o remount,ro "$place" 2>/dev/null || true
+        echo "system-pool: the secrets wait for the system pool: the controller seals and opens nothing until it mounts"
+    else
+        echo "system-pool: the secrets folder could not be held while the pool is not mounted" >&2
+    fi
+}
 hold_projects() {
     local place; place="$(projects_place)"
     mkdir -p "$place"
@@ -107,7 +150,7 @@ targets() {
     sdk="$(envget SDK_ROOT)"
     printf '%s\n' "docker=${BB_SP_DOCKER:-/var/lib/docker}" "containerd=${BB_SP_CONTAINERD:-/var/lib/containerd}" \
         "libvirt=${BB_SP_LIBVIRT:-/var/lib/libvirt}" "toolchains=${sdk:-/var/lib/aerieos-controller/sdk}" \
-        "home=${BB_SP_HOME:-/home}" "workspace=${BB_SP_WORKSPACE:-/workspace}"
+        "home=${BB_SP_HOME:-/home}" "workspace=${BB_SP_WORKSPACE:-/workspace}" "secrets=$(secrets_place)"
     named_projects >/dev/null || printf '%s\n' "projects=$(projects_place)"
 }
 
@@ -152,12 +195,14 @@ apply() {
         return "$rc"
     fi
     if ! mounted "$p"; then
+        hold_secrets
         echo "system-pool: $p is not mounted yet: tried again in half a minute" >&2
         return 1
     fi
     # This install named the pool: one named before the mark is marked now.
     [ -s "$p/$SUB/$OWNER_MARK" ] || mark_pool "$p" || true
-    local line name place src
+    local line name place src waited=""
+    held "$(secrets_place)" && waited=1
     while IFS= read -r line; do
         name="${line%%=*}"; place="${line#*=}"; src="$p/$SUB/$name"
         mkdir -p "$src" "$place"
@@ -173,12 +218,27 @@ apply() {
             continue
         fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
+            [ "$name" = secrets ] && chmod go-rwx "$src"
             [ -n "$(ls -A "$src" 2>/dev/null)" ] || as_place "$src" "$place"
+            # Secrets a stick kept before they went to the pool (a pool named
+            # by an earlier release) go there once, never hidden under an
+            # empty folder of the pool's: the key in them is the one the
+            # controller sealed under.
+            if [ "$name" = secrets ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && [ -n "$(ls -A "$place" 2>/dev/null)" ]; then
+                cp -a "$place/." "$src/"
+                find "$place" -mindepth 1 -delete
+                echo "system-pool: the secrets moved from the stick to $p"
+            fi
         fi
         if ! findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; then
             mount --bind "$src" "$place"
         fi
     done < <(targets)
+    # A controller that started while its secrets were held has no key: it
+    # starts again on the pool's.
+    if [ -n "$waited" ] && [ -z "${BB_SP_NO_SYSTEMCTL:-}" ] && systemctl is-active --quiet "$CONTROLLER" 2>/dev/null; then
+        systemctl restart --no-block "$CONTROLLER" 2>/dev/null || true
+    fi
     mkdir -p "$RUN"; : > "$READY"
     # The held services start now their condition holds; at boot this runs
     # before them, so systemd starts them in order anyway.
@@ -334,8 +394,17 @@ set_pool() {
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
     if [ "$(pool_owner "$p")" = other ]; then
-        echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, or pick a pool without it; nothing on $p was touched" >&2
-        return 3
+        if [ "${2:-}" != --aside ]; then
+            echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, set it aside, or pick a pool without it; nothing on $p was touched" >&2
+            return 3
+        fi
+        # Set aside, never taken (the operator, 8 Nov): renamed beside it
+        # as it is, to be deleted by a person once sure, and this install
+        # starts on an empty folder.
+        local aside
+        aside="$(aside_name "$p")"
+        mv -T "$p/$SUB" "$aside" || { echo "system-pool: $p/$SUB could not be set aside; nothing on $p was touched" >&2; return 1; }
+        echo "system-pool: the other install's $p/$SUB is set aside as $aside, untouched: delete it once nothing in it is wanted"
     fi
     [ -n "${BB_SP_NO_SYSTEMCTL:-}" ] || systemctl stop "${SERVICES[@]/%/.service}" 2>/dev/null || true
     mark_pool "$p"
@@ -372,6 +441,15 @@ set_pool() {
         # bind still standing (a second one stacked under the first by two
         # applies at once) would empty the old pool (B476, B613). Nothing
         # more moves; what moved stays.
+        # The secrets are the one folder carried from an old pool to the new:
+        # the install key in them opens what the controller sealed, and the
+        # stick's folder under the bind is empty.
+        if [ "$name" = secrets ] && findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place" \
+                && ! held "$place" && ! on_it "$place" "$src"; then
+            cp -an "$place/." "$src/"
+        fi
+        unhold "$place"
+        [ "$name" = secrets ] && chmod go-rwx "$src"
         local tries=0
         while findmnt -rn -o TARGET "$place" 2>/dev/null | grep -qx "$place"; do
             if [ "$tries" -ge 8 ] || ! umount "$place"; then
@@ -416,16 +494,17 @@ status() {
     # Where the projects are: a named folder on the disks, the pool's, or
     # held (nowhere yet: never the stick).
     if [ -n "$pf" ]; then home="folder"; elif [ -n "$p" ] && [ "$ready" = true ]; then home="pool"; else home="held"; fi
-    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s"}\n' \
+    local oth; oth="$(others | paste -sd, -)"
+    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s]}\n' \
         "${p//\"/}" "$ready" "${on_stick[*]}" "${kb:-null}" "${since:-null}" "${pf//\"/}" \
-        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home"
+        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth"
 }
 
 case "${1:-}" in
     apply) apply ;;
-    set) set_pool "${2:-}" ;;
+    set) set_pool "${2:-}" "${3:-}" ;;
     projects)
         if [ "${2:-}" = --release ]; then release_projects; else shift; set_projects "$@"; fi ;;
     status) status ;;
-    *) echo "usage: system-pool apply | set PATH | spaces PATH [NAME...] | spaces --release | status" >&2; exit 64 ;;
+    *) echo "usage: system-pool apply | set PATH [--aside] | spaces PATH [NAME...] | spaces --release | status" >&2; exit 64 ;;
 esac

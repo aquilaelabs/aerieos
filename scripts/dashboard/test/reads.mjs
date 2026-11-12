@@ -263,7 +263,8 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   ok(mine.status === 403, `a session cannot open its own network (${mine.status} ${mine.error})`);
   // In the dialog: a row per address under Also sees, and Add an address.
   await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reaches?.length === 2, { timeout: 20000 });
-  await page.evaluate(() => renameProject('alpha'));
+  // What sessions reach is the space's (R223): its own dialog, the card's door.
+  await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   const rows = await page.$$eval('#rnReachRows .rnreach [data-reach]', es => es.map(e => e.value));
   ok(rows.join() === '192.168.1.50,192.168.1.60:8123', `the dialog draws a row per address (${rows.join(', ')})`);

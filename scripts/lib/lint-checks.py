@@ -378,5 +378,63 @@ def packs():
     sys.exit(r.returncode)
 
 
+def dupes():
+    """A name defined twice where the second silently wins: a function or
+    method twice in one python class or module (B734: the server's Handler
+    lost a handler to a later one of the same name), and a top-level name
+    declared in two of the page's classic scripts, which share one global
+    scope, so the later script fails to load whole (B733)."""
+    import ast
+    bad = []
+    for f in sorted(pathlib.Path("scripts").rglob("*.py")):
+        try:
+            tree = ast.parse(f.read_text(encoding="utf-8"), str(f))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        for scope in [tree, *(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef))]:
+            seen = {}
+            for n in scope.body:
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.decorator_list:
+                    if n.name in seen:
+                        bad.append(f"{f}:{n.lineno}: {n.name} again (first at line {seen[n.name]}), so only this one runs")
+                    seen.setdefault(n.name, n.lineno)
+    page = pathlib.Path("scripts/dashboard/index.html")
+    if page.is_file():
+        srcs = re.findall(r'<script src="([\w.-]+\.js)"></script>', page.read_text(encoding="utf-8"))
+        owner = {}
+        decl = re.compile(r"^(?:let|const|var|function\*?|async function|class)\s+([A-Za-z_$][\w$]*)")
+        for src in srcs:
+            f = page.parent / src
+            if not f.is_file():
+                continue
+            for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                m = decl.match(ln)
+                if not m:
+                    continue
+                names = [m.group(1)]
+                # let a = 1, b = 2: each name the line declares at its top level
+                if ln.startswith(("let ", "var ", "const ")):
+                    depth, cur, out = 0, "", []
+                    for ch in ln.split(None, 1)[1].rstrip(";"):
+                        depth += ch in "([{" or 0
+                        depth -= ch in ")]}" or 0
+                        if ch == "," and depth == 0:
+                            out.append(cur)
+                            cur = ""
+                        else:
+                            cur += ch
+                    out.append(cur)
+                    names = [mm.group(1) for mm in (re.match(r"\s*([A-Za-z_$][\w$]*)\s*(=|$)", x) for x in out) if mm]
+                for nm in names:
+                    if nm in owner and owner[nm][0] != src:
+                        bad.append(f"scripts/dashboard/{src}:{i}: {nm} is declared in {owner[nm][0]}:{owner[nm][1]} too, so {src} would not load")
+                    owner.setdefault(nm, (src, i))
+    for b in bad:
+        print(f"  [FAIL] {b}")
+    if not bad:
+        print("  [ok]   no function, method or page-level name is defined twice")
+    sys.exit(1 if bad else 0)
+
+
 {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
- "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid, "changelog": changelog}[verb]()
+ "channels": channels, "shipped": shipped, "packs": packs, "unraid": unraid, "changelog": changelog, "dupes": dupes}[verb]()

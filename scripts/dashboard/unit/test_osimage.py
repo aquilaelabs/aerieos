@@ -212,6 +212,38 @@ class TheAgent(unittest.TestCase):
         self.assertIn("gh attestation verify", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "the working files are gone")
 
+    def test_a_write_cut_short_leaves_the_slot_reading_as_empty(self):
+        # The old release stayed on the ESP over a half-written root, and the
+        # next update kept that root under the old version's name.
+        w = World(slot="a")
+        w.publish("0.9.1")
+        os.makedirs(os.path.join(w.esp, "aerieos", "b"), exist_ok=True)
+        open(os.path.join(w.esp, "aerieos", "b", "release"), "w").write("BUILDERBOT_OS_VERSION=0.8.9\n")
+        os.chmod(w.dev["b"], 0o400)
+        self.addCleanup(os.chmod, w.dev["b"], 0o600)
+        if os.access(w.dev["b"], os.W_OK):
+            self.skipTest("run as root: every file writes")
+        state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 71), text)
+        self.assertFalse(os.path.exists(os.path.join(w.esp, "aerieos", "b", "release")))
+
+    def test_no_copy_of_the_configuration_no_update(self):
+        # Going back to this slot needs the copy; without it nothing is written.
+        w = World(slot="a")
+        w.publish("0.9.1")
+        locked = os.path.join(w.state, "locked")
+        os.makedirs(locked)
+        open(os.path.join(locked, "f"), "w").write("x")
+        os.chmod(locked, 0)
+        self.addCleanup(os.chmod, locked, 0o700)
+        if os.access(locked, os.R_OK):
+            self.skipTest("run as root: every folder reads")
+        state, code, text = self.run_update(w, {"release": "v0.9.1"})
+        self.assertEqual((state, code), ("failed", 74), text)
+        self.assertIn("did not take, so nothing was written", text)
+        with open(w.dev["b"], "rb") as f:
+            self.assertEqual(f.read(), b"\0" * 4096, "the other slot untouched")
+
     def test_a_slot_on_trial_is_never_the_one_an_update_runs_from(self):
         # B470: running slot b on trial, slot a is the only good one, and an
         # update would have written it.

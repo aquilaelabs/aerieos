@@ -29,11 +29,13 @@ is followed by hand with one line the new controller's Nodes page gives
 
 The bundle's shape: a header line BBMOVE1, a JSON manifest (version, state
 version, made at, the old address, what it carries, the sha256 of the
-token, nothing secret), a newline, then the sealed tar.gz (ChaCha20-Poly1305
-under HKDF(token)).
+token, nothing secret, and a MAC under the bundle's key over the rest), a
+newline, then the sealed tar.gz (ChaCha20-Poly1305 under HKDF(token)), whose
+first entry, bundle.json, says the manifest carries that MAC.
 """
 import base64
 import contextlib
+import errno
 import hashlib
 import hmac
 import io
@@ -290,7 +292,7 @@ SIZE_BUDGET_S = 1.0
 _sizes = {}      # path: (at, bytes, over), kept a while
 
 
-def _size_of(src, leave=()):
+def _size_of(src, leave=(), budget=None):
     """(bytes, over) under a tree, symlinks not followed, within
     SIZE_BUDGET_S: `over` says the walk stopped and the bytes are a floor.
     Kept for ten minutes per path."""
@@ -314,11 +316,28 @@ def _size_of(src, leave=()):
                 continue
             if not os.path.islink(os.path.join(root, f)):
                 n += st.st_size
-        if time.monotonic() - t0 > SIZE_BUDGET_S:
+        if time.monotonic() - t0 > (SIZE_BUDGET_S if budget is None else budget):
             over = True
             break
     _sizes[key] = (time.time(), n, over)
     return n, over
+
+
+# A piece whose walk ran out of time is walked whole once more behind the
+# page, so the next read says its size rather than a floor; one at a time.
+SIZE_BEHIND_S = 120
+_behind = threading.Lock()
+
+
+def _measure_behind(jobs):
+    def run():
+        with _behind:
+            for path, leave in jobs:
+                _sizes.pop((str(Path(path)), tuple(sorted(leave))), None)
+                with contextlib.suppress(OSError):
+                    _size_of(path, leave, budget=SIZE_BEHIND_S)
+    if not _behind.locked():
+        threading.Thread(target=run, name="move-sizes", daemon=True).start()
 
 
 def pieces():
@@ -327,17 +346,37 @@ def pieces():
     outside it (on unless it is logs or the job trees); the repositories
     (off: both homes may mount the same share); the install key (off: the
     new home asks for it)."""
+    # Each tree walked beside the others, so the page waits a walk's budget
+    # once rather than once per piece (two seconds and more on a cold read).
+    asked = []
+
     def piece(key, label, about, path, on, fixed=False, leave=()):
-        size, over = _size_of(path, leave)
-        return {"key": key, "label": label, "about": about, "size": size, "over": over, "on": on, "fixed": fixed}
+        row = {"key": key, "label": label, "about": about, "size": 0, "over": False, "on": on, "fixed": fixed}
+        asked.append((row, path, tuple(leave)))
+        return row
     out = [piece("state", "The state", "accounts, nodes, spaces, settings, the notebooks, the database, what is sealed", STATE, True, True, LEAVE)]
     for kind, path in (store_paths() or {}).items():
         if path and not str(path).startswith(str(STATE)):
             out.append(piece(f"store:{kind}", kind, str(path), path, kind not in STORES_OFF))
     if SECRETS and Path(SECRETS).is_dir():
-        out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
+        if os.access(SECRETS, os.R_OK | os.X_OK):
+            out.append(piece("secrets", "The deploy key and the secrets", SECRETS, SECRETS, True, True, leave=SECRETS_LEAVE))
+        else:
+            # Root's alone on a machine of its own: the dashboard cannot
+            # list it, and a walk of it carried nothing without a word (B728).
+            out.append({"key": "secrets", "label": "The deploy key and the secrets", "size": 0, "on": False, "fixed": True,
+                        "about": f"{SECRETS} is root's alone here, so a bundle carries none of it: copy its *.env files "
+                                 "and ssh/ to the new home by hand, as root"})
     out.append(piece("repos", "The repositories", f"{WORKSPACE}: leave off when the new home reaches the same folder, a share both mount, or the disks the new machine adopts, where This machine names it as the spaces folder", WORKSPACE, False))
     out.append({"key": "install_key", "label": "The install key", "about": "else the new home asks for it", "size": len(install_key() or b""), "on": False})
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=max(1, len(asked))) as pool:
+        got = list(pool.map(lambda a: _size_of(a[1], a[2]), asked))
+    for (row, _, _), (size, over) in zip(asked, got, strict=True):
+        row["size"], row["over"] = size, over
+    behind = [(path, leave) for (row, path, leave) in asked if row["over"]]
+    if behind:
+        _measure_behind(behind)
     return out
 
 
@@ -494,30 +533,74 @@ def split_form(src, content_type, file_field, dest, small=64 << 10):
                 state = "body"
 
 
+# The manifest line is plain, read before anything is opened, so it is held
+# to the body by a MAC under the bundle's key, checked once the body is
+# unpacked and before anything here changes (B724). A bundle that carries
+# the mark below as its first sealed entry has one, so a MAC taken off the
+# line is caught too; a bundle made before (no mark) lands as it did.
+MANIFEST_MARK = "bundle.json"
+
+
+def _manifest_mac(key, m):
+    body = json.dumps({k: v for k, v in m.items() if k != "mac"}, sort_keys=True, separators=(",", ":")).encode()
+    return hmac.new(hmac.new(key, b"builderbot bundle manifest", hashlib.sha256).digest(), body, hashlib.sha256).hexdigest()
+
+
+def _manifest_held(path, key, work):
+    """Why the manifest line is not the one the bundle was sealed with, or
+    "" when it is (or the bundle is from before manifests were held)."""
+    try:
+        mark = json.loads((Path(work) / MANIFEST_MARK).read_text())
+    except (OSError, ValueError):
+        mark = None
+    if not isinstance(mark, dict) or not mark.get("mac"):
+        return ""
+    try:
+        with open(path, "rb") as f:
+            f.readline()
+            m = json.loads(f.readline())
+    except (OSError, ValueError):
+        m = None
+    if not isinstance(m, dict) or not hmac.compare_digest(str(m.get("mac") or ""), _manifest_mac(key, m)):
+        return "the bundle's outer details were changed after it was made (its kind, origin or version): nothing here was changed"
+    return ""
+
+
+# The manifest's room ahead of the body: the line is padded to it with
+# spaces (whitespace JSON reads past), so the body is written once, in
+# place, rather than to a file beside it and copied after, which needed
+# twice the bundle's size free on the disk it was packed on.
+MANIFEST_SLOT = 64 << 10
+
+
 def write_bundle(dest, header, manifest, key, **pack_kw):
     """A bundle written to `dest` as it is packed, never whole in memory:
     `header`, the manifest line (`manifest(counts)`, a dict, its format
-    set here), then the body sealed under `key` a piece at a time. The body
-    goes first to a file beside `dest`, since the manifest names its counts,
-    and is copied after it. Returns (manifest, counts)."""
+    set here), then the body sealed under `key` a piece at a time. The
+    manifest names the body's counts, so its line is a slot of spaces
+    filled in once the body is written. Returns (manifest, counts)."""
     dest = Path(dest)
-    body = dest.with_name(dest.name + ".body")
     # The database's log folded into it first, so the copy is not torn (B601).
     with contextlib.suppress(Exception):
         checkpoint()
-    try:
-        with open(body, "wb") as f:
-            sealer = _Sealer(f, key)
-            with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
-                counts = _pack_into(tar, **pack_kw)
-            sealer.finish()
+    with open(dest, "wb") as out:
+        out.write(header)
+        out.write(b" " * (MANIFEST_SLOT - 1) + b"\n")
+        sealer = _Sealer(out, key)
+        with tarfile.open(fileobj=sealer, mode="w|gz") as tar:
+            mark = json.dumps({"mac": True}).encode()
+            info = tarfile.TarInfo(MANIFEST_MARK)
+            info.size, info.mtime, info.mode = len(mark), int(time.time()), 0o600
+            tar.addfile(info, io.BytesIO(mark))
+            counts = _pack_into(tar, **pack_kw)
+        sealer.finish()
         m = dict(manifest(counts), format=FORMAT)
-        with open(dest, "wb") as out, open(body, "rb") as f:
-            out.write(header)
-            out.write(json.dumps(m).encode() + b"\n")
-            shutil.copyfileobj(f, out, 1 << 20)
-    finally:
-        body.unlink(missing_ok=True)
+        m["mac"] = _manifest_mac(key, m)
+        line = json.dumps(m).encode()
+        if len(line) >= MANIFEST_SLOT:
+            raise OSError(f"the bundle's details ran past their {MANIFEST_SLOT >> 10} KiB")
+        out.seek(len(header))
+        out.write(line + b" " * (MANIFEST_SLOT - 1 - len(line)))
     return m, counts
 
 
@@ -654,23 +737,39 @@ def pack_bundle():
                 "packed_at": int(time.time()), "from": page_url(), "to": d.get("to", ""), "repos": bool(d.get("repos")),
                 "carries_key": bool(d.get("carries_key") and counts.get("install_key")),
                 "nodes": list(node_ids()), "bare_metal": bool(bare_metal()), "counts": counts, "token_hash": d.get("token_hash", "")}
+    # The bundle before goes first: it is the state as it was then, never
+    # what moves, and kept while the new one was packed it took its room
+    # twice over on a disk the bundle may only just fit.
+    for old in out_dir.glob("*"):
+        if old.suffix in BUNDLE_SUFFIXES or old.name.endswith((".partial", ".body")):
+            old.unlink(missing_ok=True)
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
                                         stores=set(d["stores"]) if isinstance(d.get("stores"), list) else None)
+        os.replace(tmp, out_dir / name)
+        with _lock:
+            d = _load()
+            d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
+            _save(d)
     except OSError as e:
         tmp.unlink(missing_ok=True)
-        return {"error": f"the bundle could not be written: {e.strerror or e}"}
-    os.replace(tmp, out_dir / name)
-    with _lock:
-        d = _load()
-        for old in out_dir.glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
-            if old.name != name:
-                old.unlink(missing_ok=True)
-        d.update(bundle=name, size=(out_dir / name).stat().st_size, packed_at=manifest["packed_at"], carries_key=manifest["carries_key"])
-        _save(d)
+        (out_dir / name).unlink(missing_ok=True)
+        return {"error": f"the bundle could not be written: {_no_room_said(e, out_dir, bool(d.get('repos')))}"}
     return {"ok": True, "bundle": name, "size": d["size"], "counts": counts}
+
+
+def _no_room_said(e, where, repos):
+    """An error packing a bundle as a sentence; a full disk said with
+    where it is and what to do about it."""
+    if getattr(e, "errno", None) != errno.ENOSPC:
+        return str(e.strerror or e)
+    try:
+        free = f"{shutil.disk_usage(str(where)).free / 1e9:.1f} GB"
+    except OSError:
+        free = "too little"
+    return (f"the disk holding this controller's state ({where}) filled up: {free} free once the unfinished bundle was removed. "
+            + ("Free room there, or prepare the move again without the repositories, which then move by naming their folder on the new home"
+               if repos else "Free room there and try again"))
 
 
 # A backup of the controller under a token of its own (the operator, 6 Nov):
@@ -706,10 +805,10 @@ def backup_bundle(principal, repos=False, carry_key=False, stores=None):
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(repos), carry_key=bool(carry_key),
                                         stores=set(stores) if stores is not None else None)
+        os.replace(tmp, out_dir / name)
     except OSError as e:
         tmp.unlink(missing_ok=True)
-        return {"error": f"the backup could not be written: {e.strerror or e}"}
-    os.replace(tmp, out_dir / name)
+        return {"error": f"the backup could not be written: {_no_room_said(e, out_dir, bool(repos))}"}
     for old in out_dir.glob("*"):
         if old.name != name:
             old.unlink(missing_ok=True)
@@ -1108,6 +1207,52 @@ def _set_aside_clashes(carried, workspace_dir, stamp, state_dir):
     return said
 
 
+def _carry_share_people(aside, state_dir):
+    """The accounts this controller made from an old system's share users
+    (users.adopt: no password of their own, an SMB password's hash) carried
+    into the landed accounts under the same id, so the shares already served
+    to them keep their people (B716); a name or an id the landed accounts
+    already have is left and said. What was carried or left, said."""
+    try:
+        was = json.loads((aside / "users.json").read_text())
+        now = json.loads((state_dir / "users.json").read_text())
+    except (OSError, ValueError):
+        return []
+    if not isinstance(was, dict) or not isinstance(now, dict):
+        return []
+    old, new = was.get("users") or {}, now.setdefault("users", {})
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return []
+    uids = {str((u or {}).get("uid") or "") for u in new.values() if isinstance(u, dict)}
+    carried, left = [], []
+    for name, u in sorted(old.items()):
+        if not isinstance(u, dict) or u.get("password") or not u.get("smb_nt") or u.get("role") == "owner":
+            continue
+        if name in new or str(u.get("uid") or "") in uids:
+            left.append(name)
+            continue
+        new[name] = u
+        carried.append(name)
+    said = []
+    if carried:
+        tmp = state_dir / ".users.json.carry"
+        try:
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                json.dump(now, f, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, state_dir / "users.json")
+        except OSError as e:
+            with contextlib.suppress(OSError):
+                tmp.unlink()
+            return [f"the share users made here ({', '.join(carried)}) could not be kept ({e}): make them again on the Users page"]
+        said.append(f"the share users made here are kept as accounts with their SMB passwords: {', '.join(carried)}")
+    if left:
+        said.append(f"share users made here whose name the moved controller already has are its accounts now: {', '.join(left)}")
+    return said
+
+
 def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None, build_state_version=None, here_bare_metal=None, key=None,
             work_root=None):
     """The bundle unsealed under the token and put in place of the state here
@@ -1144,6 +1289,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     fh = open(path, "rb")
     fh.readline(); fh.readline()
     if m.get("format") == 1:
+        # The format before was opened whole in memory; a bundle that big
+        # was never one of them (B724: the format is read from the plain line).
+        if os.path.getsize(path) > (2 << 30):
+            fh.close()
+            return {"error": "the bundle says it is of the format before, which was never this big: not opened"}
         try:
             src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
         except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
@@ -1171,6 +1321,10 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             unpacked = f"the bundle is damaged or cut short ({e}); nothing here was changed"
         if unpacked:
             return {"error": unpacked}
+        counts.pop(MANIFEST_MARK, None)
+        changed = _manifest_held(path, key, work)
+        if changed:
+            return {"error": changed}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir / f".moved-{stamp}"
         # A landing within the same second as one before (a retry after a
@@ -1186,12 +1340,27 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         # the swap left the new state half restored, the old one aside and
         # not said where.
         if (work / "workspace").is_dir():
-            workspace_dir.mkdir(parents=True, exist_ok=True)
-            said += _set_aside_clashes(work / "workspace", workspace_dir, stamp, state_dir)
-            shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
+            set_aside = []
+            try:
+                workspace_dir.mkdir(parents=True, exist_ok=True)
+                set_aside = _set_aside_clashes(work / "workspace", workspace_dir, stamp, state_dir)
+                said += set_aside
+                shutil.copytree(str(work / "workspace"), str(workspace_dir), symlinks=True, dirs_exist_ok=True)
+            except (OSError, shutil.Error) as e:
+                # Said, with what was set aside and where, rather than
+                # escaping the landing with those lines lost (B725).
+                return {"error": f"the spaces could not be copied into {workspace_dir} ({str(e)[:300]}); the state here was not changed"
+                                 + (". Set aside before the copy: " + "; ".join(set_aside) if set_aside else "")}
         if (work / "secrets").is_dir() and secrets_dir:
-            secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
+            try:
+                secrets_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                shutil.copytree(str(work / "secrets"), str(secrets_dir), symlinks=True, dirs_exist_ok=True)
+            except (OSError, shutil.Error) as e:
+                # A secrets folder that is root's takes nothing the dashboard
+                # writes (and root never reads what the dashboard's account
+                # left for it): the rest lands, and this is said (B728).
+                said.append(f"the old controller's secrets were not written into {secrets_dir} ({str(e)[:200]}): "
+                            "copy its *.env files and ssh/ there as root, then restart the controller")
         swapped = False
         # The landing marked while the state is half old and half new, so a
         # power loss midway leaves a word of it for the next start (B622):
@@ -1224,6 +1393,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                 except OSError:
                     _store_here(state_dir, kind_dir.name)
                     _into(kind_dir, state_dir / kind_dir.name)
+            said += _carry_share_people(aside, state_dir)
             if (work / "install-key").is_file():
                 # A key the landing could not take is said in the result
                 # and kept on the record (B623), never swallowed.

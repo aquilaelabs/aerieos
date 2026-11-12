@@ -33,10 +33,9 @@ function chatOpen(w){ chatWith = w; chatMsgs = []; chatDrawn = ""; loadChat(); }
 // project channels beside the open conversation at a desk, one at a time
 // on a phone, the composer at the foot. Chat on the dock's line opens it,
 // and pressed again while it is in front puts the dock down.
-function openChatTab(){
+function openChatTab(press = false){
   const t = tabs.find(x => x.kind === "chat");
-  if (t && panes[1] === t.id && dockUp){ dockShow(t.id); return; }
-  if (t){ dockShow(t.id); return; }
+  if (t){ dockShow(t.id, press); return; }
   openTab({kind: "chat", arg: "__chat", label: "Chat"});
 }
 

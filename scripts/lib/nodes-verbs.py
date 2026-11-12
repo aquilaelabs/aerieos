@@ -18,6 +18,31 @@ arg = sys.argv[3] if len(sys.argv) > 3 else ""
 nodes = dash.load("nodes", dash.beside(py))
 
 
+def _seen(rows):
+    """What a session asking through the relay may read (B727): its space's
+    own nodes (its node, Also works on, the hosting-only ones) and every
+    node only for an owner's or an administrator's seat, as the Nodes page
+    narrows them; a person at the controller reads them all."""
+    uid = os.environ.get("BB_ACCOUNT_UID") or ""
+    if os.environ.get("BB_RELAYED") != "1" or not uid:
+        return rows
+    import json
+    state = os.environ["DASHBOARD_STATE"]
+    try:
+        us = (json.load(open(os.path.join(state, "users.json"))).get("users") or {}).values()
+    except (OSError, ValueError, AttributeError):
+        us = []
+    if any(isinstance(u, dict) and u.get("uid") == uid and u.get("role") in ("owner", "admin") for u in us):
+        return rows
+    mine = set()
+    with contextlib.suppress(Exception):
+        prefs = dash.load("prefs", dash.beside(py))
+        prefs.configure(state=state, write_json=lambda *a: None)
+        rec = prefs.get(os.environ.get("BB_PROJECT") or "") or {}
+        mine = {rec.get("node") or "", *(rec.get("nodes") or []), *(rec.get("hosts") or [])} - {""}
+    return [n for n in rows if n["id"] in mine]
+
+
 def list_():
     try:
         nodes.db.open_readonly(os.environ["DASHBOARD_STATE"])
@@ -28,7 +53,11 @@ def list_():
     # Enrolled machines only. The controller's own record is registry plumbing
     # (it is how a share it mounts is recognized as a node's store) and never a
     # machine anybody lists: it runs no work and takes no toolchains.
-    rows = [n for n in rows if n["kind"] != "local"]
+    every = [n for n in rows if n["kind"] != "local"]
+    rows = _seen(every)
+    if every and not rows:
+        print("this space has no node of its own: its settings name one (Nodes), and an administrator's seat reads every node")
+        raise SystemExit(0)
     if not rows:
         print("no node is enrolled; the dashboard's Nodes page mints a token for one")
         print("a space with no node can be read and edited here, and cannot be built")
@@ -65,7 +94,7 @@ def show(name):
     """One node in full, by its name or id: `aerie nodes show NAME`."""
     try:
         nodes.db.open_readonly(os.environ["DASHBOARD_STATE"])
-        rows = [n for n in nodes.node_list() if n["kind"] != "local"]
+        rows = _seen([n for n in nodes.node_list() if n["kind"] != "local"])
     except Exception as e:
         print(f"no node store yet; the dashboard creates it on boot ({e})")
         raise SystemExit(0) from None

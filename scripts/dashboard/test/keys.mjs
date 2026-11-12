@@ -128,7 +128,9 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   const mine0 = await keys({ action: 'change-mine' });
   ok(mine0.ok && /^[0-9a-f]{4} [0-9a-f]{4}$/.test(mine0.fingerprint), `an account changes its own key (${JSON.stringify(mine0)})`);
   await page.goto(base + '/#/settings/profile');
-  await page.waitForFunction(() => document.querySelector('.doc.on [data-sect="profile:mykey"]'), null, { timeout: 20000 });
+  // The section stands in its place while the store is read: waited for
+  // with what it shows once read.
+  await page.waitForFunction(() => document.querySelector('.doc.on [data-sect="profile:mykey"] .keyfp'), null, { timeout: 20000 });
   const prof = await page.evaluate(() => {
     const s = document.querySelector('.doc.on [data-sect="profile:mykey"]');
     s.open = true;

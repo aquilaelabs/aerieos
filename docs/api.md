@@ -17,7 +17,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/status` | prefix | `_get_status` | GET /api/status. |  |
 | GET | `/api/reset` | exact | `_get_reset` | GET /api/reset: how a Reset that un-enrolls its nodes first is getting on: each node, done or why not, and the error that stopped it. | refused: controller-read |
 | GET | `/api/move` | exact | `_get_move` | GET /api/move (R90 step 12): a move armed here (and, asked with ?pieces=1, what a bundle may carry with each piece's size), or this controller moved, or this state arrived by a move with the nodes not yet here; an admini |  |
-| GET | `/api/move-bundle` | exact | `_get_move_bundle` | GET /api/move-bundle: the bundle as a download, packed fresh under the armed move's key at this moment (R175 step 1); the owner's. |  |
+| GET | `/api/move-bundle` | exact | `_get_move_bundle` | GET /api/move-bundle[?name=]: the bundle as a download, packed fresh under the armed move's key at this moment (R175 step 1), or the one just packed by name; the owner's. |  |
 | GET | `/api/move-backup` | exact | `_get_move_backup` | GET /api/move-backup?name=: the controller's backup packed under a token of its own, as a download; the owner's. |  |
 | GET | `/api/backup` | exact | `_get_backup` | GET /api/backup (R161 step 4): the password set or not, the last copy, where the copies go and the copies found; an administrator's. |  |
 | GET | `/api/backup-file` | exact | `_get_backup_file` | GET /api/backup-file?name=NAME: a copy under the state as a download, the owner's; sealed, so a download is only ever a sealed file. |  |
@@ -69,6 +69,8 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read. |  |
 | GET | `/api/containers` | prefix | `_get_containers` | GET /api/containers. | refused: containers-read |
 | GET | `/api/vms` | exact | `_get_vms` | GET /api/vms (R91): the VMs of the projects this account may read them on (a session: its own), the OS catalog and the VM hosts. |  |
+| GET | `/api/node-files` | exact | `_get_node_files` | GET /api/node-files?node=&root=&path= (R224): the node's roots, and with a root the folder's listing; an administrator's. |  |
+| GET | `/api/node-files/read` | exact | `_get_node_files_read` | GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's bytes streamed from its node, a download or shown in the page; nothing it holds runs here (a page or a script is sent as text). |  |
 | GET | `/api/project-job` | prefix | `_get_project_job` | GET /api/project-job. | refused: create |
 | GET | `/api/trash` | prefix | `_get_trash` | GET /api/trash. | refused: trash |
 | GET | `/api/claude-now` | prefix | `_get_claude_now` | GET /api/claude-now. |  |
@@ -131,6 +133,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/pin` | prefix | `_pin` | Pin or unpin a command: macros.pin. | refused: command-pin |
 | POST | `/api/reset` | exact | `_reset` | POST /api/reset: start over at onboarding (settings.reset), and the dashboard re-executes itself so the next page is Create the owner. | refused: controller |
 | POST | `/api/move` | exact | `_move` | POST /api/move (R90 step 12): prepare (the move armed, the token answered once, a bundle packed), forget (withdrawn), moved (this controller marked moved to the new one, read-only from here on), ask (the new address aske |  |
+| POST | `/api/node-files` | exact | `_node_files` | POST /api/node-files (R224): mkdir, rename or delete (into the root's trash) on a node's root; an administrator's, audited. |  |
 | POST | `/api/backup` | exact | `_backup` | POST /api/backup {action: now}: a copy written now, the owner's. |  |
 | POST | `/api/create` | prefix | `_create` | New project: a fresh local repo, a clone or a link, and what the dialog chose besides (projects.create_from_dialog). | refused: create |
 | POST | `/api/profile` | prefix | `_profile` | The signed-in account's own settings (the Profile page): read on GET, saved on POST, by profiletab.py. |  |

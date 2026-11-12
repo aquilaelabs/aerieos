@@ -8,6 +8,15 @@ ESP="${BB_ESP:-/boot/efi}"
 NEW="${BB_OS_GRUBCFG:-/usr/lib/aerieos-os/grub.cfg}"
 CMDLINE="${BB_CMDLINE:-/proc/cmdline}"
 grep -q 'aeriekept=' "$CMDLINE" 2>/dev/null && exit 0
+# ...nor while this slot is on trial: the counting that brings a failed
+# update back to the slot before lives in the menu itself, so a new image's
+# menu goes on only once the health check has marked it good (health runs
+# this again then).
+SLOT="${BB_OS_SLOT:-/usr/lib/aerieos-os/slot}"
+if bash "$SLOT" status 2>/dev/null | grep -q '^trial:'; then
+    echo "boot-menu: this slot is on trial: the boot menu follows it once it is marked good"
+    exit 0
+fi
 [ -s "$NEW" ] && [ -d "$ESP/grub" ] || exit 0
 cmp -s "$NEW" "$ESP/grub/grub.cfg" && exit 0
 cp "$NEW" "$ESP/grub/grub.cfg.new"

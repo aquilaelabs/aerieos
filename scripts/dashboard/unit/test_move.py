@@ -91,6 +91,43 @@ class Move(unittest.TestCase):
         self.assertTrue(got.get("ok"), got)
         self.assertEqual((self.tmp / "new-ws" / "alpha" / "big.bin").read_bytes(), (self.ws / "alpha" / "big.bin").read_bytes())
 
+    def test_a_bundle_is_packed_in_place_and_the_one_before_goes_first(self):
+        # A full disk on the old home (the operator, 8 Nov): the body went to
+        # a file beside the bundle and was copied after, and the bundle
+        # before stayed until the new one was done, so packing took three
+        # times the bundle's room.
+        (self.ws / "alpha" / "big.bin").write_bytes(os.urandom(256 << 10))
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        first = move.bundle_path()
+        seen, real = [], move._pack_into
+
+        def watching(tar, **kw):
+            seen.append(sorted(p.name for p in first.parent.iterdir()))
+            return real(tar, **kw)
+        with mock.patch.object(move, "_pack_into", watching):
+            self.assertTrue(move.pack_bundle().get("ok"))
+        self.assertEqual(len(seen), 1)
+        self.assertNotIn(first.name, seen[0], "the bundle before is gone before the new one is packed")
+        self.assertTrue(all(n.endswith(".partial") for n in seen[0]), seen[0])
+        now = move.bundle_path()
+        self.assertEqual(sorted(p.name for p in now.parent.iterdir()), [now.name], "no body beside it, nothing left over")
+        line = now.read_bytes().split(b"\n")[1]
+        self.assertEqual(len(move.HEADER) + len(line) + 1, len(move.HEADER) + move.MANIFEST_SLOT)
+        self.assertEqual(json.loads(line)["format"], 2, "the slot reads as the manifest")
+        self.assertTrue(self._land(now, r["token"]).get("ok"))
+
+    def test_a_full_disk_while_packing_is_said_as_a_sentence(self):
+        r = move.prepare("user:ann", "https://new.example", repos=True)
+        self.assertTrue(r.get("ok"))
+
+        def full(tar, **kw):
+            raise OSError(28, "No space left on device")
+        with mock.patch.object(move, "_pack_into", full):
+            got = move.pack_bundle()
+        self.assertIn("filled up", got.get("error", ""))
+        self.assertIn("without the repositories", got["error"])
+        self.assertEqual([p for p in (self.state / "move").iterdir() if p.suffix != ".json"], [], "nothing half written is left")
+
     def test_a_landings_upload_is_read_a_megabyte_at_a_time(self):
         # The bundle part straddles the reader's megabyte edges, and its
         # bytes hold the boundary's start (never the whole: a browser picks
@@ -134,6 +171,26 @@ class Move(unittest.TestCase):
         got = self._land(old, token)
         self.assertTrue(got.get("ok"), got)
         self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
+
+    def test_a_manifest_changed_after_the_bundle_was_made_is_refused(self):
+        # B724: the plain line's origin, kind and versions were believed.
+        r = move.prepare("user:ann", "https://new.example")
+        path = self.tmp / "config" / "move" / r["bundle"]
+        head, line, body = path.read_bytes().split(b"\n", 2)
+        m = json.loads(line)
+        self.assertTrue(m.get("mac"))
+        for why, edit in (("origin", lambda x: x.update({"from": "https://elsewhere.example/"})),
+                          ("mac taken off", lambda x: x.pop("mac"))):
+            changed = dict(m)
+            edit(changed)
+            bad = self.tmp / f"bad-{len(why)}.bbmove"
+            bad.write_bytes(head + b"\n" + json.dumps(changed).encode() + b"\n" + body)
+            got = self._land(bad, r["token"])
+            self.assertIn("outer details were changed", got.get("error", ""), why)
+            self.assertFalse((self.tmp / "new-config" / "users.json").exists(), f"{why}: nothing here changed")
+        got = self._land(path, r["token"])
+        self.assertTrue(got.get("ok"), got)
+        self.assertNotIn("bundle.json", got.get("counts", {}))
 
     def test_the_bundle_moves_the_state_and_the_nodes_follow(self):
         r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
@@ -242,6 +299,67 @@ class Move(unittest.TestCase):
         self.assertTrue([p for p in (new_ws / ".trash").iterdir() if p.name.startswith("old-before-move-")], "a deleted one of the same name too")
         said = " ".join(str(x) for x in (got.get("said") or []))
         self.assertIn("alpha: this controller had a space folder of that name", said)
+
+    def land_with_copy_failing(self, which):
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        (new_state / "fresh.json").write_text("{}")
+        (new_ws / "alpha").mkdir(parents=True)
+        (new_ws / "alpha" / "mine.txt").write_text("here first\n")
+        self.configure(new_state, bare=True)
+        real = shutil.copytree
+
+        def copy(src, dst, *a, **k):
+            if Path(src).name == which:
+                raise PermissionError(13, "Permission denied", str(dst))
+            return real(src, dst, *a, **k)
+        with mock.patch.object(move.shutil, "copytree", copy):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        return got, new_state
+
+    def test_a_workspace_copy_that_fails_is_said_with_what_was_set_aside(self):
+        # B725: the copy's error escaped restore() after this controller's
+        # alpha had gone to the trash, and the line saying so was lost.
+        got, new_state = self.land_with_copy_failing("workspace")
+        self.assertIn("could not be copied", got.get("error", ""), got)
+        self.assertIn("alpha: this controller had a space folder", got["error"])
+        self.assertTrue((new_state / "fresh.json").is_file(), "the state here not changed")
+        self.assertFalse((new_state / "users.json").exists())
+
+    def test_secrets_the_home_cannot_take_are_said_and_the_rest_lands(self):
+        # B728: a secrets folder that is root's stopped the whole landing.
+        got, new_state = self.land_with_copy_failing("secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertIn("secrets were not written", " ".join(got.get("said") or []))
+        self.assertTrue((new_state / "users.json").exists())
+
+    def test_share_users_made_here_are_kept_through_a_landing(self):
+        # B716: the accounts a stick made from the old system's share users
+        # went with the state the move replaced, and the shares lost them.
+        r = move.prepare("user:ann", "https://new.example", repos=True, carry_key=True)
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        here = {"users": {
+            "setup": {"uid": "u_00000001", "role": "owner", "password": "pbkdf2_sha256$1$x$y"},
+            "carol": {"uid": "u_0000000c", "role": "user", "password": "", "smb_nt": "A" * 32},
+            "ann": {"uid": "u_0000000a", "role": "user", "password": "", "smb_nt": "B" * 32},
+            "dave": {"uid": "u_0000000d", "role": "user", "password": ""}}}
+        (new_state / "users.json").write_text(json.dumps(here))
+        self.configure(new_state, bare=True)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        users = json.loads((new_state / "users.json").read_text())["users"]
+        self.assertEqual(users["carol"], here["users"]["carol"], "kept whole, its id with it")
+        self.assertNotIn("setup", users, "the setup account goes with what was here")
+        self.assertNotIn("dave", users, "no SMB password: not a share user")
+        self.assertNotEqual(users["ann"].get("smb_nt"), "B" * 32, "the moved controller's ann is its own")
+        said = " ".join(got.get("said") or [])
+        self.assertIn("kept as accounts with their SMB passwords: carol", said)
+        self.assertIn("already has are its accounts now: ann", said)
+        self.assertEqual(os.stat(new_state / "users.json").st_mode & 0o777, 0o600)
 
     def test_a_backup_arms_nothing_and_lands_under_its_own_token(self):
         # The operator, 6 Nov: a copy of the controller to keep, under a token
@@ -445,6 +563,17 @@ class Move(unittest.TestCase):
         self.assertEqual(move.restored()["from"], "https://old.example/")
         self.assertFalse(move.tell_old(force=True), "the old address does not answer from here; told again next tick")
         self.assertIn("tell_error", move.restored())
+
+    def test_a_secrets_folder_the_dashboard_cannot_list_is_said_on_its_piece(self):
+        # B728: root's folder on a machine of its own was walked as empty,
+        # and the piece said nothing of it.
+        os.chmod(self.secrets, 0o100)
+        self.addCleanup(os.chmod, self.secrets, 0o700)
+        if os.access(self.secrets, os.R_OK):
+            self.skipTest("run as root: every folder reads")
+        pc = next(p for p in move.pieces() if p["key"] == "secrets")
+        self.assertFalse(pc["on"])
+        self.assertIn("root's alone here, so a bundle carries none of it", pc["about"])
 
     def test_the_pieces_say_their_sizes_and_the_ticks_hold(self):
         pcs = {p["key"]: p for p in move.pieces()}

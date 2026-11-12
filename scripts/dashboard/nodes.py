@@ -130,9 +130,11 @@ def _node_list(all=False):
     # followed the press: pressing() grays it for the round trip, and then
     # the render put a fresh, enabled one in its place. Update agent did
     # exactly that, which is what the operator kept seeing.
-    for j in _rows("SELECT id, node, type, spec, state FROM jobs WHERE "
+    for j in _rows("SELECT id, node, type, spec, state, step, started FROM jobs WHERE "
                    "state IN ('queued', 'assigned', 'running')"):
-        entry = {"id": j["id"], "type": j["type"], "state": j["state"]}
+        # Its step and when it started ride along (the operator, 8 Nov): a
+        # page holding its steps behind the job says what runs and how long.
+        entry = {"id": j["id"], "type": j["type"], "state": j["state"], "step": (j["step"] or "")[:60], "started": j["started"] or 0}
         inflight.setdefault(j["node"], []).append(entry)
         if j["type"] != "system":
             continue
@@ -1712,7 +1714,7 @@ def _census(c):
                 "ok": v.get("ok") is True, "corrected": v.get("corrected") is True} if v else {}
     # ...and whether its console takes a password (R194, AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
-        out["console"] = {"os": c["console"].get("os") is True, "set": c["console"].get("set") is True}
+        out["console"] = {k: c["console"].get(k) is True for k in ("os", "set", "open")}
     # ...and what it adopted of another NAS (R163 step 8): each mount, its
     # filesystem, read-only or not and mounted now, the merged trees, and
     # the parity disk left alone.
@@ -1800,12 +1802,16 @@ def _census(c):
         kb = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None  # noqa: E731
         out["os_stick"] = {"stick": True, "pool": str(s.get("pool") or "")[:200] if str(s.get("pool") or "").startswith("/") else "",
                            "ready": s.get("ready") is True,
-                           "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects")],
+                           "on_stick": [x for x in (s.get("on_stick") or []) if x in ("docker", "containerd", "libvirt", "toolchains", "projects", "secrets")],
                            "written_kb": kb(s.get("written_kb")), "boot_written_kb": kb(s.get("boot_written_kb")),
                            # A folder of the machine's own as the projects folder (R163).
                            "projects": str(s.get("projects") or "")[:300] if str(s.get("projects") or "").startswith("/") else "",
                            "projects_bound": s.get("projects_bound") is True,
-                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else ""}
+                           "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else "",
+                           # Pools holding another install's folder, set aside if picked.
+                           "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16],
+                           # The stick's own partition: its size and its room, from an agent that says them.
+                           **{k: kb(s.get(k)) for k in ("var_total_mb", "var_free_mb") if kb(s.get(k)) is not None}}
     # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
@@ -2055,6 +2061,9 @@ def _census(c):
     # said, so the row can tell "no sessions here" from "did not say"; the
     # proxy relays a project's session to a node only on the
     # strength of this.
+    # The file explorer's port (R224): its presence says the agent serves it.
+    if isinstance(c.get("files"), dict):
+        out["files"] = {"port": _mb(c["files"].get("port")) or 0}
     se = c.get("session")
     if isinstance(se, dict):
         out["session"] = {
@@ -4073,6 +4082,26 @@ def storage_attention():
                 if not x.get("mounted"):
                     out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "array", "bad": True, "key": f"array:{n['id']}:{kind}{x.get('slot')}",
                                 "said": f"the array's {kind}{x.get('slot')} ({x.get('id') or 'unknown disk'}) is not mounted: the disk is gone or failed; Replace on the Storage page rebuilds it"})
+        # An old system's array adopted writable and not taken over (the
+        # operator, 8 Nov): its files change with no parity behind them until
+        # Take the array over on This machine builds SnapRAID's. A standing
+        # row, not dismissed: it leaves when the array is taken or released.
+        ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
+        if ad.get("writable") and "taken" in ad and not ad.get("taken") and (ad.get("parity") or []) and not (ar.get("data") or []):
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "untaken", "bad": False, "key": "",
+                        "said": "the old system's disks are writable with no parity behind them: Take the array over, under Adopted disks on This "
+                                "machine, builds SnapRAID's parity on the old parity disk, in the background; until then a disk lost loses its files"})
+        # The stick's own partition running out of room (the operator, 8
+        # Nov: it filled, and the controller went down with it): said while
+        # it has under a tenth left or under a gigabyte, with what takes the
+        # weight off it.
+        st = rep.get("os_stick") if isinstance(rep.get("os_stick"), dict) else {}
+        total, free = st.get("var_total_mb"), st.get("var_free_mb")
+        if st.get("stick") and isinstance(total, int) and isinstance(free, int) and total > 0 and (free < 1024 or free * 10 < total):
+            out.append({"kind": "disk", "id": n["id"], "node": n["name"], "what": "stick", "bad": free < 512, "key": f"stick:room:{n['id']}:{free // 256}",
+                        "said": f"the stick's own partition has {free / 1024:.1f} GB free of {total / 1024:.1f} GB, and the controller stops when it is full"
+                                + (": name a system pool under Pool and spaces on This machine, which takes docker, the VMs, the spaces and the secrets off it"
+                                   if not st.get("ready") else ": the Storage page says what is on it")})
         # The last Check parity's result (R163 step 15), until dismissed:
         # clean, or what differed and what was or could not be corrected.
         v = ar.get("verify") if isinstance(ar.get("verify"), dict) else {}
@@ -4432,7 +4461,7 @@ def adopted_pools(rep):
             and not re.search(r"/disk\d+$", str(m["where"]))]
 
 
-def node_system_pool(principal, node_id, path=""):
+def node_system_pool(principal, node_id, path="", aside=False):
     """A stick's system pool (R161 step 10): the pool, by its mount point,
     where docker, containerd, libvirt, the toolchains and the projects write
     instead of the stick; a system job on the own machine's node, whose root
@@ -4460,9 +4489,9 @@ def node_system_pool(principal, node_id, path=""):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     if system_job_for(node_id):
         return {"error": "a system job is already in flight on this node; one at a time"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path}, "timeout": 6 * 3600})
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True}, "timeout": 6 * 3600})
     if r.get("ok"):
-        audit(principal, "system-pool", node_id, {"job": r["job"], "path": path})
+        audit(principal, "system-pool", node_id, {"job": r["job"], "path": path, "aside": aside is True})
     return r
 
 
@@ -6497,6 +6526,10 @@ def job_next(node_id, wait, runner="node", alive=None):
                 # answer. This is how the next one does not.
                 if _hello_wanted.pop(node_id, None):
                     return {"hello": True}
+                # ...and setup having ended where the screen still takes
+                # admin with no password (R194).
+                if _console_close_due(node_id):
+                    return {"console_close": True}
                 # ...and the synced projects that moved (R162, wssync.py):
                 # the agent asks what changed, so a save on another node or
                 # in VS Code reaches this one in a second, not at its next
@@ -6508,6 +6541,29 @@ def job_next(node_id, wait, runner="node", alive=None):
             if left <= 0:
                 return None
             _wake.wait(min(left, 5))
+
+
+# Whether this controller has finished being first set up (R194): joined by
+# server.py, which holds the accounts, the settings and the move.
+setup_over = lambda: False
+_console_asked = {}
+
+
+def _console_close_due(node_id):
+    """Whether to tell a node to close the login with no password at its
+    screen: setup has ended and its census says the login is open. Not by
+    the machine being the own one, since the row a landed move brings may
+    not be marked so. At most once a minute, so a machine that cannot close
+    it is not asked on every poll; its census says when it has."""
+    if not setup_over():
+        return False
+    if not (((node(node_id) or {}).get("reported") or {}).get("console") or {}).get("open"):
+        return False
+    now = time.time()
+    if now - _console_asked.get(node_id, 0) < 60:
+        return False
+    _console_asked[node_id] = now
+    return True
 
 
 UPDATE_QUIET_S = 600
@@ -7553,7 +7609,7 @@ def verb(principal, req):
              "feature": lambda: node_feature(principal, nid, field(req, "feature"), field(req, "op")),
              "controller-update": lambda: node_controller_update(principal, nid, field(req, "release")),
              "os-update": lambda: node_os_update(principal, nid, field(req, "release"), field(req, "from")),
-             "system-pool": lambda: node_system_pool(principal, nid, field(req, "path")),
+             "system-pool": lambda: node_system_pool(principal, nid, field(req, "path"), aside=req.get("aside") is True),
              "os-kept": lambda: node_os_kept(principal, nid, field(req, "verb"), field(req, "version")),
              "projects-folder": lambda: node_projects_folder(principal, nid, field(req, "path"), req.get("release") is True),
              "machine": lambda: node_machine(principal, nid, field(req, "hostname"), field(req, "timezone"), req.get("spindown")),

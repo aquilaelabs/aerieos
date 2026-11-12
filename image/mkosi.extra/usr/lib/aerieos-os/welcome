@@ -19,9 +19,12 @@ mkdir -p "$(dirname "$OUT")"
     printf '\n        AerieOS%s, slot %s\n' "${ver:+ $ver}" "$("$LIB/slot" current 2>/dev/null || echo "?")"
     printf '        Open http://\\4:%s/ in a browser on this network.\n' "${port:-7680}"
     # The way in at this screen (R194): admin, once a console password is
-    # set on This machine; until then, where to set one.
+    # set on This machine; while the machine is first set up, with none
+    # (console-door); otherwise, where to set one.
     if [ -s "${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}" ]; then
         printf '        Log in here as admin with the console password.\n'
+    elif [ -e "${BB_CONSOLE_OPEN:-/var/lib/aerieos-os/console-open}" ]; then
+        printf '        Until setup is finished, log in here as admin with no password.\n'
     else
         printf '        To log in here, set a console password on This machine.\n'
     fi

@@ -1,8 +1,8 @@
 # Machines: the controller, nodes and storage
 
 The Machines group on the rail: **Nodes**, every machine work runs on,
-**Storage**, what a node's disks hold, and **Installed**, what the Library
-put on a node. Beside it, the **Controller** group holds what the
+**Storage**, what a node's disks hold, **Installed**, what the Library
+put on a node, and **Files**, what is on a node's disks. Beside it, the **Controller** group holds what the
 controller owns: **This machine** on a bare-metal install, **Settings**
 (Controller settings), **Network**, **Keys** and **Audit**. **Jobs**, the
 queue of work placed on the nodes, and **Schedules** are a group of their
@@ -496,6 +496,41 @@ holds its models and spend, Ollama's pulled models, Install once
 something is behind it, and Remove; the Library's card for it only
 installs. Over the rows, the system packages the node lacks for what its
 store holds, with the one press that installs them.
+
+## Files
+
+**Files**, under Machines, is the files on one node's disks, the node
+picked in the Machines header; on a machine AerieOS is installed on, its
+own machine is one of them. It is an administrator's alone, and every
+change is written to the audit log. What it reaches is the node's
+**roots**, a chip each over the list: the spaces folder a stick names,
+its pools, its array, the disks it adopted from another system, its
+shares, and the disks and network shares it mounts (its Storage
+section's mounts and its other disks). The system's own folders (`/`, `/etc`, `/usr`, `/var` and the
+like) are never a root, and nothing in a root leads out of it: a path
+with `..` or a link pointing elsewhere is refused by the node itself.
+Aerie Workshop's own container has no Files page of its own, since its
+files are the image's; its nodes have theirs.
+
+A folder is a table, folders first: its name, size, when it changed and
+whose it is. A folder's name opens it, the line of names over the list
+goes back up, and a file's name shows it over the page: a picture, a
+video, a sound or a PDF as itself, anything else as its first 256 KB of
+text, with **Download** for the whole. A page or a script on a disk is
+shown as text and never runs. **Upload** sends the files you pick, or
+drop on the page, to the folder on show, with its progress, asking first
+before it replaces one of the same name. **New folder** makes one. Tick
+rows for **Rename**, **Move** (to a folder of the same root),
+**Download** and **Delete**. A delete is never final: what is deleted goes
+to the root's `.aerieos-trash` folder, with a note of where it was, and
+stays there until somebody empties it. A file or folder made from here
+takes the owner of the folder it is made in, so a share's people can
+still change what an administrator put there.
+
+The node's agent answers each request on its screen relay port, which
+only the controller can reach, each one signed by the controller for
+that request and that minute. A node whose agent is older says so, and
+updating it from the Nodes page brings the Files page to it.
 
 ## This machine
 

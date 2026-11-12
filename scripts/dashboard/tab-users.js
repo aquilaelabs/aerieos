@@ -122,7 +122,12 @@ function usersDetail(u){
        autocomplete="off" spellcheck="false" ${extra}${ro ? " disabled" : ""}></div>`;
   const facts = [agentLogins(u) || "signed in to no agent yet", u.seen ? `seen ${esc(ago(u.seen))}` : "never seen",
                  u.projects?.length ? `on ${u.projects.length} space${u.projects.length === 1 ? "" : "s"}` : "on no space yet"];
-  const access = rolesData === null ? `<div class="sub dim">reading its roles…</div>` : rolesAccessFields(u.name);
+  // While the roles are read, their two fields in their places (the
+  // operator, 7 Nov: a block that grew in after the rest read as pop-in).
+  const access = rolesData === null
+    ? `<div class="setrow col ctlrow">${lbl("", "Everywhere roles", "hold on every space and on AerieOS itself, as far as each one's areas say")}<div class="loading">${skRows(1)}</div></div>
+       <div class="setrow col ctlrow">${lbl("", "Spaces", "a role on a space puts the account on it; taken off, it is not on it")}<div class="loading">${skRows(2)}</div></div>`
+    : rolesAccessFields(u.name);
   return `<div class="rhead" data-uback><span class="shback" role="img" aria-label="Back to People">\u2039</span><b>${esc(u.name)}</b> <span class="dim">${facts.join(" · ")}</span></div>
     ${u.claude_shared_with?.length ? `<div class="sub warn">the same Claude account as ${u.claude_shared_with.map(esc).join(", ")
       }, allowed only while one person is behind both</div>` : ""}

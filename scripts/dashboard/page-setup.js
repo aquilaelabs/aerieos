@@ -82,13 +82,14 @@ function drawSetup(){
   // would otherwise take what was typed with it.
   setupPlaceAuto(s);
   const sig = JSON.stringify([setupWalkSig(s), setupPlaceSig(s), setupDisks.making || "", s.node?.name || "", s.waiting?.name || "", s.waiting?.state || "", s.waiting?.live,
-                              s.git, s.claude, s.project, !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
+                              s.git, s.claude, s.project, s.own?.reported?.console || null, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
   const typed = setupKeepTyped(el);
   if (setupWalking()){
     el.innerHTML = setupWalkHtml(s);
     wireSetup(el, s);
+    setupInOrder(el, s);
     typed();
     return;
   }
@@ -137,6 +138,7 @@ function drawSetup(){
       ? `<p>The Spaces page holds it, and every one after it.</p>`
       : `<p>A repository to work on: a new one, or one cloned from GitHub or Gitea.</p>${placed ? "" : `<div class="sub bad setwhy">Once the spaces have a place, in step 3.</div>`}`,
       s.project ? "" : `<button type="button" data-setproject${placed ? "" : " disabled"}>New space</button>`)}
+    ${setupConsoleWanted(s) ? setupConsoleCard(next++, s) : ""}
     <div class="setfinish">
       <p class="dim">${s.node ? `Steps 2 to ${next - 1} can wait: Home keeps them until they are done.` : "Finish opens once your node answers."}
         Storage and the idle timeout have working defaults, under Controller settings.</p>
@@ -145,11 +147,26 @@ function drawSetup(){
     </div>
   </div>`;
   wireSetup(el, s);
+  setupInOrder(el, s);
   typed();
 }
 
 // What a disk's row shows, for the redraw test: a disk's temperature and the
 // like move on every read and are not the page's business.
+// A password for the machine's screen (R194): the machine takes admin with
+// none until setup ends, so this is for keeping a way in past that. Never in
+// the needed order: a person may leave it, and This machine sets one later.
+function setupConsoleWanted(s){
+  return !!s.own?.reported?.console?.os;
+}
+function setupConsoleCard(num, s){
+  const c = s.own.reported.console;
+  return setupCard(num, "A password for this screen", !!c.set, false, c.set
+    ? `<p>Log in at this machine's screen or a KVM as <code>admin</code> with it; <code>sudo</code> gives root. This machine changes it, after Finish.</p>`
+    : `<p>${c.open ? "Until setup ends, this machine's screen or a KVM logs in as <code>admin</code> with no password, in case something here stops answering. Set one to keep that way in afterwards" : "Set one to log in at this machine's screen or a KVM as <code>admin</code>"}. It is not your dashboard password, and This machine can set one later.</p>${consolePwFields("setfields")}`,
+    c.set ? "" : `<button type="button" class="primary" data-console="set">Set it</button>`, c.set ? "" : "optional");
+}
+
 function setupDisksSig(dk){
   return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.ok]));
 }
@@ -173,6 +190,7 @@ function wireSetup(el, s){
   // The walk's steps are This machine's and Controller settings' own, so
   // their own wiring serves them; nothing here sends anything else.
   if (setupWalking()){ wireHeld(el); wireMove(el); }
+  wireMachineConsole(el);
   const vm = el.querySelector("[data-setvm]"), en = el.querySelector("[data-setenroll]");
   if (vm) vm.onclick = () => ndDialogs().openVm();
   if (en) en.onclick = () => ndDialogs().openEnroll();
@@ -278,8 +296,9 @@ function setupPlaceAuto(s){
   const n = s.node, stick = setupStickOf(s);
   if (!n || !stick || stick.pool || stick.projects || setupWalking() || setupDisks.making || state?.firstboot?.adopt || !state?.can?.admin) return;
   if ((n.jobs || []).some(j => j.apply)) return;
-  const pools = (n.reported?.pools || []).filter(p => p.mount);
-  const mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || n.reported?.array?.mount || "";
+  // Never a pool holding another install's folder: setting it aside is the person's press.
+  const pools = (n.reported?.pools || []).filter(p => p.mount && !(stick.others || []).includes(p.mount));
+  const arr = n.reported?.array?.mount, mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || (arr && !(stick.others || []).includes(arr) ? arr : "");
   if (!mount || setupPlaceTried === mount) return;
   setupPlaceTried = mount;
   postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))
@@ -381,11 +400,12 @@ function setupWalkHtml(s){
   if (s.own) cards.push(setupCard(++i, "This machine", !!s.node, !s.node, s.node
     ? `<p><b>${esc(s.node.name)}</b> is answering${s.node.agent?.addr ? `, at ${esc(s.node.agent.addr)}` : ""}.</p>`
     : `<p>Its agent is coming up. The steps below need it, and this turns to done by itself.</p>`));
-  const parts = n && (plan || had?.mounts?.length) ? adoptParts(n) : null;
+  const parts = n && (plan || had?.mounts?.length) ? adoptParts(n, {take: false}) : null;
   if (parts) cards.push(setupCard(++i, "The old system's disks", adopted, !s.node,
     `${adopted ? "" : `<p>Read only suits a trial: nothing is written to the data disks, and a pool stays writable either way. If your spaces are on the data disks and are to stay there, adopt Writable: a read-only disk cannot hold the spaces folder.</p>`}${parts.body}`));
   else if (s.own && !plan) cards.push(setupDisksCard(++i));
   if (n && stick) cards.push(setupPlaceCard(++i, s, true));
+  if (setupConsoleWanted(s)) cards.push(setupConsoleCard(++i, s));
   const landing = !ld ? skRows(1)
     : !ld.fresh ? `<div class="sub warn">A move lands only on a fresh controller, and this one has other accounts or nodes already. Take those away first, or install again.</div>`
     : !ld.owner ? `<div class="sub warn">A move here is the owner's to land.</div>`
@@ -633,4 +653,64 @@ function wireSetupDisks(el){
     await setupDisksLoad();
     setupSig = ""; drawSetup();
   });
+}
+
+// ---- one step at a time ----------------------------------------------------
+// The steps a setup cannot go on without are taken in order (the operator,
+// 8 Nov: a later step pressed early failed, or queued behind the one before
+// and was refused): each waits, its controls dead, until every one before it
+// is done, and says which. The rest (shares, your name, Claude, a first space,
+// what to have with you) stay open in any order. And one system job runs on a
+// machine at a time, so while one runs every step that would start another
+// waits for it, the page saying what runs.
+const SETUP_NEEDED = new Set(["This machine", "Your first node", "The old system's disks", "Where the spaces and containers go", "Land the controller"]);
+const SETUP_FREE = "[data-setwalk], [data-setvm], [data-setenroll], [data-setgit], #setName, #setEmail, [data-setclaude], [data-setproject], [data-heldstart]";
+const SETUP_JOB_WORDS = {"storage-adopt": "adopting the old system's disks", "storage-pool": "making the pool", "storage-array": "setting up the array",
+  "system-pool": "moving to the system pool", "projects-folder": "taking the spaces folder", "storage-share": "setting up the shares",
+  "console": "setting the console password", "machine": "setting its name and clock"};
+function setupHoldCard(card, why){
+  card.classList.add("held");
+  card.querySelectorAll("button, select, input, textarea, a.btn").forEach(x => {
+    if (x.matches(SETUP_FREE)) return;
+    if (x.tagName === "A"){ x.setAttribute("aria-disabled", "true"); x.tabIndex = -1; x.classList.add("dead"); }
+    else x.disabled = true;
+  });
+  const body = card.querySelector(":scope > .setstepbody") || card;
+  if (why && !body.querySelector(":scope > .setwhy.held")){
+    const d = document.createElement("div");
+    d.className = "sub note setwhy held";
+    d.textContent = why;
+    body.append(d);
+  }
+}
+function setupInOrder(el, s){
+  const n = s.node || s.own;
+  const stick = setupStickOf(s);
+  const cards = [...el.querySelectorAll("section.setstep")];
+  let first = null;     // the earliest needed step not yet done
+  for (const c of cards){
+    const title = c.querySelector(".setstephead h3")?.textContent || "";
+    const need = SETUP_NEEDED.has(title) || (title === "Your disks" && !!stick);
+    if (!need) continue;
+    const done = c.classList.contains("done");
+    if (first && !done) setupHoldCard(c, `After step ${first.num}, ${first.title}.`);
+    if (!done && !first) first = {num: c.querySelector(".setnum")?.textContent || "", title};
+  }
+  const job = (n?.jobs || []).find(j => j.apply);
+  if (!job) return;
+  const words = SETUP_JOB_WORDS[job.apply] || String(job.apply).replace(/-/g, " ");
+  for (const c of cards) if (!c.classList.contains("done")) setupHoldCard(c, "");
+  const head = el.querySelector(".setuphead, .setuppage > :first-child");
+  const band = document.createElement("div");
+  band.className = "field setjobband";
+  // What it is on and how long it has run, so a long one reads as going
+  // rather than stuck (the operator, 8 Nov); no bar, since a job measures
+  // nothing but its time (the progress rule).
+  const since = job.started ? Math.max(0, Math.floor(Date.now() / 1000 - job.started)) : 0;
+  const took = since >= 3600 ? `${Math.floor(since / 3600)} h ${Math.floor(since % 3600 / 60)} min` : since >= 60 ? `${Math.floor(since / 60)} min` : since ? `${since} s` : "";
+  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
+      job.step || took ? ` <span class="dim">${[job.step && esc(job.step), took && `${esc(took)} so far`].filter(Boolean).join(", ")}</span>` : ""
+    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
+  if (head) head.after(band); else el.prepend(band);
+  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }

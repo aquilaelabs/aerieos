@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# The way in at the screen while a machine is first set up (R194, the
+# operator, 8 Nov): admin logs in with no password until setup ends, so
+# there is a way in when the agent or the dashboard is what stopped, without
+# the reboot Rescue takes, which on a stick loses the journal of the boot
+# being looked at. Made here at boot rather than by the agent for the same
+# reason. A login on the console's getty only: the image has no ssh server,
+# and whoever is at this keyboard can already pick Rescue.
+#
+# It opens once, on a machine's first boot (no own-node mark yet), so an
+# install that has already been set up never opens by an update. The mark
+# then holds it across the reboots of a first setup, and only its absence
+# closes: the agent runs "close" when the controller says setup has ended,
+# or when a console password is set.
+set -euo pipefail
+LIB="${BB_OS_LIB:-/usr/lib/aerieos-os}"
+MARK="${BB_CONSOLE_OPEN:-/var/lib/aerieos-os/console-open}"
+HASH="${BB_CONSOLE_HASH:-/var/lib/builderbot/console-hash}"
+OWN="${BB_OWN_NODE:-/etc/aerieos-controller/own-node}"
+SUDOERS="${BB_CONSOLE_SUDOERS:-/etc/sudoers.d/aerieos-console-open}"
+CMDLINE="${BB_CMDLINE:-/proc/cmdline}"
+ACCOUNT="admin"
+
+redraw() {
+    "$LIB/welcome" || true
+    # Each getty on show takes the new words now, not at the next login.
+    agetty --reload >/dev/null 2>&1 || true
+}
+
+boot() {
+    # The ISO's installer is not a machine being set up.
+    if grep -qw 'bbinstaller=1' "$CMDLINE" 2>/dev/null; then
+        return 0
+    fi
+    if [ -s "$HASH" ]; then
+        rm -f "$MARK" "$SUDOERS"
+        return 0
+    fi
+    [ -e "$OWN" ] || : > "$MARK"
+    if [ ! -e "$MARK" ]; then
+        rm -f "$SUDOERS"
+        return 0
+    fi
+    getent passwd "$ACCOUNT" >/dev/null || useradd -m -s /bin/bash -G sudo "$ACCOUNT"
+    passwd -d "$ACCOUNT" >/dev/null
+    # No password to give sudo either, for as long as this lasts. A dot in a
+    # name is a file sudo does not read, so the half-written one is ignored.
+    mkdir -p "$(dirname "$SUDOERS")"
+    printf '%s ALL=(ALL:ALL) NOPASSWD:ALL\n' "$ACCOUNT" > "$SUDOERS.new"
+    chmod 440 "$SUDOERS.new"
+    mv -f "$SUDOERS.new" "$SUDOERS"
+}
+
+close() {
+    rm -f "$MARK" "$SUDOERS"
+    if [ ! -s "$HASH" ] && getent passwd "$ACCOUNT" >/dev/null; then
+        usermod -L "$ACCOUNT" || true
+    fi
+    redraw
+}
+
+case "${1:-}" in
+    boot) boot ;;
+    close) close ;;
+    redraw) redraw ;;
+    *) echo "usage: console-door boot|close|redraw" >&2; exit 64 ;;
+esac

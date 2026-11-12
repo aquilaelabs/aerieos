@@ -133,20 +133,25 @@ def keep_state_before(say, running):
     src = _env("BB_OS_STATE", "/var/lib/aerieos-controller/config")
     if not os.path.isdir(src):
         say("no controller configuration here to copy before the update\n")
-        return
+        return True
     keep = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before")
     os.makedirs(keep, mode=0o700, exist_ok=True)
     dest = os.path.join(keep, f"{running or 'unknown'}.tar.gz")
     r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs", "--exclude=os-draft", "--exclude=.moved-*", "--exclude=.move-*",
                         os.path.basename(src)], capture_output=True, text=True, check=False)
-    if r.returncode != 0:
-        say(f"the configuration's copy before the update did not take: {r.stderr.strip()[-300:]}\n")
-        return
+    # 1 is GNU tar's word for a file that changed as it was read (a log,
+    # the database between its writes): the copy is whole. 2 is a failure.
+    if r.returncode not in (0, 1):
+        with contextlib.suppress(OSError):
+            os.unlink(dest + ".new")
+        say(f"the configuration's copy before the update did not take, so nothing was written: {r.stderr.strip()[-300:]}\n")
+        return False
     os.replace(dest + ".new", dest)
     say(f"the configuration as it is, kept at {dest}\n")
     olds = sorted((os.path.join(keep, f) for f in os.listdir(keep) if f.endswith(".tar.gz")), key=os.path.getmtime)
     for old in olds[:-2]:
         os.unlink(old)
+    return True
 
 
 # ---- older versions kept (R201, the operator, 1 Nov) ---------------------------
@@ -292,6 +297,11 @@ def _keep_slot(say, dev, where, keep):
         return
     d = os.path.join(kept_dir(), ver)
     new = d + ".new"
+    # A copy kept already is the one taken from a whole slot: it is never
+    # replaced by what the slot holds now.
+    if os.path.isfile(os.path.join(d, "root.squashfs")):
+        say(f"{ver} is kept already, on the boot menu\n")
+        return
     try:
         with open(dev, "rb") as f:
             head = f.read(48)
@@ -402,12 +412,21 @@ def stick_status():
         return {}
     if not isinstance(d, dict) or not d.get("stick"):
         return {"stick": False}
-    return {"stick": True, "pool": str(d.get("pool") or "")[:200], "ready": d.get("ready") is True,
+    # The stick's own partition (/var): how much room it has, since what
+    # fills it takes the controller down (the operator, 8 Nov).
+    try:
+        du = shutil.disk_usage(_env("BB_SP_VAR", "/var"))
+        room = {"var_total_mb": du.total >> 20, "var_free_mb": du.free >> 20}
+    except OSError:
+        room = {}
+    return {"stick": True, "pool": str(d.get("pool") or "")[:200], "ready": d.get("ready") is True, **room,
             "on_stick": [str(x)[:20] for x in (d.get("on_stick") or [])][:8],
             "written_kb": d.get("written_kb") if isinstance(d.get("written_kb"), int) else None,
             "boot_written_kb": d.get("boot_written_kb") if isinstance(d.get("boot_written_kb"), int) else None,
             "projects": str(d.get("projects") or "")[:300], "projects_bound": d.get("projects_bound") is True,
-            "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else ""}
+            "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else "",
+            # The pools holding another install's folder, which a pick there sets aside.
+            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16]}
 
 
 class OsImageMixin:
@@ -425,6 +444,11 @@ class OsImageMixin:
         if not KEPT_VER.fullmatch(ver) or not os.path.isdir(os.path.join(kept_dir(), ver)):
             job.say(f"refused: {ver or 'that version'} is not kept here\n")
             return "failed", 64
+        if verb == "next" and os_release().get("trial"):
+            # A visit now spends one of the trial's two boots, and a trial
+            # not yet booted would end on the slot it came from.
+            job.say("refused: an update is on trial and not marked good yet: let it boot and the health check mark it, then visit an older version\n")
+            return "failed", 79
         if verb == "next":
             rc = self._sh(job, ["bash", tool, "kept-next", ver], timeout=30)
             if rc == 0:
@@ -537,7 +561,9 @@ class OsImageMixin:
         if not path.startswith("/") or ".." in path.split("/"):
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
-        rc = self._sh(job, ["bash", tool, "set", path], timeout=6 * 3600)
+        # Another install's folder there is set aside only when asked (the
+        # operator, 8 Nov); the tool refuses it otherwise.
+        rc = self._sh(job, ["bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
         self.hello_again("the system pool was set")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
@@ -709,9 +735,29 @@ class OsImageMixin:
         if self._sh(job, ["bash", tool, "hold"], timeout=30) != 0:
             say("GRUB's environment could not be set back to this slot: nothing written\n")
             return "failed", 73
+        # The configuration as it is, first: going back to this slot needs
+        # it, so an update that could not take it does not go ahead.
+        if not keep_state_before(say, rel.get("version") or ""):
+            return "failed", 74
         # What the slot holds goes on the boot menu before it is overwritten.
         job.step(f"keeping what slot {other} holds")
         keep_slot(say, dev, os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
+        # The slot's old release named off it before its root is written: a
+        # write cut short leaves a slot that reads as empty, never as the
+        # old version, which the next update's keep would have taken and
+        # put in place of the good copy kept before it.
+        try:
+            stale = os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other, "release")
+            if os.path.exists(stale):
+                os.unlink(stale)
+                fd = os.open(os.path.dirname(stale), os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except OSError as e:
+            say(f"slot {other}'s old release could not be taken off it before writing: {e}; nothing written\n")
+            return "failed", 72
         job.step(f"writing slot {other}")
         try:
             with open(files["root.squashfs"], "rb") as f, open(dev, "r+b") as d:
@@ -736,7 +782,6 @@ class OsImageMixin:
         except OSError as e:
             say(f"the ESP did not take slot {other}'s kernel: {e}\n")
             return "failed", 72
-        keep_state_before(say, rel.get("version") or "")
         # Named for the next boot and put on trial (R161 step 2) in one
         # write: two boots without the health check's word go back to the
         # slot running now. Not set, it is said, and the next boot stays here

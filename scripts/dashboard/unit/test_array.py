@@ -60,6 +60,16 @@ class TheAgent(unittest.TestCase):
     def test_the_files_are_rendered_from_the_record(self):
         conf = self.am.render_snapraid(REC)
         self.assertIn("parity /mnt/parity/p1/snapraid.parity\n", conf)
+        # On a stick the system's content file is left out (the operator, 8
+        # Nov: gigabytes, rewritten whole at every autosave, on the stick's
+        # own partition); the data disks' copies are the record.
+        cmd = os.path.join(self.d, "cmdline")
+        with open(cmd, "w") as f:
+            f.write("BOOT_IMAGE=/vmlinuz aerieslot=a aerietoram=1\n")
+        with mock.patch.dict(os.environ, {"BB_CMDLINE": cmd}):
+            stick = self.am.render_snapraid(REC)
+        self.assertNotIn("content /var/lib/builderbot/snapraid.content", stick)
+        self.assertIn("content /mnt/disks/d1/.snapraid.content\n", stick)
         self.assertNotIn("2-parity", conf)
         self.assertIn("content /var/lib/builderbot/snapraid.content\n", conf)
         self.assertIn("content /mnt/disks/d1/.snapraid.content\n", conf)
@@ -176,6 +186,34 @@ class TheAgent(unittest.TestCase):
         self.assertIn("one at a time", text)
         with mock.patch.dict(os.environ, self.env):
             self.am._state_set(running="")
+
+    def test_a_sync_runs_in_the_background_and_one_left_by_a_restart_is_cleared(self):
+        # The operator, 8 Nov: a sync held the machine's one job slot for
+        # hours; the job ends at once, the sync's progress is the array's.
+        bg = []
+
+        def watched(argv, say, progress, timeout=0):
+            bg.append(argv)
+            progress(12, 250)
+            return 1, "Error: disk d2 went away"
+        # The thread writes the state as the agent's process would: the env
+        # of the test held around it to its end.
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(self.am, "run_watched", watched):
+            state, code, text, _ = self.run_job({"array": "sync"}, REC)
+            self.am._BG["thread"].join(5)
+        self.assertEqual((state, bg), ("succeeded", [["/usr/bin/snapraid", "sync"]]), text)
+        self.assertIn("in the background", text)
+        with mock.patch.dict(os.environ, self.env):
+            st = self.am._state()
+            self.assertEqual(st.get("running"), "")
+            self.assertIn("the sync failed (1): Error: disk d2 went away", st.get("status", ""))
+            # A run the state says is going, with no thread behind it: the agent restarted mid-sync.
+            self.am._state_set(running="sync", progress="40%", bg=True)
+            self.am._BG["thread"] = None
+            with mock.patch.object(self.am, "_mounted", return_value=True), mock.patch.object(self.am, "_df", return_value=(100, 10)):
+                now = self.am.array_now()
+            self.assertEqual(now.get("running"), "")
+            self.assertIn("stopped with the agent; Sync now resumes it", now.get("status", ""))
         content = os.path.join(self.d, "snapraid.content")
         open(content, "w").close()
         with mock.patch.dict(os.environ, {"BB_SNAPRAID_CONTENT": content}):
@@ -276,12 +314,21 @@ class Takeover(unittest.TestCase):
 
     def take(self, cfg, out=None):
         job = Job()
+        self.bg = getattr(self, "bg", [])
+
+        def watched(argv, say, progress, timeout=0):
+            self.bg.append(argv)
+            progress(40, 300)
+            return 0, "done"
         with mock.patch.dict(os.environ, self.env), mock.patch.object(self.am, "disks_now", return_value=self.disks), \
              mock.patch.object(self.am.shutil, "which", side_effect=lambda t: f"/usr/bin/{t}"), mock.patch.object(self.am.os, "geteuid", return_value=0), \
              mock.patch.object(self.am, "_df", return_value=(3815447, 10)), mock.patch.object(self.am, "_out", side_effect=out or (lambda argv: "pppp\n")), \
              mock.patch.object(self.am.os.path, "ismount", return_value=False), mock.patch.object(self.am.os, "makedirs"), \
-             mock.patch.object(self.am, "_mounted", side_effect=lambda p: p not in self.down):
+             mock.patch.object(self.am, "_mounted", side_effect=lambda p: p not in self.down), mock.patch.object(self.am, "run_watched", watched):
             state, code = self.A()._apply_storage_array(job, cfg)
+            t = self.am._BG.get("thread")
+            if t:
+                t.join(5)
             return state, code, job.text(), self.am.read_record(), self.ad.read_record()
 
     def test_a_dry_run_says_it_all_and_changes_nothing(self):
@@ -301,7 +348,16 @@ class Takeover(unittest.TestCase):
         made = [a for a in self.ran if a[0].startswith(("mkfs", "wipefs", "sgdisk", "parted", "fdisk", "sfdisk"))]
         self.assertEqual(made, [["mkfs.xfs", "-L", "aerie-p1", "/dev/sdd1"]], "the parity partition alone, never a data disk, never a partition table")
         self.assertIn(["mount", "-T", self.env["BB_ADOPT_FSTAB"], "/mnt/disk1"], self.ran)
-        self.assertEqual(self.ran[-1], ["/usr/bin/snapraid", "sync"])
+        # The first sync is the background's (the operator, 8 Nov): the job
+        # ends once the parity disk is mounted, the sync's progress is the
+        # array's state, and its end stamps last_sync.
+        self.assertEqual(self.ran[-1], ["mount", "/mnt/parity/p1"])
+        self.assertEqual(self.bg, [["/usr/bin/snapraid", "sync"]])
+        self.assertIn("in the background", text)
+        with mock.patch.dict(os.environ, self.env):
+            st = self.am._state()
+        self.assertEqual((st.get("running"), st.get("bg")), ("", False))
+        self.assertGreater(st.get("last_sync", 0), 0)
         self.assertTrue(rec["adopted"])
         self.assertEqual([(d["slot"], d["where"]) for d in rec["data"]], [(1, "/mnt/disk1"), (2, "/mnt/disk2")])
         self.assertEqual(rec["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}], "a pool not in front of the disks is left out")

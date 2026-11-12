@@ -23,7 +23,7 @@ edge:
 | Build | CI runner, builds, tests, the scanner's findings, signing and releases | [building.md](building.md) |
 | Containers | The Docker manager, its System section with nginx and the scanners | [containers.md](containers.md) |
 | Containers | VMs | [vms.md](vms.md) |
-| Controller, Machines, Jobs | This machine, Controller settings, Network, Nodes, Storage, Installed and the job queue | [machines.md](machines.md) |
+| Controller, Machines, Jobs | This machine, Controller settings, Network, Nodes, Storage, Installed, Files and the job queue | [machines.md](machines.md) |
 | Sessions | each agent's sessions: starting one, what it sees, what it is told | [sessions.md](sessions.md) |
 | People, Settings | Users, Roles, and your Profile | [people.md](people.md) |
 | Build > Library, Phone | The companion app for an Android phone | [companion-app.md](companion-app.md) |

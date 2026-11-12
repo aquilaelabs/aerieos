@@ -58,6 +58,12 @@ const DRIVERS = {
     open: () => page.evaluate(() => openInstalledTab()),
     readyWhen: '.installedtab details.sect, .installedtab .empty',
   },
+  // A machine's files (R224): its roots and the first one's top folder, or
+  // the band saying it has none.
+  files: {
+    open: () => page.evaluate(() => openFilesTab()),
+    readyWhen: '.filestab .fxpage, .filestab .empty, .filestab .notice',
+  },
   // A Library entry's own page (R183): the first toolchain's on the node.
   entry: {
     open: () => page.evaluate(async () => {

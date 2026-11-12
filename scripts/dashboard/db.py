@@ -25,6 +25,7 @@ are small, human-edited and read whole, and they stay where they are.
 """
 
 import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -48,6 +49,7 @@ _lock = threading.RLock()
 def configure(*, state):
     """Open the store and bring its schema up to date: the boot's half."""
     globals()["STATE"] = Path(state)
+    globals()["_audit_key"] = None
     _open()
     migrate()
 
@@ -60,6 +62,7 @@ def open_readonly(state):
     the list" a write, and two processes racing the boot's.
     """
     globals()["STATE"] = Path(state)
+    globals()["_audit_key"] = None
     _open()
 
 
@@ -222,6 +225,35 @@ def mint(prefix):
 # ---------------------------------------------------------------------------
 # audit
 
+_audit_key = None
+
+
+def _audit_mac_key():
+    """The install's own key for the audit's digests, made once beside the
+    database: a plain hash of a body holding one short secret (a backup's
+    password) could be guessed offline by anyone reading the audit (B726);
+    keyed, the same parameters still read as the same digest here."""
+    global _audit_key
+    if _audit_key is None:
+        f = Path(STATE or ".") / ".audit-key"
+        try:
+            k = f.read_bytes()
+        except OSError:
+            k = b""
+        if len(k) < 32:
+            k = secrets.token_bytes(32)
+            try:
+                fd = os.open(str(f), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "wb") as w:
+                    w.write(k)
+            except FileExistsError:
+                k = f.read_bytes() if len(f.read_bytes()) >= 32 else k
+            except OSError:
+                pass
+        _audit_key = k
+    return _audit_key
+
+
 def audit(principal, action, target, params):
     """One row per mutation: when, who, what, on what, and a digest of the
     parameters (never the parameters themselves, which may carry tokens and
@@ -229,7 +261,7 @@ def audit(principal, action, target, params):
     which is why this lands with the schema and not with the first screen
     that displays it."""
     blob = json.dumps(params, sort_keys=True, default=str) if params else ""
-    digest = (f"sha256:{hashlib.sha256(blob.encode()).hexdigest()[:12]}"
+    digest = (f"mac:{hmac.new(_audit_mac_key(), blob.encode(), hashlib.sha256).hexdigest()[:12]}"
               f"·{len(blob)}b" if blob else "")
     try:
         _exec("INSERT INTO audit (id, at, principal, action, target, params) "

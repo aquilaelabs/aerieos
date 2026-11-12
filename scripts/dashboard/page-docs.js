@@ -1003,6 +1003,17 @@ function busy(btn, word){
   if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }
 
+// A bar where the thing running reports an honest measure of its own (the
+// operator, 8 Nov: SnapRAID's percentage, an upload's bytes sent), under the
+// word that says what runs; "" for anything that reports none, since a bar
+// that guesses is a lie with a scale on it (the progress rule). `said` is
+// "45%, 120 MB/s" or a number 0..100.
+function pctBar(said, label = "progress"){
+  const m = typeof said === "number" ? said : parseInt(String(said || "").match(/(\d{1,3})%/)?.[1] ?? "", 10);
+  if (!Number.isFinite(m)) return "";
+  return `<progress class="pbar" max="100" value="${Math.max(0, Math.min(100, m))}" aria-label="${esc(label)}"></progress>`;
+}
+
 // ...and the other half, for a press that can fail without a repaint behind
 // it. Most busy() calls need none: the round trip redraws the surface and
 // the button with it, but the notebook's Send and Save both stay on screen

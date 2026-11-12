@@ -79,10 +79,14 @@ controller's own logs and the journal are kept in memory, so they start
 again at each boot; the controller's logs go to a pool when Controller
 settings' paths put them there. What writes all day, docker's images and
 containers, the VMs, the toolchains and the spaces, lives on a **system
-pool**: picked under This machine's **Pool and spaces** from the pools and the
+pool**, and so does the secrets folder with the install key, so the stick
+alone opens nothing the controller sealed: picked under This machine's **Pool and spaces** from the pools and the
 array the machine has, it is where those folders are bound at every boot,
 and picking it moves what the stick held of them there. Until one is
-picked, docker and the VMs wait, and the spaces are held: the spaces
+picked, docker and the VMs wait, and the spaces are held (the secrets stay
+on the stick until a pool is picked; once one is, a boot where it is not
+mounted holds the secrets folder empty, makes no key, and restarts the
+controller when the pool mounts): the spaces
 folder is an empty read-only mount of its own, no space is made, cloned
 or moved in, and they are never written to the stick. **Pool and spaces**
 also says what still lives on the stick and how much has been written to it,
@@ -121,8 +125,15 @@ go, landing the controller, what comes after it, and the way back. Every install
 takes the same walk with the steps it has: a stick made from another system's
 backup adopts that system's disks in it and says what going back costs, any
 other stick makes its own, and an install with no stick goes straight to
-landing. **Walk me through it** and **Set up a new one instead** go between the
-walk and a new start. A
+landing. The steps it cannot go on without come in order: each waits, with a
+line saying which step it waits for, until the ones before it are done, and
+while the machine runs a job (adopting the disks, moving to a pool) every step
+that would start another waits for it, the page saying what runs. **Walk me
+through it** and **Set up a new one instead** go between the walk and a new
+start. The stick's own partition is small (a few gigabytes until a system
+pool takes docker, the spaces and the secrets off it), and This machine says
+how much room it has left, as the bell does when it runs low: the
+controller stops when it is full. A
 pool the machine adopted can be the system pool whatever its filesystem; a
 data disk cannot, since it carries the old system's parity. **Read only**
 writes nothing to the data disks, so with no writable pool nothing new has
@@ -299,9 +310,19 @@ share settings offered to serve as the old system did. **Take the array
 over** (after **Check the takeover**, which says every step and changes
 nothing) makes the data disks writable where they are, never formatting
 one, gives the old parity disk's first partition a filesystem for
-SnapRAID's parity, and builds the parity with a first sync, the array
-unprotected until it ends. The array then appears on the Storage page with
-its sync, scrub and Check parity. Each share keeps its places as the old
+SnapRAID's parity, and starts the first sync, which builds the parity from
+nothing. That sync runs in the background, hours for a large array, with
+its progress on This machine and the Storage page (a bar, since SnapRAID
+says how far it is): the takeover's job ends at once, so the machine's
+other jobs are not held behind it. The array is unprotected until the sync
+ends. Taking the array over is not a step of the first-run walk: it is
+done from here afterwards, and the bell carries a row saying the array
+has no parity yet, with This machine on it, until it is taken over or the
+disks are released. SnapRAID's content files, its catalogue of every block
+of the array, live on the data disks; on a stick none goes on the stick's
+own partition, where one for a large array would fill it. The array then
+appears on the Storage page with its sync, scrub and Check parity, each a
+run in the background too. Each share keeps its places as the old
 system had them: where its new files land (a pool, or the array) and what
 the mover does with them, from what to what (a pool to the array, the
 array to a pool, one pool to another, or nothing). They are set before the
@@ -343,7 +364,13 @@ This machine's Console section: it logs in as `admin`, with `sudo` for
 root, and it is separate from the dashboard's password. The image's root
 forgets everything at each boot, so the password's hash is kept on the
 data partition and the account is made from it at every start; until one
-is set, the screen says where to set it. Root itself has no password. When
+is set, the screen says where to set it. While a machine is first set up,
+`admin` logs in with no password and `sudo` asks for none, so there is a way
+in if the agent or the dashboard stops partway. The first-run page offers a
+password; setup's end, or setting one, closes that login. It opens only on a
+machine's first boot, so an update never opens it on an install already set
+up, and it is a login at the screen or serial line only. Root itself has no
+password. When
 nothing else answers, the boot menu's **Rescue** entry, beside Safe mode,
 starts nothing and opens a root shell at the screen: whoever is at the
 keyboard can already take the disks out, so it opens nothing they do not
@@ -511,12 +538,20 @@ within ten minutes restarts, a kernel or initramfs that panics restarts
 after fifteen seconds, and a kernel that will not load falls to the slot
 before at once; a second boot without the health check's word goes back to
 the slot before by itself, and This machine says so until the next update.
-Picking the slot before from the menu during a trial ends the trial there.
+Picking the slot before from the menu during a trial ends the trial there,
+and visiting an older version is refused while one runs. The new image's
+own boot menu goes on the disk only once its slot is marked good, so a
+release whose menu is broken cannot take away the way back.
 Before an update the controller's configuration is copied to
-`/var/lib/aerieos-os/before/` (the two newest kept). A boot that fell
+`/var/lib/aerieos-os/before/` (the two newest kept), first, and an update
+that cannot take that copy writes nothing. The other slot's old release is
+taken off it before its root is written, so a write cut short leaves a slot
+that reads as empty, never as the version it held. A boot that fell
 back puts that copy back before the controller starts, when the newer slot
-moved the configuration on further than the slot before reads; what it held
-is kept in `/var/lib/aerieos-os/rolled-back-TIME/`. A patch carries no
+moved the configuration on further than the slot before reads, and so does
+the slot before picked by hand from the boot menu, when a newer build wrote
+the configuration; what it held is kept in
+`/var/lib/aerieos-os/rolled-back-TIME/`. A patch carries no
 configuration change, so falling back on one boots the same configuration
 as it is.
 
@@ -534,7 +569,8 @@ configuration has moved on further than that version reads, its copy is used and
 yours is set aside, and comes back when the visit ends; what the visit changed
 is set aside in `/var/lib/aerieos-os/rolled-back-TIME-visit/`. Updates wait
 until a visit ends. An image built before this feature cannot boot from files,
-so it is said and not kept. The menu on the ESP follows the image running, so a
+so it is said and not kept, and a version kept already is never replaced by
+what the slot holds later. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.
 
 **The short address.** On a controller's own machine the dashboard stays on its

@@ -374,12 +374,20 @@ function attRow(a){
   // calls failing, a hot disk, a pool not online, an array slot gone;
   // each to the Storage page, where Replace and the rest are.
   if (a.kind === "disk"){
-    return `<div class="bnote att${a.bad ? " bad" : ""}">
-      <div class="bt">${esc({failing: "A disk is failing", hot: "A disk runs hot", pool: "A pool is not online", array: "An array disk is gone"}[a.what] || "Storage")} on ${esc(a.node)}</div>
+    // Two of these act on This machine (the operator, 8 Nov): an adopted
+    // array not yet taken over (Take the array over, under Adopted disks)
+    // and a stick's own partition filling (a system pool, under Pool and
+    // spaces); the rest on the Storage page.
+    const machine = {untaken: "adopted", stick: "stick"}[a.what];
+    const until = a.what === "untaken" ? "until the array is taken over, or released" : a.what === "stick" ? "until the stick has room again"
+      : a.bad ? "until it is replaced or back" : "until it cools";
+    return `<div class="bnote att${a.bad ? " bad" : a.what === "untaken" || a.what === "stick" ? " warn" : ""}">
+      <div class="bt">${esc({failing: "A disk is failing", hot: "A disk runs hot", pool: "A pool is not online", array: "An array disk is gone",
+                             untaken: "The array has no parity yet", stick: "The stick is running out of room"}[a.what] || "Storage")} on ${esc(a.node)}</div>
       <div class="bsum">${esc(a.said)}</div>
-      <div class="bfoot"><span>${a.bad ? "until it is replaced or back" : "until it cools"}</span>
+      <div class="bfoot"><span>${until}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
-          <a href="#" data-bstorage="${esc(a.id)}">Storage page</a></span></div></div>`;
+          ${machine ? `<a href="#" data-bmachine="${machine}">This machine</a>` : `<a href="#" data-bstorage="${esc(a.id)}">Storage page</a>`}</span></div></div>`;
   }
   // The controller's own machine's power (R164 step 3): on its UPS
   // battery, the battery low or to be replaced, the UPS silent; and its

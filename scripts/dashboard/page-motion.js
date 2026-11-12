@@ -506,3 +506,40 @@ function slideHidden(el, willShow, after){
              () => { el.hidden = !willShow; after?.(); });
 }
 
+
+// ---- a press that is taken -------------------------------------------------
+// Any request a press starts holds its button until the answer comes, and a
+// button still waiting after a moment wears the spinner pressing() gives (the
+// operator, 8 Nov: buttons that answered nothing for a while read as missed).
+// The press is the last button or a.btn clicked; a question it asked passes
+// it on, so the request after the answer is still the asker's. Requests a
+// page makes on its own (the polls) come long after any press and are not tied.
+let pressEl = null, pressAt = 0;
+const PRESS_TIE_MS = 1500;
+function pressTrackDown(e){
+  const b = e.target.closest?.("button, a.btn");
+  if (!b) return;
+  if (b.closest(".askdlg")){ if (pressEl) pressAt = performance.now(); return; }
+  pressEl = b; pressAt = performance.now();
+}
+function pressHold(b, p){
+  b.__pending = (b.__pending || 0) + 1;
+  const t = setTimeout(() => {
+    if (!b.__pending || !b.isConnected || b.getAttribute("aria-busy") === "true") return;
+    b.classList.add("working"); b.dataset.pressWorking = "1";
+  }, PRESS_SHOW_MS);
+  const done = () => {
+    clearTimeout(t);
+    b.__pending -= 1;
+    if (b.__pending <= 0 && b.dataset.pressWorking){ b.classList.remove("working"); delete b.dataset.pressWorking; }
+  };
+  p.then(done, done);
+}
+function pressTrackFetch(orig){
+  return function(...args){
+    const p = orig.apply(this, args);
+    const b = pressEl;
+    if (b && b.isConnected && performance.now() - pressAt < PRESS_TIE_MS) pressHold(b, p);
+    return p;
+  };
+}

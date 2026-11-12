@@ -32,6 +32,22 @@ class StorageRows(unittest.TestCase):
         self.assertIn("57 °C", got[1]["said"])
         self.assertTrue(all(r["kind"] == "disk" and r["node"] == "nas" for r in got))
 
+    def test_an_array_adopted_writable_and_not_taken_and_a_stick_short_of_room(self):
+        # The operator, 8 Nov: writable disks with no parity behind them, and
+        # the stick's own partition filling, each a row on the bell with
+        # where to act; a read-only adoption and a roomy stick say nothing.
+        rep = {"adopted": {"writable": True, "taken": False, "parity": ["sdd"], "mounts": [{"where": "/mnt/disk1", "mounted": True, "ro": False}]},
+               "os_stick": {"stick": True, "ready": False, "var_total_mb": 2000, "var_free_mb": 150}}
+        got = self.rows([own(rep)])
+        self.assertEqual([(r["what"], r["bad"]) for r in got], [("untaken", False), ("stick", True)])
+        self.assertIn("Take the array over", got[0]["said"])
+        self.assertIn("name a system pool", got[1]["said"])
+        rep["adopted"]["writable"] = False
+        rep["os_stick"] = {"stick": True, "ready": True, "var_total_mb": 64000, "var_free_mb": 50000}
+        self.assertEqual(self.rows([own(rep)]), [])
+        rep["adopted"] = {"writable": True, "taken": True, "parity": ["sdd"]}
+        self.assertEqual(self.rows([own(rep)]), [], "taken over: the parity is SnapRAID's")
+
     def test_nothing_from_a_healthy_machine_or_another_node(self):
         rep = {"disks": [{"name": "sda", "smart": {"health": "ok", "temp_c": 40}}], "pools": [{"name": "tank", "health": "online"}], "array": {}}
         self.assertEqual(self.rows([own(rep)]), [])

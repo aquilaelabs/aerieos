@@ -58,7 +58,8 @@ class TheImage(unittest.TestCase):
             f.write(f"SDK_ROOT={d}/sdk\nWORKSPACE={d}/ws\n")
         env = dict(os.environ, BB_OS_WORK=f"{d}/work", BB_OS_RUN=f"{d}/run", BB_CMDLINE=f"{d}/cmd", BB_CONTROLLER_ENV=f"{d}/env",
                    BB_SP_DOCKER=f"{d}/docker", BB_SP_CONTAINERD=f"{d}/containerd", BB_SP_LIBVIRT=f"{d}/libvirt",
-                   BB_SP_HOME=f"{d}/home", BB_SP_WORKSPACE=f"{d}/workspace", BB_SP_NO_SYSTEMCTL="1")
+                   BB_SP_HOME=f"{d}/home", BB_SP_WORKSPACE=f"{d}/workspace", BB_SP_SECRETS=f"{d}/secrets",
+                   BB_SP_NO_SYSTEMCTL="1")
         return subprocess.run(["bash", TOOL, *argv], capture_output=True, text=True, env=env, check=False)
 
     def test_the_tool_says_what_is_on_the_stick_and_refuses_what_it_cannot_take(self):
@@ -151,6 +152,22 @@ class TheImage(unittest.TestCase):
                 self.assertEqual(read(d, "pool2", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
                 # ...and set again by the same install, holding its own data now.
                 self.assertEqual(self.tool(d, "set", f"{d}/pool2").returncode, 0)
+                # Set aside when asked (the operator, 8 Nov): renamed beside it,
+                # .old then .old-2, nothing in it read or deleted, and the pool
+                # taken on an empty folder.
+                for n, was in ((1, "aerieos-system.old"), (2, "aerieos-system.old-2")):
+                    os.makedirs(f"{d}/pool4/aerieos-system/home", exist_ok=True)
+                    with open(f"{d}/pool4/aerieos-system/.aerieos-install", "w") as f:
+                        f.write(f"earlier-{n}")
+                    r = self.tool(d, "set", f"{d}/pool4", "--aside")
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertIn("set aside as", r.stdout)
+                    self.assertEqual(read(d, "pool4", was, ".aerieos-install"), f"earlier-{n}", "kept as it was")
+                    self.assertEqual(read(d, "pool4", "aerieos-system", ".aerieos-install"), read(d, "work", "install-id")[:64])
+                    # The next round's folder is another install's again.
+                    with open(f"{d}/pool4/aerieos-system/.aerieos-install", "w") as f:
+                        f.write("x")
+                self.assertTrue(os.path.isdir(f"{d}/pool4/aerieos-system.old/home"))
                 # A pool in memory (the stick's own root, a tmpfs) is never one (B719).
                 os.makedirs(f"{d}/pool3")
                 for fst in ("tmpfs", "overlay"):
@@ -189,6 +206,52 @@ class TheImage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertTrue(os.path.exists(f"{d}/pool/aerieos-system/home/ada/.signin"), r.stdout)
             self.assertEqual(os.listdir(f"{d}/home"), [], "off the stick")
+
+    def fakes(self, d):
+        fakes = f"{d}/fakes"
+        os.makedirs(fakes)
+        for p in ("mount", "umount", "findmnt"):
+            with open(f"{fakes}/{p}", "w") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            os.chmod(f"{fakes}/{p}", 0o755)
+        return {"BB_SP_NO_MOUNT": "1", "BB_SP_MOUNTED": "1", "PATH": fakes + ":" + os.environ["PATH"]}
+
+    def test_the_secrets_go_to_the_pool_and_off_the_stick(self):
+        # The operator, 7 Nov: the stick alone opens nothing the controller
+        # sealed, so the install key and the secrets live on the pool.
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(f"{d}/secrets/install-key")
+            with open(f"{d}/secrets/install-key/key", "w") as f:
+                f.write("k" * 64)
+            os.makedirs(f"{d}/pool")
+            with mock.patch.dict(os.environ, self.fakes(d)):
+                r = self.tool(d, "set", f"{d}/pool")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
+            self.assertEqual(os.listdir(f"{d}/secrets"), [], "off the stick")
+            self.assertEqual(os.stat(f"{d}/pool/aerieos-system/secrets").st_mode & 0o077, 0, "nobody else's")
+
+    def test_secrets_kept_on_the_stick_by_an_earlier_release_go_to_its_pool_once(self):
+        # A pool named before the secrets went there: its folder for them is
+        # empty, and binding it over the stick's would hide the key.
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(f"{d}/secrets/install-key")
+            with open(f"{d}/secrets/install-key/key", "w") as f:
+                f.write("k" * 64)
+            os.makedirs(f"{d}/pool/aerieos-system")
+            os.makedirs(f"{d}/work")
+            with open(f"{d}/work/system-pool", "w") as f:
+                f.write(f"{d}/pool\n")
+            with mock.patch.dict(os.environ, self.fakes(d)):
+                r = self.tool(d, "apply")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn("the secrets moved from the stick", r.stdout)
+                self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
+                self.assertEqual(os.listdir(f"{d}/secrets"), [])
+                # Once: a second boot finds them there and moves nothing.
+                r = self.tool(d, "apply")
+                self.assertNotIn("moved from the stick", r.stdout)
+                self.assertEqual(read(d, "pool", "aerieos-system", "secrets", "install-key", "key"), "k" * 64)
 
     def test_a_folder_on_the_disks_is_named_the_projects_folder_and_let_go(self):
         # R163 (the operator, 1 Nov): a controller moved here without its
@@ -255,8 +318,10 @@ class TheAgent(unittest.TestCase):
                 f.write('echo \'{"stick": true, "pool": "/mnt/fast", "ready": true, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12}\'\n')
             with mock.patch.dict(os.environ, {"BB_OS_POOL": fake}):
                 got = self.av.stick_status()
+            # The stick's own partition's room rides along, measured here.
+            self.assertTrue(isinstance(got.pop("var_total_mb"), int) and isinstance(got.pop("var_free_mb"), int))
             self.assertEqual(got, {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"], "written_kb": 2048, "boot_written_kb": 12,
-                                   "projects": "", "projects_bound": False, "projects_home": ""})
+                                   "projects": "", "projects_bound": False, "projects_home": "", "others": []})
             with mock.patch.dict(os.environ, {"BB_OS_POOL": os.path.join(d, "none")}):
                 self.assertEqual(self.av.stick_status(), {})
 
@@ -338,10 +403,10 @@ class TheController(unittest.TestCase):
 
     def test_the_census_keeps_the_stick_to_its_shape(self):
         import nodes
-        got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "evil"],
+        got = nodes._census({"os_stick": {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets", "evil"],
                                           "written_kb": 2048, "boot_written_kb": -1}})
-        self.assertEqual(got["os_stick"], {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects"],
-                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": ""})
+        self.assertEqual(got["os_stick"], {"stick": True, "pool": "/mnt/fast", "ready": True, "on_stick": ["projects", "secrets"],
+                                           "written_kb": 2048, "boot_written_kb": None, "projects": "", "projects_bound": False, "projects_home": "", "others": []})
         self.assertNotIn("os_stick", nodes._census({"os_stick": {"stick": False}}))
 
     def test_the_verb_is_a_sticks(self):

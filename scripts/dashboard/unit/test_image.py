@@ -623,6 +623,10 @@ class Workflow(unittest.TestCase):
             # B621: the way in when the dashboard is what does not answer, on
             # the screen itself (the console password needs the dashboard).
             self.assertIn("set a console password on This machine", issue)
+            marked = os.path.join(d, "open"); open(marked, "w").close()
+            sh(f"bash {os.path.join(lib, 'welcome')}", {"BB_OS_LIB": fake, "BB_ISSUE_DIR": out, "BB_CONTROLLER_ENV": env_file, "BB_CONSOLE_OPEN": marked})
+            self.assertIn("Until setup is finished, log in here as admin with no password.", open(os.path.join(out, "10-aerieos.issue")).read())
+            os.unlink(marked)
             self.assertIn("pick Rescue on the boot menu", issue)
             self.assertIn("journalctl -u aerieos-controller", issue)
             self.assertNotIn("\\", issue.replace("\\4", "").replace("\\\\", ""), "no stray escape in an issue file")
@@ -665,6 +669,94 @@ class WhatAMachineKeeps(unittest.TestCase):
         self.assertIn("ConditionPathExists=|!/etc/aerieos-controller/own-node", s)
         p = self.read("nodes/provision-linux.sh")
         self.assertIn('elif [ -f /etc/builderbot/node.json ]; then', p, "not only where the agent is still there")
+
+    def door(self, d, verb, **env):
+        """console-door in a scratch tree, each account tool a stub that logs
+        its arguments: the account as the boot leaves it, without being root."""
+        lib = os.path.join(REPO, "image/mkosi.extra/usr/lib/aerieos-os")
+        bin_ = os.path.join(d, "bin"); os.makedirs(bin_, exist_ok=True)
+        for t in ("useradd", "passwd", "usermod", "agetty"):
+            with open(os.path.join(bin_, t), "w") as f:
+                f.write(f'#!/bin/sh\necho {t} "$@" >> {d}/calls\n')
+            os.chmod(os.path.join(bin_, t), 0o755)
+        with open(os.path.join(bin_, "getent"), "w") as f:
+            f.write(f'#!/bin/sh\ntest -e {d}/have\n')
+        os.chmod(os.path.join(bin_, "getent"), 0o755)
+        fake = os.path.join(d, "lib"); os.makedirs(fake, exist_ok=True)
+        with open(os.path.join(fake, "welcome"), "w") as f:
+            f.write(f'#!/bin/sh\necho welcome >> {d}/calls\n')
+        os.chmod(os.path.join(fake, "welcome"), 0o755)
+        if not os.path.exists(os.path.join(d, "cmdline")):
+            open(os.path.join(d, "cmdline"), "w").write("quiet aerieslot=a\n")
+        full = {"PATH": f"{bin_}:{os.environ['PATH']}", "BB_OS_LIB": fake, "BB_CONSOLE_OPEN": f"{d}/open", "BB_CONSOLE_HASH": f"{d}/hash",
+                "BB_OWN_NODE": f"{d}/own", "BB_CONSOLE_SUDOERS": f"{d}/sudoers.d/open", "BB_CMDLINE": f"{d}/cmdline", **env}
+        r = subprocess.run(["bash", os.path.join(lib, "console-door"), verb], env={**os.environ, **full}, capture_output=True, text=True, check=False)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        p = os.path.join(d, "calls")
+        return open(p).read() if os.path.exists(p) else ""
+
+    def test_a_first_boot_opens_the_screen_with_sudo(self):
+        with tempfile.TemporaryDirectory() as d:
+            calls = self.door(d, "boot")
+            self.assertTrue(os.path.exists(f"{d}/open"))
+            self.assertIn("useradd -m -s /bin/bash -G sudo admin", calls)
+            self.assertIn("passwd -d admin", calls)
+            self.assertEqual(open(f"{d}/sudoers.d/open").read(), "admin ALL=(ALL:ALL) NOPASSWD:ALL\n")
+
+    def test_it_stays_open_across_a_reboot_of_a_first_setup(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.door(d, "boot")
+            open(f"{d}/own", "w").close()           # the first boot enrolled it
+            open(f"{d}/have", "w").close()
+            os.unlink(f"{d}/calls")
+            calls = self.door(d, "boot")
+            self.assertTrue(os.path.exists(f"{d}/open"))
+            self.assertNotIn("useradd", calls)
+            self.assertIn("passwd -d admin", calls)
+
+    def test_an_install_already_set_up_never_opens_by_an_update(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(f"{d}/own", "w").close()
+            open(f"{d}/have", "w").close()
+            self.assertEqual(self.door(d, "boot"), "")
+            self.assertFalse(os.path.exists(f"{d}/open"))
+            self.assertFalse(os.path.exists(f"{d}/sudoers.d/open"))
+
+    def test_a_kept_password_means_it_is_shut(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(f"{d}/hash", "w").write("$6$x\n")
+            open(f"{d}/open", "w").close()
+            self.assertEqual(self.door(d, "boot"), "")
+            self.assertFalse(os.path.exists(f"{d}/open"))
+
+    def test_the_iso_installer_does_not_open_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(f"{d}/cmdline", "w").write("quiet bbinstaller=1\n")
+            self.assertEqual(self.door(d, "boot"), "")
+            self.assertFalse(os.path.exists(f"{d}/open"))
+
+    def test_closing_locks_admin_takes_sudo_away_and_redraws(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.door(d, "boot")
+            open(f"{d}/have", "w").close()
+            calls = self.door(d, "close")
+            self.assertFalse(os.path.exists(f"{d}/open"))
+            self.assertFalse(os.path.exists(f"{d}/sudoers.d/open"))
+            self.assertIn("usermod -L admin", calls)
+            self.assertIn("welcome", calls)
+            self.assertIn("agetty --reload", calls)
+
+    def test_closing_for_a_password_does_not_lock_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(f"{d}/open", "w").close()
+            open(f"{d}/hash", "w").write("$6$x\n")
+            open(f"{d}/have", "w").close()
+            self.assertNotIn("usermod", self.door(d, "close"))
+
+    def test_the_boot_opens_it_before_the_welcome_and_the_image_has_no_ssh_server(self):
+        s = self.read("image/mkosi.extra/usr/lib/systemd/system/aerieos-os-env.service")
+        self.assertLess(s.index("console-door boot"), s.index("aerieos-os/welcome"))
+        self.assertNotIn("openssh-server", self.read("image/mkosi.conf"))
 
     def test_the_console_can_log_in(self):
         self.assertRegex(self.read("image/mkosi.conf"), r"(?m)^\s+login$", "agetty has nothing to run without it (B668)")

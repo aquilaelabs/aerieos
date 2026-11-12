@@ -234,7 +234,7 @@ print(json.dumps(out))
   // make a mutation, and a log that calls everybody that answers nothing.
   ok(row && row.principal === 'user:test' && row.target === 'alpha',
      `a mutation writes an audit row naming the account: who, what, on what (${row?.principal})`);
-  ok(row && /^sha256:[0-9a-f]{12}·\d+b$/.test(row.params),
+  ok(row && /^mac:[0-9a-f]{12}·\d+b$/.test(row.params),
      '...with a parameter digest in a fixed shape');
   ok(!JSON.stringify(tail).includes('sekrit'),
      '...and never the parameters themselves, which carry tokens and env text');
@@ -1443,7 +1443,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // Oct): it is a row under Also works on, marked Hosting only, and
     // nothing else.
     await page.evaluate(async () => { nodesList = null; await loadNodes(); });
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     await page.waitForFunction(id => [...document.querySelectorAll('#rnNodesMore input')].some(i => i.value === id), minted.id, { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id))
@@ -1539,7 +1539,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        && /disabled/.test(await page.$eval(`${ROW} .name .pill`, e => e.textContent))
        && /disabled on the Nodes page/.test(dis.error || ''),
        `Disable asks, marks the row disabled, and a space may not add it until Enable (${dis.error})`);
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id)),
        '...and the space settings\' node picker does not offer it');
@@ -1584,7 +1584,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const hostsNow = await gammaHosts(minted.id);
     ok(!hosted.error && hostsNow.join() === minted.id,
        `...but a space may name it under Hosts its containers on (${hosted.error || hostsNow.join()})`);
-    await page.evaluate(n => renameProject(n), 'gamma');
+    await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector(`#rnNodesMore:not([hidden]) input[value="${minted.id}"]:checked`, { timeout: 10000 });
     ok(/\(Hosting only\)$/.test(await page.$eval(`#rnNodesMore input[value="${minted.id}"]`, i => i.parentElement.querySelector('span').textContent))
        && await page.$eval('.rnbar[data-rnbar="runs"] [data-rnsave]', b => b.disabled),
@@ -2312,7 +2312,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   // fetched yet. The picker used to stay hidden until the dialog was closed
   // and opened again; it has to appear on this opening, when the list lands.
   await page.evaluate(() => { nodesList = null; });
-  await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
+  // The node is the space's (R223): its own dialog, the card's door; the
+  // build command and outputs are the repository's, in its settings after.
+  await page.evaluate(n => renameProject(n, 'project'), 'alpha');
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   await page.waitForSelector('#rnNodeField:not([hidden])', { timeout: 10000 });
   ok(true, 'the node picker appears on the first opening after a load, when the list arrives, not on the next one');
@@ -2321,6 +2323,10 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(await page.$eval('#rnNode', s => ![...s.options].some(o => o.value === 'local') && [...s.options].some(o => /sandbox/.test(o.textContent))),
      'the space\'s node is any node but this container: the ssh sandbox included');
   await page.selectOption('#rnNode', minted.id);
+  const nodeNo = await saveDialog(page);
+  ok(!nodeNo, `the space's dialog saves its node (${nodeNo || 'saved'})`);
+  await page.evaluate(n => renameProject(n), 'alpha');
+  await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
   await page.fill('#rnBuildCmd', './gradlew assembleDebug');
   await page.fill('#rnOutputs', 'app/build/outputs/apk/**/*.apk, extra/*.xpi');
   await page.fill('#rnCaptureDays', '3');

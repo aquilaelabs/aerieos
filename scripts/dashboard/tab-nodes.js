@@ -106,12 +106,25 @@ async function loadNodesOnce(seq){
 // the restore below fires only when nothing repainted: an error, or an
 // action that changes no state. Put the await askYes() BEFORE the call, so
 // canceling leaves the button alive.
+// ...and one still going after a moment wears a spinner (the operator, 8
+// Nov: a press that took a while looked like one that had missed): not while
+// a question the press asked waits for its answer, and not where busy() has
+// put its own word on the button.
+const PRESS_SHOW_MS = 200;
 async function pressing(btn, fn){
   if (!btn || btn.disabled) return undefined;
   btn.disabled = true;
+  const t = setInterval(() => {
+    if (!btn.isConnected || btn.getAttribute("aria-busy") === "true") return;
+    if (document.querySelector(".modal.askdlg:not([hidden])")) return;
+    btn.classList.add("working");
+    btn.setAttribute("aria-busy", "true");
+  }, PRESS_SHOW_MS);
   try{
     return await fn();
   }finally{
+    clearInterval(t);
+    if (btn.classList.contains("working")){ btn.classList.remove("working"); btn.removeAttribute("aria-busy"); }
     if (btn.isConnected) btn.disabled = false;
   }
 }

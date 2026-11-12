@@ -104,8 +104,13 @@ function renderProfileInto(i){
     const fld = label => skField(label, 18);
     d.setBar("");
     splitOff(d.list);                   // drawn before: its grid is the template's to bring
+    // Every section the page always has, so none arrives after (the
+    // operator, 7 Nov: settings popping in on a page that never changes);
+    // Your shares, a machine install's alone, comes with its answer.
     d.list.innerHTML = skTpl(skSplit([["Who you are", PROFILE_SAYS.you], ["What you may do", PROFILE_SAYS.may],
-      ["Password", PROFILE_SAYS.password]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join(""),
+      ["Password", PROFILE_SAYS.password], ["Two-factor sign-in", PROFILE_SAYS.twofactor], ["Your key store", PROFILE_SAYS.mykey],
+      ["Uses of your tokens", PROFILE_SAYS.uses], ["Your terminal", PROFILE_SAYS.terminal],
+      ["Where the bell reaches you", PROFILE_SAYS.reach], ["Signed in as you", PROFILE_SAYS.devices]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join(""),
       pageHead({title: GHOST, facts: [["Roles", GHOST], ["Owner of", GHOST]]})));
     return;
   }

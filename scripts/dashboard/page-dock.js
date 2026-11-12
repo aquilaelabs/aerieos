@@ -75,10 +75,14 @@ function dockSettle(){
 
 // ---- the dock's line ------------------------------------------------------
 
-function dockShow(id){
+function dockShow(id, press = false){
   const t = tabOf(id);
   if (!t) return;
-  if (panes[1] === id && dockUp && active === 1){ dockUp = false; active = 0; }
+  // The tab on show, pressed on the line, puts the dock down wherever the
+  // keyboard was: a click in the page above took it there, and the press
+  // only gave it back, so the dock shut on the second press. Called from
+  // elsewhere it puts the dock down only from the dock's own keyboard.
+  if (panes[1] === id && dockUp && (press || active === 1)){ dockUp = false; active = 0; }
   else { dockPlace(t); }
   dockKeep();
   show(t);
@@ -144,7 +148,7 @@ function dockSpend(t){
 }
 
 function wireDockBar(bar){
-  bar.querySelectorAll("[data-dock]").forEach(b => b.onclick = e => { e.stopPropagation(); if (!dockSwallow) dockShow(b.dataset.dock); });
+  bar.querySelectorAll("[data-dock]").forEach(b => b.onclick = e => { e.stopPropagation(); if (!dockSwallow) dockShow(b.dataset.dock, true); });
   bar.querySelectorAll("[data-min]").forEach(b => b.onclick = e => hideTab(b.dataset.min, e));
   // Close ends the session, as a middle click does (the operator, 17 Oct:
   // minimize alone left no way to end one from its tab).
@@ -173,7 +177,7 @@ function wireDockBar(bar){
     const t = tabOf(b.dataset.pop);
     if (t?.popped) reattachTab(t.id, e); else popOut(b.dataset.pop, e);
   });
-  bar.querySelector("[data-dchat]")?.addEventListener("click", e => { e.stopPropagation(); openChatTab(); });
+  bar.querySelector("[data-dchat]")?.addEventListener("click", e => { e.stopPropagation(); openChatTab(true); });
   bar.querySelector("[data-dnew]")?.addEventListener("click", e => { e.stopPropagation(); newShell(""); });
   bar.querySelector("[data-dtoggle]")?.addEventListener("click", e => { e.stopPropagation(); dockToggle(); });
   // The dock's top edge is its handle: dragged, the height follows the

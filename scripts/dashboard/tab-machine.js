@@ -138,7 +138,7 @@ function wireOlderVersions(root){
 // what writes all day (docker, the VMs, the toolchains, the projects) is on
 // the system pool picked here, or waits for one. What still lives on the
 // stick and what it has written, in the facts voice.
-const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces"};
+const STICK_WORDS = {docker: "docker's images", containerd: "containers' layers", libvirt: "the VMs", toolchains: "the toolchains", projects: "the spaces", secrets: "the secrets and the install key"};
 // The system pool's picker: The stick's own, and the first-run walk's.
 function stickPoolPick(n, s, none = "No pool or array here yet: make one on the Storage page, then pick it here."){
   // An adopted pool counts whatever its filesystem (B663): the census's
@@ -155,9 +155,13 @@ function stickPoolPick(n, s, none = "No pool or array here yet: make one on the 
   const pick = admin ? `<div class="actbar"><label class="pick"><span class="pickw">System pool</span><select id="stickPool" aria-label="system pool"${why ? " disabled" : ""}>${
       optionList([...(s.pool ? [] : [["", "pick a pool"]]), ...mounts], s.pool || "")}</select></label><span class="sp"></span>
       <button type="button" class="primary" data-stickpool${why ? " disabled" : ""}>${s.pool ? "Move to this pool" : "Use this pool"}</button></div>
-      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}` : "";
+      ${why ? `<div class="sub dim">${esc(why)}</div>` : ""}<div class="sub warn" id="stickPoolOther"${stickPoolOther(s, s.pool || "") ? "" : " hidden"}>${STICK_OTHER}</div>` : "";
   return pick;
 }
+// A pool holding another install's folder (the operator, 8 Nov): never taken,
+// set aside beside it when picked, for a person to delete once sure.
+const STICK_OTHER = "This pool holds another AerieOS install's folder, aerieos-system. Using it renames that folder to aerieos-system.old (or .old-2 and on) and leaves it as it is, to delete once nothing in it is wanted.";
+const stickPoolOther = (s, path) => !!path && (s?.others || []).includes(path);
 
 function stickSection(n){
   const s = n?.reported?.os_stick;
@@ -171,10 +175,13 @@ function stickSection(n){
     ["The spaces", s.projects ? (s.projects_bound ? `in ${s.projects}` : `${s.projects}, waiting for its disks`) : s.ready ? `on ${s.pool}` : "held until a pool or a folder on the disks is named: none is made on the stick",
      {cls: s.projects ? (s.projects_bound ? "ok" : "warn") : s.ready ? "" : "warn"}],
     ["Written to the stick", [gb(s.written_kb) && `${gb(s.written_kb)} in its life`, gb(s.boot_written_kb) && `${gb(s.boot_written_kb)} since this boot`].filter(Boolean).join(", ")],
+    // The stick's own partition, which the controller stops with when it is full (the operator, 8 Nov).
+    ...(typeof s.var_total_mb === "number" ? [["Room on the stick", `${gb(s.var_free_mb * 1024)} free of ${gb(s.var_total_mb * 1024)}`,
+        {cls: s.var_free_mb < 1024 || s.var_free_mb * 10 < s.var_total_mb ? (s.var_free_mb < 512 ? "bad" : "warn") : ""}]] : []),
   ];
   const pick = stickPoolPick(n, s);
   return docSection("nodes", "stick", "Pool and spaces", s.ready ? "written rarely" : (s.on_stick || []).length ? "writes on the stick" : "waiting for a pool",
-    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
+    `<div class="field">${factGrid(rows, "stickfacts")}${pick}<div class="hint">They write all day, so they live on a pool and never on the stick. The secrets and the install key go there too, so the stick alone opens nothing. Until one is picked, Docker and the VMs wait and no space can be made.</div></div>${projectsFolderField(n, s, admin)}`,
     {cls: s.ready ? "" : "warn"});
 }
 
@@ -216,13 +223,16 @@ function wireStick(root){
   }));
   const b = root.querySelector("[data-stickpool]"), sel = root.querySelector("#stickPool");
   if (!b || !sel) return;
+  const s = (ownMachine()?.reported?.os_stick) || {};
+  const note = root.querySelector("#stickPoolOther");
+  sel.onchange = () => { if (note) note.hidden = !stickPoolOther(s, sel.value); };
   b.onclick = () => pressing(b, async () => {
-    const path = sel.value;
+    const path = sel.value, aside = stickPoolOther(s, path);
     if (!path) return notify("pick a pool first", true);
-    if (!await askYes(`Put docker, the VMs, the toolchains and the spaces on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, and the stick keeps the configuration alone.`,
-        {title: "Use this pool?", verb: "Move"})) return;
+    if (!await askYes(`${aside ? `${path} holds another AerieOS install's folder. It is renamed to ${path}/aerieos-system.old (or .old-2 and on) and nothing in it is read, taken or deleted: delete it yourself once nothing in it is wanted.\n\n` : ""}Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
+        {title: aside ? "Set it aside and use this pool?" : "Use this pool?", verb: aside ? "Set aside and move" : "Move"})) return;
     busy(b, "Moving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path})).json().catch(() => ({error: "no answer"}));
+    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside})).json().catch(() => ({error: "no answer"}));
     notify(j.error || "moving to the pool: This machine says when it is done", !!j.error);
     await loadNodes();
   });
@@ -237,9 +247,14 @@ function machineConsoleSection(n){
   return docSection("nodes", "console", "Console", c.set ? "password set" : "no password", `<div class="field">
       <div class="hint">At this machine's screen or a KVM, log in as <code>admin</code> with this password; <code>sudo</code> gives root${
         helpIcon("It is not your dashboard password, and it is kept on the machine, not here. When nothing else answers, the boot menu's Rescue entry opens a root shell at the screen.")}</div>
-      <div class="fgrid"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
-        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>
+      ${consolePwFields()}
       <div class="actbar">${c.set ? `<button type="button" class="danger" data-console="clear">Take it away</button>` : ""}<button type="button" class="primary" data-console="set">${c.set ? "Change it" : "Set it"}</button></div></div>`);
+}
+
+// The two fields, here and on the first-run page's step.
+function consolePwFields(cls = ""){
+  return `<div class="fgrid${cls ? ` ${cls}` : ""}"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
+        <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>`;
 }
 
 function wireMachineConsole(root){
@@ -306,7 +321,7 @@ function adoptBackSection(n){
 
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
-function adoptParts(n){
+function adoptParts(n, {take = true} = {}){
   const had = n.reported?.adopted;
   if (had && (had.mounts || []).length){
     const rows = [...had.mounts.map(m => [m.where, `${m.fs}, ${m.ro ? "read-only" : "writable"}${m.mounted ? "" : ", not mounted yet"}`, {cls: m.mounted ? "" : "warn"}]),
@@ -315,10 +330,14 @@ function adoptParts(n){
     // Taking the array over (R163 step 3): SnapRAID's parity on the old
     // parity disk, the data disks writable where they are; offered by an
     // agent that has it, where the old parity disk is here.
-    const canTake = "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
+    // The first-run walk leaves it out (the operator, 8 Nov): the parity
+    // is built after the walk, from here, and the bell says so until it is.
+    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
+        : had.writable && !take
+        ? "Writable: the shares are served, and the old parity disk is left alone until the array is taken over. That comes after this walk, under Adopted disks on This machine, where Take the array over builds SnapRAID's parity in the background; the bell says so until it is done."
         : had.writable
         ? "Writable, a trial: the shares are served and the old parity disk is left alone, so going back to the old system takes a parity sync there, which leaves its array unprotected until it ends. Its plugins do not come over, and people's passwords reach the shares (SMB) but not the dashboard's sign-in, which each sets on Profile."
         : "Read-only: nothing on a data disk is written, so the old system's parity stays good. New files land on a pool."}</div>

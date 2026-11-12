@@ -4767,6 +4767,11 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         echo "== changelog: commits named, never a bug's or an item's number"
         python3 "$BB_LIB/lint-checks.py" changelog || rc=1
     fi
+    # A name defined twice, where the later silently wins (B733, B734).
+    if grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
+        section "names defined twice (python functions and methods, the page's scripts)"
+        python3 "$BB_LIB/lint-checks.py" dupes || rc=1
+    fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
         python3 "$BB_LIB/lint-checks.py" packs || rc=1

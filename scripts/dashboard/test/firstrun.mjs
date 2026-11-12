@@ -400,6 +400,33 @@ await firstRun(false);
         toDo: pill("The old system's disks"), landHeld: step('Land the controller')?.querySelector('[data-moveland]')?.disabled,
         heldWhy: /It waits for the step before/.test(words('Land the controller')) && !/the spaces need a place first/.test(words('Land the controller')), links: panel().querySelectorAll('a.pagelink').length,
         back: words('If you go back'), rail: getComputedStyle(document.getElementById('rail') || document.body).display };
+      // In order (the operator, 8 Nov): the pool step waits on the disks,
+      // saying so; and a system job in flight holds every step that would
+      // start another, the page saying what runs.
+      out.orderHeld = !!step('Where the spaces and containers go')?.classList.contains('held')
+        && /After step \d+, The old system's disks/.test(words('Where the spaces and containers go'));
+      out.orderSaid = [step('Where the spaces and containers go')?.className, titles().join('|'), [...panel().querySelectorAll('section.setstep')].map(c => c.className + ':' + (c.querySelector('h3')?.textContent || '')).join(' / ')].join(' ## ');
+      { const jobsWere = n.jobs; n.jobs = [{ id: 'j_1', apply: 'storage-adopt', step: 'mounting /mnt/disk2', started: Math.floor(Date.now() / 1000) - 400 }]; redraw({});
+        out.jobBand = panel().querySelector('.setjobband')?.textContent.replace(/\s+/g, ' ') || '';
+        out.jobHeld = step("The old system's disks")?.querySelector('[data-adopt="adopt"]')?.disabled === true;
+        n.jobs = jobsWere; redraw({}); out.jobGone = !panel().querySelector('.setjobband'); }
+      // Adopted writable, not taken over: the walk offers no Take (the
+      // operator, 8 Nov: the parity comes after, from This machine), and
+      // says where it comes from.
+      redraw({ adopted: { writable: true, taken: false, parity: ['sdd'], mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: false, mounted: true }] } });
+      out.noTake = !step("The old system's disks")?.querySelector('[data-adopttake]') && /Take the array over builds/.test(words("The old system's disks"));
+      // The screen's password: optional, offered while the screen is open,
+      // never waiting on the steps before it, and gone once set.
+      { redraw({ console: { os: true, set: false, open: true } });
+        const c = step('A password for this screen');
+        out.conPill = c?.querySelector('.pill')?.textContent;
+        out.conSaid = words('A password for this screen');
+        out.conLive = !!c && !c.querySelector('#conPw').disabled && !c.querySelector('[data-console=set]').disabled;
+        out.conHeld = c?.classList.contains('held');
+        redraw({ console: { os: true, set: true, open: false } });
+        out.conDone = step('A password for this screen')?.querySelector('.pill')?.textContent;
+        out.conFields = !!step('A password for this screen')?.querySelector('#conPw');
+        redraw({}); out.conOff = !step('A password for this screen'); }
       // Adopted read only with the pool not mounted: nowhere to put anything
       // is said, in the step that is stuck.
       redraw({ adopted: { writable: false, mounts: [{ where: '/mnt/disk1', fs: 'xfs', ro: true, mounted: true }] } });
@@ -455,6 +482,13 @@ await firstRun(false);
        `...the token and the bundle said first, that the old controller may be off, and how to go and make them (${walk.first.slice(0, 200)})`);
     ok(walk.adopt && walk.toDo === 'to do' && walk.links === 0, `...the disks adopted in place, with no link leading away (${JSON.stringify([walk.adopt, walk.toDo, walk.links])})`);
     ok(walk.landHeld === true && walk.heldWhy, '...Land waiting on the disks, saying why');
+    ok(walk.orderHeld, `...the pool step waits on the disks step, saying which (${walk.orderSaid})`);
+    ok(/adopting the old system's disks/.test(walk.jobBand) && /mounting \/mnt\/disk2, 6 min so far/.test(walk.jobBand) && /One job runs on a machine at a time/.test(walk.jobBand) && walk.jobHeld && walk.jobGone,
+       `...and while a system job runs every step that would start another waits, the page saying what runs, its step and how long (${walk.jobBand})`);
+    ok(walk.noTake, '...and the walk never offers to take the array over: that comes after it, from This machine');
+    ok(walk.conPill === 'optional' && /with no password/.test(walk.conSaid) && walk.conLive && !walk.conHeld,
+       `...a password for the screen is offered as optional, saying the screen is open until setup ends, and waits on no step (${walk.conPill}, ${walk.conLive}, ${walk.conHeld})`);
+    ok(walk.conDone === 'done' && !walk.conFields && walk.conOff, `...done with no fields once set, and not drawn where the machine has no such screen (${walk.conDone}, ${walk.conFields}, ${walk.conOff})`);
     ok(walk.heldSaid, '...and a hold with the step before it done says its own reason');
     ok(walk.doneDisks === 'done' && /adopted read only, with no writable pool/.test(walk.stuck) && walk.pick0.join() === '',
        `...a read-only adoption with no pool to write on says so where it stops (${walk.stuck.slice(0, 200)})`);

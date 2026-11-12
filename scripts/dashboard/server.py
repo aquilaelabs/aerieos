@@ -1255,6 +1255,12 @@ def _project_cards(who, ps):
     return out
 
 
+def _tpart(name, fn, *a):
+    """fn(*a), its time added to the request's part `name` (timing.py)."""
+    with timing.timed(name):
+        return fn(*a)
+
+
 def _project_columns(who, facts):
     """The row the page reads for each project _projects_on_disk found: its
     facts, and everything else a row carries. The project's own settings
@@ -1437,7 +1443,7 @@ def _project_columns(who, facts):
                     # Any model through a router (R144): the models the
                     # router allows this project, with their context and
                     # price, and what the project has spent through it.
-                    "router": _router_row(d.name),
+                    "router": _tpart("projects:router", _router_row, d.name),
                     # Whether a commit here would carry an author, asked WITH
                     # the override: somebody whose Profile has no email can
                     # still set one for this project, and then a session may
@@ -1446,39 +1452,39 @@ def _project_columns(who, facts):
                     # nothing is committed there.
                     "git_ready": True if f.get("work") else _row_git_ready(base_git, mine_prefs.get(d.name))
                                  if users.uid_of(who) else True,
-                    "push_how": projects.push_how(d.name),
+                    "push_how": _tpart("projects:push_how", projects.push_how, d.name),
                     # Whether its settings are this account's to change (B19):
                     # the page locks them, with the reason, where not.
-                    "may_settings": not users.may(who, "settings", d.name) if who else True,
+                    "may_settings": not _tpart("projects:may", users.may, who, "settings", d.name) if who else True,
                     # ...and the reason where not, which the Snapshots and
                     # Running sessions sections say without asking for what
                     # they would only be refused (B89).
-                    "settings_why": users.may(who, "settings", d.name) if who else "",
+                    "settings_why": _tpart("projects:may", users.may, who, "settings", d.name) if who else "",
                     # ...and why its notebook, its tree and the project itself
                     # are not this account's to change, or "" (B86): a role
                     # that gives Projects Read alone sees the page with every
                     # writing control dead and this said under it, rather
                     # than each refused only at the press.
-                    "write_why": users.may(who, "write", d.name) if who else "",
-                    "trash_why": users.may(who, "trash", d.name) if who else "",
+                    "write_why": _tpart("projects:may", users.may, who, "write", d.name) if who else "",
+                    "trash_why": _tpart("projects:may", users.may, who, "trash", d.name) if who else "",
                     # ...and why its version is not this account's to move or
                     # release (Releases and versions Write), for the
                     # Artifacts view's bumps, Release and Set (B101).
-                    "release_why": users.may(who, "version", d.name) if who else "",
+                    "release_why": _tpart("projects:may", users.may, who, "version", d.name) if who else "",
                     # Whether this project has a compose file, which is the
                     # same question as "could its tests run in a container of
                     # its own": the settings dialog offers that choice only
                     # where there is something to run in (R68 step 6).
-                    "has_compose": devapp.project_has_compose(d.name),
+                    "has_compose": _tpart("projects:compose", devapp.project_has_compose, d.name),
                     # The newest transcript, read through the home's link
                     # onto the projects share (lib/common.sh's
                     # claude_projects_link), so a conversation a node's
                     # session had is offered here and continued there.
-                    "last_claude": last_claude(d, users.uid_of(who)),
+                    "last_claude": _tpart("projects:last_claude", last_claude, d, users.uid_of(who)),
                     # ...and each other coding agent's newest, for its own
                     # Resume in the chooser (the operator, 23 Oct: a ChatGPT
                     # conversation was there and nothing offered it back).
-                    "last_agents": last_agents(d, users.uid_of(who)),
+                    "last_agents": _tpart("projects:last_agents", last_agents, d, users.uid_of(who)),
                     # Where this project's sessions run (roadmap #24): the
                     # node's name, or "" for here, and why the button is
                     # dead when its node cannot take one. The proxy decides
@@ -1499,7 +1505,7 @@ def _project_columns(who, facts):
                     # {since, cmd, by}, or null. The companion app times
                     # its turn note by it and the project's During-a-test-run
                     # setting.
-                    "testing": testreg.running(d.name),
+                    "testing": _tpart("projects:testing", testreg.running, d.name),
                     "rules": rule_counts.get(d.name, 0),
                     "pending": pend_counts.get(d.name, 0),
                     # Why nothing routed to this project's node runs right
@@ -1528,7 +1534,7 @@ def _project_columns(who, facts):
                         project_prefs.get(d.name, {}).get("node") or "", "")
                     # ...or its map is still building (mapping.py): the
                     # same ghosting, for the seconds it takes.
-                    or mapping.held(d.name),
+                    or _tpart("projects:mapping", mapping.held, d.name),
                     "issues": issues})
     return out
 
@@ -3049,6 +3055,48 @@ def newest_transcript(project_dir, uid=""):
     return next((f for _, f in sorted(files, key=lambda x: x[0], reverse=True) if transcripts.has_turn(f)), None)
 
 
+# The newest conversations, kept per project and account while the folders
+# they are read from have not changed (a conversation begun or removed moves
+# its folder's time), and for half a minute at most, so a conversation still
+# being written shows its time that late at worst. Read on every status
+# poll, for every project: the folders' globs were most of the poll's time.
+_LAST_KEEP_S = 30
+_last_kept = {}
+
+
+def _times(paths):
+    out = []
+    for d in paths:
+        try:
+            out.append(os.stat(d).st_mtime_ns)
+        except OSError:
+            out.append(0)
+    return tuple(out)
+
+
+def _last_cached(kind, project_dir, uid, folders, read):
+    """read(), kept while the account's transcripts folder and the folders
+    under it that existed at the last read keep their times: a folder made
+    moves the first, a conversation begun or removed moves its own. The
+    candidates are a hundred or so per space (every agent and slot), on the
+    projects share, and statting each on every poll was the cost itself."""
+    key = (kind, str(project_dir), uid)
+    now = time.monotonic()
+    got = _last_kept.get(key)
+    if got and now - got[1] < _LAST_KEEP_S and _times(got[3]) == got[0]:
+        return got[2]
+    folders = {Path(f) for f in folders}
+    cands = folders | {f.parent for f in folders}
+    tops = {c.parent for c in cands} - cands
+    watch = sorted({str(t) for t in tops} | {str(c) for c in cands if c.is_dir()})
+    seen = _times(watch)
+    value = read()
+    if len(_last_kept) > 4096:
+        _last_kept.clear()
+    _last_kept[key] = (seen, now, value, watch)
+    return value
+
+
 def last_claude(project_dir, uid=""):
     """The most recent Claude transcript for a working directory, or None.
 
@@ -3058,10 +3106,18 @@ def last_claude(project_dir, uid=""):
     is a link onto the projects share (lib/common.sh's claude_projects_link),
     so this reads what a session on a node wrote.
     """
-    newest = newest_transcript(project_dir, uid)
-    if newest is None:
-        return None
-    return {"id": newest.stem, "when": int(newest.stat().st_mtime)}
+    folders = transcripts.dirs(uid, Path(str(project_dir)).name) if uid else [CLAUDE_PROJECTS / str(project_dir).replace("/", "-")]
+
+    def read():
+        newest = newest_transcript(project_dir, uid)
+        if newest is None:
+            return None
+        try:
+            return {"id": newest.stem, "when": int(newest.stat().st_mtime)}
+        except OSError:
+            return None
+    got = _last_cached("claude", project_dir, uid, folders, read)
+    return dict(got) if got else None
 
 
 def last_agents(project_dir, uid=""):
@@ -3070,18 +3126,26 @@ def last_agents(project_dir, uid=""):
     folder its Stop hook copies a session's log into (transcripts.py)."""
     if not uid:
         return {}
-    out = {}
-    for d in transcripts.dirs(uid, Path(str(project_dir)).name):
-        for a in transcripts.OTHER_AGENTS:
-            try:
-                files = [f for f in (d / a).glob("*.jsonl") if f.is_file()]
-            except OSError:
-                continue
-            for f in files:
-                when = int(f.stat().st_mtime)
-                if when > (out.get(a) or {}).get("when", 0):
-                    out[a] = {"id": f.stem, "when": when}
-    return out
+    roots = transcripts.dirs(uid, Path(str(project_dir)).name)
+
+    def read():
+        out = {}
+        for d in roots:
+            for a in transcripts.OTHER_AGENTS:
+                try:
+                    files = [f for f in (d / a).glob("*.jsonl") if f.is_file()]
+                except OSError:
+                    continue
+                for f in files:
+                    try:
+                        when = int(f.stat().st_mtime)
+                    except OSError:
+                        continue
+                    if when > (out.get(a) or {}).get("when", 0):
+                        out[a] = {"id": f.stem, "when": when}
+        return out
+    folders = [d / a for d in roots for a in transcripts.OTHER_AGENTS]
+    return {k: dict(v) for k, v in _last_cached("agents", project_dir, uid, folders, read).items()}
 
 
 MODEL_FAMILY = re.compile(r'"model"\s*:\s*"claude-(opus|sonnet|haiku|fable)')
@@ -4363,6 +4427,10 @@ try:
     # The accounts' SMB passwords and a share's names (R164 step 1).
     nodes.smb_users = users.smb_users
     nodes.smb_resolve = users.smb_resolve
+    # ...and whether setup has ended, which closes a screen's open login
+    # (R194). A landing cut midway is not an end: its setting came with the
+    # bundle, and the way in is wanted most then.
+    nodes.setup_over = lambda: bool(users.owner_name() and settings.get("setup_done") and not move.cut_landing())
     # ...and the weeks-long record of the own machine's samples (R164 step 4).
     history.configure(state=STATE)
     nodes.history_add = history.add
@@ -5413,6 +5481,10 @@ if BARE_METAL:
 import backup                                                    # noqa: E402
 # Moving this controller to another home (R90 step 12, move.py): the bundle
 # and its token, the nodes told, the knock answered once restored here.
+# The file explorer (R224, fileexplorer.py): a machine's roots through its agent.
+import fileexplorer                                              # noqa: E402
+fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.route_host(nid), key=lambda nid: nodes.screen_key(nid),
+                       audit=lambda who, what, detail, params: db.audit(who, what, detail, params))
 import move                                                      # noqa: E402
 move.checkpoint = db.checkpoint
 move.install_landed_key = lambda key, state_dir: installkey.landed(key, state_dir)
@@ -6020,6 +6092,8 @@ GET_ROUTES = (
     ("prefix", "/api/docker", "_get_docker"),
     ("prefix", "/api/containers", "_get_containers"),
     ("exact", "/api/vms", "_get_vms"),
+    ("exact", "/api/node-files", "_get_node_files"),
+    ("exact", "/api/node-files/read", "_get_node_files_read"),
     ("prefix", "/api/project-job", "_get_project_job"),
     ("prefix", "/api/trash", "_get_trash"),
     ("prefix", "/api/claude-now", "_get_claude_now"),
@@ -6095,6 +6169,7 @@ POST_ROUTES = (
     ("prefix", "/api/pin", "_pin"),
     ("exact", "/api/reset", "_reset"),
     ("exact", "/api/move", "_move"),
+    ("exact", "/api/node-files", "_node_files"),
     ("exact", "/api/backup", "_backup"),
     ("prefix", "/api/create", "_create"),
     ("prefix", "/api/profile", "_profile"),
@@ -8425,6 +8500,139 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return self._json(devapp.containers())
 
+    def _node_files_admin(self):
+        """Whether the asker may use the file explorer: an administrator,
+        signed in as themselves (R224)."""
+        me = self._who() or {}
+        return bool(users.is_admin(me)) and not me.get("session")
+
+    def _get_node_files(self):
+        """GET /api/node-files?node=&root=&path= (R224): the node's roots, and
+        with a root the folder's listing; an administrator's."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._node_files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        nid, root = q.get("node", [""])[0], q.get("root", [""])[0]
+        n = nodes.node(nid) if nid else None
+        if not n or n.get("kind") != "agent":
+            return self._json({"error": "no such node"}, 404)
+        out = {"node": nid, "name": n.get("name") or nid, "roots": fileexplorer.roots(n),
+               "serves": bool(((n.get("reported") or {}).get("files") or {}).get("port")), "live": n.get("live") is not False}
+        if root:
+            got, status = fileexplorer.act(self._principal(), True, nid, root, "list", path=q.get("path", [""])[0])
+            if status != 200:
+                return self._json({**out, "error": got.get("error") or f"the agent answered {status}"}, 200)
+            out.update(got)
+        return self._json(out)
+
+    def _get_node_files_read(self):
+        """GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's
+        bytes streamed from its node, a download or shown in the page;
+        nothing it holds runs here (a page or a script is sent as text)."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._node_files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        nid, root, path = q.get("node", [""])[0], q.get("root", [""])[0], q.get("path", [""])[0]
+        tg = fileexplorer._target(True, nid, root)
+        if tg.get("error"):
+            return self._json(tg, 400)
+        start = 0
+        rng = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range") or "")
+        if rng:
+            start = int(rng.group(1))
+        try:
+            up = fileexplorer.open_request(tg, {"op": "read", "root": root.rstrip("/"), "path": path, "from": start})
+        except OSError as e:
+            return self._json({"error": f"{tg['node'].get('name')} did not answer: {e}"}, 502)
+        try:
+            status, hdr, rest = fileexplorer.read_head(up)
+            if status != 200:
+                return self._json(fileexplorer.read_json(up, hdr, rest), status)
+            name = path.rstrip("/").rsplit("/", 1)[-1] or "file"
+            length, size = int(hdr.get("content-length") or 0), int(hdr.get("x-size") or 0)
+            self.send_response(206 if rng else 200)
+            if q.get("dl", [""])[0]:
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(name))
+            else:
+                ctype = fileexplorer.shown_as(name)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", "inline; filename*=UTF-8''" + urllib.parse.quote(name))
+                if ctype != "application/pdf":
+                    self.send_header("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Accept-Ranges", "bytes")
+            if rng:
+                self.send_header("Content-Range", f"bytes {start}-{max(start, size - 1)}/{size}")
+            self.send_header("Content-Length", str(length))
+            self.end_headers()
+            if rest:
+                self.wfile.write(rest[:length])
+            left = length - len(rest[:length])
+            while left > 0:
+                got = up.recv(min(1 << 20, left))
+                if not got:
+                    break
+                self.wfile.write(got)
+                left -= len(got)
+        finally:
+            up.close()
+        return None
+
+    def _node_files_upload(self):
+        """POST /api/node-files/upload?node=&root=&path=&name= (R224): the
+        request's body, the file itself, streamed to its node a megabyte
+        at a time; an administrator's, audited."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if not self._node_files_admin():
+            return self._json({"error": "the file explorer is an administrator's"}, 403)
+        if (cross := self._ws_cross_origin()):
+            return self._json({"error": cross}, 403)
+        nid, root, path, name = (q.get(k, [""])[0] for k in ("node", "root", "path", "name"))
+        try:
+            n = int(self.headers.get("Content-Length", "-1"))
+        except ValueError:
+            n = -1
+        if n < 0:
+            return self._json({"error": "the upload says no length"}, 411)
+        tg = fileexplorer._target(True, nid, root)
+        if tg.get("error") or not fileexplorer.NAME.fullmatch(name or ""):
+            self.close_connection = True
+            return self._json(tg if tg.get("error") else {"error": "a file's name is needed, without a slash"}, 400)
+        try:
+            up = fileexplorer.open_request(tg, {"op": "write", "root": root.rstrip("/"), "path": path, "name": name,
+                                                 "replace": q.get("replace", [""])[0] == "1"}, method="PUT", length=n)
+        except OSError as e:
+            self.close_connection = True
+            return self._json({"error": f"{tg['node'].get('name')} did not answer: {e}"}, 502)
+        try:
+            left = n
+            while left > 0:
+                chunk = self.rfile.read(min(1 << 20, left))
+                if not chunk:
+                    break
+                up.sendall(chunk)
+                left -= len(chunk)
+            status, hdr, rest = fileexplorer.read_head(up)
+            got = fileexplorer.read_json(up, hdr, rest)
+        except OSError as e:
+            self.close_connection = True
+            return self._json({"error": f"the upload to {tg['node'].get('name')} stopped: {e}"}, 502)
+        finally:
+            up.close()
+        if status == 200:
+            db.audit(self._principal(), "files-upload", f"{tg['node'].get('name')}:{root}/{path.strip('/')}/{name}"[:120], {"size": n})
+        return self._json(got, status)
+
+    def _node_files(self, req):
+        """POST /api/node-files (R224): mkdir, rename or delete (into the root's
+        trash) on a node's root; an administrator's, audited."""
+        got, status = fileexplorer.act(self._principal(), self._node_files_admin(), field(req, "node"), field(req, "root"),
+                                       field(req, "action"), path=str(req.get("path") or ""), name=str(req.get("name") or ""),
+                                       dest=str(req.get("dest") or ""))
+        return self._json(got, status)
+
     def _get_vms(self):
         """GET /api/vms (R91): the VMs of the projects this account may read
         them on (a session: its own), the OS catalog and the VM hosts."""
@@ -8892,6 +9100,9 @@ class Handler(BaseHTTPRequestHandler):
         # ...and a move landed from Controller settings, its bundle streamed.
         if self.path.split("?")[0] == "/api/move-land":
             return self._move_land()
+        # ...and a file put on a machine from the file explorer (R224), streamed through.
+        if self.path.split("?")[0] == "/api/node-files/upload":
+            return self._node_files_upload()
         req = self._read_json()
         if req is None:
             return None
@@ -12954,6 +13165,12 @@ class Handler(BaseHTTPRequestHandler):
             if r.get("ok"):
                 db.audit(self._principal(), "move-backup", "", {"repos": req.get("repos") is True, "size": r.get("size", 0)})
             return self._json(r, 400 if r.get("error") else 200)
+        if act == "pack":
+            # The bundle packed now, the page waiting on it with its button
+            # saying so (the operator, 8 Nov: a download link said nothing
+            # for as long as the packing took); then fetched by name.
+            r = move.pack_bundle()
+            return self._json(r, 400 if r.get("error") else 200)
         if act == "forget":
             r = move.forget(self._principal())
             if r.get("ok"):
@@ -12966,7 +13183,7 @@ class Handler(BaseHTTPRequestHandler):
         if act == "ask":
             learned = move.ask_new(force=True)
             return self._json({"ok": True, "moved": learned, **move.status()})
-        return self._json({"error": "action is prepare, backup, forget, moved or ask"}, 400)
+        return self._json({"error": "action is prepare, pack, backup, forget, moved or ask"}, 400)
 
     def _move_peer(self):
         """/api/v1/move/* (R175): what the two controllers say to each
@@ -13001,15 +13218,23 @@ class Handler(BaseHTTPRequestHandler):
             shutil.copyfileobj(f, self.wfile)
 
     def _get_move_bundle(self):
-        """GET /api/move-bundle: the bundle as a download, packed fresh under
-        the armed move's key at this moment (R175 step 1); the owner's."""
+        """GET /api/move-bundle[?name=]: the bundle as a download, packed
+        fresh under the armed move's key at this moment (R175 step 1), or the
+        one just packed by name; the owner's."""
         me = self._who() or {}
         if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
             return self._json({"error": "the move bundle is its owner's"}, 403)
-        r = move.pack_bundle()
-        if r.get("error"):
-            return self._json({"error": r["error"]}, 404)
+        # ?name= is the bundle the page just packed (action pack), served as
+        # it is; with no name, packed fresh here as before.
+        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        name = q.get("name", [""])[0]
+        if not name:
+            r = move.pack_bundle()
+            if r.get("error"):
+                return self._json({"error": r["error"]}, 404)
         p = move.bundle_path()
+        if p and name and p.name != name:
+            return self._json({"error": "that bundle has been packed again since: press Download the bundle again"}, 404)
         if not p:
             return self._json({"error": "no move is prepared"}, 404)
         self.send_response(200)

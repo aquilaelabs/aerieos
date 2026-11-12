@@ -25,7 +25,7 @@ runner's token is typed on the CI runner page.
 | `BANNER_LINK_LABEL` | *(empty)* | The link's words; "more" when empty |
 | `FEATURES_OFF_WHY` | *(empty)* | The sentence a switched-off feature shows; "switched off on this install" when empty |
 | `SCANNER_REPORTS_PATH` | `/mnt/user/appdata/scanners/reports` | deprecated in 0.9.0, removed in the release after: the directory a scanner on the host writes SARIF into, mounted read-only at `/reports` and still read by `aerie findings` and the Analysis view beside what the Scanners page's own scanners send up ([scanners.md](scanners.md)); empty where no host scanner runs |
-| `BUILDERBOT_PULL` | `missing` | AerieOS's own dev instance only: compose's pull policy, `build` to build this checkout (with `BUILDERBOT_TAG=dev`) |
+| `AERIE_PULL` | `missing` | AerieOS's own dev instance only: compose's pull policy, `build` to build this checkout (with `AERIE_TAG=dev`); `BUILDERBOT_PULL` and `BUILDERBOT_TAG` are read too until 0.10 |
 
 Mounts: the projects folder, the state directories (`home`, `config`), the
 `/sdk` (the browsers `aerie capture shot` uses; a node keeps its own
@@ -77,7 +77,7 @@ there is none. Kept beside the state, a copy of `/config` carries the key,
 so the Keys page and `aerie doctor` say so; mount a secrets folder the
 controller may write to and the next start moves the key into it. On
 a NAS host that is the container's **Edit**, **Secrets directory** set to a
-folder such as `/mnt/user/appdata/BuilderBot/secrets` with access
+folder such as `/mnt/user/appdata/Aerie-Workshop/secrets` with access
 **Read/Write**, then **Apply**: an install from a template before 0.8.0
 keeps the read-only mount it was made with until it is changed there.
 

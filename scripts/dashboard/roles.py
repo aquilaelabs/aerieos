@@ -18,6 +18,7 @@ person should be given a group of permissions.
 """
 import contextlib
 import json
+import os
 import re
 import threading
 from pathlib import Path
@@ -251,11 +252,30 @@ def _clean(r):
             "note": str(r.get("note") or "")[:200], "only": only}
 
 
-def _load():
+# The file parsed once while it stays the same file (its inode, size and
+# time): a role check reads it, the status poll makes several per space,
+# and parsing it each time was a tenth of the poll. A write replaces the
+# file, so a change is read at the next check.
+_read_kept = [None, None]
+
+
+def _read():
     try:
-        v = json.loads(FILE.read_text())
-    except (OSError, ValueError, TypeError, AttributeError):
-        v = {}
+        st = os.stat(FILE)
+        sig = (st.st_ino, st.st_size, st.st_mtime_ns)
+    except (OSError, TypeError):
+        return {}
+    if _read_kept[0] != sig:
+        try:
+            v = json.loads(FILE.read_text())
+        except (OSError, ValueError, TypeError, AttributeError):
+            v = {}
+        _read_kept[:] = [sig, v if isinstance(v, dict) else {}]
+    return _read_kept[1]
+
+
+def _load():
+    v = _read()
     rs = v.get("roles") if isinstance(v, dict) and isinstance(v.get("roles"), dict) else {}
     return {str(n): _clean(r) for n, r in rs.items() if n not in BUILTIN}
 
@@ -269,10 +289,7 @@ def _save(custom, two_factor=None):
 def _two_factor_list():
     """The roles an administrator requires a second factor of (R127),
     built in ones included."""
-    try:
-        v = json.loads(FILE.read_text())
-    except (OSError, ValueError, TypeError, AttributeError):
-        return set()
+    v = _read()
     got = v.get("two_factor") if isinstance(v, dict) else None
     return {str(x) for x in got} if isinstance(got, list) else set()
 

@@ -2,9 +2,87 @@
 
 ## Unreleased
 
+### Added
+
+- While a machine is first set up, its screen or a KVM logs in as admin with no password, even if the dashboard or the agent has stopped, and the first-run page offers a password to keep a way in after setup ends (cf50004)
+
+## 0.9.0-dev.5123: 2026-11-08
+
+### Added
+
+- The bell says when an adopted array is writable with no parity yet, with This machine on the row, and when a stick's own partition is running out of room; This machine shows that partition's room (80b84fe)
+
 ### Changed
 
-- A row on the Installed page that says an update is available has its Update button there, as the Library's card does (dbba5cea)
+- Taking the array over no longer holds the machine for the hours the first parity sync takes: the job ends once the parity disk is ready and the sync runs in the background, as Sync now and Scrub do too, its progress on This machine and the Storage page; the first-run walk no longer offers the takeover, which comes after it from This machine (80b84fe)
+- A bar shows how far a sync, scrub or parity check is, and how much of a bundle has been sent when a move lands; a first-run step held behind a job says the job's step and how long it has run (80b84fe)
+
+### Fixed
+
+- On a stick, SnapRAID's content file (a catalogue of every block of the array, gigabytes for a large one, rewritten whole as a sync goes) no longer goes on the stick's own partition, which it filled during a first sync, taking the controller down with it; it lives on the data disks (80b84fe)
+
+## 0.9.0-dev.5119: 2026-11-08
+
+### Changed
+
+- A new Unraid or compose install keeps its state in /mnt/user/appdata/Aerie-Workshop, and the template's hostname is aerie-workshop; an install already running keeps its own folders. Upgrading: a compose install that never set APPDATA_PATH must set APPDATA_PATH=/mnt/user/appdata/BuilderBot in its .env before it updates, or it starts on an empty folder (9c94749)
+- Every button that starts something shows it was taken: one still working after a moment wears a spinner, and Download the bundle says Packing until the file is ready, a failure said on the page rather than as a page of its own (56f8685)
+- The first-run walk takes its steps in order: a step that needs the one before waits, saying which, and while the machine runs a job (adopting the disks, moving to a pool) the steps that would start another wait for it, the page saying what runs, where a press used to fail with 'one at a time' (56f8685)
+
+### Deprecated
+
+- BUILDERBOT_TAG and BUILDERBOT_PULL in a compose .env are now AERIE_TAG and AERIE_PULL; the old names are read until 0.10 (9c94749)
+
+## 0.9.0-dev.5114: 2026-11-08
+
+### Added
+
+- A stick offered a pool that holds another AerieOS install's folder now offers to set that folder aside (renamed to aerieos-system.old, then .old-2 and on, untouched) and use the pool, where it only refused; the picker says so before you press (ee21eac)
+- A Files page under Machines: browse, preview, upload, download, rename, move and delete files on a node's pools, array, shares and mounted disks, for administrators, every change in the audit log; a delete goes to that disk's .aerieos-trash folder. A node's agent serves it once updated (8458483)
+
+### Fixed
+
+- Downloading a move's bundle needs only the bundle's own size free on the old controller's disk, where it needed up to three times that and could end in a bare "No space left on device"; a full disk is now said with what to do (95cc75d)
+- A stick that goes back to the configuration from before an update keeps its logs in memory as before, instead of writing them to the stick (510d31c)
+
+## 0.9.0-dev.5096: 2026-11-07
+
+### Changed
+
+- On a stick, the secrets folder with the install key moves to the system pool along with docker, the VMs, the toolchains and the spaces, so the stick alone opens nothing the controller sealed; a stick whose pool was picked before carries them over at its next boot (ee7e020, 5fb699a)
+- Pages open faster: the status read every page waits on takes about a third of the time it did (the newest conversations and the roles are no longer read again on every poll), Controller settings measures what a move would carry side by side, the Library reads once when it opens, and a pointer resting on Containers or Build reads ahead what that page shows first (5897793, 31e5ea6, 2b03cbc, dee915b)
+- Profile waits with every section it always has, and a person's roles on the Users page wait in their places, so nothing grows in after the page has drawn (e3d8adb)
+- On a phone, a space's Docker view keeps its view toggle and buttons on one line and its status under them, where the status was squeezed between them (bf59b20, e610c71)
+
+### Fixed
+
+- A controller whose secrets folder is root's alone (every install on a machine of its own, a stick included, and a container whose secrets folder is closed as the install guide says) could not reach the install key it made there, so it sealed nothing and a move carrying the old controller's key stopped at landing with permission denied; the boot now says so if the controller's account cannot read its key (ee7e020, f957998)
+- A move landing on a stick keeps the accounts the stick made from the old system's share users, with their SMB passwords, so shares already served to them keep their people; a name the moved controller already has is its account, and the landing says so (275cfe6)
+- A landing whose spaces cannot be copied says so with what it set aside, instead of stopping with those lines lost; secrets the new home cannot write no longer stop a landing, which lands the rest and says to copy them by hand (2b4bef3)
+- A bundle's secrets piece says when the secrets folder is root's alone and the bundle carries none of it, instead of packing it as empty without a word (1114a0b)
+- A session's commit after a command the controller ran for it (a release's changelog section, a pull) no longer carries the old files back over what the controller committed (e9c1fef)
+- A release keeps a changelog line's commit when the line was committed on its own right after its change (4108ed5)
+- aerie settings names the hosting-only nodes ticked under Also works on (2daf041)
+- The dock's tab on show, pressed, puts the dock down on the first press, also after a click in the page above (42d145c)
+- An OS update takes the configuration's copy before anything else and stops when it cannot; a slot whose write was cut short reads as empty rather than as its old version, which the next update would have kept in place of the good copy; and the older slot picked by hand from the boot menu takes back its own configuration when a newer build wrote the one there, where its controller sat refusing to start (7c9c50c)
+- A new OS image's boot menu goes on only once the health check marks its slot good, so a release with a broken menu cannot take away the way back to the slot before (6659f2a)
+- Visiting an older version is refused while an update is on trial, which the visit would have spent a boot of or ended (84e5f03)
+
+### Security
+
+- A move or backup bundle's outer details (its kind, origin and versions) are held to its sealed body, and a bundle changed after it was made is refused before anything changes; bundles made before still land (679ccaf)
+- The audit's digest of a change's parameters is keyed by the install's own key, so a short secret in a request cannot be guessed from the audit (808926d)
+- A session's aerie nodes reads its space's own nodes, as the Nodes page narrows them; an owner's or an administrator's seat reads every node (6c75b33)
+
+### Upgrading
+
+- A controller that could not reach its install key (under Fixed) seals what it kept open at its first start on this release; nothing is asked of you (ee7e020)
+
+## 0.9.0-dev.5065: 2026-11-07
+
+### Changed
+
+- A row on the Installed page that says an update is available has its Update button there, as the Library's card does (760de66)
 
 ### Fixed
 

@@ -304,7 +304,7 @@ def share_siblings():
     Two things it deliberately will not do. A mount whose source is a whole
     filesystem (root "/") says nothing about a directory name and is skipped.
     And a name that IS a valid project never enters the set, whatever it is
-    mounted from: /mnt/user/appdata/BuilderBot would otherwise teach this to
+    mounted from: /mnt/user/appdata/Aerie-Workshop would otherwise teach this to
     ignore the AerieOS project's own findings, which is the one mistake
     here that would hide real work rather than noise.
     """

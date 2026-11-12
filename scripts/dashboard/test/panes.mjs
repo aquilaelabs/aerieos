@@ -224,6 +224,21 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
      'closing the popped window brings the tab back on its own');
 }
 
+// The tab on show, pressed, puts the dock down on the first press, also
+// after a click in the page above took the keyboard there: the press gave
+// the dock the keyboard back and it shut on the second.
+{
+  const id = ids[1];
+  await page.evaluate(id => { dockToggle(false); dockShow(id); }, id);
+  await page.waitForFunction(id => dockUp && active === 1 && panes[1] === id, id, { timeout: 4000 });
+  await page.click('#pane0', { position: { x: 40, y: 120 } });
+  const moved = await page.evaluate(() => active);
+  await page.click(`.dockline [data-dock="${id}"]`);
+  ok(await page.evaluate(() => dockUp === false), `the tab on show puts the dock down on the first press, the keyboard on the page before it (${moved})`);
+  await page.click(`.dockline [data-dock="${id}"]`);
+  ok(await page.evaluate(id => dockUp === true && panes[1] === id, id), '...and brings it up again on the next');
+}
+
 // The dock's line with more tabs than fit has an arrow at the end with more
 // past it on a desk, as a row of big chips has, and a press on it moves the
 // line along (the operator, 24 Oct).
