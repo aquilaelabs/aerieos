@@ -1,5 +1,31 @@
 {
  "about": "What aerie lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, aerie lint on a node skips its checks.",
+ "credits": [
+  {
+   "maker": "Vidar Holen",
+   "name": "shellcheck"
+  },
+  {
+   "maker": "the hadolint project",
+   "name": "hadolint"
+  },
+  {
+   "maker": "rhysd",
+   "name": "actionlint"
+  },
+  {
+   "maker": "Astral",
+   "name": "ruff"
+  },
+  {
+   "maker": "Mike Farah",
+   "name": "yq"
+  },
+  {
+   "maker": "David Peter",
+   "name": "fd"
+  }
+ ],
  "label": "Lint tools (shellcheck, hadolint, actionlint, ruff, yq, fd)",
  "layout": {
   "bin": [
@@ -8,6 +34,7 @@
   "env": {},
   "tool": "bin/shellcheck"
  },
+ "maker": "AerieOS",
  "name": "lint-tools",
  "platforms": [
   "linux/amd64"

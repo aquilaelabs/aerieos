@@ -11,6 +11,7 @@
   },
   "tool": "cargo/bin/cargo"
  },
+ "maker": "The Rust Project",
  "name": "rust",
  "platforms": [
   "linux/amd64"

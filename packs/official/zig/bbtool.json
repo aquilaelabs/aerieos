@@ -8,6 +8,7 @@
   "env": {},
   "tool": "zig"
  },
+ "maker": "Zig Software Foundation",
  "name": "zig",
  "platforms": [
   "linux/amd64"

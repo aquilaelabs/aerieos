@@ -1,5 +1,19 @@
 {
  "about": "What aerie tool docs runs: reads a PDF, Word document, slide deck or spreadsheet as Markdown, draws a PDF's pages as pictures, and converts with pandoc. Also lets Claude Code read PDFs. About 650 MB.",
+ "credits": [
+  {
+   "maker": "Microsoft",
+   "name": "markitdown"
+  },
+  {
+   "maker": "Artifex",
+   "name": "PyMuPDF"
+  },
+  {
+   "maker": "John MacFarlane",
+   "name": "pandoc"
+  }
+ ],
  "label": "Document readers (markitdown, PyMuPDF, pandoc)",
  "layout": {
   "bin": [
@@ -8,6 +22,7 @@
   "env": {},
   "tool": "bin/markitdown"
  },
+ "maker": "AerieOS",
  "name": "documents",
  "platforms": [
   "linux/amd64"

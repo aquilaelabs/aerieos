@@ -30,6 +30,7 @@
   "update_job": "opencode-update"
  },
  "label": "Any model",
+ "maker": "Anomaly",
  "name": "open",
  "platforms": [
   "linux/*"

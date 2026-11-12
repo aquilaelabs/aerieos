@@ -73,6 +73,8 @@ def pack():
     section asked before, written to packs/services/model-router by
     tools/packs-export.py and held to this by aerie lint."""
     return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+            # Two makers' programs behind one card: AerieOS's, each credited.
+            "maker": "AerieOS", "credits": [{"name": "LiteLLM", "maker": "BerriAI"}, {"name": "Ollama", "maker": "Ollama"}],
             "about": "LiteLLM on this node holding your provider keys, Ollama beside it where you turn it on, offered to the spaces you allow: "
                      "each is handed its address and a key of its own at a session's start, so its spend is its own. What Start's Any model runs through.",
             "service": {"kind": "router"},

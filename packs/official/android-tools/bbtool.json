@@ -9,6 +9,7 @@
   "env": {},
   "tool": "cmdline-tools/bin/sdkmanager"
  },
+ "maker": "Google",
  "name": "android-tools",
  "platforms": [
   "linux/*"

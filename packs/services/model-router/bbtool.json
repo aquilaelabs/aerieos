@@ -68,7 +68,18 @@
    "name": "projects"
   }
  ],
+ "credits": [
+  {
+   "maker": "BerriAI",
+   "name": "LiteLLM"
+  },
+  {
+   "maker": "Ollama",
+   "name": "Ollama"
+  }
+ ],
  "label": "Model router",
+ "maker": "AerieOS",
  "name": "model-router",
  "platforms": [
   "linux/amd64",

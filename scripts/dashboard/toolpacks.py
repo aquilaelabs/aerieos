@@ -675,6 +675,13 @@ def validate(m, shipped=()):
         errors.append("terms lists what it is under, each {label, url}")
         terms = []
     out["terms"] = [{"label": str(t["label"])[:120], "url": str(t.get("url") or "")[:300]} for t in terms]
+    # Who the tool is by, and each of them where it carries several makers'
+    # (packformat.maker_of): said wrong is said, not dropped in silence.
+    if m.get("maker") is not None and not packformat.maker_of(m):
+        errors.append(f"maker is who the tool is by, an organization or a person: one line of up to {packformat.MAKER_MAX} plain characters")
+    if m.get("credits") is not None and (not isinstance(m["credits"], list) or len(packformat.credits_of(m)) != len(m["credits"])):
+        errors.append(f"credits lists up to {packformat.CREDITS_MAX} of {{name, maker}}: each tool the pack carries and who it is by")
+    out["maker"], out["credits"] = packformat.maker_of(m), packformat.credits_of(m)
     # What it touches (R169 step 4): the hosts its install fetches from and
     # whether it needs root on the node, said on Look before it is added; a
     # pack that needs root is an administrator's to add.
@@ -1369,6 +1376,7 @@ def recipe(rec):
     # drawn (B106): the label stands in for it.
     row = {"name": m["name"], "label": m["label"], "probe": m["name"], "about": m["about"] or m["label"],
            "platforms": m["platforms"], "layout": m["layout"], "source": src, "terms": m["terms"],
+           "maker": m.get("maker") or "", "credits": m.get("credits") or [],
            "verbs": m["verbs"],
            "pack": {"url": rec["url"], "commit": rec["commit"], "path": rec.get("path", ""), "by": rec.get("by", ""), "at": rec.get("at", 0),
                     "tier": rec.get("tier") or ("here" if rec.get("hosted") else "url"),

@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/kotlin-lsp"
  },
+ "maker": "JetBrains",
  "name": "kotlin-lsp",
  "platforms": [
   "linux/amd64",

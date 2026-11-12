@@ -293,7 +293,7 @@ can bring one, its adapter written in the pack's manifest
 out, where its payload keeps each thing and how each answer is written. So
 a new agent is a signed entry in the catalog, with no release of AerieOS.
 
-Gemini is Google's Antigravity CLI (`agy`), Built by Aerie. Its card is
+Gemini is Google's Antigravity CLI (`agy`): by Google, Packaged by Aerie. Its card is
 under Coding agents on the Library; **Install** shows what it fetches (the
 program from Google's storage, held to its sha512) and its terms, and
 keeps it; then install it on a node from the same card and tick it under

@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/node"
  },
+ "maker": "OpenJS Foundation",
  "name": "node",
  "platforms": [
   "linux/amd64",

@@ -62,7 +62,7 @@ in, how it takes the briefing and AerieOS's guards, where its
 conversations are). Both carry `"tier": "official"`, which is what lets
 them stand in for install steps and verbs and take a shipped name; a pack
 you add is `url`, and a pack from the vetted catalog takes the tier its
-index entry says (the Library reads official and `aerie` as Built by Aerie).
+index entry says (the Library reads official and `aerie` as Packaged by Aerie).
 An agent whose manifest cannot name how it takes the guards is
 not a pack and is not listed. The files are written from the tables by
 `tools/packs-export.py --write` and `aerie lint` fails when they drift, so
@@ -250,6 +250,7 @@ before, so an extra does not move the number.
 | Extra | Without it | First read by |
 |---|---|---|
 | A coding agent's `signin.flow` | The agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
+| `maker` and `credits`, in a manifest and an index entry | The card names nobody as the tool's maker. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 
@@ -328,10 +329,29 @@ each with who stands behind it, what it is and the platforms it works on:
 
 | On the card | What it means | The index's word |
 |---|---|---|
-| **Built by Aerie** | AerieOS's own: a toolchain, agent or app it ships, or a pack its maintainers wrote for somebody else's tool. | `official` (a shipped row), `aerie` |
+| **Packaged by Aerie** | The pack is AerieOS's own work: how the tool is fetched, checked and installed, for a toolchain, agent or app it ships or a pack its maintainers wrote. The tool itself is usually somebody else's, named beside the pill. | `official` (a shipped row), `aerie` |
 | **Verified** | The vendor's own pack, from a vendor the maintainers have verified: a shorter list than Vetted. | `verified` |
 | **Vetted** | Anybody's pack, reviewed by the maintainers. | `vetted` |
 | **Sideloaded** | Added here by its address, or made here: no index pins it. | none |
+
+To the left of that pill a card names who the tool itself is by: the
+organization or the person that makes it, which an entry says in `maker`
+(`"maker": "Google"`), in its manifest and again in its index entry so the
+card can say it before the pack is fetched. A pack that puts several
+makers' tools together says `"maker": "AerieOS"` (or whoever put it
+together) and lists each under `credits`, which its Details page reads
+out:
+
+```json
+"maker": "AerieOS",
+"credits": [{"name": "shellcheck", "maker": "Vidar Holen"}, {"name": "ruff", "maker": "Astral"}]
+```
+
+Every entry in the vetted catalog names its maker; its check refuses one
+that does not. A sideloaded pack's card names none, whatever its manifest
+says: what nobody vetted does not get to say whose it is. Both keys are
+extras ([above](#the-format-and-what-it-promises)), read by the AerieOS
+releases after 0.9.0-dev.5284.
 
 The words on the card are a person's; a manifest and the index keep their
 own, and an AerieOS from before `aerie` and `verified` reads both as

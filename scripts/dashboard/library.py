@@ -12,15 +12,21 @@ read's own endpoint, so nothing is installed two ways.
 """
 import re
 
+import agents
 import packformat
 
 KINDS = ("toolchain", "agent", "pack", "service", "app", "companion")
 # Who stands behind a card, as a person reads it (the operator, 12 Nov):
 # AerieOS's own shipped rows and the packs its maintainers wrote are both
-# Built by Aerie, a verified vendor's own pack is Verified, anybody's pack
+# Packaged by Aerie, a verified vendor's own pack is Verified, anybody's pack
 # the maintainers reviewed is Vetted, and what a person added themselves is
 # Sideloaded. The row's `tier` is the first word of each.
-TIER_WORDS = {"official": "Built by Aerie", "verified": "Verified", "vetted": "Vetted", "url": "Sideloaded", "here": "Sideloaded", "sideloaded": "Sideloaded"}
+TIER_WORDS = {"official": "Packaged by Aerie", "verified": "Verified", "vetted": "Vetted", "url": "Sideloaded", "here": "Sideloaded", "sideloaded": "Sideloaded"}
+
+
+# Who a shipped coding agent is by where its row names no provider: OpenCode
+# runs any provider's model and is Anomaly's.
+AGENT_MAKERS = {"open": "Anomaly"}
 
 
 def _an(w):
@@ -80,6 +86,11 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     its answers on this node} for the packs with a config block."""
     out = []
     pack_values = pack_values or {}
+    # Who each tool is by (the operator, 12 Nov), for its card to name beside
+    # the tier: a shipped row's own word, a coding agent's provider, and for
+    # what the signed catalog lists, the entry's. Never a sideloaded pack's
+    # own claim: what nobody vetted does not get to say whose it is.
+    said = {e["name"]: e.get("maker", "") for e in (catalog_index or {}).get("packs") or []}
     # ...and this person's own answers, for the fields a pack scopes to a
     # person (R172 step 5): None where it asks none of them, or they may not.
     pack_mine = pack_mine or {}
@@ -91,6 +102,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     waiting = {str(x) for w in job.get("waiting") or [] if w.get("action") != "check" for x in w.get("names") or []}
     for r in agent_rows or []:
         out.append({"kind": "agent", "tier": "official", "name": r["name"], "label": r.get("label") or r["name"], "agent": r.get("agent", ""),
+                    "maker": AGENT_MAKERS.get(r.get("agent", "")) or getattr(agents.get(r.get("agent", "")), "provider", "") or "",
                     "about": _agent_about(r.get("for") or r.get("label") or ""), "platforms": [],
                     "installed": bool(r.get("installed")), "version": r.get("installed") or "", "latest": r.get("latest") or "",
                     "update": r.get("state") == "update", "running": bool(r.get("running")), "doing": r.get("action") or "",
@@ -103,7 +115,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     for m in tc.get("machine") or []:
         here = bool(m.get("here"))
         ver = m.get("installed") or m.get("loaded") or ""
-        out.append({"kind": "toolchain", "tier": "official", "name": m["name"], "label": m.get("label") or m["name"],
+        out.append({"kind": "toolchain", "tier": "official", "name": m["name"], "label": m.get("label") or m["name"], "maker": "NVIDIA",
                     "about": ("For " + (f"this machine's {m.get('gpu') or m.get('card')}" if m.get("card") else "an NVIDIA card")
                               + ": CUDA, the hardware video encoder and the emulator's GPU rendering need it. It is this machine's own, not a copy on the store.")
                     if m["name"] == "nvidia-driver" else
@@ -126,6 +138,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
             packs_here.add(i["name"])
         t = _tier(pack.get("tier", "url") if pack else "official")
         out.append({"kind": "pack" if pack else "toolchain", "tier": t, "name": i["name"], "label": i.get("label") or i["name"],
+                    "maker": "" if t == "sideloaded" else i.get("maker") or said.get(i["name"].replace(":", "-"), ""),
+                    "credits": [] if t == "sideloaded" else i.get("credits") or [],
                     "about": i.get("about") or "", "platforms": i.get("platforms") or [], "terms": i.get("terms") or [],
                     "installed": bool(i.get("installed")), "unknown": bool(i.get("unknown")), "version": i.get("version") or "",
                     "latest": i.get("latest") or "", "update": i.get("state") == "update", "updatable": bool(i.get("updatable")),
@@ -150,6 +164,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         m, st = s.get("manifest") or {}, s.get("status") or {}
         deployed = bool(st.get("deployed"))
         out.append({"kind": "service", "tier": "official", "name": m.get("name", ""), "label": m.get("label") or m.get("name", ""),
+                    "maker": packformat.maker_of(m) or said.get(m.get("name", ""), ""), "credits": packformat.credits_of(m),
                     "about": m.get("about") or "", "platforms": m.get("platforms") or [], "terms": [],
                     "installed": deployed, "unknown": False, "version": "", "latest": "", "update": False,
                     "running": bool(st.get("job")), "doing": "deploy" if st.get("job") else "",
@@ -159,6 +174,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "verb": "" if deployed else "install"})
     for a in apps or []:
         out.append({"kind": "app", "tier": _tier(a.get("tier", "official")), "name": a["id"], "label": a["name"], "about": a.get("what") or "", "platforms": ["linux/*"],
+                    "maker": "" if _tier(a.get("tier", "official")) == "sideloaded" else a.get("maker") or said.get(a["id"], ""),
+                    "credits": [] if _tier(a.get("tier", "official")) == "sideloaded" else a.get("credits") or [],
                     "by": a.get("by") or "", "at": a.get("at") or 0,
                     "port": a.get("port"), "media": bool(a.get("media")), "secrets": a.get("secrets") or [],
                     # Its compose file as the catalog holds it, and the blanks New container fills (step 2).
@@ -181,6 +198,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if e.get("kind") == "app":
             if e["name"] not in app_ids:
                 out.append({"kind": "app", "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
+                            "maker": e.get("maker", ""),
                             "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12],
                             "update": False, "running": False, "compose": "", "blanks": [],
                             "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "install",
@@ -189,6 +207,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if e.get("kind") == "service":
             continue
         out.append({"kind": "pack", **({"group": "agent"} if e.get("agent") is True else {}), "tier": _tier(e.get("tier")), "name": e["name"], "label": e.get("label") or e["name"], "about": e.get("about") or "",
+                    "maker": e.get("maker", ""),
                     "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12], "update": False,
                     "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add",
                     **_past(e, catalog_index)})
@@ -196,7 +215,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
         if not c.get("offered"):
             continue
         first = (c.get("files") or [None])[0]
-        out.append({"kind": "companion", "tier": "official", "name": c["name"], "label": c.get("title") or c["name"], "about": c.get("does") or "",
+        out.append({"kind": "companion", "tier": "official", "name": c["name"], "label": c.get("title") or c["name"], "about": c.get("does") or "", "maker": "AerieOS",
                     "platforms": [], "installed": False, "version": c.get("version") or "", "latest": "", "update": False, "running": False,
                     "dev": bool(c.get("dev")), "download": first, "files": c.get("files") or [], "absent": c.get("absent") or "",
                     "verb": "download" if first else ""})

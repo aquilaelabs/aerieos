@@ -38,6 +38,32 @@ class Rows(unittest.TestCase):
         self.rows = library.rows(TC, AGENTS, APPS, INDEX, COMP)
         self.by = {(r["kind"], r["name"]): r for r in self.rows}
 
+    def test_a_card_names_who_the_tool_is_by_and_never_on_a_sideloaded_packs_own_word(self):
+        """The operator, 12 Nov: the tier says who stands behind the pack,
+        the maker who the tool itself is by."""
+        tc = {"nonode": False, "items": [
+            {"name": "jdk", "label": "JDK 21", "about": "Java", "maker": "Eclipse Adoptium"},
+            {"name": "lint-tools", "label": "Lint tools", "about": "linters", "maker": "AerieOS", "credits": [{"name": "ruff", "maker": "Astral"}]},
+            {"name": "ghidra", "label": "Ghidra", "about": "a decompiler", "pack": {"url": "https://example.com/g", "commit": "a" * 40, "tier": "vetted"}},
+            {"name": "mine", "label": "Mine", "about": "my own", "maker": "Google", "credits": [{"name": "x", "maker": "y"}],
+             "pack": {"url": "https://example.com/m", "commit": "b" * 40, "tier": "url"}}]}
+        index = {"packs": [{"name": "ghidra", "url": "https://example.com/g", "commit": "a" * 40, "sha256": "c" * 64, "tier": "vetted", "maker": "NSA"},
+                           {"name": "radare", "url": "https://example.com/r", "commit": "d" * 40, "sha256": "e" * 64, "tier": "vetted", "maker": "the radare project"},
+                           {"name": "whoami", "kind": "app", "url": "https://example.com/w", "commit": "d" * 40, "sha256": "e" * 64, "tier": "aerie", "maker": "Traefik Labs"}]}
+        apps = [dict(APPS[0], maker="Jellyfin", tier="official"), {"id": "ownapp", "name": "Own", "what": "mine", "tier": "sideloaded", "maker": "Somebody", "compose": ""}]
+        by = {r["name"]: r for r in library.rows(tc, AGENTS + [{"name": "opencode", "agent": "open", "label": "OpenCode", "for": "Any model"}], apps, index, COMP,
+                                                 services=[{"manifest": {"name": "model-router", "label": "Model router", "maker": "AerieOS",
+                                                                         "credits": [{"name": "LiteLLM", "maker": "BerriAI"}]}, "status": {}}])}
+        self.assertEqual((by["jdk"]["maker"], by["jdk"]["credits"]), ("Eclipse Adoptium", []))
+        self.assertEqual((by["lint-tools"]["maker"], by["lint-tools"]["credits"]), ("AerieOS", [{"name": "ruff", "maker": "Astral"}]))
+        self.assertEqual(by["ghidra"]["maker"], "NSA", "a pack kept from the catalog, by its entry's word")
+        self.assertEqual((by["mine"]["maker"], by["mine"]["credits"]), ("", []), "what nobody vetted does not say whose it is")
+        self.assertEqual(by["radare"]["maker"], "the radare project", "an entry not yet added names its maker before it is fetched")
+        self.assertEqual((by["whoami"]["maker"], by["jellyfin"]["maker"], by["ownapp"]["maker"]), ("Traefik Labs", "Jellyfin", ""))
+        self.assertEqual((by["claude-code"]["maker"], by["codex-cli"]["maker"], by["opencode"]["maker"]), ("Anthropic", "OpenAI", "Anomaly"))
+        self.assertEqual((by["model-router"]["maker"], by["model-router"]["credits"]), ("AerieOS", [{"name": "LiteLLM", "maker": "BerriAI"}]))
+        self.assertEqual(by["android"]["maker"], "AerieOS")
+
     def test_one_shape_in_the_pages_order(self):
         kinds = [r["kind"] for r in self.rows]
         self.assertEqual(kinds, ["agent", "agent", "toolchain", "toolchain", "pack", "pack", "app", "pack", "companion", "companion"])

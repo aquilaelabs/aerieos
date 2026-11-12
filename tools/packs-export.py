@@ -27,6 +27,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
 import agents    # noqa: E402
 import catalogrows  # noqa: E402
+import library  # noqa: E402
 import toolpacks  # noqa: E402
 
 PACKS = os.path.join(ROOT, "packs")
@@ -52,6 +53,9 @@ def agent_packs():
     out = []
     for a in agents.TABLE:
         m = {"name": a.id, "label": a.name, "about": f"{a.product}, run by sessions as {a.command}", "tier": "official",
+             # Who the agent is by: its provider, or its maker where it runs
+             # any provider's model.
+             "maker": library.AGENT_MAKERS.get(a.id) or a.provider,
              "platforms": ["linux/*"], "terms": [],
              # ...with how it is told a command needs no asking, where the
              # table says a way (agents.allow_plan).
@@ -120,6 +124,9 @@ def catalog_index(root):
         tar = subprocess.run(["git", "-C", root, "archive", "--format=tar", head, folder], capture_output=True, check=True).stdout
         new.append({"name": name, "url": url, "commit": head, "path": folder, "sha256": hashlib.sha256(tar).hexdigest(),
                     "tier": "official", "withdrawn": False, "about": m["about"] or m["label"], "platforms": m["platforms"]})
+        # Who the tool is by, for its card before the pack is fetched.
+        if m.get("maker"):
+            new[-1]["maker"] = m["maker"]
         # A deployed thing's entry says its kind, or an install's Library
         # offers it a second time as a tool pack to add.
         if m.get("service"):

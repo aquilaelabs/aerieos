@@ -43,23 +43,57 @@ FORMATS = {
 
 
 # Who stands behind a catalog entry, as the signed index says it (`tier`)
-# and as a person reads it (the operator, 12 Nov: Built by Aerie, Verified
-# and Vetted, in place of official and vetted, which did not say who made
-# what):
-#   official  one of AerieOS's own shipped rows, as a pack   Built by Aerie
-#   aerie     a pack AerieOS's maintainers wrote             Built by Aerie
+# and as a person reads it (the operator, 12 Nov: Packaged by Aerie,
+# Verified and Vetted, in place of official and vetted, which did not say
+# who made what; Packaged, not Built, since the tool itself is somebody
+# else's and the card names them: maker_of below):
+#   official  one of AerieOS's own shipped rows, as a pack   Packaged by Aerie
+#   aerie     a pack AerieOS's maintainers wrote             Packaged by Aerie
 #   verified  a verified vendor's own pack, a shorter list   Verified
 #   vetted    anybody's pack the maintainers reviewed        Vetted
 # The words in a manifest and an index are stored ones and stay; a word this
 # build has not met is read as vetted, the least any signed entry is, which
 # is how a release from before `aerie` and `verified` reads them too.
 TIERS = ("official", "aerie", "verified", "vetted")
-TIER_WORDS = {"official": "Built by Aerie", "aerie": "Built by Aerie", "verified": "Verified", "vetted": "Vetted"}
+TIER_WORDS = {"official": "Packaged by Aerie", "aerie": "Packaged by Aerie", "verified": "Verified", "vetted": "Vetted"}
 
 
 def tier_of(word):
     """A signed entry's tier as this build keeps it."""
     return word if word in TIERS else "vetted"
+
+
+# Who a tool is by (the operator, 12 Nov): the organization or the person
+# that makes it, as its manifest, its index entry or its shipped row says in
+# `maker`, a short line of plain words drawn on its card beside the tier. A
+# pack of several makers' tools is by AerieOS and names each under
+# `credits`, [{name, maker}], which its Details page lists. An extra: a
+# build from before it leaves both out.
+MAKER_MAX, CREDITS_MAX = 60, 24
+
+
+def _line(v):
+    """A name as a card draws it: one line of printable words, or ""."""
+    s = " ".join(str(v).split()) if isinstance(v, str) else ""
+    return s if s and len(s) <= MAKER_MAX and s.isprintable() and not any(c in s for c in "<>{}\\") else ""
+
+
+def maker_of(doc):
+    """Who the tool is by, as `doc` says it, or "" where it says nobody or
+    says it in a way a card would not draw."""
+    return _line(doc.get("maker")) if isinstance(doc, dict) else ""
+
+
+def credits_of(doc):
+    """[{name, maker}] for the tools a pack of several makers' carries, each
+    a line; a row that names no tool is left out."""
+    rows = doc.get("credits") if isinstance(doc, dict) else None
+    out = []
+    for c in rows if isinstance(rows, list) else []:
+        name = _line(c.get("name")) if isinstance(c, dict) else ""
+        if name:
+            out.append({"name": name, "maker": _line(c.get("maker"))})
+    return out[:CREDITS_MAX]
 
 
 def of(doc):

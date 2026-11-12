@@ -35,6 +35,7 @@
   "update_job": "codex-update"
  },
  "label": "ChatGPT",
+ "maker": "OpenAI",
  "name": "codex",
  "platforms": [
   "linux/*"

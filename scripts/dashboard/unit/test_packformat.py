@@ -55,6 +55,46 @@ class Kept(unittest.TestCase):
                 self.assertFalse(seen.get("error"), (p.name, seen))
 
 
+class Makers(unittest.TestCase):
+    """Who a tool is by (the operator, 12 Nov): a line a card draws, from a
+    manifest, an index entry or a shipped row; said wrong it is nobody."""
+
+    def test_a_maker_is_one_line_of_plain_words(self):
+        self.assertEqual(packformat.maker_of({"maker": "  Eclipse   Adoptium "}), "Eclipse Adoptium")
+        self.assertEqual(packformat.maker_of({"maker": "Kornel Lesi\u0144ski"}), "Kornel Lesi\u0144ski")
+        for bad in ("", "x" * 61, "<b>Google</b>", "a\x1b[31m", 7, None, ["Google"], "{name}"):
+            self.assertEqual(packformat.maker_of({"maker": bad}), "", repr(bad))
+        self.assertEqual(packformat.maker_of("Google"), "")
+
+    def test_credits_name_each_tool_and_who_it_is_by(self):
+        got = packformat.credits_of({"credits": [{"name": "ruff", "maker": "Astral"}, {"name": "fd"}, {"maker": "nobody's tool"}, "x", {"name": "<i>"}]})
+        self.assertEqual(got, [{"name": "ruff", "maker": "Astral"}, {"name": "fd", "maker": ""}])
+        self.assertEqual(len(packformat.credits_of({"credits": [{"name": f"t{i}"} for i in range(40)]})), packformat.CREDITS_MAX)
+
+    def test_a_manifest_and_an_index_entry_carry_them_and_a_wrong_one_is_said(self):
+        m = json.loads((KEPT / "1" / "hexkit.json").read_text())
+        got, errors = toolpacks.validate({**m, "maker": "Example Labs", "credits": [{"name": "hexdump", "maker": "the util-linux project"}]})
+        self.assertEqual((errors, got["maker"], got["credits"]), ([], "Example Labs", [{"name": "hexdump", "maker": "the util-linux project"}]))
+        got, errors = toolpacks.validate(m)
+        self.assertEqual((errors, got["maker"], got["credits"]), ([], "", []), "a manifest from before the key says nobody, and is as valid")
+        self.assertTrue(any("maker is who the tool is by" in e for e in toolpacks.validate({**m, "maker": "<b>x</b>"})[1]))
+        self.assertTrue(any("credits lists" in e for e in toolpacks.validate({**m, "credits": [{"maker": "no name"}]})[1]))
+        idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": [{**ENTRY, "maker": "Eclipse Adoptium"}, {**ENTRY, "name": "plain"}]}).encode())
+        self.assertEqual((why, idx["packs"][0]["maker"], "maker" in idx["packs"][1]), ("", "Eclipse Adoptium", False))
+
+    def test_every_shipped_row_agent_and_app_names_its_maker(self):
+        root = Path(__file__).resolve().parents[3]
+        rows = json.loads((root / "config" / "toolchains.json").read_text())["toolchains"]
+        self.assertEqual([r["name"] for r in rows if not packformat.maker_of(r)], [])
+        for r in rows:
+            self.assertEqual(packformat.credits_of(r), r.get("credits") or [], r["name"])
+            if r["maker"] == "AerieOS":
+                self.assertGreater(len(r.get("credits") or []), 1, f"{r['name']}: a toolchain AerieOS put together credits each maker's tool in it")
+        self.assertEqual([k for k, v in nasapps.APPS.items() if not packformat.maker_of(v)], [])
+        import agents
+        self.assertEqual([a.id for a in agents.TABLE if not (library.AGENT_MAKERS.get(a.id) or a.provider)], [])
+
+
 class Number(unittest.TestCase):
     def test_a_manifest_past_this_build_is_refused_in_one_sentence(self):
         m = json.loads((KEPT / "1" / "hexkit.json").read_text())
@@ -81,7 +121,7 @@ class Number(unittest.TestCase):
 
 
 class Tiers(unittest.TestCase):
-    """Who stands behind an entry (the operator, 12 Nov): Built by Aerie,
+    """Who stands behind an entry (the operator, 12 Nov): Packaged by Aerie,
     Verified and Vetted are what a person reads; the stored words stay."""
 
     def test_the_index_s_words_are_kept_and_one_not_met_reads_as_vetted(self):
@@ -91,10 +131,10 @@ class Tiers(unittest.TestCase):
         self.assertEqual([p["tier"] for p in idx["packs"]], ["official", "aerie", "verified", "vetted", "vetted", "vetted"])
 
     def test_what_a_person_reads_for_each(self):
-        self.assertEqual([packformat.TIER_WORDS[t] for t in packformat.TIERS], ["Built by Aerie", "Built by Aerie", "Verified", "Vetted"])
+        self.assertEqual([packformat.TIER_WORDS[t] for t in packformat.TIERS], ["Packaged by Aerie", "Packaged by Aerie", "Verified", "Vetted"])
         rows = library.rows({"items": []}, [], [], {"packs": [dict(ENTRY, name=f"p{i}", tier=t) for i, t in enumerate(("aerie", "verified", "vetted"))]}, {})
         self.assertEqual([(r["tier"], library.TIER_WORDS[r["tier"]]) for r in rows],
-                         [("official", "Built by Aerie"), ("verified", "Verified"), ("vetted", "Vetted")])
+                         [("official", "Packaged by Aerie"), ("verified", "Verified"), ("vetted", "Vetted")])
 
     def test_a_pack_s_agent_is_offered_from_any_signed_tier_and_never_from_an_address(self):
         m, errors = toolpacks.validate(json.loads((KEPT / "1" / "kite.json").read_text()))

@@ -35,6 +35,7 @@
   "update_job": "copilot-update"
  },
  "label": "Copilot",
+ "maker": "GitHub",
  "name": "copilot",
  "platforms": [
   "linux/*"

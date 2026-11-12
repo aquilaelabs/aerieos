@@ -108,6 +108,10 @@ def parse(index_bytes):
                     "tier": packformat.tier_of(p.get("tier")), "withdrawn": p.get("withdrawn") is True,
                     "about": str(p.get("about") or "")[:400],
                     "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]})
+        # Who the tool is by, where the entry says: a card names them
+        # before the pack is fetched, as it does once it is kept.
+        if packformat.maker_of(p):
+            out[-1]["maker"] = packformat.maker_of(p)
         # A shipped coding agent's entry says its install recipe's rev (R169
         # step 13), so an install fetches the pack only when that is higher
         # than the recipe its release carries.

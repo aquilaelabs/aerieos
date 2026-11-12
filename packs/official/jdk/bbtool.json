@@ -10,6 +10,7 @@
   },
   "tool": "bin/java"
  },
+ "maker": "Eclipse Adoptium",
  "name": "jdk",
  "platforms": [
   "linux/amd64",

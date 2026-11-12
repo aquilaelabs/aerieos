@@ -1,5 +1,19 @@
 {
  "about": "Python and TypeScript language servers, so a session sees type errors as it edits rather than at the next build.",
+ "credits": [
+  {
+   "maker": "Microsoft",
+   "name": "pyright"
+  },
+  {
+   "maker": "the typescript-language-server project",
+   "name": "typescript-language-server"
+  },
+  {
+   "maker": "Microsoft",
+   "name": "TypeScript"
+  }
+ ],
  "label": "Language servers (Python, TypeScript)",
  "layout": {
   "bin": [
@@ -8,6 +22,7 @@
   "env": {},
   "tool": "node_modules/.bin/pyright-langserver"
  },
+ "maker": "AerieOS",
  "name": "language-servers",
  "platforms": [
   "linux/*",

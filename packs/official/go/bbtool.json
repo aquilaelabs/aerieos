@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/go"
  },
+ "maker": "Google",
  "name": "go",
  "platforms": [
   "linux/amd64",

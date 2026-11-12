@@ -1,5 +1,15 @@
 {
  "about": "uv and a Python 3.12 with pip and venv, for a project's own dependencies: uv venv, then uv pip install -r requirements.txt. The node's own python3 has neither.",
+ "credits": [
+  {
+   "maker": "Astral",
+   "name": "uv"
+  },
+  {
+   "maker": "Python Software Foundation",
+   "name": "Python"
+  }
+ ],
  "label": "Python (uv)",
  "layout": {
   "bin": [
@@ -8,6 +18,7 @@
   "env": {},
   "tool": "bin/uv"
  },
+ "maker": "AerieOS",
  "name": "python",
  "platforms": [
   "linux/amd64"

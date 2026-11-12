@@ -2134,6 +2134,9 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .librarytab .lctitle{min-width:0;display:flex;flex-direction:column;gap:3px}
 .librarytab .lcard .name{font-weight:600;font-size:1.05rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
 .librarytab .lcmeta{display:flex;gap:4px;flex-wrap:wrap}
+/* Who the tool is by, at the left of its pills in the quiet voice: a name,
+   not a state, so it wears no pill. */
+.librarytab .lcmeta .lcby{font:var(--f-note);color:var(--dim);align-self:center;margin-right:4px;overflow-wrap:anywhere}
 .librarytab .lcmeta:empty{display:none}
 .librarytab .lcabout{color:var(--dim);font:var(--f-ui);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .librarytab .lcard.open .lcabout{display:block}

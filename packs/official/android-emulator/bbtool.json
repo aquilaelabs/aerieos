@@ -8,6 +8,7 @@
   "env": {},
   "tool": "root:android/emulator/emulator"
  },
+ "maker": "Google",
  "name": "android:emulator",
  "platforms": [
   "linux/amd64"

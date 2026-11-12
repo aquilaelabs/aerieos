@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/xcodes"
  },
+ "maker": "XcodesOrg",
  "name": "xcodes",
  "platforms": [
   "darwin/*"

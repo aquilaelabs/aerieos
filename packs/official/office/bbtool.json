@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/soffice"
  },
+ "maker": "The Document Foundation",
  "name": "office",
  "platforms": [
   "linux/amd64"

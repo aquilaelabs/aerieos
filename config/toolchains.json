@@ -86,6 +86,7 @@
     "             no content length. It is marked as an approximation everywhere",
     "             it is shown.",
     "terms: what installing it is under, each {label, url}, with accept: true for an agreement installing accepts (Google's, NVIDIA's, Apple's) rather than an open-source license. Drawn on the row.",
+    "maker: who the tool is by, an organization or a person, drawn on its card beside the tier; a toolchain that carries several makers' tools is by AerieOS and names each under credits, [{name, maker}], which its Details page lists.",
     "",
     "  checksum (R137) where the publisher states what a tarball's or script's download is,",
     "           checked before it is unpacked or run (sdkmeta.py checksum): github-asset,",
@@ -153,6 +154,7 @@
         "darwin/amd64"
       ],
       "about": "Java 21, which Gradle, sdkmanager and the emulator tools need. The first thing a node needs for Android work.",
+      "maker": "Eclipse Adoptium",
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -211,6 +213,7 @@
         "jdk"
       ],
       "about": "sdkmanager and avdmanager, through which every other Android toolchain installs. Sets this node's ANDROID_HOME.",
+      "maker": "Google",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -265,6 +268,7 @@
         "android-tools"
       ],
       "about": "The CMake the NDK's build system uses.",
+      "maker": "Google",
       "source": {
         "kind": "sdkmanager",
         "package": "cmake",
@@ -305,6 +309,7 @@
         "android:platform-tools"
       ],
       "about": "The Android emulator. Its system images, one per API level, are added on the Emulator tab. Google ships it for x86_64 Linux only.",
+      "maker": "Google",
       "system": {
         "apt": [
           "libpulse0",
@@ -384,6 +389,7 @@
         "android-tools"
       ],
       "about": "adb and the other tools that talk to a phone or an emulator; the emulator and the Phone tab need it. Google ships it for x86_64 Linux only.",
+      "maker": "Google",
       "source": {
         "kind": "sdkmanager",
         "package": "platform-tools",
@@ -418,6 +424,7 @@
         "android-tools"
       ],
       "about": "The android.jar a build compiles against (compileSdk), at the newest level Google publishes. Update adds the next level beside it, so older projects keep building. Removing this removes every level.",
+      "maker": "Google",
       "source": {
         "kind": "sdkmanager",
         "package": "platforms;android",
@@ -453,6 +460,7 @@
         "android-tools"
       ],
       "about": "aapt2, d8, zipalign and apksigner at the newest stable version. Update adds the next beside it.",
+      "maker": "Google",
       "source": {
         "kind": "sdkmanager",
         "package": "build-tools",
@@ -488,6 +496,7 @@
         "android-tools"
       ],
       "about": "Native development kit, for C and C++ inside an Android app.",
+      "maker": "Google",
       "source": {
         "kind": "sdkmanager",
         "package": "ndk",
@@ -525,6 +534,7 @@
         "darwin/*"
       ],
       "about": "Flutter with its Dart SDK. Builds Android apps on Linux, and iOS too on a Mac with Xcode.",
+      "maker": "Google",
       "source": {
         "kind": "git",
         "url": "https://github.com/flutter/flutter.git",
@@ -569,6 +579,7 @@
         "darwin/amd64"
       ],
       "about": "Go, which cross-compiles to Windows, macOS, Linux and ARM with nothing else to install.",
+      "maker": "Google",
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -641,6 +652,7 @@
         "linux/*"
       ],
       "about": "The .NET SDK plus the maui-android workload: Android apps from C#.",
+      "maker": "Microsoft",
       "source": {
         "kind": "script",
         "url": "https://dot.net/v1/dotnet-install.sh",
@@ -715,6 +727,7 @@
         "darwin/amd64"
       ],
       "about": "Node.js and npm, for a project built with npm and for anything that drives a browser with Playwright.",
+      "maker": "OpenJS Foundation",
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -767,6 +780,17 @@
       ],
       "updatable": true,
       "about": "uv and a Python 3.12 with pip and venv, for a project's own dependencies: uv venv, then uv pip install -r requirements.txt. The node's own python3 has neither.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "uv",
+          "maker": "Astral"
+        },
+        {
+          "name": "Python",
+          "maker": "Python Software Foundation"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1016,6 +1040,7 @@
         "node"
       ],
       "about": "Chromium, Firefox and WebKit with the module that drives them, for aerie capture shot and browser tests. Needs node.",
+      "maker": "Microsoft",
       "source": {
         "kind": "command",
         "requires": "npm",
@@ -1070,6 +1095,33 @@
         "linux/amd64"
       ],
       "about": "What aerie lint runs: shellcheck, hadolint, actionlint and ruff, with yq and fd. Without it, aerie lint on a node skips its checks.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "shellcheck",
+          "maker": "Vidar Holen"
+        },
+        {
+          "name": "hadolint",
+          "maker": "the hadolint project"
+        },
+        {
+          "name": "actionlint",
+          "maker": "rhysd"
+        },
+        {
+          "name": "ruff",
+          "maker": "Astral"
+        },
+        {
+          "name": "yq",
+          "maker": "Mike Farah"
+        },
+        {
+          "name": "fd",
+          "maker": "David Peter"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1139,6 +1191,17 @@
         "linux/arm64"
       ],
       "about": "ffmpeg, ffprobe and ffplay, for cutting, converting and sizing video and audio, and for turning a recording into frames a session can look at.",
+      "maker": "FFmpeg project",
+      "credits": [
+        {
+          "name": "FFmpeg",
+          "maker": "the FFmpeg project"
+        },
+        {
+          "name": "these builds",
+          "maker": "BtbN"
+        }
+      ],
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -1179,6 +1242,21 @@
       ],
       "updatable": true,
       "about": "What aerie tool sound say and hear run: piper turns text into speech, and whisper turns a recording back into text with its times. About 800 MB.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "piper",
+          "maker": "Open Home Foundation"
+        },
+        {
+          "name": "the ljspeech voice",
+          "maker": "from Keith Ito's LJ Speech dataset"
+        },
+        {
+          "name": "faster-whisper",
+          "maker": "SYSTRAN"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1237,6 +1315,25 @@
       ],
       "updatable": true,
       "about": "PyTorch with CUDA, numpy and ONNX, run as python-ml, for training or running a model on the node's NVIDIA card (driver 580 or newer); without a card it runs on the CPU. About 6 GB.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "PyTorch",
+          "maker": "PyTorch Foundation"
+        },
+        {
+          "name": "CUDA",
+          "maker": "NVIDIA"
+        },
+        {
+          "name": "NumPy",
+          "maker": "the NumPy project"
+        },
+        {
+          "name": "ONNX",
+          "maker": "the ONNX project"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1291,6 +1388,29 @@
       ],
       "updatable": true,
       "about": "What aerie tool graphics runs: ImageMagick for resizing, cropping and comparing images, resvg for SVG to PNG, and oxipng, pngquant and cwebp for shrinking what an app ships.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "ImageMagick",
+          "maker": "ImageMagick Studio"
+        },
+        {
+          "name": "resvg",
+          "maker": "Linebender"
+        },
+        {
+          "name": "oxipng",
+          "maker": "the oxipng project"
+        },
+        {
+          "name": "pngquant",
+          "maker": "Kornel Lesiński"
+        },
+        {
+          "name": "libwebp",
+          "maker": "Google"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1379,6 +1499,17 @@
       ],
       "updatable": true,
       "about": "What aerie tool diagrams runs: PlantUML and Mermaid, diagrams drawn from text. Needs jdk and playwright beside it.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "PlantUML",
+          "maker": "the PlantUML project"
+        },
+        {
+          "name": "Mermaid",
+          "maker": "the Mermaid project"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1438,6 +1569,21 @@
       ],
       "updatable": true,
       "about": "What aerie tool docs runs: reads a PDF, Word document, slide deck or spreadsheet as Markdown, draws a PDF's pages as pictures, and converts with pandoc. Also lets Claude Code read PDFs. About 650 MB.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "markitdown",
+          "maker": "Microsoft"
+        },
+        {
+          "name": "PyMuPDF",
+          "maker": "Artifex"
+        },
+        {
+          "name": "pandoc",
+          "maker": "John MacFarlane"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1495,6 +1641,7 @@
       ],
       "updatable": true,
       "about": "What aerie tool office runs: LibreOffice without a window, to turn documents, decks and spreadsheets into PDFs. About 750 MB.",
+      "maker": "The Document Foundation",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1543,6 +1690,17 @@
       ],
       "updatable": true,
       "about": "The server behind a project's File access setting: FTPS on the project's node, where people sign in with their own AerieOS name and password. About 60 MB.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "pyftpdlib",
+          "maker": "Giampaolo Rodola"
+        },
+        {
+          "name": "pyOpenSSL",
+          "maker": "the Python Cryptographic Authority"
+        }
+      ],
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1599,6 +1757,21 @@
         "node"
       ],
       "about": "Python and TypeScript language servers, so a session sees type errors as it edits rather than at the next build.",
+      "maker": "AerieOS",
+      "credits": [
+        {
+          "name": "pyright",
+          "maker": "Microsoft"
+        },
+        {
+          "name": "typescript-language-server",
+          "maker": "the typescript-language-server project"
+        },
+        {
+          "name": "TypeScript",
+          "maker": "Microsoft"
+        }
+      ],
       "source": {
         "kind": "command",
         "requires": "npm",
@@ -1647,6 +1820,7 @@
         "linux/arm64"
       ],
       "about": "JetBrains' Kotlin language server, so a session sees Kotlin errors as it edits. Carries its own Java.",
+      "maker": "JetBrains",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1699,6 +1873,7 @@
         "linux/amd64"
       ],
       "about": "rustup, cargo and the stable toolchain. Building for Windows also needs a linker: mingw, or zig with cargo-zigbuild.",
+      "maker": "The Rust Project",
       "source": {
         "kind": "script",
         "fresh_only": true,
@@ -1756,6 +1931,7 @@
         "linux/amd64"
       ],
       "about": "The Swift toolchain for Linux: shared logic, server-side Swift, and compiling packages. Not an iOS SDK.",
+      "maker": "Apple",
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -1801,6 +1977,7 @@
         "linux/amd64"
       ],
       "about": "Zig, and a C and C++ cross-compiler (zig cc) for Windows, macOS and Linux; it also links Rust for those.",
+      "maker": "Zig Software Foundation",
       "source": {
         "kind": "tarball",
         "fresh_only": true,
@@ -1841,6 +2018,7 @@
         "darwin/*"
       ],
       "about": "Installs and switches Xcode versions on a Mac: run xcodes install --latest on the node, with an Apple ID the first time.",
+      "maker": "XcodesOrg",
       "source": {
         "kind": "script",
         "fresh_only": true,

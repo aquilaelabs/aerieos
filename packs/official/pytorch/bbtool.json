@@ -1,5 +1,23 @@
 {
  "about": "PyTorch with CUDA, numpy and ONNX, run as python-ml, for training or running a model on the node's NVIDIA card (driver 580 or newer); without a card it runs on the CPU. About 6 GB.",
+ "credits": [
+  {
+   "maker": "PyTorch Foundation",
+   "name": "PyTorch"
+  },
+  {
+   "maker": "NVIDIA",
+   "name": "CUDA"
+  },
+  {
+   "maker": "the NumPy project",
+   "name": "NumPy"
+  },
+  {
+   "maker": "the ONNX project",
+   "name": "ONNX"
+  }
+ ],
  "label": "PyTorch with CUDA (python-ml, numpy, ONNX)",
  "layout": {
   "bin": [
@@ -8,6 +26,7 @@
   "env": {},
   "tool": "bin/python-ml"
  },
+ "maker": "AerieOS",
  "name": "pytorch",
  "platforms": [
   "linux/amd64"

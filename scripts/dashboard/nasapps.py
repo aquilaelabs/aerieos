@@ -40,7 +40,7 @@ IDS_RE = re.compile(r"[0-9]{1,6}:[0-9]{1,6}")
 # blanks as ${VARS} the environment fills, so the file reads as compose
 # everywhere and the dialog's Environment tab shows what was chosen.
 APPS = {
-    "jellyfin": {"name": "Jellyfin", "what": "a media server: films, series and music streamed to every screen", "port": 8096, "media": True,
+    "jellyfin": {"maker": "Jellyfin", "name": "Jellyfin", "what": "a media server: films, series and music streamed to every screen", "port": 8096, "media": True,
                  "compose": """services:
   jellyfin:
     image: jellyfin/jellyfin:10.10.7
@@ -55,7 +55,7 @@ APPS = {
       - ${DATA}/cache:/cache
       - ${MEDIA}:/media:ro
 """},
-    "plex": {"name": "Plex", "what": "a media server with Plex's apps and account; claim it on its first open", "port": 32400, "media": True,
+    "plex": {"maker": "Plex", "name": "Plex", "what": "a media server with Plex's apps and account; claim it on its first open", "port": 32400, "media": True,
              "compose": """services:
   plex:
     image: plexinc/pms-docker:1.41.6.9685-d301f511a
@@ -71,7 +71,7 @@ APPS = {
       - ${DATA}/transcode:/transcode
       - ${MEDIA}:/data:ro
 """},
-    "arr": {"name": "The arr stack", "what": "Sonarr, Radarr and Prowlarr: series, films and the indexers they search", "port": 8989, "media": True,
+    "arr": {"maker": "AerieOS", "credits": [{"name": "Sonarr", "maker": "the Sonarr team"}, {"name": "Radarr", "maker": "the Radarr team"}, {"name": "Prowlarr", "maker": "the Prowlarr team"}, {"name": "the container images", "maker": "LinuxServer.io"}], "name": "The arr stack", "what": "Sonarr, Radarr and Prowlarr: series, films and the indexers they search", "port": 8989, "media": True,
             "compose": """services:
   sonarr:
     image: lscr.io/linuxserver/sonarr:4.0.14
@@ -109,7 +109,7 @@ APPS = {
     volumes:
       - ${DATA}/prowlarr:/config
 """},
-    "qbittorrent": {"name": "qBittorrent", "what": "a download client with a web page; its first password is in its log", "port": 8080, "media": True,
+    "qbittorrent": {"maker": "the qBittorrent project", "name": "qBittorrent", "what": "a download client with a web page; its first password is in its log", "port": 8080, "media": True,
                     "compose": """services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:5.0.4
@@ -127,7 +127,7 @@ APPS = {
       - ${DATA}/config:/config
       - ${MEDIA}:/downloads
 """},
-    "immich": {"name": "Immich", "what": "photos and videos from every phone, with faces, places and search; its own database beside it", "port": 2283, "media": True,
+    "immich": {"maker": "Immich", "name": "Immich", "what": "photos and videos from every phone, with faces, places and search; its own database beside it", "port": 2283, "media": True,
                "compose": """services:
   immich-server:
     image: ghcr.io/immich-app/immich-server:v1.131.3
@@ -166,7 +166,7 @@ APPS = {
     volumes:
       - ${DATA}/postgres:/var/lib/postgresql/data
 """, "secrets": ["DB_PASSWORD"]},
-    "nextcloud": {"name": "Nextcloud", "what": "files, calendars and contacts with its apps, on a database of its own", "port": 8081, "media": True,
+    "nextcloud": {"maker": "Nextcloud", "name": "Nextcloud", "what": "files, calendars and contacts with its apps, on a database of its own", "port": 8081, "media": True,
                   "compose": """services:
   nextcloud:
     image: nextcloud:31.0.5-apache
@@ -198,7 +198,7 @@ APPS = {
     volumes:
       - ${DATA}/db:/var/lib/mysql
 """, "secrets": ["DB_PASSWORD", "ADMIN_PASSWORD"]},
-    "homeassistant": {"name": "Home Assistant", "what": "home automation; on the machine's own network so it finds the devices around it", "port": 8123, "media": False,
+    "homeassistant": {"maker": "Open Home Foundation", "name": "Home Assistant", "what": "home automation; on the machine's own network so it finds the devices around it", "port": 8123, "media": False,
                       "compose": """services:
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:2025.5.3
@@ -211,7 +211,7 @@ APPS = {
       - ${DATA}/config:/config
       - /run/dbus:/run/dbus:ro
 """},
-    "syncthing": {"name": "Syncthing", "what": "folders kept the same between this machine and others, with no cloud between", "port": 8384, "media": True,
+    "syncthing": {"maker": "Syncthing Foundation", "name": "Syncthing", "what": "folders kept the same between this machine and others, with no cloud between", "port": 8384, "media": True,
                   "compose": """services:
   syncthing:
     image: syncthing/syncthing:1.29.6
@@ -265,6 +265,8 @@ def catalog():
     picture when it has one (R182)."""
     return [{"id": k, "name": v["name"], "what": v["what"], "port": v["port"], "media": v.get("media", False), "secrets": v.get("secrets", []),
              "tier": v.get("tier", "official"), "by": v.get("by", ""), "at": v.get("at", 0),
+             # Who the app itself is by (the operator, 12 Nov), where it says.
+             "maker": str(v.get("maker") or ""), "credits": list(v.get("credits") or []),
              "icon": f"/api/pack-icon?app={k}&v={v.get('at', 0)}" if icon_of(k) else ""}
             for k, v in _all().items()]
 

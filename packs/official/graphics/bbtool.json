@@ -1,5 +1,27 @@
 {
  "about": "What aerie tool graphics runs: ImageMagick for resizing, cropping and comparing images, resvg for SVG to PNG, and oxipng, pngquant and cwebp for shrinking what an app ships.",
+ "credits": [
+  {
+   "maker": "ImageMagick Studio",
+   "name": "ImageMagick"
+  },
+  {
+   "maker": "Linebender",
+   "name": "resvg"
+  },
+  {
+   "maker": "the oxipng project",
+   "name": "oxipng"
+  },
+  {
+   "maker": "Kornel Lesi\u0144ski",
+   "name": "pngquant"
+  },
+  {
+   "maker": "Google",
+   "name": "libwebp"
+  }
+ ],
  "label": "Graphics tools (ImageMagick, resvg, oxipng, pngquant, cwebp)",
  "layout": {
   "bin": [
@@ -8,6 +30,7 @@
   "env": {},
   "tool": "bin/magick"
  },
+ "maker": "AerieOS",
  "name": "graphics",
  "platforms": [
   "linux/amd64"

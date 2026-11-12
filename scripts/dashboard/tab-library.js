@@ -23,7 +23,7 @@ let libQ = "", libKind = "", libTier = "";
 // Whether the source chips drew the last time the page did: a library whose
 // cards all come from one source draws none, and its waiting template then
 // holds no row for them (it stood a row lower than the page it waited for
-// once every catalog entry was Built by Aerie).
+// once every catalog entry was Packaged by Aerie).
 let libHadTiers = false;
 const libSeen = {};            // what a pack's Look brought back, by row key ("looking" while it is asked)
 let libWantAgent = "";         // the agent whose card a door asked to open, until the rows land
@@ -41,7 +41,7 @@ function libGroup(r){ return r.group || r.kind; }
 // Who stands behind a card (the operator, 12 Nov): what AerieOS ships or
 // its maintainers wrote, a verified vendor's own pack, anybody's pack the
 // maintainers reviewed, and what a person added themselves.
-const LIB_TIERS = [["official", "Built by Aerie"], ["verified", "Verified"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
+const LIB_TIERS = [["official", "Packaged by Aerie"], ["verified", "Verified"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
 function libTierWord(t){ return (LIB_TIERS.find(([k]) => k === t) || [t, t])[1]; }
 
 function openLibrary(){
@@ -147,8 +147,23 @@ function libMatch(r, q){
 
 // The pills a row wears: its tier (the three read on every row), what is
 // installed, and what an update would move it to, which alone is news.
+// Who a tool is by, in a sentence for its Details (the operator, 12 Nov):
+// its maker, or, where a pack carries several makers' tools and is
+// AerieOS's own putting together, each tool with who it is by.
+function makerLine(r){
+  if (!r.maker) return "";
+  const cs = (r.credits || []).filter(c => c.name);
+  if (!cs.length) return `<span class="sub lcmaker">By ${esc(r.maker)}.</span>`;
+  return `<span class="sub lcmaker">Put together by ${esc(r.maker)} from other people's work: ${cs.map(c => `${esc(c.name)}${c.maker ? ` (${esc(c.maker)})` : ""}`).join(", ")}.</span>`;
+}
+
+// A card's line under its name: who the tool is by, in the quiet voice at
+// the left, then who stands behind the pack (the tier), its version and
+// what is out. The maker is the tool's, the tier the pack's: Google's
+// program, packaged by Aerie.
 function libPills(r){
-  const tier = `<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
+  const by = r.maker ? `<span class="lcby" title="who ${esc(r.label)} is by">${esc(r.maker)}</span>` : "";
+  const tier = `${by}<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
   const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
   const upd = r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
   const dev = r.dev ? devMark() : "";
@@ -249,6 +264,7 @@ function libDetail(r){
   // pack's Look, an app's compose with its blanks, a companion's files.
   const key = `${r.kind}:${r.name}`;
   const lines = [];
+  if (makerLine(r)) lines.push(makerLine(r));
   if (r.platforms?.length) lines.push(`<span class="sub">Platforms: ${esc(r.platforms.join(", "))}</span>`);
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);

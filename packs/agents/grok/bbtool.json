@@ -35,6 +35,7 @@
   "update_job": "grok-update"
  },
  "label": "Grok",
+ "maker": "xAI",
  "name": "grok",
  "platforms": [
   "linux/*"

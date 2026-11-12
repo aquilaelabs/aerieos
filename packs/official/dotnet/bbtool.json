@@ -11,6 +11,7 @@
   },
   "tool": "dotnet"
  },
+ "maker": "Microsoft",
  "name": "dotnet",
  "platforms": [
   "linux/*"

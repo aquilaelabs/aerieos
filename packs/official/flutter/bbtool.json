@@ -8,6 +8,7 @@
   "env": {},
   "tool": "bin/flutter"
  },
+ "maker": "Google",
  "name": "flutter",
  "platforms": [
   "linux/*",

@@ -175,6 +175,8 @@ function instAboutLines(r){
     return lines.filter(Boolean).join("");
   }
   if (r.about) lines.push(`<span class="sub">${esc(r.about)}</span>`);
+  // Who it is by, as its Library card's Details say (makerLine).
+  if (typeof makerLine === "function" && makerLine(r)) lines.push(makerLine(r));
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.${r.needed_by?.length ? ` Needed by ${esc(r.needed_by.join(", "))}.` : ""}</span>`);

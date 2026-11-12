@@ -5,6 +5,7 @@
   "bin": [],
   "env": {}
  },
+ "maker": "Google",
  "name": "android:platforms",
  "platforms": [
   "linux/*"

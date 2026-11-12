@@ -8,6 +8,7 @@
   "env": {},
   "tool": "usr/bin/swift"
  },
+ "maker": "Apple",
  "name": "swift",
  "platforms": [
   "linux/amd64"

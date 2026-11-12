@@ -1,5 +1,19 @@
 {
  "about": "What aerie tool sound say and hear run: piper turns text into speech, and whisper turns a recording back into text with its times. About 800 MB.",
+ "credits": [
+  {
+   "maker": "Open Home Foundation",
+   "name": "piper"
+  },
+  {
+   "maker": "from Keith Ito's LJ Speech dataset",
+   "name": "the ljspeech voice"
+  },
+  {
+   "maker": "SYSTRAN",
+   "name": "faster-whisper"
+  }
+ ],
  "label": "Speech in and out (piper, whisper)",
  "layout": {
   "bin": [
@@ -8,6 +22,7 @@
   "env": {},
   "tool": "bin/piper"
  },
+ "maker": "AerieOS",
  "name": "audio",
  "platforms": [
   "linux/amd64"

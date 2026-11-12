@@ -8,6 +8,7 @@
   "env": {},
   "tool": "root:android/platform-tools/adb"
  },
+ "maker": "Google",
  "name": "android:platform-tools",
  "platforms": [
   "linux/amd64"

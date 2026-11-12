@@ -53,14 +53,27 @@ ok(await page.evaluate(() => {
     && new RegExp(`Not for this node\\s*${off.length}\\b`).test(head);
 }), 'a card not for this node is not drawn, and the head counts them (R170 step 9)');
 // Who stands behind a card, in the words a person reads (the operator, 12
-// Nov): Built by Aerie for what AerieOS ships or wrote, never the stored
+// Nov): Packaged by Aerie for what AerieOS ships or wrote, never the stored
 // word official.
 const tierPills = await page.$$eval('.doc .librarytab .lcard', cs => cs.map(c => c.querySelector('.lcmeta .pill')?.textContent.trim() || ''));
 ok(tierPills.length > 0 && tierPills.every(t => /^(built by aerie|verified|vetted|sideloaded)$/.test(t)) && tierPills.includes('built by aerie'),
    `the tier reads on every card as a pill, in a person's words (${[...new Set(tierPills)].join(', ')})`);
-ok(await page.evaluate(() => libTierWord('official') === 'Built by Aerie' && libTierWord('verified') === 'Verified'
-     && LIB_TIERS.map(([, l]) => l).join(', ') === 'Built by Aerie, Verified, Vetted, Sideloaded'),
-   'the tier chips are Built by Aerie, Verified, Vetted and Sideloaded');
+ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && libTierWord('verified') === 'Verified'
+     && LIB_TIERS.map(([, l]) => l).join(', ') === 'Packaged by Aerie, Verified, Vetted, Sideloaded'),
+   'the tier chips are Packaged by Aerie, Verified, Vetted and Sideloaded');
+// ...and to the left of that pill a card names who the tool itself is by
+// (the operator, 12 Nov): the tier is the pack's, the maker the tool's.
+{
+  const by = await page.evaluate(() => { const c = document.querySelector('.librarytab .lcard[data-lrow="toolchain:jdk"] .lcmeta');
+    return c && { first: c.firstElementChild?.className, text: c.firstElementChild?.textContent, pill: c.querySelector('.pill')?.textContent,
+                  left: c.firstElementChild.getBoundingClientRect().right <= c.querySelector('.pill').getBoundingClientRect().left + 1 }; });
+  ok(by && by.first === 'lcby' && by.text === 'Eclipse Adoptium' && by.pill === 'packaged by aerie' && by.left,
+     `a card names its tool's maker to the left of the pill that says who packaged it (${JSON.stringify(by)})`);
+  const made = await page.evaluate(() => ({ none: (lib.rows || []).filter(r => r.tier !== 'sideloaded' && !r.maker && r.kind !== 'pack').map(r => `${r.kind}:${r.name}`),
+    lint: makerLine((lib.rows || []).find(r => r.name === 'lint-tools') || {}).replace(/<[^>]+>/g, '') }));
+  ok(!made.none.length && /^Put together by AerieOS from other people's work: shellcheck \(Vidar Holen\), .*ruff \(Astral\)/.test(made.lint),
+     `every card AerieOS ships names a maker, and one of several makers' tools is AerieOS's with each credited in its Details (${made.none.join(', ') || 'all named'}; ${made.lint.slice(0, 90)})`);
+}
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
   return !!head && /Installed/.test(head.textContent);

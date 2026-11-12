@@ -69,6 +69,9 @@ def manifest_of(row):
     if rev_of(row) > 1:
         shipped["rev"] = rev_of(row)
     return {"name": row["name"], "label": row["label"], "about": row.get("about", ""), "tier": "official",
+            # Who the tool is by, and each of them where it carries several
+            # makers' (packformat.maker_of), where the row says.
+            **{k: row[k] for k in ("maker", "credits") if row.get(k)},
             "platforms": row.get("platforms") or ["linux/amd64"], "terms": row.get("terms") or [],
             "layout": {k: v for k, v in lay.items() if k in ("bin", "env", "tool")},
             "shipped": shipped}
@@ -84,6 +87,7 @@ def row_of(m):
     row = {"name": m.get("name"), "label": m.get("label"), "about": m.get("about", ""),
            "platforms": m.get("platforms") or [], "terms": m.get("terms") or [], "layout": lay}
     row.update({k: sh[k] for k in SHIPPED_KEYS if k in sh})
+    row.update({k: m[k] for k in ("maker", "credits") if m.get(k)})
     if rev_of(sh) > 1:
         row["rev"] = rev_of(sh)
     return row
