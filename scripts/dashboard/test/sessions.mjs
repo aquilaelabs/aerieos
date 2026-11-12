@@ -538,12 +538,14 @@ await phone.waitForSelector('.resumemenu', { timeout: 5000 }).catch(async () => 
   await phone.waitForSelector('.resumemenu', { timeout: 10000 });
 });
 // Its Resume band reads your conversations as it opens (R143).
-await phone.waitForFunction(() => document.querySelector('.resumemenu .rmconvs'), null, { timeout: 10000 }).catch(() => {});
+await phone.waitForFunction(() => document.querySelector('.resumemenu #rmConvSel'), null, { timeout: 10000 }).catch(() => {});
+// One pulldown of them and one press (R236), not a row and a button each.
 const chooser = await phone.$eval('.resumemenu', el => ({ shown: getComputedStyle(el).display !== 'none',
   start: [...el.querySelectorAll('.rmline:not(.rmconv) button')].map(b => b.textContent.trim()),
+  picks: el.querySelectorAll('#rmConvSel option').length,
   resume: [...el.querySelectorAll('.rmconv button')].map(b => b.textContent.trim()), text: el.textContent.trim().slice(0, 120) }));
-ok(chooser.shown && chooser.start.join() === 'New' && chooser.resume.length >= 1 && chooser.resume.every(b => b === 'Resume'),
-   `phone: Claude on a space with history shows New, and its conversations to resume under it (${chooser.start.join(' | ')}; ${chooser.resume.length} to resume; ${chooser.text})`);
+ok(chooser.shown && chooser.start.join() === 'New' && chooser.picks >= 1 && chooser.resume.join() === 'Resume',
+   `phone: Claude on a space with history shows New, and its conversations to resume in one pulldown with one press (${chooser.start.join(' | ')}; ${chooser.picks} to pick from; ${chooser.resume.join(' | ')}; ${chooser.text})`);
 // ...where it can be seen. The sidebar scrolls, the chooser is placed inside
 // the card, and pressing Claude on a project whose session has ended opens
 // this and NOTHING ELSE, so one drawn below the fold is a press with no

@@ -118,6 +118,54 @@ ok(!rm.started && (rm.anchor ? /Resume the Claude conversation/.test(rm.head) &&
    `Resume opens the chooser on the conversation picked, or says why it cannot, starting nothing yet (${JSON.stringify(rm)})`);
 await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(state.projects); });
 
+// A label, a note and Kept (R236, the operator, 12 Nov): Edit swaps a row's
+// fields in, Save says each to the controller, and the row is then read by
+// its label, its first words still under it.
+{
+  const ROW = `${SESS} [data-cvrow="conv-two-2025"]`;
+  await page.click(`${ROW} [data-cvedit]`);
+  await page.waitForSelector(`${ROW} .cvform`, { timeout: 10000 });
+  const form = await page.$eval(`${ROW}`, e => ({ fields: [...e.querySelectorAll('.cvform input, .cvform textarea')].map(x => x.className),
+    labels: [...e.querySelectorAll('.cvform label')].map(x => x.textContent.replace(/\?$/, '').trim()), acts: [...e.querySelectorAll('button')].map(b => b.textContent.trim()) }));
+  ok(form.acts.join() === 'Cancel,Save' && /cvLabel/.test(form.fields.join()) && /cvNote/.test(form.fields.join()) && /cvKeep/.test(form.fields.join()),
+     `Edit swaps the row's label, note and Keep in, with Cancel and Save and none of the row's other presses (${form.labels.join(' | ')}; ${form.acts.join(' | ')})`);
+  await page.fill(`${ROW} .cvLabel`, 'The worktree chat');
+  await page.fill(`${ROW} .cvNote`, 'left off at the token test\nnext: the upgrade suite');
+  await page.check(`${ROW} .cvKeep`);
+  await page.click(`${ROW} [data-cvsave]`);
+  await page.waitForFunction(sel => /The worktree chat/.test(document.querySelector(sel + ' .cvlabel')?.textContent || ''), ROW, { timeout: 10000 }).catch(() => {});
+  const row = await page.$eval(ROW, e => ({ label: e.querySelector('.cvlabel')?.textContent || '', first: e.querySelector('.first')?.textContent || '',
+    note: e.querySelector('.cvnote')?.textContent || '', pills: [...e.querySelectorAll('.pill')].map(x => x.textContent.trim()), form: !!e.querySelector('.cvform') }));
+  const api = await page.evaluate(async () => ((await (await fetch('/api/transcripts?project=alpha')).json()).rows || []).find(r => r.id === 'conv-two-2025'));
+  ok(row.label === 'The worktree chat' && /An earlier chat from the worktree/.test(row.first) && /left off at the token test/.test(row.note) && row.pills.includes('kept') && !row.form,
+     `the row is read by its label, its first words and its note under it, and says it is kept (${JSON.stringify(row)})`);
+  ok(api.label === 'The worktree chat' && api.note === 'left off at the token test\nnext: the upgrade suite' && api.kept === true,
+     `...and the controller keeps the three (${JSON.stringify({ label: api.label, note: api.note, kept: api.kept })})`);
+  // The space card's picker is one pulldown of them, each by its label or
+  // its first words, its agent and when; the picked one's note under it.
+  if (await page.$('[data-c="alpha"]')){
+    await page.evaluate(() => { resumeFor = null; drawProjects(state.projects); openTab({ kind: 'projects', arg: '__projects' }); });
+    await page.evaluate(() => document.querySelector('[data-c="alpha"]').click());
+    await page.waitForSelector('.resumemenu #rmConvSel', { state: 'attached', timeout: 10000 }).catch(() => {});
+    const pick = await page.evaluate(() => { const m = document.querySelector('.resumemenu'); const s = m?.querySelector('#rmConvSel');
+      return { options: [...(s?.options || [])].map(o => o.textContent), presses: [...(m?.querySelectorAll('.rmconv button') || [])].map(b => b.textContent.trim()),
+               all: m?.querySelector('[data-rmall]')?.textContent.trim() || '', rows: m?.querySelectorAll('.rmconv').length }; });
+    ok(pick.rows === 1 && pick.presses.join() === 'Resume' && pick.options.length >= 2 && pick.options.some(o => /^The worktree chat · Claude · .* · kept$/.test(o))
+       && pick.options.some(o => /^Please tick the roadmap item off.* · Claude · /.test(o)) && /^All \d+ conversations$/.test(pick.all),
+       `the card's picker is one pulldown and one Resume: a labeled one by its label, another by its first words, each with its agent and when (${pick.options.join(' || ')}; ${pick.all})`);
+    await page.selectOption('.resumemenu #rmConvSel', 'conv-two-2025');
+    await page.waitForFunction(() => /left off at the token test/.test(document.querySelector('.resumemenu .rmnote')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+    const picked = await page.evaluate(() => ({ note: document.querySelector('.resumemenu .rmnote')?.textContent || '', cv: document.querySelector('.resumemenu [data-cv]')?.dataset.cv || '' }));
+    ok(/left off at the token test/.test(picked.note) && picked.cv === 'conv-two-2025', `picking one shows its note under it and points Resume at it (${JSON.stringify(picked)})`);
+    await page.evaluate(() => document.querySelector('.resumemenu [data-rmall]').click());
+    await page.waitForSelector(`${SESS} .cvlogs .artrow`, { timeout: 10000 });
+    ok(await page.evaluate(() => !document.querySelector('.resumemenu') && !!document.querySelector('.nb .nbview[data-view="sessions"]:not([hidden]) .cvlogs')),
+       'All conversations opens the notebook\'s Sessions view and shuts the chooser');
+  }
+  await page.evaluate(() => openNotebook('alpha', 'sessions'));
+  await page.waitForSelector(`${SESS} .cvlogs .artrow`, { timeout: 10000 });
+}
+
 const tokyo = await page.evaluate(async () => (await fetch('/api/transcript?project=alpha&id=conv-one-2026&tz=Asia/Tokyo')).text());
 ok(/You \(2026-09-28 19:15\):/.test(tokyo), 'the stamps follow the zone the link names');
 const nozone = await page.evaluate(async () => (await fetch('/api/transcript?project=alpha&id=conv-one-2026&tz=Mars%2FOlympus')).status);
@@ -155,6 +203,17 @@ ok(/not by a session/.test(bySession.error || ''), `a session cannot make a conv
 await page.evaluate(() => openNotebook('alpha', 'sessions'));
 await page.waitForSelector(`${SESS} [data-cvresume="conv-two-2025"]`, { timeout: 15000 });
 const rowOf = id => `${SESS} .artrow:has([data-cvresume="${id}"])`;
+{
+  // A person's own session says the same of their conversations (aerie transcripts label).
+  const cliS = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8',
+    env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
+  const said = cliS('transcripts', 'label', 'conv-one-2026', 'Ticking', 'the', 'roadmap');
+  const list2 = cliS('transcripts', 'list');
+  ok(/conv-one-2026 is labeled: Ticking the roadmap/.test(said) && /conv-one-2026 .*Ticking the roadmap/.test(list2) && /conv-two-2025 .*kept {2}The worktree chat\n {6}note: left off at the token test next: the upgrade suite/.test(list2),
+     `aerie transcripts label names one from a session, and the list prints each under its label, a kept one marked and its note under it (${said.trim()})`);
+  const del = await sfetch('/api/transcripts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', id: 'conv-one-2026', action: 'delete' }) }).then(r => r.status, () => 0);
+  ok(del === 403, `...while deleting one stays its person's, never a session's (${del})`);
+}
 // A row's ⋯ opened until its item shows (B384): a redraw landing between
 // the press and the menu replaced the row, and the menu opened on the one
 // taken away.

@@ -1020,6 +1020,13 @@ html[data-motion="reduce"] .tourring{transition:none}
 .cvlogs .artrow .first{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* A conversation's time is one piece: on a phone its PM never sits alone on a line. */
 .cvlogs .artrow .top b{white-space:nowrap}
+/* ...but a label is a person's own words, up to a line of them: it wraps. */
+.cvlogs .artrow .top b.cvlabel{white-space:normal;overflow-wrap:anywhere}
+/* A conversation's note keeps the lines it was written in. */
+.cvlogs .cvnote{white-space:pre-line;overflow-wrap:anywhere}
+/* The row whose fields are in: the form takes the row. */
+.cvlogs .artrow.cvediting .grow{flex:1 1 100%;min-width:0}
+.cvform input, .cvform textarea{width:100%}
 /* A swatch renders in its own scheme: the tokens above are defined for
    .sw[data-theme=...] as well as for the page, so this is the palette itself
    at 1cm rather than a hand-kept copy of it. */
@@ -5505,17 +5512,21 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
 .resumemenu .rmline .rmacts{margin-left:auto}
 .resumemenu .rmacts button{white-space:nowrap}
 /* ...in three bands (R143): yours running, Start, Resume, each headed in the
-   tag voice as the bell's groups are; a conversation's first words on a
-   quiet line of their own under its agent and when, the list scrolling past
-   a few. */
+   tag voice as the bell's groups are. */
 .resumemenu .rmgroup{display:flex;flex-direction:column;gap:8px;min-width:0}
 .resumemenu .rmtitle{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
 .resumemenu .rmgroup .rmtitle+.rmline{border-top:0;padding-top:0}
-.resumemenu .rmconvs{display:flex;flex-direction:column;gap:8px;max-height:calc(var(--tap) * 5);overflow-y:auto}
-.resumemenu .rmconvs .rmline:first-child{border-top:0;padding-top:0}
+/* Resume is one pulldown (R236): it takes the line beside its press, the
+   picked one's note or first words on a quiet line under them, and the way
+   to all of them a link at the band's foot. */
+.resumemenu .rmline .rmwho.rmpick{flex:1 1 0;min-width:0}
+.resumemenu .rmline .rmwho.rmpick select{flex:1 1 auto;width:100%;min-width:0}
+.resumemenu .rmall{align-self:flex-start}
 .resumemenu .rmconv .rmfirst{flex:1 0 100%;font:var(--f-note);color:var(--dim);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .resumemenu .rmconv .rmin{margin-left:auto;font:var(--f-note);color:var(--dim)}
+/* ...a note in the person's own lines, and in ink: it is theirs to read. */
+.resumemenu .rmconv .rmnote{white-space:pre-line;color:var(--ink);overflow-wrap:anywhere;max-height:6.5em;overflow-y:auto}
 .resumemenu .rmfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .resumemenu .rmfields select{width:100%;min-width:0}
 @media(max-width:420px){ .resumemenu .rmfields{grid-template-columns:minmax(0,1fr)} }

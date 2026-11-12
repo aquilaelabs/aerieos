@@ -62,6 +62,8 @@ let rmAgent = {project: "", agent: ""};
 // band (R143): the Sessions view's list, read as it opens. rows null while
 // it is on its way.
 let rmConvs = {project: "", rows: null, error: ""};
+// ...and the one its pulldown is on, the newest until another is picked.
+let rmConv = {project: "", id: ""};
 async function loadRmConvs(name){
   rmConvs = {project: name, rows: null, error: ""};
   try{
@@ -688,24 +690,36 @@ function placeResumeMenu(){
     const a = list.find(x => x.id === rmAgent.agent);
     return startLine(a, list.length > 1 ? `<select id="rmAgentSel" aria-label="the coding agent to start">${optionList(list.map(x => [x.id, x.name]), a.id)}</select>` : "");
   };
-  // Resume: your conversations here, newest first (the Sessions view's
-  // list), each its agent, when and its first words.
+  // Resume: your conversations here as one pulldown (R236, the operator,
+  // 12 Nov: a list of rows with a button each was the longest thing on the
+  // card), newest first, each said by its label, or its first words where
+  // it has none, its agent and when; one press beside it, the picked one's
+  // note under it (its first words where it has a label, or where they
+  // were cut), and the way to all of them, in the notebook's Sessions view.
   const convs = () => {
     if (rmConvs.project !== p.name || rmConvs.rows === null)
       return `<div class="rmstate">${rmConvs.error ? esc(rmConvs.error) : "Reading your conversations here…"}</div>`;
     const ok = new Set(here().map(a => a.id));
-    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude")).slice(0, 8);
+    const rows = rmConvs.rows.filter(r => ok.has(r.agent || "claude"));
     if (!rows.length) return `<div class="rmstate">None yet: a conversation started here is kept to go on with.</div>`;
-    return `<div class="rmconvs">${rows.map(r => {
-      const a = agentById(r.agent || "claude"), live = mine.find(x => x.row.claude?.conv === r.id);
-      // Every slot of its agent taken: said on the row, not offered and then
-      // refused on the press.
-      const full = !live && !freeSlot(p.name, a.id);
-      return `<div class="rmline rmconv"><span class="rmwho"><b>${esc(a.name)}</b><span class="rmsays">${esc(ago(r.at))}</span></span>${
+    if (rmConv.project !== p.name || !rows.some(r => r.id === rmConv.id)) rmConv = {project: p.name, id: rows[0].id};
+    const r = rows.find(x => x.id === rmConv.id);
+    const a = agentById(r.agent || "claude"), live = mine.find(x => x.row.claude?.conv === r.id);
+    // Every slot of its agent taken: said in the press's place, not offered
+    // and then refused on the press.
+    const full = !live && !freeSlot(p.name, a.id);
+    const CUT = 40;
+    const says = x => x.label || x.first || "nothing said yet";
+    const opt = x => { const w = says(x); return `<option value="${esc(x.id)}"${x.id === r.id ? " selected" : ""}>${
+      esc(w.length > CUT ? w.slice(0, CUT - 1).trimEnd() + "…" : w)} · ${esc(agentById(x.agent || "claude").name)} · ${esc(ago(x.at))}${x.kept ? " · kept" : ""}</option>`; };
+    const under = r.note || (r.first && (r.label || r.first.length > CUT) ? r.first : "");
+    return `<div class="rmline rmconv"><span class="rmwho rmpick"><select id="rmConvSel" aria-label="the conversation to go on with">${rows.map(opt).join("")}</select></span>${
         live ? `<span class="rmsays rmin">running in ${esc(agentSlotName(live.agent, live.slot))}</span>`
         : full ? `<span class="rmsays rmin">every ${esc(a.name)} session you may run here is running</span>`
              : `<div class="actbar rmacts"><button data-cv="${esc(r.id)}" data-cvagent="${esc(a.id)}" data-cvat="${esc(String(r.at))}" data-node="${esc(at(n))}" title="go on with this conversation">Resume</button></div>`}${
-        r.first ? `<div class="rmfirst">${esc(r.first)}</div>` : ""}</div>`; }).join("")}</div>`;
+        under ? `<div class="rmfirst${r.note ? " rmnote" : ""}">${esc(under)}</div>` : ""}</div>
+      <button type="button" class="link rmall" data-rmall title="every conversation of yours on this space: read, label, keep or delete one">${
+        rmConvs.rows.length === 1 ? "Your conversation here" : `All ${rmConvs.rows.length} conversations`}</button>`;
   };
   const facts = n && claudeNodeFacts(n);
   const html = !ns.length
@@ -744,6 +758,15 @@ function placeResumeMenu(){
   if (nsel) nsel.onchange = () => { rmNode = {project: p.name, node: nsel.value}; placeResumeMenu(); };
   const asel = m.querySelector("#rmAgentSel");
   if (asel) asel.onchange = () => { rmAgent = {project: p.name, agent: asel.value}; placeResumeMenu(); };
+  const csel = m.querySelector("#rmConvSel");
+  if (csel) csel.onchange = () => { rmConv = {project: p.name, id: csel.value}; placeResumeMenu(); };
+  // All of them: the notebook's Sessions view, where each is read, labeled,
+  // kept or deleted.
+  m.querySelectorAll("[data-rmall]").forEach(b => b.onclick = () => {
+    resumeFor = null;
+    drawProjects(state.projects);
+    openNotebook(p.name, "sessions");
+  });
   m.querySelectorAll("[data-signin-node]").forEach(b => b.onclick = () => {
     resumeFor = null;
     drawProjects(state.projects);
