@@ -418,12 +418,16 @@ ok(mob.display === 'flex' && !mob.bKeys,
     const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
     return { keys: [...h.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent.trim()).join(' '), shown: !h.hidden && h.offsetParent !== null,
              ends: ends.map(b => b.id), words: ends.map(b => getComputedStyle(b.querySelector('.mw')).display), labels: ends.map(b => b.getAttribute('aria-label') || ''),
-             tall: [...bar.querySelectorAll('button')].filter(b => b.offsetParent !== null).every(b => b.getBoundingClientRect().height >= 40),
+             tall: [...bar.querySelectorAll('button')].filter(b => b.offsetParent !== null).every(b => b.getBoundingClientRect().height >= 30 && b.getBoundingClientRect().width >= 30),
              inBar: ends.every(b => b.getBoundingClientRect().right <= innerWidth + 1), scrolls: h.scrollWidth > h.clientWidth,
+             // ...as the dock's line reads: its end faded with the arrow where more keys lie past it, the two presses still, to the arrow's right.
+             arrow: h.classList.contains('hscroll') && h.classList.contains('chr') && !h.classList.contains('chl') && getComputedStyle(h, '::after').content.includes('\u203a'),
+             faded: getComputedStyle(h).maskImage !== 'none' || getComputedStyle(h).webkitMaskImage !== 'none',
+             after: ends.every(b => b.getBoundingClientRect().left >= h.getBoundingClientRect().right - 1),
              overlay: [...document.querySelectorAll('.slot.ownterm .xhot')].filter(x => getComputedStyle(x).display !== 'none').length }; });
   ok(band.shown && band.keys === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && band.ends.join() === 'mKeys,mMacros' && band.words.every(d => d === 'none') && band.labels.every(Boolean)
-     && band.tall && band.inBar && band.overlay === 0,
-     `phone: the band at a shell's foot is its hot bar, a line of its keys with Keys and Commands at its end, and nothing floats over the terminal (${JSON.stringify(band)})`);
+     && band.tall && band.inBar && band.overlay === 0 && (!band.scrolls || (band.arrow && band.faded)) && band.after,
+     `phone: the band at a shell's foot is its hot bar, a line of its keys that reads as the dock's line does (a faded end and its arrow where more lie past it), Keys and Commands still at the arrow's right, and nothing floats over the terminal (${JSON.stringify(band)})`);
 }
 ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
    `...Keys and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);

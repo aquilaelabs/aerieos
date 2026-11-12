@@ -128,7 +128,7 @@ function mobHotRec(){
 function mobHotLinks(rec, has){
   if (mobHotRec() !== rec) return;
   const lb = $("mHot")?.querySelector("[data-hlinks]");
-  if (lb && lb.hidden !== !has) lb.hidden = !has;
+  if (lb && lb.hidden !== !has){ lb.hidden = !has; chipsEdge($("mHot")); }
   if (!has) mobLinksShut();
 }
 function mobLinksShut(){
@@ -179,6 +179,9 @@ function drawKeys(){
   setHidden(hot, !own);
   if (!own) mobLinksShut();
   else { const rec = mobHotRec(); if (rec) mobHotLinks(rec, termLinks(rec).length > 0); }
+  // Its ends, as the dock's line has them: faded, with the arrow, where
+  // more keys lie past one (chipsEdge), measured once it is laid out.
+  if (own) requestAnimationFrame(() => chipsEdge(hot));
   // Sessions is a page and Chat the dock's tab (R250): the foot bar keeps
   // what is about the terminal in front, its keys, Keys and Commands, and
   // is not drawn with nothing in it.
