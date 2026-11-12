@@ -54,6 +54,46 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', "...and the keys row's arrow l
 await page.evaluate(() => sendKey('pgup')); await sleep(300);
 await page.evaluate(() => sendKey('pgdn')); await sleep(300);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leaves copy mode by itself');
+// The hot bar (the operator, 12 Nov): over the terminal's top right corner,
+// the keys a terminal is most reached for, a shell's on a shell's tab.
+{
+  const HOT = '#pane1 .slot.ownterm .xhot';
+  const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
+    const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
+    return { keys: [...b.querySelectorAll('.xhotkeys button')].map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
+             top: Math.round(r.top - h.top), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1,
+             tall: [...b.querySelectorAll('button')].every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
+  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn Links' && !hot.folded && hot.top >= 0 && hot.top < 20 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall,
+     `a shell's terminal wears its hot bar at its top right: a shell's keys, a page back and on, and Links (${JSON.stringify(hot)})`);
+  await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);
+  const up = tmuxFmt('shell-9', '#{pane_in_mode}');
+  await page.click(`${HOT} [data-hk="down"]`); await sleep(300);
+  ok(up === '1' && tmuxFmt('shell-9', '#{pane_in_mode}') === '0', `its PgUp scrolls a page back and its arrow is the program's, as the keys row's are (${up})`);
+  // Links: what the terminal shows, read whole where a link runs past the
+  // pane's width, wrapped by the terminal or broken there by the program.
+  await page.evaluate(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9');
+    const type = t => termType(rec, new TextEncoder().encode(t));
+    type("clear; printf 'soft https://example.test/soft/%s end\\n' \"$(printf 'a%.0s' $(seq 1 400))\"; echo \"https://example.test/hard/$(printf 'b%.0s' $(seq 1 400))\" | fold -w \"$(tput cols)\"; echo done-links\r"); });
+  await page.waitForFunction(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); const b = rec?.term?.buffer?.active;
+    for (let i = 0; b && i < b.length; i++) if (/^done-links/.test(b.getLine(i)?.translateToString(true) || '')) return true; return false; }, null, { timeout: 15000 }).catch(() => {});
+  await page.click(`${HOT} [data-hlinks]`);
+  const links = await page.evaluate(sel => { const l = document.querySelector(sel + ' .xlinks');
+    return { shown: !l.hidden, hrefs: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...l.querySelectorAll('a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),
+             copies: l.querySelectorAll('[data-hcopy]').length, wide: l.getBoundingClientRect().right <= innerWidth + 1 }; }, HOT);
+  ok(links.shown && links.hrefs.includes('https://example.test/soft/' + 'a'.repeat(400)) && links.hrefs.includes('https://example.test/hard/' + 'b'.repeat(400))
+     && links.rel && links.copies === links.hrefs.length && links.wide,
+     `Links lists the terminal's links to open or copy, each whole though it ran over several rows (${links.hrefs.map(h => h.slice(0, 34) + '… ' + h.length).join(', ')})`);
+  await page.click(`${HOT} [data-hlinks]`);
+  ok(await page.$eval(`${HOT} .xlinks`, l => l.hidden), '...and a second press puts the list away');
+  // Folded to its handle, a browser's own choice.
+  await page.click(`${HOT} .xhottog`);
+  const folded = await page.evaluate(sel => { const b = document.querySelector(sel); return { folded: b.classList.contains('folded'), keys: getComputedStyle(b.querySelector('.xhotkeys')).display,
+    kept: localStorage.getItem('bb-term-hot'), says: b.querySelector('.xhottog').getAttribute('aria-label') }; }, HOT);
+  ok(folded.folded && folded.keys === 'none' && folded.kept === '0' && /show/.test(folded.says), `its handle folds it away, and this browser keeps that (${JSON.stringify(folded)})`);
+  await page.click(`${HOT} .xhottog`);
+  ok(await page.$eval(HOT, b => !b.classList.contains('folded')), '...and brings it back');
+  await page.evaluate(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); termType(rec, new TextEncoder().encode('clear\r')); });
+}
 ok((await row('shell-9').locator('.pill.ok').textContent()).trim() === 'on screen', 'its row says it is on screen');
 ok((await row('shell-9').locator('[data-go]').evaluate(e => saidOf(e))) === await page.$eval('#pane1 .dtab.on .dlbl', el => saidOf(el)),
    "the session row and its tab on the dock's line are described by the same words");
