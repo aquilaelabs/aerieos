@@ -284,8 +284,16 @@ def settle(agent, raw):
     Build can write a turn's first words after the rest, so a copy taken
     only at the hook missed them until the next turn ended."""
     try:
-        if os.fork():
-            return
+        # Python warns of a fork where it counts more than one thread, on
+        # stderr, which is where an agent reads this hook's refusal from: the
+        # warning came out ahead of the sentence now and then (seen in a
+        # whole test run, 12 Nov). The child here only sleeps and copies a
+        # file, so the warning has nothing to say of it.
+        import warnings                                         # noqa: PLC0415
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            if os.fork():
+                return
     except OSError:
         return
     try:
