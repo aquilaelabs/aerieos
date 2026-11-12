@@ -1046,113 +1046,124 @@ def _mkdirs(path, uid, gid):
 
 
 def apply(steps, uid, gid):
+    """The plan's steps, made. One that fails says which it was: a mount's
+    own error names no path, and "No such file or directory" alone left
+    nobody knowing which of the view's forty mounts it was."""
     for step in steps:
-        kind, target = step[0], step[-1] if step[0] in ("bind", "bindmap", "bindmine", "bindro", "bindrw", "bindfile") else step[1]
-        if kind == "private":
-            _mount(None, "/", None, MS_REC | MS_PRIVATE)
-        elif kind == "proc":
-            _mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC)
-        elif kind == "tmpfs":
-            opts = step[2]
-            if opts.endswith(",owned"):
-                opts = opts[: -len(",owned")] + f",uid={uid},gid={gid}"
-            os.makedirs(target, exist_ok=True)
-            _mount("tmpfs", target, "tmpfs", MS_NOSUID | MS_NODEV, opts)
-        elif kind == "bind":
-            src = step[1]
-            if not os.path.isdir(target):
-                _mkdirs(target, uid, gid)
+        try:
+            _apply(step, uid, gid)
+        except OSError as e:
+            raise Refused(f"bb-session: the view's step '{' '.join(str(x) for x in step)}' failed: "
+                          f"{e.strerror or e}") from None
+
+
+def _apply(step, uid, gid):
+    kind, target = step[0], step[-1] if step[0] in ("bind", "bindmap", "bindmine", "bindro", "bindrw", "bindfile") else step[1]
+    if kind == "private":
+        _mount(None, "/", None, MS_REC | MS_PRIVATE)
+    elif kind == "proc":
+        _mount("proc", "/proc", "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC)
+    elif kind == "tmpfs":
+        opts = step[2]
+        if opts.endswith(",owned"):
+            opts = opts[: -len(",owned")] + f",uid={uid},gid={gid}"
+        os.makedirs(target, exist_ok=True)
+        _mount("tmpfs", target, "tmpfs", MS_NOSUID | MS_NODEV, opts)
+    elif kind == "bind":
+        src = step[1]
+        if not os.path.isdir(target):
+            _mkdirs(target, uid, gid)
+        _mount(src, target, None, MS_BIND | MS_REC)
+    elif kind == "bindmap":
+        # A tree of the session's project, its worktrees and its works,
+        # with their owner read as the account's own user and written as
+        # the owner (R125 step 7, B356): a session that runs as its own
+        # user can write its tree and its git reads it as its own. A plain
+        # bind where the filesystem will not map one (a share squashes
+        # every writer to one owner already).
+        src = step[1]
+        if not os.path.isdir(target):
+            _mkdirs(target, uid, gid)
+        if _USERNS is None or not _bind_idmapped(src, target, _USERNS):
             _mount(src, target, None, MS_BIND | MS_REC)
-        elif kind == "bindmap":
-            # A tree of the session's project, its worktrees and its works,
-            # with their owner read as the account's own user and written as
-            # the owner (R125 step 7, B356): a session that runs as its own
-            # user can write its tree and its git reads it as its own. A plain
-            # bind where the filesystem will not map one (a share squashes
-            # every writer to one owner already).
-            src = step[1]
-            if not os.path.isdir(target):
+    elif kind == "bindro":
+        # A read-only bind of a directory onto itself: bind first, then
+        # remount read-only, which is the only way the flag takes on a bind.
+        # The view's root is private, so this is read-only here and nowhere
+        # else, and the agent still writes the bundle from outside the view.
+        src = step[1]
+        # Onto a place the view has yet to make, when it is a project
+        # this one reads under the fresh /workspace: the writable bind
+        # makes its target, and this one did not, so the first session
+        # with a read project met "mount: No such file or directory".
+        # Only where nothing is: a read-only bind lands on files too (the
+        # claude binary's link), and making a directory there is EEXIST.
+        #
+        # A file put back into a new home has a file to land on made
+        # for it, in the folder made for that.
+        if not os.path.lexists(target):
+            if os.path.isdir(src):
                 _mkdirs(target, uid, gid)
-            if _USERNS is None or not _bind_idmapped(src, target, _USERNS):
-                _mount(src, target, None, MS_BIND | MS_REC)
-        elif kind == "bindro":
-            # A read-only bind of a directory onto itself: bind first, then
-            # remount read-only, which is the only way the flag takes on a bind.
-            # The view's root is private, so this is read-only here and nowhere
-            # else, and the agent still writes the bundle from outside the view.
-            src = step[1]
-            # Onto a place the view has yet to make, when it is a project
-            # this one reads under the fresh /workspace: the writable bind
-            # makes its target, and this one did not, so the first session
-            # with a read project met "mount: No such file or directory".
-            # Only where nothing is: a read-only bind lands on files too (the
-            # claude binary's link), and making a directory there is EEXIST.
-            #
-            # A file put back into a new home has a file to land on made
-            # for it, in the folder made for that.
-            if not os.path.lexists(target):
-                if os.path.isdir(src):
-                    _mkdirs(target, uid, gid)
-                else:
-                    _mkdirs(os.path.dirname(target), uid, gid)
-                    with open(target, "x"):
-                        pass
-            _mount(src, target, None, MS_BIND | MS_REC)
-            _mount(src, target, None, MS_BIND | MS_REMOUNT | MS_RDONLY)
-        elif kind == "bindrw":
-            # A writable bind INSIDE a read-only one. A bind copies the flags
-            # of the mount it is taken from, read-only included (measured on
-            # bb-dev-sandbox: a plain bind of flutter under the read-only store
-            # came out read-only), so the flag is cleared with a remount of its
-            # own. The file system underneath is writable; only this mount was not.
-            src = step[1]
-            _mount(src, target, None, MS_BIND | MS_REC)
-            _mount(src, target, None, MS_BIND | MS_REMOUNT)
-        elif kind == "hide":
-            _mount("tmpfs", target, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0500")
-        elif kind == "make":
-            # A folder made on the disk, before a cover goes over its parent,
-            # so the bind that puts it back has something to bind (B379). Made
-            # as the session account, the way Claude Code would have made it:
-            # root's mkdir and chown are refused on a share that squashes root.
-            pid = os.fork()
-            if pid == 0:
-                try:
-                    os.setgid(gid)
-                    os.setuid(uid)
-                    os.makedirs(target, 0o755, exist_ok=True)
-                    os._exit(0)
-                except OSError:
-                    os._exit(1)
-            if os.waitpid(pid, 0)[1] != 0:
-                print(f"bb-session: could not make {target}; a conversation started here is not kept", file=sys.stderr)
-        elif kind == "bindmine":
-            # This project's own transcripts put back over the cover; where
-            # the folder could not be made there is nothing to bind, and the
-            # session still starts. A folder itself, never a link: root's
-            # bind followed one into a folder the account could not reach
-            # (B518).
-            if _real_dir(step[1]):
-                _mkdirs(target, uid, gid)
-                _mount(step[1], target, None, MS_BIND | MS_REC)
-        elif kind == "hidefile":
-            _mount("/dev/null", target, None, MS_BIND)
-        elif kind == "bindfile":
-            # One file over another. A link at the target is followed, so a
-            # resolv.conf that is systemd-resolved's link is covered where it
-            # points, in this view only.
-            _mount(step[1], target, None, MS_BIND)
-        elif kind == "detach":
-            _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
-        elif kind == "letgo":
-            # A mount of the node's that is not the view's. One that went
-            # between the plan and now, or with the one it was inside, is
-            # gone already, which is what was asked.
+            else:
+                _mkdirs(os.path.dirname(target), uid, gid)
+                with open(target, "x"):
+                    pass
+        _mount(src, target, None, MS_BIND | MS_REC)
+        _mount(src, target, None, MS_BIND | MS_REMOUNT | MS_RDONLY)
+    elif kind == "bindrw":
+        # A writable bind INSIDE a read-only one. A bind copies the flags
+        # of the mount it is taken from, read-only included (measured on
+        # bb-dev-sandbox: a plain bind of flutter under the read-only store
+        # came out read-only), so the flag is cleared with a remount of its
+        # own. The file system underneath is writable; only this mount was not.
+        src = step[1]
+        _mount(src, target, None, MS_BIND | MS_REC)
+        _mount(src, target, None, MS_BIND | MS_REMOUNT)
+    elif kind == "hide":
+        _mount("tmpfs", target, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0500")
+    elif kind == "make":
+        # A folder made on the disk, before a cover goes over its parent,
+        # so the bind that puts it back has something to bind (B379). Made
+        # as the session account, the way Claude Code would have made it:
+        # root's mkdir and chown are refused on a share that squashes root.
+        pid = os.fork()
+        if pid == 0:
             try:
-                _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
-            except OSError as e:
-                if e.errno not in (errno.EINVAL, errno.ENOENT):
-                    raise
+                os.setgid(gid)
+                os.setuid(uid)
+                os.makedirs(target, 0o755, exist_ok=True)
+                os._exit(0)
+            except OSError:
+                os._exit(1)
+        if os.waitpid(pid, 0)[1] != 0:
+            print(f"bb-session: could not make {target}; a conversation started here is not kept", file=sys.stderr)
+    elif kind == "bindmine":
+        # This project's own transcripts put back over the cover; where
+        # the folder could not be made there is nothing to bind, and the
+        # session still starts. A folder itself, never a link: root's
+        # bind followed one into a folder the account could not reach
+        # (B518).
+        if _real_dir(step[1]):
+            _mkdirs(target, uid, gid)
+            _mount(step[1], target, None, MS_BIND | MS_REC)
+    elif kind == "hidefile":
+        _mount("/dev/null", target, None, MS_BIND)
+    elif kind == "bindfile":
+        # One file over another. A link at the target is followed, so a
+        # resolv.conf that is systemd-resolved's link is covered where it
+        # points, in this view only.
+        _mount(step[1], target, None, MS_BIND)
+    elif kind == "detach":
+        _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
+    elif kind == "letgo":
+        # A mount of the node's that is not the view's. One that went
+        # between the plan and now, or with the one it was inside, is
+        # gone already, which is what was asked.
+        try:
+            _call("umount2", target.encode(), ctypes.c_int(MNT_DETACH))
+        except OSError as e:
+            if e.errno not in (errno.EINVAL, errno.ENOENT):
+                raise
 
 
 def _ipbin():
