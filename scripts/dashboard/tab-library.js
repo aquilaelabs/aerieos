@@ -20,6 +20,11 @@
 
 let lib = null, libNode = "", libRev = 0, libSeq = 0, libLanded = 0, libFollow = null;
 let libQ = "", libKind = "", libTier = "";
+// Whether the source chips drew the last time the page did: a library whose
+// cards all come from one source draws none, and its waiting template then
+// holds no row for them (it stood a row lower than the page it waited for
+// once every catalog entry was Built by Aerie).
+let libHadTiers = false;
 const libSeen = {};            // what a pack's Look brought back, by row key ("looking" while it is asked)
 let libWantAgent = "";         // the agent whose card a door asked to open, until the rows land
 // The sections, in the page's order: what a session runs first, then what
@@ -364,11 +369,13 @@ function libFilterBand(kindRows, tierRows, acts = ""){
                  {key: "update", label: "Updates", count: count("update", LIB_STANDS.update)},
                  ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: count(k, r => libGroup(r) === k)}))];
   const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: tierRows.filter(r => r.tier === k).length}));
+  const tierChips = chipButtons(tiers, libTier, "data-libtier", undefined, "Any source");
+  libHadTiers = !!tierChips;
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
       placeholder="search by name or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
     <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", kindRows.length)}</div>
-    <div class="chips" data-chips="libtier">${chipButtons(tiers, libTier, "data-libtier", undefined, "Any source")}</div>
+    <div class="chips" data-chips="libtier">${tierChips}</div>
   </div>`;
 }
 
@@ -405,7 +412,7 @@ function renderLibraryInto(i){
     d.setBar("");
     const skcard = () => `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
     d.list.innerHTML = skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
-      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name or what it does"><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div><div class="chips">${skel("chips", 3)}</div></div>`
+      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name or what it does"><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
       + `<div class="field libgroups">${LIB_KINDS.map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}</h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`);
     if (!libSeq) loadLibrary();
     return;

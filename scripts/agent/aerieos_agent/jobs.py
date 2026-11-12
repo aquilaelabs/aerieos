@@ -386,19 +386,19 @@ class Job(threading.Thread):
             delay = min(delay * 2, 60)
 
     def pack_bundle(self, agent, into, who, rooted):
-        """The bundle a pack's agent's sign-in runs from: `into` where its
-        packs describe that agent's sign-in, else the controller's bundle
-        fetched now and looked in again (a pack added or changed a moment
-        ago is in the controller's bundle before it is in the copy kept
-        here, which is refreshed on the agent's own clock). '' with the
-        refusal said when neither carries it."""
-        if agent in pack_signins(into):
-            return into
+        """The bundle a pack's agent's sign-in runs from: the controller's,
+        fetched now, since what the pack says of its sign-in is in the
+        controller's bundle the moment the pack is added or updated and in
+        the copy kept here only once something fetches it (a sign-in ran a
+        flow from before its pack's update, met on the dev pair); `into`,
+        the copy here, when the controller's cannot be had. '' with the
+        refusal said when neither carries the agent's sign-in."""
         fresh = self.agent.bundle(self, who)
         if fresh and rooted:
             fresh = os.path.realpath(os.path.join(ROOT_BUNDLE_DIR, "current"))
-        if fresh and agent in pack_signins(fresh):
-            return fresh
+        for at in (fresh, into):
+            if at and agent in pack_signins(at):
+                return at
         self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
         return ""
 
