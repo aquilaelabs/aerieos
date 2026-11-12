@@ -387,7 +387,7 @@ async function tpLook(){
   f.busy = "look"; f.error = ""; tpDraw();
   let body;
   if (pack && f.catalog) body = {action: "preview", url: f.catalog.url, commit: f.catalog.commit, sha256: f.catalog.sha256, path: f.catalog.path || ""};
-  else if (pack && !pack.here) body = {action: "preview", url: pack.url};
+  else if (pack && !pack.here) body = {action: "preview", url: pack.url, path: pack.path || ""};
   else if (!pack && f.catalog) body = {action: "preview", url: f.catalog.url, commit: f.catalog.commit, sha256: f.catalog.sha256, path: f.catalog.path || ""};
   else if (!pack && f.from === "repo") body = {action: "preview", url: f.url.trim()};
   else if (f.file){

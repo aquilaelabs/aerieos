@@ -1310,7 +1310,14 @@ def recipe(rec):
            "verbs": m["verbs"],
            "pack": {"url": rec["url"], "commit": rec["commit"], "path": rec.get("path", ""), "by": rec.get("by", ""), "at": rec.get("at", 0),
                     "tier": rec.get("tier") or ("here" if rec.get("hosted") else "url"),
-                    "guidance": rec.get("guidance", ""), "here": bool(rec.get("hosted")), "agent": bool(offers_agent(rec)),
+                    "guidance": rec.get("guidance", ""),
+                    # Made here: a person's own text or archive. A folder of
+                    # a repository is kept hosted too, so the nodes take it
+                    # from the controller, but it came from where its url
+                    # says, and a page that called it made here (every pack
+                    # of the catalog, each a folder of it) was wrong.
+                    "here": bool(rec.get("hosted")) and str(rec.get("url") or "").startswith(HERE),
+                    "agent": bool(offers_agent(rec)),
                     # Whether it carries an icon of its own (R182).
                     "icon": bool(rec.get("icon"))}}
     # A coding agent it offers, for bb-tty and bb-agent-hook on the node,

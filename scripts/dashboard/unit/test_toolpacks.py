@@ -162,7 +162,9 @@ class Repository(unittest.TestCase):
         self.assertTrue(r.get("ok"), r)
         self.assertEqual((r["pack"]["path"], r["pack"]["tier"], r["pack"]["url"], r["pack"]["commit"]), ("packs/hexkit", "vetted", self.url, commit))
         row = toolpacks.recipes()[0]
-        self.assertEqual((row["pack"]["path"], row["pack"]["here"], row["source"]["kind"]), ("packs/hexkit", True, "git"))
+        # Kept hosted, so a node takes it from the controller, and still
+        # from its repository as far as a page says: never "made here".
+        self.assertEqual((row["pack"]["path"], row["pack"]["here"], row["source"]["kind"]), ("packs/hexkit", False, "git"))
         self.assertTrue(row["source"]["url"].startswith("bundle:"), row["source"])
         # What a node fetches is the commit the bundle holds, which is the
         # folder's own here, never the repository's it came from: asked for
