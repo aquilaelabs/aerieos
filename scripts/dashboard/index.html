@@ -5795,6 +5795,33 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 .pane .slot.ownterm .xselbar{position:absolute;display:flex;gap:var(--label-gap);padding:var(--label-gap);
   background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   box-shadow:0 10px 24px rgba(0,0,0,.5);pointer-events:auto}
+/* The hot bar (the operator, 12 Nov): the keys a terminal is most reached
+   for, over its top right corner. The one piece of the dashboard's chrome
+   that sits on a terminal, so it is quiet until the pointer or the focus is
+   on it, folds to its handle, and never takes the terminal's width: on a
+   narrow one its keys scroll sideways in their own line. */
+.pane .slot.ownterm{position:relative}
+.pane .slot.ownterm .xhot{position:absolute;top:var(--label-gap);right:calc(var(--field-gap) + 6px);z-index:6;
+  display:flex;align-items:center;gap:var(--label-gap);max-width:calc(100% - 2 * var(--field-gap) - 6px);
+  padding:var(--label-gap);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
+  box-shadow:0 6px 18px rgba(0,0,0,.45);opacity:.6;transition:opacity .15s}
+.pane .slot.ownterm .xhot:hover,.pane .slot.ownterm .xhot:focus-within{opacity:1}
+@media(hover:none){ .pane .slot.ownterm .xhot{opacity:.92} }
+.pane .slot.ownterm .xhot .xhotkeys{display:flex;gap:var(--label-gap);min-width:0;overflow-x:auto;scrollbar-width:none}
+.pane .slot.ownterm .xhot .xhotkeys::-webkit-scrollbar{display:none}
+.pane .slot.ownterm .xhot button{flex:0 0 auto;min-height:var(--ctl);min-width:var(--ctl);padding:0 8px;font:var(--f-data);white-space:nowrap}
+.pane .slot.ownterm .xhot.folded{opacity:.5;padding:0;border-color:transparent;background:none;box-shadow:none}
+.pane .slot.ownterm .xhot.folded .xhotkeys{display:none}
+.pane .slot.ownterm .xhot.folded .xhottog{background:var(--panel)}
+/* Its links: a list under the bar, each a link to open and a press to copy. */
+.pane .slot.ownterm .xlinks{position:absolute;top:calc(100% + var(--label-gap));right:0;width:min(26rem,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:var(--label-gap);padding:var(--field-gap);background:var(--panel);
+  border:var(--hair) solid var(--line);border-radius:var(--r-surface);box-shadow:0 10px 24px rgba(0,0,0,.5)}
+.pane .slot.ownterm .xlinks[hidden]{display:none}
+.pane .slot.ownterm .xlinks .xlhead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.pane .slot.ownterm .xlinks .xlrow{display:flex;align-items:center;gap:var(--field-gap);min-width:0}
+.pane .slot.ownterm .xlinks .xlrow a{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--f-data)}
+.pane .slot.ownterm .xlinks .xlnone{font:var(--f-note);color:var(--dim)}
 .pane .empty-pane{margin:auto;color:var(--dim);font-style:italic}
 /* A popped-out terminal's placeholder (R8): the pane's empty voice, and the
    one control under it. */
