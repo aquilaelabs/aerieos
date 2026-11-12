@@ -54,17 +54,20 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', "...and the keys row's arrow l
 await page.evaluate(() => sendKey('pgup')); await sleep(300);
 await page.evaluate(() => sendKey('pgdn')); await sleep(300);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leaves copy mode by itself');
-// The hot bar (the operator, 12 Nov): over the terminal's top right corner,
-// the keys a terminal is most reached for, a shell's on a shell's tab.
+// The hot bar (the operator, 12 Nov): at a desk, over the terminal's bottom
+// right corner and slightly translucent, the keys a terminal is most
+// reached for, a shell's on a shell's tab.
 {
   const HOT = '#pane1 .slot.ownterm .xhot';
   const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
     const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
     return { keys: [...b.querySelectorAll('.xhotkeys button')].filter(x => !x.hidden).map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
-             top: Math.round(r.top - h.top), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1,
+             bottom: Math.round(h.bottom - r.bottom), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1 && r.top >= h.top,
+             seen: +getComputedStyle(b).opacity,
              tall: [...b.querySelectorAll('button')].filter(x => !x.hidden).every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
-  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.top >= 0 && hot.top < 20 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall,
-     `a shell's terminal wears its hot bar at its top right: a shell's keys and a page back and on, and no Links while it shows no link (${JSON.stringify(hot)})`);
+  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.bottom >= 0 && hot.bottom < 24 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall
+     && hot.seen > 0.6 && hot.seen < 1,
+     `a shell's terminal wears its hot bar at its bottom right, slightly translucent: a shell's keys and a page back and on, and no Links while it shows no link (${JSON.stringify(hot)})`);
   await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);
   const up = tmuxFmt('shell-9', '#{pane_in_mode}');
   await page.click(`${HOT} [data-hk="down"]`); await sleep(300);
@@ -82,10 +85,11 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
   await page.click(`${HOT} [data-hlinks]`);
   const links = await page.evaluate(sel => { const l = document.querySelector(sel + ' .xlinks');
     return { shown: !l.hidden, hrefs: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...l.querySelectorAll('a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),
-             copies: l.querySelectorAll('[data-hcopy]').length, wide: l.getBoundingClientRect().right <= innerWidth + 1 }; }, HOT);
+             copies: l.querySelectorAll('[data-hcopy]').length, wide: l.getBoundingClientRect().right <= innerWidth + 1,
+             over: l.getBoundingClientRect().bottom <= document.querySelector(sel).getBoundingClientRect().top + 1 }; }, HOT);
   ok(links.shown && links.hrefs.includes('https://example.test/soft/' + 'a'.repeat(400)) && links.hrefs.includes('https://example.test/hard/' + 'b'.repeat(400))
-     && links.rel && links.copies === links.hrefs.length && links.wide,
-     `Links lists the terminal's links to open or copy, each whole though it ran over several rows (${links.hrefs.map(h => h.slice(0, 34) + '… ' + h.length).join(', ')})`);
+     && links.rel && links.copies === links.hrefs.length && links.wide && links.over,
+     `Links lists the terminal's links over the bar, to open or copy, each whole though it ran over several rows (${links.hrefs.map(h => h.slice(0, 34) + '… ' + h.length).join(', ')})`);
   await page.click(`${HOT} [data-hlinks]`);
   ok(await page.$eval(`${HOT} .xlinks`, l => l.hidden), '...and a second press puts the list away');
   // Folded to its handle, a browser's own choice.
@@ -395,9 +399,9 @@ await phone.waitForFunction(() => typeof state !== 'undefined' && state && Array
 const mob = await phone.waitForFunction(() => {
   if (!tabs.some(t => t.kind === 'term')) openTab({kind: 'term', arg: argForSession('shell-alpha'), label: 'shell-alpha'});
   const k = document.getElementById('mKeys');
-  const bw = [...document.querySelectorAll('#mobar button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
+  const bw = [...document.querySelectorAll('#mobar > button')].filter(b => b.offsetParent !== null).map(b => Math.round(b.getBoundingClientRect().width));
   window.__seen = { tabs: tabs.map(t => t.kind), keys: !!k && !k.hidden && k.offsetParent !== null, widths: bw,
-                    whole: [...document.querySelectorAll('#mobar button')].every(b => b.scrollWidth <= b.clientWidth),
+                    whole: [...document.querySelectorAll('#mobar > button')].every(b => b.scrollWidth <= b.clientWidth),
                     display: getComputedStyle(document.getElementById('mobar')).display,
                     bKeys: !!document.getElementById('bKeys'), w: innerWidth };
   return window.__seen.keys && window.__seen;
@@ -405,8 +409,24 @@ const mob = await phone.waitForFunction(() => {
   .catch(async () => (await phone.evaluate(() => window.__seen)) || {});
 ok(mob.display === 'flex' && !mob.bKeys,
    `the phone bar carries the keys, and the strip has no ⌨ anywhere to hide (${JSON.stringify(mob)})`);
+// On a phone the band at the terminal's foot is the hot bar (the operator,
+// 12 Nov): the keys of the terminal in front in a line that scrolls, Keys
+// and Commands two small presses at its end, and nothing floating over
+// the terminal.
+{
+  const band = await phone.evaluate(() => { const h = document.getElementById('mHot'), bar = document.getElementById('mobar');
+    const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
+    return { keys: [...h.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent.trim()).join(' '), shown: !h.hidden && h.offsetParent !== null,
+             ends: ends.map(b => b.id), words: ends.map(b => getComputedStyle(b.querySelector('.mw')).display), labels: ends.map(b => b.getAttribute('aria-label') || ''),
+             tall: [...bar.querySelectorAll('button')].filter(b => b.offsetParent !== null).every(b => b.getBoundingClientRect().height >= 40),
+             inBar: ends.every(b => b.getBoundingClientRect().right <= innerWidth + 1), scrolls: h.scrollWidth > h.clientWidth,
+             overlay: [...document.querySelectorAll('.slot.ownterm .xhot')].filter(x => getComputedStyle(x).display !== 'none').length }; });
+  ok(band.shown && band.keys === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && band.ends.join() === 'mKeys,mMacros' && band.words.every(d => d === 'none') && band.labels.every(Boolean)
+     && band.tall && band.inBar && band.overlay === 0,
+     `phone: the band at a shell's foot is its hot bar, a line of its keys with Keys and Commands at its end, and nothing floats over the terminal (${JSON.stringify(band)})`);
+}
 ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
-   `...its two buttons share the bar in equal halves, each word whole (${JSON.stringify(mob.widths)})`);
+   `...Keys and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
 // About control carries the word instead, and exactly one of the two, never
 // both: showing the label on a desktop as well stacked it under the version
@@ -731,7 +751,7 @@ await phone.evaluate(() => openNotebook('alpha'));
 await phone.waitForFunction(() => tabOf(panes[active])?.kind === 'notebook');
 ok(await phone.$eval('#mKeys', b => b.hidden && getComputedStyle(b).display === 'none'), 'Keys leaves the bar over a document tab');
 ok(await phone.$eval('#mMacros', b => b.hidden), '...and so does Commands');
-ok(await phone.$$eval('#mobar button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
+ok(await phone.$$eval('#mobar > button', bs => bs.filter(b => b.offsetWidth).every(b => b.scrollWidth <= b.clientWidth + 1)),
    '...and what is left is not cut short');
 // A Claude tab is a terminal, but not one to type keys or macros into: they
 // go to a conversation with its own idea of what a keystroke means.

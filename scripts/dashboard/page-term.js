@@ -57,18 +57,22 @@ function termSlot(t){
     <div class="xend" hidden><span class="xwhy"></span><button type="button" class="xagain">Reconnect</button></div>${consoleBar(t)}</div>`;
 }
 
-// The hot bar (the operator, 12 Nov): over the terminal's top right corner,
-// the keys a terminal is most often reached for, a press each, so they are
-// there without a keyboard that has them and without the Keys panel open.
-// Which keys is by what the tab is: a coding agent's (Esc to interrupt,
-// Shift+Tab for its mode, the arrows and Enter for its menus), a shell's
-// (Tab to complete, ^C, ^D), and for every terminal the page up and down
-// and Links, which lists the links on its screen to open or copy (a link a
-// terminal prints could be neither on a phone) and is there only while the
-// terminal shows one (the operator, 12 Nov: a press that lists nothing is
-// not a press to offer). A log takes no keys and has the page keys and
-// Links alone, as an account with no shell has on a session it only reads. Static per tab: what is folded is the browser's and is put
-// on after the draw (termHotWire), so the slot is never drawn again for it.
+// The hot bar (the operator, 12 Nov): the keys a terminal is most often
+// reached for, a press each, so they are there without a keyboard that has
+// them. At a desk it floats over the terminal's bottom right corner,
+// slightly translucent; on a phone it is the band at the terminal's foot,
+// where Keys and Commands alone used to be (page-keys.js drawKeys draws it
+// there from the same list). Which keys is by what the tab is: a coding
+// agent's (Esc to interrupt, Shift+Tab for its mode, the arrows and Enter
+// for its menus), a shell's (Tab to complete, ^C, ^D), and for every
+// terminal the page up and down and Links, which lists the links on its
+// screen to open or copy (a link a terminal prints could be neither on a
+// phone) and is there only while the terminal shows one (the operator, 12
+// Nov: a press that lists nothing is not a press to offer). A log takes no
+// keys and has the page keys and Links alone, as an account with no shell
+// has on a session it only reads. Static per tab: what is folded is the
+// browser's and is put on after the draw (termHotWire), so the slot is
+// never drawn again for it.
 const TERM_HOT = {
   agent: [["escape", "Esc", "interrupt, or back out of a menu"], ["backtab", "⇧Tab", "Shift+Tab: its next mode"], ["up", "↑", "up"], ["down", "↓", "down"],
           ["enter", "⏎", "Enter"], ["ctrl-c", "^C", "Ctrl+C"]],
@@ -76,24 +80,43 @@ const TERM_HOT = {
           ["ctrl-c", "^C", "Ctrl+C: stop what is running"], ["ctrl-d", "^D", "Ctrl+D: end of input"]],
   every: [["pgup", "PgUp", "a page back"], ["pgdn", "PgDn", "a page on"]],
 };
-function termHotBar(t){
+// A tab's keys, each [key, what it shows, what it says].
+function termHotKeys(t){
   const types = !termLog(t) && mayShell();
-  const keys = [...(types ? TERM_HOT[agentOfArg(t.arg) ? "agent" : "shell"] : []), ...TERM_HOT.every];
+  return [...(types ? TERM_HOT[agentOfArg(t.arg) ? "agent" : "shell"] : []), ...TERM_HOT.every];
+}
+// ...as buttons, Links after them, hidden until the terminal shows a link.
+function termHotButtons(t){
+  return termHotKeys(t).map(([k, l, says]) => `<button type="button" data-hk="${esc(k)}" title="${esc(says)}" aria-label="${esc(says)}">${esc(l)}</button>`).join("")
+    + `<button type="button" data-hlinks hidden aria-expanded="false" title="the links on this terminal, to open or copy">Links</button>`;
+}
+function termHotBar(t){
   return `<div class="xhot" role="toolbar" aria-label="terminal keys">
-    <span class="xhotkeys">${keys.map(([k, l, says]) => `<button type="button" data-hk="${esc(k)}" title="${esc(says)}" aria-label="${esc(says)}">${esc(l)}</button>`).join("")}<button
-      type="button" data-hlinks hidden aria-expanded="false" title="the links on this terminal, to open or copy">Links</button></span><button
+    <span class="xhotkeys">${termHotButtons(t)}</span><button
       type="button" class="xhottog" aria-expanded="true" aria-label="hide these keys" title="hide these keys">›</button>
     <div class="xlinks" hidden></div></div>`;
 }
 
+// The links a terminal shows, drawn into `box` as a list, each a link to
+// open and a press to copy; `shut` puts the list away once one is opened.
+function termLinksFill(rec, box, shut){
+  const found = termLinks(rec);
+  box.innerHTML = `<div class="xlhead">Links on this terminal</div>` + (found.length
+    ? found.map((u, i) => `<div class="xlrow"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u.length > 64 ? u.slice(0, 44) + "…" + u.slice(-16) : u)}</a><button
+        type="button" data-hcopy="${i}">Copy</button></div>`).join("")
+    : `<div class="xlnone">None on its screen or in the lines before it.</div>`);
+  box.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = async () => { await termCopyText(found[+b.dataset.hcopy]); notify("Copied"); });
+  box.querySelectorAll("a").forEach(a => a.onclick = () => shut());
+}
+
 // Whether the bar is folded to its handle: this browser's choice, kept on
-// the device; folded until asked for on a phone, where the screen is the
-// terminal's and the Keys panel is a press away.
+// the device, and a desk's alone: on a phone the keys are the band at the
+// terminal's foot, with nothing to fold.
 const TERM_HOT_KEY = "bb-term-hot";
 function termHotFolded(){
   let v = null;
   try{ v = localStorage.getItem(TERM_HOT_KEY); }catch(e){ /* no storage: the default */ }
-  return v === null ? isPhone() : v === "0";
+  return v === "0";
 }
 
 function termHotWire(rec){
@@ -116,6 +139,8 @@ function termHotWire(rec){
     const has = termLinks(rec).length > 0;
     if (lb.hidden !== !has) lb.hidden = !has;
     if (!has && !links.hidden) shut();
+    // ...and on the phone's band, where this terminal is the one in front.
+    if (typeof mobHotLinks === "function") mobHotLinks(rec, has);
   };
   rec.hotLinks();
   // A press on the bar leaves the keyboard where it is: the terminal keeps
@@ -131,13 +156,7 @@ function termHotWire(rec){
   bar.querySelectorAll("[data-hk]").forEach(b => b.onclick = () => { shut(); termKey(rec.t, b.dataset.hk); });
   lb.onclick = () => {
     if (!links.hidden) return shut();
-    const found = termLinks(rec);
-    links.innerHTML = `<div class="xlhead">Links on this terminal</div>` + (found.length
-      ? found.map((u, i) => `<div class="xlrow"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u.length > 64 ? u.slice(0, 44) + "…" + u.slice(-16) : u)}</a><button
-          type="button" data-hcopy="${i}">Copy</button></div>`).join("")
-      : `<div class="xlnone">None on its screen or in the lines before it.</div>`);
-    links.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = async () => { await termCopyText(found[+b.dataset.hcopy]); notify("Copied"); });
-    links.querySelectorAll("a").forEach(a => a.onclick = () => shut());
+    termLinksFill(rec, links, shut);
     links.hidden = false;
     lb.setAttribute("aria-expanded", "true");
   };

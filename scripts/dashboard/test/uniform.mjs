@@ -2532,7 +2532,7 @@ if (runs('c')) {
   await phone.setViewportSize({ width: 344, height: 882 });
   await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
   await sleep(400);
-  const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar button')]
+  const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar > button')]
     .filter(b => b.offsetHeight > 0 && b.getBoundingClientRect().right > innerWidth + 1).map(b => b.textContent.trim()));
   ok(cut.length === 0, `...and the bar fits a fold's 344px cover${cut.length ? `: cut off ${cut.join(', ')}` : ''}`);
   // ...and the top bar's search keeps its 80px there, nothing in the header

@@ -338,18 +338,22 @@ wheel would in an agent's tab. A press held on a word selects it, with a
 grip at each end to widen it and **Copy** beside it; a tap still brings up
 the keyboard.
 
-**The hot bar** sits over a terminal's top right corner: the keys a
-terminal is most reached for, a press each. On a coding agent's tab they
-are Esc, Shift+Tab, the up and down arrows, Enter and Ctrl+C; on a shell's,
-Esc, Tab, the arrows, Ctrl+C and Ctrl+D; every terminal has PgUp and PgDn.
-**Links** joins them while the terminal shows a link, and lists the links
-on its screen and in the lines before it, each to open in a new tab or
-copy: a link that runs over
-several rows is read whole, which is how a sign-in link a program prints is
-opened on a phone. The **›** at its end folds the bar to that one handle
-and **‹** brings it back; the choice is this browser's, and on a phone it
-starts folded. A log's tab, and a session you may only read, have the page
-keys, and Links while there is one, alone.
+**The hot bar** is the keys a terminal is most reached for, a press each.
+On a coding agent's tab they are Esc, Shift+Tab, the up and down arrows,
+Enter and Ctrl+C; on a shell's, Esc, Tab, the arrows, Ctrl+C and Ctrl+D;
+every terminal has PgUp and PgDn. **Links** joins them while the terminal
+shows a link, and lists the links on its screen and in the lines before
+it, each to open in a new tab or copy: a link that runs over several rows
+is read whole, which is how a sign-in link a program prints is opened on a
+phone. A log's tab, and a session you may only read, have the page keys,
+and Links while there is one, alone.
+
+At a **desk** the bar floats over the terminal's bottom right corner,
+slightly translucent until the pointer is on it; the **›** at its end folds
+it to that one handle and **‹** brings it back, a choice this browser
+keeps. On a **phone** it is the band at the terminal's foot: its keys in a
+line that scrolls under a thumb, and on a shell's tab **⌨** and **»** at
+its end, which open the full Keys panel and Commands.
 
 The launcher sets this on the session as it starts one, not only in the config
 file, because `~/.tmux.conf` lives on the persistent home and is yours.

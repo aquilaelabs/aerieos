@@ -119,6 +119,24 @@ function slidePanel(el, show, swap){
 // is nothing to type into at all.
 const isShellTab = t => t?.kind === "term" && !agentOfArg(t.arg);
 
+// The terminal the phone's band is for: the one in front.
+function mobHotRec(){
+  const t = tabOf(panes[active]);
+  return t ? [...TERMS.values()].find(r => r.t.id === t.id && r.el.isConnected) || null : null;
+}
+// Links on the band, there while the terminal in front shows a link.
+function mobHotLinks(rec, has){
+  if (mobHotRec() !== rec) return;
+  const lb = $("mHot")?.querySelector("[data-hlinks]");
+  if (lb && lb.hidden !== !has) lb.hidden = !has;
+  if (!has) mobLinksShut();
+}
+function mobLinksShut(){
+  const box = $("mLinks");
+  if (box && !box.hidden) box.hidden = true;
+  $("mHot")?.querySelector("[data-hlinks]")?.setAttribute("aria-expanded", "false");
+}
+
 function drawKeys(){
   const el = $("keys");
   const t = tabOf(panes[active]);
@@ -141,10 +159,30 @@ function drawKeys(){
   const mm = $("mMacros");
   mm.classList.toggle("on", showMacros);
   setHidden(mm, !term);
+  // On a phone the band is the hot bar (the operator, 12 Nov): the keys of
+  // the terminal in front, whichever kind it is, with Keys and Commands at
+  // its end where it is a shell. A desk's keys float over the terminal.
+  const hot = $("mHot"), own = t?.kind === "term" && termOwn(t) && isPhone() ? t : null;
+  if (paint(hot, own ? termHotButtons(own) : "")){
+    hot.querySelectorAll("[data-hk]").forEach(b => b.onclick = () => { mobLinksShut(); sendKey(b.dataset.hk); });
+    const lb = hot.querySelector("[data-hlinks]");
+    if (lb) lb.onclick = () => {
+      const rec = mobHotRec(), box = $("mLinks");
+      if (!rec || !box.hidden) return mobLinksShut();
+      termLinksFill(rec, box, mobLinksShut);
+      box.hidden = false;
+      lb.setAttribute("aria-expanded", "true");
+    };
+    // A press on the band leaves the keyboard where it is.
+    hot.onpointerdown = e => { if (e.target.closest("button")) e.preventDefault(); };
+  }
+  setHidden(hot, !own);
+  if (!own) mobLinksShut();
+  else { const rec = mobHotRec(); if (rec) mobHotLinks(rec, termLinks(rec).length > 0); }
   // Sessions is a page and Chat the dock's tab (R250): the foot bar keeps
-  // what is about the terminal in front, Keys and Commands, and is not
-  // drawn with nothing in it.
-  setHidden($("mobar"), mk.hidden && mm.hidden);
+  // what is about the terminal in front, its keys, Keys and Commands, and
+  // is not drawn with nothing in it.
+  setHidden($("mobar"), mk.hidden && mm.hidden && !own);
   // One panel at a time: whichever is opening slides, and any that is
   // closing in the same breath swaps out under it (see slidePanel).
   // Commands closes with the keys when the tab underneath is not a shell: a

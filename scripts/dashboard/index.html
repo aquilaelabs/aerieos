@@ -5796,33 +5796,39 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   box-shadow:0 10px 24px rgba(0,0,0,.5);pointer-events:auto}
 /* The hot bar (the operator, 12 Nov): the keys a terminal is most reached
-   for, over its top right corner. The one piece of the dashboard's chrome
-   that sits on a terminal, so it is quiet until the pointer or the focus is
-   on it, folds to its handle, and never takes the terminal's width: on a
-   narrow one its keys scroll sideways in their own line. Placed in the
-   slot, which fills its pane's stack (.pane .stack > *) and so already
-   holds what is placed in it: no position of its own is set on the slot. */
-.pane .slot.ownterm .xhot{position:absolute;top:var(--label-gap);right:calc(var(--field-gap) + 6px);z-index:6;
+   for. At a desk it floats over the terminal's bottom right corner, the one
+   piece of the dashboard's chrome that sits on a terminal, so it is
+   slightly translucent until the pointer or the focus is on it and folds to
+   its handle; on a phone it is not drawn here at all: the keys are the band
+   at the terminal's foot (.mobar .mhot, below). Placed in the slot, which
+   fills its pane's stack (.pane .stack > *) and so already holds what is
+   placed in it: no position of its own is set on the slot. */
+.pane .slot.ownterm .xhot{position:absolute;bottom:calc(var(--field-gap) + 2px);right:calc(var(--field-gap) + 6px);z-index:6;
   display:flex;align-items:center;gap:var(--label-gap);max-width:calc(100% - 2 * var(--field-gap) - 6px);
   padding:var(--label-gap);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
-  box-shadow:0 6px 18px rgba(0,0,0,.45);opacity:.6;transition:opacity .15s}
+  box-shadow:0 6px 18px rgba(0,0,0,.45);opacity:.78;transition:opacity .15s}
 .pane .slot.ownterm .xhot:hover,.pane .slot.ownterm .xhot:focus-within{opacity:1}
-@media(hover:none){ .pane .slot.ownterm .xhot{opacity:.92} }
+/* A terminal that has ended has its reason and Reconnect at its foot, and
+   one an account only reads has its message line there: the keys stand
+   clear of both. */
+.pane .slot.ownterm:has(.xend:not([hidden])) .xhot{display:none}
+.pane .slot.ownterm:has(.consbar) .xhot{bottom:calc(var(--tap) + 3 * var(--field-gap))}
 .pane .slot.ownterm .xhot .xhotkeys{display:flex;gap:var(--label-gap);min-width:0;overflow-x:auto;scrollbar-width:none}
 .pane .slot.ownterm .xhot .xhotkeys::-webkit-scrollbar{display:none}
 .pane .slot.ownterm .xhot button{flex:0 0 auto;min-height:var(--ctl);min-width:var(--ctl);padding:0 8px;font:var(--f-data);white-space:nowrap}
 .pane .slot.ownterm .xhot.folded{opacity:.5;padding:0;border-color:transparent;background:none;box-shadow:none}
 .pane .slot.ownterm .xhot.folded .xhotkeys{display:none}
 .pane .slot.ownterm .xhot.folded .xhottog{background:var(--panel)}
-/* Its links: a list under the bar, each a link to open and a press to copy. */
-.pane .slot.ownterm .xlinks{position:absolute;top:calc(100% + var(--label-gap));right:0;width:min(26rem,calc(100vw - 32px));
+@media(max-width:900px){ .pane .slot.ownterm .xhot{display:none} }
+/* Its links: a list over the bar, each a link to open and a press to copy. */
+.xlinks{position:absolute;bottom:calc(100% + var(--label-gap));right:0;width:min(26rem,calc(100vw - 32px));z-index:7;
   display:flex;flex-direction:column;gap:var(--label-gap);padding:var(--field-gap);background:var(--panel);
   border:var(--hair) solid var(--line);border-radius:var(--r-surface);box-shadow:0 10px 24px rgba(0,0,0,.5)}
-.pane .slot.ownterm .xlinks[hidden]{display:none}
-.pane .slot.ownterm .xlinks .xlhead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
-.pane .slot.ownterm .xlinks .xlrow{display:flex;align-items:center;gap:var(--field-gap);min-width:0}
-.pane .slot.ownterm .xlinks .xlrow a{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--f-data)}
-.pane .slot.ownterm .xlinks .xlnone{font:var(--f-note);color:var(--dim)}
+.xlinks[hidden]{display:none}
+.xlinks .xlhead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.xlinks .xlrow{display:flex;align-items:center;gap:var(--field-gap);min-width:0}
+.xlinks .xlrow a{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--f-data)}
+.xlinks .xlnone{font:var(--f-note);color:var(--dim)}
 .pane .empty-pane{margin:auto;color:var(--dim);font-style:italic}
 /* A popped-out terminal's placeholder (R8): the pane's empty voice, and the
    one control under it. */
@@ -5857,6 +5863,11 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   border:var(--hair) solid var(--line);border-top:0;border-radius:0 0 var(--r-surface) var(--r-surface)}
 .mobar button{min-height:var(--tap)}
 .mobar button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var(--on-fill)}
+/* The terminal's keys in the band, a phone's alone (the hot bar): a line of
+   them that scrolls under a thumb, taking what Keys and Commands leave. */
+.mobar{position:relative}
+.mobar .mhot{display:none}
+.mobar .mlinks{right:6px}
 .keys,.panes{border-radius:0}   /* the bar below them owns the bottom corners */
 /* flex-shrink 1, unlike the strip and the bar: on a phone held sideways the
    fixed chrome plus a flyout can be taller than the screen, and since the
@@ -5913,6 +5924,14 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   .mobar button{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .mobar button[hidden]{display:none}
   .mobar[hidden]{display:none}
+  /* The hot bar is the band (the operator, 12 Nov): the terminal's keys in a
+     line that scrolls, each a thumb wide, and Keys and Commands two small
+     presses at its end, their words left to their labels. */
+  .mobar .mhot:not([hidden]){display:flex;gap:6px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+  .mobar .mhot::-webkit-scrollbar{display:none}
+  .mobar .mhot button{flex:0 0 auto;min-width:var(--tap);padding-inline:10px;font:var(--f-data);white-space:nowrap}
+  .mobar .mhot:not([hidden]) ~ button{flex:0 0 auto;min-width:var(--tap);padding-inline:10px}
+  .mobar .mhot:not([hidden]) ~ button .mw{display:none}
   .mobar{border:0;border-top:var(--hair) solid var(--line);border-radius:0}   /* its foot is the bottom bar's line */
   .panes{min-height:90px}
 }
@@ -7691,9 +7710,16 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
       <div class="lab">git</div>
       <div class="macros" id="git"><div class="loading" data-skel="chips">loading…</div></div>
     </div>
+    <!-- The band at a terminal's foot. On a phone it is the hot bar (the
+         operator, 12 Nov): the keys of the terminal in front in a line that
+         scrolls, then Keys and Commands as two small presses at its end;
+         at a desk the keys float over the terminal (page-term.js) and the
+         band is Commands alone. -->
     <div class="mobar" id="mobar">
-      <button id="mKeys">⌨ Keys</button>
-      <button id="mMacros">» Commands</button>
+      <span class="mhot" id="mHot" role="toolbar" aria-label="terminal keys" hidden></span>
+      <button id="mKeys" aria-label="every key a touch keyboard lacks">⌨<span class="mw"> Keys</span></button>
+      <button id="mMacros" aria-label="commands to type into the shell">»<span class="mw"> Commands</span></button>
+      <div class="xlinks mlinks" id="mLinks" hidden></div>
     </div>
   </div>
 </main>
