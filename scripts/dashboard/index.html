@@ -2176,10 +2176,10 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .fxic{width:16px;height:16px;flex:0 0 auto;display:block;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;color:var(--dim)}
 .fxplace.on .fxic{color:var(--ink)}
 .fxmain{min-width:0;border:var(--hair) solid var(--line);border-radius:var(--r-surface);background:var(--panel)}
-.fxbar{display:flex;align-items:center;gap:var(--field-gap);min-width:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line)}
-.fxbar .fxbarend{display:flex;align-items:center;gap:var(--field-gap);margin-inline-start:auto;min-width:0;flex:0 1 auto}
-.fxbar .flfilter{flex:0 1 14rem;min-width:6rem;width:14rem}
-.fxbar .actbar{flex:0 0 auto}
+.flbar{display:flex;align-items:center;gap:var(--field-gap);min-width:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line)}
+.flbar .flbarend{display:flex;align-items:center;gap:var(--field-gap);margin-inline-start:auto;min-width:0;flex:0 1 auto}
+.flbar .flfilter{flex:0 1 14rem;min-width:6rem;width:14rem}
+.flbar .actbar{flex:0 0 auto}
 .fxcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;min-width:0;flex:1 1 auto;font:var(--f-ui)}
 .fxcrumbs .fxhere{font-weight:600;overflow-wrap:anywhere}
 .fxcrumbs .fxsep{color:var(--dim)}
@@ -2215,11 +2215,11 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
   .fxplace .fxpname{flex:0 0 auto;overflow:visible}
   .fxplace.fxtrash{margin-top:0}
   .fxmain{border-inline:0;border-radius:0}
-  .fxbar{flex-wrap:wrap}
-  .fxbar .fxcrumbs{flex:1 0 100%}
-  .fxbar .fxbarend{margin-inline-start:0;flex:1 1 100%}
-  .fxbar .flfilter{flex:1 1 6rem;width:auto}
-  .fxbar .fxbarend>.flfilter:only-child{flex:0 1 14rem}   /* in the trash, where nothing stands beside it: no control spans a phone */
+  .flbar{flex-wrap:wrap}
+  .flbar .fxcrumbs{flex:1 0 100%}
+  .flbar .flbarend{margin-inline-start:0;flex:1 1 100%}
+  .flbar .flfilter{flex:1 1 6rem;width:auto}
+  .flbar .flbarend>.flfilter:only-child{flex:0 1 14rem}   /* in the trash, where nothing stands beside it: no control spans a phone */
   .tbl.fxtbl .tline{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--row-x)}
   .tbl.fxtbl .tline>.td[data-th="Modified"],.tbl.fxtbl .tline>.td.act{display:none}
   .tbl.fxtbl .tline>.td[data-th]::before{content:none}

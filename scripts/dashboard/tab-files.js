@@ -170,7 +170,7 @@ function renderFilesInto(i){
     // As it waits, the page it will be: the places, the bar and the rows.
     d.list.innerHTML = skTpl(`<div class="fxpage"><div class="fxcols"><nav class="fxplaces"><div class="fxphead">Places</div>${
       [GHOST, GHOST, GHOST].map(g => `<span class="fxplace">${FL_ICON.place}<span class="fxpname">${g}</span></span>`).join("")}</nav>
-      <div class="fxmain"><div class="fxbar"><nav class="fxcrumbs"><span class="fxhere">${GHOST}</span></nav></div>${skRows(6)}</div></div></div>`);
+      <div class="fxmain"><div class="flbar"><nav class="fxcrumbs"><span class="fxhere">${GHOST}</span></nav></div>${skRows(6)}</div></div></div>`);
     if (!flSeq) loadFiles();
     return;
   }
@@ -202,7 +202,7 @@ function renderFilesInto(i){
         ${trash ? "" : `<div class="actbar"><button type="button" data-fxact="mkdir">New folder</button>
         <button type="button" class="primary" data-fxact="upload"${fl.serves ? "" : " disabled"}>Upload</button>
         <input type="file" id="flPick" multiple hidden></div>`}`;
-  const bar = `<div class="fxbar">${flCrumbs()}<div class="fxbarend">${right}</div></div>`;
+  const bar = `<div class="flbar">${flCrumbs()}<div class="flbarend">${right}</div></div>`;
   const up = flUp ? `<div class="fxnote"><div class="sub">Uploading ${esc(flUp.name)} (${flUp.i} of ${flUp.n}): ${flSize(flUp.done)} of ${flSize(flUp.size)}</div>
       <progress max="${flUp.size || 1}" value="${flUp.done}" aria-label="upload progress"></progress></div>` : "";
   const why = !fl.serves ? `<div class="field"><div class="notice warn">${esc(fl.name)}'s agent does not serve files yet: update it from the Nodes page.</div></div>`
