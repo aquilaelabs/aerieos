@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, log, pack_signins, root_docker_env
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, log, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -385,6 +385,23 @@ class Job(threading.Thread):
             time.sleep(delay)
             delay = min(delay * 2, 60)
 
+    def pack_bundle(self, agent, into, who, rooted):
+        """The bundle a pack's agent's sign-in runs from: `into` where its
+        packs describe that agent's sign-in, else the controller's bundle
+        fetched now and looked in again (a pack added or changed a moment
+        ago is in the controller's bundle before it is in the copy kept
+        here, which is refreshed on the agent's own clock). '' with the
+        refusal said when neither carries it."""
+        if agent in pack_signins(into):
+            return into
+        fresh = self.agent.bundle(self, who)
+        if fresh and rooted:
+            fresh = os.path.realpath(os.path.join(ROOT_BUNDLE_DIR, "current"))
+        if fresh and agent in pack_signins(fresh):
+            return fresh
+        self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
+        return ""
+
     def claude_login(self, spec, agent="", pack=False):
         """`claude auth login` on this machine, under a pty, as the SESSION
         account (roadmap R47).
@@ -423,9 +440,10 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
-        if pack and agent not in pack_signins(into):
-            self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
-            return "failed", 64
+        if pack:
+            into = self.pack_bundle(agent, into, who, bool(root_bb))
+            if not into:
+                return "failed", 64
         # The AerieOS account, so the bundle's own user_home resolves the
         # same per-account home bb-tty gives a session here. Resolved there
         # rather than here: one implementation of "where does this account
@@ -548,9 +566,10 @@ class Job(threading.Thread):
         into = root_bb or self.agent.bundle(self, who)
         if not into:
             return "failed", 69
-        if pack and agent not in pack_signins(into):
-            self.say(f"refused: no tool pack on this node brings a coding agent called '{agent}' with a sign-in of its own\n")
-            return "failed", 64
+        if pack:
+            into = self.pack_bundle(agent, into, who, bool(root_bb))
+            if not into:
+                return "failed", 64
         # The session account's home, which is this process's own where the
         # agent is not root and as_user changed nothing.
         env.setdefault("HOME", os.path.expanduser("~"))

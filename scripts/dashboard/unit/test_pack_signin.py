@@ -378,6 +378,24 @@ class SealedAndWatched(unittest.TestCase):
         self.assertEqual(tw.watched()[".heron/cli"], "oauth-token")
         self.assertEqual(tw.watched()[".claude"], ".credentials.json")
 
+    def test_a_sign_in_asked_for_before_the_nodes_bundle_caught_up_fetches_the_bundle_first(self):
+        # The pack gained its flow a moment ago: the controller's bundle has
+        # it, the copy kept on the node is from before.
+        import types
+        old = os.path.join(self.d, "old")
+        os.makedirs(os.path.join(old, "config"))
+        with open(os.path.join(old, "config", "toolpacks.json"), "w") as f:
+            json.dump({"toolchains": [{"name": "heron", "agent": dict(cleaned(), signin={"file": "", "env": ""})}]}, f)
+        said, fetched = [], []
+        job = types.SimpleNamespace(say=said.append, agent=types.SimpleNamespace(bundle=lambda j, who: fetched.append(1) or os.path.join(self.d, "store")))
+        new = os.path.realpath(os.path.join(self.d, "current"))
+        self.assertEqual(self.node.Job.pack_bundle(job, "heron", new, {}, True), new)
+        self.assertEqual(fetched, [], "a bundle that carries it is used as it is")
+        self.assertEqual(self.node.Job.pack_bundle(job, "heron", old, {}, True), new, "root's copy, as the fetch left it")
+        self.assertEqual((fetched, said), ([1], []))
+        self.assertEqual(self.node.Job.pack_bundle(job, "otter", old, {}, True), "")
+        self.assertIn("no tool pack on this node brings a coding agent called 'otter'", said[-1])
+
     def test_no_bundle_is_no_pack_agents(self):
         self.node.ROOT_BUNDLE_DIR = os.path.join(self.d, "nowhere")
         self.assertEqual(self.node.pack_signins(), {})

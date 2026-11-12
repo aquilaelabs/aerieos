@@ -93,6 +93,10 @@ function jobTitle(j){
   if (j.type === "storage") return "measure the disks";
   // Each coding agent's sign-in, sign-out and install by its own name, every
   // agent's job named <id>-login, -logout and -update (B291).
+  // A pack's agent's sign-in and sign-out are one pair of jobs for all of
+  // them (R233 step 6), the spec naming which.
+  const pk = (j.type === "agent-login" || j.type === "agent-logout") && AGENTS.find(a => a.id === s.agent);
+  if (pk) return `sign ${esc(pk.name)} ${j.type === "agent-login" ? "in" : "out"}`;
   const ag = (j.type || "").match(/^([a-z]+)-(login|logout|update)$/);
   // By its id or by its program: OpenCode's jobs are named after the
   // program (opencode-update) and its id is open, so its row read "exec".
