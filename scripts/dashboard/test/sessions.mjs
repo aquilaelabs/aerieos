@@ -62,7 +62,7 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
     const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
     return { keys: [...b.querySelectorAll('.xhotkeys button')].filter(x => !x.hidden).map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
              top: Math.round(r.top - h.top), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1,
-             tall: [...b.querySelectorAll('button')].every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
+             tall: [...b.querySelectorAll('button')].filter(x => !x.hidden).every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
   ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.top >= 0 && hot.top < 20 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall,
      `a shell's terminal wears its hot bar at its top right: a shell's keys and a page back and on, and no Links while it shows no link (${JSON.stringify(hot)})`);
   await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);

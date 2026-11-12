@@ -5799,8 +5799,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    for, over its top right corner. The one piece of the dashboard's chrome
    that sits on a terminal, so it is quiet until the pointer or the focus is
    on it, folds to its handle, and never takes the terminal's width: on a
-   narrow one its keys scroll sideways in their own line. */
-.pane .slot.ownterm{position:relative}
+   narrow one its keys scroll sideways in their own line. Placed in the
+   slot, which fills its pane's stack (.pane .stack > *) and so already
+   holds what is placed in it: no position of its own is set on the slot. */
 .pane .slot.ownterm .xhot{position:absolute;top:var(--label-gap);right:calc(var(--field-gap) + 6px);z-index:6;
   display:flex;align-items:center;gap:var(--label-gap);max-width:calc(100% - 2 * var(--field-gap) - 6px);
   padding:var(--label-gap);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
