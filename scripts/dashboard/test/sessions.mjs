@@ -60,11 +60,11 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
   const HOT = '#pane1 .slot.ownterm .xhot';
   const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
     const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
-    return { keys: [...b.querySelectorAll('.xhotkeys button')].map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
+    return { keys: [...b.querySelectorAll('.xhotkeys button')].filter(x => !x.hidden).map(x => x.textContent.trim()), folded: b.classList.contains('folded'),
              top: Math.round(r.top - h.top), right: Math.round(h.right - r.right), inside: r.left >= h.left - 1,
              tall: [...b.querySelectorAll('button')].every(x => x.getBoundingClientRect().height >= 30) }; }, HOT);
-  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn Links' && !hot.folded && hot.top >= 0 && hot.top < 20 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall,
-     `a shell's terminal wears its hot bar at its top right: a shell's keys, a page back and on, and Links (${JSON.stringify(hot)})`);
+  ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.top >= 0 && hot.top < 20 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall,
+     `a shell's terminal wears its hot bar at its top right: a shell's keys and a page back and on, and no Links while it shows no link (${JSON.stringify(hot)})`);
   await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);
   const up = tmuxFmt('shell-9', '#{pane_in_mode}');
   await page.click(`${HOT} [data-hk="down"]`); await sleep(300);
@@ -76,6 +76,9 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
     type("clear; printf 'soft https://example.test/soft/%s end\\n' \"$(printf 'a%.0s' $(seq 1 400))\"; echo \"https://example.test/hard/$(printf 'b%.0s' $(seq 1 400))\" | fold -w \"$(tput cols)\"; echo done-links\r"); });
   await page.waitForFunction(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); const b = rec?.term?.buffer?.active;
     for (let i = 0; b && i < b.length; i++) if (/^done-links/.test(b.getLine(i)?.translateToString(true) || '')) return true; return false; }, null, { timeout: 15000 }).catch(() => {});
+  // ...and Links is there once the terminal shows one (the operator, 12 Nov).
+  const offered = await page.waitForFunction(sel => !document.querySelector(sel + ' [data-hlinks]').hidden, HOT, { timeout: 8000 }).then(() => true, () => false);
+  ok(offered, 'Links joins the bar once the terminal shows a link');
   await page.click(`${HOT} [data-hlinks]`);
   const links = await page.evaluate(sel => { const l = document.querySelector(sel + ' .xlinks');
     return { shown: !l.hidden, hrefs: [...l.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...l.querySelectorAll('a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),

@@ -64,9 +64,10 @@ function termSlot(t){
 // Shift+Tab for its mode, the arrows and Enter for its menus), a shell's
 // (Tab to complete, ^C, ^D), and for every terminal the page up and down
 // and Links, which lists the links on its screen to open or copy (a link a
-// terminal prints could be neither on a phone). A log takes no keys and
-// has the last three alone, as an account with no shell has on a session
-// it only reads. Static per tab: what is folded is the browser's and is put
+// terminal prints could be neither on a phone) and is there only while the
+// terminal shows one (the operator, 12 Nov: a press that lists nothing is
+// not a press to offer). A log takes no keys and has the page keys and
+// Links alone, as an account with no shell has on a session it only reads. Static per tab: what is folded is the browser's and is put
 // on after the draw (termHotWire), so the slot is never drawn again for it.
 const TERM_HOT = {
   agent: [["escape", "Esc", "interrupt, or back out of a menu"], ["backtab", "⇧Tab", "Shift+Tab: its next mode"], ["up", "↑", "up"], ["down", "↓", "down"],
@@ -80,7 +81,7 @@ function termHotBar(t){
   const keys = [...(types ? TERM_HOT[agentOfArg(t.arg) ? "agent" : "shell"] : []), ...TERM_HOT.every];
   return `<div class="xhot" role="toolbar" aria-label="terminal keys">
     <span class="xhotkeys">${keys.map(([k, l, says]) => `<button type="button" data-hk="${esc(k)}" title="${esc(says)}" aria-label="${esc(says)}">${esc(l)}</button>`).join("")}<button
-      type="button" data-hlinks aria-expanded="false" title="the links on this terminal, to open or copy">Links</button></span><button
+      type="button" data-hlinks hidden aria-expanded="false" title="the links on this terminal, to open or copy">Links</button></span><button
       type="button" class="xhottog" aria-expanded="true" aria-label="hide these keys" title="hide these keys">›</button>
     <div class="xlinks" hidden></div></div>`;
 }
@@ -109,6 +110,14 @@ function termHotWire(rec){
   };
   const shut = () => { links.hidden = true; lb.setAttribute("aria-expanded", "false"); };
   fold(termHotFolded());
+  // Links while the terminal shows a link, looked for again a moment after
+  // each thing it writes (termHotLook).
+  rec.hotLinks = () => {
+    const has = termLinks(rec).length > 0;
+    if (lb.hidden !== !has) lb.hidden = !has;
+    if (!has && !links.hidden) shut();
+  };
+  rec.hotLinks();
   // A press on the bar leaves the keyboard where it is: the terminal keeps
   // the focus it had, and a phone's keyboard does not fold away under a key.
   bar.onpointerdown = e => { if (e.target.closest("button")) e.preventDefault(); };
@@ -133,6 +142,13 @@ function termHotWire(rec){
     lb.setAttribute("aria-expanded", "true");
   };
   bar.onkeydown = e => { if (e.key === "Escape" && !links.hidden){ e.stopPropagation(); shut(); } };
+}
+
+// The terminal wrote something: whether it shows a link is looked at again,
+// once it has been quiet for a moment, never on every line of a long run.
+function termHotLook(rec){
+  clearTimeout(rec.hotTimer);
+  rec.hotTimer = setTimeout(() => { if (!rec.gone) rec.hotLinks?.(); }, 400);
 }
 
 // The links a terminal shows, newest first: on its screen and in the lines
@@ -308,6 +324,10 @@ function termMount(el, t, key){
       term.onBinary(d => termType(rec, Uint8Array.from(d, c => c.charCodeAt(0))));
     }
     term.onResize(({cols, rows}) => termSend(rec, 1, new TextEncoder().encode(JSON.stringify({cols, rows}))));
+    // What it writes may bring a link, or scroll the last one away: the hot
+    // bar's Links follows.
+    (term.onWriteParsed || term.onRender).call(term, () => termHotLook(rec));
+    termHotLook(rec);
     // Its box changes size with the pane, the dock and the keyboard.
     rec.ro = new ResizeObserver(() => termFit(rec));
     rec.ro.observe(el.querySelector(".xhost"));
