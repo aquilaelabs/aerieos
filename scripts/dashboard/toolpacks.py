@@ -506,9 +506,18 @@ def _signin_flow(f, out, errors):
     bad = len(errors)
     if not out.get("login"):
         errors.append("agent.signin.flow is run by agent.signin.login, the command that starts its sign-in")
+    # How its link starts, or the few ways it may (a program that signs in
+    # at one of several hosts): each https and its host.
     url = f.get("url")
-    if not (isinstance(url, str) and FLOW_URL.fullmatch(url)):
-        errors.append("agent.signin.flow.url is how the link it prints starts: https and its host, e.g. https://auth.example.com/")
+    urls = url if isinstance(url, list) else [url]
+    if not (1 <= len(urls) <= 4 and all(isinstance(u, str) and FLOW_URL.fullmatch(u) for u in urls)):
+        errors.append("agent.signin.flow.url is how the link it prints starts: https and its host, e.g. https://auth.example.com/, or up to 4 of them")
+    # How the flow ends: by the kept file's arrival, for a program that stays
+    # up once signed in (its first-run screens are the person's own), or by
+    # the program ending itself, signed in when it says so by its exit.
+    ends = f.get("ends", "kept")
+    if ends not in ("kept", "exit"):
+        errors.append("agent.signin.flow.ends is kept (the kept file's arrival ends it) or exit (the program ends itself once signed in)")
     words = {}
     for k in ("prompt", "code_after", "refused"):
         v = f.get(k, "")
@@ -527,6 +536,7 @@ def _signin_flow(f, out, errors):
     kept = f.get("kept")
     if not (isinstance(kept, str) and REL.fullmatch(kept)):
         errors.append("agent.signin.flow.kept is the file its sign-in is kept in, under the account's home")
+        kept = ""
     logout = f.get("logout") if f.get("logout") is not None else []
     if not (isinstance(logout, list) and len(logout) <= 6 and all(isinstance(x, str) and ARG.fullmatch(x) for x in logout)) \
             or (logout and logout[0] != out.get("command")):
@@ -535,13 +545,22 @@ def _signin_flow(f, out, errors):
     if len(errors) != bad:
         return None
     return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"], "refused": words["refused"],
-            "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout)}
+            "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout),
+            **({"ends": "exit"} if ends == "exit" else {})}
 
 
 def _agent_uses(a):
     """What a cleaned adapter uses that a second number of the framework
     brought, each (version, what it is)."""
-    return [((2, 1), "its agent's signin.flow")] if ((a or {}).get("signin") or {}).get("flow") else []
+    flow = ((a or {}).get("signin") or {}).get("flow")
+    if not flow:
+        return []
+    out = [((2, 1), "its agent's signin.flow")]
+    if flow.get("ends") == "exit":
+        out.append(((2, 2), "signin.flow.ends"))
+    if isinstance(flow.get("url"), list):
+        out.append(((2, 2), "signin.flow.url as a list"))
+    return out
 
 
 def _agent_format(a):

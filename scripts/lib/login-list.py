@@ -157,7 +157,9 @@ def pack_flows():
             continue
         kept, url = flow.get("kept"), flow.get("url")
         if not (isinstance(kept, str) and re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", kept) and not kept.startswith("/")
-                and not any(p in ("", ".", "..") for p in kept.split("/")) and isinstance(url, str) and url.startswith("https://")):
+                and not any(p in ("", ".", "..") for p in kept.split("/"))
+                # How its link starts, one way or a few: each a web address.
+                and (urls := url if isinstance(url, list) else [url]) and all(isinstance(u, str) and u.startswith("https://") for u in urls)):
             continue
         out[name] = a
     return out

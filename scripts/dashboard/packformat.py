@@ -48,12 +48,14 @@ this beside toolpacks.py from a checkout of any release.
 FORMAT = 2
 # ...and the framework's second number, which this build reads up to: what
 # was added since that an earlier build leaves out. It never resets.
-MINOR = 1
+MINOR = 2
 VERSION = f"{FORMAT}.{MINOR}"
 # What each second number added, by the version that brought it.
 ADDED = {
     (2, 1): "a coding agent's sign-in described as data (signin.flow), so the page runs it; who a tool is by (maker), "
             "and each maker's tool where a pack carries several (credits)",
+    (2, 2): "a sign-in whose program ends by itself once signed in (signin.flow.ends exit), and whose link may start in "
+            "more than one way (signin.flow.url as a list)",
 }
 # What each number added, for the docs and for a person reading a refusal.
 FORMATS = {

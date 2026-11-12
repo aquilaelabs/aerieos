@@ -91,8 +91,14 @@ while True:
         out(k.decode() + " \b")
     if code == b"good-code":
         keep()
+        if KIND == "exits":
+            out("\r\nLogin successful.\r\n")
+            sys.exit(0)
         out("\x1b[2J\x1b[HWelcome! Choose your color scheme\r\n > dark\r\n   light\r\n")
         time.sleep(600)
+    if KIND == "exits":
+        out("\r\nLogin failed: that code was not accepted.\r\n")
+        sys.exit(1)
     out("\r\n\u28ef Signing in...")
     time.sleep(0.3)
     out("\r\u28df \x1b[31mThat code was not accepted. Try again.\x1b[0m\r\n > ")
@@ -113,6 +119,12 @@ def with_flow(**change):
         else:
             m["agent"]["signin"]["flow"][k] = v
     return m
+
+
+def at_2_2(m):
+    """The same manifest, saying the framework version that holds how a
+    flow ends and a link of several beginnings."""
+    return dict(m, framework="2.2")
 
 
 class TheFlowAsData(unittest.TestCase):
@@ -145,6 +157,19 @@ class TheFlowAsData(unittest.TestCase):
             self.assertTrue(any("one of them" in e for e in errors), (change, errors))
         flow = cleaned(with_flow(prompt=None, code_after="enter the one-time code"))["signin"]["flow"]
         self.assertEqual((flow["prompt"], flow["code_after"]), ("", "enter the one-time code"))
+
+    def test_how_a_flow_ends_and_a_link_of_several_beginnings_are_framework_2_2s(self):
+        m = with_flow(ends="exit")
+        self.assertTrue(any("signin.flow.ends is catalog framework 2.2's" in e for e in toolpacks.validate(m)[1]))
+        m["framework"] = "2.2"
+        self.assertEqual(cleaned(m)["signin"]["flow"]["ends"], "exit")
+        self.assertNotIn("ends", cleaned()["signin"]["flow"], "one that says none ends on its kept file, as before")
+        m = with_flow(url=["https://a.heron.example/", "https://b.heron.example/x"])
+        m["framework"] = "2.2"
+        self.assertEqual(cleaned(m)["signin"]["flow"]["url"], ["https://a.heron.example/", "https://b.heron.example/x"])
+        for bad in ({"ends": "soon"}, {"url": []}, {"url": ["https://a.heron.example/"] * 5}, {"url": ["https://a.heron.example/", "ftp://x.example/"]}):
+            _, errors = toolpacks.validate(dict(with_flow(**bad), framework="2.2"))
+            self.assertTrue(any("flow.ends" in e or "flow.url" in e for e in errors), (bad, errors))
 
     def test_a_flow_needs_the_command_that_starts_it(self):
         m = copy.deepcopy(HERON)
@@ -321,6 +346,29 @@ class OnTheNode(unittest.TestCase):
         self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK)
         self.assertEqual(signin.PACK_FLOW["code"].search(log).group(1), "WXYZ-1234")
         self.assertNotIn("Paste code", log)
+
+    def test_a_program_that_ends_itself_is_signed_in_when_it_exits_clean(self):
+        # As the shipped agents' own logins do: the flow waits for the
+        # program, and its exit is the word on whether it took.
+        self.write_packs(at_2_2(with_flow(ends="exit", url=["https://login.heron.example/", "https://accounts.heron.example/o/oauth2/"])))
+        log, code = self.flow(("Paste code", "good-code"), env={"HERON_KIND": "exits"})
+        self.assertEqual(code, 0, log)
+        self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK, "the link by whichever of its beginnings it has")
+        self.assertIn("[aerieos] signed in to Heron on node one", log)
+        log, code = self.flow(("Paste code", "bad-code"), env={"HERON_KIND": "exits"})
+        self.assertEqual(code, 1, log)
+        self.assertIn("Login failed: that code was not accepted", [ln for ln in log.splitlines() if ln.strip()][-1])
+
+    def test_a_program_that_ends_itself_is_run_whatever_file_is_there(self):
+        # It knows a sign-in that ran out, where a file left in place does not.
+        self.write_packs(at_2_2(with_flow(ends="exit")))
+        os.makedirs(os.path.dirname(os.path.join(self.home, KEPT)))
+        with open(os.path.join(self.home, KEPT), "w") as f:
+            f.write("{}")
+        log, code = self.flow(("Paste code", "good-code"), env={"HERON_KIND": "exits"})
+        self.assertEqual(code, 0, log)
+        self.assertNotIn("already signed in", log)
+        self.assertTrue(os.path.exists(os.path.join(self.home, "heron.pid")), "the program was run")
 
     def test_signed_in_already_starts_nothing(self):
         os.makedirs(os.path.dirname(os.path.join(self.home, KEPT)))

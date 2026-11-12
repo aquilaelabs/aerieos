@@ -17,6 +17,8 @@ held to plain words by toolpacks.py):
                person types the code on the provider's page
   kept         the file under the account's home whose arrival says the
                account is signed in, which ends the flow
+  ends         "exit" for a program that ends itself once signed in: the
+               flow then waits for it and is signed in when it exits clean
   refused      the words it shows when it does not take the code, so the
                flow ends then, in its words, and not after a wait
   logout       its own sign-out command; left out, a sign-out removes `kept`
@@ -91,9 +93,11 @@ def squash(text):
 
 
 def link_in(raw, prefix):
-    """The longest link in `raw` that starts as the pack says, or "": the
-    one a terminal link carries whole, or the one drawn on one wide row."""
-    got = re.findall(re.escape(prefix) + r"[^\s\x1b\x07\"'<>]*", raw)
+    """The longest link in `raw` that starts as the pack says (one way, or
+    one of a few), or "": the one a terminal link carries whole, or the one
+    drawn on one wide row."""
+    ways = prefix if isinstance(prefix, list) else [prefix]
+    got = [m for p in ways for m in re.findall(re.escape(p) + r"[^\s\x1b\x07\"'<>]*", raw)]
     return max(got, key=len) if got else ""
 
 
@@ -149,7 +153,10 @@ def sign_in(agent, a):
     if not home or not argv:
         say(f"{name} has no sign-in to run here")
         return 1
-    if kept_now(kept):
+    # A program that ends itself is asked whatever its file says: it knows
+    # a sign-in that has run out, where a file left in place does not.
+    by_exit = flow.get("ends") == "exit"
+    if kept_now(kept) and not by_exit:
         say(f"already signed in to {name} here: sign out first to sign in as somebody else")
         return 0
     if not shutil.which(argv[0]):
@@ -231,7 +238,7 @@ def sign_in(agent, a):
                             os.write(master, b"\r")
                         sent_at, since, typed_code = time.time(), "", got
                         say(f"the code is with {name}; waiting for it to keep the sign-in")
-            if kept_now(kept):
+            if not by_exit and kept_now(kept):
                 say(f"signed in to {name} on {os.environ.get('BB_NODE') or 'this machine'}")
                 return 0
             text = visible(raw)
@@ -265,7 +272,9 @@ def sign_in(agent, a):
                 asked = True
                 say("Paste code: the one that page gives you once you have signed in there")
             if proc.poll() is not None:
-                if kept_now(kept):
+                # Ended by itself: signed in where it says so by its exit,
+                # or where the file its sign-in is kept in is there.
+                if (by_exit and proc.returncode == 0) or (not by_exit and kept_now(kept)):
                     say(f"signed in to {name} on {os.environ.get('BB_NODE') or 'this machine'}")
                     return 0
                 break

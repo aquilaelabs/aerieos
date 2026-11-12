@@ -194,12 +194,13 @@ person the link and a field for the code, which is what a phone can use:
 | Key | What it says |
 |---|---|
 | `answers` | Up to four things its screen asks before the link: `when` is the plain words it shows, `send` the key or short word typed there (letters and digits, eight at most; empty for Enter alone). Enter follows each. |
-| `url` | How the link it prints starts: `https`, its host, and as much of the path as never changes. The link is read whole however the program wraps it. |
+| `url` | How the link it prints starts: `https`, its host, and as much of the path as never changes. The link is read whole however the program wraps it. A program that signs in at one of several hosts gives up to four, as a list (framework 2.2). |
 | `prompt` | The words it waits at for the code the provider's page hands back. The page draws a field, and what a person pastes there is typed into the program. |
 | `code_after` | In `prompt`'s place, for a flow where a person types a code on the provider's page: the words that code follows on its screen. The page shows the code, and nothing is typed back. |
 | `refused` | The words it shows when it does not take the code. The flow ends then and the page says why in the program's own words; without it, a code that was not taken is noticed after two minutes. |
 | `kept` | The file under the account's home its sign-in is kept in. Its arrival ends the flow, signed in; it is what says who is signed in on a node, it is sealed where a node seals sign-ins, and a sign-out removes it. |
 | `logout` | Its own sign-out command, where it has one (`["kite", "logout"]`); the kept file is removed after it. |
+| `ends` | `exit` for a program that ends itself once signed in (`kite login` that returns): the flow waits for it, and it is signed in when it exits clean. Left out, the flow ends when the kept file arrives and the program is ended then, which is for one that stays up on its own screens (framework 2.2). |
 
 Nothing in a flow is a pattern or a command line: the words are plain ones,
 compared without their spaces or case, and the only program run is the
@@ -270,6 +271,7 @@ on its Details what that install leaves out.
 | 1.0 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | | 0.9.0's first releases |
 | 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
 | 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
+| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), and whose link may start in more than one way (`signin.flow.url` as a list). | Takes the entry; one that reads 2.1 runs neither kind of flow from its page, and the agent signs in in its terminal. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 
