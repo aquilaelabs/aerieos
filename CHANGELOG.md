@@ -14,6 +14,10 @@
 - Start agent's menu offers your conversations on a space as one pulldown with one Resume, each named by its label or its first words, where it listed a row and a button for each; a link under it opens all of them in the Sessions view, which has a find field past five (d95ead2)
 - A Library card names who its tool is by (Google, Eclipse Adoptium, Anthropic) to the left of its pill, and the pill reads Packaged by Aerie where it read Built by Aerie: the pill says who packaged a tool, never who made it. A toolchain that puts several makers' tools together is by AerieOS, with each credited on its Details page (b64cf66)
 
+### Fixed
+
+- Sign in on Claude Code's row opened a link cut off at its first line, so Claude's page said only that the sign-in did not complete: a newer Claude Code prints the link wrapped and as a terminal hyperlink. The whole link is read now, for every agent's sign-in (54f906a)
+
 ## 0.9.0-dev.5284: 2026-11-12
 
 ### Changed
