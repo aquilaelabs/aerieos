@@ -5,6 +5,8 @@
 ### Fixed
 
 - A session that cannot start on a node because part of its view could not be mounted says which part; it said only 'No such file or directory' (6ee24d7)
+- A session or a shell starts again on a node set up before AerieOS had its name, once that node's agent has restarted: none did where the node carries a CI runner's folder, ending at 'this node could not build its view' (55a9cd1)
+- A session's view leaves out the agent's own folder on a node set up since AerieOS had its name, or whose Enroll script was run again: it was left in view there, readable as far as its files' permissions allowed (other spaces' build caches and containers' data among them) (55a9cd1)
 
 ## 0.9.0-dev.5269: 2026-11-12
 
