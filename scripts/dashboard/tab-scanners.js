@@ -140,7 +140,9 @@ function renderScannersInto(i){
     d.list.innerHTML = scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
       : skTpl(pageHead({facts: [["Newest known", GHOST], ["Checked", GHOST]], actions: scannersActs(null)})
         + docSection("scanners", "schedule", "Schedule", "", `<div class="field">${skRows(2)}</div>`)
-        + docSection("scanners", "node-", GHOST, "", `<div class="field">${skRows(3)}</div>`)
+        // A node's section before its name is read: a word, since a
+        // section's title is words and the ghost is a fact's value.
+        + docSection("scanners", "node-", "Nodes", "", `<div class="field">${skRows(3)}</div>`)
         + docSection("scanners", "uncovered", "Not covered", "", `<div class="field">${skRows(1)}</div>`));
     if (!scannersErr) loadScanners();
     return;
