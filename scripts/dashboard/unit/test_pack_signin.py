@@ -59,6 +59,7 @@ out = lambda s: (sys.stdout.write(s), sys.stdout.flush())
 home = os.environ["HOME"]
 open(os.path.join(home, "heron.pid"), "w").write(str(os.getpid()))
 open(os.path.join(home, "heron.cols"), "w").write(str(os.get_terminal_size().columns))
+open(os.path.join(home, "heron.token"), "w").write(os.environ.get("BB_TOKEN", ""))
 tty.setraw(0)
 def key():
     return os.read(0, 1)
@@ -263,8 +264,10 @@ class OnTheNode(unittest.TestCase):
         return False
 
     def test_the_link_goes_up_whole_the_code_comes_down_and_the_program_is_ended_once_signed_in(self):
-        log, code = self.flow(("Paste code", "good-code"))
+        log, code = self.flow(("Paste code", "good-code"), env={"BB_TOKEN": "the-flows-own-token"})
         self.assertEqual(code, 0, log)
+        with open(os.path.join(self.home, "heron.token")) as f:
+            self.assertEqual(f.read(), "", "what the flow reports with is not handed to the program signing in")
         self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK, "whole, though the program wraps it at 80 columns")
         self.assertIn("[aerieos] signed in to Heron on node one", log)
         self.assertTrue(os.path.getsize(os.path.join(self.home, KEPT)) > 0)

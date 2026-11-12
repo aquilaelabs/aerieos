@@ -146,6 +146,10 @@ def sign_in(agent, a):
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
     env = dict(os.environ, TERM="xterm-256color", COLUMNS=str(COLS), LINES=str(ROWS))
     env.update({str(k): str(v) for k, v in (a.get("env") or {}).items()})
+    # What this flow tells the controller with afterwards is aerie's own to
+    # hold: the program signing in has no use for it.
+    for k in ("BB_TOKEN", "BB_LOGIN_AUTH"):
+        env.pop(k, None)
     # The code is typed into the program, never said back up the log.
     with contextlib.suppress(termios.error, OSError):
         attrs = termios.tcgetattr(0)
