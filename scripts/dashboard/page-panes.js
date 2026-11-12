@@ -139,9 +139,11 @@ function unveil(frame){
 function consoleBar(t){
   if (mayShell() || !isClaude(t)) return "";
   const s = sessionOf(t.arg);
+  // By the name of the agent the session is: a Gemini tab's said Claude.
+  const who = agentOfSession(tmuxBase(s))?.agent.name || "Claude";
   return `<div class="consbar" data-sess="${esc(s)}">
-    <input class="consin" placeholder="message Claude, then Enter"
-      aria-label="message Claude" autocomplete="off" spellcheck="false">
+    <input class="consin" placeholder="message ${esc(who)}, then Enter"
+      aria-label="message ${esc(who)}" autocomplete="off" spellcheck="false">
     <button type="button" class="conssend primary">Send</button>
     <button type="button" class="consend" title="end this conversation: the
       transcript is kept and can be resumed">Terminate</button>
