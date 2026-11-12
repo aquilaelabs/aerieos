@@ -141,8 +141,9 @@ def conf():
          "DATA_STORE": "/var/lib/builderbot/data", "ARTIFACTS_STORE": "/var/lib/builderbot/artifacts",
          "RUNNER_DIR": "/var/lib/builderbot/runner", "HIDE": "/devdata",
          # The agent's own directory: in the view it holds the stores above
-         # and nothing else of what the agent keeps there.
-         "STATE_DIR": "/var/lib/builderbot",
+         # and nothing else of what the agent keeps there. Under whichever
+         # of its two names is there (below), unless the layout file says.
+         "STATE_DIR": "",
          # The scoped toolchain store, whose .bb bundle is the bb and bb-tty a
          # session and the agent run. Empty until the agent writes it, and then
          # the bundle is read-only in the view (B157).
@@ -159,6 +160,7 @@ def conf():
     # run by the suite: `enter` is root through sudo, which resets the
     # environment, and root reads the machine's own file whatever it says.
     path = os.environ.get("BB_SESSION_CONF", CONF) if os.geteuid() != 0 else CONF
+    said = set()
     try:
         st = os.stat(path)
         if (st.st_uid == 0 or path != CONF) and not st.st_mode & 0o022:
@@ -167,8 +169,15 @@ def conf():
                     key, sep, value = line.strip().partition("=")
                     if sep and key in c and not line.startswith("#"):
                         c[key] = value.strip()
+                        said.add(key)
     except OSError:
         pass
+    # The agent's folder has two names (R204): /var/lib/aerieos, and
+    # /var/lib/builderbot on a machine provisioned before that, one of them
+    # a link to the other or not there at all. Whichever answers; plan reads
+    # every such path by where it really is.
+    if "STATE_DIR" not in said:
+        c["STATE_DIR"] = next((d for d in AGENT_DIRS if os.path.isdir(d)), AGENT_DIRS[0])
     if not c["HOME_ROOT"]:
         try:
             c["HOME_ROOT"] = pwd.getpwnam(c["SESSION_USER"]).pw_dir
@@ -190,6 +199,21 @@ def _repo_name(tree):
     name = re.split(r"[/:]", m.group(1).rstrip("/"))[-1]
     name = name[:-4] if name.endswith(".git") else name
     return name if re.fullmatch(r"[A-Za-z0-9._-]{1,100}", name) and not name.startswith(".") else ""
+
+
+AGENT_DIRS = ("/var/lib/aerieos", "/var/lib/builderbot")
+
+
+def _real(path):
+    """A path of the layout by where it really is, "" for none. The agent's
+    folder answers to two names, one a link to the other (R204), and the
+    layout names its stores under one and its runner under the other: read
+    as written, the cover over the folder went on under one name and the
+    runner's folder was then looked for under the other, where the cover had
+    just put nothing, so no session started; and on a machine where the old
+    name is the link, the folder was not covered at all."""
+    path = (path or "").rstrip("/")
+    return os.path.realpath(path) if path else ""
 
 
 def _real_dir(path):
@@ -555,15 +579,15 @@ def plan(c, a, uid, wall=None):
         if _real_dir(path):
             caches.setdefault(os.path.realpath(path), set()).update(keep)
     caches = sorted(caches.items())
-    data, art = c["DATA_STORE"].rstrip("/"), c["ARTIFACTS_STORE"].rstrip("/")
-    store = c["TOOLCHAINS_STORE"].rstrip("/") if c.get("TOOLCHAINS_STORE") else ""
+    data, art = _real(c["DATA_STORE"]), _real(c["ARTIFACTS_STORE"])
+    store = _real(c.get("TOOLCHAINS_STORE"))
     # What every scope of the toolchain store keeps once, beside them: the
     # Android system images, which the scoped store links to by a relative
     # path, so the view holds it wherever it holds the store.
     beside = f"{os.path.dirname(store)}/shared" if store and _real_dir(store) else ""
     if not _real_dir(beside):
         beside = ""
-    state = c["STATE_DIR"].rstrip("/") if c.get("STATE_DIR") else ""
+    state = _real(c.get("STATE_DIR"))
     top = _top()
 
     # The places on the node this project is set to see (its settings, the
@@ -825,9 +849,9 @@ def plan(c, a, uid, wall=None):
         steps.append(("bindro", real, real))
     # What the layout names to hide, where it is not out of sight already:
     # under a cover it is not there to mount on.
-    for hidden in [c["RUNNER_DIR"]] + [x for x in c["HIDE"].split(":") if x]:
-        if _real_dir(hidden.rstrip("/")) and not _inside(hidden.rstrip("/"), out_of_sight):
-            steps.append(("hide", hidden.rstrip("/")))
+    for hidden in [_real(x) for x in [c["RUNNER_DIR"]] + c["HIDE"].split(":") if x]:
+        if _real_dir(hidden) and not _inside(hidden, out_of_sight):
+            steps.append(("hide", hidden))
     # ...and, on the controller's own machine (R90), everything the wall
     # names: the controller's state, env file, secrets and agent socket.
     # Under /var, /etc and /run, which are the system's own and stay in the
