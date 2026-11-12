@@ -271,7 +271,7 @@ on its Details what that install leaves out.
 | 1.0 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | | 0.9.0's first releases |
 | 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
 | 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
-| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), and whose link may start in more than one way (`signin.flow.url` as a list). | Takes the entry; one that reads 2.1 runs neither kind of flow from its page, and the agent signs in in its terminal. | the releases after 0.9.0-dev.5284 |
+| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), and whose link may start in more than one way (`signin.flow.url` as a list). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 

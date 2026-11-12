@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 import agents  # noqa: E402
+import packformat  # noqa: E402
 import signin  # noqa: E402
 import toolpacks  # noqa: E402
 
@@ -170,6 +171,16 @@ class TheFlowAsData(unittest.TestCase):
         for bad in ({"ends": "soon"}, {"url": []}, {"url": ["https://a.heron.example/"] * 5}, {"url": ["https://a.heron.example/", "ftp://x.example/"]}):
             _, errors = toolpacks.validate(dict(with_flow(**bad), framework="2.2"))
             self.assertTrue(any("flow.ends" in e or "flow.url" in e for e in errors), (bad, errors))
+
+    def test_a_flow_written_for_a_later_framework_in_a_way_this_build_does_not_read_is_left_out(self):
+        # The second number's promise: an install from before it takes the
+        # entry and leaves the new part out, never refuses the manifest.
+        m = dict(with_flow(url={"any-of": ["https://a.heron.example/"]}, ends="when-told"), framework="2.9")
+        got, errors = toolpacks.validate(m)
+        self.assertEqual(errors, [])
+        self.assertNotIn("flow", got["pack_agent"]["signin"], "the agent signs in in its terminal here")
+        _, errors = toolpacks.validate(dict(m, framework=packformat.VERSION))
+        self.assertTrue(errors, "said wrong in a version this build reads, it is said")
 
     def test_a_flow_needs_the_command_that_starts_it(self):
         m = copy.deepcopy(HERON)

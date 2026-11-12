@@ -344,7 +344,7 @@ EVENT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9._]{0,40}$")
 TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,60}$")
 
 
-def _pack_agent(name, a, errors):
+def _pack_agent(name, a, errors, newer=False):
     """The adapter of a coding agent a vetted pack brings, checked and cut
     down to what bb-tty and bb-agent-hook read, or None."""
     if not isinstance(a, dict):
@@ -453,9 +453,16 @@ def _pack_agent(name, a, errors):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
     if si.get("flow") is not None:
+        before = len(errors)
         flow = _signin_flow(si["flow"], out, errors)
         if flow:
             out["signin"]["flow"] = flow
+        elif newer:
+            # Written for a later second number of the framework than this
+            # build reads (R234 step 7): a flow said in a way it does not
+            # know is left out, and the agent signs in in its terminal;
+            # the manifest is not refused for it.
+            del errors[before:]
     _agent_allow(a, out, errors)
     if (out.get("allow") or {}).get("how") == "hook" and not ((answers or {}).get("pre") or {}).get("approve"):
         errors.append("agent.allow.how hook needs hooks.answers.pre to say how a tool is approved (an approve)")
@@ -662,7 +669,7 @@ def validate(m, shipped=()):
         errors.append("shipped (a toolchain's recipe) is an official pack's alone")
     if m.get("agent") is not None:
         if not official:
-            a = _pack_agent(name, m["agent"], errors)
+            a = _pack_agent(name, m["agent"], errors, newer=(packformat.framework_of(m) or (0, 0))[1] > packformat.MINOR)
             if a:
                 out["pack_agent"] = a
                 # What it uses says the format it needs, and the manifest
