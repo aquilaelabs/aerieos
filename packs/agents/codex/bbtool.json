@@ -29,12 +29,46 @@
   "product": "Codex CLI",
   "provider": "OpenAI",
   "reported": "codex",
+  "signin": {
+   "flow": {
+    "code_after": "Enter this one-time code",
+    "ends": "exit",
+    "kept": ".codex/auth.json",
+    "logout": [
+     "codex",
+     "logout"
+    ],
+    "url": "https://auth.openai.com/",
+    "who": {
+     "email": [
+      "tokens",
+      "id_token",
+      "email"
+     ],
+     "key": [
+      "OPENAI_API_KEY"
+     ],
+     "key_named": "an OpenAI API key",
+     "plan": [
+      "tokens",
+      "id_token",
+      "https://api.openai.com/auth",
+      "chatgpt_plan_type"
+     ]
+    }
+   },
+   "login": [
+    "codex",
+    "login",
+    "--device-auth"
+   ]
+  },
   "state": "hooks",
   "tool": "codex-cli",
   "transcripts": ".codex/sessions",
   "update_job": "codex-update"
  },
- "framework": "2.1",
+ "framework": "2.2",
  "label": "ChatGPT",
  "maker": "OpenAI",
  "name": "codex",

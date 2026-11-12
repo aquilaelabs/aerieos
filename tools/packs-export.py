@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
 import agents    # noqa: E402
 import catalogrows  # noqa: E402
 import library  # noqa: E402
+import packformat  # noqa: E402
 import toolpacks  # noqa: E402
 
 PACKS = os.path.join(ROOT, "packs")
@@ -63,7 +64,12 @@ def agent_packs():
                       # ...and how it is installed (R169 step 13): the recipe
                       # the controller hands a node, which the catalog's copy
                       # replaces when its rev is higher.
-                      | ({"install": a.install} if a.install else {})}
+                      | ({"install": a.install} if a.install else {})
+                      # ...and how it signs in (R234 step 6), in the words a
+                      # pack's agent says its own: the one driver runs both.
+                      | ({"signin": a.signin} if a.signin else {})}
+        # The framework version it needs: the least that holds what it uses.
+        m["framework"] = packformat.least(m, toolpacks._agent_uses({"signin": a.signin or {}})) or m["framework"]
         out.append((os.path.join(PACKS, "agents", a.id, "bbtool.json"), m))
     return out
 

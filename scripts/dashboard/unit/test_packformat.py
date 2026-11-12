@@ -141,7 +141,12 @@ class Framework(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         for f in sorted((root / "packs").glob("*/*/bbtool.json")):
             m = json.loads(f.read_text())
-            self.assertEqual(m.get("framework"), "2.1", f"{f.parent.name} names its maker, which is framework 2.1's")
+            # A shipped agent that says how it signs in says who is signed
+            # in from a named file, which is 2.2's.
+            want = "2.2" if (m.get("agent") or {}).get("signin") else "2.1"
+            self.assertEqual(m.get("framework"), want, f"{f.parent.name} names its maker, which is framework 2.1's")
+            if want == "2.2":
+                self.assertTrue(toolpacks.validate(dict(m, framework="2.1"))[1], f"{f.parent.name}: what it uses is held to the version it says")
 
 
 class Number(unittest.TestCase):

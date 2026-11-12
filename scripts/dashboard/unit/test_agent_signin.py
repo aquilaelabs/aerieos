@@ -19,6 +19,7 @@ import claudegrant  # noqa: E402
 import signin  # noqa: E402
 
 LIST = os.path.join(HERE, "..", "..", "lib", "login-list.py")
+FLOW = os.path.join(HERE, "..", "..", "lib", "login-flow.py")
 PROBES = os.path.join(HERE, "..", "..", "lib", "doctor-probes.py")
 
 
@@ -44,6 +45,14 @@ class Listed(unittest.TestCase):
         p = subprocess.run([sys.executable, "-I", LIST], env={"BB_USERS_DIR": self.root, "PATH": os.environ["PATH"]},
                            capture_output=True, text=True, check=True)
         return json.loads(p.stdout)[0]
+
+    def sign_out(self, agent):
+        """The sign-out as `aerie login --out --agent` runs it: the one
+        driver, from what the agent's row says."""
+        p = subprocess.run([sys.executable, FLOW, "out", agent], env={"HOME": self.home, "PATH": os.environ["PATH"], "BB_NODE": "node one"},
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        return p.stdout
 
     def test_nobody_signed_in_lists_no_agent(self):
         self.assertEqual(self.listed()["agents"], {})
@@ -75,6 +84,20 @@ class Listed(unittest.TestCase):
         self.put(".grok/auth.json", {"token": "opaque"})
         self.assertEqual(self.listed()["agents"]["grok"], {"email": "an xAI account", "plan": ""})
 
+    def test_claude_is_the_rows_own_address_while_its_credential_is_there(self):
+        self.put(".claude.json", {"oauthAccount": {"emailAddress": "me@example.invalid"}})
+        self.assertEqual(self.listed()["email"], "", "a name left behind by a sign-out is not a sign-in")
+        self.put(".claude/.credentials.json", {"claudeAiOauth": {"accessToken": "never-read"}})
+        got = self.listed()
+        self.assertEqual((got["email"], got["agents"]), ("me@example.invalid", {}))
+
+    def test_a_file_that_does_not_read_is_unread_never_a_sign_out(self):
+        p = os.path.join(self.home, ".codex", "auth.json")
+        os.makedirs(os.path.dirname(p))
+        with open(p, "w") as f:
+            f.write("{half a file")
+        self.assertIn("error", self.listed()["agents"]["codex"])
+
     def test_copilot_s_managed_header_is_read_past_and_kept(self):
         # 1.0.103 opens its config with comment lines (B280).
         head = "// User settings belong in settings.json.\n// This file is managed automatically.\n"
@@ -83,7 +106,7 @@ class Listed(unittest.TestCase):
         with open(p, "w") as f:
             f.write(head + json.dumps({"lastLoggedInUser": {"login": "octo"}, "theme": "dark"}))
         self.assertEqual(self.listed()["agents"]["copilot"], {"email": "octo", "plan": ""})
-        subprocess.run([sys.executable, "-I", LIST, "--forget-copilot", self.home], check=True)
+        self.sign_out("copilot")
         with open(p) as f:
             got = f.read()
         self.assertTrue(got.startswith(head))
@@ -92,7 +115,7 @@ class Listed(unittest.TestCase):
     def test_forgetting_copilot_keeps_the_rest_of_its_config(self):
         self.put(".copilot/config.json", {"lastLoggedInUser": {"login": "octo"}, "loggedInUsers": [{"login": "octo"}],
                                           "copilotTokens": {"x": "y"}, "theme": "dark"})
-        subprocess.run([sys.executable, "-I", LIST, "--forget-copilot", self.home], check=True)
+        self.sign_out("copilot")
         with open(os.path.join(self.home, ".copilot", "config.json")) as f:
             self.assertEqual(json.load(f), {"theme": "dark"})
         self.assertNotIn("copilot", self.listed()["agents"])
@@ -205,7 +228,10 @@ class Flows(unittest.TestCase):
         # A device flow that prints its code alone on the next line: every
         # character of it could be a link's, and it is not one.
         st = self.flow("grok", "To sign in, open this page in a browser on any device you like: https://accounts.x.ai/device\nWXYZ-1234\nWaiting...\n")
-        self.assertEqual((st["url"], st["code"]), ("https://accounts.x.ai/device", "WXYZ-1234"))
+        self.assertEqual(st["url"], "https://accounts.x.ai/device")
+        st = self.flow("grok", "To sign in, open this page in a browser on any device you like: https://accounts.x.ai/device\n"
+                               "Confirm this code in your browser:\n\n  WXYZ-1234\n\nWaiting...\n")
+        self.assertEqual((st["url"], st["code"]), ("https://accounts.x.ai/device", "WXYZ-1234"), "the code is the one after the words its flow names")
         long = "https://accounts.x.ai/oauth2/device/verify?user_code=WXYZ-1234&client_id=grok-cli-00000000000&scope=openid%20profile"
         st = self.flow("grok", "Open:\n" + long[:80] + "\n" + long[80:] + "\n\nCode: WXYZ-1234\n")
         self.assertEqual(st["url"], long, "while a link that did wrap is still joined")

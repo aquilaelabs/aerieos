@@ -25,12 +25,41 @@
   "product": "Claude Code",
   "provider": "Anthropic",
   "reported": "claude",
+  "signin": {
+   "flow": {
+    "ends": "exit",
+    "kept": ".claude/.credentials.json",
+    "logout": [
+     "claude",
+     "auth",
+     "logout"
+    ],
+    "prompt": "Paste code",
+    "url": [
+     "https://claude.com/",
+     "https://console.anthropic.com/",
+     "https://platform.claude.com/"
+    ],
+    "who": {
+     "email": [
+      "oauthAccount",
+      "emailAddress"
+     ],
+     "file": ".claude.json"
+    }
+   },
+   "login": [
+    "claude",
+    "auth",
+    "login"
+   ]
+  },
   "state": "hooks",
   "tool": "claude-code",
   "transcripts": ".claude/projects",
   "update_job": "claude-update"
  },
- "framework": "2.1",
+ "framework": "2.2",
  "label": "Claude",
  "maker": "Anthropic",
  "name": "claude",

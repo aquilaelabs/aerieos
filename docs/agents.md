@@ -128,7 +128,13 @@ your sign-in, what you added to the agent and Remove.
   code the page gives back. Codex's, Copilot's and Grok's are device flows: the
   row shows the link and a one-time code, which you enter on OpenAI's,
   GitHub's or xAI's page; nothing is pasted back. Codex's device login has to be
-  switched on in the ChatGPT account's security settings first.
+  switched on in the ChatGPT account's security settings first. Each
+  agent's sign-in is described as data, the same way a pack's agent
+  describes its own ([A sign-in from the page](tool-packs.md#a-sign-in-from-the-page)):
+  how its link starts, where its code is, how it ends, the file the
+  sign-in is kept in and where who is signed in is read. One driver on the
+  node runs every agent's from that, so what goes up the job's log is the
+  link and the code, never the program's screen.
 
 - **Your plugins and MCP servers.** Each agent's own page on a node (Open on
   its Installed row) lists what you added to that agent on the node, as the node last said: Claude Code's plugins, and
@@ -281,7 +287,7 @@ in as: Claude Code's account from `.claude.json`, Codex CLI's from the id
 token in `~/.codex/auth.json` (the account it names and its plan, never a
 token), Copilot CLI's from the GitHub login its config remembers, Grok
 Build's from `~/.grok/auth.json` (the email its token names, never the
-token). The
+token), each read from where the agent's sign-in data says it is. The
 controller keeps that per account, per node, per agent, and holds no
 credential of any of them.
 

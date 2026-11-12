@@ -29,12 +29,40 @@
   "product": "Grok Build",
   "provider": "xAI",
   "reported": "grok",
+  "signin": {
+   "env": {
+    "GROK_DISABLE_AUTOUPDATER": "1"
+   },
+   "flow": {
+    "code_after": "Confirm this code in your browser",
+    "ends": "exit",
+    "kept": ".grok/auth.json",
+    "logout": [
+     "grok",
+     "logout"
+    ],
+    "url": [
+     "https://accounts.x.ai/",
+     "https://auth.x.ai/",
+     "https://x.ai/",
+     "https://grok.com/"
+    ],
+    "who": {
+     "named": "an xAI account"
+    }
+   },
+   "login": [
+    "grok",
+    "login",
+    "--device-auth"
+   ]
+  },
   "state": "hooks",
   "tool": "grok-build",
   "transcripts": ".grok/sessions",
   "update_job": "grok-update"
  },
- "framework": "2.1",
+ "framework": "2.2",
  "label": "Grok",
  "maker": "xAI",
  "name": "grok",

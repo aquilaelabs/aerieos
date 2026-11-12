@@ -29,12 +29,47 @@
   "product": "Copilot CLI",
   "provider": "GitHub",
   "reported": "copilot",
+  "signin": {
+   "env": {
+    "COPILOT_AUTO_UPDATE": "false"
+   },
+   "flow": {
+    "answers": [
+     {
+      "send": "y",
+      "when": "plaintext config file"
+     }
+    ],
+    "code_after": "enter code",
+    "ends": "exit",
+    "forget": {
+     "keys": [
+      "lastLoggedInUser",
+      "loggedInUsers"
+     ],
+     "like": "token"
+    },
+    "kept": ".copilot/config.json",
+    "url": "https://github.com/login/device",
+    "who": {
+     "email": [
+      "lastLoggedInUser",
+      "login"
+     ]
+    }
+   },
+   "login": [
+    "copilot",
+    "login",
+    "--device-code"
+   ]
+  },
   "state": "hooks",
   "tool": "copilot-cli",
   "transcripts": ".copilot/session-state",
   "update_job": "copilot-update"
  },
- "framework": "2.1",
+ "framework": "2.2",
  "label": "Copilot",
  "maker": "GitHub",
  "name": "copilot",

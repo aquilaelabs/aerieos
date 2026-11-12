@@ -33,16 +33,16 @@ import time
 
 from . import tokenseal
 from .accounts import UID_RE, user_of
-from .base import log, pack_signins, wipe
+from .base import SIGNINS, log, pack_signins, wipe
 from .names import VAR
 
 SEAL_DIR = VAR + "/tokens"
 OPEN_DIR = "/run/bb-tokens"
 GRACE_S = 300
 EVERY_S = 10
-# ...and Grok Build's session (R95 step 21), a file of its own as Codex's is.
-FILES = (("claude", os.path.join(".claude", ".credentials.json")), ("codex", os.path.join(".codex", "auth.json")),
-         ("grok", os.path.join(".grok", "auth.json")), ("copilot", os.path.join(".copilot", "config.json")))
+# The shipped agents' sign-ins, each the file its row says it is kept in
+# (base.SIGNINS).
+FILES = tuple((agent, os.path.join(*row["kept"].split("/"))) for agent, row in SIGNINS.items())
 
 
 def files():
@@ -76,47 +76,64 @@ def _jwt_email(d, depth=0):
     return ""
 
 
+def _at(d, path):
+    """The value the keys of `path` lead to in `d`, or None; a token met on
+    the way is opened to what it says of its holder."""
+    for k in path:
+        if isinstance(d, str):
+            d = _claims(d)
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d
+
+
+def _jsonc(data):
+    """A file's JSON, read past leading `//` lines (Copilot's config opens
+    with them since 1.0.103, B282)."""
+    lines = (data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)).splitlines()
+    n = 0
+    while n < len(lines) and (not lines[n].strip() or lines[n].lstrip().startswith("//")):
+        n += 1
+    return json.loads("\n".join(lines[n:]))
+
+
 def about(agent, data, home):
     """What a sign-in says of itself, kept readable in its seal's header so
-    the Installed page can name who is signed in without opening it."""
+    the Installed page can name who is signed in without opening it: read
+    from what the agent's row or its pack says of its sign-in (`who`), as
+    login-list.py who_of reads the open file, so a row names the same
+    account sealed or open."""
     out = {"agent": agent}
-    with contextlib.suppress(ValueError, TypeError, AttributeError):
-        if agent == "codex":
-            toks = (json.loads(data) or {}).get("tokens") or {}
-            c = _claims(toks.get("id_token"))
-            out["email"] = str(c.get("email") or "")[:120]
-            out["plan"] = str(((c.get("https://api.openai.com/auth") or {}).get("chatgpt_plan_type")) or "")[:40]
-        elif agent == "claude":
-            with open(os.path.join(home, ".claude.json"), encoding="utf-8") as f:
-                out["email"] = str(((json.load(f).get("oauthAccount") or {}).get("emailAddress")) or "")[:120]
-        elif agent == "grok":
-            # The email its token's claims name, else that it is an xAI
-            # account (login-list.py grok_of says it the same way).
-            out["email"] = (_jwt_email(json.loads(data)) or "an xAI account")[:120]
-        elif agent == "copilot":
-            # Its config opens with // lines since 1.0.103 (B282), then the
-            # JSON naming the GitHub login it is signed in as.
-            lines = data.decode("utf-8", "replace").splitlines()
-            n = 0
-            while n < len(lines) and (not lines[n].strip() or lines[n].lstrip().startswith("//")):
-                n += 1
-            u = (json.loads("\n".join(lines[n:])) or {}).get("lastLoggedInUser") or {}
-            out["email"] = str(u.get("login") or "")[:120] if isinstance(u, dict) else ""
-        elif agent in pack_signins():
-            # A pack's agent's: the email a token in it names where one
-            # does, else whose account it is (login-list.py pack_of says it
-            # the same way).
-            out["email"] = (pack_who(data) or f"{pack_signins()[agent]['provider'] or agent} account")[:120]
+    row = SIGNINS.get(agent) or pack_signins().get(agent)
+    if not row:
+        return out
+    who = row.get("who") or {}
+    whose = who.get("named") or f"{row.get('provider') or agent} account"
+    with contextlib.suppress(OSError, ValueError, TypeError, AttributeError):
+        if who.get("file") and who["file"] != row["kept"]:
+            # Another file says who (Claude Code's own record beside its
+            # credential): read from the home.
+            with open(os.path.join(home, who["file"]), "rb") as f:
+                data = f.read(1 << 20)
+        try:
+            d = _jsonc(data)
+        except (ValueError, TypeError):
+            # A JSON file that does not read names nobody; a token kept as
+            # plain text is its provider's account.
+            if who.get("email") or who.get("key") or (who.get("file") or row["kept"]).endswith(".json"):
+                return out
+            out["email"] = whose[:120]
+            return out
+        email = _at(d, who["email"]) if who.get("email") else _jwt_email(d)
+        email = email if isinstance(email, str) else ""
+        if who.get("plan"):
+            plan = _at(d, who["plan"]) if email else ""
+            out["plan"] = (plan if isinstance(plan, str) else "")[:40]
+        if not email and who.get("key") and _at(d, who["key"]):
+            email, out["plan"] = who.get("key_named") or f"{row.get('provider') or agent} API key", "API"
+        out["email"] = (email or ("" if who.get("email") else whose))[:120]
     return out
-
-
-def pack_who(data):
-    """The email a pack agent's kept sign-in names, or "": read from a token
-    in it where it is JSON that carries one, never a credential."""
-    try:
-        return _jwt_email(json.loads(data))
-    except (ValueError, TypeError, AttributeError):
-        return ""
 
 
 def _shred(path):

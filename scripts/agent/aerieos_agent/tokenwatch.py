@@ -18,10 +18,11 @@ import struct
 import threading
 import time
 
-from .base import log, pack_signins
+from .base import SIGNINS, log, pack_signins
 
-# The folder in an account's home, and the file in it that is the sign-in.
-TOKENS = {".claude": ".credentials.json", ".codex": "auth.json", ".copilot": "config.json", ".grok": "auth.json"}
+# The folder in an account's home, and the file in it that is the sign-in:
+# the shipped agents', from where each row says its own is kept.
+TOKENS = dict(os.path.split(row["kept"]) for row in SIGNINS.values())
 
 
 def watched():

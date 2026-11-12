@@ -969,103 +969,52 @@ cmd_login() {
         BB_USERS_DIR="$BUILDER_USERS" python3 "$BB_LIB/login-list.py"
         return 0
     fi
-    # `--flow --agent ID` and `--out --agent ID` are the same two for another
-    # coding agent (R95 step 3): its own device login in the account's home
-    # on this machine, the binary found where a session finds it (the
-    # agent's pinned copy, then the session account's own). Each prints its
-    # link and its one-time code and waits for the person to enter the code
-    # on the provider's page; nothing is typed back here. Checked against
-    # Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct), Grok Build's
-    # device code from its user guide (25 Oct).
-    if { [ "${1:-}" = --flow ] || [ "${1:-}" = --out ]; } && [ "${2:-}" = --agent ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag="${3:-}" pack=""
-        local pinned="${BB_AGENTS_PINNED:-/usr/local/lib/builderbot/agents}"
-        case "$ag" in
-            codex|copilot|grok) ;;
-            # A coding agent a tool pack brings (R233 step 6), where its
-            # pack says how it signs in: its program is the pack's, on the
-            # PATH a job here is handed, and its screens are worked by
-            # login-flow.py from the pack's own words.
-            *) python3 "$BB_LIB/login-flow.py" has "$ag" 2>/dev/null \
-                   || die "no coding agent called '${ag}' signs in here"
-               pack=1 ;;
-        esac
-        [ -n "$uid" ] || die "a sign-in names the account it is for"
-        HOME="$(user_home "$uid")" && export HOME
-        if [ -n "$pack" ]; then
-            if [ "$1" = --flow ]; then
-                # Its last line says why where it fails, in the program's
-                # own words: nothing is said after it.
-                python3 "$BB_LIB/login-flow.py" in "$ag" || exit 1
-            else
-                python3 "$BB_LIB/login-flow.py" out "$ag" || die "the sign-out did not complete"
-            fi
-            claude_login_check --loud "$ag" || true
-            return 0
-        fi
-        PATH="$pinned/$ag:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v "$ag" >/dev/null 2>&1 \
-            || die "$ag is not installed on this machine: Install on its card in the Library, with this node picked, puts one down"
-        case "$1:$ag" in
-            --flow:codex)   codex login --device-auth || die "the sign-in did not complete" ;;
-            --flow:copilot) COPILOT_AUTO_UPDATE=false copilot login --device-code || die "the sign-in did not complete" ;;
-            --out:codex)    codex logout || die "codex logout did not complete" ;;
-            # Copilot CLI 1.0.102 has no logout of its own outside a session
-            # (its /logout): the account it signed in as is forgotten from
-            # its config, and the token with it where it was kept there.
-            --out:copilot)  python3 "$BB_LIB/login-list.py" --forget-copilot "$HOME" || die "the sign-out did not complete" ;;
-            --flow:grok)    GROK_DISABLE_AUTOUPDATER=1 grok login --device-auth || die "the sign-in did not complete" ;;
-            --out:grok)     GROK_DISABLE_AUTOUPDATER=1 grok logout || die "grok logout did not complete" ;;
-        esac
-        log "signed ${1#--} ${ag} on ${BB_NODE:-this machine}"
-        # ...and said to the controller at once, as Claude's flow says its own.
-        claude_login_check --loud "$ag" || true
-        return 0
-    fi
-    # `--out` is the sign-out run BY THE AGENT, in a claude-logout job, for
-    # the account the dashboard asked about: `claude auth logout` in that
-    # account's home on this machine, found the way --flow finds it.
-    if [ "${1:-}" = --out ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}"
-        local pinned="${BB_CLAUDE_PINNED:-/usr/local/lib/builderbot/claude}"
-        [ -n "$uid" ] || die "a sign-out names the account it is for"
-        HOME="$(user_home "$uid")" && export HOME
-        PATH="$pinned:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v claude >/dev/null 2>&1 \
-            || die "Claude Code is not installed on this machine, so there is no login here to sign out of"
-        claude auth logout || die "claude auth logout did not complete"
-        log "signed out of Claude on ${BB_NODE:-this machine}"
-        claude_login_check --loud || true
-        return 0
-    fi
-    # `--flow` is the sign-in run BY THE AGENT, in a claude-login job, with
-    # that job's pty as its terminal (roadmap R47). The account is the one the
-    # dashboard asked for and the home is resolved here, by the same user_home
-    # a session on this machine gets: one implementation of "where does this
-    # account live", rather than a second copy in the agent.
+    # `--flow` and `--out` are the sign-in and the sign-out run BY THE AGENT,
+    # in a job, for the account the dashboard asked about, with that job's pty
+    # as its terminal (roadmap R47): Claude's, or with `--agent ID` any other
+    # coding agent's (R95 step 3, R233 step 6). One path for every agent
+    # (R234 step 6): each says how it signs in as data, its row in the
+    # agents' table or its pack's manifest, and login-flow.py runs its
+    # program and works its screens from that. The account's home is
+    # resolved here, by the same user_home a session on this machine gets:
+    # one implementation of "where does this account live".
     #
-    # The grant STAYS HERE. What goes up is which Anthropic account this
-    # machine is now signed in as, so its row can name it.
-    if [ "${1:-}" = --flow ]; then
-        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}"
-        # The pinned dir is the agent's CLAUDE_DIR; BB_CLAUDE_PINNED is for
-        # the suite, which runs on a machine that may carry a real one.
+    # The grant STAYS HERE. What goes up is which account this machine is
+    # now signed in as, so its row can name it.
+    if [ "${1:-}" = --flow ] || [ "${1:-}" = --out ]; then
+        local uid="${BB_ACCOUNT_UID:-}" base="${BUILDER_HOME:-$HOME}" ag=claude
+        # The pinned copies are the agent's own folders; BB_CLAUDE_PINNED and
+        # BB_AGENTS_PINNED are for the suite, which runs on a machine that
+        # may carry a real one.
         local pinned="${BB_CLAUDE_PINNED:-/usr/local/lib/builderbot/claude}"
-        [ -n "$uid" ] && HOME="$(user_home "$uid")" && export HOME
-        mkdir -p "$HOME/.claude" 2>/dev/null || true
-        # Claude Code from where a SESSION finds it (the agent's session
+        local pinned_agents="${BB_AGENTS_PINNED:-/usr/local/lib/builderbot/agents}"
+        [ "${2:-}" = --agent ] && ag="${3:-}"
+        python3 "$BB_LIB/login-flow.py" has "$ag" 2>/dev/null \
+            || die "no coding agent called '${ag}' signs in here"
+        if [ -n "$uid" ]; then
+            HOME="$(user_home "$uid")" && export HOME
+        elif [ "$1" = --out ]; then
+            die "a sign-out names the account it is for"
+        elif [ "$ag" != claude ]; then
+            die "a sign-in names the account it is for"
+        fi
+        # The program from where a SESSION finds it (the agent's session
         # PATH): the pinned copy first, then the session account's own
         # ~/.local/bin, which is where the provisioner installs it, and only
         # then this account's. The agent runs this with its own PATH, and
         # the flow used to look in this account's home alone: the owner's
         # home IS the session account's, so it worked for them and for
-        # nobody else, and a second account was told Claude Code was not
-        # installed on a machine whose sessions ran it fine (24 Sep).
-        PATH="$pinned:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
-        command -v claude >/dev/null 2>&1 \
-            || die "Claude Code is not installed on this machine (looked on PATH, at $pinned and in $base/.local/bin): Install on Claude Code's card in the Library, with this node picked, puts down one copy every account runs"
-        claude auth login || die "the sign-in did not complete"
-        claude_login_check --loud || true
+        # nobody else (24 Sep).
+        PATH="$pinned:$pinned_agents/$ag:$base/.local/bin:$base/.npm-global/bin:$HOME/.local/bin:$PATH"; export PATH
+        if [ "$1" = --flow ]; then
+            # Its last line says why where it fails, in the program's own
+            # words: nothing is said after it.
+            python3 "$BB_LIB/login-flow.py" in "$ag" || exit 1
+        else
+            python3 "$BB_LIB/login-flow.py" out "$ag" || die "the sign-out did not complete"
+        fi
+        # ...and said to the controller at once.
+        if [ "$ag" = claude ]; then claude_login_check --loud || true; else claude_login_check --loud "$ag" || true; fi
         return 0
     fi
     # ON A NODE the flow below runs in this terminal: this machine signs

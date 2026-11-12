@@ -182,6 +182,19 @@ class TheFlowAsData(unittest.TestCase):
         _, errors = toolpacks.validate(dict(m, framework=packformat.VERSION))
         self.assertTrue(errors, "said wrong in a version this build reads, it is said")
 
+    def test_a_later_frameworks_flow_with_a_key_this_build_does_not_know_is_left_out_whole(self):
+        # Half a flow read is worse than none: a way to sign out that this
+        # build would not know of must not be read as "remove the file".
+        m = dict(with_flow(unlearn={"keys": ["user"]}), framework="2.9")
+        got, errors = toolpacks.validate(m)
+        self.assertEqual(errors, [])
+        self.assertNotIn("flow", got["pack_agent"]["signin"])
+        got, errors = toolpacks.validate(dict(with_flow(who={"email": ["account", "email"]}, forget={"keys": ["account"]}), framework=packformat.VERSION))
+        self.assertEqual(errors, [])
+        self.assertEqual(got["pack_agent"]["signin"]["flow"]["forget"], {"keys": ["account"]})
+        _, errors = toolpacks.validate(dict(with_flow(who={"email": ["account", "email"]}), framework="2.1"))
+        self.assertTrue(any("signin.flow.who" in e for e in errors), errors)
+
     def test_a_flow_needs_the_command_that_starts_it(self):
         m = copy.deepcopy(HERON)
         del m["agent"]["signin"]["login"]
@@ -399,10 +412,13 @@ class OnTheNode(unittest.TestCase):
     def run_flow(self, *argv):
         return subprocess.run([sys.executable, FLOW, *argv], env=self.env, capture_output=True, text=True, check=False)
 
-    def test_only_an_agent_this_bundles_packs_describe_a_flow_for(self):
+    def test_only_an_agent_that_describes_a_flow_here(self):
         self.assertEqual(self.run_flow("has", "heron").returncode, 0)
-        for other in ("otter", "codex", "claude", "../heron"):
+        for other in ("otter", "open", "../heron"):
             self.assertEqual(self.run_flow("has", other).returncode, 1, other)
+        # A shipped agent's is its row's in the agents' table, the same data.
+        for shipped in ("claude", "codex", "copilot", "grok"):
+            self.assertEqual(self.run_flow("has", shipped).returncode, 0, shipped)
         m = copy.deepcopy(HERON)
         del m["agent"]["signin"]["flow"]
         self.write_packs(m)

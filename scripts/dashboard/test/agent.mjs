@@ -1175,7 +1175,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     {
       const base = `${DIR}/flow-home`;
       mkdirSync(`${base}/.local/bin`, { recursive: true });
-      writeFileSync(`${base}/.local/bin/claude`, '#!/bin/sh\necho "fake claude $*"\n');
+      // What it was run with goes into its home: its screen is the driver's
+      // to read (scripts/lib/login-flow.py), never the log.
+      writeFileSync(`${base}/.local/bin/claude`, '#!/bin/sh\necho "fake claude $*" > "$HOME/ran"\necho "its own screen"\n');
       chmodSync(`${base}/.local/bin/claude`, 0o755);
       const run = (uid) => { try {
         return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'login', '--flow'],
@@ -1185,8 +1187,9 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
                    BB_CLAUDE_PINNED: `${base}/no-pin` } }) };
       } catch (e) { return { code: e.status, out: String(e.stdout) + String(e.stderr) }; } };
       const second = run('u_0badf00d');
-      ok(second.code === 0 && /fake claude auth login/.test(second.out),
-         `the sign-in flow for a second account runs the session account's Claude Code (${
+      const ran = existsSync(`${base}/users/u_0badf00d/ran`) ? readFileSync(`${base}/users/u_0badf00d/ran`, 'utf8') : '';
+      ok(second.code === 0 && /fake claude auth login/.test(ran) && /signed in to Claude on/.test(second.out) && !/its own screen/.test(second.out),
+         `the sign-in flow for a second account runs the session account's Claude Code, by the one driver every agent's sign-in has (${
            second.out.trim().split('\n').pop().slice(0, 70)})`);
       ok(existsSync(`${base}/users/u_0badf00d/.claude`),
          "...with the credential's home the second account's own");

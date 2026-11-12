@@ -178,7 +178,39 @@ def _agent(a, errors):
         errors.append(why)
     elif recipe:
         out["install"] = recipe
+    # How it signs in (R234 step 6), in a pack agent's own words: the
+    # command that starts it and the flow, held by the one validator.
+    si = a.get("signin")
+    if si is not None:
+        got = signin_checked(si, out["command"], errors)
+        if got:
+            out["signin"] = got
     return out
+
+
+def signin_checked(si, command, errors):
+    """A shipped agent's `signin` checked as a pack agent's is: {login, env,
+    flow}, or None with why in `errors`."""
+    if not isinstance(si, dict):
+        errors.append("agent.signin is an object: login, env, flow")
+        return None
+    bad = len(errors)
+    login = si.get("login") if si.get("login") is not None else []
+    if not (isinstance(login, list) and len(login) <= 6 and all(isinstance(x, str) and ARG.fullmatch(x) for x in login)):
+        errors.append("agent.signin.login lists up to 6 plain words")
+        login = []
+    if login and login[0] != command:
+        errors.append("agent.signin.login runs the agent's own command, e.g. [\"foo\", \"login\"]")
+    env = si.get("env") if si.get("env") is not None else {}
+    if not (isinstance(env, dict) and len(env) <= 8 and all(ENV_NAME.fullmatch(str(k)) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
+                                                          for k, v in env.items())
+            and not any(k.startswith("BB_") or k in ("PATH", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH") for k in env)):
+        errors.append("agent.signin.env maps up to 8 NAME to plain words its sign-in runs with (an updater off), none of PATH, HOME, LD_* or AerieOS's own BB_ names")
+        env = {}
+    flow = _signin_flow(si.get("flow"), {"command": command, "login": list(login)}, errors) if si.get("flow") is not None else None
+    if len(errors) != bad:
+        return None
+    return {"login": list(login), **({"env": dict(env)} if env else {}), **({"flow": flow} if flow else {})}
 
 
 def _agent_allow(a, out, errors):
@@ -455,6 +487,11 @@ def _pack_agent(name, a, errors, newer=False):
     if si.get("flow") is not None:
         before = len(errors)
         flow = _signin_flow(si["flow"], out, errors)
+        # ...and one that carries a key this build does not know is left
+        # out whole too: half a flow read (a sign-out that forgets keys
+        # read as one that removes the file) is worse than none.
+        if flow and newer and isinstance(si["flow"], dict) and set(si["flow"]) - FLOW_KEYS:
+            flow = None
         if flow:
             out["signin"]["flow"] = flow
         elif newer:
@@ -494,6 +531,8 @@ def _pack_agent(name, a, errors, newer=False):
 FLOW_WORDS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .,:;'()/&-]{1,79}$")
 FLOW_URL = re.compile(r"^https://[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){1,6}(?:/[A-Za-z0-9._~/-]{0,120})?$")
 FLOW_SEND = re.compile(r"^[A-Za-z0-9]{0,8}$")
+# Every key of a flow this build reads.
+FLOW_KEYS = frozenset(("answers", "url", "prompt", "code_after", "refused", "kept", "logout", "ends", "who", "forget"))
 
 
 def _signin_flow(f, out, errors):
@@ -549,11 +588,76 @@ def _signin_flow(f, out, errors):
             or (logout and logout[0] != out.get("command")):
         errors.append("agent.signin.flow.logout runs the agent's own command, e.g. [\"foo\", \"logout\"]; left out, a sign-out removes the kept file")
         logout = []
+    who, forget = _flow_who(f.get("who"), errors), _flow_forget(f.get("forget"), errors)
+    if forget and logout:
+        errors.append("agent.signin.flow names logout (its own sign-out command) or forget (the keys a sign-out takes out of a file), not both")
     if len(errors) != bad:
         return None
     return {"url": url, "prompt": words["prompt"], "code_after": words["code_after"], "refused": words["refused"],
             "answers": [{"when": a["when"], "send": a.get("send", "")} for a in answers], "kept": kept, "logout": list(logout),
-            **({"ends": "exit"} if ends == "exit" else {})}
+            **({"ends": "exit"} if ends == "exit" else {}), **({"who": who} if who else {}), **({"forget": forget} if forget else {})}
+
+
+# One step on the way to a value in a JSON file: a key's name, as written.
+FLOW_KEY = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:/@-]{0,79}$")
+
+
+def _flow_path(v):
+    return isinstance(v, list) and 1 <= len(v) <= 6 and all(isinstance(x, str) and FLOW_KEY.fullmatch(x) for x in v)
+
+
+def _flow_who(w, errors):
+    """Who is signed in, read from a file the agent keeps (framework 2.2):
+    `file` under the account's home (the kept file when left out), `email`
+    and `plan` each the keys to follow to the value, a token on the way
+    opened to what it says of its holder; `key` the keys to an API key, and
+    `key_named` what the account is called then; `named`, what it is called
+    when the file names nobody. Left out, the address a token in the kept
+    file names, else its provider's account."""
+    if w is None:
+        return None
+    if not isinstance(w, dict):
+        errors.append("agent.signin.flow.who is an object: file, email, plan, key, key_named, named")
+        return None
+    out = {}
+    if w.get("file"):
+        if not (isinstance(w["file"], str) and REL.fullmatch(w["file"])):
+            errors.append("agent.signin.flow.who.file is the file that says who is signed in, under the account's home")
+        else:
+            out["file"] = w["file"]
+    for k in ("email", "plan", "key"):
+        if w.get(k) is not None:
+            if not _flow_path(w[k]):
+                errors.append(f"agent.signin.flow.who.{k} lists the keys to follow to it in that file, up to 6, e.g. [\"account\", \"email\"]")
+            else:
+                out[k] = list(w[k])
+    for k in ("named", "key_named"):
+        if w.get(k):
+            if not (isinstance(w[k], str) and FLOW_WORDS.fullmatch(w[k])):
+                errors.append(f"agent.signin.flow.who.{k} is plain words for the account, e.g. an Example account")
+            else:
+                out[k] = w[k]
+    if out.get("key_named") and not out.get("key"):
+        errors.append("agent.signin.flow.who.key_named says what an API key's account is called, so who.key says where the key is")
+    return out or None
+
+
+def _flow_forget(g, errors):
+    """A sign-out that takes keys out of a JSON file and leaves the rest
+    (framework 2.2), for a program with no sign-out command whose sign-in
+    is kept in a file of its settings: `file` under the home (the kept file
+    when left out), `keys` the top-level keys forgotten, `like` a word, any
+    key that carries it forgotten too."""
+    if g is None:
+        return None
+    keys = g.get("keys") if isinstance(g, dict) and g.get("keys") is not None else []
+    like = g.get("like", "") if isinstance(g, dict) else ""
+    if not (isinstance(g, dict) and isinstance(keys, list) and len(keys) <= 8 and all(isinstance(k, str) and FLOW_KEY.fullmatch(k) for k in keys)
+            and isinstance(like, str) and re.fullmatch(r"[a-z]{3,20}|", like) and (keys or like)
+            and (not g.get("file") or (isinstance(g["file"], str) and REL.fullmatch(g["file"])))):
+        errors.append("agent.signin.flow.forget is {keys, like, file}: up to 8 top-level keys a sign-out takes out of the kept file (or the file named), and a word any forgotten key carries")
+        return None
+    return {"keys": list(keys), **({"like": like} if like else {}), **({"file": g["file"]} if g.get("file") else {})}
 
 
 def _agent_uses(a):
@@ -567,6 +671,10 @@ def _agent_uses(a):
         out.append(((2, 2), "signin.flow.ends"))
     if isinstance(flow.get("url"), list):
         out.append(((2, 2), "signin.flow.url as a list"))
+    if flow.get("who"):
+        out.append(((2, 2), "signin.flow.who"))
+    if flow.get("forget"):
+        out.append(((2, 2), "signin.flow.forget"))
     return out
 
 
@@ -828,7 +936,7 @@ def validate(m, shipped=()):
     out["icon"] = ic
     # What it uses is in the framework version it says (R234 step 7): the
     # number on a manifest is what an install has to know to do all of it.
-    errors.extend(packformat.needs(m, [*packformat.uses_of(m), *_agent_uses(out.get("pack_agent"))]))
+    errors.extend(packformat.needs(m, [*packformat.uses_of(m), *_agent_uses(out.get("pack_agent")), *_agent_uses(out.get("agent"))]))
     return (out if not errors else None), errors
 
 

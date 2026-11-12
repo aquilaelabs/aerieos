@@ -1,16 +1,15 @@
-"""Behind `aerie login --flow --agent ID` and `--out --agent ID` for a coding
-agent a tool pack brings (R233 step 6): its sign-in run for the page.
+"""Behind `aerie login --flow` and `--out` for every coding agent that says
+how it signs in: its sign-in run for the page (R233 step 6, R234 step 6).
 
-A shipped agent's sign-in is a command that prints a link and waits; a
-pack's agent may sign in on a screen of its own (Antigravity CLI opens on a
-menu, then draws the link and a field for the code). This runs that program
-under a terminal of its own, wide enough that a long link stays on one row,
-and works its screens from what the pack says of them (agent.signin.flow,
-held to plain words by toolpacks.py):
+One driver for all of them, the shipped agents and the ones a tool pack
+brings: each describes its sign-in as data (its row in the agents' table,
+or agent.signin.flow in its pack's manifest, held to plain words by
+toolpacks.py), and this runs the program under a terminal of its own, wide
+enough that a long link stays on one row, and works its screens from that:
 
-  answers      what it asks before the link: the words a screen shows, and
+  answers      what it asks along the way: the words a screen shows, and
                the key or short word typed there, Enter after it
-  url          how the link it prints starts
+  url          how the link it prints starts (one way, or one of a few)
   prompt       the words it waits at for the code the provider's page hands
                back, which is read from this flow's own terminal and typed
   code_after   or the words a one-time code follows, for a flow where the
@@ -21,18 +20,20 @@ held to plain words by toolpacks.py):
                flow then waits for it and is signed in when it exits clean
   refused      the words it shows when it does not take the code, so the
                flow ends then, in its words, and not after a wait
-  logout       its own sign-out command; left out, a sign-out removes `kept`
+  logout       its own sign-out command; or
+  forget       the keys a sign-out takes out of the kept file, for a
+               program with no sign-out of its own; with neither, a
+               sign-out removes `kept`
 
 What goes up the job's log is this driver's lines and never the program's
 screen: the link on one line, a one-time code on another, and the words the
-controller's sign-in card waits for (signin.py PACK_FLOW). The code that
-comes down is typed into the program and not echoed, so the log never holds
-it. The program is ended once its sign-in is kept: what it asks after that
-(a color scheme, terms, a folder's trust) is the person's own to answer, in
-their first session.
+controller's sign-in card waits for (signin.py FLOW). The code that comes
+down is typed into the program and not echoed, so the log never holds it.
+A program that stays up is ended once its sign-in is kept: what it asks
+after that (a color scheme, terms, a folder's trust) is the person's own to
+answer, in their first session.
 
-    login-flow.py has AGENT    exit 0 when this bundle's packs bring AGENT
-                               with a sign-in flow
+    login-flow.py has AGENT    exit 0 when AGENT describes a sign-in here
     login-flow.py in AGENT     run the flow in HOME
     login-flow.py out AGENT    sign out in HOME
 """
@@ -72,13 +73,18 @@ def say(msg):
     sys.stdout.flush()
 
 
-def flows():
-    """{agent: its adapter} for the packs' agents in this bundle that
-    describe a sign-in's flow: login-list.py holds the one reading."""
+def readers():
+    """login-list.py, which holds the one reading of who signs in how."""
     spec = importlib.util.spec_from_file_location("login_list", os.path.join(HERE, "login-list.py"))
     ll = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ll)
-    return ll.pack_flows()
+    return ll
+
+
+def flows():
+    """{agent: its adapter} for every coding agent in this bundle that
+    describes a sign-in's flow: the shipped ones and the packs'."""
+    return readers().signins()
 
 
 def visible(raw):
@@ -162,6 +168,9 @@ def sign_in(agent, a):
     if not shutil.which(argv[0]):
         say(f"{a.get('product') or name} is not installed on this machine: Install on {name}'s card in the Library, with this node picked, puts it here")
         return 1
+    # The folder its sign-in is kept in is there before it writes one.
+    with contextlib.suppress(OSError):
+        os.makedirs(os.path.dirname(kept), mode=0o700, exist_ok=True)
     # A folder of its own to start in, empty and the account's: a program
     # that asks about the folder it is in is asked about this one.
     where = os.path.join(home, ".cache", "aerieos", "signin")
@@ -306,12 +315,22 @@ def sign_out(agent, a):
     if not home:
         return 1
     argv = [str(x) for x in flow.get("logout") or []]
+    if flow.get("forget"):
+        # No sign-out of its own: what its settings remember of the sign-in
+        # is taken out of them, and the settings stay.
+        if readers().forget(home, flow) != 0:
+            say(f"{name}'s sign-in could not be taken out of {(flow['forget'].get('file') or flow['kept'])} in your home here")
+            return 1
+        say(f"signed out of {name} on {os.environ.get('BB_NODE') or 'this machine'}")
+        return 0
+    env = dict(os.environ)
+    env.update({str(k): str(v) for k, v in (a.get("env") or {}).items()})
     if argv:
         if not shutil.which(argv[0]):
             say(f"{a.get('product') or name} is not installed on this machine, so there is no sign-in of its own to end")
             return 1
         try:
-            got = subprocess.run(argv, cwd=home, timeout=90, check=False).returncode
+            got = subprocess.run(argv, cwd=home, env=env, timeout=90, check=False).returncode
         except (OSError, subprocess.SubprocessError) as e:
             say(f"{name}'s sign-out did not run: {e}")
             return 1

@@ -54,8 +54,9 @@ VERSION = f"{FORMAT}.{MINOR}"
 ADDED = {
     (2, 1): "a coding agent's sign-in described as data (signin.flow), so the page runs it; who a tool is by (maker), "
             "and each maker's tool where a pack carries several (credits)",
-    (2, 2): "a sign-in whose program ends by itself once signed in (signin.flow.ends exit), and whose link may start in "
-            "more than one way (signin.flow.url as a list)",
+    (2, 2): "a sign-in whose program ends by itself once signed in (signin.flow.ends exit), whose link may start in "
+            "more than one way (signin.flow.url as a list), that says where who is signed in is read (signin.flow.who), "
+            "and whose sign-out takes keys out of a settings file (signin.flow.forget)",
 }
 # What each number added, for the docs and for a person reading a refusal.
 FORMATS = {

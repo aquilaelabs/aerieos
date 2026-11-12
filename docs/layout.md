@@ -101,7 +101,7 @@ scripts/
   lib/diag.py                    `aerie diag`
   lib/node-log.py                `aerie logs --node`
   lib/login-check.py             `aerie login --check`: who this account is signed in to each agent as on this machine, told to the controller
-  lib/login-flow.py              `aerie login --flow` and `--out` for a coding agent a tool pack brings: its sign-in's own screens worked from what its pack says of them, the link sent up and the code typed in
+  lib/login-flow.py              `aerie login --flow` and `--out` for every coding agent, shipped or a pack's: its sign-in's own screens worked from what its row or its pack says of them, the link sent up and the code typed in
   lib/emu-job.py                 `aerie emu` as a job on the project's node
   lib/run-job.py                 `aerie run`: the snapshot, the job, the log back
   lib/build-or-test.py           the command, place and outputs `aerie build` and `aerie test` read from the settings
@@ -139,7 +139,7 @@ scripts/
   lib/version-verbs.py           `aerie version`
   lib/changelog-verbs.py         `aerie changelog`
   lib/token-verbs.py             `aerie token keep`
-  lib/login-list.py              `aerie login --list`: every account this machine is signed in as
+  lib/login-list.py              `aerie login --list`: every account this machine is signed in as, each agent's read from what its sign-in data says (who_of), and the sign-out that forgets keys
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
   startup.d/*.sh                 startup hooks
@@ -459,6 +459,7 @@ docs/building.md                 builds, tests, CI runners and logs, the scanner
 docs/toolchains.md               the toolchain store, the Library, the Installed page's toolchains, the Emulator page, the NVIDIA card, Android, the Phone page
 docs/agents.md                   the coding agents: the agent table, the Library and the Installed page, installing and signing in to each on a node (R95)
 docs/tool-packs.md               tool packs: adding one, a project's Toolchains setting, and writing a bbtool.json
+docs/submitting.md               submitting to the vetted catalog: a tool pack, a coding agent or a Docker app from writing it to a merged entry
 docs/containers.md               the Containers page and nginx: dev instances, how one is reached, networks, image updates
 docs/scanners.md                 the Scanners page: AerieOS's own scanners on each node, their schedule, and the reports
 docs/versions.md                 versions and release lines: aerie version line, forward, backport, a patch line's rules

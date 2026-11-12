@@ -136,6 +136,22 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # table (agents.py login_job, logout_job), to the agent `aerie login --flow` and
 # `aerie login --out` are run for. Claude's are the claude-login and
 # claude-logout of old, which name no agent.
+# How each shipped agent's sign-in is kept and whom it names, as the
+# controller's table says it (agents.py signin.flow: kept, who), copied
+# rather than imported since the agent carries no dashboard module;
+# unit/test_shipped_signin.py holds the two to each other. A pack's agent's
+# comes from its manifest the same way (pack_signins below), so the seal,
+# the watch and a seal's header read every agent's from data (R234 step 6).
+SIGNINS = {
+    "claude": {"kept": ".claude/.credentials.json", "provider": "Anthropic",
+               "who": {"file": ".claude.json", "email": ["oauthAccount", "emailAddress"]}},
+    "codex": {"kept": ".codex/auth.json", "provider": "OpenAI",
+              "who": {"email": ["tokens", "id_token", "email"],
+                      "plan": ["tokens", "id_token", "https://api.openai.com/auth", "chatgpt_plan_type"],
+                      "key": ["OPENAI_API_KEY"], "key_named": "an OpenAI API key"}},
+    "grok": {"kept": ".grok/auth.json", "provider": "xAI", "who": {"named": "an xAI account"}},
+    "copilot": {"kept": ".copilot/config.json", "provider": "GitHub", "who": {"email": ["lastLoggedInUser", "login"]}},
+}
 AGENT_LOGINS = {"codex-login": "codex", "copilot-login": "copilot", "grok-login": "grok"}
 AGENT_LOGOUTS = {"codex-logout": "codex", "copilot-logout": "copilot", "grok-logout": "grok"}
 AGENT_INSTALLS = {
@@ -331,6 +347,27 @@ def pack_agent_ids():
 _pack_kept = {"stamp": None, "rows": {}}
 
 
+def _who(w):
+    """A flow's `who` as this agent reads it, or None: the keys to follow
+    are plain words, the file a plain path under the home (the controller
+    holds a manifest's to the same, toolpacks._flow_who)."""
+    if not isinstance(w, dict):
+        return None
+    out = {}
+    f = w.get("file")
+    if isinstance(f, str) and re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", f) and not f.startswith("/") and not any(p in ("", ".", "..") for p in f.split("/")):
+        out["file"] = f
+    for k in ("email", "plan", "key"):
+        v = w.get(k)
+        if isinstance(v, list) and 1 <= len(v) <= 6 and all(isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.:/@-]{0,79}", x) for x in v):
+            out[k] = list(v)
+    for k in ("named", "key_named"):
+        v = w.get(k)
+        if isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .,:;'()/&-]{1,79}", v):
+            out[k] = v
+    return out or None
+
+
 def pack_signins(bundle=""):
     """{agent: {"kept": file under the home, "provider": whose account}} for
     the packs' coding agents whose pack describes a sign-in's flow (R233
@@ -360,6 +397,9 @@ def pack_signins(bundle=""):
                         and not any(p in ("", ".", "..") for p in kept.split("/"))):
                     continue
                 got[name] = {"kept": kept, "provider": str(a.get("provider") or "")[:60]}
+                who = _who(flow.get("who"))
+                if who:
+                    got[name]["who"] = who
         except (OSError, ValueError, AttributeError, TypeError):
             got = {}
         _pack_kept.update(stamp=stamp, rows=got)

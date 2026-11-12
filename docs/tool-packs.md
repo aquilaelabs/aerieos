@@ -200,7 +200,14 @@ person the link and a field for the code, which is what a phone can use:
 | `refused` | The words it shows when it does not take the code. The flow ends then and the page says why in the program's own words; without it, a code that was not taken is noticed after two minutes. |
 | `kept` | The file under the account's home its sign-in is kept in. Its arrival ends the flow, signed in; it is what says who is signed in on a node, it is sealed where a node seals sign-ins, and a sign-out removes it. |
 | `logout` | Its own sign-out command, where it has one (`["kite", "logout"]`); the kept file is removed after it. |
+| `forget` | In `logout`'s place, for a program with no sign-out command whose sign-in sits in a file of its settings: `{"keys": ["user"], "like": "token"}` takes those top-level keys, and any key that carries the word, out of the kept file (or the JSON file `file` names) and leaves the rest; the kept file is not removed (framework 2.2). |
+| `who` | Where who is signed in is read, for the row that names them: `email` and `plan` are each the keys to follow in the kept file (`["account", "email"]`), a token met on the way opened to what it says of its holder; `file` names another JSON file under the home that says it, beside the kept one; `key` the keys to an API key, and `key_named` what the account is called then; `named` what it is called when the file names nobody. Left out, the address a token in the kept file names, else the provider's account (framework 2.2). |
 | `ends` | `exit` for a program that ends itself once signed in (`kite login` that returns): the flow waits for it, and it is signed in when it exits clean. Left out, the flow ends when the kept file arrives and the program is ended then, which is for one that stays up on its own screens (framework 2.2). |
+
+The agents AerieOS ships sign in this way too: each one's row in its own
+table says its flow in these words, its official pack's manifest carries
+it, and one driver on the node runs every agent's sign-in, so what a
+shipped agent can do at its sign-in a pack's agent can.
 
 Nothing in a flow is a pattern or a command line: the words are plain ones,
 compared without their spaces or case, and the only program run is the
@@ -271,7 +278,7 @@ on its Details what that install leaves out.
 | 1.0 | Tool packs (install steps, layout, verbs, config, system packages), Docker apps, and a coding agent whose hooks are a named shape (`grouped` or `flat`, `snake` or `camel`). | | 0.9.0's first releases |
 | 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
 | 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
-| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), and whose link may start in more than one way (`signin.flow.url` as a list). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
+| 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 
 ### What stays AerieOS's own
 
@@ -323,6 +330,9 @@ release still supported, so an entry is signed only when the oldest install
 that reads its format takes it as the newest does.
 
 ## The vetted catalog
+
+To put a pack, a coding agent or an app of yours into it, see
+[Submitting to the catalog](submitting.md).
 
 The public catalog (the `aerieos-catalog` repository, R169) is an index
 of packs reviewed by AerieOS's maintainers, each entry pinning a pack's

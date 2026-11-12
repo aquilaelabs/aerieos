@@ -7,10 +7,11 @@ once.
 BB_USERS_DIR is the directory the accounts' homes are under.
 
 Each row carries the other coding agents' sign-ins too (R95 step 3), under
-`agents`: Codex CLI's from its auth.json (the account the id token names,
-never the token), Copilot CLI's from its config (the GitHub login it last
-signed in as). `--forget-copilot HOME` is Copilot's sign-out, which its
-1.0.102 has no command for outside a session.
+`agents`, every one read the same way from what its row in the agents'
+table or its pack's manifest says of its sign-in (who_of, R234 step 6):
+Codex CLI's from its auth.json (the account the id token names, never the
+token), Copilot CLI's from its config (the GitHub login it last signed in
+as), and so on. `forget` is the sign-out of a program with none of its own.
 """
 import base64
 import json
@@ -57,34 +58,6 @@ def sealed_of(home, agent):
     return {"email": str(h.get("email") or "")[:120], "plan": str(h.get("plan") or "")[:40]}
 
 
-def codex_of(home):
-    """Who this account's Codex CLI is signed in as here, {email, plan}, or
-    None. $CODEX_HOME is ~/.codex for a session (bb-tty sets none). None
-    only when there is no login file: one that could not be read is
-    {"error": why}, which nobody reads as a sign-out (B236)."""
-    try:
-        with open(os.path.join(home, ".codex", "auth.json")) as f:
-            d = json.load(f)
-    except FileNotFoundError:
-        # Sealed, its copy not open now (R126): still a sign-in.
-        got = sealed_of(home, "codex")
-        return got if got and got["email"] else None
-    except (OSError, ValueError) as e:
-        return {"error": f"{type(e).__name__}: {e}"[:200]}
-    if not isinstance(d, dict):
-        return None
-    toks = d.get("tokens") if isinstance(d.get("tokens"), dict) else {}
-    idt = toks.get("id_token")
-    claims = idt if isinstance(idt, dict) else _claims(idt) if idt else {}
-    email = str(claims.get("email") or "")[:120]
-    if email:
-        auth = claims.get("https://api.openai.com/auth") if isinstance(claims.get("https://api.openai.com/auth"), dict) else {}
-        return {"email": email, "plan": str(auth.get("chatgpt_plan_type") or "")[:40]}
-    if d.get("OPENAI_API_KEY"):
-        return {"email": "an OpenAI API key", "plan": "API"}
-    return None
-
-
 def _jwt_email(d, depth=0):
     """The email a JSON Web Token anywhere in this record says it is for,
     read from its claims without checking its signature (a name to show,
@@ -107,25 +80,6 @@ def _jwt_email(d, depth=0):
             if isinstance(mail, str) and "@" in mail:
                 return mail[:120]
     return ""
-
-
-def grok_of(home):
-    """Who this account's Grok Build is signed in as here, {email, plan}, or
-    None: its session in ~/.grok/auth.json (R95 step 21), the email its
-    token names where it names one."""
-    p = os.path.join(home, ".grok", "auth.json")
-    try:
-        with open(p) as f:
-            d = json.load(f)
-    except FileNotFoundError:
-        # Sealed, its copy not open now (R126): still a sign-in.
-        got = sealed_of(home, "grok")
-        return got if got and got["email"] else None
-    except (OSError, ValueError) as e:
-        return {"error": f"{type(e).__name__}: {e}"[:200]}
-    if not d:
-        return None
-    return {"email": _jwt_email(d) or "an xAI account", "plan": ""}
 
 
 def packs_file():
@@ -165,13 +119,47 @@ def pack_flows():
     return out
 
 
-def pack_of(home, agent, a):
-    """Who this account is signed in to a pack's agent as here, {email,
-    plan}, or None: the file its pack says the sign-in is kept in, the email
-    a token in it names where one does, else whose account it is."""
-    whose = f"{str(a.get('provider') or '').strip()[:60] or agent} account"
+def _jsonc(data):
+    """(its leading comment lines, its JSON) of a file's text: Copilot's
+    config.json opens with `//` lines saying it is managed since 1.0.103,
+    which a plain json.loads refused, so a sign-in there never reached the
+    card."""
+    lines = data.splitlines(keepends=True)
+    n = 0
+    while n < len(lines) and (not lines[n].strip() or lines[n].lstrip().startswith("//")):
+        n += 1
+    return "".join(lines[:n]), json.loads("".join(lines[n:]))
+
+
+def _at(d, path):
+    """The value the keys of `path` lead to in `d`, or None. A token met on
+    the way (a JSON web token as text) is opened to what it says of its
+    holder, read and never checked."""
+    for k in path:
+        if isinstance(d, str):
+            d = _claims(d)
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d
+
+
+def who_of(home, agent, a):
+    """Who this account is signed in to a coding agent as here, {email,
+    plan}, or None: one reading for every agent, from what its row or its
+    pack says of its sign-in (signin.flow, R234 step 6). The file the
+    sign-in is kept in, or the one `who.file` names beside it; the address
+    and the plan at the keys `who` gives, a token on the way opened to its
+    claims; with no keys given, the address any token in it names. A file
+    that names nobody is the account `who.named` says, or its provider's.
+    None only when there is no sign-in: a file that could not be read is
+    {"error": why}, which nobody reads as a sign-out (B236)."""
+    flow = a["signin"]["flow"]
+    who = flow.get("who") or {}
+    whose = who.get("named") or f"{str(a.get('provider') or '').strip()[:60] or agent} account"
+    apart = bool(who.get("file")) and who["file"] != flow["kept"]
     try:
-        with open(os.path.join(home, a["signin"]["flow"]["kept"]), "rb") as f:
+        with open(os.path.join(home, who.get("file") or flow["kept"]), "rb") as f:
             data = f.read(1 << 20)
     except FileNotFoundError:
         # Sealed, its copy not open now (R126): still a sign-in.
@@ -179,68 +167,78 @@ def pack_of(home, agent, a):
         return got if got and got["email"] else None
     except OSError as e:
         return {"error": f"{type(e).__name__}: {e}"[:200]}
+    # Where another file says who, the sign-in itself is what makes it one
+    # rather than a leftover name: a signed-out home keeps the first and
+    # loses the second.
+    if apart and not os.path.exists(os.path.join(home, flow["kept"])) and not sealed_of(home, agent):
+        return None
     if not data.strip():
         return None
     try:
-        email = _jwt_email(json.loads(data))
-    except (ValueError, TypeError, AttributeError):
-        email = ""
-    return {"email": (email or whose)[:120], "plan": ""}
+        d = _jsonc(data.decode("utf-8", "replace"))[1]
+    except (ValueError, TypeError) as e:
+        # A JSON file that does not read is unread; a token kept as plain
+        # text is a sign-in that names nobody.
+        if who.get("email") or who.get("key") or (who.get("file") or flow["kept"]).endswith(".json"):
+            return {"error": f"{type(e).__name__}: {e}"[:200]}
+        return {"email": whose[:120], "plan": ""}
+    email = _at(d, who["email"]) if who.get("email") else _jwt_email(d)
+    if isinstance(email, str) and email:
+        plan = _at(d, who["plan"]) if who.get("plan") else ""
+        return {"email": email[:120], "plan": (plan if isinstance(plan, str) else "")[:40]}
+    if who.get("key") and _at(d, who["key"]):
+        return {"email": (who.get("key_named") or f"{str(a.get('provider') or agent)} API key")[:120], "plan": "API"}
+    if who.get("email") or not d:
+        return None
+    return {"email": whose[:120], "plan": ""}
 
 
-def _copilot_config(home):
-    return os.path.join(home, ".copilot", "config.json")
-
-
-def _jsonc(path):
-    """A Copilot file as (its leading comment lines, its JSON): since 1.0.103
-    its config.json opens with `//` lines saying it is managed, which a plain
-    json.load refused, so a sign-in there never reached the card."""
-    with open(path) as f:
-        lines = f.read().splitlines(keepends=True)
-    n = 0
-    while n < len(lines) and (not lines[n].strip() or lines[n].lstrip().startswith("//")):
-        n += 1
-    return "".join(lines[:n]), json.loads("".join(lines[n:]))
-
-
-def copilot_of(home):
-    """Who this account's Copilot CLI is signed in as here, {email: the
-    GitHub login, plan}, or None."""
+def forget(home, flow):
+    """A sign-out for a program with none of its own (Copilot CLI outside a
+    session): the keys its flow names taken out of the file its sign-in is
+    kept in, and any key that carries the word it gives; everything else,
+    and the file's leading comment lines, left as they were."""
+    g = flow.get("forget") or {}
+    p = os.path.join(home, g.get("file") or flow["kept"])
     try:
-        _, d = _jsonc(_copilot_config(home))
-    except FileNotFoundError:
-        # Sealed, its copy not open now (R126 step 3): still a sign-in.
-        got = sealed_of(home, "copilot")
-        return got if got and got["email"] else None
-    except (OSError, ValueError) as e:
-        return {"error": f"{type(e).__name__}: {e}"[:200]}
-    u = d.get("lastLoggedInUser") if isinstance(d, dict) else None
-    login = str((u or {}).get("login") or "")[:120] if isinstance(u, dict) else ""
-    return {"email": login, "plan": ""} if login else None
-
-
-def forget_copilot(home):
-    """Copilot's sign-out: the logins its config remembers, and a token it
-    kept there in plain text, taken out; everything else left as it was."""
-    p = _copilot_config(home)
-    try:
-        head, d = _jsonc(p)
+        with open(p, encoding="utf-8") as f:
+            head, d = _jsonc(f.read())
     except FileNotFoundError:
         return 0
     except (OSError, ValueError):
         return 1
     if not isinstance(d, dict):
         return 1
-    for k in [k for k in d if k in ("lastLoggedInUser", "loggedInUsers") or "token" in k.lower()]:
+    like = str(g.get("like") or "").lower()
+    for k in [k for k in d if k in (g.get("keys") or []) or (like and like in k.lower())]:
         d.pop(k, None)
     tmp = p + ".new"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(head)
         json.dump(d, f, indent=2)
     os.chmod(tmp, 0o600)
     os.replace(tmp, p)
     return 0
+
+
+def shipped():
+    """{agent: its adapter} for the shipped agents that say how they sign
+    in: the controller's own table (agents.py), which rides in this bundle
+    beside the hook. {} where the bundle carries none."""
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard")
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import agents                                           # noqa: PLC0415 (the bundle's, beside the dashboard)
+        return agents.signs_in()
+    except (ImportError, AttributeError):
+        return {}
+
+
+def signins():
+    """Every coding agent that describes its sign-in, the shipped and the
+    packs': what `aerie login` runs and what each row's reader reads."""
+    return {**pack_flows(), **shipped()}
 
 
 def mcp_of(home):
@@ -265,7 +263,8 @@ def mcp_of(home):
     except OSError:
         pass
     try:
-        got = (_jsonc(os.path.join(home, ".copilot", "mcp-config.json"))[1] or {}).get("mcpServers")
+        with open(os.path.join(home, ".copilot", "mcp-config.json"), encoding="utf-8") as f:
+            got = (_jsonc(f.read())[1] or {}).get("mcpServers")
         if isinstance(got, dict) and got:
             out["copilot"] = sorted(str(k)[:80] for k in got)[:32]
     except (OSError, ValueError, AttributeError):
@@ -314,32 +313,20 @@ def main():
         names = sorted(os.listdir(root))
     except OSError:
         names = []
-    packs = pack_flows()
+    all_ = signins()
     for name in names[:64]:
         if not re.fullmatch(r"u_[0-9a-f]{8}", name):
             continue
         home = os.path.join(root, name)
-        email = ""
-        try:
-            d = json.load(open(os.path.join(home, ".claude.json")))
-            email = str(((d.get("oauthAccount") or {}).get("emailAddress")) or "")[:120]
-        except (OSError, ValueError, AttributeError, TypeError):
-            email = ""
-        # The credential is what makes it a login rather than a leftover name: a
-        # signed-out home keeps .claude.json and loses this file, and reporting
-        # the stale name would keep the card claiming a login that is gone.
-        if email and not os.path.exists(os.path.join(home, ".claude", ".credentials.json")) \
-                and not sealed_of(home, "claude"):
-            email = ""
-        agents = {k: v for k, v in (("codex", codex_of(home)), ("copilot", copilot_of(home)),
-                                    ("grok", grok_of(home)),
-                                    *((name, pack_of(home, name, a)) for name, a in packs.items())) if v}
+        got = {k: who_of(home, k, a) for k, a in all_.items()}
+        # Claude's is the row's own address, as it was before the others had
+        # one; the rest are under `agents`.
+        email = str((got.pop("claude", None) or {}).get("email") or "")
+        agents = {k: v for k, v in got.items() if v}
         out.append({"uid": name, "email": email, "plugins": plugins_of(home), "agents": agents, "mcp": mcp_of(home)})
     print(json.dumps(out))
 
 
 # Imported by login-check.py for the agents' readers, run by `aerie login --list`.
 if __name__ == "__main__":
-    if len(sys.argv) == 3 and sys.argv[1] == "--forget-copilot":
-        sys.exit(forget_copilot(sys.argv[2]))
     main()

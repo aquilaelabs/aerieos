@@ -78,15 +78,21 @@ def whoami():
     if not shutil.which("claude"):
         return False, ""
     home = os.environ.get("HOME") or ""
-    if not os.path.exists(os.path.join(home, ".claude", ".credentials.json")):
-        return False, ""
-    try:
-        with open(os.path.join(home, ".claude.json")) as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        return False, ""
-    email = str(((d.get("oauthAccount") or {}).get("emailAddress")) or "")[:120]
+    ll = readers()
+    a = ll.signins().get("claude")
+    got = ll.who_of(home, "claude", a) if a and home else None
+    email = str((got or {}).get("email") or "")
     return bool(email), email
+
+
+def readers():
+    """login-list.py, which holds the one reading of every agent's sign-in
+    (who_of): the files are read as `aerie login --list` reads them."""
+    spec = importlib.util.spec_from_file_location(
+        "login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
+    ll = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ll)
+    return ll
 
 
 def plan_now():
@@ -111,18 +117,15 @@ def plan_now():
 
 
 def others():
-    """Codex's, Copilot's and Grok's sign-ins here, each said to the controller,
-    signed in or not. login-list.py holds the one reading of their files."""
-    spec = importlib.util.spec_from_file_location(
-        "login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
-    ll = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ll)
+    """Every other coding agent's sign-in here, the shipped and the packs',
+    each said to the controller, signed in or not: read from what its row
+    or its pack says of its sign-in (R234 step 6)."""
+    ll = readers()
     home = os.environ.get("HOME") or ""
-    # ...and a pack's agent's, where its pack says how it signs in (R233
-    # step 6): the same sentence, from the file its sign-in is kept in.
-    packs = [(name, (lambda h, name=name, a=a: ll.pack_of(h, name, a))) for name, a in ll.pack_flows().items()]
-    for agent, read in (("codex", ll.codex_of), ("copilot", ll.copilot_of), ("grok", ll.grok_of), *packs):
-        got = read(home) if home else None
+    for agent, a in sorted(ll.signins().items()):
+        if agent == "claude":
+            continue
+        got = ll.who_of(home, agent, a) if home else None
         if got and got.get("error"):
             # Unread is not signed out (B236): nothing is said for it.
             if loud and agent == FOR:

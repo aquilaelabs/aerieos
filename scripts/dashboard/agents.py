@@ -47,6 +47,7 @@ class Agent:
     pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter (R169 step 9), None for the shipped
     allow: dict = field(default=None, compare=False, hash=False)  # how it is told a command needs no asking (ALLOW_HOW), None for no way
     install: dict = field(default=None, compare=False, hash=False)  # its install recipe (install_checked), None for one a pack installs
+    signin: dict = field(default=None, compare=False, hash=False)  # how it signs in, as a pack's manifest says its own (agent.signin), None for none
 
     @property
     def arg(self):
@@ -84,6 +85,15 @@ TABLE = (
           briefing="system-prompt-file", guards="hooks", state="hooks",
           transcripts=".claude/projects", live=True, tool="claude-code",
           allow={"how": "settings", "rule": "Bash({cmd} *)"},
+          # Its sign-in as a pack's agent says its own (R234 step 6): a link
+          # at one of three hosts, a code pasted back, the program ending
+          # itself once signed in; who is signed in is the address its own
+          # record names, while the credential beside it is there.
+          signin={"login": ["claude", "auth", "login"],
+                  "flow": {"url": ["https://claude.com/", "https://console.anthropic.com/", "https://platform.claude.com/"],
+                           "prompt": "Paste code", "ends": "exit", "kept": ".claude/.credentials.json",
+                           "logout": ["claude", "auth", "logout"],
+                           "who": {"file": ".claude.json", "email": ["oauthAccount", "emailAddress"]}}},
           # Its installer is handed no version: the one asked for is read
           # from the versions folder it leaves (fresh).
           install={"rev": 1, "script": "curl -fsSL https://claude.ai/install.sh | bash", "pin": None, "env": {},
@@ -97,6 +107,16 @@ TABLE = (
           latest_url="https://registry.npmjs.org/@openai/codex/latest",
           allow={"how": "rules-file", "file": ".codex/rules/aerieos.rules",
                  "rule": 'prefix_rule(pattern={argv}, decision="allow")'},
+          # A device login (0.164.0): a link, a one-time code under it,
+          # the program ending itself once the person has entered the code
+          # on OpenAI's page; who is signed in is the address its id token
+          # names, or that it is an API key.
+          signin={"login": ["codex", "login", "--device-auth"],
+                  "flow": {"url": "https://auth.openai.com/", "code_after": "Enter this one-time code", "ends": "exit",
+                           "kept": ".codex/auth.json", "logout": ["codex", "logout"],
+                           "who": {"email": ["tokens", "id_token", "email"],
+                                   "plan": ["tokens", "id_token", "https://api.openai.com/auth", "chatgpt_plan_type"],
+                                   "key": ["OPENAI_API_KEY"], "key_named": "an OpenAI API key"}}},
           install={"rev": 1, "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
                    "pin": ["CODEX_RELEASE", "{v}"], "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"},
                    "bin": ".local/bin/codex", "also": [], "fresh": ""}),
@@ -107,6 +127,18 @@ TABLE = (
           transcripts=".copilot/session-state", tool="copilot-cli", live=True,
           latest_url="https://registry.npmjs.org/@github/copilot/latest",
           allow={"how": "flag", "flag": "--allow-tool", "rule": "shell({cmd}:*)"},
+          # A device login (1.0.102). With no keyring on the machine it
+          # asks, once GitHub has the code, whether to keep its token in
+          # its config file: answered yes, the file being the account's
+          # own. It has no sign-out of its own outside a session, so the
+          # logins its config remembers are forgotten from it, and the
+          # token with them where it was kept there.
+          signin={"login": ["copilot", "login", "--device-code"], "env": {"COPILOT_AUTO_UPDATE": "false"},
+                  "flow": {"url": "https://github.com/login/device", "code_after": "enter code", "ends": "exit",
+                           "answers": [{"when": "plaintext config file", "send": "y"}],
+                           "kept": ".copilot/config.json",
+                           "forget": {"keys": ["lastLoggedInUser", "loggedInUsers"], "like": "token"},
+                           "who": {"email": ["lastLoggedInUser", "login"]}}},
           install={"rev": 1, "script": "curl -fsSL https://gh.io/copilot-install | bash",
                    "pin": ["VERSION", "v{v}"], "env": {"PREFIX": "{home}/.local"},
                    "bin": ".local/bin/copilot", "also": [], "fresh": ""}),
@@ -121,6 +153,13 @@ TABLE = (
           transcripts=".grok/sessions", tool="grok-build", live=True,
           latest_url="https://x.ai/cli/stable",
           allow={"how": "flag", "flag": "--allow", "rule": "Bash({cmd}:*)"},
+          # A device code: a link at one of its hosts, the code under it,
+          # the program ending itself once confirmed; who is signed in is
+          # the address a token of its session names, where one does.
+          signin={"login": ["grok", "login", "--device-auth"], "env": {"GROK_DISABLE_AUTOUPDATER": "1"},
+                  "flow": {"url": ["https://accounts.x.ai/", "https://auth.x.ai/", "https://x.ai/", "https://grok.com/"],
+                           "code_after": "Confirm this code in your browser", "ends": "exit", "kept": ".grok/auth.json",
+                           "logout": ["grok", "logout"], "who": {"named": "an xAI account"}}},
           # Its installer takes the version as its argument, not from its
           # environment: handed over through BB_PIN, empty for the newest.
           install={"rev": 1, "script": "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}",
@@ -341,6 +380,30 @@ def _pack_rows():
                               live=True, tool=name, pack=a, allow=allow_checked(a.get("allow"))[0]))
         _packs.update(key=got, rows=tuple(rows))
     return _packs["rows"]
+
+
+def signs_in():
+    """{id: adapter} for the shipped agents that say how they sign in, each
+    in the shape a pack agent's cleaned adapter has (name, product, command,
+    provider, env, login, signin.flow), so one driver on the node runs
+    every agent's sign-in and one reader says who is signed in
+    (scripts/lib/login-flow.py, login-list.py)."""
+    out = {}
+    for a in TABLE:
+        if a.signin and a.signin.get("flow"):
+            out[a.id] = {"name": a.name, "product": a.product, "command": a.command, "provider": a.provider,
+                         "env": dict(a.signin.get("env") or {}), "login": list(a.signin.get("login") or []),
+                         "signin": {"flow": dict(a.signin["flow"])}}
+    return out
+
+
+def flow_of(agent_id):
+    """How this agent's sign-in goes, as its row or its pack's manifest
+    says (signin.flow), or None for one that describes none."""
+    a = get(agent_id)
+    if a is None:
+        return None
+    return ((a.signin or {}).get("flow") if not a.pack else ((a.pack.get("signin") or {}).get("flow"))) or None
 
 
 def rows():

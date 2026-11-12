@@ -33,43 +33,21 @@ import time
 
 import agents
 
-# The URL the flow prints, and the two things it says when it is over.
-AUTH_URL = re.compile(r"https://(?:claude\.com|console\.anthropic\.com|"
-                      r"platform\.claude\.com)/\S+")
+# The words the card waits for where a flow wants a code pasted back.
 PROMPT = "Paste code"
 
-# Each coding agent's flow as its log reads (R95 step 3): the link it
-# prints, the one-time code a device flow shows beside it (the person types
-# it on the provider's page, and nothing comes back down), and the prompt a
-# flow that wants a code pasted back waits at. Claude's asks for a code;
-# Codex's device login (`codex login --device-auth`, 0.163.0) and Copilot's
-# (`copilot login --device-code`, 1.0.102) show one.
-FLOWS = {
-    "claude": {"url": AUTH_URL, "code": None, "prompt": PROMPT},
-    # The link ends at a space or at the color code Codex prints around it
-    # (\x1b[...m): taken with \S+ the reset came along, the link opened a
-    # page that said the session had ended.
-    "codex": {"url": re.compile(r"https://auth\.openai\.com/[^\s\x1b]+"),
-              "code": re.compile(r"one-time code[^\n]*\n\s*(?:\x1b\[[0-9;]*m)*([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+)"),
-              "prompt": None},
-    "copilot": {"url": re.compile(r"https://github\.com/login/device[^\s\x1b]*"),
-                "code": re.compile(r"enter code\s+([A-Z0-9]{4}-[A-Z0-9]{4})"),
-                "prompt": None},
-    # Grok Build's device code (`grok login --device-auth`): a link on an
-    # x.ai host and a code beside it, matched broadly since its words are
-    # documented as "a URL and a code" (25 Oct).
-    "grok": {"url": re.compile(r"https://(?:[a-z0-9-]+\.)*(?:x\.ai|grok\.com)/[^\s\x1b]*"),
-             "code": re.compile(r"(?<![A-Z0-9-])([A-Z0-9]{4,}-[A-Z0-9]{4,})(?![A-Z0-9-])"),
-             "prompt": None},
-}
-# A pack's agent's flow (R233 step 6) reads the same for every one of them:
-# its own screens are driven on the node by scripts/lib/login-flow.py from
-# what its pack says of them, and what comes up the log is that driver's
-# lines, the link on one, a one-time code on another, and the prompt's words
-# where the flow wants a code pasted back.
-PACK_FLOW = {"url": re.compile(r"(?<=\[aerieos\] open this link to sign in: )https://[^\s\x1b]+"),
-             "code": re.compile(r"\[aerieos\] then enter this code there: ([A-Za-z0-9-]{4,40})"),
-             "prompt": PROMPT}
+# Every coding agent's flow reads the same in its job's log (R233 step 6,
+# R234 step 6): its own screens are driven on the node by
+# scripts/lib/login-flow.py from what its row in the agents' table or its
+# pack's manifest says of them (signin.flow), and what comes up the log is
+# that driver's lines, the link on one, a one-time code on another (the
+# person types it on the provider's page, and nothing comes back down), and
+# the prompt's words where the flow wants a code pasted back.
+FLOW = {"url": re.compile(r"(?<=\[aerieos\] open this link to sign in: )https://[^\s\x1b]+"),
+        "code": re.compile(r"\[aerieos\] then enter this code there: ([A-Za-z0-9-]{4,40})"),
+        "prompt": PROMPT}
+# The name it had while only a pack's agent signed in this way.
+PACK_FLOW = FLOW
 # The first agent build that runs a pack agent's sign-in job (0.9.429); an
 # older one in the window is asked to update first, in words.
 PACK_FLOW_BUILD = 429
@@ -78,19 +56,35 @@ PACK_FLOW_BUILD = 429
 def flow_of(agent):
     """How an agent's flow reads in its job's log, or None for one that
     signs in nowhere the page can run."""
-    if agent in FLOWS:
-        return FLOWS[agent]
     a = agents.get(agent)
-    return PACK_FLOW if a is not None and a.pack and a.login_job else None
+    return FLOW if a is not None and a.login_job and agents.flow_of(agent) else None
 
 
 def pastes(agent):
     """Whether the agent's flow wants a code pasted back (a field on the
     card), as against showing one to type on the provider's page."""
-    if agent in FLOWS:
-        return bool(FLOWS[agent]["prompt"])
-    a = agents.get(agent)
-    return bool(a is not None and a.pack and (((a.pack.get("signin") or {}).get("flow") or {}).get("prompt")))
+    return bool((agents.flow_of(agent) or {}).get("prompt"))
+
+
+def _screen(agent):
+    """How the program's own screen reads, from the same data: (the link's
+    pattern, the words a one-time code follows). For a node whose bundle is
+    from before the one driver (a shipped agent's sign-in ran bare there,
+    its screen the job's log), until its next hello brings this build's."""
+    f = agents.flow_of(agent) or {}
+    urls = f.get("url") if isinstance(f.get("url"), list) else [f.get("url") or "https://"]
+    return re.compile("(?:" + "|".join(re.escape(u) for u in urls) + r")[^\s\x1b]*"), str(f.get("code_after") or "")
+
+
+def _code_after(text, after):
+    """The one-time code that follows the words `after` on a screen, as the
+    node's driver reads it (login-flow.py code_in)."""
+    flat = re.sub(r"\s+", " ", text)
+    at = flat.lower().rfind(after.lower()) if after else -1
+    if at < 0:
+        return ""
+    m = re.search(r"(?<![A-Za-z0-9-])([A-Z0-9]{4,12}(?:-[A-Z0-9]{3,12}){0,3})(?![A-Za-z0-9-])", flat[at + len(after):at + len(after) + 160])
+    return m.group(1) if m else ""
 
 
 # How long start_on_node() waits for the URL before answering. The flow takes
@@ -218,10 +212,16 @@ class NodeFlow:
     def state(self):
         j, out = self._log()
         done = (j.get("state") or "") in ("succeeded", "failed", "canceled")
-        flow = flow_of(self.agent) or FLOWS["claude"]
-        url = link(out, flow["url"])
-        c = flow["code"].search(out) if flow["code"] else None
-        prompt = flow["prompt"]
+        url = link(out, FLOW["url"])
+        c = FLOW["code"].search(out)
+        code = c.group(1) if c else ""
+        if not url:
+            # No driver's line: the program's own screen, from a bundle of
+            # before, read by what the agent's flow says of it.
+            rx, after = _screen(self.agent)
+            url = link(out, rx)
+            code = _code_after(plain(out), after) if url else ""
+        prompt = PROMPT if pastes(self.agent) else None
         why = ""
         if done and j.get("state") != "succeeded":
             # The last line that says something: never a piece of the link.
@@ -235,7 +235,7 @@ class NodeFlow:
         return {"running": not done, "url": url,
                 # A device flow's code, shown for the person to type on the
                 # provider's page; "" for a flow that wants one pasted back.
-                "code": c.group(1) if c else "", "agent": self.agent,
+                "code": code, "agent": self.agent,
                 # Whether this flow takes a code back: the card draws the
                 # field for one that does and the code to type for one that
                 # does not.
