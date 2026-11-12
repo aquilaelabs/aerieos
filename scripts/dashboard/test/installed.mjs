@@ -118,9 +118,14 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
     out.here = { text: text(out.here), button: /data-si="in"/.test(out.here) };
     out.paste = { text: text(out.paste), field: /id="authCode"/.test(out.paste) && !/id="authCode"[^>]* disabled/.test(out.paste), link: /href="https:\/\/accounts\.example\.test\/o\/auth\?x=1"/.test(out.paste) };
     out.device = { text: text(out.device), field: /id="authCode"/.test(out.device), code: /class="sicode">WXYZ-1234</.test(out.device) };
+    // Edit is for a pack a person added themselves, here as on the Library.
+    out.edit = { catalog: /data-instact="edit"/.test(instActs(row, { install: true })), own: /data-instact="edit"/.test(instActs({ ...row, tier: 'sideloaded' }, { install: true })),
+                 remove: /data-instact="remove"/.test(instActs(row, { install: true })) };
     inst.rows.pop(); agentsAdopt([]); instRev++; drawPanes();
     return out;
   });
+  ok(!got.edit.catalog && got.edit.own && got.edit.remove,
+     `a pack kept from the catalog has Remove and no Edit on its row, and one a person added has Edit (${JSON.stringify(got.edit)})`);
   ok(got.here.button && /You are not signed in to Kite on \S+: sign in here, or in the terminal of a Kite session there/.test(got.here.text),
      `a pack agent whose pack says how it signs in has Sign in on its page, and the page says its terminal is the other way (${got.here.text.slice(0, 120)})`);
   ok(got.paste.field && got.paste.link && /sign in to Example, and paste the code it gives you/.test(got.paste.text),

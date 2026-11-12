@@ -135,7 +135,10 @@ function instActs(r, may){
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
   const upd = r.installed && r.update ? a("update", "Update", "primary") : "";
-  if (r.kind === "pack" && r.pack) return `${upd}${a("edit", "Edit")}${r.installed ? a("remove", "Remove", "danger") : ""}`;
+  // Edit on a pack a person added themselves, as on the Library's card: one
+  // kept from the catalog is the catalog's, its kept copy reached from its
+  // Details page there.
+  if (r.kind === "pack" && r.pack) return `${upd}${r.tier === "sideloaded" ? a("edit", "Edit") : ""}${r.installed ? a("remove", "Remove", "danger") : ""}`;
   return r.installed ? `${upd}${a("remove", "Remove", "danger")}` : "";
 }
 
