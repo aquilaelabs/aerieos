@@ -176,6 +176,46 @@ class Flows(unittest.TestCase):
         self.assertTrue(st["waiting"])
         self.assertEqual(st["code"], "")
 
+    URL = ("https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a&response_type=code"
+           "&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key"
+           "+user%3Aprofile&code_challenge=1Hwngyh1Ihh80Q&code_challenge_method=S256&state=XPQEcWJxK6HQ")
+
+    def test_claude_s_link_wrapped_at_the_pty_s_width_is_taken_whole(self):
+        # The job's pty is eighty wide: the flow broke the link across lines,
+        # and the page opened its first line alone (the operator, 12 Nov).
+        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
+        st = self.flow("claude", "Browser didn't open? Use the url below to sign in (c to copy)\n\n"
+                                 + wrapped + "\n\nPaste code here if prompted > ")
+        self.assertEqual(st["url"], self.URL)
+
+    def test_claude_s_link_as_a_terminal_hyperlink_is_its_target(self):
+        out = ("Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + self.URL[:80] + "\x1b]8;;\x07\n"
+               "\x1b]8;;" + self.URL + "\x07" + self.URL[80:] + "\x1b]8;;\x07\n\nPaste code here if prompted > ")
+        self.assertEqual(self.flow("claude", out)["url"], self.URL)
+
+    def test_the_link_is_whole_at_any_width_and_however_the_hyperlink_ends(self):
+        for width in (40, 60, 80, 120):
+            wrapped = "\r\n".join(self.URL[i:i + width] for i in range(0, len(self.URL), width))
+            st = self.flow("claude", "Use the url below\r\n\r\n\x1b[36m" + wrapped + "\x1b[0m\r\n\r\nPaste code here if prompted > ")
+            self.assertEqual(st["url"], self.URL, width)
+        st = self.flow("claude", "\x1b]8;;" + self.URL + "\x1b\\" + self.URL[:80] + "\x1b]8;;\x1b\\\n")
+        self.assertEqual(st["url"], self.URL, "a hyperlink ended with ST, not BEL")
+
+    def test_a_one_time_code_under_a_long_link_line_is_not_more_of_the_link(self):
+        # A device flow that prints its code alone on the next line: every
+        # character of it could be a link's, and it is not one.
+        st = self.flow("grok", "To sign in, open this page in a browser on any device you like: https://accounts.x.ai/device\nWXYZ-1234\nWaiting...\n")
+        self.assertEqual((st["url"], st["code"]), ("https://accounts.x.ai/device", "WXYZ-1234"))
+        long = "https://accounts.x.ai/oauth2/device/verify?user_code=WXYZ-1234&client_id=grok-cli-00000000000&scope=openid%20profile"
+        st = self.flow("grok", "Open:\n" + long[:80] + "\n" + long[80:] + "\n\nCode: WXYZ-1234\n")
+        self.assertEqual(st["url"], long, "while a link that did wrap is still joined")
+
+    def test_a_failed_claude_flow_never_gives_a_piece_of_its_link_as_why(self):
+        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
+        st = self.flow("claude", "Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + wrapped + "\x1b]8;;\x07\n", "failed")
+        self.assertNotIn("]8;;", st["error"])
+        self.assertNotIn("state=", st["error"])
+
     def test_a_failed_device_flow_says_why_in_its_own_words(self):
         st = self.flow("codex", "https://auth.openai.com/codex/device\nError: device auth timed out after 15 minutes\n", "failed")
         self.assertEqual(st["error"], "Error: device auth timed out after 15 minutes")

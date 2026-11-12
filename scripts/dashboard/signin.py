@@ -113,6 +113,53 @@ _flows = {}
 nodes = None
 mint = None
 
+# What a flow's log carries around its link that is not the link. Claude Code
+# prints the link as a terminal hyperlink (OSC 8: ESC ] 8 ; ; URI BEL, the
+# text, then the same closed), and wraps it at the pty's width, which a job's
+# pty leaves at its default: taken with \S+ off one line, the link opened was
+# its first eighty-odd characters, without its state or code challenge, and
+# the sign-in page said only that it did not complete; and the failure's
+# reason was a piece of the link's last line, "]8;;" and all.
+OSC8 = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)(?:\x07|\x1b\\)")
+ESCAPES = re.compile(r"\x1b\]8;[^;\x07\x1b]*;[^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b|\r")
+URL_PART = re.compile(r"[A-Za-z0-9%._~:/?#\[\]@!$&'()*+,;=-]+")
+# A one-time code alone on a line, as a device flow prints it: never more of
+# a link, though every character of it could be.
+CODE_LINE = re.compile(r"[A-Z0-9]{4,}(?:-[A-Z0-9]{3,}){1,3}")
+
+
+def plain(out):
+    """A log as it reads on a screen: escapes and carriage returns out."""
+    return ESCAPES.sub("", out or "")
+
+
+def link(out, rx):
+    """The flow's link, whole: a hyperlink's own target where the flow
+    printed one (never wrapped), else the text's, its wrapped lines joined
+    back while each next line is nothing but more of a URL."""
+    for target in OSC8.findall(out or ""):
+        m = rx.match(target)
+        if m:
+            return m.group(0)
+    text = plain(out)
+    m = rx.search(text)
+    if not m:
+        return ""
+    url, prev = m.group(0), text[text.rfind("\n", 0, m.start()) + 1:m.end()]
+    if text[m.end():m.end() + 1] == "\n":
+        for line in text[m.end() + 1:].split("\n"):
+            part = line.strip()
+            # More of the link: URL characters alone, after a line the
+            # wrap filled, or carrying the query's own marks.
+            if not part or not URL_PART.fullmatch(part) or not (len(prev) >= 60 or any(c in part for c in "%=&")):
+                break
+            # ...and never the code a device flow prints under its link.
+            if CODE_LINE.fullmatch(part):
+                break
+            url, prev = url + part, line
+    return url
+
+
 # What gets removed from a pasted code before it is handed to the flow:
 # whitespace of every kind (a wrapped copy brings line breaks, a phone
 # keyboard adds a trailing space), control characters, and the zero-width
@@ -172,19 +219,20 @@ class NodeFlow:
         j, out = self._log()
         done = (j.get("state") or "") in ("succeeded", "failed", "canceled")
         flow = flow_of(self.agent) or FLOWS["claude"]
-        m = flow["url"].search(out)
+        url = link(out, flow["url"])
         c = flow["code"].search(out) if flow["code"] else None
         prompt = flow["prompt"]
         why = ""
         if done and j.get("state") != "succeeded":
-            for line in reversed(out.splitlines()):
+            # The last line that says something: never a piece of the link.
+            for line in reversed(plain(out).splitlines()):
                 line = line.strip()
-                if line and not line.startswith("http") and (not prompt or prompt not in line):
+                if line and not line.startswith("http") and line not in url and (not prompt or prompt not in line):
                     # Without the mark a driver's or a check's line opens with.
                     why = re.sub(r"^\[(?:aerieos|builderbot)\]\s*", "", line)[-300:]
                     break
             why = why or "the sign-in did not finish"
-        return {"running": not done, "url": m.group(0) if m else "",
+        return {"running": not done, "url": url,
                 # A device flow's code, shown for the person to type on the
                 # provider's page; "" for a flow that wants one pasted back.
                 "code": c.group(1) if c else "", "agent": self.agent,
