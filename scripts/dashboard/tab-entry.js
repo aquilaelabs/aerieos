@@ -34,6 +34,9 @@ function renderEntryInto(i){
   const d = docSurface(i, "entry");
   if (!d) return;
   d.setBar("");
+  // A page that came back without the entry it was for (the browser's kept
+  // layout after a reload that did not land on its address): the Library.
+  if (!entryKey){ d.list.innerHTML = ""; setTimeout(() => { if (!entryKey) openLibrary(); }, 0); return; }
   if (lib === null){
     d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3)));
     if (!libSeq) loadLibrary();

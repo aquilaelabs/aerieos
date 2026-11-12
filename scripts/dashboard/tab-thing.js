@@ -75,6 +75,10 @@ function renderThingInto(i){
   const d = docSurface(i, "thing");
   if (!d) return;
   d.setBar("");
+  // A page that came back without the thing it was for (the browser's kept
+  // layout after a reload that did not land on its address) has nothing to
+  // name: it is the Installed page then, where the row is.
+  if (!thingKey){ d.list.innerHTML = ""; setTimeout(() => { if (!thingKey) openInstalledTab(); }, 0); return; }
   if (inst === null){
     d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3)));
     if (!instSeq) loadInstalled();
