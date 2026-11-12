@@ -124,7 +124,10 @@ function mobHotRec(){
 function mobLinksShut(){
   const box = $("mLinksBox");
   if (box && !box.hidden) box.hidden = true;
-  $("mLinks")?.setAttribute("aria-expanded", "false");
+  // Written only when it changes: a status read that brings nothing new
+  // writes nothing.
+  const ml = $("mLinks");
+  if (ml && ml.getAttribute("aria-expanded") !== "false") ml.setAttribute("aria-expanded", "false");
 }
 // A phone's line carries a shell's other keys past the hot ones, where the
 // Keys panel was (the operator, 12 Nov: most of them were on the bar

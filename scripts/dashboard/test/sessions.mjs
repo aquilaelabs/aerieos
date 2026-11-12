@@ -433,7 +433,7 @@ ok(mob.display === 'flex' && !mob.bKeys,
      `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture and Commands still at the arrow's right, and nothing floats over the terminal (${JSON.stringify(band)})`);
 }
 ok((mob.widths || []).length === 2 && Math.abs(mob.widths[0] - mob.widths[1]) <= 1 && mob.whole,
-   `...Keys and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);
+   `...Links and Commands are one size at its end, neither cut (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
 // About control carries the word instead, and exactly one of the two, never
 // both: showing the label on a desktop as well stacked it under the version
@@ -702,9 +702,8 @@ ok(await phone.evaluate(() => !document.getElementById('tabbar'))
    && await phone.$eval('#pane1 .dockline', el => getComputedStyle(el).display !== 'none'),
    "on a phone the terminals are the dock's line, as at a desk (R218 step 4)");
 
-// Swapping one flyout for another: the outgoing one stays under the incoming
-// slide and the terminal changes size once, when the new one lands. Commands
-// needs a shell under it, so make sure the pane is showing one.
+// Commands, the phone's one flyout, needs a shell under it, so make sure
+// the pane is showing one.
 await phone.evaluate(() => {
   const shell = t => t.kind === 'term' && !t.arg.startsWith('claude:');
   if (!tabs.some(shell)) newShell();
@@ -712,18 +711,10 @@ await phone.evaluate(() => {
   render();
 });
 await phone.waitForFunction(() => document.querySelector('.col.term').getAnimations().length === 0);
-await phone.evaluate(() => mobPanel('keys'));
-await phone.waitForFunction(() => document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'));
-const hSess = await phone.$eval('#panes', el => el.offsetHeight);
-await phone.click('#mMacros');
-const swap = await phone.evaluate(() => ({
-  oldShown: document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'),
-  newSliding: document.getElementById('macpanel').classList.contains('sliding'),
-  paneH: document.getElementById('panes').offsetHeight }));
-ok(swap.oldShown && swap.newSliding && swap.paneH === hSess, 'a flyout swap slides the new one over the old, terminal untouched');
-await phone.waitForFunction(() => !document.getElementById('macpanel').classList.contains('sliding'));
-ok(await phone.$eval('#keys', el => !el.classList.contains('show')) && await phone.$eval('#macpanel', el => el.classList.contains('show')),
-   '...and the old one is gone when the new one lands');
+await phone.evaluate(() => { if (!showMacros) mobPanel('macros'); });
+await phone.waitForFunction(() => document.getElementById('macpanel').classList.contains('show') && !document.getElementById('macpanel').classList.contains('sliding'));
+ok(await phone.$eval('#macpanel', el => el.classList.contains('show')) && !(await phone.$('#keys')),
+   'Commands is the one flyout over a shell on a phone: its keys are on the hot bar, with no panel of their own');
 // A second tap mid-slide reverses from where the panel is, not from full height.
 const hFull = await phone.$eval('#macpanel', el => el.offsetHeight);   // landed, in the flow
 // The whole gesture inside one evaluate, and the wait measured against the
@@ -810,10 +801,6 @@ await land.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) 
 await land.waitForFunction(() => document.getElementById('macpanel').classList.contains('show') && !document.getElementById('macpanel').classList.contains('sliding'));
 const fit = await land.evaluate(() => ({ bar: document.getElementById('mobar').getBoundingClientRect().bottom, panes: document.getElementById('panes').offsetHeight }));
 ok(fit.bar <= 390 && fit.panes >= 90, `landscape: the bar stays on screen with a flyout open (bar bottom ${Math.round(fit.bar)}px, terminal ${fit.panes}px)`);
-await land.evaluate(() => mobPanel('keys'));
-await land.waitForFunction(() => document.getElementById('keys').classList.contains('show') && !document.getElementById('keys').classList.contains('sliding'));
-const fit2 = await land.evaluate(() => ({ bar: document.getElementById('mobar').getBoundingClientRect().bottom, panes: document.getElementById('panes').offsetHeight }));
-ok(fit2.bar <= 390 && fit2.panes >= 90, `landscape: same with the keys (bar bottom ${Math.round(fit2.bar)}px, terminal ${fit2.panes}px)`);
 await closePage(land);
 
 // ---- a tab that outlived its container ---------------------------------
