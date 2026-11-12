@@ -533,7 +533,10 @@ function wireLibrary(root){
   root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => move(() => { libTier = b.dataset.libtier; }));
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
   const chk = root.querySelector("[data-libcheck]");
-  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking"); await tcAct("check"); await loadLibrary(); });
+  // ...and the vetted catalog read again with it: its index is kept for an
+  // hour, so a newer pin showed up to an hour after Check (B793).
+  if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking");
+    await Promise.all([tcAct("check"), fetch("/api/catalog?fresh=1").catch(() => null)]); await loadLibrary(); });
   const ab = root.querySelector("[data-libabort]");
   if (ab) ab.onclick = async () => { await tcAct("abort"); loadLibrary(); };
   const sd = root.querySelector("[data-libsysdeps]");
