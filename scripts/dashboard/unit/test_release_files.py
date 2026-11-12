@@ -63,6 +63,29 @@ class Files(unittest.TestCase):
         self.assertTrue(rows[0]["bad"])
         self.assertIn("has not signed it yet: the space's Signing view", rows[0]["why"])
 
+    def gone_at(self, after):
+        import time
+        with mock.patch.object(releasefiles.forgerelease, "_handle", return_value=("github", "GitHub", None)), \
+                mock.patch.object(releasefiles.forgerelease, "_files_on",
+                                  side_effect=releasefiles.forgerelease.NoRelease("there is no release for v1.0.0-dev.5 on GitHub")):
+            releasefiles.check("app", now=time.time() + after)
+        return releasefiles.attention(["app"])
+
+    def test_a_release_deleted_on_the_git_host_ends_its_watch_and_its_row(self):
+        # B780: read once short of a file, then taken away on purpose.
+        self.assertEqual(len(self.check(["app-1.0.0-dev.5.tar.gz"])), 1)
+        self.assertEqual(self.gone_at(5 * 3600), [])
+
+    def test_and_one_deleted_after_the_watch_gave_up_is_learned_of_within_a_day(self):
+        self.assertEqual(len(self.check(["app-1.0.0-dev.5.tar.gz"])), 1)
+        self.assertEqual(self.gone_at(4 * 3600 + 5 * 86400), [])
+
+    def test_a_release_never_made_keeps_its_row(self):
+        releasefiles.expect("app", "v1.0.0-dev.5")
+        rows = self.gone_at(4 * 3600)
+        self.assertEqual(len(rows), 1)
+        self.assertIn("there is no release", rows[0]["why"])
+
     def test_nothing_is_checked_before_ci_has_had_its_time(self):
         self.assertEqual(self.check([], after=60), [])
 

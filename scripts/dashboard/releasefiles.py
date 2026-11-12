@@ -10,7 +10,8 @@ does not change what an older release is held to. `*` matches as a shell
 pattern does. A release is checked once WAIT_S has passed since its tag was
 pushed (CI's builds: the OS image alone is over an hour), then every
 TICK_S until it is whole or GIVE_UP_S has passed; a row stays until it is
-whole or put away.
+whole or put away, or until a release that was read is deleted on the git
+host, which ends its watch.
 
     configure(state=, workspace=, write_json_fn=)
     wanted(project, tag)   the names the release must carry, or []
@@ -38,6 +39,8 @@ write_json = None
 MANIFEST = ".release-files"
 WAIT_S = int(os.environ.get("BB_RELEASEFILES_WAIT", str(3 * 3600)))
 GIVE_UP_S = 3 * 86400
+# How often a release past GIVE_UP_S whose row still stands is asked after.
+GONE_S = 86400
 TICK_S = int(os.environ.get("BB_RELEASEFILES_TICK", "600"))
 _lock = threading.Lock()
 
@@ -120,14 +123,32 @@ def check(project, now=None):
     for tag, rec in recs.items():
         if not isinstance(rec, dict) or now - int(rec.get("at") or 0) < WAIT_S:
             continue
-        if rec.get("done") or now - int(rec.get("at") or 0) > GIVE_UP_S:
+        if rec.get("done"):
+            continue
+        late = now - int(rec.get("at") or 0) > GIVE_UP_S
+        # Past giving up, a release whose row still stands is looked at once
+        # a day, only to learn that it has been taken away.
+        if late and (not rec.get("url") or now - int(rec.get("asked") or rec.get("checked") or 0) < GONE_S):
             continue
         try:
             gone, url = missing(project, tag)
-            rec.update(checked=now, url=url, gone=[{"name": n, "why": _why(project, tag, n)} for n in gone],
-                       error="")
+            if late:
+                # Still there: its row stands as it was last read.
+                rec.update(asked=now)
+            else:
+                rec.update(checked=now, url=url, gone=[{"name": n, "why": _why(project, tag, n)} for n in gone],
+                           error="")
+        except forgerelease.NoRelease as e:
+            if rec.get("url"):
+                # Read before, and not there now: deleted on the git host,
+                # on purpose. Not a release short of a file: its watch ends,
+                # and its row with it (B780).
+                rec.update(checked=now, done=now, deleted=True, gone=[], error="")
+            elif not late:
+                rec.update(checked=now, error=str(e))
         except forgerelease.Refused as e:
-            rec.update(checked=now, error=str(e))
+            if not late:
+                rec.update(checked=now, error=str(e))
         if not rec.get("gone") and not rec.get("error"):
             rec["done"] = now
         with _lock:

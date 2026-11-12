@@ -65,6 +65,10 @@ class Refused(Exception):
     """A release this module will not make, with the sentence to show."""
 
 
+class NoRelease(Refused):
+    """The git host has no release for the tag: never made, or taken away."""
+
+
 def configure(*, state, workspace, write_json_fn):
     globals().update(STATE=Path(state), WORKSPACE=Path(workspace), write_json=write_json_fn)
     import gitcreds                                         # noqa: PLC0415
@@ -773,7 +777,7 @@ def _files_on(kind, name, ctx, tag):
         repo, token = ctx
         rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{t}", token)
         if not rel:
-            raise Refused(f"there is no release for {tag} on GitHub")
+            raise NoRelease(f"there is no release for {tag} on GitHub")
         return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
                                            for a in rel.get("assets") or []}
     f, at = ctx
@@ -781,13 +785,13 @@ def _files_on(kind, name, ctx, tag):
         pid = urllib.parse.quote(at["path"], safe="")
         rel = f.ask("GET", f"/projects/{pid}/releases/{t}")
         if not rel:
-            raise Refused(f"there is no release for {tag} on GitLab")
+            raise NoRelease(f"there is no release for {tag} on GitLab")
         return ((rel.get("_links") or {}).get("self") or "",
                 {x.get("name"): (int(x["id"]), 0, 0) for x in ((rel.get("assets") or {}).get("links") or [])})
     owner, _, repo = at["path"].partition("/")
     rel = f.ask("GET", f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases/tags/{t}")
     if not rel:
-        raise Refused(f"there is no release for {tag} on {name}")
+        raise NoRelease(f"there is no release for {tag} on {name}")
     return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
                                        for a in rel.get("assets") or []}
 
@@ -953,7 +957,7 @@ def _draft(project, tag):
     repo, token = ctx
     rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}", token)
     if not rel:
-        raise Refused(f"there is no release for {tag} on GitHub")
+        raise NoRelease(f"there is no release for {tag} on GitHub")
     if not rel.get("draft"):
         raise Refused(f"{tag} is published already")
     return repo, token, rel
