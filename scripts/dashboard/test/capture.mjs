@@ -273,9 +273,12 @@ exit 0
   mkdirSync(bin, { recursive: true });
   writeFileSync(`${bin}/adb`, '#!/bin/sh\n[ "$1" = devices ] && echo "List of devices attached"; exit 0\n', { mode: 0o755 });
   writeFileSync(`${bin}/emulator`, '#!/bin/sh\necho "emulator ran" >&2; exit 1\n', { mode: 0o755 });
+  // An SDK of its own: the node's real store is not this check's to read
+  // (one gone stale under the session answered for it, and start said that).
+  mkdirSync(`${S}/emusdk/system-images`, { recursive: true });
   const emu = (...a) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'emu', ...a], { encoding: 'utf8',
     env: { ...process.env, ANDROID_AVD_HOME: home, ANDROID_AVD_NAME: 'builderbot-36', PATH: `${bin}:${process.env.PATH}`,
-           BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
+           ANDROID_HOME: `${S}/emusdk`, BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
   const holder = spawn('flock', [`${home}/builderbot-36.avd/multiinstance.lock`, 'sleep', '600'], { detached: true, stdio: 'ignore' });
   await new Promise(r => setTimeout(r, 400));
   const t0 = Date.now();
