@@ -104,7 +104,7 @@ runs against the latest the controller knows, asked on the toolchains' own
 clock (weekly, when a node starts, and on **Check for updates**). Until it
 is installed no Claude session starts there: the space's Start agent
 is ghosted with the reason, and the terminal refuses with the same
-sentence. Press **Install** or **Update** there to install or update it:
+sentence. Press **Install** or **Software update** there to install or update it:
 that ends every Claude session on the node first, then the agent runs the
 installer as the session account and, on a managed node, pins the binary
 where the account cannot write it, so `claude update` typed in a session

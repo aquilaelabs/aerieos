@@ -3621,7 +3621,7 @@ ok(page.errors.length === 0,
     await page.evaluate(() => loadLibrary());
     await page.waitForFunction(sel => { const c = document.querySelector(sel);
       return !!c && /update available/.test(c.querySelector('.pcacts .state')?.textContent || '') && /595\.95\.01 is out/.test(c.querySelector('.lcmeta').textContent); }, DRV, { timeout: 20000 });
-    ok(await page.$eval(`${DRV} [data-libact="install"]`, b => !b.disabled && b.textContent.trim() === 'Update'),
+    ok(await page.$eval(`${DRV} [data-libact="install"]`, b => !b.disabled && b.textContent.trim() === 'Software update'),
        'a newer version of the installed branch is said on the card, and it offers Update');
     // Remove, on the Installed page's row: asked first, and the removal queued.
     await page.evaluate(id => openThing(id, 'toolchain:nvidia-driver'), shed.id);
@@ -3703,7 +3703,7 @@ ok(page.errors.length === 0,
       await page.evaluate(id => openLibraryOn(id), shed.id);
       await page.evaluate(() => loadLibrary());
       const newer = await page.waitForFunction(sel => { const c = document.querySelector(sel);
-        return !!c && /1\.18\.0 is out/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.textContent.trim() === 'Update'; },
+        return !!c && /1\.18\.0 is out/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.textContent.trim() === 'Software update'; },
         CTK, { timeout: 20000 }).then(() => true, () => false);
       ok(unknown && newer, `unknown to Docker the Installed row says so, and with a newer one on offer the card offers Update (${JSON.stringify({ unknown, newer })})`);
       await hello(shed, { sandbox: true, docker: '', gpu_card: card, gpu_driver: on, gpu_container: none });
@@ -3876,7 +3876,7 @@ ok(page.errors.length === 0,
   await page.evaluate(id => openLibraryOn(id, 'claude'), en.id);
   const AGL = `.librarytab [data-libnode="${en.id}"] .lcard[data-lrow="agent:claude-code"]`;
   await page.waitForSelector(`${AGL} [data-libact="install"]`, { timeout: 15000 });
-  ok(await page.$eval(`${AGL} [data-libact="install"]`, b => !b.disabled && b.textContent.trim() === 'Update')
+  ok(await page.$eval(`${AGL} [data-libact="install"]`, b => !b.disabled && b.textContent.trim() === 'Software update')
      && /1\.2\.0 is out/.test(await page.$eval(AGL, c => c.querySelector('.lcmeta').textContent)),
      '...and the Library\'s Claude Code card says what is out and offers Update');
   await page.evaluate(() => openNodesTab());

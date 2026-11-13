@@ -45,7 +45,7 @@ aerie toolchains env                 # the PATH lines; new shells get them autom
 
 The NDK, CMake, the SDK platform and build-tools are versioned rows: each
 is a family of packages side by side, so the check asks whether the newest
-the repository offers is on the store, and Update installs it beside the
+the repository offers is on the store, and Software update installs it beside the
 older ones rather than in their place. The platform row's newest is the
 newest level's base (`platforms;android-37.0`, what `compileSdk = 37`
 names), not a quarterly minor or an extension level. A session cannot
@@ -289,7 +289,7 @@ anywhere else.
 
 **From the dashboard.** The **Library**, under Build on the rail, offers
 everything above as a card each for the node picked in the group's header:
-what it is, its terms, what it needs, and Install or Update. The
+what it is, its terms, what it needs, and Install or Software update. The
 **Installed** page, under Machines, lists what that node holds, the path each
 landed on and its system packages, with Remove. If an install fails, its
 card says why: the sentence, not the several hundred lines of progress
@@ -392,7 +392,7 @@ is one shape: its name, its tier (official, shipped with AerieOS;
 vetted, from the catalog the maintainers sign; sideloaded, added by URL or
 made here), what is installed and what an update would move it to, one
 line saying what it is, and at its right the one verb it takes: Install,
-Update, Remove, Edit on a pack, Download on a companion, Install on a
+Software update, Remove, Edit on a pack, Download on a companion, Install on a
 service once it is configured on the Installed page, and on an app New
 container, since an app is not installed on the node but made as a
 container, each press another one under its own name. Details opens the
@@ -443,7 +443,7 @@ puts on a node is the Installed page's, below.
 toolchain the [toolchain store](#the-toolchain-store-lives-outside-the-image)
 holds there, as the Library has a card per toolchain the catalog offers:
 each with its size, its installed version, its path, and an amber line
-when a check finds a newer one. Install and Update are on the Library's
+when a check finds a newer one. Install and Software update are on the Library's
 card; Remove is on the Installed page's row. A recipe that gives a session
 commands says under which name: they live under `aerie tool NAME` (`aerie tool
 graphics`, `aerie tool diagrams`), one name per recipe, so the card says what

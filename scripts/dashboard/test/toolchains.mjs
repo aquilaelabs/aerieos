@@ -171,8 +171,8 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   ok(d.state === 'installed' && /\bok\b/.test(d.cls) && !d.acts.includes('Install') && !d.pills.some(p => /is out/.test(p)),
      `installed and current: it says installed, offers no Install, and claims no update (${d.state}; ${d.acts.join(', ') || 'no verb'})`);
   d = await card('flutter', { installed: true, unknown: false, version: '3.0', update: true, latest: '3.1' });
-  ok(d.state === 'update available' && /\bwarn\b/.test(d.cls) && d.acts.includes('Update') && d.pills.includes('3.1 is out'),
-     `an update out says update available in amber, with Update and what is out (${d.state}; ${d.pills.join(', ')})`);
+  ok(d.state === 'software update available' && /\bwarn\b/.test(d.cls) && d.acts.includes('Software update') && d.pills.includes('3.1 is out'),
+     `an update out says software update available in amber, with Software update and what is out (${d.state}; ${d.pills.join(', ')})`);
   d = await card('flutter', { installed: false, unknown: false, update: false, latest: '' });
   ok(d.state === '' && d.acts.includes('Install') && !d.pills.some(p => /warn/.test(p)),
      '...and one not installed offers Install and says nothing amber');
@@ -728,7 +728,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(true, '...and Update keeps the pack at the newer commit');
   // From the vetted catalog (R169 step 4): a pack kept at the index's pin
   // wears vetted, a sha256 the index does not pin is refused (B440), and
-  // when the index pins a newer commit the card offers Update manifest, in the look of any update: the
+  // when the index pins a newer commit the card offers Manifest update, in the look of any update: the
   // dialog on that pin with what it changes marked, Update keeping it there
   // with its tier (B442). The catalog's address is a dead one here, so each
   // read falls back to the index kept in the state.
@@ -757,21 +757,21 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     const vcard = await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .lcard[data-lrow="pack:hexkit"] .lcmeta .pill')].map(p => p.textContent.trim()));
     ok(vcard.includes('vetted'), `the kept pack's card wears vetted (${vcard.join(', ')})`);
     // A newer pin is an update, drawn as every other and named apart from a
-    // program's (the operator, 13 Nov): Update manifest in the accent, the
+    // program's (the operator, 13 Nov): Manifest update in the accent, the
     // card's one verb, its state in the warning voice saying which update
     // it is, and counted under Updates.
     const offer = await page.evaluate(sel => { const b = document.querySelector(sel), c = b.closest('.lcard');
       return { word: b.textContent.trim(), accent: b.classList.contains('primary'), verbs: [...c.querySelectorAll('[data-libact]')].map(x => x.dataset.libact).join(),
                state: c.querySelector('.state')?.textContent.trim() || '', warn: /warn/.test(c.querySelector('.state')?.className || ''),
                counted: (lib.rows || []).filter(LIB_STANDS.update).some(r => r.name === 'hexkit') }; }, REPIN);
-    ok(offer.word === 'Update manifest' && offer.accent && offer.verbs === 'repin' && offer.state === 'manifest update available' && offer.warn && offer.counted,
-       `the catalog's newer pin is offered as Update manifest, in the accent, the card saying a manifest update is available (${JSON.stringify(offer)})`);
+    ok(offer.word === 'Manifest update' && offer.accent && offer.verbs === 'repin' && offer.state === 'manifest update available' && offer.warn && offer.counted,
+       `the catalog's newer pin is offered as Manifest update, in the accent, the card saying a manifest update is available (${JSON.stringify(offer)})`);
     await page.click(REPIN);
     await page.waitForSelector('#tpmodal:not([hidden]) .tpseen', { timeout: 20000 });
     const upd = await page.$eval('#tpmodal', e => e.textContent.replace(/\s+/g, ' '));
     ok(/strings -a \{args\} changed was \{dir\}\/bin\/hexkit strings \{args\}/.test(upd) && /the vetted catalog's newer pin/.test(upd)
        && upd.includes(next.slice(0, 12)),
-       `Update manifest opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
+       `Manifest update opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
     await page.click('#tpmodal [data-tpadd]');
     await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, next, { timeout: 20000 });
     const after = await page.evaluate(() => (toolchains.items || []).find(i => i.name === 'hexkit').pack.tier);
@@ -939,7 +939,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await page.fill('#tpText', JSON.stringify({ ...pasted, label: 'Wordy two' }));
   await page.click('#tpmodal [data-tplook]');
   await page.waitForSelector('#tpmodal [data-tpadd]', { timeout: 20000 });
-  ok(await page.$eval('#tpmodal [data-tpadd]', e => e.textContent) === 'Update manifest',
+  ok(await page.$eval('#tpmodal [data-tpadd]', e => e.textContent) === 'Manifest update',
      '...the card\'s Edit opens on its bbtool.json, and a changed one is offered as an Update');
   await page.click('#tpmodal [data-tpadd]');
   await page.waitForFunction(c => { const p = (toolchains?.items || []).find(i => i.name === 'wordy');

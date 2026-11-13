@@ -110,7 +110,7 @@ function instState(r){
     const m = r.machine, st = m.state;
     if (!m.managed) return w("installed by hand on this machine");
     if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("installed and in use", "ok")
-      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "update available" : "installed, takes the card at a restart", "warn");
+      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "software update available" : "installed, takes the card at a restart", "warn");
     return st === "absent" ? w("not installed") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
       : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
   }
@@ -120,7 +120,7 @@ function instState(r){
   if (r.pack?.disabled) return w(esc(r.pack.disabled) + ": the Library offers a version that fits when there is one", "warn");
   // The version that is out is the row's pill ("2.1.314 is out"), so the
   // state says only that, as the Library's card does.
-  if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
+  if (r.installed) return w(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
 }
@@ -137,7 +137,8 @@ function instActs(r, may){
     : `<button type="button" class="primary" data-instact="install" data-instkind="service" data-instname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}"` : ""}>Install</button>`;
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
-  const upd = r.installed && r.update ? a("update", "Update", "primary") : "";
+  // Software update, as the Library's card says it (the operator, 13 Nov).
+  const upd = r.installed && r.update ? a("update", "Software update", "primary") : "";
   // Edit on a pack a person added themselves, as on the Library's card: one
   // kept from the catalog is the catalog's, its kept copy reached from its
   // Details page there.

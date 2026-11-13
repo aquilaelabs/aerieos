@@ -102,7 +102,7 @@ While one of yours runs, the button reads **Manage agent**.
 **Build, then Library** has a card per coding agent under Coding agents,
 for the node picked in the Build group's header
 ([toolchains.md](toolchains.md#the-library)): what it is, its version
-against the latest, and Install or Update. **Machines, then Installed**
+against the latest, and Install or Software update. **Machines, then Installed**
 holds what that node has: a row per agent installed there, which opens on
 your sign-in, what you added to the agent and Remove.
 
@@ -113,7 +113,7 @@ your sign-in, what you added to the agent and Remove.
   after the controller starts, weekly, when a node starts, and on Check for
   updates in the Library. A node behind is a row in the bell, which
   opens the Library on that node.
-- **Install, Update, Remove.** Install and Update on the Library's card,
+- **Install, Software update, Remove.** Install and Software update on the Library's card,
   Remove on the Installed page's row; an administrator's, or whoever may install
   toolchains on that node. Each ends that agent's sessions on the node
   first, then runs the vendor's own installer as the session account
@@ -181,7 +181,7 @@ controller fetches the pack at the pinned commit, checks its archive's
 sha256 and the recipe's shape, and hands the node the catalog's recipe
 instead: the job's first line then says `by the catalog's recipe (rev N)`.
 It is read once per commit, behind the Library as the page opens, so a
-press on Update does not wait for it; where nothing is newer, which is
+press on Software update does not wait for it; where nothing is newer, which is
 nearly always, nothing is fetched at all. So when a vendor changes its
 installer, the answer is a catalog commit and a maintainer's signature,
 and no install waits for a release. A catalog that does not answer, a

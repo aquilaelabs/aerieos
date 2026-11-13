@@ -329,7 +329,7 @@ function tpModalHtml(){
   const add = offer ? `<button type="button" class="primary" data-tpadd${f.busy ? " disabled" : ""}>${
     // A pack already kept takes a newer manifest here, never a program on
     // a node: the press says so, as the card's does (the operator, 13 Nov).
-    f.busy === "add" ? (fresh ? "Adding…" : "Updating…") : fresh ? "Add" : "Update manifest"}</button>` : "";
+    f.busy === "add" ? (fresh ? "Adding…" : "Updating…") : fresh ? "Add" : "Manifest update"}</button>` : "";
   const rm = p ? `<button type="button" class="danger" data-tprm="${esc(p.name)}">Remove</button>` : "";
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
     ${p ? `<div class="field"><div class="sub">${here ? "Made here" : `From <code>${esc(p.pack.url)}</code>`} at ${esc(p.pack.commit.slice(0, 12))}, added by ${
