@@ -5,6 +5,7 @@
 ### Added
 
 - An install's receipt: every install of a pack on a node records the manifest commit it came from, when, and the sha256 of every file that landed, with one hash over them all, so what its install downloads from somewhere else leaves a trail. The pack's page on Installed says it, and says when the copy there is from an earlier manifest than the one kept now, when the same manifest left other files there the time before, and when another node's copy of the same manifest is other files, which is what an install that fetches the latest of something looks like. A pack installed before this has a receipt once it is installed again (3777ced)
+- Declared downloads, pack format 3: a pack's manifest can list every file its install takes from somewhere else, each with its address and its sha256 (`install.fetch`). AerieOS fetches each and holds it to that sha256 before the install runs, and the install steps then run with no network, so nothing a pack did not declare can arrive; a node that cannot cut the network for a step installs the pack all the same and says so on the job and on the pack's page. Look says what a pack declares, or that it declares none, before it is added (95bebe6)
 
 ### Changed
 
