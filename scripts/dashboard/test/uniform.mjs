@@ -2529,7 +2529,9 @@ if (runs('c')) {
   ok(small.length === 0, `on a touch phone the dock, the notebook and the bar are a thumb's size${small.length ? ': ' + small.slice(0, 4).join(', ') : ''}`);
   await phone.evaluate(() => openNewProject());
   await phone.waitForSelector('.modal:not([hidden]) .foot button', { timeout: 10000 });
-  const shortFoot = await phone.$$eval('.modal:not([hidden]) .foot button', bs => bs.filter(b => b.getBoundingClientRect().height < 36).length);
+  // (The page's own control height, --tap: never a number kept here.)
+  const shortFoot = await phone.$$eval('.modal:not([hidden]) .foot button', bs => { const tap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tap'));
+    return bs.filter(b => b.getBoundingClientRect().height < tap - 0.5).length; });
   ok(shortFoot === 0, `...and a dialog's buttons are the tap height (${shortFoot} short)`);
   await phone.setViewportSize({ width: 344, height: 882 });
   await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));

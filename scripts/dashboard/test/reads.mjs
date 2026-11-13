@@ -37,8 +37,10 @@ ok(rows.length >= 2 && !rows.some(([n]) => n === 'alpha') && rows.map(([n]) => n
    && rows.every(([, on]) => !on),
    `the space's settings offer every other space as a listbox row, alphabetical, none ticked yet (${rows.map(([n]) => n).join(', ')})`);
 const look = await page.$eval('#rnReads', e => ({ overflow: getComputedStyle(e).overflowY, border: getComputedStyle(e).borderTopWidth,
-  row: Math.round(e.querySelector('label.lrow').getBoundingClientRect().height), display: getComputedStyle(e.querySelector('label.lrow')).display }));
-ok(look.overflow === 'auto' && look.border === '1px' && look.row >= 38 && look.display === 'flex',
+  row: Math.round(e.querySelector('label.lrow').getBoundingClientRect().height), display: getComputedStyle(e.querySelector('label.lrow')).display,
+  // A control's height, the page's own (--tap): never a number kept here.
+  tap: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tap')) }));
+ok(look.overflow === 'auto' && look.border === '1px' && look.tap > 0 && look.row >= look.tap && look.display === 'flex',
    `a listbox is a bordered box that scrolls, its rows a thumb high (${JSON.stringify(look)})`);
 // ...and no Debug grants beside them: every project's are the Debug page's
 // (R147, the operator, 26 Oct; settings.mjs). diag.mjs holds the refusals.

@@ -173,7 +173,11 @@
      tracking wherever it is used, so figures line up and read as one. */
   --display:"Segoe UI Variable Display","SF Pro Display",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:dark;
-  --tap:38px;
+  /* 32px, the height the group header's New VM and Enroll were alone in
+     (the operator, 13 Nov: a more reasonable size for a button everywhere;
+     it was 38px). Every control takes it: a button, a field and a pulldown
+     on one row stay one height. */
+  --tap:32px;
   /* One height for every control a person types into or presses beside
      another, the finger's: a field, a pulldown, a one-line prose box and a
      button on the same row were 35, 35, 38 and 30px (the operator, 29 Sep),
@@ -597,6 +601,9 @@ header h1{font-size:15px;margin:0;font-weight:600}
    operator, 5 Oct). The version button is the same height, as wide as its
    text. */
 header>button{min-height:var(--tap);min-width:var(--tap)}
+/* ...and its picture buttons one width, the control's own: a button's side
+   padding made the bug, the cards and the sign-out wider than the bell. */
+header>button:not(#bAbout){padding-inline:6px}
 /* The mark in the scheme's second color (the operator, 16 Oct); red when
    the controller does not answer. */
 .logo{width:22px;height:22px;flex:0 0 auto;color:var(--note);display:block;
@@ -1268,7 +1275,7 @@ body.firstrun #panes{display:none}
 .setstepbody .setcmd{margin:6px 0 8px;padding:8px 9px;font:var(--f-data);color:var(--ink);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-control,6px);white-space:pre-wrap;overflow-wrap:anywhere}
 .setstep>.actbar{justify-content:flex-end;flex-wrap:wrap}
 .setfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--field-gap);margin-top:8px}
-:is(.setfields,.setstepbody .fgrid) input:not([type=checkbox]):not([type=radio]):not([type=file]){width:100%;box-sizing:border-box;min-height:var(--ctl);padding:8px 9px;font:var(--f-field)}
+:is(.setfields,.setstepbody .fgrid) input:not([type=checkbox]):not([type=radio]):not([type=file]){width:100%;box-sizing:border-box;min-height:var(--ctl);padding:6px 9px;font:var(--f-field)}
 @media(max-width:600px){ .setfields{grid-template-columns:minmax(0,1fr)} }
 .setfinish{display:flex;flex-direction:column;gap:8px;padding-top:4px}
 .setfinish p{margin:0;font:var(--f-note)}
@@ -1424,8 +1431,8 @@ body.firstrun #panes{display:none}
    is not valid shorthand (inherit cannot ride inside it), so the whole
    declaration was dropped and every button wore 13.3px Arial (B711). */
 button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--line);
-  border-radius:var(--r-control);padding:6px 10px;font:var(--f-ui);cursor:pointer;
-  white-space:nowrap;min-height:30px;touch-action:manipulation;
+  border-radius:var(--r-control);padding:4px 12px;font:var(--f-ui);cursor:pointer;
+  white-space:nowrap;min-height:var(--tap);touch-action:manipulation;
   -webkit-tap-highlight-color:transparent}
 /* Hover, only where there is a pointer that hovers. On a touch screen a tap
    leaves the element in :hover until the next tap somewhere else: a card
@@ -1882,7 +1889,7 @@ textarea,select{
 .doctab select,.doctab textarea,
 .nb input,.nb textarea,.nb select,
 .resumemenu select{width:100%;box-sizing:border-box;
-  padding:8px 9px;font:var(--f-field)}
+  padding:6px 9px;font:var(--f-field)}
 /* ...and one height for all of them, the buttons beside them included
    (the header keeps its own smaller buttons: they sit beside no field). */
 .modal input:where(:not([type="checkbox"],[type="radio"])),.modal select,
@@ -1944,9 +1951,13 @@ textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
    6: nine copies, one per surface). Safari zooms the page into a typed field
    under 16px and this layout cannot zoom back, so on iOS no such field is
    smaller, whatever its component sets: a platform guard, which is why it
-   outranks them. A select never zooms and keeps the field size. */
+   outranks them. A select never zooms and keeps the field size. A line of
+   16px at the field's 1.5 is 24px, which with the field's own padding
+   stood 38px beside a 32px button: a one-line field there takes half the
+   padding and is the control's height again. */
 @media(max-width:900px){ @supports (-webkit-touch-callout:none){
-  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),textarea{font-size:16px !important} } }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),textarea{font-size:16px !important}
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),textarea.proseline{padding-block:3px !important} } }
 .modal input:focus,.modal textarea:focus,.modal select:focus,
 .uimenu input:focus,.uimenu textarea:focus,.uimenu select:focus,
 .doctab input:focus,.doctab select:focus,.doctab textarea:focus,
@@ -3756,7 +3767,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.page.grouped>.subrow>.subnav{flex:0 1 auto;min-width:0;margin:0}
 @media(min-width:601px){ .pane .bar.page.grouped>.subrow>.subnav.pseg>button{font:600 12px/1 system-ui,sans-serif;padding:0 13px} }
 .pane .bar.page.grouped>.subrow>.sp{flex:1}
-.pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:5px 0}
+.pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:4px 0}   /* the dock line's 4px above and below (the operator, 13 Nov) */
 .pane .bar.page.grouped>.subrow>.actbar>button{min-height:32px;padding:4px 12px;font:var(--f-ui)}
 @media(max-width:600px){ .pane .bar.page.grouped .pfacts{flex:1 1 100%} }
 /* A sub-tab whose feature the picked node lacks (R178): muted, a word after
@@ -5666,7 +5677,7 @@ html,body{overscroll-behavior-x:none}
 .dockline .dtab.dchat .dlbl{padding:2px 10px}
 .dockline .dtab.dchat.unread{color:var(--ink)}
 /* As tall as a tab beside it, its 32px and its edges (B142). */
-.pane .bar.dockbar .ic{min-height:calc(32px + 2 * var(--hair));min-width:calc(32px + 2 * var(--hair))}
+.pane .bar.dockbar .ic{min-height:var(--tap);min-width:var(--tap)}
 @media(max-width:900px){
   .panes{border:0;border-radius:0}
   /* Up, the page is not drawn and the header's line is right above: the
@@ -5910,9 +5921,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   .mobar:has(.mhot:not([hidden])){gap:4px;padding:4px 6px;align-items:center}
   .mobar .mhot:not([hidden]){display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
   .mobar .mhot::-webkit-scrollbar{display:none}
-  .mobar .mhot button{flex:0 0 auto;min-height:calc(32px + 2 * var(--hair));min-width:calc(32px + 2 * var(--hair));padding:0 10px;
+  .mobar .mhot button{flex:0 0 auto;min-height:var(--tap);min-width:var(--tap);padding:0 10px;
     border-radius:var(--r-control);font:var(--f-data);white-space:nowrap}
-  .mobar .mhot:not([hidden]) ~ button{flex:0 0 auto;min-height:calc(32px + 2 * var(--hair));inline-size:calc(36px + 2 * var(--hair));padding:0}
+  .mobar .mhot:not([hidden]) ~ button{flex:0 0 auto;min-height:var(--tap);inline-size:calc(var(--tap) + 4px);padding:0}
   .mobar{border:0;border-top:var(--hair) solid var(--line);border-radius:0}   /* its foot is the bottom bar's line */
   .panes{min-height:90px}
 }

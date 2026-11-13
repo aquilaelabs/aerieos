@@ -503,7 +503,7 @@ the `.modal input, …` sizing group, its iOS rule and its `:focus` group. **The
 alone**: Safari there zooms the page into a typed field smaller than that
 and this layout cannot zoom back, so fields you type into are 16px under
 `@supports (-webkit-touch-callout: none)`, a property only iOS has, and the
-field size everywhere else. A browser without `appearance: base-select` (Firefox, Safari) draws the closed picker the page's way too, the same dim triangle and end padding (the operator, 18 Oct: match Chrome); its open list stays the browser's. A `<select>` never zooms, so it keeps the field
+field size everywhere else. A one-line field there takes 3px above and below its 24px line in place of the field's 6px, so it is still `--tap` high beside a button. A browser without `appearance: base-select` (Firefox, Safari) draws the closed picker the page's way too, the same dim triangle and end padding (the operator, 18 Oct: match Chrome); its open list stays the browser's. A `<select>` never zooms, so it keeps the field
 size at every width: a 16px mono picker beside an 11px label is the loudest
 thing on the tab, and it was on every tab. Tap targets are `min-height: var(--tap)`. A row of filters
 is `<div class="field histbar">`. A control stops short of its surface (`min(--ctl-w, 88%)`), the cap on its row where it has one: every row of controls (a field and its label, a filter row, a picker row, an add row) wears `.ctlrow`, the one class the cap and the bottom line-up read, a line of controls each in its own grid cell `.ctlline`, a box that sizes its own `.ctlown`; no page is named in those rules (R218 step 64); a floating menu is a surface of its own, and a field in it runs the menu's width as its buttons do (the operator, 19 Oct).
@@ -530,7 +530,13 @@ each other were 35, 35, 38 and 30px (the operator, 29 Sep): now every
 input, select, proseline and button in a document, a notebook or a dialog
 takes `min-height: var(--ctl)`, the color swatches alone keeping their
 circle, and `test/uniform.mjs` fails a line of controls that are not one
-height. The header keeps its own smaller buttons, which sit beside no field.
+height. `--tap` is 32px (the operator, 13 Nov: every button the size the
+group header's New VM and Enroll node were alone in; it was 38px), and
+nothing sets a height of its own beside it: a button anywhere, the header's
+picture buttons (one width too, the control's), a tab on the dock's line and
+a key of the phone's hot bar are all that height, so a row of mixed controls
+is one line. A page's sub-nav row keeps 4px above and below its buttons, the
+dock line's own spacing.
 
 **Controls on a row line up at their bottom edge.** A row mixes fields that
 carry a label above them with bare controls (a select, a button, a remove)
