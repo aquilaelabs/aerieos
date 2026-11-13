@@ -23,7 +23,7 @@ controller can; nobody else reads anything whole.
 | **Root on a node** | the machine: every session there, every token file on it | the controller: a node has no credential to the controller beyond its own enrollment, which reaches its own space's work and nothing of another node's |
 | **Root on the controller** | everything the controller can read, the install key included | nothing is kept from root on the running controller; this is the host's own trust (`docker exec`, the machine's console) |
 | **A copy of a disk** (a backup, a stolen drive, a copy of `/config`) | nothing | the sealed stores open without the install key (kept outside `/config`), the node's sealed sign-ins open without the controller, the signing keys and git tokens are ciphertext |
-| **Someone on the LAN** | nothing | reading or changing what the page, the agent channel and the terminal relay carry: the channel and the relay are signed by their own keys either way; the page's traffic is theirs to read where the dashboard is served over http (step 2 below) |
+| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (no `openssl` on it) is served unencrypted and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below) |
 | **The page's own code** | drawing what the controller answers and asking it to act | holding a key: the page never holds a key (a key of a person's own is a passkey's or a companion's, R157), keeps no secret in local or session storage, and under the CSP of step 4 runs no script it did not ship |
 
 ## What each store protects, and what it does not
@@ -39,7 +39,7 @@ opens it; while that pool is not mounted the folder is held empty and the
 controller starts with nothing sealed or opened, then starts again when the
 pool mounts. Everything the controller keeps sealed is sealed under a key
 derived from it: the accounts' keys, the signing keys, two-factor secrets,
-the deploy keys' passphrases, a space's own git line from before 0.8.0.
+the deploy keys, a space's own git line from before 0.8.0.
 
 - Protects against: a copy of `/config` (ciphertext alone), a backup
   restored on another machine (refused until the key is given), an
@@ -96,21 +96,43 @@ this boot.
 **The signing keys and the deploy keys** (`/config/signing`, `/config/deploy-keys`;
 sealed, root-only). A signing is a job on the space's node handed the key
 over the agent's channel for that job; a push with a deploy key goes
-through the shielded ssh agent.
+through the shielded ssh agent. A deploy key made or pasted in a space's
+settings is kept by a root-only helper as `NAME.sealed`, sealed under the
+install key, and is opened only into that agent: no private key file is on
+the disk. One from before is sealed at the first start of a build that
+seals them. An install with no install key keeps a deploy key as a plain
+file and says so when it is made; a key an operator places by hand in the
+secrets folder's `ssh/` is theirs, plain, and outside `/config`.
 
 - Protects against: a session reading, printing or committing a key; a copy
-  of `/config`.
+  of `/config`, root's folders in it included.
 - Does not protect against: root on the node during the job that holds the
-  key.
+  key; root on the running controller, which holds the install key.
 
-**The cryptography itself.** Today every seal is HMAC-SHA256 in counter
-mode with a second HMAC as its tag, and the node's key pair is
-Diffie-Hellman in RFC 3526's 2048-bit group, built from the standard
-library because the image carried nothing else. It is sound by
-construction and reviewed by nobody outside. Step 3 moves every seal to
-X25519 and ChaCha20-Poly1305 (or AES-GCM) with HKDF from a vetted library,
-reseals what was sealed the old way, and reads the old format for one
-release; step 7 is the outside review.
+**A share's password** (`users.json`, on a controller that serves shares).
+Samba takes the NT hash of a password, MD4, which is far weaker than the
+sign-in's own hash and opens the shares as the password does. It is kept
+for an account an SMB share names and for nobody else: made as that person
+next signs in or changes their password, taken away when no share names
+them. A person may set a separate share password on Profile, which is then
+the one kept.
+
+- Protects against: every account's password being guessable from a copy of
+  `users.json`, as it was while the hash was kept for all of them.
+- Does not protect against: a copy of `users.json` for the people a share
+  names: use a separate share password where that matters.
+
+**The cryptography itself.** Every seal is ChaCha20-Poly1305 under a key
+HKDF derives, and a node's key pair is X25519, from the `cryptography`
+library; a passkey's signature and its point on P-256 are checked by the
+same library. Where the library is missing the controller seals nothing
+and says why, never with a cipher of its own. What is still written here:
+MD4 for a share's NT hash on a machine whose OpenSSL withholds it (the
+library has none; it is held to the RFC's answers), the reader for a
+passkey's CBOR, which parses and decides nothing, and the seals of the
+format before, which are opened and never made. A node that has not the
+library seals a coding agent's sign-in the older way, which the controller
+opens and seals again. Step 7 is the outside review.
 
 ## What an unlock gives up
 
@@ -200,7 +222,7 @@ and nothing is made under a link on the way.
 | 5, an unlock that gives up less | the controller holding a person's whole store open while they are signed in |
 | 6, memory and process | a core dump, swap or a neighboring process reading a key the controller holds |
 | 7, outside review | this page and the cryptography being right by their authors' word alone |
-| 8, sign-in hardened | a stolen cookie used from another device; guessing a password at any way in (the sign-in page, the command line, the app, file access), where an address is held after 100 wrong in a quarter of an hour and an account only slowed; what was done to the host read back by person and machine |
+| 8, sign-in hardened | a stolen cookie used from another device; guessing a password at any way in (the sign-in page, the command line, the app, file access), where an address is held after 100 wrong in a quarter of an hour and an account only slowed, the address being each visitor's own behind the install's tunnel or a reverse proxy named in Settings and never the proxy's, which is everybody's; what was done to the host read back by person and machine |
 
 What no step closes: root on the running controller, and a person's own
 agent acting as them on their own spaces, which is what it is for. The

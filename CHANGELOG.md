@@ -20,6 +20,12 @@
 - An update that cannot move `/config` forward no longer starts on it half changed. When one of an update's steps on `/config` fails, `/config` is put back from the copy taken just before, the container stops saying which step failed and why, and the release you came from starts on `/config` as it left it; it went on before, with one line in the log. What the failed start left is kept under `/config/backups/rolled-back-TIME`, a note in `/config/update-did-not-land.txt` says what happened, and the same build is not tried again until the note is removed. Upgrading: nothing to do (8a8f0b4)
 - Snapshots kept for 0 days takes no snapshot and leaves the ones a repository already has; it removed them all at the next daily look. They go again once some days are kept and they pass them (8a8f0b4)
 
+- What is typed in a terminal on a node, a file opened in Files and a VM's screen now cross your network encrypted: the node makes itself a certificate and the controller takes that one and no other, so nobody on the network reads them or steps between. An opening request is also good once, where one read off the wire could be sent again for two minutes. Upgrading: each node takes it with its next agent update, by itself; a node with no `openssl` on it stays unencrypted, and its page says so under Sessions (0cfbf38)
+- Deploy keys are sealed under the install key and opened only into the ssh agent, so a copy of `/config` carries none of them usable; each was a plain key file guarded by its permissions alone. Upgrading: the keys you have are sealed at the first start, and nothing changes in how a space pushes (75b436e)
+- On a controller that serves shares, the weaker hash Samba needs of a person's password is kept only for a person a share names, and removed when none does; it was kept for every account at every sign-in. Upgrading: `/config` moves to state 23; somebody you name on a share later signs in to AerieOS once more before the share opens for them, and the share's row says who it is waiting for (b49f127)
+- A passkey's signature is checked by the cryptography library, and a controller without that library seals nothing and says so, where it fell back to a cipher of its own (75b436e)
+- Settings, Connection has Reverse proxy in front: the address of a proxy on another machine that stands before the dashboard, so wrong passwords are counted against each visitor and not against the proxy (b49f127)
+
 ### Fixed
 
 - A press on the rail, a page of a sub-nav or a notebook's view tab no longer grows a spinning ring while its page reads, which pushed everything beside it; the ring is kept for a button with room for it (2cad430)
@@ -29,6 +35,8 @@
 - Taking a retired node's folder off a shared toolchain store works; the node refused it every time. (71a209b)
 - A job on the controller that prints nothing still ends at its time limit, and a job that runs out of time is ended together with what it started. (71a209b)
 - `aerie lint` in a space's own project no longer applies AerieOS's own house rules to it (a word it keeps to one place, bug numbers in a changelog, names defined twice). (71a209b)
+- A hundred wrong passwords from anyone reaching AerieOS through its tunnel no longer hold everybody who comes in that way for a quarter of an hour: each visitor is counted by their own address (b49f127)
+- A session on a node enrolled by a public hostname reaches its controller, and a terminal opens there: `aerie` in the session and the terminal's own check refused the hostname's certificate (b49f127)
 - A repository whose daily snapshots were switched off before that switch was removed is no longer left off with nothing to turn it back on: it keeps 0 days, which the days field shows and changes. A person's terminal colors for one space, which nothing read any more, are no longer stored. The step that was to do both in the last release read a file by the wrong name and changed nothing. Upgrading: `/config` moves to state 22, so a build from before this one no longer starts on it; a repository that had the switch off shows Snapshots kept for 0 days, and its snapshots stay (8a8f0b4)
 - An audit entry or a job whose new id was already taken is written under another; it was dropped, the job with an error (8a8f0b4)
 

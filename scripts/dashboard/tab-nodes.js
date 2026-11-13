@@ -1176,6 +1176,13 @@ function nodeSessNetRow(n){
     : !sealed ? `<div class="sub dim">Nothing is signed in here yet: a sign-in made here is sealed as the login writes it.</div>`
     : `<div class="sub">${sealed} sign-in${sealed === 1 ? "" : "s"} sealed here. Each opens only while its person has a terminal open on this node, so a copy of its disk signs in to nothing.</div>`
       + (n.tokseal_stale ? `<div class="sub">${n.tokseal_stale} still sealed under an older key: ${n.tokseal_stale === 1 ? "it moves" : "each moves"} to its account's own key when ${n.tokseal_stale === 1 ? "its person opens" : "their people open"} a terminal here.</div>` : "");
+  // How the controller reaches this node's terminals, files and VMs'
+  // screens (R243): over TLS to the certificate the node made for itself,
+  // or not, said with why.
+  const rl = n.reported?.relay;
+  const relayLine = !rl ? `<div class="sub warn">Not encrypted yet: this node's agent is from before they were, and takes it up with its next update.</div>`
+    : rl.tls ? `<div class="sub">Encrypted, to the certificate this node made for itself and no other. A request to it is good once.</div>`
+    : `<div class="sub warn">Not encrypted: this node could not make itself a certificate (openssl is not on it), so what is typed in a terminal here crosses the network readable.</div>`;
   const ac = n.reported?.session?.accounts || {};
   const acctLine = ac.error ? `<div class="sub bad">Not in force: ${esc(ac.error)}.</div>`
     : ac.users === undefined ? ""
@@ -1204,7 +1211,9 @@ function nodeSessNetRow(n){
     <div class="field"><div class="sub">Each account here is a user of its own, so no account and no shell as the session account reaches another's sign-ins or terminals.</div>
     ${acctLine}</div>
     <div class="field"><div class="sub">The coding agents' sign-ins are kept sealed here, opened only while their person has a terminal open.</div>
-    ${sealLine}</div>`;
+    ${sealLine}</div>
+    <div class="field"><div class="sub">Terminals, files and VMs' screens reach this node from the controller alone.</div>
+    ${relayLine}</div>`;
 }
 
 // How many Claude sessions here may work on a prompt at once (turns.py on
