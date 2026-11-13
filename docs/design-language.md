@@ -538,6 +538,16 @@ a key of the phone's hot bar are all that height, so a row of mixed controls
 is one line. A page's sub-nav row keeps 4px above and below its buttons, the
 dock line's own spacing.
 
+**A button has a little depth** (the operator, 13 Nov: a subtle gradient):
+`--sheen`, a faint light at its top edge falling to a faint shade at its
+foot, laid as the background image over whatever color the button wears, so
+the accent, the danger tone and a space's own color keep theirs and every
+theme gets it without a line of its own. It is on `button`, `a.btn` and a
+dock tab, and only on a press that has a ground: a rule that draws a button
+with none (a link, a picture alone, a row you open, a tab of a strip) says
+`--sheen:none` beside its `background:none`. Nothing else carries a
+gradient: a card, a band and a field stay flat.
+
 **Controls on a row line up at their bottom edge.** A row mixes fields that
 carry a label above them with bare controls (a select, a button, a remove)
 and a centered line floats the bare one between its neighbor's label and its

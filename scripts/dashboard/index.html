@@ -451,7 +451,7 @@ html[data-mode="light"][data-theme="sepia"],html[data-mode="light"] .sw[data-the
    own solid ground: output read through a pattern is output misread. */
 html[data-theme="nostromo"]:not([data-mode="light"]){--glass:color-mix(in srgb, var(--panel) 70%, transparent)}
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane .bar{background:var(--glass)}
-html[data-theme="nostromo"]:not([data-mode="light"]) .pane{background:transparent}
+html[data-theme="nostromo"]:not([data-mode="light"]) .pane{background:transparent;--sheen:none}
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane .stack:has(> .doc.on){background-color:var(--glass)}
 
 /* The hallway behind the page: two amber lamps up in the ceiling, a cold
@@ -513,7 +513,7 @@ html[data-theme="nostromo"]:not([data-mode="light"]) .dockline .dtab.pc.on{
    half's are, a little more opaque, since dark ink reads through less. */
 html[data-mode="light"][data-theme="nostromo"]{--glass:color-mix(in srgb, var(--panel) 80%, transparent)}
 html[data-mode="light"][data-theme="nostromo"] .pane .bar{background:var(--glass)}
-html[data-mode="light"][data-theme="nostromo"] .pane{background:transparent}
+html[data-mode="light"][data-theme="nostromo"] .pane{background:transparent;--sheen:none}
 html[data-mode="light"][data-theme="nostromo"] .pane .stack:has(> .doc.on){background-color:var(--glass)}
 html[data-mode="light"][data-theme="nostromo"] body::before{
   content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
@@ -711,7 +711,7 @@ html.theming,html.theming *,html.theming *::before,html.theming *::after{
    has been delivered. The page leaves it off under reduced motion. */
 #bBell.flash{border-radius:var(--r-control);animation:bellbad .45s ease-in-out 2}
 @keyframes bellbad{
-  0%,100%{background:transparent}
+  0%,100%{background:transparent;--sheen:none}
   50%{background:var(--bad);color:var(--bg)}
 }
 /* Still unmistakable without the animation: it is filled either way, and the
@@ -738,7 +738,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 .tourcard .tourstep{font:var(--f-note);color:var(--dim);margin-bottom:6px}
 .tourcard .toursay{line-height:1.45;margin-bottom:10px}
 .tourcard .tourall{margin-bottom:8px}
-.tourcard .actbar{padding:0;border:0;background:none;gap:8px}
+.tourcard .actbar{padding:0;border:0;background:none;--sheen:none;gap:8px}
 .tourcard.sheet{left:0;right:0;bottom:0;top:auto!important;width:auto;border-radius:var(--r-surface) var(--r-surface) 0 0;
   padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 @media(prefers-reduced-motion:reduce){ .tourring{transition:none} }
@@ -843,7 +843,7 @@ html[data-motion="reduce"] .tourring{transition:none}
 .rsplit{display:grid;grid-template-columns:minmax(13rem,17rem) minmax(0,1fr);align-items:start}
 .rlist{display:flex;flex-direction:column;border-right:var(--hair) solid var(--line);min-width:0}
 .rrow{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;white-space:normal;
-  background:none;border:0;border-bottom:var(--hair) solid var(--line);border-radius:0;padding:var(--row-y) var(--row-x);
+  background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);border-radius:0;padding:var(--row-y) var(--row-x);
   min-height:var(--tap);color:var(--ink)}
 .rrow .name{font-weight:600}
 .rrow .rtags{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font:var(--f-note)}
@@ -905,7 +905,7 @@ html[data-motion="reduce"] .tourring{transition:none}
   .ssplit.sopen>.scur>summary,.rsplit.open>.rdetail>.rhead{pointer-events:auto;cursor:pointer}
   :is(.ssplit.sopen>.scur>summary,.rsplit.open>.rdetail>.rhead)>.shback{display:inline-flex;align-items:center;color:var(--dim);font-size:1.3em;line-height:1}
   .rsplit.open>.rdetail>.rhead>.shback{margin-right:8px;vertical-align:-1px}
-  .ssplit:not(.sopen)>.snav .rrow.on{background:none}
+  .ssplit:not(.sopen)>.snav .rrow.on{background:none;--sheen:none}
   .ssplit.sopen[data-move="in"]>:not(.snav){animation:splitIn .26s cubic-bezier(.33,1,.68,1)}
   .ssplit:not(.sopen)[data-move="back"]>.snav{animation:splitBack .26s cubic-bezier(.33,1,.68,1)}
 }
@@ -955,7 +955,7 @@ html[data-motion="reduce"] .tourring{transition:none}
   .rsplit.open>.rlist,.rsplit:not(.open)>.rdetail{display:none}
   /* As a page of settings does: no row stays lit on the list, and the
      detail slides in from the right and the list back from the left. */
-  .rsplit:not(.open)>.rlist .rrow.on{background:none}
+  .rsplit:not(.open)>.rlist .rrow.on{background:none;--sheen:none}
   .rsplit.open[data-move="in"]>.rdetail{animation:splitIn .26s cubic-bezier(.33,1,.68,1)}
   .rsplit:not(.open)[data-move="back"]>.rlist{animation:splitBack .26s cubic-bezier(.33,1,.68,1)}
 }
@@ -971,7 +971,7 @@ html[data-motion="reduce"] .tourring{transition:none}
    quiet link beside its name that opens the instances under it, each a
    line of its own indented under the area, its two boxes in the columns. */
 .rareahead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
-.rareas .rexp{background:none;border:0;padding:0;min-height:0;color:var(--note);font:var(--f-note);cursor:pointer}
+.rareas .rexp{background:none;--sheen:none;border:0;padding:0;min-height:0;color:var(--note);font:var(--f-note);cursor:pointer}
 .rareas .rexp::after{content:" \25B8";display:inline-block}
 .rareas .rexp[aria-expanded="true"]::after{content:" \25BE"}
 @media(hover:hover){ .rareas .rexp:hover{text-decoration:underline} }
@@ -1158,7 +1158,7 @@ button.sw.on,button.sw.on:hover{background:var(--bg);border-color:var(--line);co
    band's inset, rule and capitals) reached into it and set every heading
    in from the paragraph under it (B110). */
 .about .abpage :is(h2,h3,h4){margin:12px 0 4px;padding:0;border:0;font:var(--f-ui);font-weight:600;
-  text-transform:none;letter-spacing:normal;position:static;background:none}
+  text-transform:none;letter-spacing:normal;position:static;background:none;--sheen:none}
 /* The guide is read, so it has the box: the box stands at its full height
    and the page takes everything the title, the switch and the foot leave;
    the build lines are the changelog's (what is running is what changed),
@@ -1321,7 +1321,7 @@ body.firstrun #panes{display:none}
 .hsrow{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:var(--hair) solid var(--line);min-height:var(--tap)}
 .hsrow.done{color:var(--dim)}
 .hsrow.done .setnum{color:var(--pass);border-color:var(--green2-edge)}
-.hcard .hjob{width:100%;text-align:left;background:none;border:0;border-radius:0;padding:8px 16px;
+.hcard .hjob{width:100%;text-align:left;background:none;--sheen:none;border:0;border-radius:0;padding:8px 16px;
   border-bottom:var(--hair) solid var(--line);white-space:normal;justify-content:flex-start;min-height:var(--tap)}
 .hcard .hjob:last-child{border-bottom:0}
 .hcard .hjob .sub{display:block}
@@ -1367,7 +1367,7 @@ body.firstrun #panes{display:none}
 .ntrow .sub{display:block}
 .runnersall{display:flex;flex-direction:column;border:var(--hair) solid var(--line);
   border-radius:var(--r-surface);margin:0 0 10px;overflow:hidden}
-.runnersall .row{width:100%;text-align:left;background:none;border:0;border-radius:0;
+.runnersall .row{width:100%;text-align:left;background:none;--sheen:none;border:0;border-radius:0;
   border-bottom:var(--hair) solid var(--line);justify-content:flex-start;min-height:var(--tap);
   white-space:normal}
 /* The state on a line of its own, and a long host wraps: on a phone the
@@ -1393,9 +1393,9 @@ body.firstrun #panes{display:none}
 /* A name that opens what it names (a repository, a project, a person) is
    linked text, as a session's name is on Sessions: the row's own ink, no box,
    underlined under the pointer. Every list draws its names with .namelink. */
-.namelink{background:none;border:0;padding:0;min-height:0;color:var(--ink);font:inherit;
+.namelink{background:none;--sheen:none;border:0;padding:0;min-height:0;color:var(--ink);font:inherit;
   text-align:left;white-space:normal;cursor:pointer;display:inline}
-@media(hover:hover){ .namelink:hover{background:none;text-decoration:underline} }
+@media(hover:hover){ .namelink:hover{background:none;--sheen:none;text-decoration:underline} }
 .row .sub{color:var(--dim);font:var(--f-data);overflow-wrap:anywhere}
 /* A NOTICE: what is wrong or what to know, under a row, in a voice of its
    own (the operator, 13 Oct: facts, warnings and settings all wore the same
@@ -1430,6 +1430,17 @@ body.firstrun #panes{display:none}
 /* The page's own secondary voice, not the browser's: `font:12px/1 inherit`
    is not valid shorthand (inherit cannot ride inside it), so the whole
    declaration was dropped and every button wore 13.3px Arial (B711). */
+/* A press has a little depth (the operator, 13 Nov: a subtle gradient, to
+   look nicer): lighter at its top edge, darker at its foot, laid over
+   whatever color the button wears, so the accent, the danger tone and a
+   space's own color keep theirs. --sheen is the button's own and never its
+   parent's (inherits: false); a rule that gives a press no ground of its
+   own (a link, a picture alone, a tab of a strip) says --sheen:none beside
+   its background:none. Important, because a color is set with the
+   background shorthand all over this sheet, which would take the image
+   off. */
+@property --sheen{syntax:"*";inherits:false;initial-value:linear-gradient(180deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,0) 48%, rgba(0,0,0,.14) 100%)}
+button,a.btn,.dockline .dtab{background-image:var(--sheen) !important}
 button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--line);
   border-radius:var(--r-control);padding:4px 12px;font:var(--f-ui);cursor:pointer;
   white-space:nowrap;min-height:var(--tap);touch-action:manipulation;
@@ -1460,7 +1471,7 @@ button{background:var(--btn);color:var(--ink);border:var(--hair) solid var(--lin
      buttons are underlined text, not green blocks: the generic green-button
      hover leaking in here painted the active tab as a filled pill the moment
      the pointer crossed it. */
-  .nbtabs button:hover,.nbtabs button.on:hover{background:none}
+  .nbtabs button:hover,.nbtabs button.on:hover{background:none;--sheen:none}
   .modal .danger:hover{background:color-mix(in srgb, var(--bad) 35%, var(--panel))}
   .nb .caution:hover{background:color-mix(in srgb, var(--warn) 30%, var(--panel))}
   button:disabled:hover,button[aria-disabled="true"]:hover{background:var(--btn);border-color:var(--line)}
@@ -1561,10 +1572,10 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent-mid)}
      50px: an option's box is content-box by default. */
   select option{display:flex;align-items:center;gap:8px;box-sizing:border-box;
     min-height:var(--tap);padding:6px 9px;border-radius:var(--r-control);
-    background:none;color:var(--ink)}
+    background:none;--sheen:none;color:var(--ink)}
   select option:hover,select option:focus{background:var(--sunk)}
   select option:checked{background:var(--accent-deep);color:var(--on-fill)}
-  select option:disabled{color:var(--dim);background:none}
+  select option:disabled{color:var(--dim);background:none;--sheen:none}
   select option::checkmark{flex:0 0 auto;color:var(--accent)}
 }
 /* ...and where base-select is not there (Firefox, Safari: the operator, 18
@@ -1748,10 +1759,10 @@ html:has(.modal:not([hidden]):not(.inline)){overflow:hidden}
 /* A dialog's box shown in place, in a notebook view (the project's Settings):
    no overlay, no shadow, the document's width, and its own scroll is the
    view's. Its title is the notebook's, so its h3 is not drawn. */
-.modal.inline{position:static;inset:auto;z-index:auto;background:none;display:block;
+.modal.inline{position:static;inset:auto;z-index:auto;background:none;--sheen:none;display:block;
   padding:0;height:auto;overflow:visible}
 .modal.inline .box{width:auto;max-width:var(--doc-w);max-height:none;overflow:visible;
-  border:0;border-radius:0;box-shadow:none;background:none}
+  border:0;border-radius:0;box-shadow:none;background:none;--sheen:none}
 .modal.inline .box > h3{display:none}
 /* The Permissions view's Agents may, lent from the settings dialog, is a
    section of the view like the two under it (the operator, 29 Oct: it ran
@@ -1768,7 +1779,7 @@ html:has(.modal:not([hidden]):not(.inline)){overflow:hidden}
    browser's top layer, the overlay's own look, none of the element's. */
 dialog.modal{width:100%;height:100%;max-width:none;max-height:none;margin:0;border:0;color:var(--ink)}
 dialog.modal:not([open]){display:none}
-dialog.modal::backdrop{background:transparent}
+dialog.modal::backdrop{background:transparent;--sheen:none}
 .modal .box{background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   width:min(520px,100%);max-height:90vh;overflow:auto;
   box-shadow:0 18px 50px rgba(0,0,0,.6)}
@@ -2011,7 +2022,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 /* Underlined and in the warm color, the way the CLAUDE.md fix link on a
    project row is: both are a line of text you can press, and reading as one
    is what tells you that. Dim and undecorated it read as a caption. */
-.modal .link{background:none;border:0;color:var(--warn);padding:2px 0;
+.modal .link{background:none;--sheen:none;border:0;color:var(--warn);padding:2px 0;
   font:12px/1.4 system-ui,sans-serif;min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}
 .modal .link[hidden]{display:none}
@@ -2035,7 +2046,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 /* A signed build's certificate fingerprint on its Artifacts row (R106):
    the whole of it, wrapping on a phone rather than cut off. */
 .artfp{font:var(--f-note);color:var(--dim);overflow-wrap:anywhere}
-.artfp .link{background:none;border:0;color:var(--warn);text-decoration:underline;cursor:pointer;padding:0 0 0 8px;font:inherit}
+.artfp .link{background:none;--sheen:none;border:0;color:var(--warn);text-decoration:underline;cursor:pointer;padding:0 0 0 8px;font:inherit}
 /* A project's signing keys (R106), its notebook's Signing view (R103): a
    row per route, its form when opened, and its actions in one line, each a
    line of text you can press as in a dialog. */
@@ -2043,7 +2054,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .rnsign:first-child{border-top:0}
 .rnsignform{display:grid;gap:6px;margin:6px 0}
 .rnsignbar{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
-.sgview .link{background:none;border:0;color:var(--warn);padding:2px 0;
+.sgview .link{background:none;--sheen:none;border:0;color:var(--warn);padding:2px 0;
   font:12px/1.4 system-ui,sans-serif;min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}
 .sgview a.link{display:inline-flex;align-items:center}
@@ -2136,12 +2147,12 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .librarytab .lcard:not(.open) .ldetail{display:none}
 .librarytab .lcard .ldetail{display:flex;flex-direction:column;gap:4px;padding-top:4px;border-top:var(--hair) solid var(--line)}
 .librarytab .lcard .ldetail .agpart{margin-top:6px}
-.librarytab .lcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.librarytab .lcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none;--sheen:none;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .librarytab .lcard .pcacts>.state{flex:1 1 auto;font:var(--f-note);color:var(--dim);min-width:0}
 .librarytab .lcard .pcacts>.state.ok{color:var(--pass)}
 .librarytab .lcard .pcacts>.state.warn{color:var(--warn)}
 .librarytab .lcard .pcacts>.state:empty{flex:1 1 auto}
-.librarytab .lcard .lmore{font:var(--f-note);min-height:0;padding:0 2px;margin-left:4px;background:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;vertical-align:middle}
+.librarytab .lcard .lmore{font:var(--f-note);min-height:0;padding:0 2px;margin-left:4px;background:none;--sheen:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;vertical-align:middle}
 .librarytab .lcard .lmore:hover{color:var(--ink)}
 .librarytab .lcard .libcompose{margin:4px 0 0;padding:8px 10px;max-height:16rem;overflow:auto;font:var(--f-data);
   background:var(--panel2,var(--panel));border:var(--hair) solid var(--line);border-radius:var(--r-s,4px);white-space:pre}
@@ -2149,7 +2160,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .librarytab .lcard.skcard .lcicon{background:var(--line)}
 /* A pack's or an app's own icon (R182): its picture fills the square, the
    kind's glyph kept under it for one that does not load. */
-.librarytab .lcicon.own,:is(.entrytab,.thingtab) .lcicon.own{overflow:hidden;background:none}
+.librarytab .lcicon.own,:is(.entrytab,.thingtab) .lcicon.own{overflow:hidden;background:none;--sheen:none}
 .librarytab .lcicon.own img,:is(.entrytab,.thingtab) .lcicon.own img{width:100%;height:100%;object-fit:contain;display:block}
 .librarytab .lcicon.own>svg,:is(.entrytab,.thingtab) .lcicon.own>svg{display:none}
 .librarytab .lcicon.own.broken,:is(.entrytab,.thingtab) .lcicon.own.broken{background:color-mix(in srgb, var(--accent) 14%, var(--panel))}
@@ -2171,7 +2182,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .fxplaces{display:flex;flex-direction:column;gap:2px;min-width:0}
 .fxplaces .fxphead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);padding:6px 8px}
 .fxplace{display:flex;align-items:center;gap:8px;min-width:0;min-height:var(--ctl);padding:4px 8px;text-align:left;
-  border:var(--hair) solid transparent;border-radius:var(--r-control);background:transparent;color:var(--ink);font:var(--f-ui)}
+  border:var(--hair) solid transparent;border-radius:var(--r-control);background:transparent;--sheen:none;color:var(--ink);font:var(--f-ui)}
 .fxplace .fxpname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fxplace .fxpkind{flex:0 0 auto;font:var(--f-note);color:var(--dim)}
 .fxplace.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
@@ -2254,7 +2265,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
    not the row's mono data line (the voices rule). */
 .installedtab .irow .iabout{font:var(--f-note)}
 .installedtab .irow:not(.open) .iabout{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.installedtab .irow .imore{font:var(--f-note);min-height:0;padding:0 2px;margin-left:4px;background:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;vertical-align:middle}
+.installedtab .irow .imore{font:var(--f-note);min-height:0;padding:0 2px;margin-left:4px;background:none;--sheen:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;vertical-align:middle}
 .installedtab .irow .imore:hover{color:var(--ink)}
 .installedtab .irow .acts{flex-wrap:wrap;justify-content:flex-end}
 .installedtab .irow .acts>.state{font:var(--f-note);color:var(--dim)}
@@ -2425,7 +2436,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 .clog .clhead{display:flex;align-items:center;gap:6px;
   border-bottom:var(--hair) solid var(--line);padding-bottom:5px}
 .clog .clhead input.clname{flex:1 1 auto;min-width:0;width:auto;
-  background:none;border:var(--hair) solid transparent;padding:3px 5px;
+  background:none;--sheen:none;border:var(--hair) solid transparent;padding:3px 5px;
   font:600 14px/1.3 system-ui,sans-serif;color:var(--ink)}
 .clog .clhead input.clname:focus{background:var(--sunk);border-color:var(--line)}
 /* An entry is its words, wrapping, with everything ABOUT it on one quiet line
@@ -2467,7 +2478,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 .pcpick{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pcpick button{width:26px;height:26px;min-height:26px;padding:0;border-radius:50%;
   border:2px solid var(--line);background:var(--pc, transparent)}
-.pcpick button[data-color=""]{background:transparent;
+.pcpick button[data-color=""]{background:transparent;--sheen:none;
   background-image:linear-gradient(135deg, transparent 45%, var(--dim) 45%, var(--dim) 55%, transparent 55%)}
 .pcpick button[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--ink)}
 /* The swatches a card's Color unrolls under its name (the operator, 18 Oct:
@@ -2491,7 +2502,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
    tinted in the accent. */
 .combo{position:relative;display:flex;flex:1 1 auto;min-width:0}
 .combo>input{flex:1 1 auto;min-width:0;width:auto;padding-right:34px}
-.combo>.combobtn{position:absolute;right:2px;top:2px;bottom:2px;width:30px;min-height:0;padding:0;border:0;background:transparent;
+.combo>.combobtn{position:absolute;right:2px;top:2px;bottom:2px;width:30px;min-height:0;padding:0;border:0;background:transparent;--sheen:none;
   color:var(--dim);display:flex;align-items:center;justify-content:center}
 .combo>.combobtn svg{width:14px;height:14px}
 .combo>.combobtn:hover{color:var(--ink)}
@@ -2499,7 +2510,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
   display:flex;flex-direction:column;background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   box-shadow:0 10px 28px rgba(0,0,0,.38)}
 .combolist[hidden]{display:none}
-.combolist>button{text-align:left;background:transparent;border:0;border-radius:var(--r-small);padding:6px 10px;min-height:34px;color:var(--ink);
+.combolist>button{text-align:left;background:transparent;--sheen:none;border:0;border-radius:var(--r-small);padding:6px 10px;min-height:34px;color:var(--ink);
   font:var(--f-ui);flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .combolist>button:hover,.combolist>button.on{background:color-mix(in srgb, var(--accent) 18%, transparent)}
 .combonone{padding:6px 10px;color:var(--dim);font:var(--f-note)}
@@ -2635,7 +2646,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
    sits under it a step sunk. Behind and ahead of main are GitHub's: two
    counts either side of a line, each over a bar. */
 .tbl.gbranches>.row.gbranch{align-items:stretch}
-.gbranches .td.lead code{font:inherit;background:none;padding:0;color:inherit}
+.gbranches .td.lead code{font:inherit;background:none;--sheen:none;padding:0;color:inherit}
 .gbranches .td .pill{margin-left:4px}
 .gbranches .gopens>.tline{cursor:pointer;border-radius:var(--r-small)}
 @media(hover:hover){.gbranches .gopens>.tline:hover{background:var(--btn)}}
@@ -2873,7 +2884,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* The details fold under a line: the row's words are the decision, this is
    the workings (files, functions, approach) wanted when the work starts
    and noise until then. */
-.roadmap .dtog{background:none;border:0;color:var(--dim);padding:2px 0;
+.roadmap .dtog{background:none;--sheen:none;border:0;color:var(--dim);padding:2px 0;
   font:11px/1.4 system-ui,sans-serif;align-self:flex-start;min-height:0}
 @media(hover:hover){ .roadmap .dtog:hover{color:var(--ink)} }
 .roadmap .dinfo{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dim);
@@ -2957,7 +2968,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .nbtabs .nbgroups,.nbtabs .nbsub{display:flex;padding:0 calc(8px + var(--doc-in));
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .nbtabs .nbgroups::-webkit-scrollbar,.nbtabs .nbsub::-webkit-scrollbar{display:none}
-.nbtabs button{background:none;border:0;border-bottom:2px solid transparent;
+.nbtabs button{background:none;--sheen:none;border:0;border-bottom:2px solid transparent;
   color:var(--dim);padding:11px 13px;font:600 12px/1 system-ui,sans-serif;
   min-height:var(--tap);border-radius:0;flex:0 0 auto}
 .nbtabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
@@ -3054,14 +3065,14 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    the list, the bar's search as wide as a control, and a search's lines as
    rows that open their doc at their section, the words marked. */
 .helptab .wknav a.on{color:var(--ink);font-weight:600;text-decoration:none}
-.helphit{display:flex;width:100%;text-align:left;background:none;border:0;border-bottom:var(--hair) solid var(--line);
+.helphit{display:flex;width:100%;text-align:left;background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);
   border-radius:0;justify-content:flex-start;white-space:normal;min-height:var(--tap);padding:var(--row-y) 0;color:inherit}
 .helphit .sub{display:block;margin-top:2px}
 @media(hover:hover){ .helphit:hover .name{text-decoration:underline} }
 .helphits mark{background:color-mix(in srgb,var(--accent) 30%,transparent);color:inherit;border-radius:2px;padding:0 1px}
 .wktabs{display:flex;gap:4px;align-items:flex-end;border-bottom:var(--hair) solid var(--line);margin-bottom:12px}
 .wktabs .sp{flex:1}
-.wktabs .wktab{background:none;border:var(--hair) solid transparent;border-bottom:0;border-radius:var(--r-small) var(--r-small) 0 0;
+.wktabs .wktab{background:none;--sheen:none;border:var(--hair) solid transparent;border-bottom:0;border-radius:var(--r-small) var(--r-small) 0 0;
   padding:6px 12px;color:var(--dim);margin-bottom:-1px}
 .wktabs .wktab.on{color:var(--ink);border-color:var(--line);background:var(--bg)}
 .wktabs .wktab.danger{color:var(--bad)}
@@ -3086,7 +3097,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .wkpage code{font-family:var(--mono);font-size:.86em;background:var(--sunk);padding:1px 4px;border-radius:var(--r-small)}
 .wkpage pre{font-family:var(--mono);font-size:.86em;line-height:1.5;background:var(--sunk);padding:9px 12px;
   border-radius:var(--r-small);overflow-x:auto;white-space:pre}
-.wkpage pre code{background:none;padding:0}
+.wkpage pre code{background:none;--sheen:none;padding:0}
 .wkpage table{border-collapse:collapse;display:block;overflow-x:auto;font-family:system-ui,sans-serif;font-size:.92em}
 /* A cell breaks between words, never inside one (B78: 'Playwrig ht', 'Pyth on'):
    the page's overflow-wrap:anywhere let a column shrink below its longest
@@ -3334,7 +3345,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* Giving an item a step, which is how a plain one becomes a plan. */
 .addstep{padding:0 0 9px 26px;display:flex;gap:8px}
 .addstep[hidden]{display:none}
-.addstep .link{background:none;border:0;color:var(--dim);padding:2px 0;
+.addstep .link{background:none;--sheen:none;border:0;color:var(--dim);padding:2px 0;
   font:12px/1.4 system-ui,sans-serif;min-height:24px}
 @media(hover:hover){ .addstep .link:hover{color:var(--accent)} }
 .addstep textarea{flex:1;min-width:0;padding:5px 8px;
@@ -3681,7 +3692,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
   scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .ritem{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  min-height:44px;padding:6px 2px;border:0;border-radius:var(--r-control);background:transparent;
+  min-height:44px;padding:6px 2px;border:0;border-radius:var(--r-control);background:transparent;--sheen:none;
   color:var(--dim);font:var(--f-note);line-height:1.1;position:relative;cursor:pointer}
 .ritem svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;
   stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
@@ -3716,7 +3727,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
     position:relative;z-index:1}   /* over a scheme's texture layer (body::before), not under it */
   .railbar .ritem{flex:1 1 0;min-width:0;min-height:var(--tap)}
   .railbar .ritem .rlbl{display:block}
-  .railbar .ritem.on{color:var(--accent);background:transparent}
+  .railbar .ritem.on{color:var(--accent);background:transparent;--sheen:none}
   .railmore{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;
     position:fixed;left:8px;right:8px;bottom:calc(58px + env(safe-area-inset-bottom));z-index:40;
     background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
@@ -3743,7 +3754,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* A page a press opened (R181): a small top header, Back to where it was
    opened from and the page's name, in place of the sub-nav it is not on. */
 .pane .bar.page .backhead{display:flex;align-items:center;gap:6px;flex:1 1 100%;min-width:0;min-height:30px;font:var(--f-ui)}
-.pane .bar.page .backhead .backbtn{display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:2px 8px 2px 2px;color:var(--dim);background:none;border:0;border-radius:var(--r-control)}
+.pane .bar.page .backhead .backbtn{display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:2px 8px 2px 2px;color:var(--dim);background:none;--sheen:none;border:0;border-radius:var(--r-control)}
 .pane .bar.page .backhead .backbtn:hover,.pane .bar.page .backhead .backbtn:focus-visible{color:var(--ink)}
 .pane .bar.page .backhead .backof{font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pane .bar.page .backhead .backof::before{content:"/";margin-right:6px;color:var(--dim);font-weight:400}
@@ -3998,7 +4009,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .alsorow>.pid{font:var(--f-data);color:var(--dim);flex:none}
 .alsorow>.alsotext{min-width:0;overflow-wrap:anywhere}
 .pcard .pnote.bad{color:var(--bad)} .pcard .pnote.warn{color:var(--warn)} .pcard .pnote.dim{color:var(--dim)}
-.pcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none}
+.pcard .pcacts{margin-top:auto;padding:6px 0 0;border:0;background:none;--sheen:none}
 .pcard .pcacts .more{position:relative;display:inline-flex;margin-left:auto}
 .pcard .pcacts .more>button{min-width:var(--tap);padding:4px 8px}
 .pcard:has(.actmenu:not([hidden])){z-index:41}
@@ -4011,7 +4022,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    a choice, a chore and the action never look alike (the operator, 17 Oct). */
 .pseg{display:inline-flex;gap:0;flex-wrap:nowrap;max-width:100%;border:var(--hair) solid var(--line);
   border-radius:var(--r-control);background:var(--btn);overflow:hidden}
-.pseg>button{flex:0 1 auto;min-width:0;margin:0;border:0;border-radius:0;background:none;color:var(--dim);
+.pseg>button{flex:0 1 auto;min-width:0;margin:0;border:0;border-radius:0;background:none;--sheen:none;color:var(--dim);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pseg>button+button{border-left:var(--hair) solid var(--line)}
 .pseg>button.on{background:color-mix(in srgb, var(--ink) 11%, var(--btn));color:var(--ink);
@@ -4027,15 +4038,15 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    as tabs standing on the bar's floor, the one on show in ink with the
    accent under it, the rest dim, no box. It runs the bar's height, so the
    line under the tab on show is the bar's own bottom edge. */
-.pane .bar .subnav.pseg{align-self:stretch;margin:-6px 0;border:0;border-radius:0;background:none;gap:2px;
+.pane .bar .subnav.pseg{align-self:stretch;margin:-6px 0;border:0;border-radius:0;background:none;--sheen:none;gap:2px;
   min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
 .pane .bar .subnav.pseg::-webkit-scrollbar{display:none}
-.pane .bar .subnav.pseg>button{min-height:0;padding:0 12px;border:0;border-radius:0;background:none;
+.pane .bar .subnav.pseg>button{min-height:0;padding:0 12px;border:0;border-radius:0;background:none;--sheen:none;
   color:var(--dim);font:var(--f-ui);font-weight:500;box-shadow:none}
 .pane .bar .subnav.pseg>button+button{border-left:0}
-.pane .bar .subnav.pseg>button.on{color:var(--ink);background:none;box-shadow:inset 0 -2px 0 var(--accent)}
+.pane .bar .subnav.pseg>button.on{color:var(--ink);background:none;--sheen:none;box-shadow:inset 0 -2px 0 var(--accent)}
 @media(hover:hover){
-  .pane .bar .subnav.pseg>button:hover,.pane .bar .subnav.pseg>button.on:hover{background:none;color:var(--ink)}
+  .pane .bar .subnav.pseg>button:hover,.pane .bar .subnav.pseg>button.on:hover{background:none;--sheen:none;color:var(--ink)}
 }
 /* On a phone the tools share the bar's width on a tighter inset, so a
    group of five (Build) reads whole down to a fold's 344px cover. */
@@ -4058,7 +4069,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
   box-shadow:0 10px 24px rgba(0,0,0,.5);overflow:hidden}
 .jumplist[hidden]{display:none}
 .jrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:0;
-  background:transparent;color:var(--ink);font:var(--f-ui);text-align:left;min-height:var(--tap)}
+  background:transparent;--sheen:none;color:var(--ink);font:var(--f-ui);text-align:left;min-height:var(--tap)}
 .jrow.on,.jrow:hover{background:var(--btn-hi)}
 .jrow .jw{color:var(--dim);font:var(--f-note);white-space:nowrap}
 .jnone{padding:8px 10px;color:var(--dim);font:var(--f-ui);overflow-wrap:anywhere}
@@ -4183,7 +4194,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .dmapplyset{display:inline-flex;gap:6px}
 .dmhead{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 16px;min-width:0}
 .dmhead>.dmid{flex:1 1 16rem;min-width:0}
-.dmhead>.actbar.dmacts{flex:0 1 auto;margin-left:auto;padding:0;border:0;background:none;justify-content:flex-end}
+.dmhead>.actbar.dmacts{flex:0 1 auto;margin-left:auto;padding:0;border:0;background:none;--sheen:none;justify-content:flex-end}
 .dmid .dmstate{font:var(--f-note);color:var(--dim);overflow-wrap:anywhere}
 .dmid .dmstate.ok{color:var(--pass)}
 .dmid .dmstate:empty{display:none}
@@ -4416,7 +4427,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 #pendList{max-height:60vh;overflow:auto;border:var(--hair) solid var(--line);border-radius:var(--r-surface)}
 #pendList .pkind{padding:6px 10px;color:var(--dim);font:var(--f-ui);
   text-transform:uppercase;letter-spacing:.04em;border-bottom:var(--hair) solid var(--line);
-  background:transparent}
+  background:transparent;--sheen:none}
 #pendList .prow{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;padding:8px 10px;
   border-bottom:var(--hair) solid var(--line);align-items:start}
 #pendList .prow:last-child{border-bottom:0}
@@ -4529,7 +4540,7 @@ button.eye.acc.on,button.eye.acc.on:hover{color:var(--accent)}
    icons are things you do TO the project and sit together as a group; this one
    removes it, and putting it in the same tray invited the hand that was going
    for the one beside it. Set apart by having no chrome at all, and last. */
-button.eye.bare{background:none;border:0;padding:5px 4px;min-width:auto}
+button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:auto}
 @media(min-width:901px){
   /* A manager row is four facts and a set of buttons: what it is, how it is,
      what it publishes, and what you can do to it. Stacked they are four lines
@@ -5088,7 +5099,7 @@ button[aria-busy="true"]{opacity:.75}
 @media(min-width:901px){
   .doctab.nodestab>.doclist>.row.stack2.ndrow,
   .doctab.machinetab>.doclist>.row.stack2.ndrow,
-  .doctab.nodestab>.doclist>.skt>.row.stack2.ndrow{background:none;border:0;border-radius:0;padding:0;margin:0 var(--row-x)}
+  .doctab.nodestab>.doclist>.skt>.row.stack2.ndrow{background:none;--sheen:none;border:0;border-radius:0;padding:0;margin:0 var(--row-x)}
   .nodestab .ndrow>.grow,
   .machinetab .ndrow>.grow{margin:var(--card-gap) 0 0;padding:var(--row-y) var(--row-x);background:var(--panel);
     border:var(--hair) solid var(--line);border-radius:var(--r-surface)}
@@ -5238,7 +5249,7 @@ button[aria-busy="true"]{opacity:.75}
 :is(.dmtab,.dkview,.vmtab) .sect .li{overflow-wrap:anywhere}
 /* A repair on a toolchain row, in the words of the line it follows: a link
    rather than a button, since the line is the control's whole context. */
-.tcs .link{background:none;border:0;color:var(--note);padding:0;font:inherit;
+.tcs .link{background:none;--sheen:none;border:0;color:var(--note);padding:0;font:inherit;
   cursor:pointer;text-decoration:underline;min-height:0}
 .tcs .link:hover{color:var(--ink)}
 /* Every icon button draws the same way, whichever class it wears. Keyed to
@@ -5491,7 +5502,7 @@ span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
 #toast .tst.bad{border-color:var(--red2-edge)}
 #toast .tst.bad .tic,#toast .tst.bad .tmsg{color:var(--bad)}
 #toast .tmsg{flex:1;min-width:0}
-#toast .tx{flex:0 0 auto;min-height:24px;min-width:24px;padding:0;border:0;background:none;color:var(--dim)}
+#toast .tx{flex:0 0 auto;min-height:24px;min-width:24px;padding:0;border:0;background:none;--sheen:none;color:var(--dim)}
 @media(max-width:900px){ #toast{right:8px;left:8px;width:auto;bottom:calc(112px + env(safe-area-inset-bottom))} }
 @media(hover:none){ #toast .tst{pointer-events:none} #toast .tx{pointer-events:auto} }
 /* ...and the same less motion where the account asked for it in the gear's
@@ -5554,7 +5565,7 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
 .resumemenu .rmstate.ok{color:var(--ink)}
 .resumemenu .rmstate.ok::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--pass);flex:0 0 auto}
 .resumemenu .rmstate.bad{color:var(--bad)}
-.resumemenu .rmacts{padding:0;border:0;background:none;gap:8px;flex-wrap:wrap}
+.resumemenu .rmacts{padding:0;border:0;background:none;--sheen:none;gap:8px;flex-wrap:wrap}
 /* The first step: a node switch, its facts, then one line per agent with its
    name and how you stand at the left and its presses at the right (the
    operator, 22 Oct). On a narrow menu the presses go under the name. */
@@ -5654,11 +5665,11 @@ html,body{overscroll-behavior-x:none}
 .dockline .dtab{display:inline-flex;align-items:center;gap:0;flex:0 0 auto;border:var(--hair) solid var(--line);
   border-radius:var(--r-control);background:var(--btn);color:var(--dim)}
 .dockline .dtab.on{border-color:var(--accent-mid);color:var(--ink)}
-.dockline .dtab .dlbl{display:inline-flex;align-items:center;gap:6px;background:none;border:0;min-height:32px;
+.dockline .dtab .dlbl{display:inline-flex;align-items:center;gap:6px;background:none;--sheen:none;border:0;min-height:calc(var(--tap) - 2 * var(--hair));
   padding:2px 8px;font:var(--f-ui);color:inherit;max-width:22ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Minimize and Close sit close beside the name (the operator, 17 Oct: the
    pair took more room than the label): narrow, no padding of their own. */
-.pane .bar.dockbar .dockline .dtab .dx{min-height:32px;min-width:22px;padding:0 3px;border:0;background:none}
+.pane .bar.dockbar .dockline .dtab .dx{min-height:calc(var(--tap) - 2 * var(--hair));min-width:22px;padding:0 3px;border:0;background:none;--sheen:none}
 .dockline .dtab .dx:last-child{margin-right:2px}
 .dockline .dtab .dlbl{padding-right:4px}
 .dockline .dspend{font:var(--f-data);font-size:11px}
@@ -5783,13 +5794,13 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
   #chatBack{display:inline-flex}
 }
 .chatrow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
-  background:none;border:0;border-bottom:var(--hair) solid var(--line);padding:8px 10px}
+  background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);padding:8px 10px}
 /* The channel on show is a quiet tint of the accent, and stays that under
    the pointer; every other channel answers the pointer with a fainter tint
    of the ink (the operator, 16 Oct: the open one lit up bright on hover and
    the rest did nothing). Above the page's button hover, which is a
    control's and too loud for a row of a list. */
-.chattab .chatrow{background:none}
+.chattab .chatrow{background:none;--sheen:none}
 @media(hover:hover){ .chattab .chatrow:hover:not(.on){background:color-mix(in srgb,var(--ink) 6%,transparent)} }
 .chattab .chatrow.on,.chattab .chatrow.on:hover{background:color-mix(in srgb,var(--accent) 13%,transparent)}
 .chatrow.on .grow{color:var(--accent)}
@@ -5872,7 +5883,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 .pane .slot.ownterm .xhot .xhotkeys{display:flex;gap:var(--label-gap);min-width:0;overflow-x:auto;scrollbar-width:none}
 .pane .slot.ownterm .xhot .xhotkeys::-webkit-scrollbar{display:none}
 .pane .slot.ownterm .xhot button{flex:0 0 auto;min-height:var(--ctl);min-width:var(--ctl);padding:0 8px;font:var(--f-data);white-space:nowrap}
-.pane .slot.ownterm .xhot.folded{opacity:.5;padding:0;border-color:transparent;background:none;box-shadow:none}
+.pane .slot.ownterm .xhot.folded{opacity:.5;padding:0;border-color:transparent;background:none;--sheen:none;box-shadow:none}
 .pane .slot.ownterm .xhot.folded .xhotkeys,.pane .slot.ownterm .xhot.folded .xhlinks{display:none}
 .pane .slot.ownterm .xhot.folded .xhottog{background:var(--panel)}
 @media(max-width:900px){ .pane .slot.ownterm .xhot{display:none} }
