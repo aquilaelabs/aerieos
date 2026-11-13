@@ -312,7 +312,7 @@ from whom it says. It is not a promise about the tool itself.
   repository: never rewrite the branch it is on.
 - **An update is another pull request** that moves `commit` and `sha256`
   (and `framework` or `format`, if the manifest now uses more). An install
-  that holds the pack sees **Catalog update** on its card, with what the
+  that holds the pack sees **Update** on its card, with what the
   new pin changes marked verb by verb, and takes it when a person says so.
   Nothing updates by itself.
 - **What is there is never rewritten.** The framework only grows: a

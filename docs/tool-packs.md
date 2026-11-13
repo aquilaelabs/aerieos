@@ -399,7 +399,7 @@ when it cannot be read, is said over the cards.
 
 A pack kept from the catalog stays at the commit it was kept at. When a
 later index pins a newer commit of it (the same repository and folder), its
-card says so and offers **Catalog update**, which opens the dialog on the
+card says an update is available and offers **Update**, which opens the dialog on the
 new pin with what it changes marked verb by verb, as Edit does for a pack
 added by address; **Update** keeps it at that pin with the index's sha256
 checked, its tier kept. A pack kept from the catalog has no Edit on its
@@ -426,7 +426,7 @@ version that fits is kept it is in no session's `PATH`, view or `aerie
 tool` verbs, in whichever space it was ticked, and a coding agent it brings
 is not offered. Its card and its Installed row say so, the bell says it
 once, and when the catalog pins a commit that names this line its card
-offers **Catalog update**, which switches it back on. Nothing is removed,
+offers **Update**, which switches it back on. Nothing is removed,
 and nothing has to be set again.
 
 ### Without the network

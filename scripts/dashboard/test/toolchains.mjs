@@ -728,7 +728,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(true, '...and Update keeps the pack at the newer commit');
   // From the vetted catalog (R169 step 4): a pack kept at the index's pin
   // wears vetted, a sha256 the index does not pin is refused (B440), and
-  // when the index pins a newer commit the card offers Catalog update: the
+  // when the index pins a newer commit the card offers Update, as any update is offered: the
   // dialog on that pin with what it changes marked, Update keeping it there
   // with its tier (B442). The catalog's address is a dead one here, so each
   // read falls back to the index kept in the state.
@@ -756,12 +756,21 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     await page.waitForSelector(REPIN, { timeout: 20000 });
     const vcard = await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .lcard[data-lrow="pack:hexkit"] .lcmeta .pill')].map(p => p.textContent.trim()));
     ok(vcard.includes('vetted'), `the kept pack's card wears vetted (${vcard.join(', ')})`);
+    // A newer pin is an update, said and drawn as every other (the operator,
+    // 13 Nov): Update in the accent, the card's one verb, its state in the
+    // warning voice, and counted under Updates.
+    const offer = await page.evaluate(sel => { const b = document.querySelector(sel), c = b.closest('.lcard');
+      return { word: b.textContent.trim(), accent: b.classList.contains('primary'), verbs: [...c.querySelectorAll('[data-libact]')].map(x => x.dataset.libact).join(),
+               state: c.querySelector('.state')?.textContent.trim() || '', warn: /warn/.test(c.querySelector('.state')?.className || ''),
+               counted: (lib.rows || []).filter(LIB_STANDS.update).some(r => r.name === 'hexkit') }; }, REPIN);
+    ok(offer.word === 'Update' && offer.accent && offer.verbs === 'repin' && offer.state === 'update available' && offer.warn && offer.counted,
+       `the catalog's newer pin is offered as Update, in the accent, the card saying update available (${JSON.stringify(offer)})`);
     await page.click(REPIN);
     await page.waitForSelector('#tpmodal:not([hidden]) .tpseen', { timeout: 20000 });
     const upd = await page.$eval('#tpmodal', e => e.textContent.replace(/\s+/g, ' '));
     ok(/strings -a \{args\} changed was \{dir\}\/bin\/hexkit strings \{args\}/.test(upd) && /the vetted catalog's newer pin/.test(upd)
        && upd.includes(next.slice(0, 12)),
-       `Catalog update opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
+       `Update opens the dialog on the index's newer pin, what it changes marked (${upd.slice(0, 240)})`);
     await page.click('#tpmodal [data-tpadd]');
     await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, next, { timeout: 20000 });
     const after = await page.evaluate(() => (toolchains.items || []).find(i => i.name === 'hexkit').pack.tier);
