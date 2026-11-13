@@ -316,6 +316,9 @@ BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains
                 # The root helper that builds a session's view, which the
                 # agent installs from here on a sandbox node (R35).
                 "nodes/bb-session",
+                # ...and the one that cuts the network for a declared pack's
+                # install steps where the job account cannot (R234).
+                "nodes/bb-netcut",
                 "scripts/dashboard/bb-tty", "scripts/dashboard/bb-work-note",
                 "scripts/dashboard/bb-prompt-relay", "scripts/dashboard/bb-check-relay",
                 "scripts/dashboard/bb-rule-hook",

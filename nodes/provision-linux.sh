@@ -2322,6 +2322,8 @@ cmd_uninstall() {
     # The session account's sudo rule first: it is the one grant here that
     # reaches root, and it must not outlive the helper it names (R35).
     rm -f /etc/sudoers.d/builderbot-session /etc/bb-session.conf /usr/local/sbin/bb-session
+    # ...and the job account's, for a tool pack's install steps (R234).
+    rm -f /etc/sudoers.d/builderbot-netcut /usr/local/sbin/bb-netcut
     [ "$configured" = 1 ] && rm -f /etc/X11/builderbot-gpu.conf /run/builderbot-gpu-display
     if [ "$stores" = 1 ]; then
         say "removing the stores on this disk"

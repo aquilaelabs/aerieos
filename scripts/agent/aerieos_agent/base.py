@@ -115,7 +115,7 @@ ROOT_BUNDLE_DIR = os.environ.get("BUILDERBOT_ROOT_BUNDLE", "/usr/local/lib/build
 # account's on the documented one, and a key written there was a session's to
 # read while the job ran. Root's, 0711, each job's folder its account's, 0700.
 SIGN_WORK = os.environ.get("BUILDERBOT_SIGN_WORK", "/run/builderbot/sign")
-ROOT_TOOLS = ("nodes/provision-linux.sh", "nodes/bb-session")
+ROOT_TOOLS = ("nodes/provision-linux.sh", "nodes/bb-session", "nodes/bb-netcut")
 # Where an updated Claude Code is pinned, root-owned, for the sessions (claude_update).
 CLAUDE_DIR = "/usr/local/lib/builderbot/claude"
 # ...and the other coding agents (R95 step 2), each in a folder of its own
@@ -250,6 +250,11 @@ def recipe_checked(r):
 
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
 SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/builderbot-session")
+# The root helper that cuts the network for a declared pack's install steps
+# where the job account cannot make a network namespace itself (R234), and
+# the one sudo rule that lets that account run it.
+NETCUT_BIN = os.environ.get("BUILDERBOT_NETCUT_BIN", "/usr/local/sbin/bb-netcut")
+NETCUT_SUDOERS = os.environ.get("BUILDERBOT_NETCUT_SUDOERS", "/etc/sudoers.d/builderbot-netcut")
 # The wall the installer writes on a controller's own machine (docs/decisions.md),
 # and where the root agent keeps that machine's compose files: under /var/lib
 # and root's alone, since the job account owns the data store and could swap

@@ -530,6 +530,17 @@ def sdk_verified(state):
     return out
 
 
+def netcut_sudoers(user, tool):
+    """The sudo rule that lets the account a node's jobs run as cut the
+    network for a declared pack's install steps (R234): the one command, which
+    runs what it is handed as that account again and never as root."""
+    return (f"# Written by the AerieOS agent (R234): the one command {user}, the account this\n"
+            f"# node's jobs run as, may run as root for a tool pack's install. It runs what it\n"
+            f"# is handed as {user} again, in a network namespace that holds no network.\n"
+            f"Defaults!{tool} !use_pty, !lecture\n"
+            f"{user} ALL=(root) NOPASSWD: {tool}\n")
+
+
 def sdk_receipts(state):
     """What each pinned install left behind (R234): {name: {commit, tree,
     files, bytes, at, before, net}} from the first line of its .bb-receipt, which

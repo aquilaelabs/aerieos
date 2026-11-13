@@ -312,6 +312,9 @@ COPY nodes/provision-macos.sh /opt/aerieos/nodes/provision-macos.sh
 # The root helper that builds a session's view, in the bundle a node fetches;
 # its agent installs it (R35).
 COPY nodes/bb-session /opt/aerieos/nodes/bb-session
+# ...and the one that cuts the network for a declared pack's install steps
+# where a node's job account cannot make a network namespace itself (R234).
+COPY nodes/bb-netcut /opt/aerieos/nodes/bb-netcut
 COPY nodes/vm/ /opt/aerieos/nodes/vm/
 # AerieOS's own docs, for the Help page (helpdocs.py, R258): the Markdown
 # alone, two levels above server.py as in a checkout; the screenshots stay

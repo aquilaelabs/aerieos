@@ -1,0 +1,92 @@
+#!/usr/bin/python3 -I
+"""bb-netcut: run a command as the caller with no network (R234).
+
+A tool pack that declares its downloads has them fetched and held to their
+sha256 by AerieOS, and its install steps then run with the network cut, so
+nothing the manifest does not name arrives (scripts/lib/sdk.sh sdk_net_cut).
+The cut is a network namespace of the step's own, which an account makes for
+itself where the machine lets it. Where it does not (a distribution that
+keeps user namespaces from unprivileged accounts), this makes it:
+
+    sudo -n bb-netcut CMD [ARG...]
+
+A new network namespace, holding nothing but a loopback that is down; then
+the caller's own account again, for good (its groups, no_new_privs); then
+CMD. Nothing else: no mount, no file, no option.
+
+Root, and the one thing the account a node's jobs run as may run through
+sudo for it (the agent installs this and writes that rule). What it is
+handed is run as the caller sudo names and never as root, so it gives that
+account nothing but the loss of the network: the caller is read from sudo
+alone, root is never a caller, and the environment CMD starts with is a
+plain one of the caller's, whatever sudo kept.
+"""
+import ctypes
+import os
+import pwd
+import sys
+
+CLONE_NEWNET = 0x40000000
+PR_SET_NO_NEW_PRIVS = 38
+PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+
+def plan(argv, environ, euid):
+    """(account, command, environment) for what was asked, or a sentence
+    saying why not. The account is the passwd entry of the caller sudo names."""
+    cmd = list(argv)
+    if cmd[:1] == ["--"]:
+        cmd = cmd[1:]
+    if not cmd or cmd[0].startswith("-"):
+        return "usage: sudo -n bb-netcut CMD [ARG...]: CMD is run as you, with no network"
+    if euid != 0:
+        return "bb-netcut makes a network namespace, which takes root: it is run through sudo"
+    uid = str(environ.get("SUDO_UID") or "")
+    if not uid.isdigit() or int(uid) == 0:
+        return "bb-netcut runs a command as the account sudo names, and that is never root"
+    try:
+        who = pwd.getpwuid(int(uid))
+    except KeyError:
+        return f"bb-netcut: no account has the uid {uid}"
+    env = {"PATH": PATH, "HOME": who.pw_dir, "USER": who.pw_name, "LOGNAME": who.pw_name,
+           "SHELL": who.pw_shell or "/bin/sh", "LANG": "C.UTF-8"}
+    return who, cmd, env
+
+
+def _call(libc, name, *args):
+    if getattr(libc, name)(*args) != 0:
+        e = ctypes.get_errno()
+        raise OSError(e, f"{name}: {os.strerror(e)}")
+
+
+def main(argv):
+    got = plan(argv, os.environ, os.geteuid())
+    if isinstance(got, str):
+        print(got, file=sys.stderr)
+        return 64
+    who, cmd, env = got
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        _call(libc, "unshare", ctypes.c_int(CLONE_NEWNET))
+        # The caller's own account again, for good.
+        os.initgroups(who.pw_name, who.pw_gid)
+        os.setgid(who.pw_gid)
+        os.setuid(who.pw_uid)
+        _call(libc, "prctl", ctypes.c_int(PR_SET_NO_NEW_PRIVS), ctypes.c_ulong(1), ctypes.c_ulong(0),
+              ctypes.c_ulong(0), ctypes.c_ulong(0))
+    except OSError as e:
+        print(f"bb-netcut: {e}", file=sys.stderr)
+        return 71
+    if os.getuid() != who.pw_uid or os.geteuid() != who.pw_uid:
+        print("bb-netcut: the drop to the caller's account did not hold", file=sys.stderr)
+        return 71
+    try:
+        os.execvpe(cmd[0], cmd, env)
+    except OSError as e:
+        print(f"bb-netcut: {cmd[0]}: {e}", file=sys.stderr)
+        return 127
+    return 127
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

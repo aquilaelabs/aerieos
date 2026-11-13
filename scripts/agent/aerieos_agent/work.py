@@ -410,6 +410,10 @@ class WorkMixin:
             return "failed", 69
         if action == "sysdeps":
             return self.sysdeps(job, names, into)
+        # What cuts the network for a declared pack's steps where the job
+        # account cannot (R234), from the bundle just fetched.
+        if action == "install":
+            self.refresh_netcut_tool()
         # The NVIDIA driver (R102), a member of the batch like any row, but
         # the machine's and not the store's: installed or removed as root by
         # bb-sandbox, after the store's names, since it ends at a restart.

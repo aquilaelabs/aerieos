@@ -94,9 +94,10 @@ class Node(unittest.TestCase):
         with open(self.dl, "wb") as f:
             f.write(b"the archive")
 
-    def run_sh(self, fields, body, unshare=None):
+    def run_sh(self, fields, body, unshare=None, env=None):
         """`fields` answers `sdk_meta field hexkit PATH`; `unshare`, where
-        given, stands in for the node's own: "no" refuses every namespace."""
+        given, stands in for the node's own: "no" refuses every namespace.
+        No helper of the machine's own is reached for: `env` names one."""
         table = "\n".join(f"        {k!r}) printf '%s\\n' {v!r} ;;" for k, v in fields.items())
         fake = ""
         if unshare == "no":
@@ -114,7 +115,8 @@ sdk_meta() {{
 {fake}{body}
 """
         p = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False,
-                           env={**os.environ, "BB_TOOLPACKS_FILE_URLS": "1"})
+                           env={**os.environ, "BB_TOOLPACKS_FILE_URLS": "1",
+                                "BUILDERBOT_NETCUT_BIN": os.path.join(self.root, "no-helper"), **(env or {})})
         return p.returncode, p.stdout + p.stderr
 
     def fields(self, sha, url=None, to="dl/a.tgz"):
@@ -152,6 +154,46 @@ sdk_meta() {{
         self.assertIn("this node cannot cut the network for a step", out)
         self.assertIn("cut=0", out)
         self.assertIn("open", out.splitlines()[-1])
+
+    def helper(self, sudo_ok=True):
+        """A stand-in for a managed node's helper and for sudo: sudo starts
+        what it is handed with a plain environment, as the real one does, and
+        the helper says it was the way in."""
+        bin_ = os.path.join(self.root, "bin")
+        os.makedirs(bin_)
+        tool = os.path.join(self.root, "bb-netcut")
+        for path, text in ((tool, '#!/bin/sh\nVIA=helper exec env "$@"\n'),
+                           (os.path.join(bin_, "sudo"),
+                            '#!/bin/sh\n[ "$1" = -n ] && shift\n' + ('exec env -i PATH=/usr/bin:/bin "$@"\n' if sudo_ok else 'exit 1\n'))):
+            with open(path, "w") as f:
+                f.write(text)
+            os.chmod(path, 0o755)
+        tmp = os.path.join(self.root, "tmp")
+        os.makedirs(tmp)
+        return {"BUILDERBOT_NETCUT_BIN": tool, "PATH": bin_ + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin"), "TMPDIR": tmp}, tmp
+
+    def test_where_the_account_cannot_the_nodes_helper_cuts_it(self):
+        env, tmp = self.helper()
+        body = (f'sdk_net_cut hexkit {self.d}; cat {self.d}/.bb-net; '
+                'env STEP_SAYS="two words" "${SDK_CUT[@]}" sh -c \'echo "step=$STEP_SAYS via=$VIA arg=$1"\' _ "an arg"; '
+                '"${SDK_CUT[@]}" sh -c "exit 7"; echo "rc=$?"')
+        rc, out = self.run_sh({}, body, unshare="no", env=env)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("its steps run with no network", out)
+        lines = out.splitlines()
+        self.assertIn("cut", lines)
+        # The step's own environment and words reach it through sudo's plain
+        # one, and what it exits with comes back.
+        self.assertIn("step=two words via=helper arg=an arg", lines)
+        self.assertIn("rc=7", lines)
+        self.assertEqual(os.listdir(tmp), [], "the environment's file is not left behind")
+
+    def test_a_helper_sudo_refuses_is_no_cut(self):
+        env, _ = self.helper(sudo_ok=False)
+        rc, out = self.run_sh({}, f'sdk_net_cut hexkit {self.d}; echo "cut=${{#SDK_CUT[@]}}"; cat {self.d}/.bb-net', unshare="no", env=env)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("this node cannot cut the network for a step", out)
+        self.assertIn("cut=0", out)
 
     def test_a_node_that_can_runs_a_step_with_no_network(self):
         probe = subprocess.run(["unshare", "--user", "--map-root-user", "--net", "true"], capture_output=True, check=False)

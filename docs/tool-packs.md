@@ -109,11 +109,22 @@ brings, and a newer version of the tool is a new commit of the pack with a
 new address and sha256, which a Manifest update shows.
 
 **Look** lists what a pack declares before it is added, or says that it
-declares none. A node that cannot cut the network for a step (it has no
-unprivileged namespaces, or runs in a container that forbids them) still
-installs the pack: its downloads are fetched and checked the same way, its
-steps run with the network, and the job and the pack's page on Installed
-say so.
+declares none.
+
+The cut is a network namespace of the step's own. The account a node's jobs
+run as makes it itself where the machine lets an account do that. Where it
+does not (a distribution that keeps user namespaces from unprivileged
+accounts), a managed node's agent makes it: it installs a small root helper,
+`bb-netcut`, with one sudo rule that lets the job account run it, and the
+helper makes the namespace and runs the step as that account again, never
+as root. A node that can do neither (its agent is not root, or it runs in a
+container that forbids namespaces) still installs the pack: its downloads
+are fetched and checked the same way, its steps run with the network, and
+the job and the pack's page on Installed say so.
+
+The cut stops an install step from fetching what the manifest does not
+name. It is not a sandbox: a step still runs as the job account, with that
+account's files.
 
 ## Official packs and agent packs
 

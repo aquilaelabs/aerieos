@@ -15,6 +15,8 @@ from .base import (
     DIAL_BACK_S,
     NEEDRESTART_DIR,
     RUNNER_DIR,
+    NETCUT_BIN,
+    NETCUT_SUDOERS,
     SANDBOX_BIN,
     SESSION_BIN,
     SESSION_CONF,
@@ -37,7 +39,7 @@ from .stores import (
     tc_root,
 )
 from .backends import net_backend
-from .toolchains import extract_sandbox_tool
+from .toolchains import extract_sandbox_tool, netcut_sudoers
 from .sessnet import session_conf, session_sudoers
 from .runners import runner_dirs, runner_slot
 from .census import FEATURES, _os_release, boot_id, export_gaps, mounts_now, network_now, services_now
@@ -580,16 +582,47 @@ class ConfigPlaneMixin:
                 tool = f.read()
         except OSError:
             return
-        wrote = []
         # Accounts as their own users (R125), once the agent has made the
         # group and bb-session is there to hold each to its own account.
         ready = getattr(self, "account_users_ready", None)
         accounts = {"controller": self.ctl.url, "pin": self.state.get("pin", ""),
                     "bundle": os.path.join(ROOT_BUNDLE_DIR, "current")} if ready and ready() else None
-        for path, text, mode, sudoers in ((SESSION_BIN, tool, 0o755, False),
-                                          (SESSION_CONF, session_conf(self.state, user, self.sessnet.conf_on, accounts),
-                                           0o644, False),
-                                          (SESSION_SUDOERS, session_sudoers(user, bool(accounts)), 0o440, True)):
+        wrote = self._write_root_files(((SESSION_BIN, tool, 0o755, False),
+                                        (SESSION_CONF, session_conf(self.state, user, self.sessnet.conf_on, accounts),
+                                         0o644, False),
+                                        (SESSION_SUDOERS, session_sudoers(user, bool(accounts)), 0o440, True)))
+        if wrote:
+            log(f"the session's view: {', '.join(wrote)} written from the bundle")
+
+    def refresh_netcut_tool(self):
+        """The helper that cuts the network for a declared pack's install
+        steps kept installed (R234): bb-netcut from root's own copy of the
+        bundle and the job account's sudo rule for it, on a node set up as a
+        sandbox whose agent is root and whose jobs run as an account of their
+        own. The installer reaches for it only where that account cannot make
+        a network namespace itself (sdk.sh sdk_net_cut); a node without it
+        installs such a pack with the network and says so. Written as the
+        session's tool is, the rule checked by visudo first."""
+        user = str(self.state.get("user") or "")
+        if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not user or user == "root":
+            return
+        try:
+            with open(os.path.join(TOOLS_DIR, "current", "nodes", "bb-netcut"), encoding="utf-8") as f:
+                tool = f.read()
+        except OSError:
+            return
+        with self.tool_lock:
+            wrote = self._write_root_files(((NETCUT_BIN, tool, 0o755, False),
+                                            (NETCUT_SUDOERS, netcut_sudoers(user, NETCUT_BIN), 0o440, True)))
+        if wrote:
+            log(f"cutting the network for a pack's install: {', '.join(wrote)} written from the bundle")
+
+    @staticmethod
+    def _write_root_files(rows):
+        """Each (path, text, mode, sudoers) written as root's own where it
+        differs from what is there; the paths that changed."""
+        wrote = []
+        for path, text, mode, sudoers in rows:
             try:
                 with open(path, encoding="utf-8") as f:
                     if f.read() == text:
@@ -616,8 +649,7 @@ class ConfigPlaneMixin:
                 log(f"could not write {path}: {e}")
                 with contextlib.suppress(OSError):
                     os.unlink(tmp)
-        if wrote:
-            log(f"the session's view: {', '.join(wrote)} written from the bundle")
+        return wrote
 
     def _apply_uninstall(self, job, cfg=None):
         """Take AerieOS off this machine, from the Nodes page. The runners

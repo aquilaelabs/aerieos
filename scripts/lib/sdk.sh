@@ -1445,11 +1445,26 @@ sdk_fetch_declared() {
 # network, for a pack whose downloads are declared: a network namespace of
 # its own, as the same account where this unshare can say so, else as that
 # namespace's root with tar told not to hand files to owners that do not
-# exist there. A node that can do neither (no unprivileged namespaces, a
-# container that forbids them) installs the pack all the same, its steps
-# with the network, and says so here and on its receipt (the operator, 13
-# Nov). DIR/.bb-net keeps which, for the receipt.
+# exist there. Where the machine keeps user namespaces from an account (a
+# distribution's own restriction), the helper a managed node's agent
+# installs makes the namespace as root and runs the step as this account
+# again (nodes/bb-netcut, through the one sudo rule the agent writes for
+# it). A node that can do none of these (a container that forbids
+# namespaces, a node whose agent is not root) installs the pack all the
+# same, its steps with the network, and says so here and on its receipt
+# (the operator, 13 Nov). DIR/.bb-net keeps which, for the receipt.
 SDK_CUT=()
+SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-/usr/local/sbin/bb-netcut}"
+# A step relayed through the helper: sudo starts it with a plain environment,
+# so the step's own is written to a file only this account reads and read
+# back by the step's shell, after the helper has dropped to this account.
+# shellcheck disable=SC2016  # the words are for the bash -c that runs them
+SDK_NETCUT_RELAY='f="$(mktemp)" || exit 1
+export -p > "$f"
+sudo -n "$0" bash -c '\''. "$0"; rm -f "$0"; exec "$@"'\'' "$f" "$@"
+rc=$?
+rm -f "$f"
+exit "$rc"'
 sdk_net_cut() {
     local what="$1" d="$2"
     SDK_CUT=()
@@ -1457,12 +1472,14 @@ sdk_net_cut() {
         SDK_CUT=(unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
     elif unshare --user --map-root-user --net true 2>/dev/null; then
         SDK_CUT=(env TAR_OPTIONS=--no-same-owner unshare --user --map-root-user --net)
+    elif [ -x "$SDK_NETCUT_BIN" ] && sudo -n "$SDK_NETCUT_BIN" true 2>/dev/null; then
+        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN")
     fi
     if [ "${#SDK_CUT[@]}" != 0 ]; then
         log "${what} declares its downloads: its steps run with no network"
         printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
     else
-        log "${what} declares its downloads, but this node cannot cut the network for a step (unshare is refused): its steps run with it"
+        log "${what} declares its downloads, but this node cannot cut the network for a step (this account may make no network namespace, and no bb-netcut makes one for it): its steps run with it"
         printf 'open\n' > "$d/.bb-net" 2>/dev/null || true
     fi
 }
