@@ -115,13 +115,16 @@ async function pressing(btn, fn){
   const t = setInterval(() => {
     if (!btn.isConnected || btn.getAttribute("aria-busy") === "true") return;
     if (document.querySelector(".modal.askdlg:not([hidden])")) return;
-    btn.classList.add("working");
+    // Only where a ring has room (pressRing, page-motion.js).
+    if (btn.classList.contains("working") || btn.__noRing) return;
+    if (!pressRing(btn)){ btn.__noRing = true; return; }
     btn.setAttribute("aria-busy", "true");
   }, PRESS_SHOW_MS);
   try{
     return await fn();
   }finally{
     clearInterval(t);
+    delete btn.__noRing;
     if (btn.classList.contains("working")){ btn.classList.remove("working"); btn.removeAttribute("aria-busy"); }
     if (btn.isConnected) btn.disabled = false;
   }

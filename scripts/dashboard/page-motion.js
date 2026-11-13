@@ -516,6 +516,24 @@ function slideHidden(el, willShow, after){
 // page makes on its own (the polls) come long after any press and are not tied.
 let pressEl = null, pressAt = 0;
 const PRESS_TIE_MS = 1500;
+// ...unless the ring has no room (the operator, 13 Nov: where the wheel would
+// disrupt a small space, like the rail's icons, none pops up). A strip of
+// presses packed side by side, or one over another, is that by its shape: a
+// group on the rail or the phone's bar grew a third line and pushed every
+// group under it, a page of a sub-nav widened and slid its neighbors. There
+// the page arriving is the answer. Anywhere else the ring is tried and
+// taken back off if it made its button taller, or its row taller or wider
+// than its box: a row of buttons that just fits a phone.
+const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chip, .lfilter, header";
+function pressRing(b){
+  if (b.closest(PRESS_TIGHT)) return false;
+  const row = b.parentElement;
+  const was = {h: b.offsetHeight, rh: row ? row.offsetHeight : 0, over: row ? Math.max(0, row.scrollWidth - row.clientWidth) : 0};
+  b.classList.add("working");
+  if (b.offsetHeight <= was.h && (!row || (row.offsetHeight <= was.rh && row.scrollWidth - row.clientWidth <= was.over))) return true;
+  b.classList.remove("working");
+  return false;
+}
 function pressTrackDown(e){
   const b = e.target.closest?.("button, a.btn");
   if (!b) return;
@@ -529,7 +547,7 @@ function pressHold(b, p){
   b.__pending = (b.__pending || 0) + 1;
   const t = setTimeout(() => {
     if (!b.__pending || !b.isConnected || b.getAttribute("aria-busy") === "true") return;
-    b.classList.add("working"); b.dataset.pressWorking = "1";
+    if (pressRing(b)) b.dataset.pressWorking = "1";
   }, PRESS_SHOW_MS);
   const done = () => {
     clearTimeout(t);

@@ -186,5 +186,52 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.setViewportSize({ width: 1280, height: 900 });
 }
 
+// ---- no ring where it has no room -------------------------------------------
+// A press still waiting after a moment wears a ring (pressHold), and on the
+// rail that was a third line under the group pressed, pushing every group
+// below it; on a sub-nav it widened the page pressed (the operator, 13 Nov:
+// where the wheel would disrupt a small space, like the rail's icons, none
+// pops up). A button with room still wears it.
+{
+  const slow = async r => { await sleep(1200); await r.continue().catch(() => {}); };
+  const boxes = () => page.evaluate(() => [...document.querySelectorAll('#rail .ritem, .pane .bar.page .pseg button')]
+    .filter(b => b.checkVisibility()).map(b => { const r = b.getBoundingClientRect(); return [r.top, r.left, r.width, r.height].map(Math.round).join(','); }).join(' '));
+  const rings = () => page.evaluate(() => [...document.querySelectorAll('button.working, a.btn.working')].map(b => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 20)));
+  await page.click('#rail [data-rail="home"]');
+  await page.waitForSelector('.doc.on .hometiles .tile', { timeout: 20000 });
+  await sleep(600);
+  const before = await boxes();
+  await page.route('**/api/**', slow);
+  const seen = [], moved = [];
+  for (const sel of ['#rail [data-rail="home"]', '.pane .bar.page .pseg button']){
+    await page.click(sel);
+    for (let i = 0; i < 12; i++){ await sleep(100); seen.push(...await rings()); if (await boxes() !== before) moved.push(sel); }
+  }
+  ok(seen.length === 0, `a group on the rail and a page of the sub-nav wear no ring while their page reads (${JSON.stringify([...new Set(seen)])})`);
+  ok(moved.length === 0, `...and nothing on the rail or the sub-nav moves (${JSON.stringify([...new Set(moved)])})`);
+  // A button with room: one in a row of its own, its press starting a slow read.
+  const ring = await page.evaluate(async () => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:300px;top:300px;width:400px;display:flex;gap:6px;z-index:99';
+    host.innerHTML = '<button type="button" id="ringProbe">Read it again</button>';
+    document.body.append(host);
+    const b = host.firstChild;
+    b.onclick = () => { fetch('/api/home'); };
+    return true;
+  });
+  await page.click('#ringProbe');
+  const wore = await until(async () => (await rings()).includes('Read it again'), 1500, 50);
+  // ...and the same button where one more thing does not fit: its row is as wide as it is.
+  await page.evaluate(() => { const b = document.getElementById('ringProbe'); b.classList.remove('working'); b.parentElement.style.cssText += ';width:auto;flex-wrap:wrap;max-width:' + b.offsetWidth + 'px'; });
+  await sleep(1500);
+  await page.click('#ringProbe');
+  let tight = false;
+  for (let i = 0; i < 12; i++){ await sleep(100); if ((await rings()).includes('Read it again')) tight = true; }
+  ok(ring && wore && !tight, `...while a button with room wears it, and the same button in a row it just fits does not (${wore}, ${tight})`);
+  await page.unroute('**/api/**');
+  await page.evaluate(() => document.getElementById('ringProbe').parentElement.remove());
+  await sleep(1500);
+}
+
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

@@ -831,6 +831,8 @@ Applies to: scripts/dashboard/page-docs.js; progress, busy, spinner, percentage
 
 Something that is running says so with a word and an animated ellipsis, `busy(btn, verb)`, and no bar or percentage of the page's own guessing: nothing here can honestly measure how far along a build or a pull is, and a bar that guesses is a lie with a scale on it. Where the thing running reports an honest measure of its own (the operator, 8 Nov: SnapRAID's percentage on a sync, scrub or parity check; the bytes of a bundle sent from the browser), a bar is drawn under the word with `pctBar`: a thin track in the line color, the accent as far as it has come, capped at a control's width, the word still saying what runs. Never a bar for a job whose only measure is time.
 
+**A press still waiting wears a ring, where a ring has room.** A press that started a request and has no answer after 200ms shows a small spinning ring after its word, or in place of its picture on a button that is a picture alone, so it reads as taken rather than missed (the operator, 8 Nov). Never where it would disrupt a small space (the operator, 13 Nov: like the rail's icons): a group on the rail or the phone's bar, a page of a sub-nav or any segmented control, a notebook's view tab, a tab on the dock, a chip and a button of the header wear none, the page arriving being the answer there; and anywhere else the ring is tried and taken back off if it made its button taller, or its row taller or wider than its box (`pressRing`, page-motion.js). A new strip of presses packed side by side joins `PRESS_TIGHT`.
+
 ### meters
 
 Applies to: scripts/dashboard/tab-nodes.js; meter, gauge, bar, track
