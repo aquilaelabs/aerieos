@@ -17,6 +17,9 @@
 - A node's agent does its file work inside an account's folder (a space's tree, a job's workspace, an account's conversations) as that account and no longer as root, so a link left there leads nowhere the account could not go itself. What a container left root-owned in a space's tree is handed to the tree's owner when the sync meets it. The agent checks that the machine holds this before relying on it; an agent update's job says so. (f2a45ad)
 - A session's terminals on a node no longer read the account's `~/.tmux.conf`: they start on AerieOS's own tmux settings, since that file is one a session can write and it ran outside the session's view. The controller's own terminal still reads yours. A new worktree is made empty and filled by the session that first enters it, so nothing a repository's git configuration names runs outside a view. An account enters only the spaces the controller granted it a terminal on. After this update a session started before it may need its terminal opened once before Restart works. (0f4f618)
 
+- An update that cannot move `/config` forward no longer starts on it half changed. When one of an update's steps on `/config` fails, `/config` is put back from the copy taken just before, the container stops saying which step failed and why, and the release you came from starts on `/config` as it left it; it went on before, with one line in the log. What the failed start left is kept under `/config/backups/rolled-back-TIME`, a note in `/config/update-did-not-land.txt` says what happened, and the same build is not tried again until the note is removed. Upgrading: nothing to do (8a8f0b4)
+- Snapshots kept for 0 days takes no snapshot and leaves the ones a repository already has; it removed them all at the next daily look. They go again once some days are kept and they pass them (8a8f0b4)
+
 ### Fixed
 
 - A press on the rail, a page of a sub-nav or a notebook's view tab no longer grows a spinning ring while its page reads, which pushed everything beside it; the ring is kept for a button with room for it (2cad430)
@@ -26,6 +29,8 @@
 - Taking a retired node's folder off a shared toolchain store works; the node refused it every time. (71a209b)
 - A job on the controller that prints nothing still ends at its time limit, and a job that runs out of time is ended together with what it started. (71a209b)
 - `aerie lint` in a space's own project no longer applies AerieOS's own house rules to it (a word it keeps to one place, bug numbers in a changelog, names defined twice). (71a209b)
+- A repository whose daily snapshots were switched off before that switch was removed is no longer left off with nothing to turn it back on: it keeps 0 days, which the days field shows and changes. A person's terminal colors for one space, which nothing read any more, are no longer stored. The step that was to do both in the last release read a file by the wrong name and changed nothing. Upgrading: `/config` moves to state 22, so a build from before this one no longer starts on it; a repository that had the switch off shows Snapshots kept for 0 days, and its snapshots stay (8a8f0b4)
+- An audit entry or a job whose new id was already taken is written under another; it was dropped, the job with an error (8a8f0b4)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
