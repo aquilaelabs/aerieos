@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A newer version of a pack kept from the catalog is offered as Update, in the same look as every other update, with the card saying update available and the Updates chip counting it; it was a plain button reading Catalog update on a card that said installed. The press still shows what the new version changes before anything is kept (783a989)
+
 ## 0.9.0-dev.5341: 2026-11-12
 
 ### Added
