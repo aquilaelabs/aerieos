@@ -14,7 +14,7 @@
 - The Library and the Installed page name their two kinds of update apart, both in the accent: Software update puts a newer program on a node (it read Update), and Manifest update keeps the catalog's newer definition of a pack you hold, showing what it changes first (it was a plain button reading Catalog update on a card that said installed). The card says which is available, and the Updates chip counts both (593a44d)
 - Every button is one height, 32px, the size New VM and Enroll node had alone (it was 38px), and a field or a pulldown beside one is the same height; the header's buttons, the dock's tabs and the phone's key bar take it too, and a page's row of sub-pages is spaced as the dock's line is (201649c)
 - A button has a faint gradient, lighter at its top edge and darker at its foot, over whatever color it wears, in every theme (19856ba)
-- A node's agent does its file work inside an account's folder (a space's tree, a job's workspace, an account's conversations) as that account and no longer as root, so a link left there leads nowhere the account could not go itself. What a container left root-owned in a space's tree is handed to the tree's owner when the sync meets it. The agent checks that the machine holds this before relying on it; an agent update's job says so. (HASH)
+- A node's agent does its file work inside an account's folder (a space's tree, a job's workspace, an account's conversations) as that account and no longer as root, so a link left there leads nowhere the account could not go itself. What a container left root-owned in a space's tree is handed to the tree's owner when the sync meets it. The agent checks that the machine holds this before relying on it; an agent update's job says so. (f2a45ad)
 
 ### Fixed
 
