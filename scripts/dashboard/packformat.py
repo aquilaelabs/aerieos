@@ -45,7 +45,7 @@ this beside toolpacks.py from a checkout of any release.
 """
 
 # The number this build reads, and every one before it.
-FORMAT = 2
+FORMAT = 3
 # ...and the framework's second number, which this build reads up to: what
 # was added since that an earlier build leaves out. It never resets.
 MINOR = 2
@@ -64,6 +64,8 @@ FORMATS = {
        "(grouped or flat, snake or camel): what 0.9.0's first releases read",
     2: "a coding agent that describes its own hook protocol (hooks.document, hooks.payload as paths, hooks.answers), "
        "prompt_fires, the start event, and the briefing and the allow list handed over by hook",
+    3: "declared downloads (install.fetch): every file an install takes from somewhere else, each with its address and "
+       "its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network",
 }
 
 

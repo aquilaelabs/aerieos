@@ -189,7 +189,10 @@ def load_toolchains(packs=()):
                            "runs": {str(v): [str(w) for w in (x.get("run") or [])][:40]
                                     for v, x in list((r.get("verbs") or {}).items())[:40] if isinstance(x, dict)},
                            "steps": [[str(w) for w in (t.get("run") or [])][:40]
-                                     for t in ((r.get("source") or {}).get("then") or [])[:20] if isinstance(t, dict)]}
+                                     for t in ((r.get("source") or {}).get("then") or [])[:20] if isinstance(t, dict)],
+                           # ...and the downloads it declares (pack format 3).
+                           "fetch": [{k: str(f.get(k) or "")[:2000] for k in ("url", "sha256", "to")}
+                                     for f in ((r.get("source") or {}).get("fetch") or [])[:32] if isinstance(f, dict)]}
         out.append(row)
     # Sorted here rather than trusted from the file, so a toolchain added at the
     # end of the catalog still lands where somebody would look for it. Leading
@@ -1277,6 +1280,9 @@ def receipt_of(nid, rep, name, p):
     if not isinstance(rc, dict) or not rc.get("tree"):
         return None
     out = {k: rc.get(k) for k in ("commit", "tree", "files", "bytes", "at")}
+    # A pack that declares its downloads: whether its steps ran with the
+    # network cut there ("cut"), or the node could not ("open").
+    out["net"] = rc.get("net") or ""
     kept = str(((p.get("source") or {}).get("commit")) or "")
     out["stale"] = kept if kept and rc.get("commit") and kept != rc["commit"] else ""
     out["before"] = rc.get("before") or ""

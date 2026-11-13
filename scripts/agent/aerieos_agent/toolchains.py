@@ -532,7 +532,7 @@ def sdk_verified(state):
 
 def sdk_receipts(state):
     """What each pinned install left behind (R234): {name: {commit, tree,
-    files, bytes, at, before}} from the first line of its .bb-receipt, which
+    files, bytes, at, before, net}} from the first line of its .bb-receipt, which
     the installer writes (sdkmeta.py receipt). `tree` is one sha256 over
     every file's, `before` the tree the same commit made here the last
     time where that was another. One installed before receipts has none
@@ -555,7 +555,10 @@ def sdk_receipts(state):
             if len(r) < 6 or r[0] != "1" or len(r[2]) != 64 or not set(r[2]) <= hexd:
                 continue
             before = r[6] if len(r) > 6 and len(r[6]) == 64 and set(r[6]) <= hexd else ""
-            out[name] = {"commit": r[1][:64], "tree": r[2], "files": int(r[3]), "bytes": int(r[4]), "at": int(r[5]), "before": before}
+            out[name] = {"commit": r[1][:64], "tree": r[2], "files": int(r[3]), "bytes": int(r[4]), "at": int(r[5]), "before": before,
+                         # A pack that declares its downloads: whether its
+                         # steps ran with the network cut, or this node could not.
+                         "net": r[7] if len(r) > 7 and r[7] in ("cut", "open") else ""}
     return out
 
 

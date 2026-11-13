@@ -1564,7 +1564,8 @@ def _census(c):
             out["toolchain_receipts"][str(k)[:40]] = {
                 "commit": re.sub(r"[^0-9a-f]", "", str(v.get("commit") or ""))[:64], "tree": v["tree"],
                 "files": max(0, int(v.get("files") or 0)), "bytes": max(0, int(v.get("bytes") or 0)), "at": max(0, int(v.get("at") or 0)),
-                "before": v["before"] if re.fullmatch(r"[0-9a-f]{64}", str(v.get("before") or "")) else ""}
+                "before": v["before"] if re.fullmatch(r"[0-9a-f]{64}", str(v.get("before") or "")) else "",
+                "net": v.get("net") if v.get("net") in ("cut", "open") else ""}
     # Kept only when the agent sent one: a listing that is there and empty
     # is a store with nothing in it (B671), a key that is absent is a node
     # that has not said, and the Installed page reads the two apart.

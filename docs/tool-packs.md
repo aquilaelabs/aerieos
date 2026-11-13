@@ -81,6 +81,40 @@ it does not stop an install. A pack installed before receipts were kept
 has none until it is installed again, and a node says one once its agent
 is 0.9.433 or newer.
 
+### Declared downloads
+
+A receipt says what landed. A pack can also say beforehand what it will
+download, and then nothing else can arrive. In its manifest, at pack format
+3:
+
+```json
+"format": 3,
+"install": {
+  "fetch": [
+    {"url": "https://github.com/hexkit/hexkit/releases/download/v1.4.2/hexkit-linux.tar.gz",
+     "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+     "to": "dl/hexkit-linux.tar.gz"}
+  ],
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+On a node AerieOS fetches each download itself, over `https` alone, and
+holds it to the sha256 the manifest says; one that answers another file
+stops the install, naming both. The files are then where `to` says, inside
+the pack, and the install steps and the verify command run with no
+network: a step that tries to fetch anything else fails, and the job says
+it ran with no network. So a pinned commit pins everything the install
+brings, and a newer version of the tool is a new commit of the pack with a
+new address and sha256, which a Manifest update shows.
+
+**Look** lists what a pack declares before it is added, or says that it
+declares none. A node that cannot cut the network for a step (it has no
+unprivileged namespaces, or runs in a container that forbids them) still
+installs the pack: its downloads are fetched and checked the same way, its
+steps run with the network, and the job and the pack's page on Installed
+say so.
+
 ## Official packs and agent packs
 
 Everything AerieOS ships is a pack in this same format too (R169): under
@@ -314,6 +348,7 @@ on its Details what that install leaves out.
 | 2.0 | A coding agent that describes its own hook protocol (`hooks.document`, `hooks.payload` as paths, `hooks.answers`), `prompt_fires`, the `start` event, and the briefing and the allow list handed over by `hook`. | Hides the entry: needs AerieOS 0.9.0 or newer. | 0.9.0 |
 | 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
 | 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
+| 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
 
 ### What stays AerieOS's own
 
@@ -558,7 +593,8 @@ the scripts it runs:
 | `framework` | The framework's version the manifest is written for, as `"2.1"`: the newest thing it uses, whichever number brought it ([The framework's version](#the-frameworks-version)). |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
-| `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. This is where a pack downloads its binaries. |
+| `install.fetch` | Pack format 3. The downloads the install takes from somewhere else, up to 32, each `{"url", "sha256", "to"}`: an `https` address, the sha256 of what it answers, and the file inside the pack it is kept as. AerieOS fetches each and holds it to its sha256 before any step runs, and a download that answers anything else installs nothing ([Declared downloads](#declared-downloads)). |
+| `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. A pack that declares no downloads fetches its binaries here; one that declares them (`install.fetch`) unpacks and builds here, with no network. |
 | `install.verify` | One command that must succeed for the install to count. |
 | `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |
 | `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |

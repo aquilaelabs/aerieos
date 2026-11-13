@@ -116,8 +116,17 @@ class Receipt(unittest.TestCase):
         with mock.patch.object(mod, "tc_root", lambda state: store):
             got = agent.sdk_receipts({})
         self.assertEqual(set(got), {"hexkit"})
-        self.assertEqual({k: got["hexkit"][k] for k in ("commit", "tree", "files", "before")},
-                         {"commit": C1, "tree": head[2], "files": 4, "before": ""})
+        self.assertEqual({k: got["hexkit"][k] for k in ("commit", "tree", "files", "before", "net")},
+                         {"commit": C1, "tree": head[2], "files": 4, "before": "", "net": ""})
+        # A pack that declares its downloads: the installer left which it was
+        # (sdk.sh sdk_net_cut), the receipt says it, and the mark is not counted.
+        for mark in ("cut", "open"):
+            put(d, ".bb-net", mark + "\n")
+            said = sdkmeta.receipt(d, C1)
+            self.assertIn("with no network" if mark == "cut" else "which this node cannot cut", said)
+            self.assertEqual(self.read(d)[0][2], head[2])
+            with mock.patch.object(mod, "tc_root", lambda state: store):
+                self.assertEqual(agent.sdk_receipts({})["hexkit"]["net"], mark)
 
     def test_the_controller_keeps_the_shape_it_knows(self):
         import nodes  # noqa: PLC0415
@@ -126,7 +135,11 @@ class Receipt(unittest.TestCase):
             "hexkit": {"commit": C1, "tree": t, "files": 4, "bytes": 15, "at": 1700000000, "before": "d" * 64, "extra": "dropped"},
             "evil": {"commit": C1, "tree": "$(rm -rf /)", "files": 1}, "odd": "not a dict",
             "junk": {"commit": "zz; rm", "tree": t, "files": "many", "bytes": 1, "at": 1}}})
-        self.assertEqual(out["toolchain_receipts"], {"hexkit": {"commit": C1, "tree": t, "files": 4, "bytes": 15, "at": 1700000000, "before": "d" * 64}})
+        self.assertEqual(out["toolchain_receipts"], {"hexkit": {"commit": C1, "tree": t, "files": 4, "bytes": 15, "at": 1700000000, "before": "d" * 64, "net": ""}})
+        # Whether its steps ran with the network cut, for a pack that declares its downloads.
+        for said, kept in (("cut", "cut"), ("open", "open"), ("wide open; rm", "")):
+            out = nodes._census({"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": said}}})
+            self.assertEqual(out["toolchain_receipts"]["hexkit"]["net"], kept)
 
     def test_what_a_row_says(self):
         import toolchains  # noqa: PLC0415

@@ -1383,12 +1383,88 @@ sdk_install_git() {
             die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
         fi
     fi
+    # What it declares it downloads (pack format 3), fetched and checked
+    # here, and then the network cut for its steps and its verify, so what
+    # it did not declare cannot arrive.
+    SDK_CUT=()
+    if [ -n "$commit" ] && [ -n "$(sdk_meta field "$what" source.offline)" ]; then
+        sdk_fetch_declared "$what" "$d"
+        sdk_net_cut "$what" "$d"
+    fi
     # A repository that installs more than itself (a tool pack's install
     # steps fetching its binaries) runs them as the script kind does.
     sdk_install_steps "$what" "$d"
     [ -z "$commit" ] || sdk_mark_exec "$what" "$d"
     sdk_install_verify "$what" "$d" ""
+    SDK_CUT=()
     [ -z "$commit" ] || sdk_receipt "$what" "$d" "$commit"
+}
+
+# sdk_fetch_declared WHAT DIR: each download a pack's manifest declares
+# (install.fetch: an address, the sha256 of what it answers, and the file
+# inside the pack it is kept as), fetched into DIR and held to that sha256.
+# One that answers anything else installs nothing: the pack's directory is
+# the partial install the caller takes off again.
+sdk_fetch_declared() {
+    local what="$1" d="$2" i=0 url want to tmp got proto
+    while :; do
+        url="$(sdk_meta field "$what" "source.fetch.${i}.url")"
+        [ -n "$url" ] || break
+        want="$(sdk_meta field "$what" "source.fetch.${i}.sha256")"
+        to="$(sdk_meta field "$what" "source.fetch.${i}.to")"
+        # https and nothing else; a suite's download is a file on disk
+        # (BB_TOOLPACKS_FILE_URLS=1, as its packs are).
+        proto="=https"
+        case "$url" in
+            https://*) ;;
+            file:///*) [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ] || die "${what}: a declared download is fetched over https, and ${url} is not"
+                       proto="=file" ;;
+            *) die "${what}: a declared download is fetched over https, and ${url} is not" ;;
+        esac
+        case "/${to}/" in *"/../"*|"//"*) die "${what}: a declared download is kept inside the pack, and ${to} is not" ;; esac
+        log "fetching ${to} from ${url}"
+        tmp="$(mktemp "${d}/.bb-fetch.XXXXXX")"
+        if ! curl -fL --proto "$proto" --proto-redir '=https' --progress-bar --connect-timeout 30 \
+                --speed-limit 1024 --speed-time 120 --retry 2 --retry-delay 5 -o "$tmp" "$url"; then
+            rm -f "$tmp"
+            die "${what}: ${url} could not be fetched: nothing is installed"
+        fi
+        got="$(sha256sum "$tmp" | cut -d' ' -f1)"
+        if [ "$got" != "$want" ]; then
+            rm -f "$tmp"
+            die "${what}: ${url} answered a file whose sha256 is ${got}, and its manifest declares ${want}: nothing is installed"
+        fi
+        mkdir -p "$(dirname "${d}/${to}")"
+        mv -f "$tmp" "${d}/${to}"
+        log "verified: sha256 matches what ${what} declares for ${to}"
+        i=$((i + 1))
+    done
+}
+
+# sdk_net_cut WHAT DIR: SDK_CUT becomes the words that run a command with no
+# network, for a pack whose downloads are declared: a network namespace of
+# its own, as the same account where this unshare can say so, else as that
+# namespace's root with tar told not to hand files to owners that do not
+# exist there. A node that can do neither (no unprivileged namespaces, a
+# container that forbids them) installs the pack all the same, its steps
+# with the network, and says so here and on its receipt (the operator, 13
+# Nov). DIR/.bb-net keeps which, for the receipt.
+SDK_CUT=()
+sdk_net_cut() {
+    local what="$1" d="$2"
+    SDK_CUT=()
+    if unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
+        SDK_CUT=(unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
+    elif unshare --user --map-root-user --net true 2>/dev/null; then
+        SDK_CUT=(env TAR_OPTIONS=--no-same-owner unshare --user --map-root-user --net)
+    fi
+    if [ "${#SDK_CUT[@]}" != 0 ]; then
+        log "${what} declares its downloads: its steps run with no network"
+        printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
+    else
+        log "${what} declares its downloads, but this node cannot cut the network for a step (unshare is refused): its steps run with it"
+        printf 'open\n' > "$d/.bb-net" 2>/dev/null || true
+    fi
 }
 
 # sdk_receipt WHAT DIR COMMIT: what a pinned install left behind, written
@@ -1475,8 +1551,8 @@ sdk_install_steps() {
         soft="$(sdk_meta field "$what" "source.then.${i}.optional")"
         [ -z "$note" ] || log "$note"
         sdk_meta_into env env "$what" "source.then.${i}.env" "dir=$d"
-        if ! env "${env[@]}" "${cmd[@]}"; then
-            [ -n "$soft" ] || die "${what}: a required step failed"
+        if ! env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}"; then
+            [ -n "$soft" ] || die "${what}: a required step failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its manifest, install.fetch)}"
             warn "$soft"
         fi
         i=$((i + 1))
@@ -1496,7 +1572,7 @@ sdk_install_verify() {
     # the pipe early can kill the producer with SIGPIPE, which pipefail then
     # reports as a failure that never happened.
     local out
-    out="$(env "${env[@]}" "${cmd[@]}" 2>&1)" \
+    out="$(env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" 2>&1)" \
         || die "${what} installed but ${cmd[0]} does not run: ${out}"
     printf '%s\n' "${out%%$'\n'*}"
 }

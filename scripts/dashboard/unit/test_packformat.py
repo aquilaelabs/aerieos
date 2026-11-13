@@ -109,7 +109,9 @@ class Framework(unittest.TestCase):
         for bad in (2.1, 2, "2", "2.x", "v2.1", "", "0.1", ["2.1"]):
             self.assertIsNone(packformat.framework_of({"framework": bad}), repr(bad))
         self.assertEqual(packformat.VERSION, f"{packformat.FORMAT}.{packformat.MINOR}")
-        self.assertIn((packformat.FORMAT, packformat.MINOR), packformat.ADDED, "each second number says what it added")
+        # The second number never resets: 2.2 is followed by 3.2 when the
+        # format moves, and what brought it says so under the number it had.
+        self.assertIn(packformat.MINOR, [y for _, y in packformat.ADDED], "each second number says what it added")
 
     def test_what_a_manifest_uses_is_in_the_version_it_says(self):
         m = json.loads((KEPT / "1" / "hexkit.json").read_text())

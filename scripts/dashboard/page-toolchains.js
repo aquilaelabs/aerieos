@@ -177,6 +177,11 @@ function tcReceiptLines(p){
   const short = h => esc(String(h || "").slice(0, 12));
   const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))} from manifest <code>${short(r.commit)}</code>: ${
     r.files === 1 ? "1 file" : `${r.files} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
+  // A pack that declares its downloads (pack format 3): each was held to the
+  // sha256 its manifest says, and its steps ran with no network, or with
+  // it on a node that cannot cut it.
+  if (r.net === "cut") lines.push(`<span class="sub tcreceipt">Its downloads are declared: each matched its sha256, and its install steps ran with no network.</span>`);
+  if (r.net === "open") lines.push(`<span class="sub tcreceipt">Its downloads are declared and each matched its sha256, but this node cannot cut the network for a step, so its install steps ran with it.</span>`);
   if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Remove it here and install it again to take what that one installs.</span>`);
   if (r.before) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files here the time before (receipt <code>${short(r.before)}</code>): something its install fetches has changed.</span>`);
   if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
@@ -232,6 +237,10 @@ function tpSeen(seen, was, offer = true){
       m.verify ? `, and checks it with ${w(m.verify)}` : ""}; on ${esc((m.platforms || []).join(", "))}.</div>
     ${verbs}
     ${Object.keys(m.system || {}).length ? `<div class="sub">System packages it installs first: ${Object.entries(m.system).map(([k, v]) => `${esc(k)} <code>${esc(v.join(" "))}</code>`).join("; ")}; a node of another package manager is not offered it.</div>` : ""}
+    ${(m.fetch || []).length ? `<div class="sub">It declares what it downloads, each held to its sha256 before its steps run with no network: ${
+      m.fetch.map(f => `<code>${esc(f.to)}</code> from <code>${esc(f.url)}</code> (<code>${esc(f.sha256.slice(0, 12))}</code>)`).join("; ")}.${
+      was && !same(m.fetch, was.fetch || []) ? ` <span class="pill warn">changed</span>` : ""}</div>`
+      : (m.steps || []).length ? `<div class="sub">It declares no downloads: what its install steps fetch is not checked, and its receipt on a node says what landed.</div>` : ""}
     ${(m.touches?.hosts || []).length ? `<div class="sub">Its install fetches from ${m.touches.hosts.map(h => `<code>${esc(h)}</code>`).join(", ")}.</div>` : ""}
     ${(m.works_with || []).length ? `<div class="sub">It works with AerieOS ${esc(m.works_with.join(", "))}.</div>` : ""}
     ${m.pack_agent ? `<div class="sub">It brings a coding agent, ${esc(m.pack_agent.name || m.name)} (<code>${esc(m.pack_agent.command || "")}</code>), handed the briefing and held by AerieOS's guards through its own hooks.${

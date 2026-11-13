@@ -706,8 +706,10 @@ def receipt(d, commit, name=""):
     from. A pack's pin covers its own files, and what its install steps
     fetch from somewhere else left no trail (the operator, 13 Nov): this is
     it. Written to DIR/.bb-receipt, whose first line is the summary the
-    node's census reads (format, commit, tree, files, bytes, when, and the
-    tree the same commit made here before where that was another), and
+    node's census reads (format, commit, tree, files, bytes, when, the
+    tree the same commit made here before where that was another, and
+    whether its steps ran with the network cut, for a pack that declares
+    its downloads: cut, open, or nothing for one that declares none), and
     added as a line to the store's own log (.bb-receipts beside DIR), which
     a remove and a reinstall leave alone. Returns the summary as words.
 
@@ -759,14 +761,23 @@ def receipt(d, commit, name=""):
                     before = r[3] if r[3] != tree else ""
     except OSError:
         pass
+    # Whether its steps ran with the network cut (sdk.sh sdk_net_cut).
+    net = ""
+    try:
+        with open(os.path.join(d, ".bb-net"), encoding="utf-8") as f:
+            net = f.readline().strip()
+    except OSError:
+        pass
+    net = net if net in ("cut", "open") else ""
     with open(os.path.join(d, ".bb-receipt"), "w", encoding="utf-8", errors="surrogateescape") as f:
-        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\n{body}")
+        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\t{net}\n{body}")
     try:
         with open(log, "a", encoding="utf-8") as f:
             f.write(f"{now}\t{name}\t{commit}\t{tree}\t{len(lines)}\t{total}\n")
     except OSError:
         pass
     said = f"receipt: {len(lines)} files, {total} bytes, from {commit[:12] or 'no commit'}, {tree[:12]} over them all"
+    said += {"cut": "; its steps ran with no network", "open": "; its steps ran with the network, which this node cannot cut"}.get(net, "")
     return said + (f"; the same commit made {before[:12]} here before" if before else "")
 
 

@@ -161,6 +161,13 @@ await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
              stale: text({ installed: true, receipt: rc({ stale: 'b'.repeat(40) }) }),
              before: text({ installed: true, receipt: rc({ before: '2'.repeat(64) }) }),
              differs: text({ installed: true, receipt: rc({ differs: [{ node: 'alder', tree: '3'.repeat(64) }, { node: 'birch', tree: '4'.repeat(64) }] }) }),
+             cut: text({ installed: true, receipt: rc({ net: 'cut' }) }), open: text({ installed: true, receipt: rc({ net: 'open' }) }),
+             seen: (() => {
+               // The Look dialog says what a pack declares it downloads, or that it declares none.
+               const m = more => ({ manifest: { name: 'hexkit', label: 'Hex kit', platforms: ['linux/amd64'], verbs: {}, steps: [['sh', '{dir}/install.sh']], ...more }, commit: 'c'.repeat(40) });
+               const read = seen => { host.innerHTML = tpSeen(seen, null, false); return [...host.querySelectorAll('.sub')].map(e => e.textContent).filter(t => /declares/.test(t)).join(' | '); };
+               return [read(m({ fetch: [{ url: 'https://example.com/hexkit.tgz', sha256: 'ab'.repeat(32), to: 'dl/hexkit.tgz' }] })), read(m({})), read(m({ steps: [] }))];
+             })(),
              none: [text({ installed: true, receipt: null }).length, text({ installed: false, receipt: rc() }).length] };
   });
   ok(said.plain.length === 1 && /^Installed .+ from manifest aaaaaaaaaaaa: 214 files, 48\.0 MB, receipt 111111111111\.$/.test(said.plain[0]) && / 1 file,/.test(said.one),
@@ -172,6 +179,14 @@ await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
   ok(said.differs.length === 2 && /^WARN The same manifest left other files on alder, birch \(receipt 333333333333, 444444444444\): something its install fetches is not pinned\.$/.test(said.differs[1]),
      `...and so is another node's copy of the same manifest being other files (${said.differs[1]})`);
   ok(said.none.join() === '0,0', '...and one installed before receipts were kept, or not installed, says nothing');
+  // Declared downloads (pack format 3): each held to its sha256, and the
+  // steps run with no network, or with it on a node that cannot cut it.
+  ok(said.cut.length === 2 && /^Its downloads are declared: each matched its sha256, and its install steps ran with no network\.$/.test(said.cut[1])
+     && said.open.length === 2 && /this node cannot cut the network for a step, so its install steps ran with it\.$/.test(said.open[1]) && !/^WARN/.test(said.open[1]),
+     `a pack that declares its downloads says its steps ran with no network, or that this node could not cut it (${said.cut[1]} | ${said.open[1]})`);
+  ok(/^It declares what it downloads, each held to its sha256 before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\)\.$/.test(said.seen[0])
+     && /^It declares no downloads: what its install steps fetch is not checked/.test(said.seen[1]) && said.seen[2] === '',
+     `...and Look says what it declares it downloads, or that it declares none, before it is added (${JSON.stringify(said.seen)})`);
 }
 
 await done(browser);

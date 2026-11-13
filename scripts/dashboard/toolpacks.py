@@ -130,6 +130,9 @@ TIERS = ("official", "vetted", "url")
 # Library as Configure on the card, the answers kept sealed on the
 # controller and handed to the node. A `list` field is rows of `fields`.
 CONFIG_KINDS = ("secret", "text", "choice", "list", "switch", "projects")
+# Declared downloads (install.fetch): how many a pack may name, and the
+# pack format that brought them.
+FETCH_MAX, FETCH_FORMAT = 32, 3
 CONFIG_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 # A deployed thing an official pack stands for (R172): the model router.
@@ -859,6 +862,33 @@ def validate(m, shipped=()):
             steps.append(w)
     out["steps"] = steps
     out["verify"] = _words(inst["verify"], "install verify", errors, ("{dir}",)) if inst.get("verify") else None
+    # Declared downloads (R234, pack format 3; the operator, 13 Nov: what an
+    # install takes from somewhere else had no paper trail): each file with
+    # the address it comes from, the sha256 of what that address answers,
+    # and where inside the pack it is kept. AerieOS fetches and checks each
+    # before the steps run, and the steps then run with no network, so what
+    # is not declared cannot arrive.
+    fetch, raw = [], inst.get("fetch")
+    if raw is not None:
+        if not isinstance(raw, list) or len(raw) > FETCH_MAX:
+            errors.append(f"install.fetch lists up to {FETCH_MAX} downloads, each {{url, sha256, to}}")
+            raw = []
+        kept_as = set()
+        for i, f in enumerate(raw):
+            url, sha, to = (str(f.get(k) or "") for k in ("url", "sha256", "to")) if isinstance(f, dict) else ("", "", "")
+            if not (re.fullmatch(r"https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}", url) and re.fullmatch(r"[0-9a-f]{64}", sha)
+                    and REL.fullmatch(to) and to != MANIFEST and to not in kept_as and set(f) <= {"url", "sha256", "to"}):
+                errors.append(f"install.fetch {i + 1} is {{url, sha256, to}}: an https address, the sha256 of what it answers (64 hex digits), "
+                              "and the file inside the pack it is kept as, each named once")
+                continue
+            kept_as.add(to)
+            fetch.append({"url": url, "sha256": sha, "to": to})
+        if fmt < FETCH_FORMAT:
+            errors.append(f'install.fetch (declared downloads) is pack format {FETCH_FORMAT}\'s: the manifest says "format": {FETCH_FORMAT}')
+        # The hosts it fetches from are its touches too, said or not.
+        hosts = out["touches"]["hosts"]
+        out["touches"]["hosts"] = hosts + sorted({f["url"].split("/")[2].split(":")[0].lower() for f in fetch} - set(hosts))
+    out["fetch"] = fetch
     lay = m.get("layout") or {}
     if not isinstance(lay, dict):
         errors.append("layout is an object: bin, env and tool")
@@ -1520,6 +1550,12 @@ def recipe(rec):
     # node (sdkmeta.packs_at makes the path whole there).
     url = f"bundle:toolpacks/{m['name']}.bundle" if rec.get("hosted") else rec["url"]
     src = {"kind": "git", "url": url, "commit": _bundle_commit(rec), "fresh_only": True}
+    # Its declared downloads (pack format 3), fetched and checked on the
+    # node before its steps, which then run with no network where the node
+    # can cut it (sdk.sh sdk_fetch_declared, sdk_net_cut).
+    if m.get("fetch"):
+        src["fetch"] = m["fetch"]
+        src["offline"] = True
     if m["steps"]:
         src["then"] = [{"run": s} for s in m["steps"]]
     if m.get("verify"):

@@ -310,8 +310,10 @@ The check runs on the pull request. A red check says why in its log.
   every file that landed ([An install's receipt](tool-packs.md#an-installs-receipt)).
   Installed on two nodes, or twice, a pack whose downloads are pinned
   leaves the same receipt; one that fetches the latest of something does
-  not, and its page says so. Pin what your install fetches to a version
-  and hold it to a checksum.
+  not, and its page says so. Declare what your install downloads
+  ([Declared downloads](tool-packs.md#declared-downloads)): each file's
+  address and sha256 in the manifest, so AerieOS fetches and checks it and
+  your steps run with no network.
 - **Sign and merge.** The index is signed with the maintainers' key and the
   pull request merged. From then on every install lists the entry at its
   next look at the catalog.
