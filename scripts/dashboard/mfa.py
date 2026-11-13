@@ -323,73 +323,37 @@ def cbor(data):
     return item(0)
 
 
-# P-256 (secp256r1)
-_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-_A = _P - 3
-_B = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
-_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
-_G = (0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
-      0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5)
-
-
-def _on_curve(pt):
-    x, y = pt
-    return 0 <= x < _P and 0 <= y < _P and (y * y - (x * x * x + _A * x + _B)) % _P == 0
-
-
-def _add(p1, p2):
-    if p1 is None:
-        return p2
-    if p2 is None:
-        return p1
-    (x1, y1), (x2, y2) = p1, p2
-    if x1 == x2 and (y1 + y2) % _P == 0:
-        return None
-    if p1 == p2:
-        m = (3 * x1 * x1 + _A) * pow(2 * y1, -1, _P) % _P
-    else:
-        m = (y2 - y1) * pow(x2 - x1, -1, _P) % _P
-    x3 = (m * m - x1 - x2) % _P
-    return x3, (m * (x1 - x3) - y1) % _P
-
-
-def _mul(k, pt):
-    out = None
-    while k:
-        if k & 1:
-            out = _add(out, pt)
-        pt = _add(pt, pt)
-        k >>= 1
-    return out
-
-
-def _der_sig(sig):
-    """(r, s) from an ASN.1 DER ECDSA signature."""
-    if len(sig) < 8 or sig[0] != 0x30:
-        raise ValueError("not a DER signature")
-    i, out = 2, []
-    for _ in range(2):
-        if sig[i] != 0x02:
-            raise ValueError("not a DER integer")
-        n = sig[i + 1]
-        out.append(int.from_bytes(sig[i + 2:i + 2 + n], "big"))
-        i += 2 + n
-    return out[0], out[1]
+def on_p256(x, y):
+    """Whether (x, y) is a point on P-256, by the cryptography library
+    (which refuses to build a key from one that is not); False where the
+    library is missing."""
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec              # noqa: PLC0415
+        ec.EllipticCurvePublicNumbers(int(x), int(y), ec.SECP256R1()).public_key()
+    except (ImportError, ValueError, TypeError):
+        return False
+    return True
 
 
 def ecdsa_p256_verify(x, y, msg, sig):
-    """Whether `sig` (DER) is an ES256 signature over `msg` by (x, y)."""
+    """Whether `sig` (ASN.1 DER) is an ES256 signature over `msg` by the
+    P-256 key (x, y): the cryptography library's check, which also holds
+    the point to the curve and reads the signature's encoding. The curve
+    arithmetic and the DER reader that stood here were written by hand
+    (R243). Where the library is not on the machine nothing verifies: a
+    passkey is then refused, never checked by other code."""
     try:
-        r, s = _der_sig(sig)
-    except (ValueError, IndexError):
+        from cryptography.exceptions import InvalidSignature                  # noqa: PLC0415
+        from cryptography.hazmat.primitives import hashes                     # noqa: PLC0415
+        from cryptography.hazmat.primitives.asymmetric import ec              # noqa: PLC0415
+    except ImportError:
         return False
-    q = (x, y)
-    if not (1 <= r < _N and 1 <= s < _N) or not _on_curve(q):
+    try:
+        key = ec.EllipticCurvePublicNumbers(int(x), int(y), ec.SECP256R1()).public_key()
+        key.verify(bytes(sig), bytes(msg), ec.ECDSA(hashes.SHA256()))
+    except (InvalidSignature, ValueError, TypeError):
         return False
-    e = int.from_bytes(hashlib.sha256(msg).digest(), "big")
-    w = pow(s, -1, _N)
-    pt = _add(_mul(e * w % _N, _G), _mul(r * w % _N, q))
-    return pt is not None and pt[0] % _N == r
+    return True
 
 
 def _client(client_json, kind, chal, origin):
@@ -432,7 +396,7 @@ def passkey_add(uid, origin, name, client_b64, att_b64, prf=False):
         if key.get(1) != 2 or key.get(3) != -7 or key.get(-1) != 1:
             return {"error": "AerieOS takes a P-256 passkey (ES256), and this authenticator offered another"}
         x, y = int.from_bytes(key[-2], "big"), int.from_bytes(key[-3], "big")
-        if not _on_curve((x, y)):
+        if not on_p256(x, y):
             return {"error": "that passkey's key is not a point on its curve"}
     except (ValueError, KeyError, IndexError, TypeError) as e:
         return {"error": f"the passkey could not be read: {e}"}

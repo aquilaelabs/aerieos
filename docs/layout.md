@@ -46,7 +46,7 @@ scripts/
   host-boot.sh                   a bare-metal install's boot under systemd: lib/boot.sh's steps, then setpriv to its account (R90)
   supervisor.sh                  keeps the box alive; the graceful shutdown
   mint-runner-token              root-only token helper (one of the two sudo commands)
-  deploy-key                     root-only deploy key helper: make, keep, forget, load (the other)
+  deploy-key                     root-only deploy key helper: make, keep, forget, load; each key sealed under the install key and opened only into the ssh agent (the other)
   secrets-carry                  root-only carrier of the secrets folder across a move on a machine of its own: pack, land (a third sudo command there, B728)
   healthcheck.sh                 docker healthcheck
   aerie                          in-container helper CLI
@@ -62,6 +62,7 @@ scripts/
   lib/bbapi.py                   the controller's API from aerie: one client, the loopback or BB_CONTROLLER, pinned https
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
   lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
+  lib/sealfile.py                what a root helper in shell keeps, sealed and opened under the install key by the controller's own seal (the deploy keys)
   lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker

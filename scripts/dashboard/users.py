@@ -1147,7 +1147,19 @@ def _named():
     return None if got is None else set(got)
 
 def _md4(data):
-    """MD4 (RFC 1320), since OpenSSL 3 no longer offers it to hashlib."""
+    """MD4 (RFC 1320): the system's own where it still offers it, else the
+    one written out here, since OpenSSL 3 keeps it from hashlib by default
+    and the cryptography library has none. It is what Samba's NT hash is,
+    kept for no other use."""
+    try:
+        return hashlib.new("md4", data, usedforsecurity=False).digest()
+    except (ValueError, TypeError):
+        pass
+    return _md4_here(data)
+
+
+def _md4_here(data):
+    """MD4 written out, for a machine whose OpenSSL does not offer it."""
     mask = 0xFFFFFFFF
     f = lambda x, y, z: (x & y) | (~x & z)  # noqa: E731
     g = lambda x, y, z: (x & y) | (x & z) | (y & z)  # noqa: E731

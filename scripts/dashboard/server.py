@@ -4813,7 +4813,7 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
 # secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                              accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
-                             poolkeys.seal_all, packconfig.seal_all),
+                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()

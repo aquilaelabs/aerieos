@@ -51,9 +51,22 @@ export BB_SHIELDED="${SECRET_VARS[*]}"
 # the controller's account reads, in /run (never the state, so a copy of the
 # state holds nothing that opens what is sealed there), written fresh each
 # start. On a bare-metal install it is among what the wall covers (R90).
+# Where the install key's file and the one before it are, kept for root in
+# its own run folder: the deploy-key helper seals the deploy keys under the
+# same key (R243), and is run through sudo, which hands it none of this
+# environment. Two lines, the key's path and the previous key's; no file
+# where the install seals nothing.
+install_key_where() {
+    mkdir -p "$BB_RUN_DIR" && chmod 700 "$BB_RUN_DIR" || return 0
+    rm -f "$BB_RUN_DIR/install-key.where"
+    [ -n "${1:-}" ] || return 0
+    ( umask 077; printf '%s\n%s\n' "$1" "${2:-}" > "$BB_RUN_DIR/install-key.where" ) || true
+}
+
 install_key_file() {
     local f=/run/builderbot-key key="${INSTALL_KEY:-}"
     rm -f "$f" /run/builderbot-signing
+    install_key_where ""
     if [ -z "$key" ] && [ -n "${SIGNING_SECRET:-}" ]; then
         key="$SIGNING_SECRET"
         warn "SIGNING_SECRET is INSTALL_KEY now: rename it in your secrets folder, since the old name is read for this release only"
@@ -78,6 +91,7 @@ install_key_file() {
         ( umask 077; printf '%s' "$prev" > "$f-previous" )
         chown "$BB_ACCOUNT" "$f-previous" 2>/dev/null || true
     fi
+    install_key_where "$f" "$f-previous"
     install_key_adopt "$key" "$prev"
 }
 
@@ -174,6 +188,7 @@ install_key_made() {
     fi
     export BB_INSTALL_KEY_DIR="$dir" BB_INSTALL_KEY_IN="$in"
     export BB_SIGNING_SECRET_FILE="$dir/key" BB_INSTALL_KEY_PREVIOUS_FILE="$dir/key-previous"
+    install_key_where "$dir/key" "$dir/key-previous"
 }
 
 # as_account CMD...: CMD as the controller's account, with its groups. gosu

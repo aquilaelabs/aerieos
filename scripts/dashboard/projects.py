@@ -657,6 +657,25 @@ def _key_helper(argv, text=None):
     return p.stdout.strip(), ""
 
 
+def deploy_keys_seal_all(again=False):
+    """The pass an install key's change runs over the deploy keys (R243),
+    as it does over every store sealed under it (installkey.configure):
+    the root helper seals again, under today's key, each one the key before
+    sealed. How many it moved; an error raised, so the key before is kept
+    and the pass runs again at the next start. Nothing to do at a start
+    with no change (the helper's own load at boot seals what was plain)."""
+    # Where the helper is not installed there is no deploy key to seal: an
+    # install with any has it, since it is what made them. One that is
+    # there and fails is said, never passed over: the key before would be
+    # let go with deploy keys still sealed under it.
+    if not again or not os.path.exists(KEY_HELPER):
+        return 0
+    out, err = _key_helper(["--reseal"])
+    if err:
+        raise OSError(f"the deploy keys were not sealed again: {err}")
+    return int(out) if out.isdigit() else 0
+
+
 def deploy_key(project, action, text=""):
     """Make, keep (pasted on `text`) or forget this project's deploy key.
     (payload, status). A key made or kept is wired as the project's ssh

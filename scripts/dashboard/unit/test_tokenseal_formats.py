@@ -86,6 +86,14 @@ class ControllerSeals(unittest.TestCase):
         with self.assertRaises(signing.Locked):
             signing.unseal(bytes(bad))
 
+    def test_with_no_vetted_cipher_nothing_is_sealed(self):
+        # It fell back to a cipher built here from HMAC, silently (R243).
+        from unittest import mock
+        with mock.patch.object(signing, "_have_aead", lambda: False):
+            with self.assertRaises(signing.NoCipher) as e:
+                signing.seal(b"secret")
+        self.assertIn("nothing can be sealed", str(e.exception))
+
     def test_the_format_is_told_by_its_magic(self):
         self.assertTrue(signing.old_format(signing.MAGIC1 + b"x" * 60))
         self.assertFalse(signing.old_format(signing.seal(b"y")))
