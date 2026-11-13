@@ -2099,6 +2099,15 @@ def _census(c):
     # The file explorer's port (R224): its presence says the agent serves it.
     if isinstance(c.get("files"), dict):
         out["files"] = {"port": _mb(c["files"].get("port")) or 0}
+    # How that port is spoken to (R243): the sha256 of the certificate the
+    # node made for itself, which is the only one the controller then takes
+    # there (relay_of), and whether it takes a signed request once. A report
+    # is kept key by key, so one not named here never reached relay_of: the
+    # first walk of this on the dev pair opened its terminal unencrypted.
+    if isinstance(c.get("relay"), dict):
+        tls = str(c["relay"].get("tls") or "")
+        out["relay"] = {"tls": tls if re.fullmatch(r"sha256:[0-9a-f]{64}", tls) else "",
+                        "once": c["relay"].get("once") is True}
     se = c.get("session")
     if isinstance(se, dict):
         out["session"] = {

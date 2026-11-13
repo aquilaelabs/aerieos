@@ -255,6 +255,26 @@ class Controller(unittest.TestCase):
             self.assertEqual(nodes.relay_of("n_before"), {"pin": "", "once": False}, "an agent from before: plain and unvalued, as it was")
             self.assertEqual(nodes.relay_of("n_gone"), {"pin": "", "once": False})
 
+    def test_a_nodes_report_of_its_relay_is_kept_by_the_controller(self):
+        # A report is kept key by key (nodes._census): the relay's was not
+        # named there, so the certificate never reached the controller and
+        # every terminal went over the plain way, which the walk on the dev
+        # pair showed where the test above, which hands relay_of a node,
+        # could not.
+        import nodes
+        pin = "sha256:" + "a" * 64
+        self.assertEqual(nodes._census({"relay": {"tls": pin, "once": True}}).get("relay"), {"tls": pin, "once": True})
+        self.assertEqual(nodes._census({"relay": {"tls": "", "once": True}}).get("relay"), {"tls": "", "once": True})
+        # What is not a certificate's sha256 is no pin; what is not True is not once.
+        self.assertEqual(nodes._census({"relay": {"tls": "sha256:zz", "once": "yes"}}).get("relay"), {"tls": "", "once": False})
+        self.assertEqual(nodes._census({"relay": {"tls": pin + "; rm -rf /"}}).get("relay"), {"tls": "", "once": False})
+        self.assertNotIn("relay", nodes._census({"relay": "tls"}))
+        self.assertNotIn("relay", nodes._census({}), "an agent from before says nothing, and is spoken to as before")
+        # ...and through to what the callers ask.
+        kept = {"reported": nodes._census({"relay": {"tls": pin, "once": True}})}
+        with mock.patch.object(nodes, "node", lambda nid: kept):
+            self.assertEqual(nodes.relay_of("n1"), {"pin": pin, "once": True})
+
     def test_the_controller_loads_the_agents_own_tls(self):
         was = termws.AGENT_DIR
         self.addCleanup(lambda: (setattr(termws, "AGENT_DIR", was), termws._term.pop("tls", None)))
