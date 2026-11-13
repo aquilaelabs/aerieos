@@ -188,7 +188,7 @@ for (const ver of vers){
     writeFileSync(`${w}/config/state.json`, JSON.stringify(newer));
     // But for the one-server lock, which is taken before the version is read
     // and is no part of the state: an empty file, and the folder's own time.
-    const listing = () => execFileSync('find', [`${w}/config`, '-mindepth', '1', '!', '-name', '.server.lock', '-printf', '%p %s %T@\n']).toString();
+    const listing = () => execFileSync('find', [`${w}/config`, '-mindepth', '1', '!', '-name', '.server.lock', '!', '-name', '.server.pid', '-printf', '%p %s %T@\n']).toString();
     const before = listing();
     const c = await start(w);
     ok(c.code === 78 && /Downgrades are not supported/.test(c.log()) && /99\.0\.0/.test(c.log()),

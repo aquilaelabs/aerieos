@@ -343,6 +343,10 @@ BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains
                 "scripts/dashboard/records.py")
 
 
+# The parts a bundle was built without, each said once (bundle()).
+_bundle_missing = set()
+
+
 def bundle():
     """bb, its library and the catalog as one tar: {body, digest}. Rebuilt
     when any of its files moves, so a node installing a toolchain runs the
@@ -367,6 +371,14 @@ def bundle():
             for part in BUNDLE_PARTS:
                 p = REPO / part
                 if not p.exists():
+                    # Said by name, once a build: a part this image does not
+                    # hold was left out without a word, and the node that
+                    # needed it found out by not having it (the audit of 13
+                    # Nov: bb-netcut, until the Dockerfile named it).
+                    if part not in _bundle_missing:
+                        _bundle_missing.add(part)
+                        print(f"dashboard: the bundle a node fetches is missing {part}: this install does not hold it",
+                              flush=True)
                     continue
                 for f in ([p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file())):
                     ti = tar.gettarinfo(str(f), arcname=str(f.relative_to(REPO)))

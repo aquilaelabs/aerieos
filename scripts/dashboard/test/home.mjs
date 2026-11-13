@@ -233,5 +233,35 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await sleep(1500);
 }
 
+// ---- the controller restarts under the page (R246) -------------------------
+// With nothing unsaved the page starts again at once, as it always did. With
+// work on it that is not saved it waits (the operator, 13 Nov): a band under
+// the header says the controller was updated and what would be lost, with
+// Reload, and the page stays as it was left. It reloaded at once before, and
+// a staged edit or a half-typed message went with it.
+{
+  await page.evaluate(() => { window.__sameLoad = true; chatDraft.suite = 'half a message'; bootSeen = 'the run before this one'; });
+  await page.evaluate(() => refresh());
+  await sleep(600);
+  const held = await page.evaluate(() => ({ same: window.__sameLoad === true, shown: !document.getElementById('newBuild').hidden,
+    said: document.getElementById('newBuildSay').textContent, draft: chatDraft.suite }));
+  ok(held.same && held.shown && /The controller was updated\. Reload to use it: a message being typed is not saved yet\./.test(held.said)
+     && held.draft === 'half a message',
+     `a restart under unsaved work is held: the band says so and the page is as it was left (${held.said})`);
+  const box = await page.evaluate(() => { const b = document.getElementById('newBuild').getBoundingClientRect(), g = document.getElementById('newBuildGo').getBoundingClientRect();
+    return { w: Math.round(b.width), over: document.documentElement.scrollWidth > innerWidth, go: Math.round(g.height) }; });
+  ok(box.w > 300 && !box.over && box.go === 32, `...across the page under the header, its Reload a control's height (${JSON.stringify(box)})`);
+  await Promise.all([page.waitForNavigation({ timeout: 15000 }), page.click('#newBuildGo')]);
+  await ready(page);
+  ok(await page.evaluate(() => window.__sameLoad !== true && document.getElementById('newBuild').hidden),
+     '...and Reload starts the page again, the band gone');
+  // Nothing unsaved: the page starts again by itself.
+  await page.evaluate(() => { window.__sameLoad = true; bootSeen = 'the run before this one'; });
+  const nav = page.waitForNavigation({ timeout: 15000 }).then(() => true, () => false);
+  await page.evaluate(() => { refresh(); });
+  ok(await nav, 'with nothing unsaved a restart reloads the page at once, as before');
+  await ready(page);
+}
+
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

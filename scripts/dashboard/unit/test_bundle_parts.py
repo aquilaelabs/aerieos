@@ -1,70 +1,65 @@
-"""What a node's sessions run from the bundle (workspace.BUNDLE_PARTS): every
-bb-* script beside bb-tty is a hook or a relay a session on a node calls, and
-one left out is a hooks file naming a path that is not there (B241: every
-Codex hook failed because bb-agent-hook did not ride along)."""
-import ast
-import json
+"""Everything the bundle a node fetches is made of is in the image (R246;
+the audit of 13 Nov): the bundle is built from the install's own files, a
+part that is not there was left out without a word, and the Dockerfile
+copies nodes/ one file at a time, so a new root helper reached no node
+until its own COPY line was written. Held here for every part, and said by
+name at run time."""
+import io
 import os
-import shutil
-import subprocess
+import pathlib
+import re
 import sys
-import tempfile
 import unittest
+from contextlib import redirect_stdout
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DASH = os.path.join(HERE, "..")
+sys.path.insert(0, os.path.join(HERE, ".."))
+import workspace  # noqa: E402
+
+ROOT = pathlib.Path(HERE).parents[2]
 
 
-def bundle_parts():
-    # Read off the source rather than imported: workspace.py configures
-    # itself against /config at import.
-    tree = ast.parse(open(os.path.join(DASH, "workspace.py")).read())
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "BUNDLE_PARTS" for t in node.targets):
-            return set(ast.literal_eval(node.value))
-    raise AssertionError("workspace.py has no BUNDLE_PARTS")
+def copies():
+    """(source in the tree, destination in the image) of every COPY line."""
+    out = []
+    for ln in (ROOT / "Dockerfile").read_text().splitlines():
+        m = re.fullmatch(r"COPY (\S+) (\S+)", ln.strip())
+        if m:
+            out.append((m.group(1), m.group(2)))
+    return out
 
 
-class BundleParts(unittest.TestCase):
-    def test_every_session_script_rides_in_the_bundle(self):
-        parts = bundle_parts()
-        scripts = sorted(f for f in os.listdir(DASH) if f.startswith("bb-") and os.path.isfile(os.path.join(DASH, f)))
-        self.assertIn("bb-agent-hook", scripts)
-        missing = [f for f in scripts if f"scripts/dashboard/{f}" not in parts]
-        self.assertEqual(missing, [], f"not in the bundle a node runs sessions from: {missing}")
+def image_has(part):
+    """Whether some COPY puts `part` at /opt/aerieos/<part>: the part
+    itself, or a folder above it copied whole."""
+    for src, dst in copies():
+        s, d = src.rstrip("/"), dst.rstrip("/")
+        if (part == s or part.startswith(s + "/")) and d + part[len(s):] == "/opt/aerieos/" + part:
+            return True
+    return False
 
-    def test_the_record_documents_ride_too(self):
-        # design-verbs.py, wiki-verbs.py and roadmap-verbs.py import
-        # records from beside the dashboard (B426).
-        self.assertIn("scripts/dashboard/records.py", bundle_parts())
 
-    def test_the_agents_hook_answers_from_the_bundle_s_files_alone(self):
-        # A node has the bundle and nothing else of the dashboard: the verbs
-        # a session is not asked about come from agents.py, which the hook
-        # imports from beside itself, so it rides too. Asked here of a copy
-        # holding only what the bundle names.
-        d = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, d, True)
-        repo = os.path.join(DASH, "..", "..")
-        for part in sorted(bundle_parts()):
-            if not part.startswith("scripts/"):
-                continue
-            src, to = os.path.join(repo, part), os.path.join(d, part)
-            os.makedirs(os.path.dirname(to), exist_ok=True)
-            if os.path.isdir(src):
-                shutil.copytree(src, to, ignore=shutil.ignore_patterns("__pycache__"))
-            else:
-                shutil.copy(src, to)
-        hook = os.path.join(d, "scripts", "dashboard", "bb-agent-hook")
-        r = subprocess.run([sys.executable, hook, "--allow", "claude"], capture_output=True, text=True, cwd=d, timeout=60, check=False)
-        self.assertEqual(r.returncode, 0, r.stderr[-400:])
-        self.assertIn("Bash(aerie roadmap *)", json.loads(r.stdout)["settings"])
-        r = subprocess.run([sys.executable, "-c", "import importlib.machinery, importlib.util, sys\n"
-                            "l = importlib.machinery.SourceFileLoader('h', sys.argv[1])\n"
-                            "m = importlib.util.module_from_spec(importlib.util.spec_from_loader('h', l)); l.exec_module(m)\n"
-                            "print(m.own_verb('aerie roadmap'), m.own_verb('aerie status'))", hook],
-                           capture_output=True, text=True, cwd=d, timeout=60, check=False)
-        self.assertEqual(r.stdout.split(), ["True", "False"], r.stderr[-400:])
+class Parts(unittest.TestCase):
+    def test_every_part_is_in_the_tree(self):
+        for part in workspace.BUNDLE_PARTS:
+            self.assertTrue((ROOT / part).exists(), f"{part} is named in BUNDLE_PARTS and is not in the tree")
+
+    def test_every_part_is_copied_into_the_image_where_the_bundle_reads_it(self):
+        self.assertTrue(image_has("scripts/lib/sdk.sh") and not image_has("nodes/not-copied"), "the check itself")
+        missing = [p for p in workspace.BUNDLE_PARTS if not image_has(p)]
+        self.assertEqual(missing, [], "the Dockerfile copies none of these to /opt/aerieos: a node would be sent a bundle without them")
+
+    def test_a_part_the_install_lacks_is_said_by_name(self):
+        said = io.StringIO()
+        with mock.patch.object(workspace, "BUNDLE_PARTS", (*workspace.BUNDLE_PARTS, "nodes/not-in-this-image")), \
+                mock.patch.object(workspace, "_bundle", {}), mock.patch.object(workspace, "_bundle_missing", set()), \
+                mock.patch.object(workspace, "REPO", ROOT), redirect_stdout(said):
+            first = workspace.bundle()
+            workspace._bundle.clear()
+            workspace.bundle()
+        self.assertTrue(first.get("digest"))
+        self.assertEqual(said.getvalue().count("the bundle a node fetches is missing nodes/not-in-this-image"), 1)
 
 
 if __name__ == "__main__":

@@ -176,7 +176,7 @@ function storageMachineDisks(n){
       return tblWrap(cols, disks.map(d => {
         const sm = d.smart || {};
         const health = [sm.health === "failing" ? `<span class="pill bad">failing</span>` : sm.health === "ok" ? `<span class="pill ok">ok</span>` : "",
-                        sm.temp_c !== undefined ? `${sm.temp_c} °C` : "", sm.hours !== undefined ? `${Math.round(sm.hours / 24)} d on` : ""].filter(Boolean).join(" · ") || "<span class=\"dim\">no SMART</span>";
+                        sm.temp_c !== undefined ? `${esc(String(sm.temp_c))} °C` : "", sm.hours !== undefined ? `${Math.round(Number(sm.hours) / 24) || 0} d on` : ""].filter(Boolean).join(" · ") || "<span class=\"dim\">no SMART</span>";
         const holds = d.parts?.length ? d.parts.map(p => `${esc(p.name)}: ${esc(p.holds)}`).join("<br>") : esc(d.holds || "nothing");
         return `<div class="row${sm.health === "failing" ? " bad" : ""}" data-disk="${esc(d.name)}">${tblLine(cols, [
           `<span class="name">${esc(d.name)}</span>${d.system ? ` <span class="tag ndown">system</span>` : ""}${d.removable ? ` <span class="pill">removable</span>` : ""}`,

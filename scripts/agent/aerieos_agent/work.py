@@ -398,11 +398,14 @@ class WorkMixin:
         if len(names) > TC_NAMES_MAX:
             job.say(f"refused: {len(names)} toolchains in one job; at most {TC_NAMES_MAX}\n")
             return "failed", 64
-        if action not in ("install", "remove", "sysdeps", "check") or (
+        # clean among them: the controller queued it and this line refused it
+        # before its branch below, so taking a retired node's directory off
+        # a store always failed (the audit of 13 Nov).
+        if action not in ("install", "remove", "sysdeps", "check", "clean") or (
                 not names and action not in ("sysdeps", "check")):
             job.say("refused: a toolchain job installs or removes named toolchains, "
-                    "installs the system packages the held ones need, or checks "
-                    "what is newer upstream\n")
+                    "installs the system packages the held ones need, checks "
+                    "what is newer upstream, or takes a retired node's directory off the store\n")
             return "failed", 64
         who = self.drop_privileges({})
         into = self.bundle(job, who)
@@ -515,7 +518,7 @@ class WorkMixin:
                 # the whole batch ends, so a session opened meanwhile has it
                 # on its PATH (the operator, 12 Oct: one opened an hour into
                 # a batch still had the old environment). Open sessions run on.
-                if action in ("install", "update"):
+                if action == "install":
                     self.session_renew()
         # The machine's own two, in the order each needs: the toolkit hands
         # the driver's libraries to a container, so it goes on after the

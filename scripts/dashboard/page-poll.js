@@ -125,7 +125,7 @@ async function refresh(){
     // operator met an old Global rules dialog under a new version's notes.
     // The reloaded page opens the changelog itself, and its tabs come from
     // the layout the server pruned of this container's dead sessions at boot.
-    if (state.boot && bootSeen && state.boot !== bootSeen){ location.reload(); return; }
+    if (state.boot && bootSeen && state.boot !== bootSeen){ restartSeen(); return; }
     welcomeOnce();
     fetched = true;
     dropGoneNotebooks();
@@ -343,6 +343,45 @@ function onRev(key, fn){
 // and every view's fetch doubled. Asked while one is out, it is remembered
 // and asked once more when that one lands.
 let revsBusy = false, revsAgain = false;
+// ---- the controller restarted under this page ------------------------------
+// The page starts again, since what it holds is from a server that is gone.
+// With work on it that is not saved it waits for a press instead (the
+// operator, 13 Nov): a band under the header says the controller was updated
+// and what would be lost, with Reload, and the page stays as it was left so
+// the work can be saved or copied first. Until this it reloaded at once, and
+// a staged roadmap edit, a wiki page being written or a half-typed message
+// went with it.
+let restartHeld = false;
+
+// What this page holds that is not saved, in words, or "".
+function unsavedHere(){
+  const said = [];
+  notebooks.forEach((nb, name) => {
+    let w = "";
+    try { w = nb.unsaved?.() || ""; } catch { w = ""; }
+    if (w) said.push(`${w} in ${name}`);
+  });
+  // A space's settings open in the dialog (a notebook's own view counts them itself).
+  try {
+    if (!rnHost && !$("rnmodal")?.hidden && rnDirty().length) said.push("a space's settings being edited");
+  } catch { /* no form filled yet */ }
+  // A message half typed: to a session's console, in the chat, in a report.
+  const typed = [...Object.values(consDraft), ...Object.values(chatDraft), $("reportText")?.value]
+    .some(v => String(v || "").trim());
+  if (typed) said.push("a message being typed");
+  return said.join(", ");
+}
+
+function restartSeen(){
+  const what = unsavedHere();
+  if (!what){ location.reload(); return; }
+  restartHeld = true;
+  const band = $("newBuild");
+  if (!band){ return; }
+  $("newBuildSay").textContent = `The controller was updated. Reload to use it: ${what} is not saved yet.`;
+  band.hidden = false;
+}
+
 async function pollRevs(){
   // A notebook view draws from its own fetch, straight into its own element,
   // so the only place to hold one is here, before the watch that starts it.
@@ -371,7 +410,7 @@ async function pollRevsOnce(){
   // The container was replaced under this page. Everything it holds is from
   // a server that no longer exists, so the cheapest correct answer is to
   // start again rather than reconcile.
-  if (revs.boot && now.boot && revs.boot !== now.boot){ location.reload(); return; }
+  if (revs.boot && now.boot && revs.boot !== now.boot){ restartSeen(); return; }
   const was = revs;
   revs = now;
   // The first poll of a page has nothing to compare against, so nothing is

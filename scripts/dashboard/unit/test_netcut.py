@@ -80,14 +80,6 @@ class Helper(unittest.TestCase):
         import workspace  # noqa: PLC0415
         self.assertIn("nodes/bb-netcut", workspace.BUNDLE_PARTS)
         self.assertIn("nodes/bb-netcut", agent.ROOT_TOOLS)
-        # The bundle is made from the image's own files, and one that is not
-        # there is left out without a word: the dev node's first walk of this
-        # had no helper for that reason.
-        with open(os.path.join(ROOT, "Dockerfile"), encoding="utf-8") as f:
-            image = f.read()
-        for part in workspace.BUNDLE_PARTS:
-            if part.startswith("nodes/"):
-                self.assertRegex(image, rf"(?m)^COPY {part}/? /opt/aerieos/{part}/?$", part)
 
 
 class Rule(unittest.TestCase):

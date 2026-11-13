@@ -1008,6 +1008,13 @@ html[data-motion="reduce"] .tourring{transition:none}
    the header, the light's reason in words (it was the light's tooltip). */
 .pollwhy{padding:4px 12px;color:var(--bad);font:12px/1.45 system-ui,sans-serif;
   border-bottom:var(--hair) solid var(--line);background:var(--bg)}
+/* The controller was updated under a page with unsaved work: a band under
+   the header in the restart band's tint, its words at the left and Reload
+   at the right. */
+.newbuild{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--ink);font:var(--f-ui);
+  background:color-mix(in srgb, var(--warn) 14%, var(--panel));border-bottom:var(--hair) solid color-mix(in srgb, var(--warn) 40%, var(--line))}
+.newbuild[hidden]{display:none}
+.newbuild>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .uadd{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
 .uadd .setrow{flex:1 1 12em}
 .setrow input:not([type=checkbox]):not([type=number]){flex:1 1 12em;min-width:0;width:auto}
@@ -7660,6 +7667,9 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
      writes it here, a band in the page's column under the header. -->
 <!--BANNER-->
 <div id="pollWhy" class="pollwhy" role="status" hidden></div>
+<!-- The controller restarted under a page that holds unsaved work
+     (page-poll.js restartSeen): said here, with the press that reloads. -->
+<div id="newBuild" class="newbuild" role="status" hidden><span class="grow" id="newBuildSay"></span><button type="button" id="newBuildGo">Reload</button></div>
 
 <main>
   <!-- The rail (R218 step 2): one column of groups down the left edge, each
@@ -8266,6 +8276,8 @@ $("rnReachAdd").onclick = () => {
   rnDrawReach(true);
 };
 $("cGo").onclick = cSubmit;
+// The controller restarted under unsaved work: the band's one press (page-poll.js).
+$("newBuildGo").onclick = () => location.reload();
 $("cCancel").onclick = () => { $("cmodal").hidden = true; };
 $("cmodal").onclick = e => { if (e.target === $("cmodal")) $("cmodal").hidden = true; };
 

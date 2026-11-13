@@ -82,6 +82,31 @@ await page.evaluate(() => {
 await page.waitForTimeout(600);
 ok(page.errors.length === 0, 'a pane replaced while covered raises nothing');
 
-ok(page.errors.length === 0, 'zero console errors');
-if (page.errors.length) console.log(page.errors);
+// ---- a screen's tab, as the page itself opens one -------------------------
+// The checks above call unveil themselves, so they could not see the page
+// failing to: its frame said onload="unveil(this)", which the page's own
+// Content-Security-Policy refuses, and nothing else lifted the veil. The
+// harness runs no VM, so the frame's page is this server's answer for a
+// screen that is not there; the frame still loads, which is all a veil waits for.
+const refused = [];
+page.on('console', m => { if (/Content Security Policy|Refused to execute inline/i.test(m.text())) refused.push(m.text()); });
+await page.evaluate(() => openTab({ kind: 'term', arg: 'screen:alpha:nobody', label: 'screen nobody' }));
+await page.waitForSelector('.pane .slot.on iframe', { timeout: 10000 });
+ok(await page.$eval('.pane .slot.on iframe', f => !f.hasAttribute('onload')),
+   'a screen\'s frame carries no inline handler, which the page\'s own policy would refuse');
+const gone = await page.waitForFunction(() => {
+  const s = document.querySelector('.pane .slot.on');
+  const v = s && s.querySelector('.veil');
+  return s && (!v || v.classList.contains('gone'));
+}, { timeout: 5000 }).then(() => true, () => false);
+ok(gone, 'the veil over a screen the page opened comes off by itself when its frame has loaded');
+ok(refused.length === 0, `...and the policy refused nothing (${refused[0] || 'nothing'})`);
+ok(!(await page.evaluate(() => [...document.querySelectorAll('script')].length
+     && /onload="unveil/.test(String(window.drawPanes)))), 'no template of the panes writes that handler');
+
+// The harness carries no noVNC, so the screen's own page is a 404 here: that
+// one line is the fixture's, and anything else is the page's.
+const errs = page.errors.filter(e => !/404 \(Not Found\) \[\/novnc\/vnc_lite\.html/.test(e));
+ok(errs.length === 0, 'zero console errors');
+if (errs.length) console.log(errs);
 await done(browser);

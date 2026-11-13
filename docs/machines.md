@@ -757,7 +757,9 @@ entrypoint and again in the dashboard:
 - **Two servers on one `/config`**: the server holds a lock on
   `/config/.server.lock` for its whole life, taken before the copy and the
   migrations. A second one started on the same folder waits half a minute
-  for the first to go, then stops with the reason.
+  for the first to go, then stops with the reason. It leaves its pid beside
+  the lock (`/config/.server.pid`), which is how the supervisor knows the
+  dashboard runs and which process to stop.
 - **An older state than this build migrates from**: the container stops,
   saying which release to start on it first.
 - **A newer state** (a rollback past an upgrade): the container stops, saying

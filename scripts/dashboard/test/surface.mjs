@@ -74,7 +74,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   // The Claude sign-in on a node's row (page-signin.js), and the press that goes to it.
   'signinRev', 'signinCannot', 'signinBusy', 'signinBlock', 'wireSignin', 'openNodeClaude', 'signinCancel', 'claudeSigninFirst', 'claudeNodes', 'claudeEnd', 'modalTop', 'keepOpen', 'keepLine', 'pollRevsOnce', 'oneOpen', 'sectGroup', 'soleOpen', 'sectJump', 'topModal', 'modalOpened', 'modalClosed', 'modalFocusables', 'dismissModal', 'modalKeys', 'scrollHint', 'scrollHints',
   'nodeGpuSection', 'nodeSound', 'nodeInternet', 'ndOffLine', 'ndNotHereHtml', 'tcTickDots',
-  'claudeNodeFacts', 'placeResumeMenu', 'pollRevs', 
+  'claudeNodeFacts', 'placeResumeMenu', 'pollRevs', 'restartSeen', 'unsavedHere', 
   'postTrash', 'phoneWhy', 'dmBootLine', 'dmLanLine', 'nodePick', 'openRunnerTab', 'renderPhoneInto', 'renderRunnerInto', 'phoneRowPress', 'openPhoneLend', 'openProjectSettings', 'settingsInto', 'settingsOut', 'pushLayout', 'readLocalPanes', 'keepLocalPanes', 'quietFields', 'reapDeadTerminals',
   'reattachTerminals', 'openFindingsTab', 'openJobsTab', 'openSchedulesTab', 'openDebugTab', 'debugGrant', 'renderDebugInto', 'wireDebug', 'loadSchedules', 'postSchedule', 'schedWhen', 'schedRow', 'schedForm', 'schedAs', 'openSchedForm', 'closeSchedForm', 'wireSchedForm', 'renderSchedulesInto', 'wireSchedules', 'openNodesTab', 'openSettingsTab', 'settingsKeep', 'settingsWake', 'loadReports', 'deleteReport', 'gitLanes', 'renderDiff',
   'openPhoneTab', 'phonePanel', 'wirePhoneTab',

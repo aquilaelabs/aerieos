@@ -167,7 +167,7 @@ function jobTook(j){
   const took = j.started && j.ended ? `${Math.max(1, j.ended - j.started)}s` : "";
   // Said once: a reason that already names the exit code keeps it.
   const code = j.exit_code !== null && j.exit_code !== undefined && j.exit_code !== 0
-    && !String(j.error || "").includes(`exit ${j.exit_code}`) ? `exit ${j.exit_code}` : "";
+    && !String(j.error || "").includes(`exit ${j.exit_code}`) ? `exit ${esc(String(j.exit_code))}` : "";
   return [took, code].filter(Boolean).join(" · ");
 }
 // The list's groups by how a job stands, for its chips (B74): what is not

@@ -268,13 +268,21 @@ function drawPanes(){
       : termOwn(t) ? termSlot(t)
       : t.kind === "term"
       // A VM's screen: noVNC's page in a frame.
-      ? `<div class="slot"><iframe title="${esc(tabLabel(t))}" src="${esc(tabUrl(t.arg))}" onload="unveil(this)"></iframe><i class="veil"></i></div>`
+      ? `<div class="slot"><iframe title="${esc(tabLabel(t))}" src="${esc(tabUrl(t.arg))}"></iframe><i class="veil"></i></div>`
       // Documents are not kept: they redraw from state in a millisecond, and
       // one per pane means one #docN, which is what renders into them.
       : `<div class="doc fx" id="doc${i}"></div>`);
     // The boot a new frame's URL carries, for openTab to tell one from before
     // its machine restarted.
     if (fresh && t.kind === "term") t.frameBoot = bootFor(t.arg);
+    // The veil over a screen's frame comes off when the frame has loaded.
+    // Wired here and not as an attribute on the frame: the page's
+    // Content-Security-Policy runs no inline handler, so the attribute was
+    // refused and nothing else lifted the veil (the audit of 13 Nov).
+    if (fresh && t.kind === "term" && !termOwn(t) && !t.popped){
+      const f = el.querySelector("iframe");
+      f?.addEventListener("load", () => unveil(f));
+    }
     if (termOwn(t)) termMount(el, t, key);
     // The id names "the document being shown in pane i", so it must name one
     // node. A hidden document left in the stack (the notebook parks there)

@@ -191,10 +191,55 @@ def kill_group(p):
         pass
 
 
+def end(p, grouped=True, grace=5, close=True):
+    """A process that ran out of time, ended: with everything it started
+    where it leads a group of its own, TERM and then KILL after `grace`
+    seconds, each wait bounded, and its pipes let go. A timeout that killed
+    the child alone and then waited on its output waited on whatever the
+    child had started for as long as that held the pipe (the audit of 13
+    Nov: curl under an install, past the timeout just reported)."""
+    def sig(s):
+        try:
+            if grouped:
+                os.killpg(p.pid, s)       # it leads its group: its pid names it, alive or not
+            else:
+                p.send_signal(s)
+        except (OSError, ProcessLookupError):
+            pass
+
+    def gone():
+        if p.poll() is None:
+            return False
+        if not grouped:
+            return True
+        try:
+            os.killpg(p.pid, 0)
+        except (OSError, ProcessLookupError):
+            return True
+        return False
+
+    for s in (signal.SIGTERM, signal.SIGKILL):
+        if gone():
+            break
+        sig(s)
+        until = time.time() + grace
+        while time.time() < until and not gone():
+            time.sleep(0.05)
+    # ...and its pipes let go, unless another thread is still reading them.
+    for f in (p.stdout, p.stderr) if close else ():
+        try:
+            if f:
+                f.close()
+        except OSError:
+            pass
+
+
 def stream(argv, run, timeout, env=None, cwd=None):
     """Run argv with its output going to the run's log as it is produced,
     in its own process group, killable. {"code", "out"}: the tail of the
-    output rides back for the runner's own reporting."""
+    output rides back for the runner's own reporting. The timeout is a
+    clock of its own: it was looked at only when a line arrived, so a child
+    that printed nothing was never ended (the audit of 13 Nov)."""
     try:
         p = subprocess.Popen(argv, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, text=True, bufsize=1,
@@ -204,24 +249,33 @@ def stream(argv, run, timeout, env=None, cwd=None):
         return {"code": 1, "out": str(e)}
     run.hold(p)
     tail = []
-    deadline = time.time() + timeout
+    expired = threading.Event()
+
+    def out_of_time():
+        expired.set()
+        end(p, close=False)           # TERM, then KILL: the loop below is still reading
+
+    clock = threading.Timer(timeout, out_of_time)
+    clock.daemon = True
+    clock.start()
     try:
         for ln in p.stdout:
             run.line(ln)
             tail.append(ln)
             del tail[:-60]
-            if time.time() > deadline:
-                kill_group(p)
-                run.line(f"\ntimed out after {timeout}s\n")
-                break
     except (OSError, ValueError):
         pass                          # the pipe went with the process
     finally:
+        clock.cancel()
         run.hold(None)
+    if expired.is_set():
+        run.line(f"\ntimed out after {timeout}s\n")
+        end(p, grace=1)
+        return {"code": 124, "out": "".join(tail)}
     try:
         code = p.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        kill_group(p)
+        end(p)
         code = 1
     return {"code": code, "out": "".join(tail)}
 

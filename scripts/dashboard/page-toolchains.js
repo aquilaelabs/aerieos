@@ -176,7 +176,7 @@ function tcReceiptLines(p){
   if (!r) return "";
   const short = h => esc(String(h || "").slice(0, 12));
   const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))} from manifest <code>${short(r.commit)}</code>: ${
-    r.files === 1 ? "1 file" : `${r.files} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
+    r.files === 1 ? "1 file" : `${esc(String(r.files))} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
   // A pack that declares its downloads (pack format 3): each was held to the
   // sha256 its manifest says, and its steps ran with no network, or with
   // it on a node that cannot cut it.

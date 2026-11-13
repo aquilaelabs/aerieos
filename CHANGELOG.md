@@ -18,6 +18,12 @@
 ### Fixed
 
 - A press on the rail, a page of a sub-nav or a notebook's view tab no longer grows a spinning ring while its page reads, which pushed everything beside it; the ring is kept for a button with room for it (2cad430)
+- Certificates the nginx page got from Let's Encrypt renew whatever the image-update checks are set to. Renewals were started under that switch, so turning image updates off stopped them without a word. A renewal round that fails is now said in the log. (HASH)
+- The page no longer throws away unsaved work when the controller restarts. With a staged edit, a page being written or a half-typed message on it, a band under the header says the controller was updated, with Reload, and the page waits; with nothing unsaved it reloads at once as before. A space's settings edited in its notebook now ask before another view is opened. (HASH)
+- A VM's screen in the dock is no longer left behind its dark cover: the cover was lifted by a handler the page's own security policy refused. (HASH)
+- Taking a retired node's folder off a shared toolchain store works; the node refused it every time. (HASH)
+- A job on the controller that prints nothing still ends at its time limit, and a job that runs out of time is ended together with what it started. (HASH)
+- `aerie lint` in a space's own project no longer applies AerieOS's own house rules to it (a word it keeps to one place, bug numbers in a changelog, names defined twice). (HASH)
 
 ## 0.9.0-dev.5341: 2026-11-12
 

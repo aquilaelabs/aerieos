@@ -14,6 +14,8 @@ set -euo pipefail
 
 # shellcheck source=lib/common.sh
 . /opt/aerieos/scripts/lib/common.sh
+# shellcheck source=lib/supervise.sh
+. /opt/aerieos/scripts/lib/supervise.sh
 
 # ---------------------------------------------------------------------------
 # Graceful shutdown
@@ -63,7 +65,7 @@ save_sessions() {
                 > "$SESSION_DIR/${name}.hist" 2>/dev/null || true
             [ "$first" -eq 1 ] || printf ','
             first=0
-            printf '\n  {"name": "%s", "cwd": "%s"}' "$name" "$dir"
+            printf '\n  {"name": "%s", "cwd": "%s"}' "$name" "$(json_str "$dir")"
         done < <(tmux list-panes -a -F '#{session_name} #{pane_current_path}' 2>/dev/null \
                  | sort -u -k1,1 || true)
         [ "$first" -eq 1 ] || printf '\n'
@@ -84,10 +86,12 @@ shutdown() {
 
     # --- instant work, before anything can time us out ---------------------
     save_sessions
-    pkill -TERM -f 'dashboard/server\.py' 2>/dev/null || true
+    local dash
+    dash="$(dashboard_pid || true)"
+    [ -z "$dash" ] || kill -TERM "$dash" 2>/dev/null || true
 
     # --- and give the dashboard its moment to finish that write ------------
-    while pgrep -f 'dashboard/server\.py' >/dev/null 2>&1; do
+    while dashboard_pid >/dev/null 2>&1; do
         waited=$(( $(date +%s) - t0 ))
         if [ "$waited" -ge "$grace" ]; then
             warn "shutdown: the dashboard is still going after ${grace}s; forcing the rest"
@@ -141,7 +145,7 @@ restarts=0; window_start=$(date +%s)
 while :; do
     sleep 5 &
     wait $! 2>/dev/null || true
-    if ! pgrep -f 'dashboard/server\.py' >/dev/null 2>&1; then
+    if ! dashboard_pid >/dev/null 2>&1; then
         now=$(date +%s)
         if [ $((now - window_start)) -ge 3600 ]; then restarts=0; window_start=$now; fi
         if [ "$restarts" -lt 5 ]; then

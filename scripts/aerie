@@ -4375,6 +4375,13 @@ cmd_findings() {
 #
 # Each check is skipped, visibly, when its tool is missing: an image from
 # before these tools shipped should say so rather than pass by omission.
+# Whether the tree lint is run in is AerieOS's own, by what only it holds:
+# this command and the reference written from its help. One place, for the
+# checks that are about this repository and no space's project.
+_lint_own_tree() {
+    [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md
+}
+
 cmd_lint() {
     local root="${1:-$PWD}" rc=0 skipped=0
     [ -d "$root" ] || die "no such directory: ${root}"
@@ -4610,7 +4617,7 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
             # GitHub points it at that day (R116): a note in any project, a
             # failure in this one, whose image build must not move under it.
             local strict=""
-            [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md && strict="--strict"
+            _lint_own_tree && strict="--strict"
             python3 "$BB_LIB/lint-checks.py" hosted $strict || rc=1
         fi
     else
@@ -4675,7 +4682,7 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
     # reference's command list are two copies of one thing, and the copy nobody
     # runs is the one that goes stale: `aerie toolchains migrate` outlived its code in
     # the README because nothing compared them.
-    if [ -f scripts/aerie ] && [ -f docs/reference.md ] && grep -q '^aerie status ' docs/reference.md; then
+    if _lint_own_tree; then
         # The agent's version is the one number in this tree a person moves
         # by hand, and a node compares the file while the row names the
         # number (B221): tools/agent-version.sh holds the two together, here
@@ -4738,17 +4745,21 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
     # The official packs under packs/ against the tables they are written
     # from (R169 step 1): tools/packs-export.py --write rewrites them.
     # The word Unraid only where its XML files are the subject (the operator, 28 Oct).
-    if grep -qF '"unraid": unraid' "$BB_LIB/lint-checks.py"; then
+    # AerieOS's own house rules, for AerieOS's own tree: these three ran on
+    # every space's project, so one that names Unraid in a tracked file, or
+    # whose changelog cites an issue as B12, failed a lint that was never
+    # about it (the audit of 13 Nov).
+    if _lint_own_tree && grep -qF '"unraid": unraid' "$BB_LIB/lint-checks.py"; then
         echo "== unraid: the word only where its XML files are the subject"
         python3 "$BB_LIB/lint-checks.py" unraid || rc=1
     fi
     # The changelog names commits, never a notebook number (the operator, 3 Nov).
-    if [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
+    if _lint_own_tree && [ -f CHANGELOG.md ] && grep -qF '"changelog": changelog' "$BB_LIB/lint-checks.py"; then
         echo "== changelog: commits named, never a bug's or an item's number"
         python3 "$BB_LIB/lint-checks.py" changelog || rc=1
     fi
     # A name defined twice, where the later silently wins (B733, B734).
-    if grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
+    if _lint_own_tree && grep -qF '"dupes": dupes' "$BB_LIB/lint-checks.py"; then
         section "names defined twice (python functions and methods, the page's scripts)"
         python3 "$BB_LIB/lint-checks.py" dupes || rc=1
     fi

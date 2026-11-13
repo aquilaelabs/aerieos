@@ -70,6 +70,7 @@ scripts/
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
+  lib/supervise.sh               what the supervisor asks of the dashboard: its pid by the file it leaves, and a JSON string for the saved sessions
   lib/embedded.py                pulls scripts and python out of quoted heredocs so `aerie lint` sees them
   lib/waits.py                   the wait for a person's Allow and the job-log stream, shared by the verbs below
   lib/devapp-verbs.py            `aerie devapp`: status, rebuild, test, new, env, remove, ls, log, start, stop, restart

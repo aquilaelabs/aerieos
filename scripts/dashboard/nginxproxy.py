@@ -944,9 +944,12 @@ def renew_loop(containers, devactions, devapp):
     again next round. Started by the server beside check_loop."""
     time.sleep(CHECK_DELAY)
     while True:
-        with contextlib.suppress(Exception):               # noqa: BLE001 (the loop outlives one bad answer)
+        try:
             for nid, host, meta in acme_due():
                 acme_request(nid, host, meta.get("method"), meta.get("email"), containers, devactions, devapp)
+        except Exception as e:                             # noqa: BLE001 (the loop outlives one bad answer, and says it)
+            print(f"dashboard: the nginx page's certificates were not all renewed this round, and are tried again: "
+                  f"{type(e).__name__}: {e}", flush=True)
         time.sleep(RENEW_EVERY)
 
 

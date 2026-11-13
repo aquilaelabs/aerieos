@@ -452,6 +452,10 @@ function makeNotebook(project){
 
   // What is unsaved here, in the words the buttons use. Both halves, because
   // both Saves write both and a Revert that left one behind would be a trap.
+  function settingsEdited(){
+    if (!rnHost || !root.contains(rnHost)) return false;
+    try { return rnDirty().length > 0; } catch { return false; }
+  }
   function nbUnsaved(){
     const n = nb.roadmapPending.length;
     const v = nb.verStagedCount();
@@ -460,6 +464,11 @@ function makeNotebook(project){
             nb.ruleStagedCount() ? "an edited rule" : "",
             nb.designStagedCount() ? "an unsaved design" : "",
             wikiDirty() ? "a wiki page being edited" : "",
+            // The space's settings, while their form is in this notebook's
+            // Settings view: another view picked, the form went back to the
+            // dialog and was filled again from what is saved, without a word
+            // (the audit of 13 Nov). The dialog's own door asks the same.
+            settingsEdited() ? "settings being edited" : "",
             nb.signStagedCount() ? "a staged signing key change" : "",
             v ? `${v} staged version bump${v === 1 ? "" : "s"}` : ""]
       .filter(Boolean).join(" and ");

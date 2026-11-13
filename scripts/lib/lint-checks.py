@@ -20,7 +20,23 @@ import xml.parsers.expat  # nosemgrep: python.lang.security.use-defused-xml.use-
 
 import dash
 
-verb, args = sys.argv[1], sys.argv[2:]
+verb, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+
+
+def newest_release(tags):
+    """The newest of these vX.Y.Z and vX.Y.Z-NAME.N tags: by its numbers, a
+    release above every pre-release that leads to it. git's own version
+    sort puts v0.9.0-dev.5341 above v0.9.0, so once 0.9.0 was tagged the
+    checks that compare against the newest release would have kept reading
+    a dev tag (the audit of 13 Nov). "" when none of them is a version."""
+    def key(t):
+        m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)(?:-([a-z][a-z0-9]*)\.(\d+))?", t)
+        if not m:
+            return None
+        x, y, z, name, n = m.groups()
+        return (int(x), int(y), int(z), 0 if name else 1, int(n or 0))
+    known = [(key(t), t) for t in tags if key(t) is not None]
+    return max(known)[1] if known else ""
 
 
 def runner():
@@ -283,7 +299,8 @@ def formats():
     def git(*a):
         return subprocess.run(["git", *a], capture_output=True, check=False)
     where = "scripts/dashboard/unit/packformat"
-    tags = git("tag", "-l", "v[0-9]*", "--sort=-v:refname").stdout.decode().split()
+    tag = newest_release(git("tag", "-l", "v[0-9]*").stdout.decode().split())
+    tags = [tag] if tag else []
     names = list(filter(None, git("ls-tree", "-r", "--name-only", tags[0], "--", where).stdout.decode().split("\n"))) if tags else []
     if not names:
         print("  [ok]   no release has carried a kept manifest yet")
@@ -314,11 +331,11 @@ def shipped():
 
     def git(*a):
         return subprocess.run(["git", *a], capture_output=True, check=False)
-    tags = git("tag", "-l", "v[0-9]*", "--sort=-v:refname").stdout.decode().split()
-    if not tags:
+    tag = newest_release(git("tag", "-l", "v[0-9]*").stdout.decode().split())
+    if not tag:
         print("  [ok]   no release tag yet, so no migration has shipped")
         sys.exit(0)
-    tag, bad = tags[0], []
+    bad = []
     names = git("ls-tree", "-r", "--name-only", tag, "--", *SHIPPED).stdout.decode().split("\n")
     for path in filter(None, names):
         then = git("show", f"{tag}:{path}").stdout
@@ -468,5 +485,12 @@ def dupes():
     sys.exit(1 if bad else 0)
 
 
-{"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
- "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid, "changelog": changelog, "dupes": dupes}[verb]()
+CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
+          "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
+          "changelog": changelog, "dupes": dupes}
+
+if __name__ == "__main__":
+    # What a check returns is its verdict: layout answered 1 for a tracked
+    # file its page does not name and this line dropped it, so the check
+    # printed FAIL and lint was clean (the audit of 13 Nov).
+    sys.exit(CHECKS[verb]() or 0)

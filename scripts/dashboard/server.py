@@ -102,6 +102,13 @@ def _one_server(state, wait=30):
 # Only the server itself: a tool or a test that imports this file reads the
 # state beside a running server by design.
 _SERVER_LOCK = _one_server(STATE) if __name__ == "__main__" else None
+# ...and says who it is, beside the lock: the supervisor asks whether the
+# dashboard runs and which process to stop by this pid (scripts/lib/
+# supervise.sh), where it looked for this file's name on any command line.
+if __name__ == "__main__":
+    with contextlib.suppress(OSError):
+        (STATE / ".server.pid.new").write_text(f"{os.getpid()}\n")
+        os.replace(STATE / ".server.pid.new", STATE / ".server.pid")
 # Before anything below writes to it: a /config newer than this build, or
 # older than it migrates from, is refused here in one sentence, a fresh one
 # is stamped, and one about to migrate is copied first (stateversion.py).
@@ -672,8 +679,11 @@ def run(cmd, cwd=None, timeout=120, env=None, split_err=False, register=None):
     try:
         out, err = p.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        p.kill()
-        p.communicate()
+        # Ended with what it started where it leads its own group, and never
+        # waited on past this: a grandchild holding the pipe kept the wait
+        # that followed the kill going long after the timeout it reported.
+        import jobs as _jobs                                 # noqa: PLC0415 (loaded far below; this runs after)
+        _jobs.end(p, grouped=register is not None)
         return {"cmd": shlex.join(cmd), "code": 124,
                 "out": f"timed out after {timeout}s", "err": ""}
     finally:
@@ -14427,12 +14437,15 @@ def main():
         def _tls_loop():
             while True:
                 time.sleep(6 * 3600)
-                with contextlib.suppress(Exception):     # noqa: BLE001
+                try:
                     if tls.renew_due():
                         if tls.mode_of(settings.get) == "self":
                             tls.apply(settings.get, names=_tls_names())
                         elif tls.mode_of(settings.get) == "acme":
                             _tls_issue()
+                except Exception as e:                   # noqa: BLE001 (the loop outlives one bad round, and says it)
+                    print(f"dashboard: its own certificate was not renewed this round, and is tried again in six hours: "
+                          f"{type(e).__name__}: {e}", flush=True)
         threading.Thread(target=_tls_loop, name="tls-renew", daemon=True).start()
     if toolchains.AUTOCHECK:
         threading.Thread(target=toolchains.versions_loop, daemon=True).start()
@@ -14444,9 +14457,12 @@ def main():
     if nginxproxy.AUTOCHECK and "image-updates" not in featuresoff.off():  # the nginx image, weekly (R192)
         threading.Thread(target=nginxproxy.check_loop, name="nginx-check", daemon=True).start()
         threading.Thread(target=scanners.check_loop, name="scanners-check", daemon=True).start()
-        # ...and the ACME renewals (R150), thirty days before a pair ends.
-        threading.Thread(target=nginxproxy.renew_loop, args=(containers, devactions, devapp),
-                         name="nginx-acme", daemon=True).start()
+    # The ACME renewals of the nginx page's certificates (R150), thirty days
+    # before a pair ends, whatever the image checks are set to: started under
+    # their switch, turning image updates off stopped every renewal without a
+    # word and the certificates ran out some ninety days later.
+    threading.Thread(target=nginxproxy.renew_loop, args=(containers, devactions, devapp),
+                     name="nginx-acme", daemon=True).start()
     # A bare-metal install's start held or not (R56 step 9), read now, and
     # the clean-shutdown marker written when the service stops it cleanly.
     if BARE_METAL:
