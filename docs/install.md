@@ -229,7 +229,11 @@ state. On start, a controller moves older state forward, one numbered step
 at a time, after copying `/config` to `/config/backups/before-VERSION` (the
 last three are kept). It refuses to start on state older than it can move
 forward, and it refuses state from
-a newer release rather than reading what it does not understand.
+a newer release rather than reading what it does not understand. A step
+that fails is undone: `/config` is put back from that copy, the container
+stops saying which step failed and why, and the release you came from starts
+on `/config` as it left it ([machines.md](machines.md#upgrades-and-config)
+has the whole of it).
 
 **Nodes and apps follow.** After the controller, update each node's agent
 from its page when the dashboard asks; a node on an agent from before a

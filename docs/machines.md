@@ -742,8 +742,18 @@ entrypoint and again in the dashboard:
   wikis. The install key, where an install with no secrets folder keeps it
   under `/config`, is left out too: it opens every sealed secret the copy
   holds, an update never changes it, and a copy put back leaves it where it
-  is. A migration that fails is said in the log and runs again at the
-  next start; the controller starts either way.
+  is.
+- **A migration that fails**: the update did not land, and the controller
+  does not start on state half changed. `/config` is put back from the copy
+  taken just before, every migration that had run with it; what the failed
+  start left is moved to `/config/backups/rolled-back-TIME`, never deleted;
+  and `/config/update-did-not-land.txt` says which build, which migration
+  and why. The container stops with that sentence, and the same build
+  started again stops again without trying. Start the release that
+  `/config` ran before, which finds it as it left it. To try this build
+  again once the cause is mended (a full disk, a file it could not read),
+  remove the note and start it. A later build is not held by the note, and
+  one that migrates clean removes it.
 - **A state file that cannot be read**: every write of a state file is
   synced to the disk before its name points at it, so a power cut does not
   leave one cut short. One that is there and is not JSON all the same is

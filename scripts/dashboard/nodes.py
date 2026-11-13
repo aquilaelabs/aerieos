@@ -5871,18 +5871,27 @@ def job_add(principal, placement, type, spec, project="", source=None):
     elif pick(probe, node_list()) is None:
         want = ", ".join(f"{k}={v}" for k, v in pl["select"].items())
         return {"error": f"no node fits {want}"}
-    jid = mint("j")
     probe = bool(isinstance(spec, dict) and spec.get("probe"))
-    if probe:
-        _probe_ids.add(jid)
-    _exec("INSERT INTO jobs (id, type, project, requested_by, placement, "
-          "source, spec, outputs, state, node, exit_code, queued, started, "
-          "ended, step, error, cancel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "
-          "'queued', ?, NULL, ?, NULL, NULL, '', '', 0)",
-          (jid, type, str(project or "")[:120], str(principal),
-           json.dumps(pl), json.dumps(source if isinstance(source, dict) else {}),
-           json.dumps(spec if isinstance(spec, dict) else {}),
-           json.dumps([]), pl.get("node") or "", int(time.time())))
+
+    def put(jid):
+        # A probe's id is known as one before its row can be read.
+        if probe:
+            _probe_ids.add(jid)
+        try:
+            _exec("INSERT INTO jobs (id, type, project, requested_by, placement, "
+                  "source, spec, outputs, state, node, exit_code, queued, started, "
+                  "ended, step, error, cancel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "
+                  "'queued', ?, NULL, ?, NULL, NULL, '', '', 0)",
+                  (jid, type, str(project or "")[:120], str(principal),
+                   json.dumps(pl), json.dumps(source if isinstance(source, dict) else {}),
+                   json.dumps(spec if isinstance(spec, dict) else {}),
+                   json.dumps([]), pl.get("node") or "", int(time.time())))
+        except sqlite3.Error:
+            _probe_ids.discard(jid)
+            raise
+    # Under an id no job has (db.minted): one that met another's was an
+    # error to whoever asked, and the job never ran.
+    jid = db.minted("j", put)
     if not probe:
         audit(principal, "job-add", jid, {"placement": pl, "type": type})
         _jstate_bump()

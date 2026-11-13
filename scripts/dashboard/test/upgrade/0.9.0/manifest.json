@@ -98,10 +98,41 @@
    "tests-first"
   ]
  },
- "state": 19,
+ "state": 22,
  "toolpacks": [
   "wordy"
  ],
+ "values": {
+  "nodes": [
+   {
+    "arch": "x86_64",
+    "cpu": 4,
+    "kind": "agent",
+    "mem_mb": 8192,
+    "name": "box",
+    "user": "bb"
+   }
+  ],
+  "prefs": {
+   "alpha": {
+    "build": "make",
+    "color": "teal"
+   },
+   "beta": {
+    "gate": {
+     "roadmap": "ask"
+    }
+   },
+   "gamma": {
+    "capture_days": 3,
+    "snapshot_days": 30
+   }
+  },
+  "settings": {
+   "apps_companion": false,
+   "apps_vscode": false
+  }
+ },
  "version": "0.9.0",
  "wiki": {
   "alpha": [

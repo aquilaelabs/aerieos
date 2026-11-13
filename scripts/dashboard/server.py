@@ -1512,7 +1512,7 @@ def _project_columns(who, facts):
                     # `yours`, because `mine` on this row is already taken by
                     # may_work: whether the project is this account's to change.
                     "yours": mine_prefs.get(d.name, {"model": "", "effort": "", "reply": "", "asks": "",
-                                                     "git_name": "", "git_email": "", "term_scheme": ""}),
+                                                     "git_name": "", "git_email": ""}),
                     # Any model through a router (R144): the models the
                     # router allows this project, with their context and
                     # price, and what the project has spent through it.
@@ -5500,7 +5500,6 @@ wssync.configure_reads(prefs.reads_trees)
 # synced copy is undone from, kept for the days its settings say.
 import snapshots                                                 # noqa: E402
 snapshots.configure(workspace=WORKSPACE, days=lambda p: prefs.get(p)["snapshot_days"],
-                    on=lambda p: prefs.get(p)["snapshots_on"],
                     names=lambda: [p for p in prefs.all_projects() if (WORKSPACE / p).is_dir()],
                     audit_fn=lambda *row: None if NODES_OK else db.audit(*row))
 files.on_change = wssync.changed
@@ -11809,8 +11808,7 @@ class Handler(BaseHTTPRequestHandler):
         name = q.get("project", [""])[0]
         if self._refused("settings", name) or self._not_project(name):
             return None
-        return self._json({"project": name, "keep": prefs.get(name)["snapshot_days"],
-                           "on": prefs.get(name)["snapshots_on"], "days": snapshots.days(name)})
+        return self._json({"project": name, "keep": prefs.get(name)["snapshot_days"], "days": snapshots.days(name)})
 
     def _snapshots(self, req):
         """POST /api/snapshots: take one now, or restore the whole tree as of a

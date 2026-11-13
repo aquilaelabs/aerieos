@@ -220,6 +220,23 @@ def mint(prefix):
     return f"{prefix}_{secrets.token_hex(4)}"
 
 
+def minted(prefix, insert, tries=6):
+    """A row put in under a new id: insert(id) runs the INSERT, and is run
+    again with another id when the table holds that one already. The id it
+    went in under. An id is 32 bits, so in a table of some hundred thousand
+    rows about one insert in twenty thousand meets one that is there, and
+    that row was lost with a line in the log: an audit row, a job."""
+    for left in range(tries - 1, -1, -1):
+        rid = mint(prefix)
+        try:
+            insert(rid)
+            return rid
+        except sqlite3.IntegrityError as e:
+            if not left or "UNIQUE" not in str(e).upper():
+                raise
+    return None
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -264,10 +281,11 @@ def audit(principal, action, target, params):
     digest = (f"mac:{hmac.new(_audit_mac_key(), blob.encode(), hashlib.sha256).hexdigest()[:12]}"
               f"·{len(blob)}b" if blob else "")
     try:
-        _exec("INSERT INTO audit (id, at, principal, action, target, params) "
-              "VALUES (?, ?, ?, ?, ?, ?)",
-              (mint("a"), int(time.time()), str(principal), str(action)[:200],
-               str(target)[:200], digest))
+        minted("a", lambda rid: _exec(
+            "INSERT INTO audit (id, at, principal, action, target, params) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (rid, int(time.time()), str(principal), str(action)[:200],
+             str(target)[:200], digest)))
     except sqlite3.Error as e:
         # Bookkeeping must never break the mutation it records: a full disk
         # mid-flight costs the row and says so, not the operator's action.

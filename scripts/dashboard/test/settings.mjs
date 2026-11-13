@@ -703,19 +703,23 @@ ok(elsewhere.git_name === 'T. Person',
     const hint = await page.$eval('#rnSnapHint', h => h.textContent);
     await page.click(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin]`);
     await page.waitForSelector(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
-    ok(marked && listed.days.find(d => d.day === day)?.pinned === true && listed.on === true && /1 pinned/.test(hint),
+    ok(marked && listed.days.find(d => d.day === day)?.pinned === true && /1 pinned/.test(hint),
        `Pin keeps a day and its row says pinned, Unpin lets it go again (${day} ${hint})`);
   }
-  // Daily snapshots switched off from Build and test, staged and saved like
-  // the days kept, and back on (R105).
+  // The daily snapshot switch is gone (0 days kept takes none), and the API
+  // does not take the key back: nothing is stored for it and nothing reads it.
   {
     await rnSect(page, 'rn:build');
     await openFold(page, 'details.sect[data-sect="rn:build"]');
-    const on = await page.$eval('#rnSnapOn', c => c.checked);
-    const r = await post('/api/prefs', { project: 'alpha', snapshots_on: false });
-    const off = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json()))).on;
-    await post('/api/prefs', { project: 'alpha', snapshots_on: true });
-    ok(on && r.status === 200 && off === false, `daily snapshots are on by default and can be switched off (${on} ${r.status} ${off})`);
+    const drawn = await page.$('#rnSnapOn');
+    const r = await post('/api/prefs', { project: 'alpha', snapshots_on: false, term_scheme: 'red' });
+    const got = await page.evaluate(async () => {
+      const snaps = await (await fetch('/api/snapshots?project=alpha')).json();
+      const row = ((await (await fetch('/api/status')).json()).projects || []).find(p => p.name === 'alpha') || {};
+      return { on: 'on' in snaps, pref: 'snapshots_on' in (row.prefs || {}), yours: 'term_scheme' in (row.yours || {}) };
+    });
+    ok(!drawn && r.status < 500 && !got.on && !got.pref && !got.yours,
+       `the daily snapshot switch and a space's terminal colors are not drawn, stored or served (${!!drawn} ${r.status} ${JSON.stringify(got)})`);
   }
   // From outside the page, which carries no sign-in: nothing is listed.
   const anon = (await fetch(URL.replace(/\/$/, '') + '/api/snapshots?project=alpha')).status;

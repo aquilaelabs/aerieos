@@ -97,15 +97,20 @@ class Gpu(unittest.TestCase):
         self.assertEqual(prefs.for_user("u_0000aaaa", "alpha")["codex_model"], "gpt-5.5")
         self.assertEqual(prefs.for_user("u_0000bbbb", "alpha")["codex_model"], "")
 
-    def test_daily_snapshots_on_by_default_and_stored_only_when_off(self):
-        # R105: a project with nothing said takes one a day, as before.
-        self.assertTrue(prefs.get("alpha")["snapshots_on"])
-        self.assertNotIn("error", prefs.set_prefs("alpha", snapshots_on="off") or {})
-        self.assertFalse(prefs.get("alpha")["snapshots_on"])
-        prefs.set_prefs("alpha", snapshots_on=True)
-        self.assertTrue(prefs.get("alpha")["snapshots_on"])
+    def test_a_setting_that_was_removed_is_not_taken_back(self):
+        # The daily snapshot switch and a space's own terminal colors went
+        # with state 22: 0 days kept is no snapshot, Profile's colors are
+        # every space's. Neither is read, stored or served again.
+        self.assertNotIn("snapshots_on", prefs.get("alpha"))
+        with self.assertRaises(TypeError):
+            prefs.set_prefs("alpha", snapshots_on="off")
+        self.assertNotIn("term_scheme", prefs.set_for_user("u_0000aaaa", "alpha", {"term_scheme": "red", "reply": "minimal"}))
+        self.assertNotIn("term_scheme", prefs.for_user("u_0000aaaa", "alpha"))
+        self.assertNotIn("error", prefs.set_prefs("alpha", snapshot_days=9) or {})
         with open(prefs.FILE) as f:
-            self.assertNotIn("snapshots_on", f.read(), "the default is never written")
+            kept = f.read()
+        self.assertNotIn("snapshots_on", kept)
+        self.assertNotIn("term_scheme", kept)
 
 
 class NodeChanged(unittest.TestCase):

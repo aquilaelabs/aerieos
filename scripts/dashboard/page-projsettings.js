@@ -37,7 +37,7 @@ const EFFORTS = [["", "Claude's default"], ["low", "low"], ["medium", "medium"],
 // a menu.
 let rnPrefWas = {git_name: "", git_email: "",
                  node: "", nodes: "", hosts: "", hosts_off: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
-                 capture_days: "7", snapshot_days: "14", snapshots_on: "1", dev_keep: "3", gate: ""};
+                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: ""};
 // The colors a project can be, by the names prefs.py stores (COLORS there)
 // and the tone each is drawn in. Named at the store and mapped here so the
 // tone can be retuned for a scheme without touching what anybody saved.
@@ -138,13 +138,12 @@ function rnPrefsOf(p){
                outputs: (p?.prefs?.outputs || []).join(", "),
                capture_days: String(p?.prefs?.capture_days ?? 7),
                snapshot_days: String(p?.prefs?.snapshot_days ?? 14),
-               snapshots_on: p?.prefs?.snapshots_on === false ? "0" : "1",
                dev_keep: String(p?.prefs?.dev_keep ?? 3),
                gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
                tests_in: p?.prefs?.tests_in || "node", test_node: rnDialVal(p, "test_node", ""),
                test_change: rnDialVal(p, "test_change", "wait"),
                gpu: p?.prefs?.gpu || "on",
-               reply: p?.yours?.reply || "", asks: p?.yours?.asks || "", term_scheme: p?.yours?.term_scheme || "",
+               reply: p?.yours?.reply || "", asks: p?.yours?.asks || "",
                devbuild: rnDialVal(p, "devbuild", "deny"),
                makevms: rnDialVal(p, "makevms", "deny"),
                installpacks: rnDialVal(p, "installpacks", "ask"),
@@ -475,15 +474,6 @@ function rnFillReads(){
   $("rnReadsWhy").hidden = mine;
 }
 
-// How this person's terminals here look with the colors picked, their
-// Profile's look and their own changes to that scheme with it.
-function rnTermPreview(){
-  const box = $("rnTermPreview");
-  if (!box) return;
-  const look = state?.term_look || {}, scheme = $("rnTermScheme").value || look.scheme || "default";
-  box.innerHTML = termPreview(termPalette(scheme, (look.colors || {})[scheme]), look);
-}
-
 // On the space's own door, under a dial, each repository that sets it apart
 // and what it holds (R223, the operator, 7 Nov: the space's settings are the
 // whole picture); nothing elsewhere.
@@ -573,13 +563,9 @@ function rnFillPrefsRest(p){
   $("rnGpu").value = p?.prefs?.gpu || "on";
   $("rnReply").value = p?.yours?.reply || "";
   $("rnAsks").value = p?.yours?.asks || "";
-  $("rnTermScheme").value = p?.yours?.term_scheme || "";
-  rnTermPreview();
-  $("rnTermScheme").onchange = rnTermPreview;
   $("rnOutputs").value = (p?.prefs?.outputs || []).join(", ");
   $("rnCaptureDays").value = String(p?.prefs?.capture_days ?? 7);
   $("rnSnapDays").value = String(p?.prefs?.snapshot_days ?? 14);
-  $("rnSnapOn").checked = p?.prefs?.snapshots_on !== false;
   $("rnDevKeep").value = String(p?.prefs?.dev_keep ?? 3);
   // Every dial here is a select filled once with its words and set to the
   // project's value: one helper for all of them (consistency pass), where
@@ -653,7 +639,7 @@ function rnDrawPrefs(){
   // starts on the ones picked in the agent's menu each time (the operator,
   // 12 Oct).
   const shut = !!p?.locked_me;
-  $("rnReply").disabled = $("rnAsks").disabled = $("rnTermScheme").disabled = shut;
+  $("rnReply").disabled = $("rnAsks").disabled = shut;
   $("rnPrefHint").textContent = shut
     ? lockedWhy(p) + "."
     : "Applied the next time Claude starts here. The model and effort are picked each time a session starts, in the Claude button's menu.";
@@ -1238,11 +1224,10 @@ function rnDrawSnapshots(){
     : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`)
     + `<div class="actbar"><button type="button" data-snaptake>Take one now</button></div>`;
   const pinned = days.filter(d => d.pinned).length;
-  $("rnSnapHint").textContent = (rnSnap.on === false
-    ? "Daily snapshots are off, so none are taken; the ones here go as they pass the days kept."
-    : rnSnap.keep
+  $("rnSnapHint").textContent = (rnSnap.keep
     ? `One a day, kept ${rnSnap.keep} day${rnSnap.keep === 1 ? "" : "s"}. A restore snapshots the tree first, so it can be undone from the line it leaves.`
-    : "Snapshots kept is 0, so none are taken; the ones here go at the next daily look.")
+    : days.length ? "Snapshots kept is 0, so none are taken; the ones here stay until some days are kept again and they pass them."
+    : "Snapshots kept is 0, so none are taken.")
     + (pinned ? ` ${pinned} pinned, kept until unpinned.` : "");
   const act = async (b, body, ask) => {
     if (ask && !await askYes(ask)) return;
@@ -1571,17 +1556,17 @@ const RN_WAS = {
   reads: ["sees", "Reads"], sees: ["sees", "Also sees"], reaches: ["sees", "Also reaches"],
   tc_off: ["tools", "Toolchains"], packs_on: ["tools", "Tool packs"],
   build: ["build", "Build"], test: ["build", "Test"], outputs: ["build", "Outputs"],
-  capture_days: ["build", "Captures kept"], snapshot_days: ["build", "Snapshots kept"], snapshots_on: ["build", "Daily snapshots"], dev_keep: ["build", "Dev builds kept"],
+  capture_days: ["build", "Captures kept"], snapshot_days: ["build", "Snapshots kept"], dev_keep: ["build", "Dev builds kept"],
   gate: ["claude", "Agents may"], test_change: ["claude", "During a test run, a change asked for"], agents_off: ["claude", "Coding agents"], agent_default: ["claude", "Start opens"], agent_slots: ["claude", "Sessions of one agent"],
   devbuild: ["claude", "Agents may"], makevms: ["claude", "Agents may"], vm_caps: ["claude", "Its VMs may hold"], report: ["claude", "Agents may"], sign: ["claude", "Agents may"],
   keys: ["claude", "Agents may"], release: ["claude", "Agents may"], pc: ["claude", "Agents may"], version: ["claude", "Move the version"],
-  reply: ["yours", "Replies"], asks: ["yours", "Questions"], term_scheme: ["yours", "Terminal colors"],
+  reply: ["yours", "Replies"], asks: ["yours", "Questions"],
   git_name: ["yours", "Commit name and email"], git_email: ["yours", "Commit name and email"],
 };
 // What a running session takes only when it starts (the briefing, the launch
 // flags, the view it runs in); everything else is read when it is used.
 const RN_AT_START = new Set(["reply", "asks", "git_name", "git_email", "node", "nodes",
-                             "reads", "sees", "test_change", "gpu", "capture_days", "snapshot_days", "snapshots_on", "dev_keep",
+                             "reads", "sees", "test_change", "gpu", "capture_days", "snapshot_days", "dev_keep",
                              "tc_off", "packs_on"]);
 
 // The fields as they stand, in rnPrefWas's own shape, so each compares with
@@ -1617,11 +1602,9 @@ function rnEnc(){
           build: $("rnBuildCmd").value.trim(), test: $("rnTestCmd").value.trim(),
           outputs: $("rnOutputs").value.trim(),
           capture_days: $("rnCaptureDays").value.trim(), snapshot_days: $("rnSnapDays").value.trim(),
-          snapshots_on: $("rnSnapOn").checked ? "1" : "0",
           dev_keep: $("rnDevKeep").value.trim(), gate: gateKey(rnGateNow()),
           tests_in: $("rnDevTest").value || "node", test_node: $("rnTestNode")?.value || "", test_change: $("rnTestChange").value || "wait",
           gpu: $("rnGpu").value || "on", reply: $("rnReply").value || "", asks: $("rnAsks").value || "",
-          term_scheme: $("rnTermScheme").value || "",
           devbuild: $("rnGateDocker").value || "deny", makevms: $("rnGateVms").value || "deny", vm_caps: rnVmCapsNow(),
           installpacks: $("rnGatePacks").value || "ask", report: $("rnGateReport").value || "auto",
           sign: $("rnGateSign").value || "ask", release: $("rnGateRelease").value || "ask",
@@ -1734,7 +1717,6 @@ function rnRevertSect(sect){
   } else if (sect === "build"){
     $("rnBuildCmd").value = w.build; $("rnTestCmd").value = w.test; $("rnOutputs").value = w.outputs;
     $("rnCaptureDays").value = w.capture_days; $("rnSnapDays").value = w.snapshot_days;
-    $("rnSnapOn").checked = w.snapshots_on !== "0";
     $("rnDevKeep").value = w.dev_keep;
   } else if (sect === "claude"){
     const g = String(w.gate).split(",");
@@ -1747,7 +1729,7 @@ function rnRevertSect(sect){
     $("rnGateRelease").value = w.release; $("rnGateKeys").value = w.keys;
     $("rnGatePc").value = w.pc; $("rnGateVersion").value = w.version;
   } else if (sect === "yours"){
-    $("rnReply").value = w.reply; $("rnAsks").value = w.asks; $("rnTermScheme").value = w.term_scheme;
+    $("rnReply").value = w.reply; $("rnAsks").value = w.asks;
     $("rnGitName").value = w.git_name; $("rnGitEmail").value = w.git_email;
     rnDrawPrefs();
   }
@@ -1854,12 +1836,11 @@ async function rnSubmit(sect, end = false){
                               node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
                               tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default, agent_slots: v.agent_slots,
                               build: v.build, test: v.test, gate: v.gate,
-                              tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks, term_scheme: v.term_scheme,
+                              tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks,
                               devbuild: v.devbuild, makevms: v.makevms, vm_caps: JSON.parse(v.vm_caps || "{}"), report: v.report, sign: v.sign, keys: v.keys, release: v.release, pc: v.pc,
                               outputs: v.outputs.split(",").map(x => x.trim()).filter(Boolean),
                               ...(v.capture_days !== "" ? {capture_days: +v.capture_days} : {}),
                               ...(v.snapshot_days !== "" ? {snapshot_days: +v.snapshot_days} : {}),
-                              snapshots_on: v.snapshots_on !== "0",
                               ...(v.dev_keep !== "" ? {dev_keep: +v.dev_keep} : {})})})});
       const j = await r.json();
       if (j.error) return stop(j.error);

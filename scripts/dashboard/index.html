@@ -4009,7 +4009,6 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .termprev .tpcur{display:inline-block;width:.6em}
 .termprev .tpcur.bar{width:0;border-left:2px solid}
 .termprev .tpcur.under{border-bottom:2px solid}
-#rnTermPreview .termprev{margin-top:4px}
 .pcard .pnote{font:var(--f-ui)}
 /* A row of another repository's list (R136, reposAlso): which repository,
    its number, its words. */
@@ -6749,25 +6748,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
           <option value="fewer">fewer: routine calls made, not asked</option>
           <option value="rarely">rarely: only when going on would be unsafe or useless</option>
         </select></label>
-        <!-- Your terminals' colors here, over your Profile's (R133 step 10):
-             a project told apart at a glance, a production one red. Drawn
-             while AerieOS's own terminal is on. -->
-        <label class="pick" id="rnTermSchemeRow" hidden>Terminal colors <select id="rnTermScheme"
-          aria-label="the colors of your terminals in this space">
-          <option value="">your Profile's</option>
-          <option value="amber">amber</option>
-          <option value="blue">blue</option>
-          <option value="dashboard">the dashboard's scheme</option>
-          <option value="default">default</option>
-          <option value="green">green</option>
-          <option value="light">light</option>
-          <option value="red">red</option>
-        </select></label>
       </div>
-      <!-- ...and how it looks, before a terminal opens (the operator, 25 Oct):
-           a line of its own under the row. -->
-      <div class="field" id="rnTermPreviewField" hidden><label class="lbl" for="rnTermPreview">How your terminals here look</label>
-        <div id="rnTermPreview" aria-live="polite"></div></div>
       <div class="hint" id="rnPrefHint"></div>
       <div class="prefrow ctlrow rncode" role="group" aria-labelledby="rnMineLabel">
         <label class="pick">Commit name <input id="rnGitName" type="text"
@@ -6935,11 +6916,8 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
         <input id="rnCaptureDays" type="number" min="0" max="365" step="1" inputmode="numeric" aria-label="days a capture is kept"> <span class="dim">days</span></div>
       <!-- The project's daily snapshots (R165): what a node gone wrong, or
            compromised, through its synced copy is undone from. -->
-      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none and keeps none. Restored from Snapshots below" tabindex="0">?</span></label>
+      <div class="logdays setrow ctlrow"><label class="ndcap" for="rnSnapDays">Snapshots kept for<span class="help" data-help="the space's tree is snapshotted once a day on the controller, where no node reaches, and each day is kept this long; 0 takes none, and the ones already kept stay. Restored from Snapshots below" tabindex="0">?</span></label>
         <input id="rnSnapDays" type="number" min="0" max="3650" step="1" inputmode="numeric" aria-label="days a snapshot is kept"> <span class="dim">days</span></div>
-      <!-- ...and whether one is taken each day (R105): on unless switched
-           off; off takes none, and what is kept ages out by the days. -->
-      <div class="logdays setrow ctlrow" hidden><label class="ndcap"><input type="checkbox" id="rnSnapOn"> Take a snapshot every day<span class="help" data-help="off, no new snapshot is taken; those kept still go once older than the days kept. A pinned day always stays" tabindex="0">?</span></label></div>
       <div class="logdays setrow ctlrow"><label class="ndcap" for="rnDevKeep">Dev builds kept<span class="help" data-help="of each product in dist/, every file of its newest this many builds stays and older builds are removed, a signed build keeping its signed copy alone; a release and anything pinned always stay; 0 keeps everything" tabindex="0">?</span></label>
         <input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric" aria-label="dev builds kept of each product"> <span class="dim">builds</span></div>
     </div>

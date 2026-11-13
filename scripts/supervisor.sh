@@ -146,6 +146,15 @@ while :; do
     sleep 5 &
     wait $! 2>/dev/null || true
     if ! dashboard_pid >/dev/null 2>&1; then
+        # A dashboard that ended because this build may not start on /config
+        # (an update whose migration failed and was put back, a state it
+        # does not read) is not started again: the container stops with the
+        # sentence, as it would have at boot, and what starts next is the
+        # person's choice of image.
+        if ! why="$(python3 /opt/aerieos/scripts/dashboard/stateversion.py check "${DASHBOARD_STATE:-/config}" 2>&1)"; then
+            printf '%s\n' "$why" >&2
+            die "${DASHBOARD_STATE:-/config} is not one this build may start on; the container stops"
+        fi
         now=$(date +%s)
         if [ $((now - window_start)) -ge 3600 ]; then restarts=0; window_start=$now; fi
         if [ "$restarts" -lt 5 ]; then

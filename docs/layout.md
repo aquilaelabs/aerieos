@@ -178,7 +178,7 @@ scripts/
     schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words, its timer and the built-in scan
     tunnel.py                    the home tunnel the controller runs itself (R176): cloudflared as its child from the settings, and the hostname's record and rules through Cloudflare's API
     statefile.py                 writing a state file, and holding it while you read-modify-write one
-    stateversion.py              /config's state version: the start's refusal of a newer or too old one, the copy before a migration, the JSON stores' migrations run
+    stateversion.py              /config's state version: the start's refusal of a newer or too old one, the copy before a migration, the JSON stores' migrations run, and /config put back with the start stopped when one fails
     statemigrations/             numbered migrations for the JSON stores (NNNN_name.py, run(ctx)), each run once as the state moves, never edited once shipped
     toolchains.py                everything behind the toolchains in the Library and the Installed page: catalog, sizes, the job worker
     toolpacks.py                 the tool packs a person adds (docs/tool-packs.md): a repository's bbtool.json, pinned to a commit, as catalog rows
@@ -434,7 +434,8 @@ test/nettest/probe.sh            the probe itself: DNS, the internet, the contro
 test/nettest/.env.example        the two addresses it needs: the controller's and the node's
 tools/american-spelling.sh       the house rule spelling's check: no British spelling on a line this branch adds
 tools/no-net-growth.sh           the everything-files against their ceilings in tools/ratchet.txt (R77)
-tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite; a release runs it
+tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite, one taken at an older state kept beside it as VERSION-stateN; a release runs it
+tools/upgrade-image.sh           the built image started on each release snapshot of /config through its own entrypoint: it answers, the stamp is the image's state, a copy was taken, the owner signs in (the image workflow's upgrade job)
 tools/vscode-vsix.py             packages apps/vscode/ as a .vsix with python's zipfile, AerieOS's version inside (R159)
 tools/companion-build.py         builds the Windows companion as one .pyz with the four agent modules its sync is (R270)
 tools/app-schemes.py             writes the Android app's twelve color schemes, both halves, from the design record (aerie design json | tools/app-schemes.py)
@@ -488,7 +489,7 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
-  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs; a tag's build and its release, made a draft
+  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); a tag's build and its release, made a draft
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       the linters, on a pull request, on this runner

@@ -214,17 +214,96 @@ class Migrate(unittest.TestCase):
         self.assertEqual(ctx["ran"], [1, 2, 3])
         self.assertEqual(sv.read(self.state), (3, "0.6.0"))
 
-    def test_a_failure_stops_at_the_last_that_ran_and_the_next_start_resumes(self):
+    def listing(self):
+        """Everything in the state but what a copy leaves where it is."""
+        return {str(p.relative_to(self.state)): p.read_bytes() for p in sorted(self.state.rglob("*"))
+                if p.is_file() and not sv._skipped(p.relative_to(self.state).parts[0])}
+
+    def test_a_failure_puts_the_state_back_and_stops_the_start(self):
+        # The operator, 13 Nov: it went on, the new build running on state
+        # half changed, with one line in the log.
+        (self.state / "state.json").write_text('{"state": 1, "by": "0.5.0"}')
+        (self.state / "roadmap.json").write_text('{"items": [1, 2, 3]}')
+        before = self.listing()
+        ctx = {"ran": [], "fail": True}
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), mock.patch.object(sv.sys, "stderr", err):
+            sv.gate(self.state, "0.6.0")
+            # What a migration that landed and one that failed half-way both left.
+            (self.state / "roadmap.json").write_text('{"items": "half changed"}')
+            with self.assertRaises(SystemExit) as e:
+                sv.migrate(self.state, ctx)
+        self.assertEqual(e.exception.code, 78)
+        self.assertEqual(ctx["ran"], [2, 3], "2 landed, 3 failed")
+        self.assertEqual(self.listing(), before, "the stamp and every file as before the update")
+        self.assertEqual(sv.read(self.state), (1, "0.5.0"))
+        note = (self.state / sv.FAILED_FILE).read_text()
+        self.assertTrue(note.startswith("build 0.6.0\n"))
+        self.assertIn("its migration 0003_m.py failed (ValueError: no)", note)
+        self.assertIn("the 1 migration(s) before it were undone with it", note)
+        self.assertIn("AerieOS 0.6.0 will not start", err.getvalue())
+        self.assertIn("Start the release this /config ran before", err.getvalue())
+        # What the failed start left is kept aside, never deleted.
+        aside = [d for d in (self.state / "backups").iterdir() if d.name.startswith("rolled-back-")]
+        self.assertEqual(len(aside), 1)
+        self.assertEqual((aside[0] / "roadmap.json").read_text(), '{"items": "half changed"}')
+
+        # The same build again: said again, nothing copied, nothing run.
+        folders = sorted(p.name for p in (self.state / "backups").iterdir())
+        err = io.StringIO()
+        with mock.patch.object(sv.sys, "stderr", err), self.assertRaises(SystemExit) as e:
+            sv.gate(self.state, "0.6.0")
+        self.assertEqual(e.exception.code, 78)
+        self.assertIn("It is not tried again by itself", err.getvalue())
+        self.assertEqual(sorted(p.name for p in (self.state / "backups").iterdir()), folders)
+        self.assertEqual(ctx["ran"], [2, 3])
+        # ...and the boot's own question, and the supervisor's before it
+        # starts the dashboard again, are answered the same: the container
+        # stops with the sentence where it kept starting a server that ended.
+        self.assertIn("It is not tried again by itself", sv.wont_start(self.state, "0.6.0"))
+        self.assertEqual(sv.wont_start(self.state, "0.6.1"), "")
+        with mock.patch.object(sv, "build_version", lambda: "0.6.0"), mock.patch.object(sv.sys, "stderr", io.StringIO()):
+            self.assertEqual(sv.main(["check", str(self.state)]), 78)
+        with mock.patch.object(sv, "build_version", lambda: "0.6.1"):
+            self.assertEqual(sv.main(["check", str(self.state)]), 0)
+        with open(os.path.join(os.path.dirname(os.path.abspath(sv.__file__)), "..", "supervisor.sh"), encoding="utf-8") as f:
+            sup = f.read()
+        self.assertLess(sup.index("stateversion.py check"), sup.index("starting it again"),
+                        "the supervisor asks before it starts the dashboard again")
+
+        # Another build is not held by it, and one that migrates clean takes the note away.
+        ctx = {"ran": []}
+        with redirect_stdout(io.StringIO()):
+            sv.gate(self.state, "0.6.1")
+            self.assertEqual(sv.migrate(self.state, ctx), [2, 3])
+        self.assertFalse((self.state / sv.FAILED_FILE).exists())
+        self.assertEqual(sv.read(self.state)[0], 3)
+
+    def test_the_cause_fixed_and_the_note_removed_it_is_tried_again(self):
+        (self.state / "state.json").write_text('{"state": 2, "by": "0.5.0"}')
+        ctx = {"ran": [], "fail": True}
+        with redirect_stdout(io.StringIO()), mock.patch.object(sv.sys, "stderr", io.StringIO()):
+            sv.gate(self.state, "0.6.0")
+            with self.assertRaises(SystemExit):
+                sv.migrate(self.state, ctx)
+        (self.state / sv.FAILED_FILE).unlink()
+        ctx = {"ran": []}
+        with redirect_stdout(io.StringIO()):
+            sv.gate(self.state, "0.6.0")
+            self.assertEqual(sv.migrate(self.state, ctx), [3])
+
+    def test_with_no_copy_to_put_back_it_goes_on_and_says_so(self):
+        # Never the case after gate(), which takes the copy or holds every
+        # migration: kept for a caller that runs them without it.
         (self.state / "state.json").write_text('{"state": 1}')
         ctx = {"ran": [], "fail": True}
-        out = io.StringIO()
-        with redirect_stdout(out):
-            self.assertEqual(sv.migrate(self.state, ctx), [2])
-        self.assertIn("0003_m.py failed", out.getvalue())
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), mock.patch.object(sv.sys, "stderr", err), \
+                mock.patch.dict(sv._COPY, {"version": ""}):
+            self.assertEqual(sv.migrate(self.state, ctx, "0.6.0"), [2])
+        self.assertIn("could not be put back as it was", err.getvalue())
         self.assertEqual(sv.read(self.state)[0], 2)
-        ctx["fail"] = False
-        with redirect_stdout(io.StringIO()):
-            self.assertEqual(sv.migrate(self.state, ctx), [3])
+        self.assertIn("0003_m.py failed", (self.state / sv.HELD_FILE).read_text())
 
     def test_no_copy_no_migration(self):
         with mock.patch.object(sv, "backup", side_effect=OSError("disk full")), \
@@ -277,6 +356,55 @@ class Release(unittest.TestCase):
             self.assertEqual(version.no_upgrade_snapshot("p", "", "0.5.0"), "")
             self.assertIn("0.5.1", version.no_upgrade_snapshot("p", "", "0.5.1"))
             self.assertEqual(version.no_upgrade_snapshot("p", "android", "0.5.1"), "", "a component is its own")
+
+    def test_and_one_taken_at_the_releases_own_state(self):
+        import version
+        tree = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tree, True)
+        (tree / "scripts" / "dashboard" / "statemigrations").mkdir(parents=True)
+        for n in (19, 20, 21):
+            (tree / "scripts" / "dashboard" / "statemigrations" / f"{n:04d}_m.py").write_text("def run(ctx): pass\n")
+        snap = tree / version.UPGRADE_SNAPSHOTS / "0.9.0"
+        snap.mkdir(parents=True)
+        with mock.patch.object(version, "root", lambda _p: tree):
+            (snap / "manifest.json").write_text('{"state": 19, "version": "0.9.0"}')
+            said = version.no_upgrade_snapshot("p", "", "0.9.0")
+            self.assertIn("was taken at state 19 and this tree is at 21", said)
+            self.assertIn("tools/upgrade-snapshot.py again", said)
+            (snap / "manifest.json").write_text('{"state": 21, "version": "0.9.0"}')
+            self.assertEqual(version.no_upgrade_snapshot("p", "", "0.9.0"), "")
+            # A manifest from before it carried its state is taken as it was.
+            (snap / "manifest.json").write_text("{}")
+            self.assertEqual(version.no_upgrade_snapshot("p", "", "0.9.0"), "")
+
+    def test_a_snapshot_taken_again_keeps_the_older_one_beside_it(self):
+        import importlib.util
+        import stateversion
+        spec = importlib.util.spec_from_file_location(
+            "upgrade_snapshot", Path(__file__).resolve().parents[3] / "tools" / "upgrade-snapshot.py")
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        top = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, top, True)
+        out = top / "0.9.0"
+        now = stateversion.current()
+        no, yes = (lambda v: False), (lambda v: True)
+        self.assertIsNone(tool.older_state(out, "0.9.0", no), "none there")
+        out.mkdir()
+        (out / "manifest.json").write_text(json.dumps({"state": now, "version": "0.9.0"}))
+        self.assertIsNone(tool.older_state(out, "0.9.0", no), "taken at this tree's state: --force is still asked")
+        (out / "manifest.json").write_text(json.dumps({"state": now - 1, "version": "0.9.0"}))
+        self.assertIsNone(tool.older_state(out, "0.9.0", yes), "a release that shipped is never taken again")
+        self.assertEqual(tool.older_state(out, "0.9.0", no), now - 1)
+        (out / "config.tar.gz").write_text("the older one")
+        dest = tool.keep_older(out, "0.9.0", now - 1)
+        self.assertEqual(dest.name, f"0.9.0-state{now - 1}")
+        self.assertEqual((dest / "config.tar.gz").read_text(), "the older one")
+        self.assertFalse(out.exists())
+        # Never over one kept before.
+        out.mkdir()
+        with self.assertRaises(SystemExit):
+            tool.keep_older(out, "0.9.0", now - 1)
 
 
 if __name__ == "__main__":

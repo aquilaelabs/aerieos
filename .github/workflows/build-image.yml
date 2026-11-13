@@ -281,6 +281,37 @@ jobs:
         if: always()
         run: echo "s=$(( $(date +%s) - T0 ))" >> "$GITHUB_OUTPUT"
 
+  # The image just pushed, started on each release snapshot of /config through
+  # its own entrypoint and startup hooks (tools/upgrade-image.sh): a person's
+  # update is the new image on the /config the old one left, and the upgrade
+  # suite starts server.py alone, with stand-ins for everything outside it.
+  # After the push, since that is where the image is: a red run here says the
+  # image under :main does not come up on a release's /config, before a
+  # release is cut from it.
+  upgrade:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start the image on each release's /config
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          image="$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')@$DIGEST"
+          docker pull --quiet "$image"
+          tools/upgrade-image.sh "$image"
+
   # The build runs on a hosted runner, out of reach of the container that
   # will eventually run its image, and invisible from inside it. So this job
   # comes back to the box and writes the outcome where `aerie ci-log` reads it.
@@ -293,7 +324,7 @@ jobs:
     # Every job of the run, not the image's alone: a run whose OS image failed
     # was recorded a success (B455). A skipped job (no tag, no box ticked)
     # counts as nothing either way.
-    needs: [build, bundle, appliance, appliance-publish]
+    needs: [build, upgrade, bundle, appliance, appliance-publish]
     # Failed, canceled and skipped are exactly the outcomes worth recording.
     if: always()
     # The image is pushed by the time this runs, so nothing waits on it: with
@@ -320,7 +351,7 @@ jobs:
         # the dashboard follows for anything the web can reach, and it keeps
         # a workflow input out of a command line.
         env:
-          JOB_RESULTS: "build=${{ needs.build.result }} bundle=${{ needs.bundle.result }} appliance=${{ needs.appliance.result }} appliance-publish=${{ needs.appliance-publish.result }}"
+          JOB_RESULTS: "build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} appliance=${{ needs.appliance.result }} appliance-publish=${{ needs.appliance-publish.result }}"
           BUILD_VERSION: ${{ needs.build.outputs.version }}
           BUILD_DIGEST: ${{ needs.build.outputs.digest }}
           BUILD_ELAPSED: ${{ needs.build.outputs.elapsed }}

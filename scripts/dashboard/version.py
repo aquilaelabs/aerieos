@@ -1086,10 +1086,26 @@ UPGRADE_SNAPSHOTS = "scripts/dashboard/test/upgrade"
 def no_upgrade_snapshot(project, comp, tgt):
     """Why `tgt` may not be released for want of its snapshot, or ""."""
     d = root(project) / UPGRADE_SNAPSHOTS
-    if comp or not d.is_dir() or (d / str(tgt) / "manifest.json").is_file():
+    if comp or not d.is_dir():
         return ""
-    return (f"{tgt} has no /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/: run tools/upgrade-snapshot.py, "
-            f"commit what it writes, then release")
+    mf = d / str(tgt) / "manifest.json"
+    if not mf.is_file():
+        return (f"{tgt} has no /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/: run tools/upgrade-snapshot.py, "
+                f"commit what it writes, then release")
+    # ...and one taken at this release's own state: a snapshot from weeks
+    # before the release, at an older state, satisfied this while the
+    # release shipped migrations it had never been taken with (the audit of
+    # 13 Nov: 0.9.0's was at state 19 with the tree at 21).
+    try:
+        had = json.loads(mf.read_text()).get("state")
+    except (OSError, ValueError):
+        had = None
+    now = max((int(p.name[:4]) for p in (root(project) / "scripts" / "dashboard" / "statemigrations").glob("[0-9][0-9][0-9][0-9]_*.py")),
+              default=None)
+    if isinstance(had, int) and now is not None and had < now:
+        return (f"{tgt}'s /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/ was taken at state {had} and this tree is at "
+                f"{now}: run tools/upgrade-snapshot.py again (it keeps the older one beside the new), commit, then release")
+    return ""
 
 
 def _creds_c(project):

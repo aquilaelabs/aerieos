@@ -744,8 +744,9 @@ controller is.
   store of `paths.py`, where no node API reaches). A file's contents are
   stored once by hash, read-only, and a day is a list of paths and hashes,
   so an unchanged file costs nothing. Kept for the space's *Snapshots
-  kept for* days (14 by default, 0 for none), older days and the objects
-  only they named removed. The space settings' Snapshots fold restores the
+  kept for* days (14 by default), older days and the objects only they
+  named removed; at 0 none is taken, and the days already kept stay until
+  some days are kept again. The space settings' Snapshots fold restores the
   whole tree as of a day, or one file; a restore first snapshots the tree
   as it is (a *before restore* day), writes through the files the sync
   reads, and tells the sync, so every node follows. An administrator's;

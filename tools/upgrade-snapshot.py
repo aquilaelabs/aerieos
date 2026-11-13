@@ -21,7 +21,10 @@ owner's password to sign in with.
 
 Writes scripts/dashboard/test/upgrade/<V>/ (V from VERSION). A shipped
 release's snapshot is never regenerated: --force is for one not yet
-released.
+released. One already there for a version not yet released, taken at an
+older state than this tree's, is kept beside the new one as <V>-stateN: the
+builds that ran at that state are installs too, and the suite starts this
+build on both.
 """
 import argparse
 import base64
@@ -57,6 +60,18 @@ PACK = {"name": "wordy", "label": "Wordy", "about": "Counts words.",
         "install": {"steps": [["sh", "-c", 'mkdir -p "$1/bin"', "x", "{dir}"]]},
         "verbs": {"count": {"about": "Words in a file.", "usage": "FILE",
                             "run": ["{dir}/bin/wordy", "{args}"]}}}
+
+
+# What fill() sets and a later build must read back unchanged (the upgrade
+# suite's values()): settings, each space's settings off their defaults, and
+# the node as it enrolled.
+VALUES = {
+    "settings": {"apps_vscode": False, "apps_companion": False},
+    "prefs": {"alpha": {"color": "teal", "build": "make"},
+              "beta": {"gate": {"roadmap": "ask"}},
+              "gamma": {"snapshot_days": 30, "capture_days": 3}},
+    "nodes": [{"name": "box", "kind": "agent", "user": "bb", "cpu": 4, "mem_mb": 8192, "arch": "x86_64"}],
+}
 
 
 def free_port():
@@ -174,14 +189,16 @@ def fill(c):
     c.auth = OWNER
     c.call("/api/users", {"action": "edit", "name": OWNER[0],
                           "profile": {"full_name": "Owner Example", "email": "owner@example.com"}})
-    c.call("/api/settings", {"set": {"apps_vscode": False, "apps_companion": False}})
+    c.call("/api/settings", {"set": VALUES["settings"]})
     # A node, enrolled as an operator does: a token minted, then presented
     # on the agent's door with what the machine is.
-    tok = c.call("/api/v1/nodes", {"action": "enroll", "name": "box", "user": "bb"})["token"]
+    box = VALUES["nodes"][0]
+    tok = c.call("/api/v1/nodes", {"action": "enroll", "name": box["name"], "user": box["user"]})["token"]
     req = urllib.request.Request(f"http://127.0.0.1:{c.port}/api/v1/agent/enroll", method="POST",
                                  headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
-                                 data=json.dumps({"user": "bb", "version": "snapshot", "census": {
-                                     "cpu": 4, "mem_mb": 8192, "arch": "x86_64", "system": "linux"}}).encode())
+                                 data=json.dumps({"user": box["user"], "version": "snapshot", "census": {
+                                     "cpu": box["cpu"], "mem_mb": box["mem_mb"], "arch": box["arch"],
+                                     "system": "linux"}}).encode())
     urllib.request.urlopen(req, timeout=30).read()  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (its own controller on loopback)
     for name, p in PEOPLE.items():
         c.call("/api/users", {"action": "add", "name": name, "password": p["password"], "role": p["role"],
@@ -214,9 +231,9 @@ def fill(c):
                                   {"name": "plain-words", "text": "Say it plainly."}]})
         c.call("/api/wiki", {"project": p, "action": "save", "name": "Home", "text": f"# {p}\n\nSee [[Build]].\n"})
         c.call("/api/wiki", {"project": p, "action": "save", "name": "Build", "text": "Run make.\n"})
-    # A project's settings.
-    c.call("/api/prefs", {"project": "alpha", "color": "teal", "build": "make"})
-    c.call("/api/prefs", {"project": "beta", "gate": {"roadmap": "auto"}})
+    # A project's settings, each one off its default so it is stored.
+    for p, want in VALUES["prefs"].items():
+        c.call("/api/prefs", {"project": p, **want})
     # A tool pack made here, from a pasted bbtool.json.
     staged = c.call("/api/toolpacks", {"action": "preview", "text": json.dumps(PACK)})
     c.call("/api/toolpacks", {"action": "add", "staged": staged.get("staged") or staged.get("id")})
@@ -240,7 +257,10 @@ def manifest(c, version):
          "project_roles": {p["name"]: p.get("project_roles") or {} for p in roles.get("people") or []
                            if p.get("project_roles")},
          "projects": list(PROJECTS), "roadmap": {}, "bugs": {}, "rules": {}, "wiki": {},
-         "toolpacks": [], "devices": {}}
+         "toolpacks": [], "devices": {},
+         # ...and what it was given, as it was given: the values a later
+         # build must still read, where the lists above are only names.
+         "values": VALUES}
     for p in PROJECTS:
         m["roadmap"][p] = sorted(i["id"] for i in c.call(f"/api/roadmap?project={p}").get("items") or [])
         m["bugs"][p] = sorted(b["id"] for b in c.call(f"/api/bugs?project={p}").get("bugs") or [])
@@ -280,16 +300,51 @@ def pack(world, dest):
             t.add(world / top, arcname=top, filter=keep)
 
 
+def released(version):
+    """Whether the tag of this version exists: its snapshot is then a
+    shipped release's, never taken again."""
+    r = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "-q", "--verify", f"refs/tags/v{version}"],
+                       capture_output=True, check=False)
+    return r.returncode == 0
+
+
+def older_state(out, version, is_released=released):
+    """The state of a snapshot already there for a version not yet released,
+    when it is older than this tree's; else None (none there, the same
+    state, or a release that shipped). It was taken before the release's
+    later migrations existed, and the builds that ran at that state are
+    installs too: it is kept, beside the one taken now."""
+    import stateversion
+    try:
+        had = json.loads((out / "manifest.json").read_text()).get("state")
+    except (OSError, ValueError):
+        return None
+    if not isinstance(had, int) or had >= stateversion.current() or is_released(version):
+        return None
+    return had
+
+
+def keep_older(out, version, had):
+    """The snapshot at `out` moved beside it as VERSION-stateN, so the new
+    one can be written where it was. The folder it went to."""
+    dest = out.with_name(f"{version}-state{had}")
+    if dest.exists():
+        raise SystemExit(f"{dest} exists already: a snapshot of {version} at state {had} was kept before")
+    out.rename(dest)
+    return dest
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--version", default=(ROOT / "VERSION").read_text().strip())
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     out = OUT / a.version
-    if (out / "manifest.json").exists() and not a.force:
+    sys.path.insert(0, str(DASH))
+    had = older_state(out, a.version)
+    if had is None and (out / "manifest.json").exists() and not a.force:
         raise SystemExit(f"{out} exists: a shipped release's snapshot is never regenerated "
                          "(--force for one not yet released)")
-    sys.path.insert(0, str(DASH))
     world = Path(tempfile.mkdtemp(prefix="bb-upgrade-snapshot."))
     c = None
     try:
@@ -298,6 +353,10 @@ def main():
         m = manifest(c, a.version)
         c.stop()
         c = None
+        # Only now, with the new one in hand: a run that failed moved nothing.
+        if had is not None:
+            kept = keep_older(out, a.version, had)
+            print(f"kept the snapshot that was there as {kept.relative_to(ROOT)}: installs at state {had} still upgrade")
         out.mkdir(parents=True, exist_ok=True)
         pack(world, out / "config.tar.gz")
         (out / "manifest.json").write_text(json.dumps(m, indent=1, sort_keys=True) + "\n")
