@@ -2935,6 +2935,25 @@ def node_funnel(principal, node_id, port, on=True):
     return r
 
 
+def agent_back(b):
+    """What a node says of an update it went back from, held to its shapes:
+    {digest, at, why}, or None."""
+    if not isinstance(b, dict) or not re.fullmatch(r"sha256:[0-9a-f]{64}", str(b.get("digest") or "")):
+        return None
+    at = b.get("at")
+    return {"digest": b["digest"], "at": at if isinstance(at, int) and not isinstance(at, bool) and at > 0 else 0,
+            "why": re.sub(r"[^ -~]", " ", str(b.get("why") or ""))[:300]}
+
+
+def went_back(n):
+    """Why this node went back from the agent this controller ships, where
+    it did (R241): the build is not sent to it again unasked. "" otherwise."""
+    b = (n.get("agent") or {}).get("back") if n else None
+    if not isinstance(b, dict) or b.get("digest") != agent_file()["digest"]:
+        return ""
+    return b.get("why") or "it did not start there"
+
+
 def agent_stale(n):
     """"" if this node runs the agent this controller ships, else why that
     matters right now.
@@ -3004,9 +3023,13 @@ def attention(project_nodes):
         # Inside a window the controller updates it once the node is idle
         # (R253): the row says so, and says why when its last try failed.
         last = next((j for j in jobs_for(node_id=n["id"], n=5, type="self-update")), None) if auto else None
+        # It took the update and went back to the agent it had (R241): said,
+        # and no longer the controller's to send by itself.
+        back = went_back(n)
+        auto = auto and not back
         out.append({"kind": "agent", "node": n["name"], "id": n["id"],
                     "from": (n.get("agent") or {}).get("version") or "?",
-                    "to": ours["version"], "window": agent_gap(n), "auto": auto,
+                    "to": ours["version"], "window": agent_gap(n), "auto": auto, "back": back,
                     "failed": (last.get("error") or "it failed") if last and last.get("state") == "failed" else "",
                     "projects": sorted(p for p, nid in project_nodes.items() if nid == n["id"])})
     return out
@@ -3188,6 +3211,17 @@ AUTO_UPDATE_EVERY = 120
 _auto_tried = {}
 
 
+def _update_again(nid):
+    """What follows an update a busy node refused: inside the window the
+    controller asks again by itself once the node is idle (auto_update), and
+    across one it is a person's press."""
+    n = node(nid)
+    mine = agent_window(((n or {}).get("agent") or {}).get("version") or "")
+    if mine and mine == agent_window(agent_file()["version"]) and not went_back(n):
+        return "asked again once the node is idle"
+    return "not retried; press Update agent again when they finish"
+
+
 def auto_update(nid):
     """Queue the self-update of an idle node whose agent is behind inside the
     window, at most once every AUTO_UPDATE_EVERY seconds per node (a busy
@@ -3199,6 +3233,10 @@ def auto_update(nid):
     # suite's stub) is never a gap, but it is no proof of one either.
     mine = agent_window((n.get("agent") or {}).get("version") or "")
     if not mine or mine != agent_window(agent_file()["version"]):
+        return None
+    # A build this node went back from is a person's to send again (the
+    # operator, 13 Nov): no loop of update, fail and go back.
+    if went_back(n):
         return None
     now = time.time()
     if now - _auto_tried.get(nid, 0) < AUTO_UPDATE_EVERY or jobs_for(node_id=nid, n=1, active=True):
@@ -3225,8 +3263,16 @@ def node_update_agent(principal, node_id):
         return {"error": "this controller ships no agent"}
     if (n.get("agent") or {}).get("digest") == ours["digest"]:
         return {"ok": True, "current": True, "version": ours["version"]}
+    # One already on its way is the one: a second press, or a press beside
+    # the controller's own, queued the same update twice, and the second
+    # reached the node after the first had replaced its agent.
+    for j in jobs_for(node_id=node_id, n=10, active=True):
+        if j.get("type") == "self-update" and (j.get("spec") or {}).get("digest") == ours["digest"]:
+            return {"ok": True, "job": j["id"], "queued": True}
     r = job_add(principal, {"node": node_id}, "self-update",
                 {"digest": ours["digest"], "version": ours["version"], "timeout": 300,
+                 # A person's press sends again a build the node went back from.
+                 **({"again": True} if principal != "system:auto-update" else {}),
                  **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {})})
     if r.get("ok"):
         audit(principal, "node-update-agent", node_id, {"to": ours["digest"]})
@@ -5099,7 +5145,7 @@ move_for_node = lambda nid: {}  # noqa: E731
 move_here = lambda nid: None  # noqa: E731
 
 
-def hello(nid, census, addr, version="", digest="", running=None, keep=None, rotates=False):
+def hello(nid, census, addr, version="", digest="", running=None, keep=None, rotates=False, back=None):
     """The agent on connect: refresh the census, record the version it is
     running, and answer with what the controller expects of it: the
     transports, the poll window, the node's own capabilities (so it can
@@ -5125,6 +5171,13 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
                "addr": addr, "last_seen": int(time.time()),
                })
     ag.pop("refused", None)
+    # An update this node would not run and went back from (R241), in the
+    # shapes this side keeps; gone once it says none.
+    went = agent_back(back)
+    if went:
+        ag["back"] = went
+    else:
+        ag.pop("back", None)
     # Why an idle session's token was not refreshed here, said by the agent
     # that tried (B419).
     kc = keep_clean(keep)
@@ -7064,9 +7117,11 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
             err = (f"the agent says other jobs are running ({', '.join(held)}), which this controller "
                    "has as finished; they leave when the agent next posts their end; press Update agent again")
         elif doing:
-            err = f"busy with {', '.join(doing[:4])}{' and more' if len(doing) > 4 else ''}: not retried; press Update agent again when they finish"
+            err = f"busy with {', '.join(doing[:4])}{' and more' if len(doing) > 4 else ''}: {_update_again(node_id)}"
         elif not err.startswith("busy"):
-            err = "the agent says other jobs are running: not retried; press Update agent again when they finish"
+            err = f"the agent says other jobs are running: {_update_again(node_id)}"
+        else:
+            err = err.replace("not retried; press Update agent again when they finish", _update_again(node_id))
         err = err[:500]
     if state == "canceled":
         err = _stopped_by(job_id, err)

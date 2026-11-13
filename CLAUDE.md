@@ -105,10 +105,12 @@ ref and nowhere else; `aerie ci-log` reads a run's output.
 ## Layout and conventions
 
 - **The agent's compatibility window.** `AGENT_VERSION` in
-  `scripts/agent/aerieos_agent/__init__.py` is `WINDOW.BUILD`: inside a
-  window nothing is held; across one the controller ends the sessions on a
-  project whose node's agent is from the old window until it is updated
-  (`server.compat_holds`). BUILD never resets; the minor moves only for a
+  `scripts/agent/aerieos_agent/__init__.py` is `WINDOW.BUILD`. A node
+  whose agent is behind is sent nothing but its own update
+  (`nodes.agent_stale`): inside a window its sessions run on and the
+  controller sends that update by itself once the node is idle; across one
+  the controller ends the sessions on a project whose node's agent is from
+  the old window until a person updates it (`server.compat_holds`). BUILD never resets; the minor moves only for a
   break, in the same change as the removal of what it supersedes.
   `test/version.mjs` holds both WINDOWs to the VERSION file.
 - **Three numbers.** `aerie version` moves per commit; a file two builds may

@@ -114,6 +114,7 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
                 -u BB_TREE_OWNER -u BB_CI_LOG_DIR -u BB_NODE_TOOLCHAINS -u BB_EMU_LOCAL \
                 TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
                 DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
+                BB_TEST_ORIGIN="${KEEP_ORIGIN:-$_here_root}" \
                 DASHBOARD_TEST_DIR="$KEEP_S" timeout --kill-after=10 "${SUITE_TIMEOUT:-1500}" node "$f" || rc=1
             case "$f" in */_probe-*) rm -f "$f" ;; esac
         done

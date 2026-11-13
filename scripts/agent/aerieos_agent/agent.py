@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -11,7 +12,8 @@ import threading
 import time
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, cap_file, log, log_once, own_digest, own_path, prune_dir
+from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, log, log_once, own_digest, own_path, prune_dir
+from .base import back_note, selfcheck, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
 from .stores import load_state, save_state, use_scope
 from .toolchains import share_images
@@ -395,10 +397,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                                         "digest": own_digest(),
                                         "running": self.running_ids(),
                                         "keep": self.keep_report(),
+                                        # An update this node would not run and went
+                                        # back from (R241), until one it keeps.
+                                        **({"back": back_note()} if back_note() else {}),
                                         # A fresh token each hello (R135 step 4).
                                         "rotates": True}, timeout=30)
         if st == 200:
             self.take_token(r.get("token"))
+            # The controller answered: an update on trial is kept (R241).
+            if not getattr(self, "hello_said", False) and trial_note() is not None and trial_passed():
+                log("the updated agent reached its controller: it is kept")
             self.hello_at = time.monotonic()
             self.hello_said = True           # the first is said on the loop; the rest beside it
             self.poll = int(r.get("poll") or 25)
@@ -699,6 +707,20 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return
         self.reexec()
 
+    def trial_over(self):
+        """The time an updated agent has to reach its controller is up (the
+        operator, 13 Nov: ten minutes): one that has not gives way to the
+        agent before it, which the entry puts back as this process starts
+        again. A controller that was away that long costs a press of Update
+        agent; an agent that cannot reach it at all costs nothing more."""
+        if getattr(self, "hello_said", False) or trial_note() is None:
+            return
+        why = f"ran {TRIAL_S // 60} minutes and never reached its controller"
+        if not trial_give_way(why):
+            return
+        log(f"this updated agent {why}: giving way to the one before it")
+        self.reexec()
+
     def cancel(self, ids):
         with self.lock:
             hit = [self.jobs[i] for i in ids if i in self.jobs]
@@ -713,6 +735,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
 
     def loop(self):
         delay = wdelay = 1
+        # An update on trial gets TRIAL_S to reach its controller (R241).
+        if trial_note() is not None:
+            t = threading.Timer(TRIAL_S, self.trial_over)
+            t.daemon = True
+            t.start()
         refused_since = 0.0     # when the controller began refusing connections (B760)
         # The hourly walk of the disks, on its own thread (storage.py).
         storage.start(lambda: self.state)
@@ -1056,11 +1083,44 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if not ok:
             job.why = said
             return "failed", 77
+        # One this node already went back from is not taken again by itself
+        # (the operator, 13 Nov): Update agent, a person's press, asks again.
+        went = back_note()
+        if went and went["digest"] == got and not spec.get("again"):
+            job.why = (f"this node went back from this build already ({went['why'] or 'it did not start here'}): "
+                       "press Update agent to try it again")
+            job.say(job.why + "\n")
+            return "failed", 79
         me = own_path()
         tmp = me + ".new"
         with open(tmp, "wb") as f:
             f.write(body)
         os.chmod(tmp, 0o755)
+        # The new file asked to load itself here, before it is the one this
+        # node runs (R241): one that cannot is never installed.
+        ok, said = selfcheck(tmp)
+        if ok is False:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            job.why = f"the new agent does not start on this node, so it was not installed: {said}"
+            job.say(job.why + "\n")
+            return "failed", 78
+        # ...and the file it replaces kept beside it, with the note that the
+        # new one is on trial: the entry puts the old one back when the new
+        # one cannot be loaded or never reaches its controller.
+        try:
+            shutil.copy2(me, me + ".prev.w")
+            os.replace(me + ".prev.w", me + ".prev")
+            if ok:
+                trial_begin(got, own_digest())
+        except OSError as e:
+            for x in (tmp, me + ".prev.w"):
+                with contextlib.suppress(OSError):
+                    os.unlink(x)
+            job.why = f"the agent this would replace could not be kept beside it ({e}), so nothing was installed"
+            job.say(job.why + "\n")
+            return "failed", 73
+        job.say((said + "\n") if ok else "this build is from before the start check: installed without it\n")
         os.replace(tmp, me)
         # Only a file actually installed restarts the agent: "already current"
         # above did too, and a second update queued behind the first ended

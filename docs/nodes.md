@@ -366,11 +366,15 @@ today, and the two it does not yet, are marked; the agent takes `exec` jobs
 and `self-update`, nothing else, until phase 6 gives it a workspace to build
 in.
 
-*Driving the self-update (after phase 9):* nothing does it unasked. The node
-list carries the digest and version this controller ships, the row compares
-its node's against them and says *update available*, and the **Update
-agent** button queues the `self-update` job with that digest in its spec,
-so a node is never handed a file other than the one this controller serves.
+*Driving the self-update:* inside a compatibility window the controller
+queues it by itself once the node is idle (`nodes.auto_update`), and asks
+again on a later idle beat when the node refused as busy; across a window it
+is a person's press, since that one ends the node's sessions. The node list
+carries the digest and version this controller ships, the row compares its
+node's against them and says *update available*, and the **Update agent**
+button queues the `self-update` job with that digest in its spec, so a node
+is never handed a file other than the one this controller serves. A press
+while one is already on its way returns that one.
 `provision-linux.sh` re-run on an enrolled node is the console path to the same
 swap, with the node's own token. The agent's `hello` after re-exec is what
 moves the row.
@@ -498,6 +502,33 @@ a `self-update` job (a capability-independent type), which downloads the
 pinned new agent by digest, swaps the file and re-execs. In the homelab this
 is a convenience; at fleet scale it is the difference between a protocol that
 can evolve and one frozen by its oldest node.
+
+**And an update that does not start goes back by itself.** One build that
+cannot run would otherwise leave every node it reached needing a person at
+its console, since the update is the only thing a node behind is sent. So
+the swap has three guards:
+
+- *Before it.* The new file is run once as `aerieos-agent selfcheck`, which
+  loads the agent as `run` does, compiles every module and reads the node's
+  state. A file that fails is not installed; the job says why and the node
+  carries on as it was.
+- *Beside it.* The file being replaced is kept (`FILE.prev`), and the new
+  one is on trial (`FILE.trial`) until the controller answers its first
+  `hello`.
+- *After it.* The zip's entry (`scripts/agent/builderbot-agent.py`, the
+  standard library alone, since it has to work when the package does not)
+  counts each start while the trial lasts. A package that cannot be loaded,
+  or a fourth start with the trial still on, puts the old file back and
+  starts it. An agent that runs and has not reached its controller in ten
+  minutes gives way the same way.
+
+A node that went back says so in its `hello` (the build it would not run,
+when, and why), and the controller stops sending that build by itself: the
+bell and the node's row say what happened, and **Update agent** sends it
+again on a person's press. A newer build is sent as any is. The count
+relies on the service starting the agent again, which systemd does; the
+first update onto a build with these guards is made by an agent without
+them.
 
 **That version is `WINDOW.BUILD`, and only the first half is a promise.** The
 window is AerieOS's own semver minor: while the space is `0.5.x`, any

@@ -738,8 +738,9 @@ def node_holds(reap=False):
     controller ships, or its Claude Code is being updated (claudecode.py),
     which ends the sessions there first. The half of a project's hold that
     is its node's. Being merely behind is not here: inside a window an
-    older agent takes a job and a session, and the Nodes page's Update is a
-    courtesy rather than a gate. reap: only what ends a running session
+    older agent keeps its sessions and starts new ones, and takes no job
+    but its own update, which the controller sends once the node is idle
+    (nodes.agent_stale, nodes.auto_update). reap: only what ends a running session
     (claudecode.holds)."""
     out = {}
     if NODES_OK:

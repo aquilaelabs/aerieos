@@ -171,6 +171,25 @@ def cmd_run():
     Agent(state).loop()
 
 
+def cmd_selfcheck():
+    """This agent loaded as `run` loads it, every module of it compiled, and
+    this node's state read, said in one line: what a self-update asks of the
+    file it is about to install, before that file replaces the running one
+    (R241). It dials nothing and changes nothing. Reaching here is the first
+    half: the entry imported this module, and with it everything `run`
+    imports. The rest are compiled and not run, so a module that is only
+    loaded when its work comes up, and may want a library this machine does
+    not have, cannot refuse an update it would never have broken."""
+    import pkgutil
+    pkg = sys.modules[__package__]
+    for m in pkgutil.iter_modules(pkg.__path__):
+        name = f"{__package__}.{m.name}"
+        src = m.module_finder.find_spec(name).loader.get_source(name)
+        compile(src or "", name, "exec")
+    load_state()
+    print(f"selfcheck ok {AGENT_VERSION} {own_digest()[:19]}")
+
+
 def cmd_status():
     state = load_state()
     shown = {k: v for k, v in state.items() if k != "token"}
@@ -281,6 +300,8 @@ def main(argv):
         cmd_follow(argv[1:])
     elif cmd == "run":
         cmd_run()
+    elif cmd == "selfcheck":
+        cmd_selfcheck()
     elif cmd == "status":
         cmd_status()
     elif cmd == "sample":

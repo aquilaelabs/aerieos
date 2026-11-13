@@ -427,7 +427,8 @@ const agentOut = openSync(AGENT_LOG_FILE, 'a');
 const AGENT_RUN = `${DIR}/agent-run/builderbot-agent`;
 mkdirSync(`${DIR}/agent-run`, { recursive: true });
 writeFileSync(AGENT_RUN, agentZip());
-const agent = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
+// let: a build that dies as it starts is started again below, as the service would (R241).
+let agent = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
 const agentLog = () => { try { return readFileSync(AGENT_LOG_FILE, 'utf8'); } catch { return ''; } };
 try {
   const live = await until(async () => {
@@ -3123,6 +3124,86 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // The status command, the one the docs tell a person to run on a node.
     const st = execFileSync('python3', [AGENT_RUN, 'status'], { env: agentEnv, encoding: 'utf8' });
     ok(st.length > 0 && new RegExp(minted.id).test(st), `\`builderbot-agent status\` names the node (${st.trim().split('\n')[0].slice(0, 80)})`);
+
+    // ---- a bad build cannot strand the node (R241) ---------------------------
+    // The update above left the file it replaced beside the new one, and the
+    // new one was on trial until its controller answered it.
+    ok(existsSync(`${AGENT_RUN}.prev`) && !existsSync(`${AGENT_RUN}.trial`)
+       && /the updated agent reached its controller: it is kept/.test(agentLog()),
+       'the file the update replaced is kept beside it, and the trial ended at the controller\'s first answer');
+    const waitJob = async (id, ms = 60000) => until(async () => {
+      const r = await api(`/api/v1/jobs?id=${id}`);
+      return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null;
+    }, ms);
+    const shipsNew = async was => until(async () => {
+      const r = await api('/api/v1/nodes');
+      return r.agent?.digest && r.agent.digest !== was ? r.agent : null;
+    }, 20000);
+    const good = shipped.digest;
+    // One: a build that cannot be loaded. The node asks the new file to load
+    // itself before installing it, and stays on the agent it has.
+    const GPU = `${SHIPPED}/aerieos_agent/gpu.py`, gpuWas = readFileSync(GPU, 'utf8');
+    appendFileSync(GPU, '\ndef the_suite_broke_this(:\n');
+    const broken = await shipsNew(good);
+    const bj = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    const bfin = bj.job ? await waitJob(bj.job) : null;
+    ok(bfin?.state === 'failed' && /does not start on this node, so it was not installed/.test(bfin.error || bfin.log || '')
+       && /SyntaxError/.test(bfin.log || ''),
+       `a build that cannot be loaded is refused by the node before it is installed (${bfin?.state}: ${(bfin?.error || '').slice(0, 90)})`);
+    const still = await nodeById(minted.id);
+    ok(still.live && still.agent.digest === good && !existsSync(`${AGENT_RUN}.new`) && !existsSync(`${AGENT_RUN}.trial`)
+       && broken && broken.digest !== good,
+       '...and the node runs on as it was, live, with nothing left beside its file');
+    writeFileSync(GPU, gpuWas);
+    // Two: a build that loads and then dies as it starts. It is installed,
+    // on trial; the service starts it again and again; the fourth start
+    // puts the old file back, and the old agent dials in and says so.
+    const CLI = `${SHIPPED}/aerieos_agent/cli.py`, cliWas = readFileSync(CLI, 'utf8');
+    writeFileSync(CLI, cliWas.replace('def cmd_run():\n    harden()\n',
+      'def cmd_run():\n    raise SystemExit("the suite: this build dies as it starts")\n    harden()\n'));
+    ok(readFileSync(CLI, 'utf8') !== cliWas, 'the suite ships a build that loads and dies in run');
+    const dying = await shipsNew(broken?.digest || good);
+    const gone = new Promise(res => agent.once('exit', code => res(code)));
+    const dj = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    const dfin = dj.job ? await waitJob(dj.job) : null;
+    ok(dfin?.state === 'succeeded' && /selfcheck ok/.test(dfin.log || '') && /installed sha256:/.test(dfin.log || ''),
+       `it passes the start check and is installed (${dfin?.state}: ${(dfin?.log || '').trim().split('\n').pop()?.slice(0, 80)})`);
+    const died = await Promise.race([gone, sleep(40000).then(() => 'still running')]);
+    ok(died !== 'still running' && died !== 0, `...and dies as it starts (exit ${died})`);
+    const trial1 = existsSync(`${AGENT_RUN}.trial`) ? JSON.parse(readFileSync(`${AGENT_RUN}.trial`, 'utf8')) : {};
+    ok(trial1.digest === dying?.digest && trial1.starts === 1, `its first start was counted (${JSON.stringify(trial1).slice(0, 120)})`);
+    let starts = 0, alive = false;
+    for (; starts < 5 && !alive; starts++){
+      const p = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
+      const ended = await Promise.race([new Promise(res => p.once('exit', () => res(true))), sleep(8000).then(() => false)]);
+      if (!ended){ agent = p; alive = true; }
+    }
+    ok(alive && starts === 3, `started again as the service would, it dies twice more and the next start stays up (${starts} starts)`);
+    const home = await until(async () => {
+      const x = await nodeById(minted.id);
+      return x.live && x.agent?.digest === good && x.agent?.back ? x : null;
+    }, 60000);
+    ok(home !== null && home.agent.back.digest === dying?.digest
+       && /started 3 times and never reached its controller/.test(home.agent.back.why),
+       `the old agent is back, live, and tells its controller which build it would not run and why (${home?.agent?.back?.why})`);
+    ok(!existsSync(`${AGENT_RUN}.trial`) && !existsSync(`${AGENT_RUN}.prev`)
+       && !readFileSync(AGENT_RUN, 'latin1').includes('this build dies as it starts'),
+       '...the file it runs from is the one from before the update, and the trial is over');
+    const att = (await api('/api/v1/nodes')).nodes.find(n => n.id === minted.id);
+    ok(att.agent.back.digest === (await api('/api/v1/nodes')).agent.digest,
+       '...and it is the build this controller ships, so the controller no longer sends it by itself');
+    const aj = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after going back'] });
+    const afin = aj.job ? await waitJob(aj.job, 30000) : null;
+    ok(afin?.state !== 'succeeded' && /Update agent/.test(`${aj.error || ''} ${afin?.error || ''}`) || afin?.state === 'succeeded',
+       `the node answers for work as an agent behind does (${aj.error || afin?.state})`);
+    // The suite ships the good build again: the node is current, and takes work.
+    writeFileSync(CLI, cliWas);
+    await until(async () => (await api('/api/v1/nodes')).agent?.digest === good, 20000);
+    const cur3 = await api('/api/v1/nodes', { action: 'update-agent', id: minted.id });
+    ok(cur3.ok && cur3.current === true, 'with the good build shipped again the node is current');
+    const gj = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after going back'] });
+    const gfin = gj.job ? await waitJob(gj.job, 30000) : null;
+    ok(gfin?.state === 'succeeded' && /alive after going back/.test(gfin.log || ''), `...and takes a job (${gfin?.state || gj.error})`);
   }
 
   // ---- one command as root, allowed by a person, run by the real agent -----
@@ -3533,6 +3614,71 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // off this machine, so the agent is still here.
     await api('/api/v1/nodes', { action: 'online', id: minted.id });
     ok((await api('/api/v1/nodes')).nodes.some(n => n.id === minted.id), '...and Undrain brings a retired row back, for what follows');
+  }
+
+  // ---- released agents against this controller (R241) ---------------------
+  // The window's promise, run and not only declared: the agent of the oldest
+  // release an install still upgrades from, and of the newest one, each as
+  // its release built it, enrolls here, dials in, is seen as behind, takes
+  // this controller's agent by its own update (the old way: these have no
+  // start check), and then takes work. From the repository's tags, which
+  // the harness's copy does not carry: without them it is said, not passed.
+  {
+    const ORIGIN = process.env.BB_TEST_ORIGIN || '';
+    const git = (...a) => execFileSync('git', ['-C', ORIGIN, '-c', `safe.directory=${ORIGIN}`, ...a],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 << 20 });
+    const has = t => { try { git('rev-parse', '-q', '--verify', `${t}^{commit}`); return true; } catch { return false; } };
+    let newest = '';
+    try { newest = ORIGIN ? git('for-each-ref', '--sort=-creatordate', '--count=1', '--format=%(refname:short)', 'refs/tags/v*').trim() : ''; } catch { newest = ''; }
+    // The oldest release an install upgrades from (every older one was withdrawn on 10 Nov).
+    const FLOOR = 'v0.9.0-dev.5173';
+    const tags = [...new Set([FLOOR, newest].filter(t => t && ORIGIN && has(t)))];
+    if (!tags.length) console.log('NOTE  released agents against this controller: not run, this copy of the tree reaches no release tag'
+      + (ORIGIN ? ` in ${ORIGIN}` : ' (no BB_TEST_ORIGIN)'));
+    const ships = (await api('/api/v1/nodes')).agent;
+    for (const [i, tag] of tags.entries()){
+      const R = `${DIR}/released/${tag}`;
+      mkdirSync(R, { recursive: true });
+      execFileSync('sh', ['-c', 'git -C "$1" -c safe.directory="$1" archive "$2" scripts/agent | tar -x -C "$3"', 'sh', ORIGIN, tag, R]);
+      const OLD = `${R}/aerieos-agent`;
+      execFileSync('python3', ['-c', `
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("released_bundle", sys.argv[1] + "/aerieos_agent/bundle.py")
+b = importlib.util.module_from_spec(spec); spec.loader.exec_module(b)
+open(sys.argv[2], "wb").write(b.build(sys.argv[1]))`, `${R}/scripts/agent`, OLD]);
+      chmodSync(OLD, 0o755);
+      const was = execFileSync('python3', ['-c', 'import zipfile,sys,re; print(re.search(r\'AGENT_VERSION = "([^"]+)"\', zipfile.ZipFile(sys.argv[1]).read("aerieos_agent/__init__.py").decode()).group(1))', OLD], { encoding: 'utf8' }).trim();
+      const m = await api('/api/v1/nodes', { action: 'enroll', name: `released${i}`, user: 'nobody' });
+      const env = { ...agentEnv, HOME: `${R}/home`, BUILDERBOT_NODE_JSON: `${R}/node.json`, BUILDERBOT_SHARE: `${R}/workspace`,
+                    BUILDERBOT_SCREEN_PORT: String(SCREEN_PORT + 1 + i) };
+      for (const d of ['home', 'workspace', 'data', 'toolchains']) mkdirSync(`${R}/${d}`, { recursive: true });
+      let said = '';
+      try {
+        said = execFileSync('python3', [OLD, 'enroll', '--controller', URL, '--token', m.token, '--user', process.env.USER || 'builder',
+          '--store', `data=${R}/data`, '--store', `toolchains=${R}/toolchains`], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) { said = String(e.stdout) + String(e.stderr); }
+      ok(/enrolled as node n_/.test(said), `the agent of ${tag} (${was}) enrolls on this controller (${said.split('\n')[0].slice(0, 80)})`);
+      const out = openSync(`${R}/agent.log`, 'a');
+      const proc = spawn('python3', [OLD, 'run'], { env, stdio: ['ignore', out, out] });
+      try {
+        const live = await until(async () => { const n = await nodeById(m.id); return n && n.live ? n : null; }, 60000);
+        ok(live !== null && live.agent.version === was && live.agent.digest !== ships.digest,
+           `...dials in, live, and is seen as behind (runs ${live?.agent?.version}, this controller ships ${ships.version})`);
+        // The controller sends the update by itself to an idle node inside the
+        // window; the press asks for the same one where it has not yet.
+        await api('/api/v1/nodes', { action: 'update-agent', id: m.id });
+        const cur = await until(async () => { const n = await nodeById(m.id); return n && n.live && n.agent.digest === ships.digest ? n : null; }, 90000);
+        ok(cur !== null && cur.agent.version === ships.version,
+           `...takes this controller's agent by its own update and dials in on it (${cur?.agent?.version || readFileSync(`${R}/agent.log`, 'utf8').trim().split('\n').slice(-2).join(' / ').slice(0, 160)})`);
+        const j = await api('/api/v1/nodes', { action: 'exec', id: m.id, argv: ['sh', '-c', `echo updated from ${tag}`] });
+        const fin = j.job ? await until(async () => { const r = await api(`/api/v1/jobs?id=${j.job}`);
+          return ['succeeded', 'failed', 'canceled'].includes(r.state) ? r : null; }, 30000) : null;
+        ok(fin?.state === 'succeeded' && new RegExp(`updated from ${tag}`).test(fin.log || ''), `...and then takes a job (${fin?.state || j.error})`);
+      } finally {
+        proc.kill('SIGTERM');
+        await api('/api/v1/nodes', { action: 'retire', id: m.id });
+      }
+    }
   }
 } finally {
   agent.kill('SIGTERM');

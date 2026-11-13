@@ -683,6 +683,112 @@ def own_digest():
         return ""
 
 
+# -- an update on trial ---------------------------------------------------------
+#
+# A self-update keeps the file it replaces (FILE.prev) and leaves a note that
+# the new one is on trial (FILE.trial). The zip's entry, builderbot-agent.py,
+# holds the way back, with the standard library alone since it has to work
+# when this package does not: it counts each start of `run` while the note is
+# there, and a package that cannot be loaded or a start past its count puts
+# the old file back, leaving why in FILE.back. This side begins a trial, ends
+# it at the first answer from the controller, gives way when none came in
+# TRIAL_S, and says a way back taken to the controller (R241).
+TRIAL_S = int(os.environ.get("BUILDERBOT_AGENT_TRIAL_S", "600") or 600)
+SELFCHECK_S = 120
+
+
+def _note(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _note_write(path, d):
+    tmp = path + ".w"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(tmp, path)
+
+
+def trial_note():
+    """The note of an update on trial, or None."""
+    return _note(own_path() + ".trial")
+
+
+def trial_begin(digest, was):
+    """The file about to replace this one is on trial from its first start."""
+    _note_write(own_path() + ".trial", {"digest": digest, "from": was, "starts": 0, "at": int(time.time())})
+
+
+def trial_passed():
+    """The trial over, the new agent kept: its note taken away, and with it
+    the word of a way back taken before. Whether there was a trial."""
+    me = own_path()
+    was = os.path.exists(me + ".trial")
+    for x in (".trial", ".back"):
+        with contextlib.suppress(OSError):
+            os.unlink(me + x)
+    return was
+
+
+def trial_give_way(why):
+    """The note marked so the entry puts the old file back at the next start,
+    which the caller makes now. False where there is no trial or nothing to
+    go back to."""
+    me = own_path()
+    t = _note(me + ".trial")
+    if t is None or not os.path.isfile(me + ".prev"):
+        return False
+    t["why"] = str(why)[:300]
+    try:
+        _note_write(me + ".trial", t)
+    except OSError:
+        return False
+    return True
+
+
+def back_note():
+    """A way back this node took, for its controller: the digest it would
+    not run, when, and why; None where it took none."""
+    b = _note(own_path() + ".back")
+    if not b or not b.get("digest"):
+        return None
+    try:
+        at = int(b.get("at") or 0)
+    except (TypeError, ValueError):
+        at = 0
+    return {"digest": str(b["digest"])[:80], "at": at, "why": str(b.get("why") or "")[:300]}
+
+
+def selfcheck(path):
+    """The agent file at `path` asked to load itself, before it replaces the
+    running one: (True, what it said) when it does, (False, why) when it
+    does not, and (None, "") for a build from before the check, which has no
+    such verb and is installed as every build was."""
+    import zipfile
+    try:
+        with zipfile.ZipFile(path) as z:
+            knows = b'"selfcheck"' in z.read("aerieos_agent/cli.py")
+    except (OSError, KeyError, zipfile.BadZipFile):
+        knows = False
+    if not knows:
+        return None, ""
+    try:
+        r = subprocess.run([sys.executable, path, "selfcheck"], capture_output=True, text=True,
+                           timeout=SELFCHECK_S, check=False, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return False, f"it did not load within {SELFCHECK_S} seconds"
+    except OSError as e:
+        return False, f"it could not be run: {e}"
+    said = (r.stdout + r.stderr).strip()
+    if r.returncode == 0 and "selfcheck ok" in r.stdout:
+        return True, r.stdout.strip().splitlines()[-1]
+    return False, " | ".join(said.splitlines()[-4:])[:400] or f"it ended with {r.returncode} and said nothing"
+
+
 # ---------------------------------------------------------------------------
 # the census and the sample
 

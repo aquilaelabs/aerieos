@@ -1351,6 +1351,12 @@ function windowGap(n){
 
 function staleWhy(n){
   const mine = n.agent?.version || "?", ship = nodesAgent?.version;
+  // It took this controller's agent and went back to the one it had (R241):
+  // not sent again by itself, so the row says what happened and what asks.
+  const back = n.agent?.back;
+  if (back && back.digest === nodesAgent?.digest)
+    return `${n.name} took ${mine === ship ? `a newer build of agent ${ship} (${short(nodesAgent?.digest)})` : `agent ${ship}`} and went back to ${
+      mine === ship ? `the one it had (${short(n.agent?.digest)})` : mine}: it ${back.why || "did not start there"}. Update agent tries it again`;
   return windowGap(n)
     ? `${n.name} runs agent ${mine} and this controller needs ${ship}: press Update agent before using this node`
     : mine === ship
