@@ -79,6 +79,9 @@ class Judgment(unittest.TestCase):
         for ln in started:
             self.assertRegex(ln, r"-v \S+/config:/config -v \S+/workspace:/workspace")
             self.assertTrue(ln.endswith(" the-image"), ln)
+            # ...as the account that owns the scratch /config: an ordinary user's own ids.
+            if os.geteuid() != 0:
+                self.assertIn(f"-e PUID={os.getuid()} -e PGID={os.getgid()}", ln)
         # A copy is asked for only where the state had to move.
         moved = sum(1 for s in self.states.values() if s < self.now)
         self.assertEqual(calls.count("backups/before-"), moved)

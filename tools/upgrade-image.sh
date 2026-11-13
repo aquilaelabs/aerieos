@@ -52,7 +52,18 @@ for snap in "${snaps[@]}"; do
     ctr="aerie-upgrade-$$-${name//[^A-Za-z0-9]/-}"
     tar --no-same-owner -xzf "$snap/config.tar.gz" -C "$work"
     mkdir -p "$work/home" "$work/sdk"
-    docker run -d -t --name "$ctr" -p 127.0.0.1::7680 -e DASHBOARD_PORT=7680 \
+    # /config is the account's the container works as, as an install's is:
+    # this user's where it is an ordinary one (PUID and PGID say so), and
+    # the image's own default where this is root, whose files that account
+    # could not read. The first real run met exactly that: users.json was
+    # root's, nobody could sign in.
+    if [ "$(id -u)" -eq 0 ]; then
+        puid=99; pgid=100
+        chown -R "$puid:$pgid" "$work"
+    else
+        puid="$(id -u)"; pgid="$(id -g)"
+    fi
+    docker run -d -t --name "$ctr" -p 127.0.0.1::7680 -e DASHBOARD_PORT=7680 -e PUID="$puid" -e PGID="$pgid" \
         -v "$work/config:/config" -v "$work/workspace:/workspace" \
         -v "$work/home:/home/builder" -v "$work/sdk:/sdk" "$image" >/dev/null \
         || { echo "FAIL  $name: the image did not start"; failed=1; continue; }

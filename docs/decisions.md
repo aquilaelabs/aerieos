@@ -517,6 +517,32 @@ upgrade suite starts this tree on every supported one, so a change that
 loses an account or a notebook entry on upgrade fails a test, not an
 install; `bb version release` refuses a version that has none.
 
+**A migration that fails stops the start and puts /config back (13 Nov
+2026).** A migration that raised was one line in the log and the new build
+ran on state half changed, to be tried again at the next start. The
+operator's choice: the copy taken before the first migration is put back,
+what the failed start wrote is kept aside, a note in /config says which
+build, which migration and why, and the controller does not start, so the
+release from before starts on /config as it left it. The same build is not
+tried again until the note is removed: each try would copy the whole state
+and move another aside. The boot's check and the supervisor ask the same
+question as the server, so the container stops with the sentence instead of
+starting the server again. The upgrade suite reads values back, not names:
+doing so found a shipped migration that read a file by a name nothing
+stores and had changed no install, which its own unit test, written
+against the same wrong name, had passed.
+
+**A patch release carries no migration (13 Nov 2026, kept).** Migrations
+are one numbered sequence and /config remembers the highest number that
+ran. A 0.9.1 that took the next number would stamp /config past the
+migrations a 0.10.0 branch already holds under lower numbers, and an
+install going from 0.9.1 to 0.10.0 would skip them. Allowing it means
+recording every migration that ran by name, a change to the state file, the
+start's gate and the downgrade check; the operator weighed that against
+how rarely a patch needs to repair stored data and kept the rule. A patch
+that meets wrong stored data reads around it in code, and the repair is a
+migration in the next minor. Lint refuses a new migration on a patch line.
+
 **A dev build's release is published by its own build, once it is whole
 (11 Nov 2026).** Every release starts as a draft so its owner can read it
 before anybody else sees it, and the dashboard's Publish refuses one still
