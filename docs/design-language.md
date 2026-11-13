@@ -392,7 +392,10 @@ Each is one rule of the design, by name; a session is handed one on the turn it 
 
 ### design-language
 
-The page's visual rules, in one place. Read this before adding or restyling
+The page's visual rules, in one place. The design has a name, Perch (the operator, 13 Nov): the shell
+every page shares (the rail, the top bar, pages with their addresses, the dock) and the rules here. A
+theme colors Perch and is not it, and the name carries no number: it is not a version of AerieOS.
+Read this before adding or restyling
 any surface, and extend the group selectors named here rather than restyling
 locally. `test/uniform.mjs` measures most of what follows on every tab and
 fails by name; the house rule `design` points here and runs it.

@@ -474,7 +474,7 @@ function resumePicker(p, m, card, anchor, ns, several){
     esc(v === "" && table === MODELS && resumeModelNow.project === p.name && resumeModelNow.model
       ? `Claude's default (last session: ${(MODELS.find(([x]) => x === resumeModelNow.model) || [])[1] || resumeModelNow.model})` : l)}</option>`).join("");
   // What it will do as its head, the two picks labeled above their fields
-  // side by side, and Back and the press at its foot (the design 2.0 pass).
+  // side by side, and Back and the press at its foot (the Perch pass).
   // The head names the agent and its product, as the other agents' does.
   // Which of your Claude sessions it is, past the first (R143).
   const as = (r.slot || 1) > 1 ? ` as ${agentSlotName(agentById("claude"), r.slot)}` : "";
