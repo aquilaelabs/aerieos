@@ -144,6 +144,13 @@ jobs:
             out/aerieos-os-*
             out/packages-moved.diff
           if-no-files-found: error
+          # A day, the shortest there is: this is how the image reaches the
+          # boot test and the release job of the same run, and nothing reads
+          # it afterwards (a release's files are on the release). Left at the
+          # default it sat for ninety days, several gigabytes from every tag,
+          # every branch push that touched the image and every weekly
+          # rebuild, and that is what used up the account's Actions storage.
+          retention-days: 1
 
   # The image booted before anything of it is published (R160 step 5): the
   # VM disk under QEMU with KVM, the dashboard's port forwarded, and a run
@@ -383,3 +390,5 @@ jobs:
           name: aerieos-os-boot
           path: serial*.log
           if-no-files-found: ignore
+          # The serial logs of a boot that failed, for whoever reads the run that week.
+          retention-days: 7
