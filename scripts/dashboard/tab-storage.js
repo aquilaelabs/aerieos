@@ -238,9 +238,13 @@ function storageShares(n){
     const names = [...(s.accounts || m.users || []).map(x => `${esc(x)}: read/write`), ...(s.readers || m.readers || []).map(x => `${esc(x)}: read-only`)];
     return `private: ${names.join(", ") || "nobody yet"}`;
   };
+  // Somebody named with no share password yet (R243): it is kept only for
+  // people a share names, and made as they next sign in.
+  const waiting = s => (s.waiting || []).length
+    ? `<div class="sub warn">${s.waiting.map(esc).join(", ")}: it opens for ${s.waiting.length === 1 ? "them" : "each"} once they have signed in to AerieOS again, or set a share password on Profile</div>` : "";
   const rows = shares.map(s => `<div class="row stack2 stshare" data-share="${esc(s.name)}"><div class="grow">
       <div class="name">${esc(s.name)} <code>${esc(s.path)}</code>${s.smb?.on || s.nfs?.on ? ` <span class="pill ok">exported</span>` : ` <span class="pill">internal</span>`}${lockedMounts.some(m => s.path === m || s.path.startsWith(m + "/")) ? ` <span class="pill warn">its pool is locked: unlock it under Pools</span>` : ""}</div>
-      ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>` : ""}
+      ${s.smb?.on ? `<div class="sub">SMB${s.smb.tm ? ", a Time Machine target" : ""}, ${access(s)}</div>${waiting(s)}` : ""}
       ${s.nfs?.on ? `<div class="sub">NFS${s.nfs.ro ? ", read-only" : ""}: ${(s.nfs.clients || []).map(esc).join(", ")} · ${esc(n.name)}:${esc(s.path)}</div>` : ""}
       ${s.smb?.on || s.nfs?.on ? "" : `<div class="sub">On this machine only: nothing serves it until you export it.</div>`}
       ${moveOf(s) ? `<div class="sub">${esc(moveSaid(moveOf(s)))}.</div>` : ""}

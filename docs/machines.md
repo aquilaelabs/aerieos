@@ -422,11 +422,15 @@ person named is read/write or read-only. A share lists people and has no passwor
 of its own: a person reaches it with
 the name and password they sign in to the dashboard with, or a separate
 password if they set one on Profile under Your shares, which also lists the
-shares named to them and the address to map each by. On a machine that serves
-shares the password is also kept as the NT hash Samba needs, which is weaker
-than the sign-in's own hash; it is handed to the own machine's agent in its
-hello and imported into Samba's database there, never written in a job or
-shown again. A missing folder is made for the share, on a mounted disk only,
+shares named to them and the address to map each by. For a person a share
+names, the password is also kept as the NT hash Samba needs, which is far
+weaker than the sign-in's own hash: it is made as that person next signs in
+or changes their password, kept for nobody a share does not name, and taken
+away when the last share stops naming them, so somebody just named on a
+share signs in to the dashboard once more before it opens for them, and the
+share's row says who it is waiting for. It is handed to the own machine's
+agent in its hello and imported into Samba's database there, never written
+in a job or shown again. A missing folder is made for the share, on a mounted disk only,
 and everyone named on it writes as one account, so they see each other's files. A
 share ticked as a Mac's Time Machine target is offered to the Finder as
 one (`fruit:time machine`), found by mDNS as Samba registers it.

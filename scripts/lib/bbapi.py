@@ -93,12 +93,20 @@ def _conn(timeout):
     if u.scheme != "https":
         return http.client.HTTPConnection(u.hostname, port, timeout=timeout), u.path.rstrip("/")
     ctx = ssl.create_default_context()
+    pin = os.environ.get("BB_CONTROLLER_PIN", "")
+    if pin == "ca":
+        # A node enrolled by a public hostname (--reach public): the name's
+        # own certificate by the system's CAs, as the agent's client checks
+        # it (controller.py's CA). Nothing is pinned: what the node sees is
+        # the edge's certificate, which changes. Compared to a digest, as
+        # every other pin is, this was refused, and no aerie verb in a
+        # session on such a node reached its controller (R243).
+        return http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx), u.path.rstrip("/")  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE                 # the pin below is the check
     # Pinned on first use, see the agent.
     c = http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     c.connect()
-    pin = os.environ.get("BB_CONTROLLER_PIN", "")
     seen = "sha256:" + hashlib.sha256(c.sock.getpeercert(True)).hexdigest()
     if pin and seen != pin:
         c.close()

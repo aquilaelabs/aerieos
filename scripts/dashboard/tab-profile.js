@@ -203,7 +203,9 @@ function profileShares(sm){
       <div class="name">${esc(r.name)}${r.ro ? ` <span class="pill">read-only</span>` : ""}${r.guest ? ` <span class="pill">everybody</span>` : ""}${r.tm ? ` <span class="pill">Time Machine</span>` : ""}</div>
       <div class="sub"><code>\\${esc(host)}\${esc(r.name)}</code> on Windows, <code>smb://${esc(host)}/${esc(r.name)}</code> on a Mac${addr ? `, or by the address ${esc(addr)}` : ""}</div>
     </div></div>`).join("");
-  const when = sm.follows ? "your shares use your sign-in password" : sm.at ? `a separate password, set ${esc(ago(sm.at))}` : "none yet: sign in again and it follows your password";
+  // Kept only while a share names you (R243): made from your password as you next sign in.
+  const when = sm.follows ? "your shares use your sign-in password" : sm.at ? `a separate password, set ${esc(ago(sm.at))}`
+    : sm.named ? "none yet: sign in again and your shares use your sign-in password" : "nothing is kept for shares while none names you";
   return `<div class="row stack2"><div class="grow">
     ${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share names you yet. An administrator names you on one from the Storage page.</div>`}
     <div class="logset">

@@ -217,6 +217,13 @@ def _redact(line):
     return re.sub(r"eyJ[A-Za-z0-9_=-]{20,}", "eyJ…", line)
 
 
+def running():
+    """Whether the install's own tunnel is up: its process is this
+    machine's, so what reaches the page through it comes from loopback
+    (the wrong-password hold counts the address it passes on, R243)."""
+    return _proc is not None and _proc.poll() is None
+
+
 def status():
     """What the Settings page says: whether cloudflared is here, running,
     registered, at which hostname, since when, its last lines."""

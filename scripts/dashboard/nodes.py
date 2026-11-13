@@ -4018,6 +4018,23 @@ def _share_cfg(sh, req):
     return cfg, ""
 
 
+def smb_named():
+    """The Unix users named on an SMB share the controller's own machine
+    serves, its users and its readers: whose share password is kept
+    (users._smb_follow). None while no own machine has said what it has."""
+    out, known = set(), False
+    for n in node_list():
+        rep = n.get("reported") or {}
+        if not own_machine(n) or not rep:
+            continue
+        known = True
+        for sh in rep.get("shares") or []:
+            sm = sh.get("smb") if isinstance(sh, dict) else None
+            if isinstance(sm, dict) and sm.get("on"):
+                out.update(str(u) for u in [*(sm.get("users") or []), *(sm.get("readers") or [])])
+    return out if known else None
+
+
 def smb_shares_for(uid):
     """The SMB shares on the controller's own machine a person reaches (R164
     step 1), for Profile: {host, address, rows: [{name, ro, guest, tm}]} with
@@ -4034,9 +4051,10 @@ def smb_shares_for(uid):
         rows = [{"name": sh["name"], "ro": reads_only(sh["smb"]), "guest": bool(sh["smb"].get("guest")), "tm": bool(sh["smb"].get("tm"))}
                 for sh in rep.get("shares") or [] if isinstance(sh, dict) and (sh.get("smb") or {}).get("on")
                 and (sh["smb"].get("guest") or (me and me in [*(sh["smb"].get("users") or []), *(sh["smb"].get("readers") or [])]))]
+        named = bool(me) and me in (smb_named() or ())
         addrs = ((rep.get("network") or {}).get("addresses") or [])
         return {"host": str(rep.get("hostname") or n.get("name") or ""), "address": str(addrs[0]).split("/")[0] if addrs else "",
-                "rows": rows}
+                "rows": rows, "named": named}
     return None
 
 

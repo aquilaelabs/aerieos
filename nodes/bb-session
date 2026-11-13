@@ -1816,14 +1816,21 @@ def _grant(c, target, tok, ro):
     port = u.port or (443 if u.scheme == "https" else 80)
     if u.scheme == "https":
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
-        conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
-        conn.connect()
-        seen = "sha256:" + hashlib.sha256(conn.sock.getpeercert(True)).hexdigest()
-        if c.get("CONTROLLER_PIN") and seen != c["CONTROLLER_PIN"]:
-            conn.close()
-            raise Refused("bb-session: the controller's certificate is not the one this node pinned")
+        if c.get("CONTROLLER_PIN") == "ca":
+            # Enrolled by a public hostname: the name's own certificate by
+            # the system's CAs, nothing pinned, as the agent's client and
+            # bbapi's read this pin (R243: compared to a digest it was
+            # refused, and no terminal opened on such a node).
+            conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
+        else:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
+            conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
+            conn.connect()
+            seen = "sha256:" + hashlib.sha256(conn.sock.getpeercert(True)).hexdigest()
+            if c.get("CONTROLLER_PIN") and seen != c["CONTROLLER_PIN"]:
+                conn.close()
+                raise Refused("bb-session: the controller's certificate is not the one this node pinned")
     else:
         conn = http.client.HTTPConnection(u.hostname, port, timeout=20)
     body = json.dumps({"arg": target, "ro": ro}).encode()

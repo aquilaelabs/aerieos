@@ -181,21 +181,35 @@ async function values(c, m, said){
 // changes, written into the unpacked /config as that build wrote it. What
 // to look for afterwards, or null when no migration past `state` has any.
 function plantOld(w, state){
-  if (state >= 22) return null;
-  // States 21 and 22: a repository's daily snapshot switch saved off, and a
-  // person's terminal colors for one space.
-  const f = `${w}/config/claude-prefs.json`;
-  const d = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
-  const users = JSON.parse(readFileSync(`${w}/config/users.json`, 'utf8'));
-  const uid = Object.values(users.users || users).map(u => u && u.uid).find(Boolean);
-  if (!uid) return null;
-  d.projects = d.projects || {};
-  d.projects.alpha = { ...(d.projects.alpha || {}), snapshots_on: false, snapshot_days: 14 };
-  d.projects.beta = { ...(d.projects.beta || {}), snapshots_on: true, snapshot_days: 9 };
-  d.users = d.users || {};
-  d.users[uid] = { ...(d.users[uid] || {}), alpha: { term_scheme: 'red', reply: 'minimal' } };
-  writeFileSync(f, JSON.stringify(d));
-  return { f, uid };
+  const out = {};
+  const uf = `${w}/config/users.json`;
+  const users = JSON.parse(readFileSync(uf, 'utf8'));
+  if (state < 22){
+    // States 21 and 22: a repository's daily snapshot switch saved off, and a
+    // person's terminal colors for one space.
+    const f = `${w}/config/claude-prefs.json`;
+    const d = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+    const uid = Object.values(users.users || users).map(u => u && u.uid).find(Boolean);
+    if (uid){
+      d.projects = d.projects || {};
+      d.projects.alpha = { ...(d.projects.alpha || {}), snapshots_on: false, snapshot_days: 14 };
+      d.projects.beta = { ...(d.projects.beta || {}), snapshots_on: true, snapshot_days: 9 };
+      d.users = d.users || {};
+      d.users[uid] = { ...(d.users[uid] || {}), alpha: { term_scheme: 'red', reply: 'minimal' } };
+      writeFileSync(f, JSON.stringify(d));
+      out.prefs = { f, uid };
+    }
+  }
+  if (state < 23 && users.users?.cy && users.users?.ada){
+    // State 23: the share password a machine that serves shares kept for
+    // every account at every sign-in, on an account no share names, and
+    // one a person set apart on Profile.
+    users.users.cy = { ...users.users.cy, smb_nt: 'C'.repeat(32), smb_at: 5, smb_follows: true };
+    users.users.ada = { ...users.users.ada, smb_nt: 'D'.repeat(32), smb_at: 5 };
+    writeFileSync(uf, JSON.stringify(users));
+    out.shares = { f: uf };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 async function signIn(browser, c, m, said){
@@ -251,8 +265,14 @@ for (const ver of vers){
       const c = await start(w);
       ok(c.code === null, `${ver} lived in: this build starts on it` + (c.code === null ? '' : `\n${c.log().slice(-1500)}`));
       if (c.code === null){
-        const d = JSON.parse(readFileSync(planted.f, 'utf8'));
-        const a = d.projects.alpha, b = d.projects.beta, mine = (d.users[planted.uid] || {}).alpha || {};
+        if (planted.shares){
+          const us = JSON.parse(readFileSync(planted.shares.f, 'utf8')).users;
+          ok(!('smb_nt' in us.cy) && !('smb_follows' in us.cy) && us.cy.password && us.ada.smb_nt === 'D'.repeat(32),
+             `${ver} lived in: a share password that followed a sign-in is gone from an account no share names, and one set apart stays (${JSON.stringify([Object.keys(us.cy).filter(k => k.startsWith('smb')), us.ada.smb_nt?.slice(0, 4)])})`);
+        }
+        if (planted.prefs){
+        const d = JSON.parse(readFileSync(planted.prefs.f, 'utf8'));
+        const a = d.projects.alpha, b = d.projects.beta, mine = (d.users[planted.prefs.uid] || {}).alpha || {};
         ok(a.snapshot_days === 0 && !('snapshots_on' in a) && b.snapshot_days === 9 && !('snapshots_on' in b),
            `${ver} lived in: a daily snapshot switch saved off is 0 days kept and the switch is gone from the stored settings (${JSON.stringify([a.snapshot_days, a.snapshots_on, b.snapshot_days, b.snapshots_on])})`);
         ok(!('term_scheme' in mine) && mine.reply === 'minimal',
@@ -260,6 +280,7 @@ for (const ver of vers){
         const H = basic(m.owner.name, m.owner.password);
         const snaps = await (await fetch(`${c.base}/api/snapshots?project=alpha`, { headers: H })).json();
         ok(snaps.keep === 0 && !('on' in snaps), `${ver} lived in: and the controller reads it so: alpha keeps 0 days (${JSON.stringify({ keep: snaps.keep, on: snaps.on })})`);
+        }
         await holds(c, m, `${ver} lived in`);
       }
       await stop(c);

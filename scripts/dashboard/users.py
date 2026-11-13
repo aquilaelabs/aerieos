@@ -435,6 +435,46 @@ def _pw_recent(key, now, add=False):
     return ts
 
 
+def counted_address(sock, forwarded="", trusted=()):
+    """The address a wrong password is counted against. The socket's own,
+    which a client cannot write, unless the socket is a proxy this install
+    trusts (its own tunnel, a proxy named in Settings): then the address
+    that proxy says it passes on, the last one in X-Forwarded-For that is
+    not itself a trusted proxy. Counted by the socket alone, everybody
+    behind the tunnel or a reverse proxy was one address, and a hundred
+    wrong passwords from anyone there held every one of them (R243).
+    `trusted` is addresses and networks as text; what does not read as one
+    is ignored, and a header from anybody else is ignored whole."""
+    import ipaddress
+
+    def addr(s):
+        try:
+            a = ipaddress.ip_address(str(s).strip().strip("[]"))
+        except ValueError:
+            return None
+        return a.ipv4_mapped or a if a.version == 6 else a
+    nets = []
+    for t in trusted or ():
+        try:
+            nets.append(ipaddress.ip_network(str(t).strip(), strict=False))
+        except ValueError:
+            continue
+
+    def is_proxy(a):
+        return any(a.version == n.version and a in n for n in nets)
+    here = addr(sock)
+    if here is None:
+        return str(sock or "")[:45]
+    if is_proxy(here):
+        for part in reversed(str(forwarded or "").split(",")):
+            a = addr(part)
+            if a is None:
+                break                     # not an address: nothing past it is believed
+            if not is_proxy(a):
+                return str(a)
+    return str(here)
+
+
 def pw_held(where):
     """Seconds left before `where` is asked for a password again, or 0."""
     now = time.time()
@@ -1080,13 +1120,31 @@ def accounts_in_use():
 # A share on the controller's own machine is reached as the account's own
 # Unix user there (bbu- and the id's hex, accounts.py), by the account's name
 # and password: a share lists people, and has no password of its own (the
-# operator, 4 Nov). On a machine that serves shares the hash is kept as the
-# account's password is set, unless the person set one apart on Profile
-# (smb_follows is absent then). Samba wants the NT hash (MD4 of the password
-# in UTF-16LE), which is what is kept here and handed to the own machine's
+# operator, 4 Nov). Samba wants the NT hash (MD4 of the password in
+# UTF-16LE), which is what is kept here and handed to the own machine's
 # agent in its hello; the password itself is never stored. The hash opens
-# the shares as the password does, so it is in the users file and nowhere
-# else, never listed, and a backup carries it sealed as the rest.
+# the shares as the password does and is far weaker than the password's own
+# hash, so it is kept for as few accounts as need it (the operator, 13 Nov):
+# on a machine that serves shares, for an account a share names, made from
+# the password as that account next signs in or changes it, and taken away
+# when no share names it any more; it was made for every account at every
+# sign-in, in the users file and every copy of it. A person may set one
+# apart on Profile (smb_follows is absent then), which is theirs until they
+# clear it. It is in the users file and nowhere else, and never listed.
+
+# () -> the Unix users a share this install serves names (its users and its
+# readers), or None while that is not known (the own machine has not said):
+# set by server.py to nodes.smb_named.
+share_named = None
+
+
+def _named():
+    """Those Unix users, or None where nobody can say."""
+    try:
+        got = share_named() if share_named else None
+    except Exception:                                          # noqa: BLE001 (a question, never the sign-in's fault)
+        return None
+    return None if got is None else set(got)
 
 def _md4(data):
     """MD4 (RFC 1320), since OpenSSL 3 no longer offers it to hashlib."""
@@ -1125,24 +1183,64 @@ def _serves_shares():
     return os.environ.get("BB_INSTALL", "") == "bare-metal"
 
 
-def _smb_follow(u, password):
-    """The account's share password follows its sign-in, where one was not set
-    apart. Called with the store's lock held, with the password in hand."""
-    if _serves_shares() and (u.get("smb_follows") or not u.get("smb_nt")):
-        u["smb_nt"], u["smb_at"], u["smb_follows"] = nt_hash(password), int(time.time()), True
+def _smb_follow(u, password, named=False):
+    """The account's share password follows its sign-in, where one was not
+    set apart and a share names the account; with no share naming it, a hash
+    that followed is taken away and none is made. Where it is not known who
+    is named, one that is there is kept in step and none is made. Called
+    with the store's lock held and the password in hand; whether the record
+    changed."""
+    if not _serves_shares() or (u.get("smb_nt") and not u.get("smb_follows")):
+        return False
+    named = _named() if named is False else named
+    if named is not None and smb_user_of(u.get("uid") or "") not in named:
+        return _smb_drop(u)
+    if named is None and not u.get("smb_nt"):
+        return False
+    nt = nt_hash(password)
+    if u.get("smb_nt") == nt and u.get("smb_follows"):
+        return False
+    u["smb_nt"], u["smb_at"], u["smb_follows"] = nt, int(time.time()), True
+    return True
+
+
+def _smb_drop(u):
+    """A hash that followed the password, taken off the record; whether one was there."""
+    if not (u.get("smb_follows") and u.get("smb_nt")):
+        return False
+    for k in ("smb_nt", "smb_at", "smb_follows"):
+        u.pop(k, None)
+    return True
 
 
 def smb_take_up(name, password):
-    """A person signing in whose account has no share password yet (it came by a
-    move, or from before this): the one they just proved, once."""
+    """A person signing in: the share password made from the one they just
+    proved where a share names them and they have none (they were named
+    since they last signed in, or came by a move), and one that followed
+    taken away where no share names them any more."""
     if not _serves_shares():
         return
     with _lock:
         d = load()
         u = d["users"].get(str(name))
-        if u and not u.get("smb_nt"):
-            _smb_follow(u, password)
+        if u and _smb_follow(u, password):
             _save(d)
+
+
+def smb_prune():
+    """Every share password that followed its account's sign-in, on an
+    account no share names any more, taken away; how many. Nothing where it
+    is not known who is named."""
+    named = _named()
+    if named is None:
+        return 0
+    with _lock:
+        d = load()
+        gone = sum(1 for u in d["users"].values()
+                   if smb_user_of(u.get("uid") or "") not in named and _smb_drop(u))
+        if gone:
+            _save(d)
+    return gone
 
 
 def smb_user_of(uid):
@@ -1172,7 +1270,11 @@ def set_smb_password(name, password):
 
 def smb_users():
     """Every account with an SMB password: [{user, nt, name}] for the own
-    machine's hello, the Unix user, the hash and the name it signs in by."""
+    machine's hello, the Unix user, the hash and the name it signs in by.
+    One that followed the sign-in of an account no share names any more is
+    taken away first (smb_prune), so the machine is never handed it."""
+    if any(u.get("smb_follows") and u.get("smb_nt") for u in load()["users"].values()):
+        smb_prune()
     out = []
     for _name, u in sorted(load()["users"].items()):
         user = smb_user_of(u.get("uid") or "")

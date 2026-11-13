@@ -694,7 +694,9 @@ const SETTING_GROUPS = [
     {key: "tls_host", label: "Hostname", type: "text", placeholder: "bb.example.com",
      hint: "The controller's own public name, which the certificate is for. Leave it empty on a LAN with no name: the install's own certificate then names the addresses the page is reached at."},
     {key: "tls_email", label: "Email (Let's Encrypt)", type: "text", placeholder: "you@example.com",
-     hint: "Where Let's Encrypt writes about the certificate. Optional."}]},
+     hint: "Where Let's Encrypt writes about the certificate. Optional."},
+    {key: "trusted_proxies", label: "Reverse proxy in front", type: "text", placeholder: "192.168.1.20",
+     hint: "Only if another machine's proxy stands in front of this page: its address, or several and networks parted by spaces. Wrong passwords are then counted against each visitor's own address, where without this the proxy is the one address everybody shares, and a hundred wrong passwords from anyone hold them all. The tunnel under Reach from outside needs no entry."}]},
   // The mail server the bell's rows go out through (R149, reach.py): each
   // person picks where the bell reaches them on their Profile; email needs
   // this server.

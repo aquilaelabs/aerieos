@@ -87,6 +87,11 @@ KEYS = {
     # tunnel's rules are written rather than clicked. The two tokens are
     # secrets: kept here, never shown back, only said to be set.
     "tunnel_host": {"default": "", "kind": "text", "shape": "host", "applied": "now"},
+    # A reverse proxy in front of the dashboard (R243): its address, or
+    # several and networks parted by spaces. Wrong passwords are then
+    # counted against the address it passes on, not against the proxy, which
+    # is everybody behind it. The install's own tunnel needs no entry.
+    "trusted_proxies": {"default": "", "kind": "text", "shape": "line", "applied": "now"},
     # The vetted catalog's address (R169 step 2): where index.json and index.sig are read from.
     "catalog_url": {"default": "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/", "kind": "text", "shape": "url", "applied": "now"},
     # Whether a pack a person added themselves (sideloaded) may offer the

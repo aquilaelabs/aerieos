@@ -82,6 +82,11 @@ class FollowsTheSignIn(unittest.TestCase):
         for p in self.patch:
             p.start()
         self.d = {"users": {"sean": {"uid": "u_0a1b2c3d", "password": "x"}}}
+        # A share names sean, unless a test says otherwise.
+        self.named = {"bbu-0a1b2c3d"}
+        named = mock.patch.object(users, "share_named", lambda: self.named)
+        named.start()
+        self.addCleanup(named.stop)
 
     def tearDown(self):
         for p in self.patch:
@@ -124,6 +129,146 @@ class FollowsTheSignIn(unittest.TestCase):
         with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
             u.smb_take_up("sean", "proved-just-now")
         self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("proved-just-now"))
+
+    def test_an_account_no_share_names_has_no_share_password(self):
+        # The NT hash is far weaker than the password's own hash, and was
+        # kept for every account at every sign-in (the operator, 13 Nov).
+        u = self.users
+        self.d["users"]["mia"] = {"uid": "u_11112222", "password": "x"}
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            self.assertFalse(u._smb_follow(self.d["users"]["mia"], "correct-horse"))
+            u.smb_take_up("mia", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["mia"])
+            # Named since: made from the password as they next sign in.
+            self.named = {"bbu-0a1b2c3d", "bbu-11112222"}
+            u.smb_take_up("mia", "correct-horse")
+            self.assertEqual(self.d["users"]["mia"]["smb_nt"], u.nt_hash("correct-horse"))
+            self.assertTrue(self.d["users"]["mia"]["smb_follows"])
+            # ...and the same sign-in again writes nothing.
+            saves = []
+            with mock.patch.object(u, "_save", lambda d: saves.append(1)):
+                u.smb_take_up("mia", "correct-horse")
+            self.assertEqual(saves, [])
+
+    def test_one_that_followed_goes_when_no_share_names_the_account_any_more(self):
+        u = self.users
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.smb_take_up("sean", "correct-horse")
+            self.assertIn("smb_nt", self.d["users"]["sean"])
+            self.named = set()
+            # The machine is never handed it, and it is off the record.
+            self.assertEqual(u.smb_users(), [])
+            for k in ("smb_nt", "smb_at", "smb_follows"):
+                self.assertNotIn(k, self.d["users"]["sean"])
+            # At a sign-in too, and a second pass finds nothing.
+            self.named = {"bbu-0a1b2c3d"}
+            u.smb_take_up("sean", "correct-horse")
+            self.named = set()
+            u.smb_take_up("sean", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["sean"])
+            self.assertEqual(u.smb_prune(), 0)
+
+    def test_one_set_apart_stays_whoever_is_named(self):
+        u = self.users
+        self.named = set()
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.set_smb_password("sean", "a-separate-one")
+            u.smb_take_up("sean", "correct-horse")
+            self.assertEqual(u.smb_prune(), 0)
+            self.assertEqual(u.smb_users(), [{"user": "bbu-0a1b2c3d", "nt": u.nt_hash("a-separate-one"), "name": "sean"}])
+
+    def test_while_nobody_can_say_who_is_named_what_is_there_is_kept_and_nothing_is_made(self):
+        u = self.users
+        self.d["users"]["mia"] = {"uid": "u_11112222", "password": "x"}
+        with mock.patch.dict(os.environ, {"BB_INSTALL": "bare-metal"}):
+            u.smb_take_up("sean", "correct-horse")
+            self.named = None
+            u.smb_take_up("mia", "correct-horse")
+            self.assertNotIn("smb_nt", self.d["users"]["mia"])
+            self.assertEqual(u.smb_prune(), 0)
+            # A password changed meanwhile keeps the one that is there in step.
+            self.assertTrue(u._smb_follow(self.d["users"]["sean"], "a-new-password"))
+            self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("a-new-password"))
+            # The question failing is nobody's sign-in failing.
+            with mock.patch.object(u, "share_named", lambda: 1 / 0):
+                u.smb_take_up("sean", "a-new-password")
+            self.assertEqual(self.d["users"]["sean"]["smb_nt"], u.nt_hash("a-new-password"))
+
+    def test_who_is_named_is_a_shares_users_and_readers_on_the_own_machine(self):
+        import nodes
+        own = {"id": "n1", "kind": "agent", "config": {"own": True},
+               "reported": {"shares": [{"name": "docs", "smb": {"on": True, "users": ["bbu-0a1b2c3d"], "readers": ["bbu-11112222"]}},
+                                       {"name": "everybody", "smb": {"on": True, "guest": True, "users": []}},
+                                       {"name": "off", "smb": {"on": False, "users": ["bbu-99999999"]}}]}}
+        other = {"id": "n2", "kind": "agent", "config": {}, "reported": {"shares": [{"name": "x", "smb": {"on": True, "users": ["bbu-77777777"]}}]}}
+        with mock.patch.object(nodes, "node_list", return_value=[other, own]):
+            self.assertEqual(nodes.smb_named(), {"bbu-0a1b2c3d", "bbu-11112222"})
+        with mock.patch.object(nodes, "node_list", return_value=[other, {"id": "n1", "kind": "agent", "config": {"own": True}, "reported": {}}]):
+            self.assertIsNone(nodes.smb_named(), "the own machine has not said what it has")
+        with mock.patch.object(nodes, "node_list", return_value=[other]):
+            self.assertIsNone(nodes.smb_named())
+
+
+class Migration(unittest.TestCase):
+    """State 23: the hashes that were made for everybody are taken away from
+    every account no share names."""
+
+    def test_only_an_account_a_share_names_keeps_one_that_followed(self):
+        import importlib
+        import sqlite3
+        mig = importlib.import_module("statemigrations.0023_share_hash_only_with_a_share")
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        f = os.path.join(d, "users.json")
+        people = {"users": {
+            "named": {"uid": "u_0a1b2c3d", "smb_nt": "A" * 32, "smb_at": 5, "smb_follows": True},
+            "reader": {"uid": "u_0000beef", "smb_nt": "B" * 32, "smb_at": 5, "smb_follows": True},
+            "nobody": {"uid": "u_11112222", "smb_nt": "C" * 32, "smb_at": 5, "smb_follows": True, "password": "kept"},
+            "apart": {"uid": "u_33334444", "smb_nt": "D" * 32, "smb_at": 5},
+            "plain": {"uid": "u_55556666", "password": "x"}}}
+        with open(f, "w") as fh:
+            json.dump(people, fh)
+        os.chmod(f, 0o600)
+        con = sqlite3.connect(os.path.join(d, "builderbot.db"))
+        con.execute("CREATE TABLE nodes (id TEXT, kind TEXT, config TEXT, reported TEXT)")
+        con.execute("INSERT INTO nodes VALUES ('local', 'local', '{}', '{}')")
+        con.execute("INSERT INTO nodes VALUES ('n1', 'agent', ?, ?)", (json.dumps({"own": True}), json.dumps(
+            {"shares": [{"name": "docs", "smb": {"on": True, "users": ["bbu-0a1b2c3d"], "readers": ["bbu-0000beef"]}},
+                        {"name": "off", "smb": {"on": False, "users": ["bbu-11112222"]}}]})))
+        con.execute("INSERT INTO nodes VALUES ('n2', 'agent', '{}', ?)", (json.dumps(
+            {"shares": [{"name": "elsewhere", "smb": {"on": True, "users": ["bbu-11112222"]}}]}),))
+        con.commit()
+        con.close()
+        mig.run({"state": d})
+        with open(f) as fh:
+            got = json.load(fh)["users"]
+        self.assertEqual(got["named"], people["users"]["named"])
+        self.assertEqual(got["reader"], people["users"]["reader"])
+        self.assertEqual(got["nobody"], {"uid": "u_11112222", "password": "kept"}, "named on another node's share, or one switched off, is not named")
+        self.assertEqual(got["apart"], people["users"]["apart"], "one set apart is its person's")
+        self.assertEqual(got["plain"], people["users"]["plain"])
+        self.assertEqual(os.stat(f).st_mode & 0o777, 0o600)
+        before = os.stat(f).st_mtime_ns
+        mig.run({"state": d})
+        self.assertEqual(os.stat(f).st_mtime_ns, before, "a second run writes nothing")
+
+    def test_with_no_own_machine_no_share_is_served_and_every_followed_one_goes(self):
+        import importlib
+        mig = importlib.import_module("statemigrations.0023_share_hash_only_with_a_share")
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        f = os.path.join(d, "users.json")
+        with open(f, "w") as fh:
+            json.dump({"users": {"a": {"uid": "u_0a1b2c3d", "smb_nt": "A" * 32, "smb_follows": True},
+                                 "b": {"uid": "u_33334444", "smb_nt": "D" * 32}}}, fh)
+        mig.run({"state": d})
+        with open(f) as fh:
+            got = json.load(fh)["users"]
+        self.assertEqual(got, {"a": {"uid": "u_0a1b2c3d"}, "b": {"uid": "u_33334444", "smb_nt": "D" * 32}})
+        # Not there, or not a record: left.
+        os.unlink(f)
+        mig.run({"state": d})
+        self.assertFalse(os.path.exists(f))
 
 
 if __name__ == "__main__":

@@ -4584,6 +4584,8 @@ try:
     # The accounts' SMB passwords and a share's names (R164 step 1).
     nodes.smb_users = users.smb_users
     nodes.smb_resolve = users.smb_resolve
+    # ...and who a share names, which is whose share password is kept (R243).
+    users.share_named = nodes.smb_named
     # ...and whether setup has ended, which closes a screen's open login
     # (R194). A landing cut midway is not an end: its setting came with the
     # bundle, and the way in is wanted most then.
@@ -6698,12 +6700,20 @@ class Handler(BaseHTTPRequestHandler):
             return ""
 
     def _peer(self):
-        """The socket's own address, which a client cannot write: what
-        wrong passwords are counted against (users.authenticate)."""
+        """What wrong passwords are counted against (users.authenticate):
+        the socket's own address, which a client cannot write, or, where
+        the socket is a proxy this install trusts, the address it passes on
+        (users.counted_address): the install's own tunnel, which dials in
+        from this machine while it runs, and any proxy named in Settings."""
         try:
-            return str(self.client_address[0])[:45]
+            sock = str(self.client_address[0])[:45]
         except (AttributeError, IndexError, TypeError):
             return ""
+        trusted = str(settings.get("trusted_proxies") or "").replace(",", " ").split()
+        with contextlib.suppress(Exception):                # noqa: BLE001 (the tunnel's state never fails a sign-in)
+            if tunnel.running():
+                trusted += ["127.0.0.0/8", "::1"]
+        return users.counted_address(sock, self.headers.get("X-Forwarded-For", ""), trusted)
 
     def _mint_lid(self, u):
         """A sign-in row for this browser (logins.mint): what the cookie
@@ -12903,13 +12913,20 @@ class Handler(BaseHTTPRequestHandler):
         # The own machine's snapshot schedules (R162 step 5), the Schedules
         # page's rows the Storage page makes and lists beside its pools.
         names = users.smb_names()
+        have = None
         for row in payload.get("nodes") or []:
             if row.get("own"):
                 row["snapshot_schedules"] = schedules.snapshot_schedules(row["node"])
                 # A share's users as people (R164 step 1), and who may be named.
+                if have is None:
+                    have = {x["user"] for x in users.smb_users()}
                 for sh in row.get("shares") or []:
-                    sh["accounts"] = [names.get(u, u) for u in (sh.get("smb") or {}).get("users") or []]
-                    sh["readers"] = [names.get(u, u) for u in (sh.get("smb") or {}).get("readers") or []]
+                    sm = sh.get("smb") or {}
+                    sh["accounts"] = [names.get(u, u) for u in sm.get("users") or []]
+                    sh["readers"] = [names.get(u, u) for u in sm.get("readers") or []]
+                    # ...and who is named with no share password yet (R243):
+                    # it is made from their password as they next sign in.
+                    sh["waiting"] = [names[u] for u in [*(sm.get("users") or []), *(sm.get("readers") or [])] if u in names and u not in have]
                 if users.is_admin(who):
                     row["extmounts"] = extmounts.rows()
                     row["backups"] = storebackups.rows()
