@@ -34,7 +34,7 @@ import tarfile
 import threading
 import time
 import urllib.parse
-from .base import hello_again, SHARE, log, log_once
+from .base import as_root, fs_holds, hello_again, SHARE, log, log_once
 from .names import VAR
 
 # What is not synced, the same set as the controller's (wssync.SKIP_DIRS
@@ -53,6 +53,7 @@ TICK = 1.0
 # 87 posts a minute at 0.44s each on a controller with two synced nodes,
 # most of its time (B643, 11 Oct), to learn nothing had changed.
 PULL_EVERY = 120.0
+CLAIM_EVERY = 600           # what root left in a tree is made its owner's at most this often
 ASK_EVERY = 30.0
 WALK_EVERY = 60.0        # a whole walk even with the watcher, for what it cannot see
 MOUNTED = ("something is mounted at /workspace, where this node's synced copy goes; "
@@ -270,6 +271,8 @@ class Project:
         self.error = ""
         self.watch = None         # its Watcher, once there is a tree to watch
         self.walked_at = 0.0
+        self.denied = False       # a change this tick was refused as the tree's owner
+        self.claimed_at = 0.0     # when what root left in the tree was last made its owner's
         try:
             with open(path) as f:
                 d = json.load(f)
@@ -279,10 +282,13 @@ class Project:
             pass
 
     def save(self):
-        tmp = self.path + ".new"
-        with open(tmp, "w") as f:
-            json.dump({"rev": self.rev, "ready": self.ready, "files": self.files}, f)
-        os.replace(tmp, self.path)
+        # The agent's own record, kept where only root writes: root's file
+        # identity for it, in the middle of work done as the tree's owner.
+        with as_root():
+            tmp = self.path + ".new"
+            with open(tmp, "w") as f:
+                json.dump({"rev": self.rev, "ready": self.ready, "files": self.files}, f)
+            os.replace(tmp, self.path)
 
 
 class WorkspaceSync:
@@ -520,6 +526,49 @@ class WorkspaceSync:
         return os.path.join(self.root, name)
 
     def one(self, p):
+        """One project brought in step, its file work done as the tree's
+        owner and not as root (base.acting_as): a session writes this tree,
+        and root opening a path in it followed whatever the session had put
+        there, a link at .bbsync-NAME.part above all (the audit of 13 Nov)."""
+        with fs_holds(self.owner()):
+            self._one(p)
+            # Refused as the owner: something in the tree is root's (a
+            # container wrote it, or this agent did before it worked as the
+            # owner). Made the owner's, at most every ten minutes, and the
+            # change is tried again on the next tick.
+            if p.denied:
+                p.denied = False
+                if time.monotonic() - p.claimed_at > CLAIM_EVERY:
+                    p.claimed_at = time.monotonic()
+                    with as_root():
+                        took = self.claim(self.top(p.name))
+                    if took:
+                        log(f"sync: {p.name}: {took} entries in its tree were root's and are its owner's now")
+                        p.hinted = True
+
+    def claim(self, top):
+        """What root left in this tree made the tree owner's, so its owner
+        can change it: only what is root's, each by its folder's descriptor
+        and never through a link, so nothing outside the tree can be named.
+        How many it took."""
+        own = self.owner()
+        if not own or not os.path.isdir(top) or os.path.islink(top):
+            return 0
+        took = 0
+        try:
+            for _d, dirs, files, dfd in os.fwalk(top, follow_symlinks=False):
+                for name in (".", *dirs, *files) if _d == top else (*dirs, *files):
+                    try:
+                        if os.stat(name, dir_fd=dfd, follow_symlinks=False).st_uid == 0:
+                            os.chown(name, own[0], own[1], dir_fd=dfd, follow_symlinks=False)
+                            took += 1
+                    except OSError:
+                        continue
+        except OSError:
+            pass
+        return took
+
+    def _one(self, p):
         top = self.top(p.name)
         started = time.time()
         if not p.ready:
@@ -569,15 +618,23 @@ class WorkspaceSync:
             # Each folder made on the way the tree owner's, not the top's
             # alone: a worktree's unit made .worktrees/PROJECT as root, and an
             # account's own user, its tree mapped to it, could make no
-            # worktree beside it (B356).
-            made, up = [], cur
-            while up and not os.path.isdir(up) and up.startswith(self.root.rstrip("/") + "/"):
-                made.append(up)
-                up = os.path.dirname(up)
-            os.makedirs(cur, exist_ok=True)
-            if own:
-                for d in made:
-                    os.lchown(d, *own)
+            # worktree beside it (B356). Root's to make, since the folder
+            # they go in may be root's, and so held to real folders all the
+            # way down from the root: a link on the way is refused.
+            with as_root():
+                made, up = [], cur
+                while up and not os.path.isdir(up) and up.startswith(self.root.rstrip("/") + "/"):
+                    made.append(up)
+                    up = os.path.dirname(up)
+                walked = self.root.rstrip("/")
+                for part in [x for x in os.path.relpath(up, walked).split("/") if x and x != "."]:
+                    walked = os.path.join(walked, part)
+                    if os.path.islink(walked):
+                        raise OSError(f"{walked} is a link, so nothing is made under it")
+                os.makedirs(cur, exist_ok=True)
+                if own:
+                    for d in made:
+                        os.lchown(d, *own)
         for part in [x for x in rel_dir.split("/") if x]:
             cur = os.path.join(cur, part)
             if not os.path.isdir(cur):
@@ -591,12 +648,20 @@ class WorkspaceSync:
         d, _, name = rel.rpartition("/")
         self.mkdirs(top, d)
         tmp = os.path.join(top, d, f"{TMP}{name}")
+        # The file the download is written to, opened here first: a folder
+        # this tree's owner may not write (a container left it root's), or a
+        # link left at the name, is refused by name and as what it is. The
+        # download swallowed it and this said "the controller answered 0",
+        # so nothing knew to hand the folder to the tree's owner.
+        with open(tmp + ".part", "wb"):
+            pass
         q = urllib.parse.urlencode({"project": p.name, "path": rel})
-        code, _ = self.agent.ctl.fetch(f"sync-file?{q}", tmp, timeout=600)
+        code, why = self.agent.ctl.fetch(f"sync-file?{q}", tmp, timeout=600)
         if code != 200:
-            with contextlib.suppress(OSError):
-                os.remove(tmp)
-            raise OSError(f"{rel}: the controller answered {code}")
+            for x in (tmp, tmp + ".part"):
+                with contextlib.suppress(OSError):
+                    os.remove(x)
+            raise OSError(f"{rel}: the controller answered {code}" if code else f"{rel} was not fetched: {why}")
         got = sha_file(tmp)
         os.chmod(tmp, mode or 0o644)
         own = self.owner()
@@ -690,6 +755,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
                 return
             p.copying -= 1
         p.rev, p.ready, p.error, p.copying = int(r.get("rev") or 0), True, "", 0
@@ -702,15 +768,20 @@ class WorkspaceSync:
         owned by the session account. Paths that would leave the tree, and
         anything but files, directories and links inside it, are refused."""
         # A worktree's name has slashes in it: its file sits beside its record.
-        tmp = os.path.join(self.record_dir(), "." + p.name.replace("/", "%") + ".tar")
+        # The download is kept where only root writes, and opened as root;
+        # what it holds is then laid out as the tree's owner.
+        with as_root():
+            tmp = os.path.join(self.record_dir(), "." + p.name.replace("/", "%") + ".tar")
         q = urllib.parse.urlencode({"project": p.name})
         try:
-            code, _ = self.agent.ctl.fetch(f"sync-tar?{q}", tmp, timeout=3600)
-            if code != 200:
-                raise OSError(f"the controller answered {code}")
+            with as_root():
+                code, _ = self.agent.ctl.fetch(f"sync-tar?{q}", tmp, timeout=3600)
+                if code != 200:
+                    raise OSError(f"the controller answered {code}")
+                opened = tarfile.open(tmp)                     # noqa: SIM115 (closed by the with below)
             self.mkdirs(top, "")
             own = self.owner()
-            with tarfile.open(tmp) as tar:
+            with opened as tar:
                 for m in tar:
                     name = m.name
                     if name.startswith("/") or ".." in name.split("/") or skipped(name):
@@ -742,7 +813,7 @@ class WorkspaceSync:
                     if own:
                         os.lchown(dest, *own)
         finally:
-            with contextlib.suppress(OSError):
+            with as_root(), contextlib.suppress(OSError):
                 os.remove(tmp)
 
     def pull(self, p, top):
@@ -786,6 +857,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
                 held.append(rel)
         if not held:
             moved |= p.rev != int(r.get("rev") or p.rev)
@@ -898,6 +970,7 @@ class WorkspaceSync:
                     self.agree(p, top, rel, got)
             except OSError as ex:
                 p.error = str(ex)[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
             p.hinted = True
             return True
         if e is None:

@@ -186,8 +186,23 @@ def cmd_selfcheck():
         name = f"{__package__}.{m.name}"
         src = m.module_finder.find_spec(name).loader.get_source(name)
         compile(src or "", name, "exec")
-    load_state()
-    print(f"selfcheck ok {AGENT_VERSION} {own_digest()[:19]}")
+    state = load_state()
+    # Whether this machine holds file work as an account (base.acting_as):
+    # tried here as root, so an update's job says it before anything on the
+    # node relies on it. It never fails the check: the agent does that work
+    # as root, as before, where it does not hold.
+    from .base import fs_probe
+    who = None
+    if state.get("user") and state.get("user") != "root":
+        import pwd
+        try:
+            pw = pwd.getpwnam(state["user"])
+            who = (pw.pw_uid, pw.pw_gid)
+        except KeyError:
+            who = None
+    ok, why = fs_probe(who)
+    fs = "holds" if ok else f"not tried ({why})" if ok is None else f"DOES NOT HOLD ({why})"
+    print(f"selfcheck ok {AGENT_VERSION} {own_digest()[:19]}; file work as the account: {fs}")
 
 
 def cmd_status():

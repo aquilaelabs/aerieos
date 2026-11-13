@@ -6,7 +6,7 @@ import os
 import re
 import shutil
 import tarfile
-from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, log
+from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, fs_holds, log
 from .stores import dir_bytes, tc_root
 
 
@@ -19,8 +19,13 @@ class WorkspaceMixin:
         and this process is root."""
         os.makedirs(path, exist_ok=True)
         if who:
+            # By the folder itself, never through a link left at its name.
             with contextlib.suppress(OSError):
-                os.chown(path, who["user"], who["group"])
+                fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    os.fchown(fd, who["user"], who["group"])
+                finally:
+                    os.close(fd)
 
     def materialize(self, job, src, who):
         """The job's source, on disk: the snapshot by digest, from the
@@ -117,17 +122,22 @@ class WorkspaceMixin:
         sharing a name are told apart by the directory the second came
         from, so a debug and a release APK of the same name both arrive."""
         seen = set()
+        # Found and read as the job's account (base.acting_as): root opened
+        # whatever a glob in the job's workspace named, so a link there to a
+        # file only root reads went up as the space's artifact.
+        who = self.drop_privileges({})
         for pat in list(outputs)[:16]:
-            for hit in sorted(glob.glob(os.path.join(base, str(pat)), recursive=True)):
-                if not os.path.isfile(hit):
-                    continue
+            with fs_holds(who):
+                hits = [h for h in sorted(glob.glob(os.path.join(base, str(pat)), recursive=True)) if os.path.isfile(h)]
+            for hit in hits:
                 rel = os.path.relpath(hit, base)
                 name = os.path.basename(rel)
                 if name in seen:
                     parent = os.path.basename(os.path.dirname(rel)) or "2"
                     name = f"{parent}-{name}"
                 seen.add(name)
-                st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}", hit)
+                with fs_holds(who):
+                    st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}", hit)
                 if st == 200 and not r.get("error"):
                     job.say(f"artifact {r['path']} ({os.path.getsize(hit)} bytes)\n")
                     job.outputs.append({"kind": "artifact", "path": r["path"],

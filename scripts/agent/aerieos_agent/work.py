@@ -12,7 +12,7 @@ import time
 import urllib.request
 import zipfile
 from . import keyops, storage
-from .base import DRIVER, OWN_COMPOSE, SANDBOX_BIN, SIGN_WORK, TOOLKIT, root_docker_env
+from .base import DRIVER, OWN_COMPOSE, SANDBOX_BIN, SIGN_WORK, TOOLKIT, fs_holds, root_docker_env
 from .stores import tc_root, tc_scope
 from .backends import pkg_backend
 from .toolchains import held_recipes, read_catalog, sdk_env, sysdeps_missing, tc_dir, tc_users, tc_users_said, tc_verbs
@@ -84,11 +84,11 @@ class WorkMixin:
             if not base or base.startswith("."):
                 base = base or "file"
             path = os.path.join(cdir, base)
-            with open(path, "w") as f:
-                f.write(str(body))
-            if who and not by_root:
-                with contextlib.suppress(OSError):
-                    os.chown(path, who["user"], who["group"])
+            # In the job account's folder, as that account; on the
+            # controller's own machine the folder is root's and so is this.
+            with fs_holds(None if by_root else who):
+                with open(path, "w") as f:
+                    f.write(str(body))
             job.say(f"wrote {base} ({len(str(body))} bytes)\n")
         # The bind directories, made here rather than by a throwaway
         # container over ssh: this process is already on the machine that
@@ -237,14 +237,12 @@ class WorkMixin:
             job.say("sent, and removed here\n")
             return "succeeded", 0
         job.say(f"fetching {what} from the controller\n")
-        code, _ = self.ctl.fetch(verb, real, timeout=int(stp.get("timeout") or 3600))
+        who = self.drop_privileges({})
+        with fs_holds(who):
+            code, _ = self.ctl.fetch(verb, real, timeout=int(stp.get("timeout") or 3600))
         if code != 200:
             job.say(f"the controller answered {code}\n")
             return "failed", 75
-        who = self.drop_privileges({})
-        if who:
-            with contextlib.suppress(OSError):
-                os.chown(real, who["user"], who["group"])
         job.say(f"fetched ({os.path.getsize(real) >> 20} MB)\n")
         return "succeeded", 0
 

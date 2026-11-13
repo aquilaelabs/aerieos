@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from . import names
 from .names import ETC, VAR
@@ -681,6 +682,260 @@ def own_digest():
         return "sha256:" + hashlib.sha256(body).hexdigest()
     except OSError:
         return ""
+
+
+# -- file work as the account whose folder it is ---------------------------------
+#
+# This agent is root, and much of what it writes and reads is inside folders
+# an account owns: a job account's workspace and store, a space's tree, an
+# account's home. Root opening a path there follows whatever the account put
+# at that path, so a link planted where root was about to write, chmod or
+# upload turned root's reach into the account's (the audit of 13 Nov). Inside
+# acting_as(), this thread's file identity is the account's: the kernel
+# checks every path it touches as that account, with none of root's file
+# capabilities and none of its groups, so a planted link leads nowhere the
+# account could not have gone itself. Files made there are the account's
+# without a chown. Linux keeps this per thread (setfsuid, setfsgid and the
+# groups of the calling thread), so the agent's other threads stay root. Two
+# things started inside it are not what they look like: a child process is
+# root again (an exec makes it whoever the process is), which is what
+# Popen's user and group are for; and a new THREAD is the account for good
+# (a thread is whoever started it), so none is started inside.
+_FSLIBC = None
+_ACTING = threading.local()
+# setgroups, as the kernel takes it for the calling thread alone: libc's own
+# applies to every thread. By machine; one not listed keeps root's groups
+# inside acting_as, said once.
+_SYS_SETGROUPS = {"x86_64": 116, "aarch64": 159, "riscv64": 159, "loongarch64": 159,
+                  "armv7l": 206, "armv6l": 206, "i686": 206, "i386": 206, "ppc64le": 81, "s390x": 206}
+_NOBODY = 0xFFFFFFFF
+
+
+def _fs_libc():
+    global _FSLIBC
+    if _FSLIBC is None:
+        import ctypes
+        try:
+            lib = ctypes.CDLL(None, use_errno=True)
+            lib.setfsuid, lib.setfsgid       # noqa: B018 (Linux alone has them: an AttributeError elsewhere)
+            _FSLIBC = lib
+        except (OSError, AttributeError):
+            _FSLIBC = False
+    return _FSLIBC
+
+
+def _fs_groups(lib, groups):
+    """This thread's supplementary groups set to `groups`; False where this
+    machine's call for it is not known."""
+    import ctypes
+    import platform
+    nr = _SYS_SETGROUPS.get(platform.machine())
+    if nr is None:
+        return False
+    arr = (ctypes.c_uint * max(1, len(groups)))(*groups)
+    return lib.syscall(ctypes.c_long(nr), ctypes.c_size_t(len(groups)), arr) == 0
+
+
+def _fs_become(lib, uid, gid, groups):
+    """This thread's file identity made (uid, gid, groups), and seen to be."""
+    import ctypes
+    if uid == 0:
+        # Back to root: the identity first, so the groups may be set again.
+        lib.setfsuid(ctypes.c_uint(0))
+        lib.setfsgid(ctypes.c_uint(0))
+        _fs_groups(lib, groups)
+    else:
+        if not _fs_groups(lib, groups):
+            log_once("fs-groups", "this machine's per-thread setgroups is not known: file work in an account's "
+                                  "folder keeps root's groups (its file identity is still the account's)")
+        lib.setfsgid(ctypes.c_uint(gid))
+        lib.setfsuid(ctypes.c_uint(uid))
+    return lib.setfsuid(ctypes.c_uint(_NOBODY)) == uid and lib.setfsgid(ctypes.c_uint(_NOBODY)) == gid
+
+
+def _ids(who):
+    """(uid, gid) of an account given as that pair or as Popen's keywords
+    (drop_privileges), or None for nobody to act as."""
+    if not who:
+        return None
+    if isinstance(who, dict):
+        uid, gid = who.get("user"), who.get("group")
+    else:
+        uid, gid = who
+    if not isinstance(uid, int) or not isinstance(gid, int) or uid <= 0:
+        return None
+    return uid, gid
+
+
+@contextlib.contextmanager
+def acting_as(who):
+    """File work in this thread done as the account `who`, a (uid, gid) or
+    drop_privileges' keywords; as it already is where this process is not
+    root, there is nobody to act as, or the machine is not Linux. Nests:
+    as_root() inside it is root again for a file of the agent's own."""
+    ids = _ids(who)
+    lib = _fs_libc() if hasattr(os, "geteuid") and os.geteuid() == 0 and ids else None
+    if not lib:
+        yield
+        return
+    was = getattr(_ACTING, "now", (0, 0))
+    groups = os.getgroups() if was[0] == 0 else getattr(_ACTING, "groups", [])
+    if was[0] == 0:
+        _ACTING.groups = groups
+    if not _fs_become(lib, ids[0], ids[1], []):
+        _fs_become(lib, was[0], was[1], [] if was[0] else groups)
+        raise OSError(f"could not take the file identity of uid {ids[0]} for work in its folder")
+    _ACTING.now = ids
+    try:
+        yield
+    finally:
+        back = _fs_become(lib, was[0], was[1], [] if was[0] else groups)
+        _ACTING.now = was
+        if not back:
+            # A thread left as the account would do root's work as it from
+            # here on, and fail in ways nobody could read: start again.
+            log("could not take this thread's own file identity back after work in an account's folder: stopping")
+            os._exit(70)
+
+
+@contextlib.contextmanager
+def as_root():
+    """Root's own file identity again, inside acting_as(): for a file of the
+    agent's own (a record, a download kept where only root writes) in the
+    middle of work in an account's folder."""
+    was = getattr(_ACTING, "now", (0, 0))
+    lib = _fs_libc() if was[0] != 0 else None
+    if not lib:
+        yield
+        return
+    groups = getattr(_ACTING, "groups", [])
+    if not _fs_become(lib, 0, 0, groups):
+        raise OSError("could not take root's file identity back for the agent's own file")
+    _ACTING.now = (0, 0)
+    try:
+        yield
+    finally:
+        ok = _fs_become(lib, was[0], was[1], [])
+        _ACTING.now = was
+        if not ok:
+            log("could not return to an account's file identity: stopping")
+            os._exit(70)
+
+
+_FS_HOLDS = {}
+
+
+def fs_probe(who):
+    """Whether acting_as() holds on this machine, tried and not assumed:
+    (True, "") when a thread acting as `who` is refused a file of root's
+    behind a link in a folder of its own, makes files that are its own,
+    carries none of root's groups, and is root again afterwards while
+    another thread stayed root throughout; (False, why) otherwise; (None,
+    why) where there is nothing to try (not root, no account, not Linux)."""
+    import tempfile
+    ids = _ids(who)
+    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return None, "this agent is not root"
+    if not ids:
+        return None, "no account to act as"
+    if not _fs_libc():
+        return None, "this system has no per-thread file identity"
+    d = tempfile.mkdtemp(prefix="aerie-fsprobe.")
+    said = []
+    try:
+        os.chmod(d, 0o755)
+        secret, acct = os.path.join(d, "roots-own"), os.path.join(d, "account")
+        with open(secret, "w") as f:
+            f.write("x")
+        os.chmod(secret, 0o600)
+        os.mkdir(acct, 0o700)
+        os.chown(acct, *ids)
+        os.symlink(secret, os.path.join(acct, "link"))
+        other = {}
+        go, went = threading.Event(), threading.Event()
+
+        def beside():
+            # A thread that was there before: it must stay root while another
+            # acts as the account. (One STARTED inside acting_as would not:
+            # a new thread is whoever started it.)
+            go.wait(20)
+            try:
+                with open(secret) as f:
+                    other["read"] = f.read() == "x"
+            except OSError as e:
+                other["read"] = False
+                other["why"] = str(e)
+            went.set()
+
+        watcher = threading.Thread(target=beside)
+        watcher.start()
+
+        def work():
+            try:
+                with acting_as(ids):
+                    go.set()
+                    went.wait(10)
+                    try:
+                        with open(os.path.join(acct, "link")) as f:
+                            f.read()
+                        said.append("a link to root's own file was followed and read")
+                    except PermissionError:
+                        pass
+                    try:
+                        with open(os.path.join(acct, "link"), "w") as f:
+                            f.write("y")
+                        said.append("a link to root's own file was followed and written")
+                    except PermissionError:
+                        pass
+                    with open(os.path.join(acct, "made"), "w") as f:
+                        f.write("z")
+                    if os.getgroups():
+                        said.append(f"the thread kept groups {os.getgroups()}")
+                    with as_root():
+                        with open(secret) as f:
+                            if f.read() != "x":
+                                said.append("root's own file changed")
+                made = os.lstat(os.path.join(acct, "made"))
+                if (made.st_uid, made.st_gid) != ids:
+                    said.append(f"a file made there is {made.st_uid}:{made.st_gid}'s, not the account's")
+                with open(secret) as f:
+                    if f.read() != "x":
+                        said.append("root's own file changed")
+            except OSError as e:
+                said.append(f"{type(e).__name__}: {e}")
+
+        t = threading.Thread(target=work)
+        t.start()
+        t.join(30)
+        go.set()
+        watcher.join(25)
+        if t.is_alive():
+            said.append("the probe did not finish")
+        if other.get("read") is not True:
+            said.append("another thread was not root meanwhile" + (f" ({other.get('why')})" if other.get("why") else ""))
+    except OSError as e:
+        said.append(f"{type(e).__name__}: {e}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return (not said), "; ".join(said)
+
+
+def fs_holds(who):
+    """acting_as() for `who`, where this machine was seen to hold it (once a
+    process, by fs_probe); else a block that changes nothing, said once: the
+    file work is then root's as it was before, and the agent's log says why."""
+    ids = _ids(who)
+    if not ids or not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return acting_as(None)
+    if "ok" not in _FS_HOLDS:
+        ok, why = fs_probe(ids)
+        _FS_HOLDS["ok"] = ok is True
+        if ok is False:
+            log(f"file work in an account's folder is done as root on this machine, as before: the check of "
+                f"doing it as the account failed ({why})")
+        elif ok is True:
+            log("file work in an account's folder is done as that account")
+    return acting_as(ids if _FS_HOLDS["ok"] else None)
 
 
 # -- an update on trial ---------------------------------------------------------

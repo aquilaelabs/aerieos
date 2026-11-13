@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, log, pack_signins, root_docker_env
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, fs_holds, log, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -668,14 +668,14 @@ class Job(threading.Thread):
             if keep and os.path.isfile(dest) and want and os.path.getsize(dest) == want:
                 self.say(f"{f} is already on this node ({want} bytes)\n")
             else:
-                st, _ = self.agent.ctl.fetch(
-                    f"file?job={self.job['id']}&path={urllib.parse.quote(str(f))}", dest)
+                # Into the job account's folder as that account, so the file
+                # is its own and a link left at the name leads nowhere new.
+                with fs_holds(who):
+                    st, _ = self.agent.ctl.fetch(
+                        f"file?job={self.job['id']}&path={urllib.parse.quote(str(f))}", dest)
                 if st != 200:
                     self.say(f"could not fetch {f} from the controller ({st})\n")
                     return "failed", 69
-                if who:
-                    with contextlib.suppress(OSError):
-                        os.chown(dest, who["user"], who["group"])
                 self.say(f"fetched {f} ({os.path.getsize(dest)} bytes)"
                          + (f" into {keep}" if keep else "") + "\n")
             if keep and os.path.dirname(dest) != cwd:

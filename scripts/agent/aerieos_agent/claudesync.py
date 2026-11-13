@@ -33,7 +33,7 @@ import time
 import urllib.parse
 
 from .accounts import user_of
-from .base import log_once
+from .base import as_root, fs_holds, log_once
 
 TICK = 5.0
 LIST_EVERY = 30.0
@@ -227,8 +227,11 @@ class ClaudeMirror:
     def mkdirs(self, uid, rel_dir):
         cur = os.path.join(self.top(), uid)
         if not os.path.isdir(cur):
-            os.mkdir(cur, 0o700)
-            self.own(cur, uid)
+            # The account's own folder, made in the session account's and
+            # then handed to the account: root's to do, and nothing under it is.
+            with as_root():
+                os.mkdir(cur, 0o700)
+                self.own(cur, uid)
         for part in ["projects", *[x for x in rel_dir.split("/") if x]]:
             cur = os.path.join(cur, part)
             if not os.path.isdir(cur):
@@ -293,7 +296,11 @@ class ClaudeMirror:
         local = self.walk(held)
         for act, key in plan(local, self.ctl, rec, fresh):
             try:
-                getattr(self, "do_" + act.replace("-", "_"))(key, local.get(key), self.ctl.get(key))
+                # Each conversation's file work as the account it belongs to
+                # (base.acting_as): its folder is that account's to write,
+                # and root following a link there reached past it.
+                with fs_holds(self.owner(key.split("/", 1)[0])):
+                    getattr(self, "do_" + act.replace("-", "_"))(key, local.get(key), self.ctl.get(key))
             except OSError as e:
                 log_once(f"claudesync {act} {key}", f"claudesync: {act} {key}: {e}")
         if json.dumps(rec, sort_keys=True) != before:

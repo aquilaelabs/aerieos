@@ -174,6 +174,22 @@ nothing, and on a node the agent that opens a seal is apart from the
 sessions, which run as their account's own user in a view of their own
 (R125, `bb-session`), so a session reaches no key the agent holds.
 
+**Root's work in an account's folder is done as that account.** A node's
+agent is root, and much of what it writes and reads is in folders an
+account owns: a space's tree, a job's workspace, an account's
+conversations. Root opening a path there follows whatever the account left
+at that path, so the agent takes the account's file identity for that work
+(for the calling thread alone: `setfsuid`, `setfsgid` and the thread's own
+groups; `base.acting_as` in the agent). The kernel then checks every path
+as that account, with none of root's file capabilities, and a planted link
+leads nowhere the account could not have gone itself. The agent tries this
+on the machine before relying on it and says in its log which it is; an
+update's job says it too (`file work as the account: holds`). Where a
+machine does not hold it, the work is root's as before and the log says so.
+A folder the agent makes for an account above that account's own (a
+space's top, an account's conversations folder) is still root's to make,
+and nothing is made under a link on the way.
+
 ## The lines the hardening closes
 
 | Step of R158 | The line it closes |
