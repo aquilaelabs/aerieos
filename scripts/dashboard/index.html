@@ -3262,6 +3262,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    buttons: the words take a line of their own when the row has no room. */
 .nb .nbview[data-view="wiki"]>.nbhead{flex-wrap:wrap}
 .nb .nbview[data-view="wiki"]>.nbhead>#wkNetState{flex:1 1 12rem;min-width:0;overflow-wrap:anywhere}
+/* ...and all of the room there is: the row's spacer took half of it, and
+   the words went to two lines beside buttons a little wider than they were. */
+.nb .nbview[data-view="wiki"]>.nbhead>.sp{display:none}
 .nb .nbhead>.nbsaidslot:empty{display:none}
 /* A view toggle before the status line (the Docker view's Cards and List)
    leaves it a sliver between itself and the buttons on a phone: there it
