@@ -13,6 +13,7 @@ browser's noVNC speaks RFB over it; nothing here reads what passes.
 import base64
 import hashlib
 import hmac
+import os
 import re
 import select
 import socket
@@ -21,8 +22,9 @@ import threading
 import time
 import urllib.parse
 
-from . import files, term
-from .base import SCREEN_PORT, _run, log, log_once
+from . import files, relaytls, term
+from .base import RELAY, SCREEN_PORT, _run, log, log_once
+from .names import VAR
 from .vms import DOMAIN_RE, VIRSH
 
 SKEW_S = 120
@@ -125,9 +127,11 @@ def _accept(conn, hdr):
 def serve_term(conn, key, hdr, q, kinds):
     """A terminal (R133): checked as the controller signed it, then its
     kind's program in a pty, joined to the socket (term.relay)."""
-    blob = (q.get("a") or [""])[0]
-    if not term.signed(key, blob, (q.get("t") or [""])[0], (q.get("s") or [""])[0]):
+    blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
+    if not term.signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
+    if nonce and not relaytls.once(sig):
+        return _refuse(conn, 403, "this request was used already")
     spec = term.unpack(blob)
     if spec is None:
         return _refuse(conn, 400, "not a terminal")
@@ -169,8 +173,11 @@ def serve_one(conn, key, kinds=None):
     domain = (q.get("vm") or [""])[0]
     if not DOMAIN_RE.fullmatch(domain):
         return _refuse(conn, 404, "no such VM")
-    if not signed(key, domain, (q.get("t") or [""])[0], (q.get("s") or [""])[0]):
+    nonce, sig = (q.get("n") or [""])[0], (q.get("s") or [""])[0]
+    if not signed(key, relaytls.subject(domain, nonce), (q.get("t") or [""])[0], sig):
         return _refuse(conn, 403, "not signed by this node's controller")
+    if nonce and not relaytls.once(sig):
+        return _refuse(conn, 403, "this request was used already")
     port = vnc_port(domain)
     if not port:
         return _refuse(conn, 409, "the VM is not running, or has no screen")
@@ -208,6 +215,26 @@ class ScreenRelay:
     def __init__(self, agent):
         self.agent = agent
         self.srv = None
+        self.tls = None
+
+    def secure(self):
+        """The relay's own certificate, made once beside the agent's data
+        (R243), and its sha256 said in the hello so the controller pins it;
+        without openssl the relay stays plain, and the node's page says so."""
+        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
+        crt, key, fp = relaytls.cert(os.path.join(data, "relay"))
+        if not fp:
+            RELAY["tls"] = ""
+            log_once("relay-tls", "screen: no certificate could be made (is openssl on this machine?), so terminals, "
+                                  "files and VMs' screens cross the network unencrypted")
+            return
+        try:
+            self.tls = relaytls.server_context(crt, key)
+        except (OSError, ValueError) as e:
+            RELAY["tls"] = ""
+            log_once("relay-tls", f"screen: the relay's certificate could not be loaded ({e}), so it is served unencrypted")
+            return
+        RELAY["tls"] = fp
 
     def start(self):
         threading.Thread(target=self.run, name="screen", daemon=True).start()
@@ -234,11 +261,14 @@ class ScreenRelay:
                 srv.bind((bound, SCREEN_PORT))
                 srv.listen(8)
                 self.srv = srv
-                log(f"screen: terminals and VMs' screens on {bound}:{SCREEN_PORT}, to the controller alone")
+                if self.tls is None:
+                    self.secure()
+                log(f"screen: terminals and VMs' screens on {bound}:{SCREEN_PORT}, to the controller alone"
+                    + (", over TLS" if self.tls else ""))
                 while True:
                     conn, _ = srv.accept()
                     key = self._keys()
-                    threading.Thread(target=self._one, args=(conn, key, self._kinds), daemon=True,
+                    threading.Thread(target=self._one, args=(conn, key, self._kinds, self.tls), daemon=True,
                                      name="screen-one").start()
             except OSError as e:
                 if self.srv is None and srv is not None and srv.fileno() == -1:
@@ -265,10 +295,21 @@ class ScreenRelay:
         return ks
 
     @staticmethod
-    def _one(conn, key, kinds):
+    def _one(conn, key, kinds, tls=None):
+        # Over TLS where the controller opens with it (it does once this
+        # node has said it has a certificate); a plain request is still
+        # taken, told by its first byte, so a controller put back to an
+        # older build keeps its terminals.
+        plain = conn
         try:
-            serve_one(conn, key, kinds)
+            if tls is not None and relaytls.looks_tls(conn):
+                plain = relaytls.accept(conn, tls)
+            serve_one(plain, key, kinds)
         except OSError:
             pass
         finally:
-            conn.close()
+            for s in {plain, conn}:
+                try:
+                    s.close()
+                except OSError:
+                    pass

@@ -22,7 +22,6 @@ import hashlib
 import importlib.util
 import os
 import selectors
-import socket
 import struct
 import time
 import urllib.parse
@@ -48,6 +47,18 @@ def term():
         spec.loader.exec_module(mod)
         _term["mod"] = mod
     return _term["mod"]
+
+
+def relaytls():
+    """The node agent's relaytls.py, loaded once by path as term.py is: the
+    TLS the relay's port is spoken to with, and the pin (R243)."""
+    if "tls" not in _term:
+        spec = importlib.util.spec_from_file_location(
+            "bb_agent_relaytls", os.path.join(str(AGENT_DIR), "aerieos_agent", "relaytls.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _term["tls"] = mod
+    return _term["tls"]
 
 
 def frame(payload, opcode=2):
@@ -133,17 +144,22 @@ def local(conn, words, *, bbtty, env, cwd, ro, cols, rows, alive):
         close(conn, f"the terminal could not start here: {e}")
 
 
-def node(conn, *, host, port, key, kind, words, cols, rows, alive, extra=None):
+def node(conn, *, host, port, key, kind, words, cols, rows, alive, extra=None, pin="", once=False):
     """A terminal on a node: its screen relay's /term, signed, then the
     two sockets spliced until either closes or `alive` says no more.
     `extra`: more fields for the signed open (the sealed sign-ins' keys,
-    R126)."""
-    t = term()
+    R126). `pin`: the relay's certificate as the node reported it, so the
+    stream is TLS to that certificate and no other; `once`: the node takes
+    a request once, so a value made here is signed with it (R243)."""
+    t, rt = term(), relaytls()
     blob = t.pack({**(extra or {}), "kind": kind, "argv": list(words), "cols": cols, "rows": rows})
     when = int(time.time())
-    q = urllib.parse.urlencode({"a": blob, "t": when, "s": t.sign(key, blob, when)})
+    nonce = os.urandom(12).hex() if once else ""
+    q = urllib.parse.urlencode({"a": blob, "t": when, "s": t.sign(key, rt.subject(blob, nonce), when), **({"n": nonce} if nonce else {})})
     try:
-        up = socket.create_connection((host, port), timeout=5)
+        up = rt.connect(host, port, pin, timeout=5)
+    except rt.Refused as e:
+        return close(conn, str(e)[:120])
     except OSError:
         return close(conn, f"the node did not answer on {host}:{port}")
     try:

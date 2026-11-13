@@ -4018,6 +4018,17 @@ def _share_cfg(sh, req):
     return cfg, ""
 
 
+def relay_of(node_id):
+    """How a node's relay port is spoken to (R243): {pin, once}. `pin` is
+    the sha256 of the certificate its agent made and reported, the only one
+    the controller then takes there, empty for a node that has none (an
+    agent from before, a machine with no openssl); `once`, that it takes a
+    signed request a single time, so the controller signs a value of its
+    own with each."""
+    r = ((node(node_id) or {}).get("reported") or {}).get("relay") or {}
+    return {"pin": str(r.get("tls") or ""), "once": bool(r.get("once"))}
+
+
 def smb_named():
     """The Unix users named on an SMB share the controller's own machine
     serves, its users and its readers: whose share password is kept

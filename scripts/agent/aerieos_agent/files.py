@@ -31,6 +31,8 @@ import stat
 import time
 import urllib.parse
 
+from . import relaytls
+
 SKEW_S = 120
 TRASH = ".aerieos-trash"
 LIST_MAX = 5000
@@ -181,9 +183,11 @@ def _err(conn, code, why):
 def serve(conn, key, hdr, q, rest):
     """One request: checked as the controller signed it, then done.
     `rest` is what of the body came with the head."""
-    blob = (q.get("a") or [""])[0]
-    if not signed(key, blob, (q.get("t") or [""])[0], (q.get("s") or [""])[0]):
+    blob, nonce, sig = (q.get("a") or [""])[0], (q.get("n") or [""])[0], (q.get("s") or [""])[0]
+    if not signed(key, relaytls.subject(blob, nonce), (q.get("t") or [""])[0], sig):
         return _err(conn, 403, "not signed by this node's controller")
+    if nonce and not relaytls.once(sig):
+        return _err(conn, 403, "this request was used already")
     spec = unpack(blob)
     if spec is None:
         return _err(conn, 400, "not a file request")

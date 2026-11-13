@@ -5658,7 +5658,9 @@ import backup                                                    # noqa: E402
 # The file explorer (R224, fileexplorer.py): a machine's roots through its agent.
 import fileexplorer                                              # noqa: E402
 fileexplorer.configure(node=lambda nid: nodes.node(nid), host=lambda nid: nodes.route_host(nid), key=lambda nid: nodes.screen_key(nid),
-                       audit=lambda who, what, detail, params: db.audit(who, what, detail, params))
+                       audit=lambda who, what, detail, params: db.audit(who, what, detail, params),
+                       connect=lambda *a, **k: termws.relaytls().connect(*a, **k),
+                       subject=lambda what, nonce: termws.relaytls().subject(what, nonce))
 import move                                                      # noqa: E402
 move.checkpoint = db.checkpoint
 move.unseal = signing.unseal
@@ -7661,14 +7663,20 @@ class Handler(BaseHTTPRequestHandler):
         if not host or not key:
             return self._json({"error": f"{rec.get('node_name')} cannot be reached for a screen"}, 503)
         t = int(time.time())
-        sig = hmac.new(key.encode(), f"{rec['domain']}.{t}".encode(), hashlib.sha256).hexdigest()
+        # Over TLS to the certificate the node reported, and signed with a
+        # value of this request's own where the node takes one once (R243).
+        relay, rt = nodes.relay_of(rec["node"]), termws.relaytls()
+        nonce = os.urandom(12).hex() if relay["once"] else ""
+        sig = hmac.new(key.encode(), f"{rt.subject(rec['domain'], nonce)}.{t}".encode(), hashlib.sha256).hexdigest()
         try:
-            up = socket.create_connection((host, SCREEN_PORT), timeout=5)
+            up = rt.connect(host, SCREEN_PORT, relay["pin"], timeout=5)
+        except rt.Refused as e:
+            return self._json({"error": f"{rec.get('node_name')}: {e}"}, 502)
         except OSError:
             return self._json({"error": f"{rec.get('node_name')} did not answer on {host}:{SCREEN_PORT}: "
                                         "its agent opens that port to this controller once it is updated"}, 502)
         up.settimeout(None)
-        lines = [f"GET /ws?vm={rec['domain']}&t={t}&s={sig} HTTP/1.1", f"Host: {host}:{SCREEN_PORT}"]
+        lines = [f"GET /ws?vm={rec['domain']}&t={t}&s={sig}{'&n=' + nonce if nonce else ''} HTTP/1.1", f"Host: {host}:{SCREEN_PORT}"]
         for k, v in self.headers.items():
             if k.lower() in ("upgrade", "connection", "sec-websocket-key", "sec-websocket-version",
                              "sec-websocket-protocol"):
@@ -7797,7 +7805,8 @@ class Handler(BaseHTTPRequestHandler):
                     tk = tokenkeys.wrapped_for(target["id"], users.uid_of(self._who() or {}),
                                                ((nodes.node(target["id"]) or {}).get("reported") or {}).get("tokseal"))
                 return termws.node(down, host=target["host"], port=target["screen"], key=nodes.screen_key(target["id"]),
-                                   kind=kind, words=words, alive=alive, extra={"tk": tk} if tk else None, **dims)
+                                   kind=kind, words=words, alive=alive, extra={"tk": tk} if tk else None,
+                                   **nodes.relay_of(target["id"]), **dims)
             env = {k: v for k, v in os.environ.items() if k != "DASHBOARD_AUTH"}
             return termws.local(down, words, bbtty=str(HERE / "bb-tty"), env=env,
                                 cwd=env.get("HOME") or "/", ro=bool(users.may(self._who(), "terminal")),
@@ -7954,7 +7963,7 @@ class Handler(BaseHTTPRequestHandler):
                     return "the controller is in maintenance mode"
                 return self._ctr_log_refused(arg, self._who())
             return termws.node(self.connection, host=target["host"], port=target["screen"], key=nodes.screen_key(target["id"]),
-                               kind="ctr", words=words, alive=alive, **dims)
+                               kind="ctr", words=words, alive=alive, **nodes.relay_of(target["id"]), **dims)
         read, why = self._log_reader(arg)
         if not termws.upgrade(self):
             return self._json({"error": why or "a websocket is asked for here"}, 403 if why else 400)

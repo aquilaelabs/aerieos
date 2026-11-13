@@ -20,6 +20,7 @@ from .base import (
     CLAUDE_DIR,
     OS_RELEASE,
     SANDBOX_BIN,
+    RELAY,
     SCREEN_PORT,
     SESSION,
     SHARE,
@@ -465,6 +466,10 @@ def census(state):
         "session": session_now(state),
         # The file explorer's requests, on the screen relay's port (R224).
         "files": {"port": SCREEN_PORT},
+        # ...and how that port is spoken to (R243): its certificate's sha256
+        # where it has one, which the controller pins, and that it takes a
+        # signed request once.
+        "relay": dict(RELAY),
         # What the disks hold (the Storage tab): the last hourly walk, never
         # one taken here, since a walk of a big store is minutes.
         "storage": storage.last(),

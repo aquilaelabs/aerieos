@@ -48,6 +48,10 @@ SESSION_BIND = os.environ.get("BUILDERBOT_SESSION_BIND", "")
 # the census is a function of the machine, and the session's state is the
 # one part of the machine this process itself is holding.
 SESSION = {}
+# What the screen relay says of itself in the hello (census, R243): its
+# certificate's sha256 once it has one, which the controller pins, and that
+# it takes a signed request once. Set by screen.py.
+RELAY = {"tls": "", "once": True}
 # How often a node whose loop is held by a census says it is still there
 # (census_beating): well inside the controller's three missed polls.
 BEAT_S = 20
