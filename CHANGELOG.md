@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- An install's receipt: every install of a pack on a node records the manifest commit it came from, when, and the sha256 of every file that landed, with one hash over them all, so what its install downloads from somewhere else leaves a trail. The pack's page on Installed says it, and says when the copy there is from an earlier manifest than the one kept now, when the same manifest left other files there the time before, and when another node's copy of the same manifest is other files, which is what an install that fetches the latest of something looks like. A pack installed before this has a receipt once it is installed again (3777ced)
+
 ### Changed
 
 - The Library and the Installed page name their two kinds of update apart, both in the accent: Software update puts a newer program on a node (it read Update), and Manifest update keeps the catalog's newer definition of a pack you hold, showing what it changes first (it was a plain button reading Catalog update on a card that said installed). The card says which is available, and the Updates chip counts both (593a44d)
