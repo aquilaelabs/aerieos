@@ -147,6 +147,38 @@ class Sites(unittest.TestCase):
         sync.mkdirs(os.path.join(root, "alpha"), "src/deep")
         self.assertTrue(os.path.isdir(os.path.join(root, "alpha", "src", "deep")))
 
+    def test_a_file_removed_on_the_node_is_sent_from_the_agents_own_folder_as_root(self):
+        # Met on 13 Nov, the day the sync began working as the tree's owner:
+        # a removal (and a link) goes up as an empty file kept beside the
+        # agent's records, where only root writes, so as the owner it was
+        # refused, the removal never reached the controller, and every
+        # change sorted after it waited behind it.
+        ws = agent.module("wssync")
+        lib = Libc()
+        seen = []
+        records = os.path.join(self.d, "records")
+        os.makedirs(records)
+        sync = object.__new__(ws.WorkspaceSync)
+        sync.root = os.path.join(self.d, "workspace")
+        sync.record_dir = lambda: records
+
+        def upload(url, src, timeout=0):
+            seen.append((lib.uid, lib.gid, os.path.basename(src), os.path.getsize(src), url))
+            return 200, {}
+        sync.agent = type("A", (), {"ctl": type("C", (), {"upload": staticmethod(upload)})()})()
+        proj = type("P", (), {})()
+        proj.name, proj.files, proj.error, proj.rev, proj.hinted, proj.denied = "alpha", {"gone.txt": ["abc", 1, 2, 0o644, ""]}, "", 0, False, False
+        a, b, c, d = Bracket.acting(None, lib)
+        with a, b, c, d:
+            with base.acting_as((1001, 1002)):
+                self.assertTrue(sync.put(proj, os.path.join(sync.root, "alpha"), "gone.txt", None, "abc", ""))
+                self.assertEqual((lib.uid, lib.gid), (1001, 1002), "and the owner's identity again for the tree")
+                self.assertTrue(sync.put(proj, os.path.join(sync.root, "alpha"), "a-link", (0, 0, 0, "target"), "", "x"))
+        self.assertEqual([(u, g, name, size) for u, g, name, size, _ in seen], [(0, 0, ".empty", 0), (0, 0, ".empty", 0)])
+        self.assertIn("gone=1", seen[0][4])
+        self.assertIn("link=target", seen[1][4])
+        self.assertNotIn("gone.txt", proj.files)
+
     def test_a_folder_the_owner_may_not_write_is_refused_as_that(self):
         # Walked on the dev node: a folder a container left root's refused the
         # download, the download swallowed why, and the sync said "the

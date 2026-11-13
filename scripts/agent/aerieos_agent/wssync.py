@@ -944,9 +944,15 @@ class WorkspaceSync:
             q["mode"] = str(e[2])
         url = "sync-put?" + urllib.parse.urlencode(q)
         if e is None or e[3]:
-            empty = os.path.join(self.record_dir(), ".empty")
-            open(empty, "wb").close()
-            code, r = self.agent.ctl.upload(url, empty, timeout=60)
+            # A removal or a link carries no bytes: what goes up is an empty
+            # file of the agent's own, beside its records, written and read
+            # as root. As the tree's owner it was refused there, so a file
+            # removed on a node, or a link changed, never reached the
+            # controller, and stopped every change sorted after it.
+            with as_root():
+                empty = os.path.join(self.record_dir(), ".empty")
+                open(empty, "wb").close()
+                code, r = self.agent.ctl.upload(url, empty, timeout=60)
         else:
             code, r = self.agent.ctl.upload(url, path, timeout=600)
         if code != 200:

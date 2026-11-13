@@ -388,6 +388,55 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(self.at("n2", "src/new.py")), "new\n")
         self.assertFalse(os.path.exists(self.at("n2", "src/b.py")))
 
+    def test_a_whole_pass_opens_the_tree_as_its_owner_and_the_agents_records_as_root(self):
+        # The sync does a tree's file work as the tree's owner and its own
+        # records as root (R240). One place missed the second half (13 Nov):
+        # a removal goes up as an empty file kept beside the records, it was
+        # written as the owner, refused, and no removal reached the
+        # controller. A suite's node is not root, where the two brackets
+        # change nothing, so they are stood in for by ones that say which is
+        # in force, and every file opened on the node is held to it.
+        import builtins
+        import contextlib
+        from unittest import mock
+        self.turn()
+        now, wrong = ["root"], []
+
+        @contextlib.contextmanager
+        def bracket(who, _arg=None):
+            now.append(who)
+            try:
+                yield
+            finally:
+                now.pop()
+        tree = os.path.join(self.tmp, "n1", "workspace") + os.sep
+        records = os.path.join(self.tmp, "n1", "data") + os.sep
+        real = builtins.open
+
+        def held(path, mode="r", *a, **k):
+            where = os.fspath(path) if isinstance(path, (str, bytes, os.PathLike)) else ""
+            where = where.decode() if isinstance(where, bytes) else where
+            want = "owner" if where.startswith(tree) else "root" if where.startswith(records) else now[-1]
+            if want != now[-1]:
+                wrong.append(f"{where[len(self.tmp) + 1:]} ({mode}) opened as {now[-1]}")
+            return real(path, mode, *a, **k)
+        write(self.at("n1", "a.txt"), "two\n")
+        write(self.at("n1", "src/new.py"), "new\n")
+        os.remove(self.at("n1", "src/b.py"))
+        os.remove(self.at("n1", "b-link"))
+        os.symlink("src/new.py", self.at("n1", "b-link"))
+        write(f"{self.ws}/alpha/from-the-controller.txt", "down\n")
+        ctl_sync.changed("alpha")
+        self.n["n1"].nudge({"alpha": 0})
+        with mock.patch.object(node_sync, "fs_holds", lambda who: bracket("owner")), \
+                mock.patch.object(node_sync, "as_root", lambda: bracket("root")), \
+                mock.patch.object(builtins, "open", held):
+            self.turn("n1", times=3)
+        self.assertEqual(wrong, [])
+        self.assertFalse(os.path.exists(f"{self.ws}/alpha/src/b.py"), "the removal reached the controller")
+        self.assertEqual(os.readlink(f"{self.ws}/alpha/b-link"), "src/new.py")
+        self.assertEqual(read(self.at("n1", "from-the-controller.txt")), "down\n")
+
     def test_a_nodes_own_save_leaves_it_at_the_controllers_revision(self):
         # What a verb that acts on the tree waits for (lib/syncwait.py down):
         # this copy at the controller's revision. A node's own change is at
