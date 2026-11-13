@@ -4,7 +4,13 @@
 
 ### Changed
 
-- A newer version of a pack kept from the catalog is offered as Update manifest, in the accent every update wears, with the card saying a manifest update is available and the Updates chip counting it; it was a plain button reading Catalog update on a card that said installed. It is named apart from Update, which puts a newer program on a node: Update manifest keeps the catalog's newer definition of the pack, and shows what it changes before anything is kept (9418884)
+- The Library and the Installed page name their two kinds of update apart, both in the accent: Software update puts a newer program on a node (it read Update), and Manifest update keeps the catalog's newer definition of a pack you hold, showing what it changes first (it was a plain button reading Catalog update on a card that said installed). The card says which is available, and the Updates chip counts both (593a44d)
+- Every button is one height, 32px, the size New VM and Enroll node had alone (it was 38px), and a field or a pulldown beside one is the same height; the header's buttons, the dock's tabs and the phone's key bar take it too, and a page's row of sub-pages is spaced as the dock's line is (201649c)
+- A button has a faint gradient, lighter at its top edge and darker at its foot, over whatever color it wears, in every theme (19856ba)
+
+### Fixed
+
+- A press on the rail, a page of a sub-nav or a notebook's view tab no longer grows a spinning ring while its page reads, which pushed everything beside it; the ring is kept for a button with room for it (2cad430)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
