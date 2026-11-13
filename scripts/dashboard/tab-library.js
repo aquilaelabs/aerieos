@@ -255,8 +255,11 @@ function libActs(r, may){
   // Update manifest, in the accent as every update is and named apart from
   // a program's Update (the operator, 13 Nov), opens the dialog on that
   // pin, its changes marked, before anything is kept. It is the card's one
-  // verb while it stands: the newer manifest is kept first, and the node's
-  // copy is then the Update that follows.
+  // verb while it stands. A pack has no version of its own to compare, so
+  // its card never carries a program's Update: the manifest is what moves.
+  // Keeping one changes what the controller and its sessions read at once
+  // and reinstalls nothing: a node's copy made by the earlier manifest's
+  // install steps stays until it is removed and installed again.
   if (r.repin && may.packs) return `${a("repin", "Update manifest", "primary")}${edit}`;
   return `${verb}${edit}`;
 }
