@@ -35,8 +35,11 @@ const LIB_KINDS = [["agent", "Coding agents"], ["toolchain", "Toolchains"], ["pa
 // kind, each across every kind's section (the operator, 29 Oct: Installed,
 // then Updates).
 // An update is a newer version of what is installed, or a newer pin of a
-// pack kept from the catalog (the operator, 13 Nov: one word and one look
-// for both; the card said Catalog update on a plain button).
+// pack kept from the catalog. Both wear the accent and both count under
+// Updates, and each says which it is (the operator, 13 Nov): Update puts a
+// newer program on the node, Update manifest keeps the catalog's newer
+// definition of a pack, and two presses reading Update for two different
+// things were confusing.
 const LIB_STANDS = {installed: r => r.installed, update: r => r.update || !!r.repin};
 // The section a card sits in: its kind, or the group it names (R169 step 9: a
 // pack that brings a coding agent is a pack's card under Coding agents).
@@ -200,10 +203,10 @@ function libState(r){
   // A pack kept here that does not fit this AerieOS is switched off until
   // one that does is kept (the operator, 12 Nov): said in the warning
   // voice, since it was working before the update.
-  if (r.pack?.disabled) return w(esc(r.pack.disabled) + (r.repin ? ": Update keeps one that fits" : r.tier === "sideloaded" ? ": Edit keeps a version that names this one" : ""), "warn");
-  // The catalog pins a newer commit of a pack kept from it: an update, said
-  // as any other is.
-  if (r.repin) return w("update available", "warn");
+  if (r.pack?.disabled) return w(esc(r.pack.disabled) + (r.repin ? ": Update manifest keeps one that fits" : r.tier === "sideloaded" ? ": Edit keeps a version that names this one" : ""), "warn");
+  // The catalog pins a newer commit of a pack kept from it: said as what
+  // it is, the pack's manifest and not the program on the node.
+  if (r.repin) return w("manifest update available", "warn");
   if (r.installed) return w(r.update ? "update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
@@ -249,11 +252,12 @@ function libActs(r, may){
   // Gemini's card), and its kept copy is reached from its Details page.
   const edit = r.kind === "pack" && r.pack && r.tier === "sideloaded" ? a("edit", "Edit") : "";
   // The catalog pins a newer commit of a pack kept from it (R169 step 4):
-  // Update, in the accent as every Update is (the operator, 13 Nov), opens
-  // the dialog on that pin, its changes marked, before anything is kept.
-  // It is the card's one verb while it stands: the newer pin is kept first,
-  // and the node's copy is then the Update that follows.
-  if (r.repin && may.packs) return `${a("repin", "Update", "primary")}${edit}`;
+  // Update manifest, in the accent as every update is and named apart from
+  // a program's Update (the operator, 13 Nov), opens the dialog on that
+  // pin, its changes marked, before anything is kept. It is the card's one
+  // verb while it stands: the newer manifest is kept first, and the node's
+  // copy is then the Update that follows.
+  if (r.repin && may.packs) return `${a("repin", "Update manifest", "primary")}${edit}`;
   return `${verb}${edit}`;
 }
 
@@ -293,7 +297,7 @@ function libDetail(r){
     if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code>${r.pack.path ? ` (${esc(r.pack.path)})` : ""} at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}. A session has <code>aerie tool ${esc(r.name)}</code>.${
       r.tier !== "sideloaded" && lib?.may?.install && !r.running ? ` <button type="button" class="link" data-libact="edit" data-libkind="pack" data-libname="${esc(r.name)}">Look for a newer pin, or remove it</button>` : ""}</span>`);
     if (r.catalog) lines.push(`<span class="sub">From <code>${esc(r.catalog.url)}</code>${r.catalog.path ? ` (${esc(r.catalog.path)})` : ""} at ${esc((r.catalog.commit || "").slice(0, 12))}, its archive's sha256 checked on the way in. Install opens the Add tool pack dialog on that commit, and Add keeps exactly that.</span>`);
-    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Update shows what it changes before it is kept.</span>`);
+    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Update manifest shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))} on each node, set on the Installed page once it is there.</span>`);
     if (r.wrong_platform) lines.push(`<span class="sub warn">${esc(r.wrong_platform)}</span>`);
     if (r.pack?.disabled) lines.push(`<span class="sub warn">It is ${esc(r.pack.disabled)}. No session uses it, and it offers no agent, until a version that names this AerieOS is kept; where it is installed it stays.</span>`);
@@ -308,7 +312,7 @@ function libDetail(r){
   }
   if (r.kind === "service"){
     lines.push(`<span class="sub">Deployed on the node as a written container; configured, read and removed on the Installed page under Machines.</span>`);
-    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Update shows what it changes before it is kept.</span>`);
+    if (r.repin) lines.push(`<span class="sub warn">The vetted catalog pins a newer commit, ${esc(r.repin.commit.slice(0, 12))}: Update manifest shows what it changes before it is kept.</span>`);
     if (r.config?.length) lines.push(`<span class="sub">Asks for ${esc(r.config.map(f => f.label).join(", "))}.</span>`);
   }
   if (r.kind === "agent"){

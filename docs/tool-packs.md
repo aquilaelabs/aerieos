@@ -43,7 +43,7 @@ To update a pack you added yourself, open its card's **Edit**. For a repository'
 at the repository's head as it opens; for a pack made here it opens on its
 `bbtool.json`, to change in place, or takes an upload of a new version, and
 **Look** reads what you gave. Either way the form marks every command the
-new version adds, changes (with what it was) or removes, and **Update**
+new version adds, changes (with what it was) or removes, and **Update manifest**
 keeps it. Where the pack is installed, uninstall it and install it again to
 take the new version.
 **Remove** takes it out of the catalog. It is refused while a node's store
@@ -399,9 +399,10 @@ when it cannot be read, is said over the cards.
 
 A pack kept from the catalog stays at the commit it was kept at. When a
 later index pins a newer commit of it (the same repository and folder), its
-card says an update is available and offers **Update**, which opens the dialog on the
+card says a manifest update is available and offers **Update manifest** (named
+apart from **Update**, which puts a newer program on a node), which opens the dialog on the
 new pin with what it changes marked verb by verb, as Edit does for a pack
-added by address; **Update** keeps it at that pin with the index's sha256
+added by address; **Update manifest** keeps it at that pin with the index's sha256
 checked, its tier kept. A pack kept from the catalog has no Edit on its
 card: its kept copy is reached from its Details page, where the line that
 says where it came from carries **Look for a newer pin, or remove it**,
@@ -426,7 +427,7 @@ version that fits is kept it is in no session's `PATH`, view or `aerie
 tool` verbs, in whichever space it was ticked, and a coding agent it brings
 is not offered. Its card and its Installed row say so, the bell says it
 once, and when the catalog pins a commit that names this line its card
-offers **Update**, which switches it back on. Nothing is removed,
+offers **Update manifest**, which switches it back on. Nothing is removed,
 and nothing has to be set again.
 
 ### Without the network
