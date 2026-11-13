@@ -88,6 +88,11 @@ HELD_FILE = "state-held"
 # there (each try would copy the whole state and move another aside), and a
 # start that migrates clean takes it away.
 FAILED_FILE = "update-did-not-land.txt"
+# In a copy whose update landed: every migration it was taken for ran. A
+# build of the same name that migrates again (a dev build made twice from
+# one commit, each with a migration more) takes a copy of its own, where it
+# reused this one and a failure put back the state from before the first.
+LANDED = ".landed"
 # The version this start's copy was taken for (gate), which is how migrate
 # finds the copy to put back.
 _COPY = {"version": ""}
@@ -258,7 +263,11 @@ def backup(state, version=None):
     root = state / BACKUPS
     dest = root / name
     if dest.exists():
-        return dest
+        if not (dest / LANDED).exists():
+            return dest
+        # The copy from an update that landed: kept under a name of its own,
+        # and this migration gets the state as it is now.
+        os.replace(dest, root / f"{name}~{time.strftime('%Y%m%d-%H%M%S')}")
     tmp = root / f".{name}.partial"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
@@ -352,7 +361,12 @@ def migrate(state, ctx, version=None):
     if ran:
         print(f"dashboard: /config migrated to state {ran[-1]} ({', '.join(f'{x:04d}' for x in ran)})",
               flush=True)
-    # Clean: whatever an earlier try left to say is over.
+    # Clean: the copy taken for these is marked as one whose update landed,
+    # and whatever an earlier try left to say is over.
+    if ran:
+        name = "before-" + re.sub(r"[^A-Za-z0-9._+-]", "_", version or _COPY["version"] or build_version())
+        with contextlib.suppress(OSError):
+            (Path(state) / BACKUPS / name / LANDED).touch()
     with contextlib.suppress(OSError):
         (Path(state) / FAILED_FILE).unlink(missing_ok=True)
     return ran
@@ -409,7 +423,7 @@ def restore(state, version):
             os.replace(p, aside / p.name)
             done.append((aside / p.name, p))
         for p in sorted(src.iterdir()):
-            if p.name == "NOT-COPIED.txt":
+            if p.name in ("NOT-COPIED.txt", LANDED):
                 continue
             os.replace(p, state / p.name)
             done.append((state / p.name, p))

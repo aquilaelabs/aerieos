@@ -292,6 +292,29 @@ class Migrate(unittest.TestCase):
             sv.gate(self.state, "0.6.0")
             self.assertEqual(sv.migrate(self.state, ctx), [3])
 
+    def test_a_build_of_the_same_name_that_migrates_again_takes_a_copy_of_its_own(self):
+        # A dev build made twice from one commit, the second with a migration
+        # more, which fails: what comes back is the state from just before
+        # it, never the copy the first one took before its own migration.
+        (self.state / "state.json").write_text('{"state": 2, "by": "0.5.0"}')
+        ctx = {"ran": []}
+        with redirect_stdout(io.StringIO()):
+            sv.gate(self.state, "0.6.0")
+            self.assertEqual(sv.migrate(self.state, ctx), [3])
+        first = self.state / "backups" / "before-0.6.0"
+        self.assertTrue((first / sv.LANDED).exists(), "the copy is marked: its update landed")
+        (self.state / "roadmap.json").write_text('{"items": "written since the first update"}')
+        (self.state / "state.json").write_text('{"state": 2, "by": "0.6.0"}')      # as if one more were to run
+        ctx = {"ran": [], "fail": True}
+        with redirect_stdout(io.StringIO()), mock.patch.object(sv.sys, "stderr", io.StringIO()):
+            sv.gate(self.state, "0.6.0")
+            with self.assertRaises(SystemExit):
+                sv.migrate(self.state, ctx)
+        self.assertEqual((self.state / "roadmap.json").read_text(), '{"items": "written since the first update"}')
+        self.assertFalse((self.state / sv.LANDED).exists(), "the mark is the copy's, never the state's")
+        kept = [d.name for d in (self.state / "backups").iterdir() if d.name.startswith("before-0.6.0~")]
+        self.assertEqual(len(kept), 1, "and the first copy is still there, under a name of its own")
+
     def test_with_no_copy_to_put_back_it_goes_on_and_says_so(self):
         # Never the case after gate(), which takes the copy or holds every
         # migration: kept for a caller that runs them without it.
