@@ -1265,6 +1265,31 @@ def pin_rows(nid, rep):
     return rows
 
 
+def receipt_of(nid, rep, name, p):
+    """An installed pack's receipt as its row says it (R234): what the node
+    reported (commit, tree, files, bytes, at), with `stale` naming the
+    commit kept now when the copy there came from an earlier manifest,
+    `before` the tree the same manifest made there the last time where it
+    was another, and `differs` each other node whose copy of the same
+    manifest is another set of files. None for one installed before
+    receipts, or by an agent from before them."""
+    rc = (rep.get("toolchain_receipts") or {}).get(name) if isinstance(rep.get("toolchain_receipts"), dict) else None
+    if not isinstance(rc, dict) or not rc.get("tree"):
+        return None
+    out = {k: rc.get(k) for k in ("commit", "tree", "files", "bytes", "at")}
+    kept = str(((p.get("source") or {}).get("commit")) or "")
+    out["stale"] = kept if kept and rc.get("commit") and kept != rc["commit"] else ""
+    out["before"] = rc.get("before") or ""
+    out["differs"] = []
+    for other in nodes.node_list() if nodes else []:
+        if other.get("id") == nid:
+            continue
+        theirs = ((other.get("reported") or {}).get("toolchain_receipts") or {}).get(name)
+        if isinstance(theirs, dict) and theirs.get("commit") == rc.get("commit") and theirs.get("tree") and theirs["tree"] != rc["tree"]:
+            out["differs"].append({"node": other.get("name") or other.get("id") or "", "tree": theirs["tree"]})
+    return out
+
+
 def payload_for_node(nid):
     n = nodes.node(nid) if nodes else None
     if not n:
@@ -1337,6 +1362,8 @@ def payload_for_node(nid):
                       # (R137): {algo, where}, algo "none" with why; absent
                       # for one installed before that.
                       "verified": ver.get(name) if here else None,
+                      # What a pinned install left behind (R234): its receipt.
+                      "receipt": receipt_of(nid, rep, name, p) if here else None,
                       "latest": "", "state": ""})
     # The versions this node's projects pin (B712), beside the catalog's rows.
     items.extend(pin_rows(nid, rep))

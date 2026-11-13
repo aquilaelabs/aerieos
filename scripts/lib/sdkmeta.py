@@ -700,10 +700,87 @@ def unreachable(host, timeout=6):
     return ""
 
 
+def receipt(d, commit, name=""):
+    """An install's receipt (R234): every file that landed in DIR with its
+    sha256, one hash over the whole list, and the commit it was installed
+    from. A pack's pin covers its own files, and what its install steps
+    fetch from somewhere else left no trail (the operator, 13 Nov): this is
+    it. Written to DIR/.bb-receipt, whose first line is the summary the
+    node's census reads (format, commit, tree, files, bytes, when, and the
+    tree the same commit made here before where that was another), and
+    added as a line to the store's own log (.bb-receipts beside DIR), which
+    a remove and a reinstall leave alone. Returns the summary as words.
+
+    Left out: git's own directory, AerieOS's marks (.bb-*) and compiled
+    python, which carries the moment it was compiled."""
+    import hashlib
+    import time
+    d = os.path.abspath(d)
+    lines, total = [], 0
+    for top, dirs, files in os.walk(d):
+        dirs[:] = sorted(x for x in dirs if x not in (".git", "__pycache__"))
+        for dn in list(dirs):
+            full = os.path.join(top, dn)
+            if os.path.islink(full):
+                lines.append((os.path.relpath(full, d), "link  " + os.readlink(full)))
+                dirs.remove(dn)
+        for fn in files:
+            if fn.startswith(".bb-") or fn.endswith(".pyc"):
+                continue
+            full = os.path.join(top, fn)
+            rel = os.path.relpath(full, d)
+            if os.path.islink(full):
+                lines.append((rel, "link  " + os.readlink(full)))
+                continue
+            if not os.path.isfile(full):
+                continue
+            h = hashlib.sha256()
+            try:
+                with open(full, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        h.update(chunk)
+                        total += len(chunk)
+            except OSError as e:
+                lines.append((rel, f"unread  {e.strerror or 'could not be read'}"))
+                continue
+            lines.append((rel, h.hexdigest() + ("  x" if os.access(full, os.X_OK) else "  -")))
+    lines.sort(key=lambda r: r[0].encode("utf-8", "surrogateescape"))
+    body = "".join(f"{what}  {rel}\n" for rel, what in lines)
+    tree = hashlib.sha256(body.encode("utf-8", "surrogateescape")).hexdigest()
+    now = int(time.time())
+    name = name or os.path.basename(d)
+    # What the same commit made here the last time, where that was another.
+    log, before = os.path.join(os.path.dirname(d), ".bb-receipts"), ""
+    try:
+        with open(log, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                r = ln.rstrip("\n").split("\t")
+                if len(r) >= 4 and r[1] == name and r[2] == commit:
+                    before = r[3] if r[3] != tree else ""
+    except OSError:
+        pass
+    with open(os.path.join(d, ".bb-receipt"), "w", encoding="utf-8", errors="surrogateescape") as f:
+        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\n{body}")
+    try:
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(f"{now}\t{name}\t{commit}\t{tree}\t{len(lines)}\t{total}\n")
+    except OSError:
+        pass
+    said = f"receipt: {len(lines)} files, {total} bytes, from {commit[:12] or 'no commit'}, {tree[:12]} over them all"
+    return said + (f"; the same commit made {before[:12]} here before" if before else "")
+
+
 def main(argv):
     if not argv:
         die("usage: sdkmeta.py names|flavors|images|field|argv|resolve|size ...")
     op = argv[0]
+
+    if op == "receipt":
+        # receipt DIR COMMIT [NAME]: what an install left, written beside it.
+        if len(argv) < 3 or not os.path.isdir(argv[1]):
+            die("receipt needs the installed directory and the commit it came from")
+        print(receipt(argv[1], argv[2], argv[3] if len(argv) > 3 else ""))
+        return
 
     if op == "names":
         print("\n".join(p["name"] for p in catalog()))

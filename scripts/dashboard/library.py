@@ -148,7 +148,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "size": i.get("size") or "", "wrong_platform": i.get("wrong_platform") or "", "pinned": i.get("pinned_by") or i.get("pinned") or [],
                     # The open row's lines, as the Toolchains page draws them (step 2).
                     "tool": i.get("tool") or "", "system": i.get("system"), "needs": i.get("needs") or [], "needed_by": i.get("needed_by") or [],
-                    "needs_missing": i.get("needs_missing") or [], "path": i.get("path") or "", "verified": i.get("verified"), "reopen": i.get("reopen") or 0,
+                    "needs_missing": i.get("needs_missing") or [], "path": i.get("path") or "", "verified": i.get("verified"), "receipt": i.get("receipt"), "reopen": i.get("reopen") or 0,
                     "pack": {k: pack.get(k) for k in ("url", "commit", "path", "by", "at", "tier", "verbs", "here", "disabled")} if pack else None,
                     # What it asks for per node, and what it has been given here (R172).
                     "config": i.get("config") or [], "values": pack_values.get(i["name"]) if i.get("config") else None,

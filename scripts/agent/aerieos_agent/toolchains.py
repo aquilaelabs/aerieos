@@ -530,6 +530,35 @@ def sdk_verified(state):
     return out
 
 
+def sdk_receipts(state):
+    """What each pinned install left behind (R234): {name: {commit, tree,
+    files, bytes, at, before}} from the first line of its .bb-receipt, which
+    the installer writes (sdkmeta.py receipt). `tree` is one sha256 over
+    every file's, `before` the tree the same commit made here the last
+    time where that was another. One installed before receipts has none
+    and is left out."""
+    store = tc_root(state)
+    out = {}
+    if not store:
+        return out
+    try:
+        names = sorted(os.listdir(store))[:80]
+    except OSError:
+        return out
+    hexd = set("0123456789abcdef")
+    for name in names:
+        if name.startswith("."):
+            continue
+        with contextlib.suppress(OSError, ValueError):
+            with open(os.path.join(store, name, ".bb-receipt"), encoding="utf-8", errors="replace") as f:
+                r = f.readline().rstrip("\n").split("\t")
+            if len(r) < 6 or r[0] != "1" or len(r[2]) != 64 or not set(r[2]) <= hexd:
+                continue
+            before = r[6] if len(r) > 6 and len(r[6]) == 64 and set(r[6]) <= hexd else ""
+            out[name] = {"commit": r[1][:64], "tree": r[2], "files": int(r[3]), "bytes": int(r[4]), "at": int(r[5]), "before": before}
+    return out
+
+
 def sdk_versions(state):
     """What `aerie toolchains versions` reports on this node: {name: version}.
 

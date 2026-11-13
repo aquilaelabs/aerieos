@@ -1388,6 +1388,22 @@ sdk_install_git() {
     sdk_install_steps "$what" "$d"
     [ -z "$commit" ] || sdk_mark_exec "$what" "$d"
     sdk_install_verify "$what" "$d" ""
+    [ -z "$commit" ] || sdk_receipt "$what" "$d" "$commit"
+}
+
+# sdk_receipt WHAT DIR COMMIT: what a pinned install left behind, written
+# down (R234; the operator, 13 Nov): the commit pins the pack's own files,
+# and what its install steps fetched from somewhere else had no trail. Every
+# file's sha256 and one hash over them all go into DIR/.bb-receipt and the
+# store's log (sdkmeta.py receipt), which the Installed page reads. A
+# receipt that could not be written fails nothing: the install is whole.
+sdk_receipt() {
+    local said
+    if said="$(sdk_meta receipt "$2" "$3" "$1" 2>&1)"; then
+        log "$said"
+    else
+        log "no receipt was kept for ${1}: ${said}"
+    fi
 }
 
 # The programs a tool pack runs by path, marked executable (B83): what its

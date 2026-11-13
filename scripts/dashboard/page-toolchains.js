@@ -162,6 +162,27 @@ function tcVerifiedLine(p){
     : v.algo === "gpg" ? `<span class="sub tcverified">Checked when it was installed: ${esc(v.where)}</span>`
     : `<span class="sub tcverified">Checked when it was installed: its ${esc(v.algo)} matched ${esc(v.where)}</span>`;
 }
+// An installed pack's receipt (R234; the operator, 13 Nov: what a pack's
+// install downloads from somewhere else had no paper trail): the manifest
+// commit the copy here came from, when, how many files landed and how big,
+// and one hash over them all. Under it, each thing the receipt shows that a
+// person would act on: a copy from an earlier manifest than the one kept
+// now, the same manifest having left other files here the time before, and
+// another node's copy of the same manifest being another set of files,
+// which is what an install that fetches "the latest" looks like. Nothing for
+// one installed before receipts were kept.
+function tcReceiptLines(p){
+  const r = p.installed ? p.receipt : null;
+  if (!r) return "";
+  const short = h => esc(String(h || "").slice(0, 12));
+  const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))} from manifest <code>${short(r.commit)}</code>: ${
+    r.files === 1 ? "1 file" : `${r.files} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
+  if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Remove it here and install it again to take what that one installs.</span>`);
+  if (r.before) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files here the time before (receipt <code>${short(r.before)}</code>): something its install fetches has changed.</span>`);
+  if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
+    r.differs.map(d => `<code>${short(d.tree)}</code>`).join(", ")}): something its install fetches is not pinned.</span>`);
+  return lines.join("");
+}
 // ---- tool packs (R77) -------------------------------------------------------
 // The one dialog the Library's Add tool pack and a pack's Edit open (tpDraw).
 // A pack is looked at before it is added: the dialog fetches its manifest at a

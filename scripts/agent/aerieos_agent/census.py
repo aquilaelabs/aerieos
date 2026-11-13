@@ -31,7 +31,7 @@ from .base import (
 )
 from .stores import _stores, console_said, noexec, store_dirs, tc_root
 from .backends import _have, net_backend, pkg_backend
-from .toolchains import _toolchains, sdk_images, sdk_verified, sdk_versions, sysdeps_now
+from .toolchains import _toolchains, sdk_images, sdk_receipts, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
     _gpu_amd,
     _gpu_card,
@@ -458,6 +458,8 @@ def census(state):
         "toolchain_versions": sdk_versions(state),
         # ...and how each was checked when it was installed (R137).
         "toolchain_verified": sdk_verified(state),
+        # ...and what each pinned install left behind: its receipt (R234).
+        "toolchain_receipts": sdk_receipts(state),
         "services": services_now(),
         # The session half (roadmap #24), as this process is holding it.
         "session": session_now(state),

@@ -145,4 +145,33 @@ ok(await page.evaluate(() => !document.querySelector('.doc .installedtab .irow')
 await page.evaluate(() => { nodesList = null; nodesStale = true; instNode = ''; inst = null; loadInstalled(); });
 await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
 
+// ---- an install's receipt ----------------------------------------------------
+// What a pack's install left on a node (R234; the operator, 13 Nov: what it
+// downloads from somewhere else had no paper trail): the manifest commit the
+// copy came from, when, how many files and how big, one hash over them all,
+// and each thing the receipt shows that a person would act on.
+{
+  const said = await page.evaluate(() => {
+    const host = document.createElement('div');
+    const at = Date.UTC(2026, 10, 13, 5, 0, 0) / 1000;
+    const rc = more => ({ commit: 'a'.repeat(40), tree: '1'.repeat(64), files: 214, bytes: 50331648, at, stale: '', before: '', differs: [], ...more });
+    const text = p => { host.innerHTML = tcReceiptLines(p); return [...host.querySelectorAll('.tcreceipt')].map(e => `${e.classList.contains('warn') ? 'WARN ' : ''}${e.textContent}`); };
+    return { plain: text({ installed: true, receipt: rc() }),
+             one: text({ installed: true, receipt: rc({ files: 1 }) })[0],
+             stale: text({ installed: true, receipt: rc({ stale: 'b'.repeat(40) }) }),
+             before: text({ installed: true, receipt: rc({ before: '2'.repeat(64) }) }),
+             differs: text({ installed: true, receipt: rc({ differs: [{ node: 'alder', tree: '3'.repeat(64) }, { node: 'birch', tree: '4'.repeat(64) }] }) }),
+             none: [text({ installed: true, receipt: null }).length, text({ installed: false, receipt: rc() }).length] };
+  });
+  ok(said.plain.length === 1 && /^Installed .+ from manifest aaaaaaaaaaaa: 214 files, 48\.0 MB, receipt 111111111111\.$/.test(said.plain[0]) && / 1 file,/.test(said.one),
+     `an installed pack says its receipt: the manifest it came from, when, how many files and how big, and one hash over them (${said.plain[0]})`);
+  ok(said.stale.length === 2 && /^WARN This copy is from an earlier manifest: the one kept now is bbbbbbbbbbbb\. Remove it here and install it again/.test(said.stale[1]),
+     `...a copy from an earlier manifest than the one kept now says so, and what to do (${said.stale[1]})`);
+  ok(said.before.length === 2 && /^WARN The same manifest left other files here the time before \(receipt 222222222222\)/.test(said.before[1]),
+     `...the same manifest having left other files here before is said (${said.before[1]})`);
+  ok(said.differs.length === 2 && /^WARN The same manifest left other files on alder, birch \(receipt 333333333333, 444444444444\): something its install fetches is not pinned\.$/.test(said.differs[1]),
+     `...and so is another node's copy of the same manifest being other files (${said.differs[1]})`);
+  ok(said.none.join() === '0,0', '...and one installed before receipts were kept, or not installed, says nothing');
+}
+
 await done(browser);

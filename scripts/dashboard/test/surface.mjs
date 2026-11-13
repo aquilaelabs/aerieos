@@ -70,7 +70,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'pShowKey', 'pSlide', 'paginate', 'paint', 'paintAdopt', 'paintBar', 'paneStack',
   'phFetch', 'tcAct', 'tcPick',
   // The Emulator tab (tab-emulator.js).
-  'openEmulator', 'emuPick', 'loadEmulator', 'emuAddRows', 'emuFlavorNow', 'emuTickedHere', 'emuRow', 'renderEmulatorInto', 'emuAct', 'tcTermsLine', 'tcVerifiedLine', 'tcSystemLine', 'tcNeedsLine', 'tcDriverLine', 'tcDriverOption', 'tcToolkitLine', 'nodesReadOnly', 'headerOnly', 'splitSects', 'splitDraw', 'splitAway', 'bootOwn', 'splitMove', 'splitMarks', 'splitOff', 'rnSplit', 'rolesInsts', 'rolesLvlAt', 'rolesSetAll', 'viewSaid', 'pageKey', 'pageLimit', 'rnPrefsOf',
+  'openEmulator', 'emuPick', 'loadEmulator', 'emuAddRows', 'emuFlavorNow', 'emuTickedHere', 'emuRow', 'renderEmulatorInto', 'emuAct', 'tcTermsLine', 'tcVerifiedLine', 'tcReceiptLines', 'tcSystemLine', 'tcNeedsLine', 'tcDriverLine', 'tcDriverOption', 'tcToolkitLine', 'nodesReadOnly', 'headerOnly', 'splitSects', 'splitDraw', 'splitAway', 'bootOwn', 'splitMove', 'splitMarks', 'splitOff', 'rnSplit', 'rolesInsts', 'rolesLvlAt', 'rolesSetAll', 'viewSaid', 'pageKey', 'pageLimit', 'rnPrefsOf',
   // The Claude sign-in on a node's row (page-signin.js), and the press that goes to it.
   'signinRev', 'signinCannot', 'signinBusy', 'signinBlock', 'wireSignin', 'openNodeClaude', 'signinCancel', 'claudeSigninFirst', 'claudeNodes', 'claudeEnd', 'modalTop', 'keepOpen', 'keepLine', 'pollRevsOnce', 'oneOpen', 'sectGroup', 'soleOpen', 'sectJump', 'topModal', 'modalOpened', 'modalClosed', 'modalFocusables', 'dismissModal', 'modalKeys', 'scrollHint', 'scrollHints',
   'nodeGpuSection', 'nodeSound', 'nodeInternet', 'ndOffLine', 'ndNotHereHtml', 'tcTickDots',

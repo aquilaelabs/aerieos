@@ -50,6 +50,37 @@ take the new version.
 holds the pack, naming the node: uninstall it there first, since a pack gone
 from the catalog leaves no row to uninstall its files from.
 
+### An install's receipt
+
+A pack is kept at a commit, and that pins the pack's own files: its
+manifest, its install script, its verbs. What the install script then
+downloads comes from wherever it says, and the commit says nothing about
+it. So every install of a pack on a node leaves a receipt: the manifest
+commit it was installed from, when, and the sha256 of every file that
+landed, with one hash over them all. The pack's page on **Installed** says
+it (`Installed 13 Nov from manifest 1a2b3c4d5e6f: 214 files, 48.0 MB,
+receipt 9f8e7d6c5b4a`), the whole list is beside the pack on the node
+(`.bb-receipt` in its directory), and the node's store keeps a line for
+every install it has made (`.bb-receipts`), which a remove and a reinstall
+leave alone.
+
+The page says three more things when the receipt shows them:
+
+- **The copy is from an earlier manifest** than the one kept now: a
+  Manifest update was taken and this node still holds what the earlier one
+  installed. Remove it there and install it again.
+- **The same manifest left other files there the time before**: something
+  its install fetches has changed since.
+- **The same manifest left other files on another node**: something its
+  install fetches is not pinned, the latest of something being the usual
+  reason.
+
+A receipt leaves out git's own directory, AerieOS's marks and compiled
+python, which carries the moment it was compiled. It records what landed;
+it does not stop an install. A pack installed before receipts were kept
+has none until it is installed again, and a node says one once its agent
+is 0.9.433 or newer.
+
 ## Official packs and agent packs
 
 Everything AerieOS ships is a pack in this same format too (R169): under

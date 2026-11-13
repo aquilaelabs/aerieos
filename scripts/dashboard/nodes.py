@@ -1552,6 +1552,19 @@ def _census(c):
     out["toolchain_verified"] = {str(k)[:40]: {"algo": str(v.get("algo") or "")[:8], "where": str(v.get("where") or "")[:200]}
                                  for k, v in list(tv.items())[:80] if isinstance(v, dict)
                                  and str(v.get("algo") or "") in ("sha1", "sha256", "sha512", "gpg", "none")}
+    # What each pinned install left behind (R234): the commit it came from,
+    # one sha256 over every file that landed, how many and how big, when,
+    # and the tree the same commit made there before where it was another.
+    tr = c.get("toolchain_receipts") if isinstance(c.get("toolchain_receipts"), dict) else {}
+    out["toolchain_receipts"] = {}
+    for k, v in list(tr.items())[:80]:
+        if not isinstance(v, dict) or not re.fullmatch(r"[0-9a-f]{64}", str(v.get("tree") or "")):
+            continue
+        with contextlib.suppress(TypeError, ValueError):
+            out["toolchain_receipts"][str(k)[:40]] = {
+                "commit": re.sub(r"[^0-9a-f]", "", str(v.get("commit") or ""))[:64], "tree": v["tree"],
+                "files": max(0, int(v.get("files") or 0)), "bytes": max(0, int(v.get("bytes") or 0)), "at": max(0, int(v.get("at") or 0)),
+                "before": v["before"] if re.fullmatch(r"[0-9a-f]{64}", str(v.get("before") or "")) else ""}
     # Kept only when the agent sent one: a listing that is there and empty
     # is a store with nothing in it (B671), a key that is absent is a node
     # that has not said, and the Installed page reads the two apart.

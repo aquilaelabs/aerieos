@@ -189,6 +189,7 @@ function instAboutLines(r){
     lines.push(tcNeedsLine(r));
     if (r.path) lines.push(`<span class="sub">At ${esc(r.path)}.</span>`);
     lines.push(tcVerifiedLine(r));
+    lines.push(tcReceiptLines(r));
     if (r.reopen) lines.push(`<span class="sub warn">${r.reopen === 1 ? "1 session" : `${r.reopen} sessions`} open here started before this was installed: reopen ${r.reopen === 1 ? "it" : "them"} to use it.</span>`);
     if (r.pinned?.length) lines.push(`<span class="sub">Pinned by ${esc(r.pinned.map(projLabel).join(", "))}.</span>`);
     if (r.pack) lines.push(`<span class="sub">${r.pack.here ? "Made here" : `From <code>${esc(r.pack.url)}</code> at ${esc((r.pack.commit || "").slice(0, 12))}`}${r.pack.by ? `, added by ${esc(r.pack.by)}` : ""}.</span>`);

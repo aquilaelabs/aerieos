@@ -306,6 +306,12 @@ The check runs on the pull request. A red check says why in its log.
   conversation, a refused command refused, a turn's working and waiting on
   the dock.
 - **Run the scanners** over the pack.
+- **Compare the receipts.** Every install leaves a receipt, the sha256 of
+  every file that landed ([An install's receipt](tool-packs.md#an-installs-receipt)).
+  Installed on two nodes, or twice, a pack whose downloads are pinned
+  leaves the same receipt; one that fetches the latest of something does
+  not, and its page says so. Pin what your install fetches to a version
+  and hold it to a checksum.
 - **Sign and merge.** The index is signed with the maintainers' key and the
   pull request merged. From then on every install lists the entry at its
   next look at the catalog.
