@@ -285,6 +285,14 @@ One entry a pull request. It holds:
   the adapter against and how you learned each fact in it (its docs, its
   own help, a run).
 
+Your entry and nothing else. The check says whose each changed entry is and
+refuses a pull request that reaches past its own: one that also moves
+another owner's entry or one of AerieOS's own, or changes any file that was
+already in the catalog. Nobody else's pull request moves yours either: your
+entry changes only with a new commit of your repository, its address never
+changes, and the two things the maintainers may change without one are its
+tier and whether it is withdrawn.
+
 The check runs on the pull request. A red check says why in its log.
 
 ## What the maintainers do
