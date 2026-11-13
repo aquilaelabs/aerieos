@@ -1512,7 +1512,14 @@ def worktree(c, argv):
                 off = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"]
                 has = subprocess.run(["git", *off, "-C", src, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
                                      env=env, check=False).returncode == 0
-                add = ["git", *off, "-C", src, "worktree", "add"] + ([wt, branch] if has else ["-b", branch, wt])
+                # With no checkout: laying the files out runs what the
+                # repository's own configuration names (a filter for a path
+                # its .gitattributes marks, a hook), and a session of the
+                # space can write that configuration. Switching two keys off
+                # left the rest (the audit of 13 Nov). The files are laid out
+                # by the session that first enters it, inside its view
+                # (enter, worktree_unfilled).
+                add = ["git", *off, "-C", src, "worktree", "add", "--no-checkout"] + ([wt, branch] if has else ["-b", branch, wt])
                 os._exit(subprocess.run(add, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                         check=False).returncode)
             except Exception:                                  # noqa: BLE001 (the child says only how it ended)
@@ -1523,10 +1530,91 @@ def worktree(c, argv):
     print(wt)
 
 
+def worktree_unfilled(wt):
+    """Whether `wt` is a git worktree made with no checkout: its .git a file
+    naming the folder git keeps for it, which has no index yet."""
+    try:
+        with open(os.path.join(wt, ".git"), encoding="utf-8") as f:
+            line = f.readline().strip()
+    except (OSError, UnicodeDecodeError):
+        return False                     # a repository's own folder, or no repository
+    if not line.startswith("gitdir: "):
+        return False
+    admin = line[len("gitdir: "):]
+    if not os.path.isabs(admin):
+        admin = os.path.normpath(os.path.join(wt, admin))
+    return os.path.isdir(admin) and not os.path.exists(os.path.join(admin, "index"))
+
+
+# What the controller granted each account on this node, kept by root where
+# only root writes: tty() writes it from the controller's answer, enter()
+# holds an account's own user to it. Under /run, so a restart of the machine,
+# which ends every session, ends every grant with them.
+GRANTS = os.environ.get("BUILDERBOT_SESSION_GRANTS", "/run/bb-session/grants")
+
+
+def _names(v):
+    return sorted({str(x) for x in v if isinstance(x, str)}) if isinstance(v, list) else []
+
+
+def grants_of(account):
+    """{space: {"reads", "works", "sees"}} the controller granted `account` here."""
+    try:
+        with open(os.path.join(GRANTS, account + ".json"), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def grant_keep(account, got):
+    """The controller's answer for a terminal kept as what `account` may
+    enter: the space it is for and what that space reads, works in and sees.
+    What it was granted before for the same space widens, never narrows
+    here, since a session of the earlier grant may still be running."""
+    project = str(got.get("project") or "")
+    if not ACCOUNT.fullmatch(account or "") or not PROJECT_DIR.fullmatch(project):
+        return
+    os.makedirs(GRANTS, mode=0o700, exist_ok=True)
+    os.chmod(GRANTS, 0o700)
+    all_ = grants_of(account)
+    was = all_.get(project) if isinstance(all_.get(project), dict) else {}
+    all_[project] = {k: sorted(set(_names(was.get(k))) | set(_names(got.get(k)))) for k in ("reads", "works", "sees")}
+    all_[project]["at"] = int(time.time())
+    path = os.path.join(GRANTS, account + ".json")
+    fd = os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(all_, f)
+    os.replace(path + ".new", path)
+
+
+def grant_hold(account, a):
+    """An account's own user enters the spaces the controller granted it a
+    terminal on, with what they read, work in and see, and no other: it was
+    held to being its own account and to nothing about the space, so
+    anything running as that user outside a view (its terminal server reads
+    a file its sessions write) could enter any space on the node (the audit
+    of 13 Nov)."""
+    project = a.get("project", "")
+    g = grants_of(account).get(project)
+    if not isinstance(g, dict):
+        raise Refused(f"bb-session: the controller has granted {account} no terminal on {project or 'that space'} on this "
+                      "machine since it started: open the space's terminal from the dashboard")
+    for k, word in (("reads", "read"), ("works", "work in"), ("sees", "see")):
+        extra = sorted(set(a.get(k) or []) - set(_names(g.get(k))))
+        if extra:
+            raise Refused(f"bb-session: {project}'s sessions were not granted to {word} {', '.join(extra)}: "
+                          "open the space's terminal again, or restart the session")
+
+
 def enter(c, a, command):
     name, uid, gid = caller(c, a.get("account", ""))
     if not command:
         raise Refused("bb-session: nothing to run")
+    # An account's own user (not the session account, which is the node's
+    # own): only what the controller granted it.
+    if c.get("ACCOUNT_USERS") == "on" and name != c.get("SESSION_USER"):
+        grant_hold(a.get("account", ""), a)
     envfile = a.get("env", "")
     project, home = a.get("project", ""), a.get("home", "").rstrip("/")
     account = a.get("account", "")
@@ -1637,6 +1725,15 @@ def enter(c, a, command):
         try:
             _default_signals()
             os.chdir(a["cwd"])
+            # A worktree this helper made with no files in it (worktree):
+            # laid out here, as the account and inside its view, where
+            # whatever the repository's configuration runs is the session's own.
+            if worktree_unfilled(a["cwd"]):
+                r = subprocess.run(["git", "-C", a["cwd"], "checkout", "-q", "-f", "HEAD"], env=env,
+                                   stdin=subprocess.DEVNULL, check=False)
+                if r.returncode:
+                    sys.stderr.write("this worktree's files were not laid out (git checkout ended with "
+                                     f"{r.returncode}): run git checkout -f HEAD in it\n")
             os.execvpe(command[0], command, env)
         except OSError as e:
             sys.stderr.write(f"bb-session: could not run {command[0]}: {e}\n")
@@ -1824,6 +1921,8 @@ def tty(c, argv, ro=False):
         raise Refused(f"{home} belongs to neither this account's user nor the session account")
     # SHELL too: tmux runs every pane's command through it, and an account
     # user's login shell is nologin, which ran nothing (B277).
+    # What it may enter from here on, kept where only root writes (enter holds it).
+    grant_keep(account, got)
     env.update(HOME=home, USER=pw.pw_name, LOGNAME=pw.pw_name, SHELL="/bin/bash", BB_TTY_GRANT=json.dumps(got))
     if ro:
         env["BB_TTY_RO"] = "1"

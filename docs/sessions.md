@@ -215,6 +215,32 @@ root-owned managed policy file outranks it.
 into the wrong tree by mistake, which is the common failure, and Bash is not
 under it.
 
+**Nothing a session wrote runs outside its view, and an account enters only
+what it was granted.** The view is entered by a launcher that runs as the
+account's own user outside it, with the account's home, which the
+account's sessions write. Three things keep that from being a way out:
+
+- *The terminal server reads AerieOS's settings alone.* An account's tmux
+  server on a node starts on the settings AerieOS ships and does not read
+  `~/.tmux.conf`, and the launcher's own git calls read no global
+  configuration. Inside a session both are the account's as ever.
+- *A worktree is made empty and filled inside the view.* `bb-session
+  worktree` runs git as the tree's owner outside every view, and laying a
+  worktree's files out runs whatever the repository's own configuration
+  names (a filter, a hook), which a session of the space can write. So it
+  makes the worktree with no files, and the session that first enters it
+  lays them out, where what runs is the session's own.
+- *Entering is held to the controller's grant.* Every terminal on a node
+  starts with the controller's grant for it: the account, the space, and
+  what that space reads, works in and sees. The root helper keeps each
+  grant where only root writes (`/run/bb-session/grants`, gone at a
+  restart with the sessions), and an account's own user enters a space
+  only with one, asking for no more than it names.
+
+Inside one space the members share a repository, so one member can still
+have git run something as another member inside that space. The boundary
+here is the view and the space, not the members of one space.
+
 **The hard boundary is the session's view (roadmap R35).** Every session on a
 node runs as one account and the node holds every space bound to it, so file
 permissions cannot keep spaces apart. On a Linux node provisioned as a

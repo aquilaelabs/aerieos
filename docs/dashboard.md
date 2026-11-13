@@ -356,7 +356,10 @@ arrows, Home and End, more Ctrl keys, and the symbols a touch keyboard
 hides).
 
 The launcher sets this on the session as it starts one, not only in the config
-file, because `~/.tmux.conf` lives on the persistent home and is yours.
+file, because `~/.tmux.conf` lives on the persistent home and is yours. That is
+the controller's own terminal: on a node, an account's session terminals
+start on AerieOS's settings alone and do not read `~/.tmux.conf`
+([sessions](sessions.md)).
 Because the setting is applied per session, a `set -g mouse on` in your own
 config does not override it: turn it back on where you want it with
 `Ctrl-b : set mouse on`.

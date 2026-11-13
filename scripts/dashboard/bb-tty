@@ -22,6 +22,22 @@ set -euo pipefail
 # dashboard suite drive this script at all.
 . "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
 
+# An account's own user on a node (R125) runs this script outside every
+# view, with the account's home, and that home is what its sessions write.
+# So the account's terminal server starts on AerieOS's own settings alone
+# and never on ~/.tmux.conf (the operator, 13 Nov; the audit of 13 Nov): a
+# line in that file ran as the account outside its view. Known by the grant
+# bb-session tty hands this script when it starts it as that user, which
+# nothing else sets. A function of this shell, not its environment, so
+# inside a session tmux is the account's as ever. This script's own git
+# calls only ask (rev-parse, show-ref, config), which run nothing a
+# configuration names, and one of them is the account's commit identity;
+# the call that lays files out is bb-session's, made with no checkout.
+if [ -n "${BB_TTY_GRANT:-}" ]; then
+    BB_TMUX_OWN="${0%/*}/../lib/tmux.conf"
+    tmux() { command tmux -f "$BB_TMUX_OWN" "$@"; }
+fi
+
 # A terminal that ends before it starts says so in its tab and waits (R132):
 # set -e ends this script at whatever failed, without a word, and the tab
 # then shows an empty terminal that ended with nothing on the screen. The
