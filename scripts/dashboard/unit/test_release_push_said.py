@@ -29,13 +29,40 @@ class PushSaid(unittest.TestCase):
         (d / "VERSION").write_text("1.2.3\n")
         git(d, "add", "VERSION")
         git(d, "commit", "-q", "-m", "one")
-        git(d, "remote", "add", "origin", f"file://{ws}/nowhere-sekrit:hunter2@x/repo.git")
+        # A remote that takes the branch and refuses a tag, in its own words.
+        remote = ws / "remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        hook = remote / "hooks" / "pre-receive"
+        hook.write_text('#!/bin/sh\nwhile read old new ref; do case "$ref" in refs/tags/*) '
+                        'echo "tags are protected here" >&2; exit 1 ;; esac; done\n')
+        hook.chmod(0o755)
+        git(d, "remote", "add", "origin", str(remote))
+        git(d, "push", "-q", "origin", "main")
         version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
         r = version.release("app")
         self.assertTrue(r.get("ok"), r)
         self.assertFalse(r["pushed"])
         self.assertIn("the push failed: ", r["note"])
+        self.assertIn("tags are protected here", r["note"])
         self.assertIn("git push origin v1.2.3", r["note"])
+
+    def test_a_remote_that_does_not_answer_tags_nothing_and_says_no_secret(self):
+        # The release is of the pushed commit (R206 step 4), so a remote that
+        # cannot be asked is the refusal, before any tag is made here.
+        ws = Path(tempfile.mkdtemp())
+        d = ws / "app"
+        d.mkdir()
+        git(d, "init", "-q", "-b", "main")
+        (d / "VERSION").write_text("1.2.3\n")
+        git(d, "add", "VERSION")
+        git(d, "commit", "-q", "-m", "one")
+        git(d, "remote", "add", "origin", "http://sekrit:hunter2@127.0.0.1:9/repo.git")
+        version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
+        for r in (version.release_plan("app"), version.release("app")):
+            self.assertIn("origin did not say where its branches are", r.get("error", ""), r)
+            self.assertIn("nothing is tagged", r["error"])
+            self.assertNotIn("hunter2", r["error"])
+        self.assertEqual(subprocess.run(["git", "-C", str(d), "tag"], capture_output=True, text=True).stdout, "")
 
 
 class DevTag(unittest.TestCase):
@@ -56,11 +83,11 @@ class DevTag(unittest.TestCase):
         self.assertEqual(tags, ["v1.2.3-dev.1"])
         self.assertIn("already exists", version.release("app", push=False, dev=True).get("error", ""))
 
-    def test_an_untracked_file_beside_the_commit_does_not_refuse_the_tag(self):
+    def test_the_release_is_of_the_commit_and_nothing_in_the_directory_beside_it(self):
         # B628: the controller's copy of a tree carries files a session keeps
-        # out of git with .git/info/exclude, which does not travel, so every
+        # out of git, and once a mode bit the share had changed, and every
         # tag was refused for 'uncommitted changes' the session never saw.
-        # An untracked file is in no commit; a tracked file changed is.
+        # R206 step 4: the release reads the commit, never that directory.
         ws = Path(tempfile.mkdtemp())
         d = ws / "app"
         d.mkdir()
@@ -69,27 +96,25 @@ class DevTag(unittest.TestCase):
         (d / "kept.txt").write_text("tracked\n")
         git(d, "add", "VERSION", "kept.txt")
         git(d, "commit", "-q", "-m", "one")
-        (d / "stray-tool.py").write_text("untracked\n")
         version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
-        p = version.release_plan("app", dev=True)
-        self.assertFalse(p.get("error"), p)
+        # An untracked file, a tracked one changed, its mode changed, and
+        # the VERSION file itself saying another number: none is in the commit.
+        (d / "stray-tool.py").write_text("untracked\n")
         (d / "kept.txt").write_text("changed\n")
+        (d / "kept.txt").chmod(0o755)
+        (d / "VERSION").write_text("9.9.9\n")
         p = version.release_plan("app", dev=True)
-        self.assertIn("uncommitted changes", p.get("error", ""), p)
-        self.assertIn("kept.txt", p["error"], "the changed file is named")
-        self.assertNotIn("stray-tool.py", p["error"])
-        self.assertIn("uncommitted changes", version.release("app", push=False, dev=True).get("error", ""))
-        git(d, "checkout", "--", "kept.txt")
-        # The VERSION file itself is the one untracked file that counts: the
-        # tag's number comes from it, so it has to be in the commit.
-        (d / "VERSION").write_text("1.2.4\n")
-        p = version.release_plan("app", dev=True)
-        self.assertIn("uncommitted changes", p.get("error", ""), p)
-        self.assertIn("VERSION", p["error"])
-        git(d, "checkout", "--", "VERSION")
+        self.assertEqual((p.get("error"), p.get("tag")), (None, "v1.2.3-dev.1"), p)
         r = version.release("app", push=False, dev=True)
         self.assertTrue(r.get("ok"), r)
-        self.assertTrue((d / "stray-tool.py").exists(), "the untracked file is left where it was")
+        self.assertEqual(r["tag"], "v1.2.3-dev.1", "the commit's VERSION, not the directory's")
+        # ...and the directory is as it was, with nothing of the release's left in it.
+        self.assertEqual((d / "VERSION").read_text(), "9.9.9\n")
+        self.assertEqual((d / "kept.txt").read_text(), "changed\n")
+        self.assertTrue((d / "stray-tool.py").exists())
+        trees = subprocess.run(["git", "-C", str(d), "worktree", "list", "--porcelain"], capture_output=True, text=True).stdout
+        self.assertEqual(trees.count("worktree "), 1, trees)
+        self.assertIsNone(getattr(version._judging, "tree", None))
 
     def test_a_dev_release_is_planned_as_its_own_tag_on_the_branchs_line(self):
         # A session's dev release is planned before anybody is asked: as the
@@ -131,6 +156,7 @@ class Finish(unittest.TestCase):
         git(d, "add", "VERSION")
         git(d, "commit", "-q", "-m", "one")
         git(d, "remote", "add", "origin", str(remote))
+        git(d, "push", "-q", "origin", "main")
         git(d, "tag", "-a", "v1.2.3", "-m", "x")
         version.configure(workspace=str(ws), state=str(ws / "state"), write_json=lambda *a, **k: None)
         # Made here, never pushed: releasing again pushes it.

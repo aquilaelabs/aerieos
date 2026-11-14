@@ -942,9 +942,66 @@ def drafts(project):
         rows = _req("GET", f"{API}/repos/{repo}/releases?per_page=30", token) or []
     except Refused as e:
         return {"error": str(e)}
-    return {"forge": name, "drafts": [{"tag": str(r.get("tag_name") or ""), "prerelease": r.get("prerelease") is True,
-                                       "notes": str(r.get("body") or ""), "url": str(r.get("html_url") or "")}
-                                      for r in rows if isinstance(r, dict) and r.get("draft") and TAG.fullmatch(str(r.get("tag_name") or ""))]}
+    out = []
+    for r in rows:
+        if not (isinstance(r, dict) and r.get("draft")):
+            continue
+        # One GitHub moved to a name of its own (untagged-ID: its tag field
+        # lost on the git host's form, B636) is listed under the tag it is
+        # titled for, which is the one it is published under from here.
+        tag = str(r.get("tag_name") or "")
+        if tag.startswith("untagged-") and TAG.fullmatch(str(r.get("name") or "")):
+            tag = str(r["name"])
+        if not TAG.fullmatch(tag):
+            continue
+        out.append({"tag": tag, "prerelease": r.get("prerelease") is True, "notes": str(r.get("body") or ""),
+                    "url": str(r.get("html_url") or ""), "holds": holds(repo, token, tag, str(r.get("body") or ""))})
+    return {"forge": name, "drafts": out}
+
+
+# The notes CI writes when the changelog has nothing for a version (the
+# tag's workflow and tools/release-attach.sh), which say nothing a person
+# reading the release can use: 4818 went out with them (2 Nov).
+_PLACEHOLDER = re.compile(r".+: see CHANGELOG\.md\.?")
+
+
+def placeholder_notes(notes):
+    """Whether a release's notes say nothing of the release: empty, or
+    ending in CI's placeholder line. The controller's own signing lines and
+    the list of downloads at the top are not what a release carries."""
+    lines = [ln.strip() for ln in str(notes or "").splitlines() if ln.strip() and not ln.startswith("Signed by AerieOS:")]
+    return not lines or bool(_PLACEHOLDER.fullmatch(lines[-1]))
+
+
+def is_pre(tag):
+    """Whether a tag is a pre-release's: anything after its version."""
+    return bool(re.search(r"(?:^|-)v\d+\.\d+\.\d+-[A-Za-z]", tag))
+
+
+def holds(repo, token, tag, notes):
+    """What keeps a draft from being published, each a sentence saying what
+    puts it right (R206 step 3); [] when nothing does. The files it must
+    carry are the caller's to check (releasefiles), which reads the list.
+
+    The tag: a release published while its tag is not on the git host is
+    given one by GitHub, on the newest commit of the default branch, which
+    is no commit the release was built from (B636 was the form's own tag
+    field, emptied). The notes: CI's placeholder says nothing."""
+    out = []
+    try:
+        ref = _req("GET", f"{API}/repos/{repo}/git/ref/tags/{urllib.parse.quote(tag, safe='')}", token)
+    except Refused as e:
+        ref = {"unknown": str(e)}
+    if not ref:
+        out.append({"what": "tag", "why": f"the tag {tag} is not on GitHub, and a release published without its tag is "
+                                          "given one on the default branch's newest commit, which nothing was built from: "
+                                          "push the tag first (releasing again finishes it), then publish"})
+    elif ref.get("unknown"):
+        out.append({"what": "tag", "why": f"whether the tag {tag} is on GitHub could not be read ({ref['unknown']})"})
+    if placeholder_notes(notes):
+        out.append({"what": "notes", "why": "the notes are the placeholder CI writes when the changelog has nothing for this "
+                                            "version: write what the release carries in the box, then publish"})
+    return out
 
 
 def _draft(project, tag):
@@ -978,12 +1035,20 @@ def draft_notes(project, tag, notes):
 def publish_draft(project, tag, notes=None, missing=()):
     """A draft published, its notes first replaced when given: {ok, tag,
     url} or {error}. Refused while `missing` names a file the release must
-    carry (releasefiles), so nothing goes out half built."""
+    carry (releasefiles), so nothing goes out half built; while its tag is
+    not on the git host; and while its notes, as they would go out, are
+    CI's placeholder (holds). Published under its own tag, a pre-release as
+    one and never the latest, whatever the draft was left marked as."""
     if missing:
         return {"error": f"{tag} is not whole yet: {', '.join(missing)} still missing. CI may still be building it"}
     try:
         repo, token, rel = _draft(project, tag)
-        body = {"draft": False, "tag_name": tag, **({"body": str(notes)[:120000]} if notes is not None else {})}
+        held = holds(repo, token, tag, str(notes) if notes is not None else str(rel.get("body") or ""))
+        if held:
+            return {"error": f"{tag} is not published: " + "; ".join(h["why"] for h in held), "holds": held}
+        pre = is_pre(tag)
+        body = {"draft": False, "tag_name": tag, "prerelease": pre, "make_latest": "false" if pre else "legacy",
+                **({"body": str(notes)[:120000]} if notes is not None else {})}
         out = _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, body) or {}
     except Refused as e:
         return {"error": str(e)}

@@ -162,8 +162,8 @@ print(json.dumps(m.release('relproj', **json.loads(${
   writeFileSync(`${R}/f`, 'edited and not committed');
   writeFileSync(`${R}/VERSION`, '1.3.0\n');
   rel = relOf({ push: false });
-  ok(!rel.ok && /uncommitted changes/.test(rel.error || ''),
-     '...and a dirty tree is refused: a tag marks a commit, not what is beside it');
+  ok(!rel.ok && /v1\.2\.0 already exists/.test(rel.error || ''),
+     `...and what is beside the commit is never read: with VERSION saying 1.3.0 uncommitted, the release is still the commit's 1.2.0 (${rel.error})`);
   rmSync(R, { recursive: true, force: true });
 }
 
@@ -1627,7 +1627,11 @@ ok((await page.errors).every(e => /400/.test(e)),
     try { body = r.request().postDataJSON() || {}; } catch {}
     if (body.action === 'release-drafts') return r.fulfill({ json: { forge: 'GitHub', drafts: [
       { tag: 'v9.9.9-dev.1', prerelease: true, url: 'https://example.invalid/1', missing: ['the.iso'], notes: 'not whole' },
-      { tag: 'v9.9.9', prerelease: false, url: 'https://example.invalid/2', missing: [], notes: 'whole' }] } });
+      { tag: 'v9.9.9', prerelease: false, url: 'https://example.invalid/2', missing: [], notes: 'whole' },
+      { tag: 'v9.9.8', prerelease: false, url: 'https://example.invalid/3', missing: [], notes: 'AerieOS 9.9.8: see CHANGELOG.md.',
+        holds: [{ what: 'notes', why: 'the notes are the placeholder CI writes' }] },
+      { tag: 'v9.9.7', prerelease: false, url: 'https://example.invalid/4', missing: [], notes: 'whole',
+        holds: [{ what: 'tag', why: 'the tag v9.9.7 is not on GitHub' }] }] } });
     if (body.action === 'release-publish' || body.action === 'release-draft-notes'){
       asked.push(body);
       return r.fulfill({ json: { ok: true, tag: body.tag } });
@@ -1644,6 +1648,17 @@ ok((await page.errors).every(e => /400/.test(e)),
                     said: await draftRow('v9.9.9-dev.1').textContent() };
   ok(drafted.notes === 'whole' && drafted.shut && !drafted.open && /Not whole yet: the\.iso/.test(drafted.said),
      `a draft shows its notes to correct, and Publish waits until it is whole (${JSON.stringify(drafted).slice(0, 120)})`);
+  // What else holds a draft back is said on its row (R206 step 3): a tag
+  // that is not on the git host stops the press, placeholder notes are put
+  // right in the box, so its press stays.
+  const held = { notes: await draftRow('v9.9.8').locator('[data-drafthold="notes"]').textContent(),
+                 notesShut: await draftRow('v9.9.8').locator('[data-draftpub]').isDisabled(),
+                 tag: await draftRow('v9.9.7').locator('[data-drafthold="tag"]').textContent(),
+                 tagShut: await draftRow('v9.9.7').locator('[data-draftpub]').isDisabled(),
+                 none: await draftRow('v9.9.9').locator('[data-drafthold]').count() };
+  ok(/Not published yet: the notes are the placeholder/.test(held.notes) && !held.notesShut
+     && /Not published yet: the tag v9\.9\.7 is not on GitHub/.test(held.tag) && held.tagShut && held.none === 0,
+     `a draft says on its row what keeps it from being published, and only what the box cannot put right stops the press (${JSON.stringify(held).slice(0, 200)})`);
   await page.fill(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, 'corrected');
   await page.click(`${LNB} #verDrafts [data-draft="v9.9.9"] [data-draftpub]`);
   await page.waitForTimeout(1500);

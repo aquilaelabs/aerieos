@@ -463,9 +463,16 @@ session never holds (R138). It is its own dial, **Agents may: Tag and
 publish a release**, named apart from signing, which makes a build rather
 than a release: auto releases at once, **ask** (the default) puts the tag
 and the commit it would mark in front of the space's owner in their bell
-and the app, and deny refuses naming the setting. A release that could not
-happen (no version, a tag already there, uncommitted changes) is refused
-before anybody is asked. From a branch other than the one builds ship
+and the app, and deny refuses naming the setting. A release is of the
+commit that is pushed: the head of the branch on the remote, which has to
+be the commit the space is on, and its version, changelog and snapshot are
+read from that commit, never from the files in the space's directory, so a
+change nobody committed is neither in it nor in its way. A release that
+could not happen (no version, a tag already there, commits not pushed, a
+remote that has moved on) is refused before anybody is asked, with what
+puts it right. A stable release or a named pre-release (a candidate) is cut
+only from a commit that is on the branch builds come from; a dev build is
+tagged on the branch it was built on. From a branch other than the one builds ship
 from, a session's release is the dev build's (`--dev`, a pre-release on
 the dev channel) unless `--stable` says otherwise, and its first line
 names the channel it lands on (R190).
@@ -480,9 +487,15 @@ repository's default branch carries `.github/workflows/release-rehearsal.yml`.
 
 **The files a release carries.** `.release-files` at the tree's root lists
 them, one a line with `@VER@` for the version. The controller checks each
-release it made against the list at its own tag once CI has had three
-hours, and a release short of a file is a red row on the bell naming the
-file and why (an unsigned APK, a file CI did not attach).
+release it made against the list at its own tag as the runs the tag started
+on GitHub end (after three hours where they cannot be read): a release
+short of a file is a red row on the bell naming the file and why (an
+unsigned APK, the run that failed), and one with every file is said
+complete, once, to the space's owner, with whether it is published or still
+a draft. A draft is published from the Artifacts view's **Drafts**, which
+holds one back, saying why on its row, while a file is missing, while its
+tag is not on the git host, or while its notes are the placeholder CI
+writes when the changelog had nothing for the version.
 
 **The forge's release.** Once the tag is pushed, Release makes the forge's
 own release beside it: titled with the version, the changelog's section for

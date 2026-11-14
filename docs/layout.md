@@ -233,8 +233,8 @@ scripts/
     changelog.py                 the user-facing record beside it: categories, and the editor's writes
     artifacts.py                 what a project built: dist/, and what a row may offer
     signing.py                   a project's Android signing keys, kept by the controller, never a session's, and the sign-key jobs that work on them on the project's node (R106)
-    releasesign.py               a release's unsigned APK from CI, signed on the project's node with its sideload key and attached (R106)
-    releasefiles.py              a release checked against the files its project lists in .release-files, a short one said on the bell (R190)
+    releasesign.py               a release's unsigned APK from CI, signed on the project's node with its sideload key and attached, from a run that passed or one still going once its release exists (R106)
+    releasefiles.py              a release checked against the files its project lists in .release-files as its CI ends, a short one said on the bell and a complete one said once (R190)
     membership.py                a project's owner, whether it is invite only, and the invitations to it
     registry.py                  projects by id (R154): each directory's permanent number and the name it is shown under, in projects.json; a directory is never handed out twice
     repos.py                     projects and their repositories (R138): which project each repository is in, in project-repos.json; create, add, move, detach for the trash, delete an empty one, and place one in no project

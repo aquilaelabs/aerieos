@@ -506,7 +506,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       // What would keep its Android APK from being signed, said before the
       // tag rather than found after it (R134 step 4).
       if (!await askYes(`Release ${blk?.target}?\n\n`
-                   + `Tags this commit as ${tag} and pushes the tag; a pushed tag is not moved or deleted from here.`
+                   + `Tags this branch's pushed commit as ${tag} and pushes the tag; a pushed tag is not moved or deleted from here. `
+                   + "A change not committed here is not in it, and a commit not pushed is asked for first."
                    + (ver?.release_sign ? `\n\nIts Android APK will not be signed: ${ver.release_sign}. `
                       + "The Signing view's Look for unsigned APKs now signs it once that is put right, within three days." : ""))) return;
       busy(b, "Releasing");
@@ -985,10 +986,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
             title="take the version back to ${esc(v.prev)}; ${esc(v.target)}'s changelog lines return to Unreleased">↩ ${esc(v.prev)}</button>` : ""}
           ${v.released ? "" : `
           <button type="button" data-verrelease="${esc(v.component || "")}"
-            ${v.dirty ? "disabled" : ""}
-            title="${v.dirty
-              ? "there are uncommitted changes: commit or discard them first, so the tag marks what is in the commit"
-              : `tag this commit ${esc(v.component ? v.component + "-v" + v.target : "v" + v.target)} and push the tag: `
+            title="${`tag the pushed commit ${esc(v.component ? v.component + "-v" + v.target : "v" + v.target)} and push the tag: `
                 + "that is what releases " + esc(v.target)}"
             >Release ${esc(v.target)}</button>`}
           <button type="button" class="verlogbtn" data-verlog="${esc(v.component || "")}"
@@ -1056,13 +1054,18 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
     const may = !projReleaseWhy(project);
     box.innerHTML = docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
       const miss = d.missing || [];
+      // What keeps it from being published, each said on its row (R206 step
+      // 3): a tag that is not on the git host stops the press; placeholder
+      // notes are put right in the box, so the press stays and is checked.
+      const holds = d.holds || [], stop = miss.length || holds.some(h => h.what !== "notes");
       return `<div class="field verdraft" data-draft="${esc(d.tag)}">
         <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
         ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
+        ${holds.map(h => `<div class="hint warn" data-drafthold="${esc(h.what)}">Not published yet: ${esc(h.why)}.</div>`).join("")}
         <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
-        ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${miss.length ? " disabled" : ""}>Publish</button></div>` : ""}
+        ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
       </div>`;
-    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest.</div>`, {cls: "warn"});
+    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"});
     wireSections(box);
     box.querySelectorAll("[data-draft]").forEach(row => {
       const tag = row.dataset.draft, ta = row.querySelector("textarea");

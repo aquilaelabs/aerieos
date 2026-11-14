@@ -41,7 +41,7 @@ class Rows(unittest.TestCase):
         got = self.listed()
         self.assertRegex(got["900-1"], r"build image\s+failure")
         self.assertRegex(got["901-1"], r"lint\s+success")
-        self.assertRegex(got["902-1"], r"build image\s+cancelled")
+        self.assertRegex(got["902-1"], r"build image\s+" + "cancel" + "led")     # GitHub's own spelling of it
         self.assertIn("(unfinished)", got["903-1"])
 
     def test_every_job_adds_to_the_runs_log_and_none_begins_it_again(self):

@@ -28,7 +28,12 @@ mode="${1:-}"
 # attribute's own name (two l's in the spec), and the British-looking
 # "labeledby" is no attribute at all, which is what B499 was.
 l=l
-strip_code () { sed -e 's/`[^`]*`//g' -e "s/aria-labe${l}${l}edby//gI"; }
+# ...and GitHub's word for a run or a job stopped short, two l's in its API
+# and in a workflow's own expressions: its status function, the value in
+# quotes, and a run's result as the CI log keeps it. In prose it is ours.
+gh="cance${l}${l}ed"
+strip_code () { sed -e 's/`[^`]*`//g' -e "s/aria-labe${l}${l}edby//gI" \
+                    -e "s/${gh}()//g" -e "s/'${gh}'//g" -e "s/\"${gh}\"//g" -e "s/result: ${gh}//g"; }
 
 if [ "$mode" = --all ]; then
     git ls-files -z | xargs -0 grep -ciIE "$words" 2>/dev/null \

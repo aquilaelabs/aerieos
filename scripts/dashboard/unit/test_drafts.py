@@ -43,20 +43,86 @@ class Drafts(unittest.TestCase):
 
     def test_a_draft_is_published_only_when_whole(self):
         self.assertIn("not whole yet: the.apk", forgerelease.publish_draft("p", "v1.0.0", missing=["the.apk"])["error"])
-        rel = {"id": 7, "tag_name": "v1.0.0", "draft": True, "html_url": "https://x/r"}
+        rel = {"id": 7, "tag_name": "v1.0.0", "draft": True, "html_url": "https://x/r", "body": "### Added\n\n- A thing"}
         sent = []
 
         def req(method, url, token, body=None, **kw):
             sent.append((method, body))
+            if "/git/ref/tags/" in url:
+                return {"ref": "refs/tags/v1.0.0"}
             return rel if method == "GET" else {**rel, "draft": False}
         with mock.patch.object(forgerelease, "_handle", return_value=("github", "GitHub", (REPO, "tok"))), \
                 mock.patch.object(forgerelease, "_req", req):
             r = forgerelease.publish_draft("p", "v1.0.0", notes="read and corrected")
             self.assertTrue(r.get("ok"), r)
             # The tag goes with it: GitHub drops a draft's tag patched without one (B696).
-            self.assertEqual(sent[-1], ("PATCH", {"draft": False, "tag_name": "v1.0.0", "body": "read and corrected"}))
+            # ...as a stable release, the latest only if it is the newest (R206 step 3).
+            self.assertEqual(sent[-1], ("PATCH", {"draft": False, "tag_name": "v1.0.0", "prerelease": False,
+                                                  "make_latest": "legacy", "body": "read and corrected"}))
             rel["draft"] = False
             self.assertIn("published already", forgerelease.publish_draft("p", "v1.0.0")["error"])
+
+
+class Holds(unittest.TestCase):
+    """What Publish checks beyond the files (R206 step 3): the tag is on the
+    git host, and the notes are not CI's placeholder. A draft published from
+    the git host's form with its tag field emptied went out as untagged-ID
+    (B636), and 4818's notes said nothing."""
+
+    def world(self, rel, tag_there=True):
+        self.sent = []
+
+        def req(method, url, token, body=None, **kw):
+            self.sent.append((method, url, body))
+            if "/git/ref/tags/" in url:
+                return {"ref": url.rsplit("/", 1)[-1]} if tag_there else None
+            if method == "GET" and "/releases?per_page=30" in url:
+                return [rel]
+            return rel if method == "GET" else {**rel, "draft": False}
+        for p in (mock.patch.object(forgerelease, "_handle", return_value=("github", "GitHub", (REPO, "tok"))),
+                  mock.patch.object(forgerelease, "_req", req)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_placeholder_notes_are_told_apart_from_notes(self):
+        for notes in ("", "  \n", "AerieOS 1.0.0: see CHANGELOG.md.", "## Downloads\n\n- the.iso\n\nAerieOS 1.0.0-dev.3: see CHANGELOG.md.",
+                      "AerieOS 1.0.0: see CHANGELOG.md.\nSigned by AerieOS: app.apk with the sideload key default"):
+            self.assertTrue(forgerelease.placeholder_notes(notes), notes)
+        for notes in ("### Added\n\n- A thing", "Fixes the update. Details: see CHANGELOG.md for the list\n\n- one"):
+            self.assertFalse(forgerelease.placeholder_notes(notes), notes)
+
+    def test_a_tag_is_a_pre_release_by_what_follows_its_version(self):
+        self.assertEqual([forgerelease.is_pre(t) for t in ("v1.0.0", "v1.0.0-dev.3", "v1.0.0-rc.1", "ext-v0.3.0", "ext-v0.3.0-dev.4")],
+                         [False, True, True, False, True])
+
+    def test_a_draft_whose_tag_is_not_on_the_host_is_not_published(self):
+        self.world({"id": 7, "tag_name": "v1.0.0-dev.3", "draft": True, "body": "### Added\n\n- A thing"}, tag_there=False)
+        r = forgerelease.publish_draft("p", "v1.0.0-dev.3")
+        self.assertIn("the tag v1.0.0-dev.3 is not on GitHub", r["error"])
+        self.assertIn("push the tag first", r["error"])
+        self.assertEqual([h["what"] for h in r["holds"]], ["tag"])
+        self.assertFalse([m for m, _, _ in self.sent if m == "PATCH"], "nothing was published")
+
+    def test_placeholder_notes_hold_it_until_the_box_says_something(self):
+        self.world({"id": 7, "tag_name": "v1.0.0-dev.3", "draft": True, "body": "AerieOS 1.0.0-dev.3: see CHANGELOG.md."})
+        r = forgerelease.publish_draft("p", "v1.0.0-dev.3")
+        self.assertIn("the notes are the placeholder", r["error"])
+        self.assertFalse([m for m, _, _ in self.sent if m == "PATCH"])
+        # The notes as they would go out are what is read: the box's.
+        r = forgerelease.publish_draft("p", "v1.0.0-dev.3", notes="### Fixed\n\n- The update")
+        self.assertTrue(r.get("ok"), r)
+        # A pre-release is published as one and never the latest, whatever the draft was marked.
+        self.assertEqual(self.sent[-1][2], {"draft": False, "tag_name": "v1.0.0-dev.3", "prerelease": True,
+                                            "make_latest": "false", "body": "### Fixed\n\n- The update"})
+
+    def test_the_drafts_list_says_each_ones_holds_and_finds_one_that_lost_its_tag(self):
+        # Published from the form with its tag field emptied, GitHub names
+        # it untagged-ID: listed under the tag it is titled for.
+        self.world({"id": 7, "tag_name": "untagged-abc123", "name": "v1.0.0-dev.3", "draft": True, "prerelease": True,
+                    "body": "AerieOS 1.0.0-dev.3: see CHANGELOG.md.", "html_url": "u"}, tag_there=False)
+        d = forgerelease.drafts("p")["drafts"]
+        self.assertEqual([x["tag"] for x in d], ["v1.0.0-dev.3"])
+        self.assertEqual([h["what"] for h in d[0]["holds"]], ["tag", "notes"])
 
 
 class TheSigningAttach(unittest.TestCase):

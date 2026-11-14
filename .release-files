@@ -1,8 +1,10 @@
 # The files every release of AerieOS carries, one a line, @VER@ the
 # release's version (0.9.0, 0.9.0-dev.4501) and * as a shell pattern. The
-# controller checks each release against the list at its own tag once CI
-# has had three hours, and says on the bell what is missing and why
-# (releasefiles.py); the release rehearsal lists it (release-rehearsal.yml).
+# controller checks each release against the list at its own tag as its
+# CI ends, and says on the bell what is missing and why, or that it is
+# complete (releasefiles.py); the tag's last job publishes a dev build once
+# it carries them all, and the release rehearsal says which were built
+# (tools/release-missing.sh).
 aerieos-controller-@VER@.tar.gz
 aerieos-controller-@VER@.tar.gz.sha256
 aerieos-companion-@VER@.exe

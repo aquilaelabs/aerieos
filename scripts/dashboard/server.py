@@ -5138,10 +5138,22 @@ releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json
                                               if d.is_dir() and not d.name.startswith(".")))
 
 
-# The files a release must carry (R190 step 4), checked once CI has had its
-# time, a release short of one said on the bell.
+# The files a release must carry (R190 step 4), checked as its CI ends, a
+# release short of one said on the bell and a complete one said once.
 import releasefiles                                              # noqa: E402
-releasefiles.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
+
+
+def _release_complete(project, tag, files, draft):
+    """A release with every file it must carry, said once to the space's
+    owner where what was said is kept (R206 step 6): the bell's latest and
+    the Notifications page."""
+    uid = membership.owner_of(project)
+    if uid:
+        notices.act(uid, {"action": "add", "kind": "said", "level": "info",
+                          "text": releasefiles.complete_words(registry.label(project), tag, files, draft)})
+
+
+releasefiles.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json, said_fn=_release_complete)
 
 
 def _release_made(project, tag):
@@ -10971,7 +10983,8 @@ class Handler(BaseHTTPRequestHandler):
                                             "the Artifacts view"}, 403)
             comp = field(req, "component") or ""
             plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True,
-                                        pre=field(req, "pre") or "")
+                                        pre=field(req, "pre") or "", env=projects._git_env(),
+                                        may_push=projects.may_push(name))
             if plan.get("error"):
                 return self._json(plan, 400)
             dev = plan["dev"]

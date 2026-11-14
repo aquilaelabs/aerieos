@@ -1606,7 +1606,9 @@ print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).tri
         const asked = await rel({});
         const ownerAsks = await (await bare('/api/phone', { headers: ownerAuth })).json();
         const ask = (ownerAsks.asks || []).find(a => a.id === asked.body.id);
-        ok(/has no version/.test(noVersion.body.error || '') && /uncommitted changes/.test(dirtyAsked.body.error || '')
+        // A VERSION file written and not committed is no version of the
+        // commit, which is what a release reads (R206 step 4).
+        ok(/has no version/.test(noVersion.body.error || '') && /has no version/.test(dirtyAsked.body.error || '')
            && asked.status === 200 && ask && ask.kind === 'release'
            && ask.tag === 'v1.2.3' && ask.sha === sha && !gitR('tag', '--list', 'v1.2.3'),
            `a session's aerie version release is refused before anybody is asked when it could not happen, then waits on the space's owner naming the tag and its commit, and tags nothing until then (${ask?.tag} on ${ask?.sha}; ${noVersion.body.error || ''} | ${dirtyAsked.body.error || ''} | ${asked.body.error || ''})`);
