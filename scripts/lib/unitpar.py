@@ -10,6 +10,13 @@ each, all at once. The output is each failing bucket's own, then one
 summary in unittest's words, which is what a reader of the tier's tail
 already reads.
 
+A module that fails in the whole run is run once more, alone, in a process
+of its own; one that passes then is said as flaky and does not fail the
+tier, as a browser suite that passes alone does not (the operator, 14 Nov).
+The tier gates every release's tag, and a module can fail for the company
+it kept: the modules of a bucket share a process, so what one leaves set is
+there for the next, and a test bound to a clock loses to sixteen at once.
+
     unitpar.py DIR TIMES [WORKERS]
     unitpar.py --bucket DIR MODULE...     (one bucket, run by the first form)
 """
@@ -59,7 +66,7 @@ def bucket(d, mods):
     line as JSON, what failed above it in unittest's words."""
     os.chdir(d)
     sys.path.insert(0, d)
-    report = {"ran": 0, "failures": 0, "errors": 0, "skipped": 0, "times": {}}
+    report = {"ran": 0, "failures": 0, "errors": 0, "skipped": 0, "times": {}, "failed": {}}
     for m in mods:
         t0 = time.time()
         buf = io.StringIO()
@@ -68,6 +75,7 @@ def bucket(d, mods):
         except Exception as e:                                # noqa: BLE001 (an import that fails is a failure)
             print(f"ERROR: {m} did not load: {type(e).__name__}: {e}")
             report["errors"] += 1
+            report["failed"][m] = [0, 1]
             continue
         r = unittest.TextTestRunner(stream=buf, verbosity=0).run(suite)
         report["times"][m] = round(time.time() - t0, 2)
@@ -76,6 +84,7 @@ def bucket(d, mods):
         report["errors"] += len(r.errors)
         report["skipped"] += len(r.skipped)
         if not r.wasSuccessful():
+            report["failed"][m] = [len(r.failures), len(r.errors)]
             sys.stdout.write(buf.getvalue().split("\n" + "-" * 70 + "\nRan ")[0] + "\n")
     print(json.dumps(report))
     return 0
@@ -101,6 +110,7 @@ def main(argv):
     ran = failures = errors = skipped = 0
     broke = False
     new_times = {}
+    failed = {}
     for p in procs:
         out, _ = p.communicate()
         lines = out.rstrip("\n").split("\n")
@@ -116,6 +126,33 @@ def main(argv):
         errors += rep.get("errors", 0)
         skipped += rep.get("skipped", 0)
         new_times.update(rep.get("times") or {})
+        failed.update(rep.get("failed") or {})
+    # Once more, alone, for each module that failed: in a process of its own,
+    # one at a time, with the machine to itself. What it says then is its
+    # result; what it said in company is above, for whoever reads why.
+    flaky = []
+    for m in sorted(failed):
+        was = failed[m]
+        print(f"== {m} failed in the whole run: once more, alone")
+        sys.stdout.flush()
+        try:
+            out = subprocess.run([sys.executable, os.path.abspath(__file__), "--bucket", d, m],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False).stdout
+            lines = out.rstrip("\n").split("\n")
+            rep = json.loads(lines[-1])
+        except (OSError, ValueError, IndexError):
+            continue
+        failures -= was[0]
+        errors -= was[1]
+        failures += rep.get("failures", 0)
+        errors += rep.get("errors", 0)
+        if rep.get("failures") or rep.get("errors"):
+            if "\n".join(lines[:-1]).strip():
+                sys.stdout.write("\n".join(lines[:-1]) + "\n")
+        else:
+            flaky.append(m)
+    if flaky:
+        print(f"flaky: {', '.join(flaky)} failed in the whole run and passed again alone")
     try:
         os.makedirs(os.path.dirname(tpath) or ".", exist_ok=True)
         with open(tpath + ".new", "w") as f:
