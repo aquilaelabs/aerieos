@@ -846,7 +846,12 @@ sleep 60
           mkdirSync(join(sdk, 'gemini', 'bin'), { recursive: true });
           writeFileSync(join(sdk, 'gemini', 'bin', 'agy'), readFileSync(join(bin, 'agy')), { mode: 0o755 });
           rmSync(join(bin, 'agy'));
-          const env = { BB_TOOLPACKS_JSON: packs, SDK_ROOT: sdk, PATH: `${bin}:${join(sdk, 'gemini', 'bin')}:${process.env.PATH}` };
+          // The machine's own copy of the program stays out of it: a CI
+          // runner's PATH holds every pack its node has, this one's among
+          // them, outside the store this test names, and the session
+          // started from there (the rehearsal of 14 Nov).
+          const rest = (process.env.PATH || '').split(':').filter(d => d && !existsSync(join(d, 'agy'))).join(':');
+          const env = { BB_TOOLPACKS_JSON: packs, SDK_ROOT: sdk, PATH: `${bin}:${join(sdk, 'gemini', 'bin')}:${rest}` };
           const offSaid = shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, { ...env, FAKE_TC_OFF: 'gemini' });
           ok(/Gemini is switched off for/.test(offSaid) && /settings, Toolchains/.test(offSaid) && !/not installed/.test(offSaid) && !alive(`gemini-${proj}`),
              `a pack's agent whose pack is off for the space is refused in those words, never as not installed (${
